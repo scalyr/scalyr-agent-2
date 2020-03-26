@@ -82,7 +82,6 @@ class AgentImageBuilder(object):
         return type(self).COPY_AGENT_SOURCE
 
     @classmethod
-    @abstractmethod
     def get_dockerfile_content(cls):  # type: () -> six.text_type
         """
         Get the content of the Dockerfile.

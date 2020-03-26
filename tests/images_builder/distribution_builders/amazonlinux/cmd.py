@@ -16,14 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.utils.compat import Path
-from tests.distribution_builders.base import BaseDistributionBuilder
-
-
-class CentOSBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-centos"
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
-
+from tests.images_builder.distribution_builders.amazonlinux import AmazonlinuxBuilder
 
 if __name__ == "__main__":
-    CentOSBuilder.handle_command_line()
+    AmazonlinuxBuilder.handle_command_line()

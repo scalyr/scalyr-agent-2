@@ -22,8 +22,8 @@ from tests.smoke_tests.common import _test_standalone_smoke
 from tests.utils.agent_runner import PACKAGE_INSTALL
 
 from tests.utils.dockerized import dockerized_case
-from tests.distribution_builders.amazonlinux import AmazonlinuxBuilder
-from tests.distribution_builders.ubuntu import UbuntuBuilder
+from tests.images_builder.distribution_builders.amazonlinux import AmazonlinuxBuilder
+from tests.images_builder.distribution_builders import UbuntuBuilder
 from tests.common import install_rpm, install_deb
 
 

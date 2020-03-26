@@ -18,7 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import pytest
 
-from tests.distribution_builders.centos import CentOSBuilder
+from tests.images_builder.distribution_builders import CentOSBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (

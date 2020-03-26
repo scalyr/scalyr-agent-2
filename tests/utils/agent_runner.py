@@ -61,7 +61,9 @@ class AgentRunner(object):
        Agent runner provides ability to launch Scalyr agent with needed configuration settings.
        """
 
-    def __init__(self, installation_type=DEV_INSTALL):  # type: (int) -> None
+    def __init__(
+        self, installation_type=DEV_INSTALL, python_version="python2"
+    ):  # type: (int) -> None
 
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
@@ -83,6 +85,8 @@ class AgentRunner(object):
         # This is useful when agent was installed from package,
         # and agent runner needs to know it where files are located.
         self._installation_type = installation_type
+
+        self._python_version = python_version
 
         self._init_agent_paths()
 
@@ -156,6 +160,8 @@ class AgentRunner(object):
         self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
     def start(self):
+
+        self.stop()
         # important to call this function before agent was started.
         self._create_agent_files()
 
@@ -167,7 +173,9 @@ class AgentRunner(object):
             )
         else:
             self._agent_process = subprocess.Popen(
-                "python {0} --no-fork --no-change-user start".format(_AGENT_MAIN_PATH),
+                "{0} {1} --no-fork --no-change-user start".format(
+                    self._python_version, _AGENT_MAIN_PATH
+                ),
                 shell=True,
             )
 
@@ -183,7 +191,8 @@ class AgentRunner(object):
 
         else:
             output = subprocess.check_output(
-                "python {0} status -v".format(_AGENT_MAIN_PATH), shell=True
+                "{0} {1} status -v".format(self._python_version, _AGENT_MAIN_PATH),
+                shell=True,
             )
             return output
 
@@ -197,7 +206,9 @@ class AgentRunner(object):
 
         else:
             result = subprocess.check_call(
-                "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
+                "{0} {1} status -v --format=json".format(
+                    self._python_version, _AGENT_MAIN_PATH
+                ),
                 shell=True,
             )
             return result
@@ -222,7 +233,8 @@ class AgentRunner(object):
 
         else:
             self._agent_process = subprocess.Popen(
-                "python {0} stop".format(_AGENT_MAIN_PATH), shell=True
+                "{0} {1} stop".format(self._python_version, _AGENT_MAIN_PATH),
+                shell=True,
             )
         print("Agent stopped.")
 
@@ -242,6 +254,7 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
+            "monitors": list(),
         }
 
     @staticmethod

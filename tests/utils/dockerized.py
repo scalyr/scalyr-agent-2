@@ -12,7 +12,7 @@ from tests.utils.compat import Path
 from scalyr_agent import compat
 
 
-def dockerized_case(builder_cls, file_path):
+def dockerized_case(builder_cls, file_path, second_exec=False):
     """Decorator that makes decorated test case run inside docker container."""
 
     def dockerized_real(f):
@@ -34,21 +34,35 @@ def dockerized_case(builder_cls, file_path):
 
             builder.build(image_cache_path=use_cache_path)
 
-            docker_client = docker.from_env()
+            docker_client = docker.from_env(timeout=300)
 
-            container = docker_client.containers.run(
-                builder.image_tag,
-                detach=True,
-                command=command,
-                stdout=True,
-                stderr=True,
-                environment=compat.os_environ_unicode.copy(),
-            )
+            if second_exec:
+                container = docker_client.containers.run(
+                    builder.image_tag,
+                    detach=True,
+                    stdout=True,
+                    stderr=True,
+                    environment=compat.os_environ_unicode.copy(),
+                )
+                output_object = container.exec_run(command,)
+                stream = output_object.output
+                print(stream)
+                exit_code = output_object.exit_code
+                container.stop()
+            else:
+                container = docker_client.containers.run(
+                    builder.image_tag,
+                    detach=True,
+                    command=command,
+                    stdout=True,
+                    stderr=True,
+                    environment=compat.os_environ_unicode.copy(),
+                )
 
-            exit_code = container.wait()["StatusCode"]
+                exit_code = container.wait()["StatusCode"]
 
-            logs = container.logs(follow=True)
-            print(logs)
+                logs = container.logs(follow=True)
+                print(logs)
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)

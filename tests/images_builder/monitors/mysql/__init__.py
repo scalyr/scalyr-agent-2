@@ -17,13 +17,16 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from tests.utils.compat import Path
-from tests.distribution_builders.base import BaseDistributionBuilder
+from tests.utils.image_builder import AgentImageBuilder
+from tests.images_builder.monitors.base import BaseMonitorBuilder
 
 
-class UbuntuBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-ubuntu"
+class MySqlBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-mysql"
+    COPY_AGENT_SOURCE = True
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
-
-if __name__ == "__main__":
-    UbuntuBuilder.handle_command_line()
+    def build(self, image_cache_path=None):
+        base_builder = BaseMonitorBuilder()
+        base_builder.build(image_cache_path=image_cache_path)
+        super(MySqlBuilder, self).build(image_cache_path=image_cache_path)
