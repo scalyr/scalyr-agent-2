@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.1 "Millenium Falcon" - Mar 15, 2020
+## 2.1.1 "Millenium Falcon" - TBD
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 15, 2020 10:30 -0800
@@ -14,7 +14,7 @@ Features
 * Agent now supports Python 2.6, 2.7 and >= 3.5
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
 * RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
-* Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Added option to `scalyr-agent-2 status -v` to emit JSON (``--format=[text|json]``).
 * Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
 * Add support for ``orjson`` JSON library when running under Python 3. This library offers significantly better performance and can be enabled by setting ``json_library`` config option to ``orjson`` and installing ``orjson`` Python package using pip.
 
@@ -32,7 +32,7 @@ Minor updates
 * Docker support now requires the docker 4.1 client library
 * Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
 * When running in foreground mode (``--no-fork`` flag), SIGINT signal (aka CTRL+C) now starts the graceful shutdown procedure.
-* Two new metrics (``app.io.wait``, ``app.mem.majfalt``) are now emitted by the Linux process monitor. If you want those metrics to be excluded for your monitors, you can utilize new ``metric_name_blacklist`` monitor config option.
+* Two new metrics (``app.io.wait``, ``app.mem.majflt``) are now emitted by the Linux process monitor. If you want those metrics to be excluded for your monitors, you can utilize new ``metric_name_blacklist`` monitor config option.
 
 Testing updates
 * Numerous changes to improve testing and coverage reporting
