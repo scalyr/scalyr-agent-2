@@ -1382,6 +1382,13 @@ if __name__ == "__main__":
     controller = PlatformController.new_platform()
     default_paths = controller.default_paths
 
+    # NOTE: This piece of code should be at the top before we parse the config since the script
+    # runs as part of postinstall step when the api key won't be set yet.
+    if options.set_python is not None:
+        set_python_version(options.set_python)
+        print("Agent switched to {0}.".format(options.set_python))
+        sys.exit(0)
+
     if options.config_filename is None:
         options.config_filename = default_paths.config_file_path
 
@@ -1489,11 +1496,6 @@ if __name__ == "__main__":
             # actions to perform the upgrade.  Currently, we do not do anything, but we need this here in case we ever
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
-
-    if options.set_python is not None:
-        set_python_version(options.set_python)
-        print("Agent switched to {0}.".format(options.set_python))
-        sys.exit(0)
 
     if "win32" == sys.platform and options.upgrade_windows:
         sys.exit(
