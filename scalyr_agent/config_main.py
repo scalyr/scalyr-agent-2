@@ -1383,7 +1383,8 @@ if __name__ == "__main__":
     default_paths = controller.default_paths
 
     # NOTE: This piece of code should be at the top before we parse the config since the script
-    # runs as part of postinstall step when the api key won't be set yet.
+    # can run as part of postinstall step when the config is not present yet. And in general, that
+    # operation should be standalone without any reliance on the agent config.
     if options.set_python is not None:
         set_python_version(options.set_python)
         print("Agent switched to {0}.".format(options.set_python))

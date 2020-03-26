@@ -19,6 +19,7 @@ import os
 import time
 import json
 import shutil
+from io import open
 
 from scalyr_agent import compat
 
@@ -159,6 +160,20 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
     assert shebang_line_main == "#!/usr/bin/env python2"
     assert shebang_line_config == "#!/usr/bin/env python2"
+
+    # Write a config with invalid config, this way we ensure config is indeed not parsed by that
+    # command even if it's present
+    mock_config = {"api_key": "", "scalr_server": "agent.scalyr.com"}
+    with open(agent_config_path, "w") as fp:
+        fp.write(json.dumps(mock_config))
+
+    # Switch to python3
+    runner.switch_version("python3", env=env)
+
+    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+    assert shebang_line_main == "#!/usr/bin/env python3"
+    assert shebang_line_config == "#!/usr/bin/env python3"
 
 
 def common_test_python3_upgrade(install_package_fn, install_next_version_fn):
