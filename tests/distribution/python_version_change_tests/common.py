@@ -32,10 +32,11 @@ from tests.utils.compat import Path
 from tests.utils.common import get_shebang_from_file
 from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
 from tests.common import PackageInstallationError
-from tests.common import install_rpm, remove_rpm
 from tests.common import install_deb, remove_deb
 
 SCALYR_PACKAGE_BIN_PATH = Path("/", "usr", "share", "scalyr-agent-2", "bin")
+
+# NOTE: Binary dir path is different across distros that's why we use which to locate it
 BINARY_DIR_PATH = Path("/", "usr", "bin")
 
 
@@ -100,7 +101,7 @@ def _mock_python_binary_version(python_binary_name, version):
     if not binary_path.exists():
         return
 
-    # make backup of the original binary in case if we want to keep useing it.
+    # make backup of the original binary in case if we want to keep using it.
     shutil.copy(six.text_type(binary_path), six.text_type(binary_path_backup_path))
     os.remove(six.text_type(binary_path))
 
@@ -116,45 +117,6 @@ def _mock_binaries(python, python2, python3):
     _mock_python_binary_version("python", python)
     _mock_python_binary_version("python2", python2)
     _mock_python_binary_version("python3", python3)
-
-
-def common_test_centos_versions():
-    runner = AgentRunner(PACKAGE_INSTALL)
-    common_version_test(
-        runner,
-        install_rpm,
-        remove_rpm,
-        None,
-        "2.5.1",
-        "2.5.1",
-        "3.4.1",
-        install_fails=True,
-    )
-    common_version_test(
-        runner,
-        install_rpm,
-        remove_rpm,
-        "config_main.py",
-        "",
-        "2.5.1",
-        "3.4.1",
-        install_fails=True,
-    )
-    common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", "3.4.1"
-    )
-    common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py3.py", "2.5.1", "2.5.1", ""
-    )
-    common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "", "", ""
-    )
-    common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", ""
-    )
-    common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py3.py", "", "2.5.1", ""
-    )
 
 
 def common_test_ubuntu_versions():
@@ -218,7 +180,9 @@ def common_version_test(
     else:
         stdout, _ = install_package_fn()
 
-    assert _get_current_config_script_name() == expected_conf_file_name
+    current_config_script_file_name = _get_current_config_script_name()
+
+    assert current_config_script_file_name == expected_conf_file_name
 
     _mock_binaries("", "", "")
 

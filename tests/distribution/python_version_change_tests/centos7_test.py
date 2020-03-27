@@ -22,7 +22,6 @@ from tests.distribution_builders.centos7_with_py3 import CentOSBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
-    common_test_centos_versions,
     common_test_switch_command_works_without_agent_config,
     common_test_python2,
     common_test_python3,
@@ -32,14 +31,40 @@ from tests.distribution.python_version_change_tests.common import (
     common_test_switch_default_to_python2,
     common_test_switch_default_to_python3,
     common_test_switch_python2_to_python3,
+    common_version_test,
 )
-from tests.common import install_rpm, install_next_version_rpm
+from tests.common import install_rpm, install_next_version_rpm, remove_rpm
+from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__)
 def test_centos_test_versions(request):
-    common_test_centos_versions()
+    runner = AgentRunner(PACKAGE_INSTALL)
+    common_version_test(
+        runner,
+        install_rpm,
+        remove_rpm,
+        None,
+        "2.5.1",
+        "2.5.1",
+        "3.4.1",
+        install_fails=True,
+    )
+
+    common_version_test(
+        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", "3.4.1"
+    )
+    common_version_test(
+        runner, install_rpm, remove_rpm, "config_main_py3.py", "2.5.1", "2.5.1", ""
+    )
+    common_version_test(runner, install_rpm, remove_rpm, "config_main.py", "", "", "")
+    common_version_test(
+        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", ""
+    )
+    common_version_test(
+        runner, install_rpm, remove_rpm, "config_main.py", "", "2.5.1", ""
+    )
 
 
 @pytest.mark.usefixtures("agent_environment")
