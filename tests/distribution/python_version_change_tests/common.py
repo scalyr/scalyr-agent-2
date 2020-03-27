@@ -70,12 +70,18 @@ def _link_to_default_python(command):
     :return:
     """
     python_path = six.text_type(BINARY_DIR_PATH / "python")
+    real_executable_path = os.readlink(six.text_type(BINARY_DIR_PATH / command))
+
+    if real_executable_path == "python":
+        # On some distros link is reverse (python -> python2) so we need to handle that scenario as
+        # well
+        return
+
     try:
         os.remove(python_path)
     except:
         pass
 
-    real_executable_path = os.readlink(six.text_type(BINARY_DIR_PATH / command))
     os.symlink(six.text_type(BINARY_DIR_PATH / real_executable_path), python_path)
 
 
@@ -218,10 +224,14 @@ def common_test_only_python_mapped_to_python2(
     Test package installation on the machine with python2 but there is only 'python' command which is mapped on to it.
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
+    real_executable_path = os.readlink(six.text_type(BINARY_DIR_PATH / "python2"))
 
     # map 'python' command on to python2
     _link_to_default_python("python2")
-    _remove_python("python2")
+    if real_executable_path != "python":
+        # On some older distros python2 is mapped to python and not vice-versa so we only remove
+        # that binary if that is not the case
+        _remove_python("python2")
     _remove_python("python3")
 
     stdout, _ = install_package_fn()
