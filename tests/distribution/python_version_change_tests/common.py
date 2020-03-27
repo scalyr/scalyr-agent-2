@@ -443,11 +443,11 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     scalyr_agent_2_target = os.path.join(binary_path, "scalyr-agent-2")
     scalyr_agent_2_config_target = os.path.join(binary_path, "scalyr-agent-2-config")
 
-    # Default should be python2
+    # Default should be python binary
     shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
     shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
-    assert shebang_line_main == "#!/usr/bin/env python2"
-    assert shebang_line_config == "#!/usr/bin/env python2"
+    assert shebang_line_main == "#!/usr/bin/env python"
+    assert shebang_line_config == "#!/usr/bin/env python"
 
     # Switch to python3
     runner.switch_version("python3", env=env)
@@ -464,6 +464,14 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
     assert shebang_line_main == "#!/usr/bin/env python2"
     assert shebang_line_config == "#!/usr/bin/env python2"
+
+    # Switch back to python (aka default)
+    runner.switch_version("python", env=env)
+
+    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+    assert shebang_line_main == "#!/usr/bin/env python"
+    assert shebang_line_config == "#!/usr/bin/env python"
 
     # Write a config with invalid config, this way we ensure config is indeed not parsed by that
     # command even if it's present
