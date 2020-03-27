@@ -446,8 +446,23 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     # Default should be python binary
     shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
     shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
-    assert shebang_line_main == "#!/usr/bin/env python"
-    assert shebang_line_config == "#!/usr/bin/env python"
+
+    # On some newer distros python binary is not available
+    if shutil.which("python"):
+        is_python_binary_available = True
+        expected = "#!/usr/bin/env python"
+    else:
+        is_python_binary_available = False
+        expected = "#!/usr/bin/env python2"
+
+    assert shebang_line_main == expected, "expected %s, got %s" % (
+        expected,
+        shebang_line_main,
+    )
+    assert shebang_line_config == expected, "expected %s, got %s" % (
+        expected,
+        shebang_line_config,
+    )
 
     # Switch to python3
     runner.switch_version("python3", env=env)
@@ -466,12 +481,13 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     assert shebang_line_config == "#!/usr/bin/env python2"
 
     # Switch back to python (aka default)
-    runner.switch_version("python", env=env)
+    if is_python_binary_available:
+        runner.switch_version("python", env=env)
 
-    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
-    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
-    assert shebang_line_main == "#!/usr/bin/env python"
-    assert shebang_line_config == "#!/usr/bin/env python"
+        shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+        shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+        assert shebang_line_main == "#!/usr/bin/env python"
+        assert shebang_line_config == "#!/usr/bin/env python"
 
     # Write a config with invalid config, this way we ensure config is indeed not parsed by that
     # command even if it's present
