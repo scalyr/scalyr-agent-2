@@ -202,16 +202,29 @@ class AgentRunner(object):
             )
             return result
 
-    def switch_version(self, version):
+    def switch_version(self, version, env=None):
+        # type: (str, Optional[dict]) -> None
+        """
+        :param version: Python version to switch the agent to.
+        :param env: Environment to use with this command.
+        :param clean_env: True to perform the switch in a clean environment without the agent config
+                          being present and any SCALYR_ environment variables being set.
+        """
+        if env:
+            kwargs = {"env": env}
+        else:
+            kwargs = {}
         if self._installation_type == PACKAGE_INSTALL:
             subprocess.check_call(
                 "/usr/sbin/scalyr-agent-2-config --set-python {0}".format(version),
                 shell=True,
+                **kwargs  # type: ignore
             )
         else:
             subprocess.check_call(
                 "python {0} --set-python {1}".format(_CONFIG_MAIN_PATH, version),
                 shell=True,
+                **kwargs  # type: ignore
             )
 
     def stop(self):

@@ -8,6 +8,7 @@ from scalyr_agent import compat
 from tests.utils.compat import Path
 
 import six
+from io import open
 
 TEMP_PREFIX = "scalyr-test-"
 
@@ -30,3 +31,14 @@ def create_tmp_file(suffix=""):
     tmp_file = tempfile.NamedTemporaryFile(prefix=TEMP_PREFIX, suffix="-" + suffix)
     tmp_file.close()
     return Path(tmp_file.name)
+
+
+def get_shebang_from_file(file_path):
+    # type: (six.text_type) -> six.text_type
+    """
+    Return shebang (first line) from a specific file path.
+    """
+    with open(file_path, "r") as fp:
+        shebang_line = fp.readline().strip()
+
+    return shebang_line

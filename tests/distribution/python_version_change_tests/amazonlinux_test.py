@@ -22,6 +22,7 @@ from tests.distribution_builders.amazonlinux import AmazonlinuxBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
+    common_test_switch_command_works_without_agent_config,
     common_test_python2,
     common_test_python3,
     common_test_only_python_mapped_to_python2,
@@ -67,6 +68,12 @@ def test_amazonlinux_test_versions(request):
     common_version_test(
         runner, install_rpm, remove_rpm, "config_main.py", "", "2.5.1", ""
     )
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(AmazonlinuxBuilder, __file__)
+def test_amazonlinux_switch_command_works_without_agent_config(request):
+    common_test_switch_command_works_without_agent_config(install_rpm)
 
 
 @pytest.mark.usefixtures("agent_environment")

@@ -22,6 +22,7 @@ from tests.distribution_builders.ubuntu import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
+    common_test_switch_command_works_without_agent_config,
     common_test_python2,
     common_test_python3,
     common_test_only_python_mapped_to_python2,
@@ -79,6 +80,12 @@ def test_ubuntu_no_python(request):
 @dockerized_case(UbuntuBuilder, __file__)
 def test_ubuntu_only_python_mapped_to_python2(request):
     common_test_only_python_mapped_to_python2(install_deb, install_next_version_deb)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(UbuntuBuilder, __file__)
+def test_deb_switch_command_works_without_agent_config(request):
+    common_test_switch_command_works_without_agent_config(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
