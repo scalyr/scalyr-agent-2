@@ -193,14 +193,14 @@ class AgentRunner(object):
                 "/usr/sbin/scalyr-agent-2 status -v --format=json", shell=True
             )
 
-            return result
-
         else:
             result = subprocess.check_call(
                 "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
                 shell=True,
             )
-            return result
+
+        result = six.ensure_text(result)
+        return result
 
     def switch_version(self, version, env=None):
         # type: (str, Optional[dict]) -> None
