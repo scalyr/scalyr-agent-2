@@ -43,7 +43,7 @@ is_python_valid() {
 
 # Return success if the current symlinks point to a valid Python interpreter (2.6, 2.7, or >= 3.5)
 is_current_python_valid() {
-  run_and_check_persion_version "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --report-python-version" 2>&1 > /dev/null
+  run_and_check_persion_version "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --report-python-version" > /dev/null 2>&1;
 }
 
 check_python_version() {
