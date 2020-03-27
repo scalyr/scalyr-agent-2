@@ -86,9 +86,6 @@ def _run_command(cmd, shell=True, env=None):
     stdout = process.stdout.read().decode("utf-8".strip())
     stderr = process.stderr.read().decode("utf-8").strip()
 
-    if exit_code != 0:
-        raise PackageInstallationError(stderr=stderr, stdout=stdout)
-
     print("Command finished")
     print("exit code: %s" % (exit_code))
     print("stdout: %s" % (stdout))
