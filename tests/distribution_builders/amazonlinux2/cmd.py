@@ -16,14 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.utils.compat import Path
-from tests.distribution_builders.base import BaseDistributionBuilder
-
-
-class UbuntuBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-ubuntu1804"
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
-
+from tests.distribution_builders.amazonlinux2 import AmazonlinuxBuilder
 
 if __name__ == "__main__":
-    UbuntuBuilder.handle_command_line()
+    AmazonlinuxBuilder.handle_command_line()

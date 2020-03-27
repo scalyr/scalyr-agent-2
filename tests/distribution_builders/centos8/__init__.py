@@ -21,7 +21,7 @@ from tests.distribution_builders.base import BaseDistributionBuilder
 
 
 class CentOSBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-centos"
+    IMAGE_TAG = "scalyr-agent-testings-centos8"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
 

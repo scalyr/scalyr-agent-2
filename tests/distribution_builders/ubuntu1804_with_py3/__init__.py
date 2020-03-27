@@ -21,7 +21,7 @@ from tests.distribution_builders.base import BaseDistributionBuilder
 
 
 class UbuntuBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-ubuntu1804"
+    IMAGE_TAG = "scalyr-agent-testings-ubuntu1804-with-py3"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
 

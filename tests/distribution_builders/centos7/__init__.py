@@ -20,10 +20,10 @@ from tests.utils.compat import Path
 from tests.distribution_builders.base import BaseDistributionBuilder
 
 
-class UbuntuBuilder(BaseDistributionBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-ubuntu1804"
+class CentOSBuilder(BaseDistributionBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-centos7"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
 
 if __name__ == "__main__":
-    UbuntuBuilder.handle_command_line()
+    CentOSBuilder.handle_command_line()
