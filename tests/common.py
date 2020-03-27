@@ -16,6 +16,11 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+if False:
+    from typing import Optional
+    from typing import Union
+    from typing import Tuple
+
 import subprocess
 
 import six
@@ -30,20 +35,10 @@ class PackageInstallationError(Exception):
 
 
 def _install_rpm(file_path, upgrade=False):
-    process = subprocess.Popen(
-        "rpm -{0} {1}".format("U" if upgrade else "i", file_path),
-        shell=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    cmd = "rpm -{0} {1}".format("U" if upgrade else "i", file_path)
+    exit_code, stdout, stderr = _run_command(cmd, shell=True)
 
-    process.wait()
-
-    stdout = process.stdout.read().decode("utf-8")
-    stderr = process.stderr.read().decode("utf-8")
-
-    if process.returncode != 0:
+    if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
 
     return stdout, stderr
@@ -56,8 +51,29 @@ def _install_deb(file_path):
         "DEBIAN_FRONTEND": "noninteractive",
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     }
+    cmd = "apt install -y -f {0}".format(file_path)
+    exit_code, stdout, stderr = _run_command(cmd, shell=True, env=env)
+
+    if exit_code != 0:
+        raise PackageInstallationError(stderr=stderr, stdout=stdout)
+
+    return stdout, stderr
+
+
+def _run_command(cmd, shell=True, env=None):
+    # type: (Union[str,list], bool, Optional[dict]) -> Tuple[int, str, str]
+    env = env or {}
+
+    if isinstance(cmd, (list, tuple)):
+        command_string = " ".join(cmd)
+    else:
+        command_string = cmd
+
+    print("--------------------------------------")
+    print("Running command: %s" % (command_string))
+
     process = subprocess.Popen(
-        "apt install -y -f {0}".format(file_path),
+        cmd,
         shell=True,
         stdin=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -66,13 +82,20 @@ def _install_deb(file_path):
     )
     process.wait()
 
-    stdout = process.stdout.read().decode("utf-8")
-    stderr = process.stderr.read().decode("utf-8")
+    exit_code = process.returncode
+    stdout = process.stdout.read().decode("utf-8".strip())
+    stderr = process.stderr.read().decode("utf-8").strip()
 
-    if process.returncode != 0:
+    if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
 
-    return stdout, stderr
+    print("Command finished")
+    print("exit code: %s" % (exit_code))
+    print("stdout: %s" % (stdout))
+    print("stderr: %s" % (stderr))
+    print("--------------------------------------")
+
+    return exit_code, stdout, stderr
 
 
 def install_rpm():
@@ -98,32 +121,20 @@ def remove_deb():
         "DEBIAN_FRONTEND": "noninteractive",
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     }
-    process = subprocess.Popen(
-        "apt remove -y scalyr-agent-2",
-        shell=True,
-        stdin=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        env=env,
-    )
-    process.wait()
+    cmd = "apt remove -y scalyr-agent-2"
+    exit_code, stdout, stderr = _run_command(cmd, shell=True, env=env)
+
+    if exit_code != 0:
+        raise PackageInstallationError(stderr=stderr, stdout=stdout)
+
+    return stdout, stderr
 
 
 def remove_rpm():
-    process = subprocess.Popen(
-        "rpm -e scalyr-agent-2",
-        shell=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    cmd = "rpm -e scalyr-agent-2"
+    exit_code, stdout, stderr = _run_command(cmd, shell=True)
 
-    process.wait()
-
-    stdout = process.stdout.read()
-    stderr = process.stderr.read()
-
-    if process.returncode != 0:
+    if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
 
     return stdout, stderr
