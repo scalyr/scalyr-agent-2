@@ -21,6 +21,11 @@ Key features:
   * Modular configuration files
   * Extensibility using monitor plugins
 
+## Release Notes and Changelog
+
+For release notes please see [RELEASE_NOTES.md](RELEASE_NOTES.md) document and for changelog,
+see [CHANGELOG.md](CHANGELOG.md) document.
+
 ## Developing
 
 From this repository, you can create your own RPM and Debian packages containing customized versions of
