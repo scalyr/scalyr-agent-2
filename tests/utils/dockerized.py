@@ -63,7 +63,7 @@ def dockerized_case(builder_cls, file_path):
                         stream, _ = container.get_archive(
                             "/var/log/scalyr-agent-2/agent.log"
                         )
-                    except Exception as e:
+                    except docker.errors.NotFound as e:
                         # Not all the test files produce agent.log so we simply ignore the error
                         # if agent log file doesn't exist
                         msg = str(e).lower()
