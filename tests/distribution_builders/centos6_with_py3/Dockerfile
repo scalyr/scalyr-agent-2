@@ -24,6 +24,7 @@ RUN yum install -y python35u python35u-devel python35u-pip
 RUN ln -sf /usr/bin/python3.5 /usr/bin/python3
 
 COPY agent_source/py26-unit-tests-requirements.txt py26-unit-tests-requirements.txt
+COPY agent_source/dev-requirements.txt dev-requirements.txt
 
 RUN pip install -r py26-unit-tests-requirements.txt
 RUN python3 -m pip install -r dev-requirements.txt
