@@ -7,20 +7,10 @@ RUN echo "$(cat /agent_source/VERSION).1" > /agent_source/VERSION
 WORKDIR /second_package
 RUN python /agent_source/build_package.py rpm
 
-FROM centos:6
-
-# Needed for python-pip package
+FROM centos:8
 RUN yum update -y
-RUN yum install -y epel-release
-
-# Needed for python35 package (epel-release only contains 3.4 which we don't support)
-RUN curl 'https://setup.ius.io/' -o setup-ius.sh
-RUN sh setup-ius.sh
-
-RUN yum update -y
-RUN yum install -y initscripts gcc python2 python2-devel python-pip
-RUN yum install -y python35u python35u-devel python35u-pip
-RUN sudo ln -sf /usr/bin/python3.5 /usr/bin/python3
+RUN yum install -y initscripts python2 python3 gcc
+RUN yum install -y python2-devel python2-pip python3-devel python3-pip
 
 COPY agent_source/dev-requirements.txt dev-requirements.txt
 
