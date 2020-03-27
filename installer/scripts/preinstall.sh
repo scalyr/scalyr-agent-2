@@ -21,26 +21,28 @@
 
 echo "Checking Python version." >&2
 
-is_python_valid(){
+is_python_valid() {
   command=$1
   version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
-  # shellcheck disable=SC2072
-  if [[ -z "${version}" ]]; then
+  exit_code=$?
+
+  # shellcheck disable=SC2072,SC2071
+  if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
     return 1
   elif [[ "$version" < "2.6" ]]; then
-    echo "Python ${version} is found but the minimum version for python 2 is 2.6."
+    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
     return 1
   elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
-    echo "Python ${version} is found but the minimum version for python 3 is 3.5."
+    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
     return 1
   else
+    echo "Found suitable python version: ${version}"
     return 0
   fi
 }
 
-
 if ! is_python_valid python && ! is_python_valid python2 && ! is_python_valid python3; then
-  echo -e "\e[31mPython interpreter is not found.\e[0m"
+  echo -e "\e[31mSuitable Python interpreter not found.\e[0m"
   echo "You can install it by running command:"
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
   if [[ -f "/etc/os-release" ]]; then

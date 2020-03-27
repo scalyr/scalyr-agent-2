@@ -17,51 +17,54 @@
 config_source_path=$(readlink /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config)
 config_base_name=$(basename "${config_source_path}")
 
-is_python_valid(){
+is_python_valid() {
   command=$1
   version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
-  # shellcheck disable=SC2072
-  if [[ -z "${version}" ]]; then
+  exit_code=$?
+
+  # shellcheck disable=SC2072,SC2071
+  if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
     return 1
   elif [[ "$version" < "2.6" ]]; then
-    echo "Python ${version} is found but the minimum version for python 2 is 2.6."
+    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
     return 1
   elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
-    echo "Python ${version} is found but the minimum version for python 3 is 3.5."
+    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
     return 1
   else
-    echo "Found1111 ${version}"
     return 0
   fi
 }
 
 
-check_python_version(){
+check_python_version() {
+  # Verify that a suitable Python version is available and set up the agent symlinks
   if is_python_valid python; then
     # 'python' command exists
-    if [[  ${config_base_name} == "config_main.py" ]]; then
+    if [[ ${config_base_name} == "config_main.py" ]]; then
       # there is no python version that was done before.
-      echo "The Scalyr agent will use the default python."
+      echo "The Scalyr agent will use the default system python binary (/usr/bin/env python)."
       /usr/share/scalyr-agent-2/bin/scalyr-switch-python default
       return 0
     fi
   fi
-  echo "The defaut 'python' command is not found, will use python2 binary for running the agent."
-  if is_python_valid python2;  then
 
-    if [[  ${config_base_name} != "config_main_py3.py" ]]; then
+  echo "The defaut 'python' command is not found, will use python2 binary (/usr/bin/env python2) for running the agent."
+  if is_python_valid python2; then
+    if [[ ${config_base_name} != "config_main_py3.py" ]]; then
       # if python version was not switched to python3 use python2
-      if [[  ${config_base_name} == "config_main_py2.py" ]]; then
-        echo "Use python2 version from previous installation."
+      if [[ ${config_base_name} == "config_main_py2.py" ]]; then
+        echo "Using python2 entry point symlink from previous installation."
       fi
       /usr/share/scalyr-agent-2/bin/scalyr-switch-python python2
       return 0
     fi
   fi
-  echo "The 'python2' command is not found, will use python3 binary for running the agent."
+
+  echo "The 'python2' command is not found, will use python3 binary (/usr/bin/env python3) for running the agent."
   if is_python_valid python3; then
-      if [[  ${config_base_name} == "config_main_py3.py" ]]; then
-        echo "Use python3 version from previous installation."
+      if [[ ${config_base_name} == "config_main_py3.py" ]]; then
+        echo "Using python3 entry point symlink from previous installation."
       else
         /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
         return 0
