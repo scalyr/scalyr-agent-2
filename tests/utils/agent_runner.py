@@ -170,8 +170,8 @@ class AgentRunner(object):
                     service_executable
                 )
             else:
-                # service is not available under some older distros
-                cmd = "/etc/init.d/scalyr-agent-2 --no-fork --no-change-user start"
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
 
             self._agent_process = subprocess.Popen(cmd, shell=True)
         else:
@@ -242,8 +242,8 @@ class AgentRunner(object):
             if service_executable:
                 cmd = "%s scalyr-agent-2 stop" % (service_executable)
             else:
-                # service is not available under some older distros
-                cmd = "/etc/init.d/scalyr-agent-2 stop"
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 stop"
 
             result = subprocess.check_call(cmd, shell=True)
 
