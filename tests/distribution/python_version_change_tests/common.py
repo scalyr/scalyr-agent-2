@@ -192,7 +192,8 @@ def common_test_only_python_mapped_to_python2(
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python2
-    assert "The Scalyr agent will use the default system python binary" in stdout
+    # this is signaled by the install script not trying to switch the interpreter
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
@@ -227,7 +228,8 @@ def common_test_only_python_mapped_to_python3(
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python3
-    assert "The Scalyr agent will use the default system python binary" in stdout
+    # this is signaled by the install script not trying to switch the interpreter
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
@@ -325,7 +327,8 @@ def common_test_switch_default_to_python2(install_package_fn, install_next_versi
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python2.
-    assert "The Scalyr agent will use the default system python binary" in stdout
+    # this is signaled by the install script not trying to switch the interpreter
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
 
     assert _get_current_config_script_name() == "config_main.py"
 
@@ -347,7 +350,7 @@ def common_test_switch_default_to_python2(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Using python2 entry point symlink from previous installation" in stdout
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py2.py"
 
@@ -372,7 +375,8 @@ def common_test_switch_default_to_python3(install_package_fn, install_next_versi
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python3.
-    assert "The Scalyr agent will use the default system python binary" in stdout
+    # this is signaled by the install script not trying to switch the interpreter
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
 
     assert _get_current_config_script_name() == "config_main.py"
 
@@ -394,7 +398,7 @@ def common_test_switch_default_to_python3(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Using python3 entry point symlink from previous installation" in stdout
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py3.py"
 
@@ -538,7 +542,7 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Using python3 entry point symlink from previous installation" in stdout
+    assert "Switching the Python interpreter used by the Scalyr Agent" not in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py3.py"
 
