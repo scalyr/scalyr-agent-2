@@ -7,7 +7,7 @@ RUN echo "$(cat /agent_source/VERSION).1" > /agent_source/VERSION
 WORKDIR /second_package
 RUN python /agent_source/build_package.py rpm
 
-FROM centos
+FROM centos:8
 RUN yum update -y
 RUN yum install -y initscripts python2 python3 gcc
 RUN yum install -y python2-devel python2-pip python3-devel python3-pip

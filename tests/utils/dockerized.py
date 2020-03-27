@@ -20,7 +20,7 @@ def dockerized_case(builder_cls, file_path):
         root = Path(__file__).parent.parent.parent
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
-        command = "python3 -u -m pytest {0}::{1} -s --no-dockerize".format(
+        command = "python3 -u -m pytest {0}::{1} -s --color=yes --no-dockerize".format(
             rel_path, f.__name__
         )
 
@@ -48,8 +48,8 @@ def dockerized_case(builder_cls, file_path):
 
             exit_code = container.wait()["StatusCode"]
 
-            logs = container.logs(follow=True)
-            print(six.ensure_text(logs))
+            logs = six.ensure_text(container.logs(follow=True))
+            print(logs)
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)

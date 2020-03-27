@@ -21,35 +21,27 @@
 
 echo "Checking Python version." >&2
 
-current_version2=$(/usr/bin/env python2 --version 2>&1 | grep -o "[0-9].[0-9]")
-current_version3=$(/usr/bin/env python3 --version 2>&1 | grep -o "[0-9].[0-9]")
+is_python_valid() {
+  command=$1
+  version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
+  exit_code=$?
 
-python2_found=false
-python3_found=false
-
-if [[ -n "${current_version2}" ]]; then
-  # shellcheck disable=SC2072
-  if [[ "$current_version2" > "2.5" ]]; then
-    python2_found=true
-    echo "Suitable python interpreter is found: ${current_version2}."
+  # shellcheck disable=SC2072,SC2071
+  if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
+    return 1
+  elif [[ "$version" < "2.6" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
+    return 1
+  elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
+    return 1
   else
-    echo -e "Python interpreter is found, but its version (${current_version2}) less than required (2.6)."
+    return 0
   fi
-fi
+}
 
-if [[ -n "${current_version3}" ]]; then
-  # shellcheck disable=SC2072
-  if [[ "$current_version3" > "3.4" ]]; then
-    python3_found=true
-    echo "Suitable python interpreter is found: ${current_version3}."
-  else
-    echo -e "Python interpreter is found, but its version (${current_version3}) less than required (3.5)."
-#    echo -e "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${current_version2}. Aborting.\e[0m" >&2
-  fi
-fi
-
-if [[ ${python2_found} == false ]] && [[ ${python3_found} == false ]]; then
-  echo -e "\e[31mPython interpreter is not found.\e[0m"
+if ! is_python_valid python && ! is_python_valid python2 && ! is_python_valid python3; then
+  echo -e "\e[31mSuitable Python interpreter not found.\e[0m"
   echo "You can install it by running command:"
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
   if [[ -f "/etc/os-release" ]]; then
@@ -68,7 +60,6 @@ if [[ ${python2_found} == false ]] && [[ ${python3_found} == false ]]; then
   fi
   exit 1
 fi
-
 
 # Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.

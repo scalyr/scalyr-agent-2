@@ -966,8 +966,8 @@ def build_base_files(base_configs="config"):
     # Create symlinks for the two commands
     os.chdir("bin")
 
-    make_soft_link("../py/scalyr_agent/agent_main_py2.py", "scalyr-agent-2")
-    make_soft_link("../py/scalyr_agent/config_main_py2.py", "scalyr-agent-2-config")
+    make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
+    make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
 
     # add switch python version script.
     shutil.copy(
