@@ -1133,6 +1133,7 @@ def create_custom_dockerfile(
     out_tar.close()
 
 
+DEFAULT = ["default", "python"]
 PYTHON2 = "python2"
 PYTHON3 = "python3"
 
@@ -1140,7 +1141,7 @@ PYTHON3 = "python3"
 def set_python_version(version):
     """Switch agent command main files to another version of python"""
     controller = PlatformController.new_platform()
-
+    # this is only for package installation.
     if controller.install_type != PACKAGE_INSTALL:
         raise RuntimeError(
             "This operation can not be performed because the Scalyr agent is not installed with package manager."
@@ -1151,12 +1152,18 @@ def set_python_version(version):
         "/", "usr", "share", "scalyr-agent-2", "py", "scalyr_agent"
     )
 
-    if version == PYTHON3:
-        agent_main_filename = "agent_main_py3.py"
-        config_main_filename = "config_main_py3.py"
-    else:
+    # use on the 'python' command and rely on the python version which it mapped on.
+    if version in DEFAULT:
+        agent_main_filename = "agent_main.py"
+        config_main_filename = "config_main.py"
+    # python 'python2
+    elif version == PYTHON2:
         agent_main_filename = "agent_main_py2.py"
         config_main_filename = "config_main_py2.py"
+    # python 'python3
+    else:
+        agent_main_filename = "agent_main_py3.py"
+        config_main_filename = "config_main_py3.py"
 
     agent_main_source = os.path.join(source_path, agent_main_filename)
     config_main_source = os.path.join(source_path, config_main_filename)
@@ -1172,10 +1179,11 @@ def set_python_version(version):
                 os.remove(target)
                 os.symlink(source, target)
 
+    # recreate symlinks to agent main and config_main.
     make_symlink(agent_main_source, scalyr_agent_2_target)
     make_symlink(config_main_source, scalyr_agent_2_config_target)
 
-    print("Switched agent to python {0}".format(version))
+    print("Switched agent to {0}".format(version))
     print(
         "If you have an existing instance of scalyr-agent-2 process running, "
         "you need to restart it for this change to take an affect.\n"
@@ -1303,7 +1311,7 @@ if __name__ == "__main__":
         "",
         "--set-python",
         dest="set_python",
-        choices=[PYTHON2, PYTHON3],
+        choices=DEFAULT + [PYTHON2, PYTHON3],
         help="Switch current python interpreter. Can be selected from python2 and python3.",
     )
 
@@ -1492,7 +1500,6 @@ if __name__ == "__main__":
 
     if options.set_python is not None:
         set_python_version(options.set_python)
-        print("Agent switched to {0}.".format(options.set_python))
         sys.exit(0)
 
     if "win32" == sys.platform and options.upgrade_windows:
