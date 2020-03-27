@@ -69,8 +69,6 @@ def _install_deb(file_path):
     stdout = process.stdout.read().decode("utf-8")
     stderr = process.stderr.read().decode("utf-8")
 
-    print(stdout)
-
     if process.returncode != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
 
