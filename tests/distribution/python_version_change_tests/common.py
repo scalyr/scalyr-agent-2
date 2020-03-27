@@ -294,31 +294,17 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     Test package installation on machine with python2
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
-    # remove python and python3 to make installer see only python2
-    is_python_binary_symlink = _python_binary_is_symlink()
 
-    if not is_python_binary_symlink:
-        # On some older distros python2 is mapped to python and not vice-versa so we only remove
-        # that binary if that is not the case
-        _remove_python("python")
-
+    _remove_python("python")
     _remove_python("python3")
 
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python2'.
-    if not is_python_binary_symlink:
-        assert (
-            "The default 'python' command not found, will use python2 binary" in stdout
-        )
-    else:
-        assert "The Scalyr agent will use the default system python binary" in stdout
+    assert "The default 'python' command not found, will use python2 binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main_py2.py
-    if not is_python_binary_symlink:
-        assert _get_current_config_script_name() == "config_main_py2.py"
-    else:
-        assert _get_current_config_script_name() == "config_main.py"
+    assert _get_current_config_script_name() == "config_main_py2.py"
 
     runner = AgentRunner(PACKAGE_INSTALL)
     runner.start()
@@ -331,10 +317,7 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     # install next version of the package
     stdout, _ = install_next_version_fn()
     # the source file should be "config_main_py2.py"
-    if not is_python_binary_symlink:
-        assert _get_current_config_script_name() == "config_main_py2.py"
-    else:
-        assert _get_current_config_script_name() == "config_main.py"
+    assert _get_current_config_script_name() == "config_main_py2.py"
 
 
 def common_test_python3(install_package_fn, install_next_version_fn):
@@ -575,17 +558,10 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     Package installer should pick python2 by default and then we switch to the python3.
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
-    is_python_binary_symlink = _python_binary_is_symlink()
-    if not is_python_binary_symlink:
-        # On some older distros python2 is mapped to python and not vice-versa so we only remove
-        # that binary if that is not the case
-        _remove_python("python")
+    _remove_python("python")
 
     install_package_fn()
-    if not is_python_binary_symlink:
-        assert _get_current_config_script_name() == "config_main_py2.py"
-    else:
-        assert _get_current_config_script_name() == "config_main.py"
+    assert _get_current_config_script_name() == "config_main_py2.py"
 
     runner = AgentRunner(PACKAGE_INSTALL)
     runner.start()
@@ -611,10 +587,7 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
 
     # switching bach to python2
     runner.switch_version("python2")
-    if not is_python_binary_symlink:
-        assert _get_current_config_script_name() == "config_main_py2.py"
-    else:
-        assert _get_current_config_script_name() == "config_main.py"
+    assert _get_current_config_script_name() == "config_main_py2.py"
     runner.start()
     time.sleep(1)
     assert _get_python_major_version(runner) == 2
