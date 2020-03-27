@@ -14,15 +14,20 @@
 # ------------------------------------------------------------------------
 #
 # author: Edward Chee <echee@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
 
 import threading
-from mock import patch
+
 from scalyr_agent.util import FakeClock, StoppableThread
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
+
+from mock import patch
+from six.moves import range
 
 
 def always_true():
@@ -224,7 +229,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
                 self._outcome_generator_lock.acquire()
                 try:
-                    outcome = reported_outcome_generator.next()
+                    outcome = next(reported_outcome_generator)
                     rate_limiter.release_token(token, outcome)
                 finally:
                     self._outcome_generator_lock.release()
@@ -248,12 +253,12 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         """
 
         class FakeClockAdvancerThread(StoppableThread):
-            def __init__(self2):
+            def __init__(self2):  # pylint: disable=no-self-argument
                 StoppableThread.__init__(
                     self2, name="FakeClockAdvancerThread", is_daemon=True
                 )
 
-            def run_and_propagate(self2):
+            def run_and_propagate(self2):  # pylint: disable=no-self-argument
                 at_least_one_client_thread_incomplete = True
                 while at_least_one_client_thread_incomplete:
                     # All client threads are likely blocking on the token queue at this point
@@ -360,7 +365,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
                     break
             advancer.stop(wait_on_join=False)
 
-        _case1_test_successes_actual_rate_leads_target_rate()
+        _case1_test_successes_actual_rate_leads_target_rate()  # pylint: disable=no-value-for-parameter
 
         rl = _create_rate_limiter()
 
@@ -408,7 +413,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
                     break
             advancer.stop(wait_on_join=False)
 
-        _case2_test_successes_actual_rate_lags_target_rate()
+        _case2_test_successes_actual_rate_lags_target_rate()  # pylint: disable=no-value-for-parameter
 
         rl = _create_rate_limiter()
 
@@ -456,7 +461,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
                     break
             advancer.stop(wait_on_join=False)
 
-        _case3_test_failures_actual_rate_lags_target_rate()
+        _case3_test_failures_actual_rate_lags_target_rate()  # pylint: disable=no-value-for-parameter
 
         rl = _create_rate_limiter()
 
@@ -502,7 +507,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
                     break
             advancer.stop(wait_on_join=False)
 
-        _case4_test_failures_actual_rate_leads_target_rate()
+        _case4_test_failures_actual_rate_leads_target_rate()  # pylint: disable=no-value-for-parameter
 
     def test_fixed_rate_single_concurrency(self):
         """Longer experiment"""

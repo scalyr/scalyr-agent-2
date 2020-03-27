@@ -15,6 +15,10 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -27,7 +31,11 @@ import atexit
 import resource
 import signal
 import tempfile
+from io import open
 
+import six
+
+from scalyr_agent import scalyr_logging
 from scalyr_agent.platform_controller import (
     PlatformController,
     DefaultPaths,
@@ -36,7 +44,12 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 import scalyr_agent.util as scalyr_util
 
-from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.__scalyr__ import (
+    get_install_root,
+    TARBALL_INSTALL,
+    DEV_INSTALL,
+    PACKAGE_INSTALL,
+)
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -143,10 +156,14 @@ class PosixPlatformController(PlatformController):
             self.__pidfile = os.path.join(
                 self.default_paths.agent_log_path, "agent.pid"
             )
-            print >> sys.stderr, "Assuming pid file is '%s'.  Use --pid-file to override." % self.__pidfile
+            print(
+                "Assuming pid file is '%s'.  Use --pid-file to override."
+                % self.__pidfile,
+                file=sys.stderr,
+            )
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)
-            print >> sys.stderr, "Using pid file '%s'." % self.__pidfile
+            print("Using pid file '%s'." % self.__pidfile, file=sys.stderr)
 
     @property
     def default_paths(self):
@@ -302,13 +319,15 @@ class PosixPlatformController(PlatformController):
                         "%s\n" % status_line
                     )
                     sys.exit(1)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
-        except SystemExit, e:
+        except SystemExit as e:
             raise e
-        except Exception, e:
-            reporter.report_status("forked #1 failed due to generic error: %s" % str(e))
+        except Exception as e:
+            reporter.report_status(
+                "forked #1 failed due to generic error: %s" % six.text_type(e)
+            )
             sys.exit(1)
 
         debug_logger("Second fork")
@@ -322,21 +341,23 @@ class PosixPlatformController(PlatformController):
             # set umask to be consistent with common settings on linux systems.  This makes the standalone agent
             # created-file permissions consistent with that of docker/k8s agents (no write permissions for group and
             # others)
-            os.umask(0022)
+            os.umask(0o022)
 
             # do second fork
             pid = os.fork()
             if pid > 0:
                 # exit from second parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             reporter.report_status("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
-        except SystemExit, e:
+        except SystemExit as e:
             raise e
-        except Exception, e:
-            reporter.report_status("forked #2 failed due to generic error: %s" % str(e))
+        except Exception as e:
+            reporter.report_status(
+                "forked #2 failed due to generic error: %s" % six.text_type(e)
+            )
             sys.exit(1)
 
         debug_logger("Finished forking")
@@ -345,12 +366,16 @@ class PosixPlatformController(PlatformController):
             # redirect standard file descriptors
             sys.stdout.flush()
             sys.stderr.flush()
-            si = file(self.__stdin, "r")
-            so = file(self.__stdout, "a+")
-            se = file(self.__stderr, "a+", 0)
+            si = open(self.__stdin, "r")
+            so = open(self.__stdout, "a+")
+            # 2->TODO io.open does not allow buffering disabling on text files. So open it as binary.
+            se = open(self.__stderr, "ba+", 0)
             os.dup2(si.fileno(), sys.stdin.fileno())
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
+            si.close()
+            so.close()
+            se.close()
 
             # Write out our process id to the pidfile.
             if not self.__write_pidfile(debug_logger=debug_logger, logger=logger):
@@ -360,9 +385,9 @@ class PosixPlatformController(PlatformController):
             reporter.report_status("success")
             logger("Process has been daemonized")
             return True
-        except Exception, e:
+        except Exception as e:
             reporter.report_status(
-                "Finalizing fork failed due to generic error: %s" % str(e)
+                "Finalizing fork failed due to generic error: %s" % six.text_type(e)
             )
             sys.exit(1)
 
@@ -379,7 +404,7 @@ class PosixPlatformController(PlatformController):
             try:
                 # noinspection PyBroadException
                 try:
-                    pf = file("/proc/%d/stat" % pid, "r")
+                    pf = open("/proc/%d/stat" % pid, "r")
                     ppid = int(pf.read().split()[3])
                     if ppid == 0:
                         return None
@@ -506,7 +531,7 @@ class PosixPlatformController(PlatformController):
             "--no-change-user",
         ] + script_arguments
 
-        print >> sys.stderr, ("Running as %s" % user_name)
+        print("Running as %s" % user_name, file=sys.stderr)
         return os.execvp("sudo", arguments)
 
     def is_agent(self):
@@ -575,14 +600,57 @@ class PosixPlatformController(PlatformController):
         """
         self._log_init_debug("Starting agent %s" % scalyr_util.get_pid_tid())
 
-        # noinspection PyUnusedLocal
-        def handle_terminate(signal_num, frame):
-            if self.__termination_handler is not None:
-                self.__termination_handler()
+        # NOTE: Other code calls "_log_init_debug" method which is responsible for buffering the
+        # log lines until the agent initialization phase has finished.
+        # We don't need to do that and can use a regular logger object inside the signal handlers,
+        # because by the time signal handlers are set up and signal handler function is called,
+        # agent and logging initialization process is already completed.
+        logger = scalyr_logging.getLogger("scalyr_agent")
 
         # noinspection PyUnusedLocal
         def handle_interrupt(signal_num, frame):
+            """
+            Signal handler which is invoked on SIGINT signal.
+
+            It takes care of gracefully shutting down the process when running in foreground
+            (non-fork) mode.
+            """
+            logger.debug("Received SIGINT signal")
+
+            if not fork:
+                # When forking is disabled and main process runs in the foreground, we can't CTRL+C
+                # to work as expected and result in the termination handler being started and
+                # process exiting.
+                sys.stderr.write(
+                    "Received CTRL+C, starting termination handler and exiting...\n"
+                )
+                handle_terminate(signal_num, frame)
+                return
+
+        # noinspection PyUnusedLocal
+        def handle_terminate(signal_num, frame):
+            """
+            Signal handler which is invoked on SIGTERM signal.
+
+            It takes care of invoking the agent termination handler function.
+            """
+            logger.debug("Received SIGTERM signal")
+
+            if self.__termination_handler is not None:
+                logger.debug("Invoking termination handler...")
+                self.__termination_handler()
+
+        # noinspection PyUnusedLocal
+        def handle_sigusr1(signal_num, frame):
+            """
+            Signal handler which is invoked on SIGUSR1 signal.
+
+            It takes care of invoking the status handler function.
+            """
+            logger.debug("Received SIGUSR1 signal")
+
             if self.__status_handler is not None:
+                logger.debug("Invoking status handler...")
                 self.__status_handler()
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
@@ -595,14 +663,16 @@ class PosixPlatformController(PlatformController):
             if not self.__write_pidfile():
                 raise AgentAlreadyRunning(
                     "The pidfile %s exists and indicates it is running pid=%s"
-                    % (self.__pidfile, str(self.__read_pidfile()))
+                    % (self.__pidfile, six.text_type(self.__read_pidfile()))
                 )
 
-        # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
-        # get a INT, then we write a status file.. this is what a process will send us when the command
-        # scalyr-agent-2 status -v is invoked.
+        # Register signal handlers for various signals.
+        # On TERM we terminate the process, in USR1 we write a status file and on INT we terminate
+        # the process when running in foreground (non-fork) mode
+        # scalyr-agent-2 status -v uses SIGUSR1 underneath
         original_term = signal.signal(signal.SIGTERM, handle_terminate)
         original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
+        original_usr1 = signal.signal(signal.SIGUSR1, handle_sigusr1)
 
         try:
             self.__is_initializing = False
@@ -616,6 +686,7 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
+            signal.signal(signal.SIGUSR1, original_usr1)
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
@@ -634,7 +705,7 @@ class PosixPlatformController(PlatformController):
             return 0  # not an error in a restart
 
         if not quiet:
-            print "Sending signal to terminate agent."
+            print("Sending signal to terminate agent.")
 
         # Try killing the daemon process
         try:
@@ -646,26 +717,26 @@ class PosixPlatformController(PlatformController):
                 term_attempts -= 1
 
             if not quiet:
-                print "Still waiting for agent to terminate, sending KILL signal."
+                print("Still waiting for agent to terminate, sending KILL signal.")
 
             while 1:
                 os.kill(pid, signal.SIGKILL)
                 PosixPlatformController.__sleep(0.1)
 
-        except OSError, err:
-            err = str(err)
+        except OSError as err:
+            err = six.text_type(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
-                print "Unable to terminate agent."
-                print str(err)
+                print("Unable to terminate agent.")
+                print(six.text_type(err))
                 return 1
 
         if not quiet:
             # Warning, do not change this output.  The config_main.py file looks for this message when
             # upgrading a tarball install to make sure the agent was running.
-            print "Agent has stopped."
+            print("Agent has stopped.")
 
         return 0
 
@@ -684,8 +755,8 @@ class PosixPlatformController(PlatformController):
             return errno.ESRCH
 
         try:
-            os.kill(pid, signal.SIGINT)
-        except OSError, e:
+            os.kill(pid, signal.SIGUSR1)
+        except OSError as e:
             if e.errno == errno.ESRCH or e.errno == errno.EPERM:
                 return e.errno
             raise e
@@ -719,7 +790,7 @@ class PosixPlatformController(PlatformController):
         try:
             time.sleep(seconds)
         except Exception:
-            print "Ignoring exception while sleeping"
+            print("Ignoring exception while sleeping")
 
     def sleep(self, seconds):
         """Sleeps for at most the specified number of seconds while also handling signals.
@@ -826,13 +897,13 @@ class PidfileManager(object):
         try:
             # Read the pidfile
             try:
-                pf = file(self.__pidfile, "r")
+                pf = open(self.__pidfile, "r")
                 raw_contents = pf.read()
             except IOError:
                 self._log("Checked pidfile: does not exist")
                 return None
 
-            if not "\n" in raw_contents:
+            if "\n" not in raw_contents:
                 # This means the write to the pidfile is half-finished, so we just pretend like the file
                 # did not exist.  This means the higher level code will think the agent isn't running, but
                 # that's ok because this can have false negatives (and the agent is just starting, so who's to
@@ -847,15 +918,18 @@ class PidfileManager(object):
                 was_locked = False
                 try:
                     fcntl.flock(pf, fcntl.LOCK_UN)
-                except IOError, e:
-                    self._log_debug("Unexpected error seen releasing lock: %s" % str(e))
-            except IOError, e:
+                except IOError as e:
+                    self._log_debug(
+                        "Unexpected error seen releasing lock: %s" % six.text_type(e)
+                    )
+            except IOError as e:
                 # Triggered if the LOCK_SH call fails, indicating another process holds the lock.
                 if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                     was_locked = True
                 else:
                     self._log_debug(
-                        "Unexpected error seen checking on lock status: %s" % str(e)
+                        "Unexpected error seen checking on lock status: %s"
+                        % six.text_type(e)
                     )
                     was_locked = False
             pf.close()
@@ -889,7 +963,7 @@ class PidfileManager(object):
         # We have a legacy agent pid file.  We see if the process is still alive on the pid in the pidfile.
         try:
             os.kill(pid, 0)
-        except OSError, e:
+        except OSError as e:
             # ESRCH indicates the process is not running, in which case we ignore the pidfile.
             if e.errno == errno.ESRCH:
                 self._log("Checked pidfile: missing+")
@@ -1001,7 +1075,7 @@ class PidfileManager(object):
                 try:
                     self._log_debug("Creating pidfile")
                     fd = os.open(self.__pidfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                except OSError, e:
+                except OSError as e:
                     if e.errno != errno.EEXIST:
                         raise e
 
@@ -1012,7 +1086,7 @@ class PidfileManager(object):
                     # an agent just finished... we pretend like we got a colision and couldn't become the agent.
                     fd = os.open(self.__pidfile, os.O_WRONLY)
                     self._log_debug("Opened pidfile for writing")
-                except OSError, e:
+                except OSError as e:
                     if e.errno == errno.ENOENT:
                         # Someone just deleted the pid file.. an agent is just finishing, so just say we couldn't
                         # acquire the lock.
@@ -1027,7 +1101,7 @@ class PidfileManager(object):
                     # Grab the lock on the file if possible.
                     fp = os.fdopen(fd, "w")
                     fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError, e:
+                except IOError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         # Someone else had the lock.
                         self._log("Acquire pidfile failed-")
@@ -1073,7 +1147,7 @@ class PidfileManager(object):
                 try:
                     fcntl.flock(self.__locked_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._log_debug("Refreshed pidfile lock")
-                except IOError, e:
+                except IOError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         self._log("Write pidfile failed-")
                         return None
@@ -1112,8 +1186,8 @@ class PidfileManager(object):
             os.unlink(self.__pidfile)
             try:
                 fcntl.flock(self.__locked_fd, fcntl.LOCK_UN)
-            except IOError, e:
-                self._log("Unexpected error seen releasing lock: %s" % str(e))
+            except IOError as e:
+                self._log("Unexpected error seen releasing lock: %s" % six.text_type(e))
 
             self.__locked_fd.close()
             self.__locked_fd = None
@@ -1165,12 +1239,14 @@ class StatusReporter(object):
 
         @param message: The text string to send.  For safety's sake, this probably should only include low ascii
             characters.
-        @type message: str
+        @type message: six.text_type
         """
         # We write out the number of bytes in the message followed by the message.  The number of bytes might be
         # different from the message length in the case of higher ascii, but we'll punt on that for now.
-        self.__fp.write("%d\n" % len(message))
-        self.__fp.write("%s" % message)
+        # 2->TODO message needs to be encoded in Python3
+        encoded_message = message.encode("utf-8")
+        self.__fp.write(b"%d\n" % len(encoded_message))
+        self.__fp.write(b"%s" % encoded_message)
         self.__fp.flush()
 
     def read_status(self, timeout=None, timeout_status=None):
@@ -1196,10 +1272,11 @@ class StatusReporter(object):
                 return timeout_status
             self.__fp.seek(0)
             num_bytes = self.__fp.readline()
-            if num_bytes != "":
+            if num_bytes != b"":
                 message = self.__fp.read()
                 if len(message) == int(num_bytes):
-                    return message
+                    # 2->TODO return unicode
+                    return message.decode("utf-8")
             time.sleep(0.20)
 
     @property
@@ -1233,7 +1310,7 @@ def _read_command_line(pid):
     """
     pf = None
     try:
-        pf = file("/proc/%d/cmdline" % pid, "r")
+        pf = open("/proc/%d/cmdline" % pid, "r")
         return pf.read().strip()
     finally:
         if pf is not None:

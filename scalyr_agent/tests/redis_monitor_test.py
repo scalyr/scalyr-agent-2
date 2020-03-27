@@ -14,14 +14,15 @@
 # ------------------------------------------------------------------------
 #
 # author: Imron Alston <imron@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
 
 import time
 import unittest
-from struct import pack
 
-from scalyr_agent.builtin_monitors.redis_monitor import RedisMonitor
 from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
 
 
@@ -39,7 +40,6 @@ class DummyLogger(object):
 
 class RedisHostTestCase(unittest.TestCase):
     def setUp(self):
-        config = {"module": "scalyr_agent.builtin_monitors.syslog_monitor"}
         self.logger = DummyLogger()
         self.host = RedisHost("localhost", 6379, "", 1000)
 
@@ -51,9 +51,11 @@ class RedisHostTestCase(unittest.TestCase):
         }
 
     def test_invalild_utf8_message(self):
-        expected = u"abc\ufffddef"
+        expected = "abc\ufffddef"
 
-        self.entry["command"] = pack("3sB13s", "abc", 0xCE, "def").rstrip("\0")
+        self.entry["command"] = compat.struct_pack_unicode(
+            "3sB13s", b"abc", 0xCE, b"def"
+        ).rstrip(b"\0")
 
         self.host.utf8_warning_interval = 1
         self.host.log_entry(self.logger, self.entry)
@@ -65,9 +67,9 @@ class RedisHostTestCase(unittest.TestCase):
     def test_truncated_utf8_message(self):
         expected = "abc... (4 more bytes)"
 
-        self.entry["command"] = pack(
-            "3sB18s", "abc", 0xCE, "... (4 more bytes)"
-        ).rstrip("\0")
+        self.entry["command"] = compat.struct_pack_unicode(
+            "3sB18s", b"abc", 0xCE, b"... (4 more bytes)"
+        ).rstrip(b"\0")
 
         self.host.log_entry(self.logger, self.entry)
         self.assertEquals(expected, self.logger.command)
@@ -75,7 +77,7 @@ class RedisHostTestCase(unittest.TestCase):
     def test_non_truncated_utf8_message(self):
 
         expected = "abc... (4 more bytes)"
-        self.entry["command"] = "abc... (4 more bytes)"
+        self.entry["command"] = b"abc... (4 more bytes)"
 
         self.host.log_entry(self.logger, self.entry)
 

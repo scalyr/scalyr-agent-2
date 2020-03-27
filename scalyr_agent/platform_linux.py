@@ -15,6 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -24,7 +27,12 @@ from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
 
-from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.__scalyr__ import (
+    get_install_root,
+    TARBALL_INSTALL,
+    DEV_INSTALL,
+    PACKAGE_INSTALL,
+)
 
 
 class LinuxPlatformController(PosixPlatformController):
@@ -92,10 +100,12 @@ class LinuxPlatformController(PosixPlatformController):
         @rtype: list<dict>
         """
         result = []
+
         if config.implicit_metric_monitor:
             result.append(
-                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics")
+                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics",)
             )
+
         if config.implicit_agent_process_metrics_monitor:
             result.append(
                 JsonObject(

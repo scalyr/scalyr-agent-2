@@ -15,16 +15,21 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
-import httplib
 import os
 import re
 import socket
 import subprocess
 import sys
-
 from tempfile import mkstemp
+from io import open
+
+import six
+import six.moves.http_client
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -38,12 +43,15 @@ try:
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
+    ssl = None  # type: ignore
 
 
 __has_pure_python_tls__ = False
 try:
-    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+    from tlslite import (  # pylint: disable=import-error
+        HTTPTLSConnection,
+        HandshakeSettings,
+    )
 
     __has_pure_python_tls__ = True
 except Exception:
@@ -81,10 +89,10 @@ class ConnectionFactory:
         @param proxies:  A dict describing the network proxies to use or None if there aren't any.  Only valid if
             use_requests is True.
 
-        @type server: str
+        @type server: six.text_type
         @type request_deadline: float
-        @type ca_file: str
-        @type intermediate_certs_file: str
+        @type ca_file: six.text_type
+        @type intermediate_certs_file: six.text_type
         @type headers: dict
         @type use_requests: bool
         @type use_tlslite: bool
@@ -116,10 +124,10 @@ class ConnectionFactory:
                 result = RequestsConnection(
                     server, request_deadline, ca_file, headers, proxies
                 )
-            except Exception, e:
+            except Exception as e:
                 log.warn(
                     "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
-                    % str(e)
+                    % six.text_type(e)
                 )
                 result = ScalyrHttpConnection(
                     server,
@@ -164,7 +172,7 @@ class Connection(object):
     def __init__(self, server, request_deadline, ca_file, headers):
 
         # Verify the server address looks right.
-        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
+        parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -183,7 +191,12 @@ class Connection(object):
         else:
             self._port = 80
 
-        self._standard_headers = headers
+        # 2->TODO In python2 httplib accepts request headers as binary string(str),
+        #  and in python3 http.client accepts headers as unicode.  In this case 'six.ensure_str' can be very useful.
+        self._standard_headers = dict()
+        for name, value in six.iteritems(headers):
+            self._standard_headers[six.ensure_str(name)] = six.ensure_str(value)
+
         self._full_address = server
         self._ca_file = ca_file
         self._request_deadline = request_deadline
@@ -277,7 +290,7 @@ class ScalyrHttpConnection(Connection):
 
         try:
             self._init_connection(pure_python_tls=use_tlslite)
-        except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+        except Exception:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
             log.info(
                 "Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation"
             )
@@ -334,9 +347,15 @@ class ScalyrHttpConnection(Connection):
         or turning it off completely.
         """
         try:
+            # pylint: disable=import-error,no-name-in-module
             from certvalidator import CertificateValidator
             from certvalidator import ValidationContext
-            from asn1crypto import x509, pem
+            from asn1crypto import (
+                x509,
+                pem,
+            )
+
+            # pylint: enable=import-error,no-name-in-module
 
             # validate server certificate chain
             session = tlslite_connection.sock.session
@@ -344,7 +363,7 @@ class ScalyrHttpConnection(Connection):
 
             # get the end-entity cert
             file_bytes = session.serverCertChain.x509List[0].bytes
-            end_entity_cert = x509.Certificate.load(str(file_bytes))
+            end_entity_cert = x509.Certificate.load(six.binary_type(file_bytes))
 
             def cert_files_exist(path, file_names):
                 file_names = [os.path.join(path, f) for f in file_names]
@@ -402,14 +421,14 @@ class ScalyrHttpConnection(Connection):
                     other_certs=intermediate_certs,
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
-            validator = CertificateValidator(
-                end_entity_cert, validation_context=context
-            )
-            validator.validate_tls(unicode(self._host))
+                validator = CertificateValidator(
+                    end_entity_cert, validation_context=context
+                )
+            validator.validate_tls(six.text_type(self._host))
             log.info(
                 "Scalyr server cert chain successfully validated via certvalidator library"
             )
-        except Exception, ce:
+        except Exception as ce:
             log.exception("Error validating server certificate chain: %s" % ce)
             raise
 
@@ -445,7 +464,7 @@ class ScalyrHttpConnection(Connection):
                     if self._ca_file:
                         try:
                             self._validate_chain_certvalidator(self.__connection)
-                        except Exception, e:
+                        except Exception:
                             log.exception("Failure in _validate_chain_certvalidator()")
                             self._validate_chain_openssl()
             else:
@@ -454,16 +473,16 @@ class ScalyrHttpConnection(Connection):
                     self._host, self._port, self._request_deadline
                 )
                 self.__connection.connect()
-        except Exception, error:
+        except Exception as error:
             if hasattr(error, "errno"):
-                errno = error.errno
+                errno = error.errno  # pylint: disable=no-member
             else:
                 errno = None
             if isinstance(error, CertValidationError):
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s"',
                     self._full_address,
-                    error.message,
+                    getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
                 )
             elif __has_ssl__ and isinstance(error, ssl.SSLError):
@@ -475,7 +494,7 @@ class ScalyrHttpConnection(Connection):
                     "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             elif errno == 61:  # Connection refused
@@ -496,7 +515,7 @@ class ScalyrHttpConnection(Connection):
                     "will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             else:
@@ -504,20 +523,29 @@ class ScalyrHttpConnection(Connection):
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             raise Exception("client/connectionFailed")
 
+    # 2->TODO ensure that httplib request accepts only binary data, even method name and
+    #  request path python2 httplib can not handle mixed data
     def _post(self, request_path, body):
         self.__http_response = None
         self.__connection.request(
-            "POST", request_path, body=body, headers=self._standard_headers
+            six.ensure_str("POST"),
+            six.ensure_str(request_path),
+            body=body,
+            headers=self._standard_headers,
         )
 
     def _get(self, request_path):
         self.__http_response = None
-        self.__connection.request("GET", request_path, headers=self._standard_headers)
+        self.__connection.request(
+            six.ensure_str("GET"),
+            six.ensure_str(request_path),
+            headers=self._standard_headers,
+        )
 
     def response(self):
         if not self.__http_response:
@@ -541,7 +569,7 @@ class ScalyrHttpConnection(Connection):
         )
 
 
-class HTTPConnectionWithTimeout(httplib.HTTPConnection):
+class HTTPConnectionWithTimeout(six.moves.http_client.HTTPConnection):
     """An HTTPConnection replacement with added support for setting a timeout on all blocking operations.
 
     Older versions of Python (2.4, 2.5) do not allow for setting a timeout directly on httplib.HTTPConnection
@@ -550,7 +578,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
 
     def __init__(self, host, port, timeout):
         self.__timeout = timeout
-        httplib.HTTPConnection.__init__(self, host, port)
+        six.moves.http_client.HTTPConnection.__init__(self, host, port)
 
     def connect(self):
         # This method is essentially copied from 2.7's httplib.HTTPConnection.connect.
@@ -566,7 +594,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
             self._tunnel()
 
 
-class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
+class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConnection):
     """An HTTPSConnection replacement that adds support for setting a timeout as well as performing server
     certificate validation.
 
@@ -598,7 +626,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         self.__timeout = timeout
         self.__ca_file = ca_file
         self.__has_ssl = has_ssl
-        httplib.HTTPSConnection.__init__(self, host, port)
+        six.moves.http_client.HTTPSConnection.__init__(self, host, port)
 
     def connect(self):
         # Do not delete the next line:
@@ -614,7 +642,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
             try:
                 old_timeout = socket.getdefaulttimeout()
                 socket.setdefaulttimeout(self.__timeout)
-                httplib.HTTPSConnection.connect(self)
+                six.moves.http_client.HTTPSConnection.connect(self)
                 return
             finally:
                 socket.setdefaulttimeout(old_timeout)
@@ -663,7 +691,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error, _:
+        except socket.error as _:
             err = _
             if sock is not None:
                 sock.close()

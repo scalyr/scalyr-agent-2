@@ -15,6 +15,8 @@
 #
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -26,6 +28,9 @@ import threading
 import time
 import sys
 
+import six
+from six.moves import range
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.log_watcher import LogWatcher
@@ -33,7 +38,6 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
-from scalyr_agent.scalyr_client import AddEventsRequest
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -798,6 +802,17 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 result,
                             )
 
+                            if result != "success":
+                                # Log the whole response body in case server returns non-success
+                                # response so we can troubleshoot the error (aka is it bug in the
+                                # agent code or similar)
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    'Received server response with status="%s" and body: %s',
+                                    result,
+                                    full_response,
+                                )
+
                             if (
                                 result == "success"
                                 or "discardBuffer" in result
@@ -1040,7 +1055,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             if active_checkpoints["time"] > full_checkpoints["time"]:
                 full_checkpoints["time"] = active_checkpoints["time"]
-                for path, checkpoint in active_checkpoints["checkpoints"].iteritems():
+                for path, checkpoint in six.iteritems(
+                    active_checkpoints["checkpoints"]
+                ):
                     full_checkpoints[path] = checkpoint
 
             return full_checkpoints
@@ -1124,7 +1141,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "Getting batch of events to send. (pipelining=%s)" % str(for_pipelining),
+            "Getting batch of events to send. (pipelining=%s)"
+            % six.text_type(for_pipelining),
         )
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
@@ -1151,7 +1169,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         )
 
         if for_pipelining:
-            add_events_request.increment_timing_data(pipelined=1.0)
+            add_events_request.increment_timing_data(**{"pipelined": 1.0})
 
         while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
@@ -1162,7 +1180,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
                 # We have to make sure we rollback any LogFileProcessors we touched by invoking their callbacks.
-                for cb in all_callbacks.itervalues():
+                for cb in six.itervalues(all_callbacks):
                     cb(LogFileProcessor.FAIL_AND_RETRY)
                 return None
 
@@ -1221,7 +1239,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "Information for batch of events. (pipelining=%s): %s"
-            % (str(for_pipelining), add_events_request.get_timing_data()),
+            % (six.text_type(for_pipelining), add_events_request.get_timing_data()),
         )
         return AddEventsTask(add_events_request, handle_completed_callback)
 
@@ -1256,7 +1274,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__lock.release()
 
         # if we have a log matcher for the path, then set it to finished
-        for path in pending_removal.iterkeys():
+        for path in six.iterkeys(pending_removal):
             matcher = self.__dynamic_matchers.get(path, None)
             if matcher is None:
                 log.warn("Log scheduled for removal is not being monitored: %s" % path)
@@ -1278,7 +1296,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # make a shallow copy for iteration
         matchers = self.__dynamic_matchers.copy()
 
-        for path, m in matchers.iteritems():
+        for path, m in six.iteritems(matchers):
             if m.is_finished():
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
@@ -1326,7 +1344,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
-        for path, log_config in pending_reload.iteritems():
+        for path, log_config in six.iteritems(pending_reload):
             log.log(scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % path)
 
             # only reload matchers that have been dynamically added
@@ -1340,7 +1358,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # update the log config of the matcher, which closes any open processors, and returns
             # their checkpoints
             closed_processors = matcher.update_log_entry_config(log_config)
-            for processor_path, checkpoint in closed_processors.iteritems():
+            for processor_path, checkpoint in six.iteritems(closed_processors):
                 checkpoints[processor_path] = checkpoint
 
             reloaded.append(matcher)
@@ -1449,7 +1467,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             # go over all items in pending_removal, and update the master
             # logs_pending_removal list
-            for path, processed in pending_removal.iteritems():
+            for path, processed in six.iteritems(pending_removal):
                 if path in self.__logs_pending_removal:
                     self.__logs_pending_removal[path] = processed
         finally:
@@ -1504,7 +1522,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         if logs_initial_positions is not None:
             for log_path in logs_initial_positions:
-                if not log_path in checkpoints:
+                if log_path not in checkpoints:
                     checkpoints[log_path] = LogFileProcessor.create_checkpoint(
                         logs_initial_positions[log_path]
                     )

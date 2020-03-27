@@ -14,18 +14,24 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import threading
+from io import open
+
 
 __author__ = "czerwin@scalyr.com"
 
 
 import os
 import tempfile
-
 import logging
 import shutil
 import sys
 import time
+
+from six.moves import range
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -40,11 +46,15 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingParameters, CopyingManager
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
-from scalyr_agent.test_base import skip, ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
-from scalyr_agent.json_lib import JsonObject, JsonArray
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
 
 ONE_MB = 1024 * 1024
 
@@ -555,9 +565,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_from_monitors(self):
-        test_manager = self._create_test_instance(
-            [], [{"path": "/tmp/hi_monitor.log",}]
-        )
+        test_manager = self._create_test_instance([], [{"path": "/tmp/hi_monitor.log"}])
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
@@ -598,7 +606,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_monitor_log_config_updated(self):
-        test_manager = self._create_test_instance([], [{"path": "hi_monitor.log"},])
+        test_manager = self._create_test_instance([], [{"path": "hi_monitor.log"}])
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
@@ -616,7 +624,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_remove_log_path_with_non_existing_path(self):
-        test_manager = self._create_test_instance([], [{"path": "test.log"},])
+        test_manager = self._create_test_instance([], [{"path": "test.log"}])
         # check that removing a non-existent path runs without throwing an exception
         test_manager.remove_log_path("test_monitor", "blahblah.log")
 
@@ -701,11 +709,19 @@ def _add_non_utf8_to_checkpoint_file(path):
     fp = open(path, "r")
     data = scalyr_util.json_decode(fp.read())
     fp.close()
+    # 2-> TODO json libraries do not allow serialize bytes string with invalid UTF-8(ujson)or even bytes in general(json).
+    # so to test this case we must write non-utf8 byte directly, without serializing.
 
-    data["test"] = "\x96"
+    # this string will be replaced with invalid utf8 byte after encoding.
+    data["test"] = "__replace_me__"
 
-    fp = open(path, "w")
-    fp.write(scalyr_util.json_encode(data))
+    json_string = scalyr_util.json_encode(data, binary=True)
+
+    # replace prepared substring to invalid byte.
+    json_string = json_string.replace(b"__replace_me__", b"\x96")
+
+    fp = open(path, "wb")
+    fp.write(json_string)
     fp.close()
 
 
@@ -718,13 +734,14 @@ def _write_bad_checkpoint_file(path):
     fp.close()
 
 
-class CopyingManagerEnd2EndTest(ScalyrTestCase):
+class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
         self._controller = None
         self._config = None
 
     def tearDown(self):
+        super(CopyingManagerEnd2EndTest, self).tearDown()
         if self._controller is not None:
             self._controller.stop()
 
@@ -1132,10 +1149,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         class _time_mock(object):
             # This dummy 'time()' should be called on new copying thread iteration
             # to emulate huge gap between last request.
-            def time(_self):
+            def time(_self):  # pylint: disable=no-self-argument
                 result = (
                     orig_time.time()
-                    + self._manager._CopyingManager__config.max_retry_time
+                    + self._manager._CopyingManager__config.max_retry_time  # pylint: disable=no-member
                 )
                 return result
 
@@ -1185,6 +1202,43 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         lines = self.__extract_lines(request)
 
         self.assertEquals(["5", "6", "7", "8", "9"], lines)
+
+    def test_whole_response_is_logged_on_non_success(self):
+        statuses = ["discardBuffer", "requestTooLarge", "parseResponseFailed"]
+
+        for status in statuses:
+            # Initially this long line shouldn't be present
+            expected_body = (
+                'Received server response with status="%s" and body: fake' % (status)
+            )
+            self.assertLogFileDoesntContainsRegex(
+                expected_body, file_path=self.agent_debug_log_path
+            )
+
+            try:
+                controller = self.__create_test_instance()
+
+                self.__append_log_lines("First line", "Second line")
+                (request, responder_callback) = controller.wait_for_rpc()
+
+                lines = self.__extract_lines(request)
+                self.assertEquals(2, len(lines))
+                self.assertEquals("First line", lines[0])
+                self.assertEquals("Second line", lines[1])
+
+                responder_callback(status)
+
+                # But after response is received, it should be present
+                expected_body = (
+                    'Received server response with status="%s" and body: fake'
+                    % (status)
+                )
+                self.assertLogFileContainsRegex(
+                    expected_body, file_path=self.agent_debug_log_path
+                )
+            finally:
+                if controller:
+                    controller.stop()
 
     def __extract_lines(self, request):
         parsed_request = test_util.parse_scalyr_request(request.get_payload())
@@ -1283,6 +1337,8 @@ class TestableCopyingManager(CopyingManager):
 
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
+
+    __test__ = False
 
     # The different points at which the CopyingManager can be stopped.  See below.
     SLEEPING = "SLEEPING"
@@ -1400,7 +1456,7 @@ class TestableCopyingManager(CopyingManager):
         """Sets the status_message to return as the response for the next AddEventsRequest.
 
         @param status_message: The status message
-        @type status_message: str
+        @type status_message: six.text_type
         """
         self.__test_state_cv.acquire()
         self.__pending_response = status_message
@@ -1412,7 +1468,7 @@ class TestableCopyingManager(CopyingManager):
 
         @param current_point: The point reached by the CopyingManager thread, only valid values are
             `SLEEPING`, `SENDING`, and `RESPONDING`.
-        @type current_point: str
+        @type current_point: six.text_type
         """
         # If we are passing through the required_transition state, consume it to signal we have accomplished
         # the transition.
@@ -1455,8 +1511,8 @@ class TestableCopyingManager(CopyingManager):
             specified state before it gets to `stopping_at`.  Otherwise an AssertionError will be thrown.
               Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
 
-        @type stopping_at: str
-        @type required_transition_state: str or None
+        @type stopping_at: six.text_type
+        @type required_transition_state: six.text_type or None
         """
         self.__test_state_cv.acquire()
         try:

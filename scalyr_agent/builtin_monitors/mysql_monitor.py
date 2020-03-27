@@ -16,11 +16,16 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import sys
 import re
 import os
 import stat
 import errno
+
+import six
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -44,7 +49,7 @@ if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] 
 # in both agent_main.py and config_main.py
 #
 # noinspection PyUnresolvedReferences,PyPackageRequirements
-import pymysql
+import pymysql  # pylint: disable=import-error
 
 __monitor__ = __name__
 
@@ -61,19 +66,19 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple MySQL instances on a single server; you can monitor each "
     "instance with a separate mysql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username which the agent uses to connect to MySQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password for connecting to MySQL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -81,7 +86,7 @@ define_config_option(
     "Location of the socket file for connecting to MySQL, e.g. "
     "``/var/run/mysqld_instance2/mysqld.sock``. If MySQL is running on the same server as the Scalyr "
     'Agent, you can usually set this to "default".',
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -89,7 +94,7 @@ define_config_option(
     "Hostname (or IP address) and port number of the MySQL server, e.g. ``dbserver:3306``, or simply "
     "``3306`` when connecting to the local machine. You should specify one of ``database_socket`` or "
     "``database_hostport``, but not both.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 # Metric definitions.
@@ -375,11 +380,11 @@ class MysqlDB(object):
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
-        except pymysql.Error, me:
+        except pymysql.Error as me:
             self._db = None
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
-        except Exception, ex:
+        except Exception as ex:
             self._logger.error("Exception trying to connect occured:  %s" % ex)
             raise Exception("Exception trying to connect:  %s" % ex)
 
@@ -414,12 +419,18 @@ class MysqlDB(object):
 
         try:
             self._cursor.execute(sql)
-        except pymysql.OperationalError, (errcode, msg):
+        except pymysql.OperationalError as error:
+            (errcode, msg) = error.args
             if errcode != 2006:  # "MySQL server has gone away"
                 self._logger.exception(
                     "Exception trying to execute query: %d '%s'" % (errcode, msg)
                 )
-                raise Exception("Database error -- " + str(errcode) + ": " + str(msg))
+                raise Exception(
+                    "Database error -- "
+                    + six.text_type(errcode)
+                    + ": "
+                    + six.text_type(msg)
+                )
             self._reconnect()
             return None
         return self._cursor.fetchall()
@@ -427,14 +438,14 @@ class MysqlDB(object):
     def _gather_db_information(self):
         try:
             r = self._query("SELECT VERSION()")
-            if r == None or len(r) == 0:
+            if r is None or len(r) == 0:
                 self._version = "unknown"
             else:
                 self._version = r[0][0]
             version = self._version.split(".")
             self._major = int(version[0])
             self._medium = int(version[1])
-        except (ValueError, IndexError), e:
+        except (ValueError, IndexError):
             self._major = self._medium = 0
             self._version = "unknown"
         except:
@@ -495,7 +506,7 @@ class MysqlDB(object):
             else:
                 value = int(value)
         except ValueError:
-            value = str(value)  # string values are possible
+            value = six.text_type(value)  # string values are possible
         return value
 
     def _parse_data(self, data, fields):
@@ -529,14 +540,14 @@ class MysqlDB(object):
 
         innodb_queries = [
             {
-                "regex": "OS WAIT ARRAY INFO: reservation count (\d+), signal count (\d+)",
+                "regex": r"OS WAIT ARRAY INFO: reservation count (\d+), signal count (\d+)",
                 "fields": [
                     {"label": "innodb.oswait_array.reservation_count", "group": 1},
                     {"label": "innodb.oswait_array.signal_count", "group": 2},
                 ],
             },
             {
-                "regex": "Mutex spin waits (\d+), rounds (\d+), OS waits (\d+)",
+                "regex": r"Mutex spin waits (\d+), rounds (\d+), OS waits (\d+)",
                 "fields": [
                     {
                         "label": "innodb.locks.spin_waits",
@@ -556,7 +567,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "RW-shared spins (\d+), OS waits (\d+); RW-excl spins (\d+), OS waits (\d+)",
+                "regex": r"RW-shared spins (\d+), OS waits (\d+); RW-excl spins (\d+), OS waits (\d+)",
                 "fields": [
                     {
                         "label": "innodb.locks.spin_waits",
@@ -581,7 +592,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "Ibuf: size (\d+), free list len (\d+), seg size (\d+),",
+                "regex": r"Ibuf: size (\d+), free list len (\d+), seg size (\d+),",
                 "fields": [
                     {"label": "innodb.ibuf.size", "group": 1},
                     {"label": "innodb.ibuf.free_list_len", "group": 2},
@@ -589,7 +600,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "(\d+) inserts, (\d+) merged recs, (\d+) merges",
+                "regex": r"(\d+) inserts, (\d+) merged recs, (\d+) merges",
                 "fields": [
                     {"label": "innodb.ibuf.inserts", "group": 1},
                     {"label": "innodb.ibuf.merged_recs", "group": 2},
@@ -597,15 +608,15 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "\d+ queries inside InnoDB, (\d+) queries in queue",
+                "regex": r"\d+ queries inside InnoDB, (\d+) queries in queue",
                 "fields": [{"label": "innodb.queries_queued", "group": 1}],
             },
             {
-                "regex": "(\d+) read views open inside InnoDB",
+                "regex": r"(\d+) read views open inside InnoDB",
                 "fields": [{"label": "innodb.opened_read_views", "group": 1}],
             },
             {
-                "regex": "History list length (\d+)",
+                "regex": r"History list length (\d+)",
                 "fields": [{"label": "innodb.history_list_length", "group": 1}],
             },
         ]
@@ -634,10 +645,10 @@ class MysqlDB(object):
             master_host = slave_status["master_host"]
         else:
             master_host = None
-        if master_host and master_host is not "None":
+        if master_host and master_host != "None":
             result = []
             sbm = slave_status.get("seconds_behind_master")
-            if isinstance(sbm, (int, long)):
+            if isinstance(sbm, six.integer_types):
                 result.append({"field": "slave.seconds_behind_master", "value": sbm})
             result.append(
                 {
@@ -676,7 +687,7 @@ class MysqlDB(object):
         for row in process_status:
             id, user, host, db_, cmd, time, state = row[:7]
             states[cmd] = states.get(cmd, 0) + 1
-        for state, count in states.iteritems():
+        for state, count in six.iteritems(states):
             state = state.lower().replace(" ", "_")
             result.append({"field": "process.%s" % state, "value": count})
         if len(result) == 0:
@@ -867,7 +878,8 @@ class MysqlDB(object):
         """Returns whether or not the given path is a socket file."""
         try:
             s = os.stat(path)
-        except OSError, (no, e):
+        except OSError as error:
+            (no, e) = error.args
             if no == errno.ENOENT:
                 return False
             self._logger.error("warning: couldn't stat(%r): %s" % (path, e))
@@ -944,8 +956,59 @@ class MysqlDB(object):
 
 
 class MysqlMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that monitors mysql databases.
     """
+# MySQL Monitor
+
+This agent monitor plugin records performance and usage data from a MySQL server.
+
+NOTE: the MySQL monitor requires Python 2.6 or higher. (This applies to the server on which the Scalyr Agent
+is running, which needn't necessarily be the same machine where the MySQL server is running.) If you need
+to monitor MySQL from a machine running an older version of Python, [let us know](mailto:support@scalyr.com).
+
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+
+## Sample Configuration
+
+To configure the MySQL monitor plugin, you will need the following information:
+
+- A MySQL username with administrative privileges. The user needs to be able to query the information_schema table,
+  as well as assorted global status information.
+- The password for that user.
+
+Here is a sample configuration fragment:
+
+    monitors: [
+      {
+         module:            "scalyr_agent.builtin_monitors.mysql_monitor",
+         database_socket:   "default",
+         database_username: "USERNAME",
+         database_password: "PASSWORD"
+      }
+    ]
+
+This configuration assumes that MySQL is running on the same server as the Scalyr Agent, and is using the default
+MySQL socket. If not, you will need to specify the server's socket file, or hostname (or IP address) and port number;
+see Configuration Reference.
+
+## Viewing Data
+
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+click the {{menuRef:Dashboards}} menu and select {{menuRef:MySQL}}. (The dashboard may not be listed until
+the agent begins sending MySQL data.) You will see an overview of MySQL performance statistics across all
+servers where you are running the MySQL plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a
+specific server.
+
+The dashboard shows only some of the data collected by the MySQL monitor plugin. To explore the full range
+of data collected, go to the Search page and search for [$monitor = 'mysql_monitor'](/events?filter=$monitor%20%3D%20%27mysql_monitor%27).
+This will show all data collected by this plugin, across all servers. You can use the {{menuRef:Refine search by}}
+dropdown to narrow your search to specific servers and monitors.
+
+The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
+[Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
+You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
+"""
 
     def _initialize(self):
         """Performs monitor-specific initialization.
@@ -964,10 +1027,7 @@ class MysqlMonitor(ScalyrMonitor):
             )
         elif "database_socket" in self._config:
             self._database_connect_type = "socket"
-            if (
-                type(self._config["database_socket"]) is str
-                or type(self._config["database_socket"]) is unicode
-            ):
+            if type(self._config["database_socket"]) is six.text_type:
                 self._database_socket = self._config["database_socket"]
                 if len(self._database_socket) == 0:
                     raise Exception(
@@ -981,10 +1041,7 @@ class MysqlMonitor(ScalyrMonitor):
                 )
         elif "database_hostport" in self._config:
             self._database_connect_type = "host:port"
-            if (
-                type(self._config["database_hostport"]) is str
-                or type(self._config["database_hostport"]) is unicode
-            ):
+            if type(self._config["database_hostport"]) is six.text_type:
                 hostport = self._config["database_hostport"]
                 if len(hostport) == 0:
                     raise Exception(
@@ -1056,10 +1113,10 @@ class MysqlMonitor(ScalyrMonitor):
                     password=self._database_password,
                     logger=self._logger,
                 )
-        except Exception, e:
+        except Exception as e:
             self._db = None
             global_log.warning(
-                "Error establishing database connection: %s" % (str(e)),
+                "Error establishing database connection: %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="mysql_connect_to_db",
             )
@@ -1076,16 +1133,6 @@ class MysqlMonitor(ScalyrMonitor):
         # to try again
         if self._db is None:
             return
-
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is str:
-                return "%r" % value
-            else:
-                return "%r" % value
 
         def print_status_line(key, value, extra_fields):
             """ Emit a status line.

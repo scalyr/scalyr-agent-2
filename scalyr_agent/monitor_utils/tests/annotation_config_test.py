@@ -15,6 +15,9 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config

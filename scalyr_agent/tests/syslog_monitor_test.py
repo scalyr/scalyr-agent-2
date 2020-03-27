@@ -15,6 +15,9 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import time
@@ -24,14 +27,16 @@ import unittest
 import logging
 import uuid
 import os
-from cStringIO import StringIO
+from io import open
+from io import StringIO
+import threading
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.util import StoppableThread
+
+import six
 
 
 class SyslogFrameParserTestCase(unittest.TestCase):
@@ -130,8 +135,8 @@ class SyslogMonitorTestCase(unittest.TestCase):
     def assertNoException(self, func):
         try:
             func()
-        except Exception, e:
-            self.fail("Unexpected Exception: %s" % str(e))
+        except Exception as e:
+            self.fail("Unexpected Exception: %s" % six.text_type(e))
         except:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
 
@@ -251,6 +256,46 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
         )
 
 
+class TestSyslogMonitor(SyslogMonitor):
+    """subclass of SyslogMonitor with overridden 'increment_counter'.
+        Provides ability to suspend test thread until written lines are handled by 'increment_counter' method.
+        """
+
+    __test__ = False
+
+    def __init__(self, *args, **kwargs):
+        super(TestSyslogMonitor, self).__init__(*args, **kwargs)
+        # wakes up the main test thread when new line added, and line counter incremented.
+        self._increment_line_cv = threading.Condition()
+        # stores the total number of 'reported_lines'. Useful when multiple lines are sent at once.
+        self._reported_lines_count = 0
+
+    def increment_counter(self, reported_lines=0, errors=0):
+        super(TestSyslogMonitor, self).increment_counter(
+            reported_lines=reported_lines, errors=errors
+        )
+
+        with self._increment_line_cv:
+            self._reported_lines_count += reported_lines
+            self._increment_line_cv.notify()
+
+    def wait_for_new_lines(self, expected_line_number=1, timeout=3):
+        """
+        Wait until written lines are processed by 'increment_counter' method.
+        :param expected_line_number: number of expected lines.
+        :param timeout: time in seconds to wait, before timeout exception.
+        """
+        with self._increment_line_cv:
+            start_time = time.time()
+            while self._reported_lines_count != expected_line_number:
+                self._increment_line_cv.wait(timeout)
+                if time.time() - start_time >= timeout:
+                    raise OSError(
+                        "Could not wait for written lines because the timeout has occurred."
+                    )
+            self._reported_lines_count = 0
+
+
 class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @classmethod
     def setUpClass(cls):
@@ -286,7 +331,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             s.close()
 
         # stop any running monitors - this might be open if an exception was thrown before a test called monitor.stop()
-        if self.monitor != None:
+        if self.monitor is not None:
             self.monitor.stop(wait_on_join=False)
 
         self.logger.removeHandler(self.handler)
@@ -309,45 +354,80 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         return connected
 
+    def send_and_wait_for_lines(
+        self, sock, data, dest_addr=None, expected_line_count=1
+    ):
+        """
+        Send data through a 'sock' socket.
+        :param dest_addr: if not None, sends 'data' via UDP.
+        :param expected_line_count: number of expected lines.
+        :type dest_addr: tuple
+        :type data: six.text_type
+        """
+        data = data.encode("utf-8")
+
+        if dest_addr is None:
+            sock.sendall(data)
+        else:
+            sock.sendto(data, dest_addr)
+        self.monitor.wait_for_new_lines(expected_line_number=expected_line_count)
+
     def test_run_tcp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
+            "log_flush_delay": 0.0,
         }
 
-        self.monitor = SyslogMonitor(config, self.logger)
+        self.monitor = TestSyslogMonitor(config, self.logger)
         self.monitor.open_metric_log()
 
         self.monitor.start()
         time.sleep(0.05)
 
-        s = socket.socket()
+        s = socket.socket(socket.AF_INET)
         self.sockets.append(s)
 
-        expected = "TCP TestXX\n"
         self.connect(s, ("localhost", 8514))
-        s.sendall(expected)
-        time.sleep(1)
+
+        expected_line1 = "TCP TestXX"
+        self.send_and_wait_for_lines(s, expected_line1 + "\n")
+
+        expected_line2 = "Line2"
+        expected_line3 = "Line3"
+        self.send_and_wait_for_lines(
+            s, expected_line2 + "\n" + expected_line3 + "\n", expected_line_count=2
+        )
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
 
-        expected = expected.strip()
-
         self.assertTrue(
-            expected in actual,
-            "Unable to find '%s' in output:\n\t %s" % (expected, actual),
+            expected_line1 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_line1, actual),
+        )
+        self.assertTrue(
+            expected_line2 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_line2, actual),
+        )
+        self.assertTrue(
+            expected_line2 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_line2, actual),
         )
 
     def test_run_udp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:5514",
+            "log_flush_delay": 0.0,
         }
-        self.monitor = SyslogMonitor(
+        self.monitor = TestSyslogMonitor(
             config, scalyr_logging.getLogger("syslog_monitor[test]")
         )
         self.monitor.open_metric_log()
@@ -359,11 +439,14 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.sockets.append(s)
 
         expected = "UDP Test %s" % (uuid.uuid4())
-        s.sendto(expected, ("localhost", 5514))
-        time.sleep(1)
+        self.send_and_wait_for_lines(s, expected, dest_addr=("localhost", 5514))
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
         self.assertTrue(
             expected in actual,
@@ -374,8 +457,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:8000, tcp:8001, udp:8002, tcp:8003",
+            "log_flush_delay": 0.0,
         }
-        self.monitor = SyslogMonitor(
+        self.monitor = TestSyslogMonitor(
             config, scalyr_logging.getLogger("syslog_monitor[test]")
         )
         self.monitor.open_metric_log()
@@ -397,23 +481,24 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.connect(tcp2, ("localhost", 8003))
 
         expected_udp1 = "UDP Test"
-        udp.sendto(expected_udp1, ("localhost", 8000))
+        self.send_and_wait_for_lines(udp, expected_udp1, ("localhost", 8000))
 
         expected_udp2 = "UDP2 Test"
-        udp.sendto(expected_udp2, ("localhost", 8002))
+        self.send_and_wait_for_lines(udp, expected_udp2, ("localhost", 8002))
 
         expected_tcp1 = "TCP Test\n"
-        tcp1.sendall(expected_tcp1)
+        self.send_and_wait_for_lines(tcp1, expected_tcp1)
 
         expected_tcp2 = "TCP2 Test\n"
-        tcp2.sendall(expected_tcp2)
+        self.send_and_wait_for_lines(tcp2, expected_tcp2)
 
-        time.sleep(1)
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
 
         expected_tcp1 = expected_tcp1.strip()

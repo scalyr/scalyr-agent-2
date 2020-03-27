@@ -14,12 +14,30 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
+
+if False:
+    from typing import Dict
 
 import datetime
 import os
 import re
 import select
+import threading
+import traceback
+
+import six
+
+try:
+    from systemd import journal
+except ImportError:
+    # We throw exception later during run time. This way we can still use print_monitor_docs.py
+    # script without systemd dependency being installed
+    journal = None
+
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
@@ -28,24 +46,6 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
     JournaldLogFormatter,
 )
-import threading
-import traceback
-from cStringIO import StringIO
-
-try:
-    from systemd import journal
-except ImportError:
-    # monitor plugins are loaded dynamically so this exception will only be raised
-    # during monitor creation if the user has configured the agent to use this plugin
-    raise Exception(
-        "Python systemd library not installed.\n\nYou must install the systemd python library in order "
-        "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
-        "  apt-get install python-systemd  (debian/ubuntu)\n"
-        "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
-        "or installed from source using pip e.g.\n\n"
-        "  pip install systemd-python\n\n"
-        "See here for more info: https://github.com/systemd/python-systemd/\n"
-    )
 
 global_log = scalyr_logging.getLogger(__name__)
 __monitor__ = __name__
@@ -54,7 +54,7 @@ define_config_option(
     __monitor__,
     "journal_path",
     "Optional (defaults to /var/log/journal). Location on the filesystem of the journald logs.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/log/journal",
 )
 
@@ -107,7 +107,7 @@ define_config_option(
     "Optional id used to differentiate between multiple journald monitors. "
     "This is useful for configurations that define multiple journald monitors and that want to save unique checkpoints for each "
     "monitor.  If specified, the id is also sent to the server along with other attributes under the `monitor_id` field",
-    convert_to=str,
+    convert_to=six.text_type,
     default="",
 )
 
@@ -139,7 +139,23 @@ define_config_option(
 # _global_checkpoints dict
 _global_lock = threading.Lock()
 
-_global_checkpoints = {}
+_global_checkpoints = {}  # type: Dict[str, Checkpoint]
+
+
+def verify_systemd_library_is_available():
+    """
+    Throw an exception if systemd library is not available.
+    """
+    if not journal:
+        raise ImportError(
+            "Python systemd library not installed.\n\nYou must install the systemd python library in order "
+            "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
+            "  apt-get install python-systemd  (debian/ubuntu)\n"
+            "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
+            "or installed from source using pip e.g.\n\n"
+            "  pip install systemd-python\n\n"
+            "See here for more info: https://github.com/systemd/python-systemd/\n"
+        )
 
 
 def load_checkpoints(filename):
@@ -167,7 +183,7 @@ def load_checkpoints(filename):
     except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "No checkpoint file '%s' exists.\n\tAll journald logs for '%s' will be read starting from their current end.",
+            "No checkpoint file '%s' exists.\n\tAll journald logs will be read starting from their current end.",
             filename,
         )
         checkpoints = {}
@@ -241,10 +257,73 @@ class Checkpoint(object):
 
 
 class JournaldMonitor(ScalyrMonitor):
+    """
+# Journald Monitor
 
-    "Read logs from journalctl and emit to scalyr"
+A Scalyr agent monitor that imports log entries from journald.
+
+The journald monitor polls systemd journal files every ``journal_poll_interval`` seconds
+and uploads any new entries to the Scalyr servers.
+
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+
+By default, the journald monitor logs all log entries, but it can also be configured to filter entries by specific
+fields.
+
+## Dependencies
+
+The journald monitor has a dependency on the Python systemd library, which is a Python wrapper around the systemd C API.
+You need to ensure this library has been installed on your system in order to use this monitor, otherwise a warning
+message will be printed if the Scalyr Agent is configured to use the journald monitor but the systemd library cannot be
+found.
+
+You can install the systemd Python library via package manager e.g.:
+
+    apt-get install python-systemd  (debian/ubuntu)
+    dnf install python-systemd  (CentOS/rhel/Fedora)
+
+Or install it from source using pip e.g.
+
+    pip install systemd-python
+
+See here for more information: https://github.com/systemd/python-systemd/
+
+## Sample Configuration
+
+The following example will configure the agent to query the journal entries
+located in /var/log/journal (the default location for persisted journald logs)
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.journald_monitor",
+      }
+    ]
+
+Here is an example that queries journal entries from volatile/non-persisted journals, and filters those entries to only
+include ones that originate from the ssh service
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.journald_monitor",
+        journal_path: "/run/log/journal",
+        journal_matches: ["_SYSTEMD_UNIT=ssh.service"]
+      }
+    ]
+
+## Polling the Journal File
+
+The journald monitor polls the journal file every ``journal_poll_interval`` seconds to check for new logs.  It does this by
+creating a polling object (https://docs.python.org/2/library/select.html#poll-objects) and calling the ``poll`` method
+of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
+After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
+seconds and then polls again.
+    """
 
     def _initialize(self):
+        verify_systemd_library_is_available()
+
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
@@ -377,9 +456,10 @@ class JournaldMonitor(ScalyrMonitor):
                                 "Checkpoint is older than %d seconds, skipping to end"
                                 % self._staleness_threshold_secs,
                             )
-                except Exception, e:
+                except Exception as e:
                     global_log.warn(
-                        "Error loading checkpoint: %s. Skipping to end." % str(e)
+                        "Error loading checkpoint: %s. Skipping to end."
+                        % six.text_type(e)
                     )
 
             if skip_to_end:
@@ -393,9 +473,10 @@ class JournaldMonitor(ScalyrMonitor):
             self._poll = select.poll()
             mask = self._journal.get_events()
             self._poll.register(self._journal, mask)
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
-                "Failed to reset journal %s\n%s" % (str(e), traceback.format_exc())
+                "Failed to reset journal %s\n%s"
+                % (six.text_type(e), traceback.format_exc())
             )
 
     def _get_extra_fields(self, entry):
@@ -405,9 +486,9 @@ class JournaldMonitor(ScalyrMonitor):
         """
         result = {}
 
-        for key, value in self._extra_fields.iteritems():
+        for key, value in six.iteritems(self._extra_fields):
             if key in entry:
-                result[value] = str(entry[key])
+                result[value] = six.text_type(entry[key])
 
         if self._id and "monitor_id" not in result:
             result["monitor_id"] = self._id
@@ -431,10 +512,10 @@ class JournaldMonitor(ScalyrMonitor):
         process = journal.NOP
         try:
             process = self._journal.process()
-        except Exception, e:
+        except Exception as e:
             # early return if there was an error
             global_log.warn(
-                "Error processing journal entries: %s" % str(e),
+                "Error processing journal entries: %s" % six.text_type(e),
                 limit_once_per_x_secs=60,
                 limit_key="journald-process-error",
             )
@@ -464,9 +545,9 @@ class JournaldMonitor(ScalyrMonitor):
                 logger = self.log_manager.get_logger(extra.get("unit", ""))
                 logger.info(self.format_msg("details", msg, extra))
                 self._last_cursor = entry.get("__CURSOR", None)
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
-                    "Error getting journal entries: %s" % str(e),
+                    "Error getting journal entries: %s" % six.text_type(e),
                     limit_once_per_x_secs=60,
                     limit_key="journald-entry-error",
                 )
@@ -474,7 +555,7 @@ class JournaldMonitor(ScalyrMonitor):
     def format_msg(
         self, metric_name, metric_value, extra_fields=None,
     ):
-        string_buffer = StringIO()
+        string_buffer = six.StringIO()
 
         string_buffer.write(
             "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
@@ -500,7 +581,7 @@ class JournaldMonitor(ScalyrMonitor):
 
         if self._last_cursor is not None:
             self._checkpoint.update_checkpoint(
-                self._checkpoint_name, str(self._last_cursor)
+                self._checkpoint_name, six.text_type(self._last_cursor)
             )
 
     def stop(self, wait_on_join=True, join_timeout=5):

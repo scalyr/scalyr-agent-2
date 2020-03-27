@@ -37,6 +37,8 @@ Dependencies:
 """
 
 from __future__ import absolute_import
+from __future__ import print_function
+from io import open
 
 if False:
     # NOTE: This is a workaround for old Python versions where typing module is not available
@@ -52,15 +54,17 @@ if False:
     T_metric_value = Union[int, float]
 
 import os
-
 import sys
 import time
 import logging
+import signal
+import json
 import argparse
 
 from datetime import datetime
 from collections import defaultdict
 
+import six
 import numpy as np
 import psutil
 
@@ -89,6 +93,8 @@ METRICS_GAUGES = {
     "memory_usage_vms": Metric(name="app.mem.bytes", _type="vmsize"),
     # IO related metrics
     "io_open_fds": Metric(name="app.io.fds", _type="open"),
+    # GC related metrics
+    "gc_garbage": Metric(name="app.gc.garbage", _type=None),
 }  # type: Dict[str, Metric]
 
 METRICS_COUNTERS = {
@@ -168,8 +174,10 @@ def send_data_to_codespeed(
     )
 
 
-def capture_metrics(tracker, process, metrics, values):
-    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], dict) -> dict
+def capture_metrics(
+    tracker, process, metrics, values, capture_agent_status_metrics=False
+):
+    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], dict, bool) -> dict
     """
     Capture gauge metric types and store them in the provided dictionary.
     """
@@ -185,8 +193,15 @@ def capture_metrics(tracker, process, metrics, values):
     psutil_metrics = get_additional_psutil_metrics(process=process)
     process_metrics.update(psutil_metrics)
 
+    # Add in agent_status metrics (if enabled)
+    if capture_agent_status_metrics:
+        agent_status_metrics = get_agent_status_metrics(process=process)
+        process_metrics.update(agent_status_metrics)
+
     metric_values = {}
     for metric_name, metric_obj in metrics.items():
+        if metric_obj not in process_metrics:
+            continue
         value = process_metrics[metric_obj]
         format_func = METRIC_FORMAT_FUNCTIONS.get(metric_name, lambda val: val)
         value = format_func(value)
@@ -221,6 +236,39 @@ def get_additional_psutil_metrics(process):
     return result
 
 
+def get_agent_status_metrics(process):
+    # type: (psutil.Process) -> dict
+    """
+    Retrieve additional agent related metrics utilizing agent status functionality.
+    """
+    result = {}
+
+    # Request json format
+    agent_data_path = os.path.expanduser("~/scalyr-agent-dev/data")
+    status_format_file = os.path.join(agent_data_path, "status_format")
+    with open(status_format_file, "w") as fp:
+        fp.write(six.text_type("json"))
+
+    # Ask agent to dump metrics
+    os.kill(process.pid, signal.SIGUSR1)
+
+    # Wait a bit for agent to write the metrics and parse the metrics
+    time.sleep(2)
+
+    status_file = os.path.join(agent_data_path, "last_status")
+
+    with open(status_file, "r") as fp:
+        content = fp.read()
+
+    content = json.loads(content)
+
+    # NOTE: Currently we only capture gc metrics
+    metric_gc_garbage = Metric(name="app.gc.garbage", _type=None)
+    result[metric_gc_garbage] = content.get("gc_stats", {}).get("garbage", 0)
+
+    return result
+
+
 def main(
     pid,
     codespeed_url,
@@ -231,8 +279,10 @@ def main(
     branch,
     commit_id,
     commit_date=None,
+    capture_agent_status_metrics=False,
+    dry_run=False,
 ):
-    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime]) -> None
+    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime], bool, bool) -> None
     """
     Main entry point / run loop for the script.
     """
@@ -246,6 +296,9 @@ def main(
     # It maps metric name to a dictionary with the results
     captured_values = defaultdict(list)  # type: Dict[str, List[T_metric_value]]
 
+    # Give it some time for the process to start and initialize before first capture
+    time.sleep(5)
+
     while time.time() <= end_time:
         logger.debug("Capturing gauge metrics...")
         capture_metrics(
@@ -253,6 +306,7 @@ def main(
             process=process,
             metrics=METRICS_GAUGES,
             values=captured_values,
+            capture_agent_status_metrics=capture_agent_status_metrics,
         )
         time.sleep(args.capture_interval)
 
@@ -270,6 +324,9 @@ def main(
 
     # Calculate derivatives for gauge metrics
     for metric_name in METRICS_GAUGES.keys():
+        if metric_name not in captured_values:
+            continue
+
         values = captured_values[metric_name]
 
         percentile_999 = np.percentile(values, 99.9)
@@ -289,6 +346,11 @@ def main(
         result[metric_name] = {"value": metric_value}
 
     logger.debug("Captured data: %s" % (str(result)))
+
+    if dry_run:
+        logger.info("Dry run, not submitting metrics to CodeSpeed...")
+        return
+
     logger.info("Capture complete, submitting metrics to CodeSpeed...")
     send_data_to_codespeed(
         codespeed_url=codespeed_url,
@@ -337,6 +399,18 @@ if __name__ == "__main__":
             "(in seconds)."
         ),
     )
+    parser.add_argument(
+        "--capture-agent-status-metrics",
+        action="store_true",
+        default=False,
+        help=("True to also capture additional metrics using agent status file."),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("Just capture metrics, but don't submit them to CodeSpeed."),
+    )
 
     args = parser.parse_args()
 
@@ -354,4 +428,6 @@ if __name__ == "__main__":
         branch=args.branch,
         commit_id=args.commit_id,
         commit_date=commit_date,
+        capture_agent_status_metrics=args.capture_agent_status_metrics,
+        dry_run=args.dry_run,
     )

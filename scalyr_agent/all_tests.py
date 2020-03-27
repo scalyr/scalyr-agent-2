@@ -17,12 +17,22 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest
 import os
 import sys
 import traceback
+
+# NOTE: We ensure repo root is in PYTHONPATH so we can import conftest module
+REPO_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
+sys.path.insert(0, REPO_ROOT_PATH)
+from conftest import collect_ignore
+from conftest import get_module_fqdn_for_path
 
 
 def find_all_tests(directory=None, base_path=None):
@@ -52,52 +62,27 @@ def find_all_tests(directory=None, base_path=None):
     return result
 
 
-PYTHON24_WHITELIST = [
-    "scalyr_agent.tests.url_monitor_test",
-]
-
-PRE_PYTHON27_WHITELIST = [
-    "scalyr_agent.tests.configuration_docker_test",
-    "scalyr_agent.tests.configuration_k8s_test",
-    "scalyr_agent.builtin_monitors.tests.docker_monitor_test",
-    "scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test",
-    "scalyr_agent.monitor_utils.tests.k8s_test",
-    "scalyr_agent.tests.syslog_request_parser_test",
-    "scalyr_agent.tests.syslog_monitor_test",
-    "scalyr_agent.tests.redis_monitor_test",
-]
-
-
 def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
     contained in files ending in '_test.py'.
     """
+    print("Current python version: %s" % sys.version)
+
     test_loader = unittest.defaultTestLoader
     suites = []
     error = False
-    for test_case in find_all_tests():
+
+    test_modules = find_all_tests()
+    # Remove all modules which are to be ignored
+    ignored_test_modules = [
+        get_module_fqdn_for_path(module_path) for module_path in collect_ignore
+    ]
+    test_modules = list(set(test_modules) - set(ignored_test_modules))
+
+    for test_case in test_modules:
         try:
-            try:
-                suites.append(test_loader.loadTestsFromName(test_case))
-            except Exception, ex:
-                if sys.version_info[:2] < (2, 5) and test_case in PYTHON24_WHITELIST:
-                    print(
-                        "Warning. Skipping unloadable module '%s'.\n"
-                        "This module was whitelisted as non-critical for Python 2.4 testing.\n"
-                        "Module-load exception message: '%s'\n" % (test_case, ex)
-                    )
-                elif (
-                    sys.version_info[:2] < (2, 7)
-                    and test_case in PRE_PYTHON27_WHITELIST
-                ):
-                    print(
-                        "Warning. Skipping unloadable module '%s'.\n"
-                        "This module was whitelisted as non-critical for pre-2.7 testing.\n"
-                        "Module-load exception message: '%s'\n" % (test_case, ex)
-                    )
-                else:
-                    raise
-        except Exception, e:
+            suites.append(test_loader.loadTestsFromName(test_case))
+        except Exception as e:
             error = True
             print(
                 "Error loading test_case '%s'.  %s, %s"

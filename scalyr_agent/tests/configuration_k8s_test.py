@@ -1,5 +1,6 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import os
-from mock import patch, Mock
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
@@ -12,6 +13,9 @@ from scalyr_agent.monitor_utils.k8s import QualifiedName
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfigurationBase
 from scalyr_agent.test_base import ScalyrTestCase
+
+from mock import patch, Mock
+import six
 
 
 class TestConfigurationK8s(TestConfigurationBase):
@@ -65,14 +69,13 @@ class TestConfigurationK8s(TestConfigurationBase):
             "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
             "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
             "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
-            "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
-            "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
             "k8s_sidecar_mode": (STANDARD_PREFIX, True, bool),
-            "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, str),
+            "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, six.text_type),
             "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
             "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
             "k8s_always_use_docker": (STANDARD_PREFIX, True, bool),
             "k8s_kubelet_host_ip": (STANDARD_PREFIX, False, bool),
+            "k8s_kubelet_api_url_template": (STANDARD_PREFIX, False, bool),
             "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
         }
 
@@ -80,7 +83,7 @@ class TestConfigurationK8s(TestConfigurationBase):
             "max_log_size": ("SCALYR_K8S_MAX_LOG_SIZE", TEST_INT, int),
             "max_log_rotations": ("SCALYR_K8S_MAX_LOG_ROTATIONS", TEST_INT, int),
             "log_flush_delay": ("SCALYR_K8S_LOG_FLUSH_DELAY", TEST_FLOAT, float),
-            "message_log": ("SCALYR_K8S_MESSAGE_LOG", TEST_STRING, str),
+            "message_log": ("SCALYR_K8S_MESSAGE_LOG", TEST_STRING, six.text_type),
             "event_object_filter": (
                 "SCALYR_K8S_EVENT_OBJECT_FILTER",
                 TEST_ARRAY_OF_STRINGS,
@@ -91,7 +94,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 TEST_INT,
                 int,
             ),
-            "leader_node": ("SCALYR_K8S_LEADER_NODE", TEST_STRING, str),
+            "leader_node": ("SCALYR_K8S_LEADER_NODE", TEST_STRING, six.text_type),
             "check_labels": ("SCALYR_K8S_CHECK_LABELS", True, bool),
             "ignore_master": ("SCALYR_K8S_IGNORE_MASTER", False, bool),
         }
@@ -105,13 +108,13 @@ class TestConfigurationK8s(TestConfigurationBase):
                     if custom_name == STANDARD_PREFIX
                     else custom_name.upper()
                 )
-                envar_value = str(value[1])
+                param_value = value[1]
                 if value[2] == ArrayOfStrings:
                     # Array of strings should be entered into environment in the user-preferred format
                     # which is without square brackets and quotes around each element
-                    envar_value = envar_value[1:-1]  # strip square brackets
-                    envar_value = envar_value.replace("'", "")
+                    envar_value = "[{0}]".format(", ".join(param_value))
                 else:
+                    envar_value = six.text_type(param_value)
                     envar_value = (
                         envar_value.lower()
                     )  # lower() needed for proper bool encoding

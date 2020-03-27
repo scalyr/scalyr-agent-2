@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 import threading
 
 __author__ = "czerwin@scalyr.com"
@@ -34,9 +36,11 @@ import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 import time
-import mock
 
+import mock
 from mock import Mock, patch, call
+import six
+from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):
@@ -221,7 +225,7 @@ class TestKubernetesApi(ScalyrTestCase):
         else:
             resp = requests.Response()
             resp.status_code = response_code_or_exception
-            resp._content = "{}"
+            resp._content = b"{}"
             mock_get.return_value = resp
 
         stack_trace_lines = ["stack_trace_line_1\n", "stack_trace_line_2\n"]
@@ -231,36 +235,43 @@ class TestKubernetesApi(ScalyrTestCase):
         # Return the log message that should have been logged if all criteria are met
         return (
             mock_logger,
-            self._get_expected_log_mesg(self._path, stack_trace_lines, resp._content),
+            self._get_expected_log_mesg(
+                self._path, stack_trace_lines, resp._content.decode("utf-8")
+            ),
         )
 
     def test_query_api_log_format(self):
         """Logging is turned on.  Asserts proper debug-logging (url + stacktrace + response content)"""
         kapi = KubernetesApi(log_api_responses=True)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         self._assert_logged(mock_logger, expected_log_msg)
 
     def test_query_api_no_log(self):
         """Logging is turned off"""
         kapi = KubernetesApi(log_api_responses=False)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_min_response_len(self):
         """Fails to satisfy minimum response len.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_min_response_len=3)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_min_latency(self):
         """Fails to satisfy minimum latency.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=10)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_ratelimit(self):
         """Fails to satisfy minimum latency.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_ratelimit_interval=77)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         mock_logger.log.assert_called_with(
             scalyr_logging.DEBUG_LEVEL_1,
@@ -272,6 +283,7 @@ class TestKubernetesApi(ScalyrTestCase):
     def test_query_api_200s_not_logged(self):
         """200 response not logged when 200s are excluded"""
         kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
+        # pylint: disable=no-value-for-parameter
         mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
         self._assert_not_logged(mock_logger, expected_log_msg)
 
@@ -280,6 +292,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
 
         def func():
+            # pylint: disable=no-value-for-parameter
             mock_logger, expected_log_msg = self._simulate_response(kapi, 404)
             self._assert_logged(mock_logger, expected_log_msg)
 
@@ -290,7 +303,10 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True)
 
         def func():
-            mock_logger, expected_log_msg = self._simulate_response(
+            (
+                mock_logger,
+                expected_log_msg,
+            ) = self._simulate_response(  # pylint: disable=no-value-for-parameter
                 kapi, requests.ReadTimeout()
             )
             self._assert_logged(mock_logger, expected_log_msg)
@@ -302,7 +318,10 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=100)
 
         def func():
-            mock_logger, expected_log_msg = self._simulate_response(
+            (
+                mock_logger,
+                expected_log_msg,
+            ) = self._simulate_response(  # pylint: disable=no-value-for-parameter
                 kapi, requests.ReadTimeout()
             )
             self._assert_not_logged(mock_logger, expected_log_msg)
@@ -537,7 +556,7 @@ class DockerClientFaker(object):
         @param container_id: The container we are reporting
         @param metric_value:  The value to return
 
-        @type container_id: str
+        @type container_id: six.text_type
         @type metric_value: int
         """
         self.__lock.acquire()
@@ -576,8 +595,9 @@ def create_object_from_dict(d):
     Takes a dict of key-value pairs and converts it to an object with attributes
     equal to the names of the keys and values equal to the values
     """
-    result = type("", (), {})()
-    for key, value in d.iteritems():
+    # 2->TODO 'type' function accepts only str, not unicode, python3 has the opposite situation.
+    result = type(six.ensure_str(""), (), {})()
+    for key, value in six.iteritems(d):
         setattr(result, key, value)
     return result
 
@@ -697,7 +717,7 @@ class FakeK8s(object):
     def stop(self):
         """Wakes up anything waiting on a pending requests.  Called when the test is finished.
         """
-        self.__lock.acquire()
+        self.__condition_var.acquire()
         try:
             if self.__pending_request is not None:
                 # If there is still a blocked request at the end of the test, drain it out with an arbitrary
@@ -705,9 +725,9 @@ class FakeK8s(object):
                 self.__pending_responses[
                     self.__pending_request
                 ] = self._raise_temp_error
-                self.__condition_var.notify_all()
+            self.__condition_var.notify_all()
         finally:
-            self.__lock.release()
+            self.__condition_var.release()
 
     def wait_until_request_pending(self, namespace=None, name=None):
         """Blocks the caller until there is a pending call to the cache's `query_object` method that is blocked,

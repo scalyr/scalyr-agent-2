@@ -15,9 +15,10 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
-
 
 import re
 
@@ -27,6 +28,8 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClockCounter
 
+import six
+
 
 class MonitorsManagerTest(ScalyrTestCase):
     def test_single_module(self):
@@ -35,7 +38,6 @@ class MonitorsManagerTest(ScalyrTestCase):
             [],
         )
         self.assertEquals(len(test_manager.monitors), 1)
-        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor()")
 
     def test_multiple_modules_and_platform_monitors(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -134,7 +136,7 @@ class MonitorsManagerTest(ScalyrTestCase):
                 },
             ],
             [],
-            extra_toplevel_config={"disable_leak_monitors_creation": True,},
+            extra_toplevel_config={"disable_leak_monitors_creation": True},
         )
 
         self.assertEquals(len(test_manager.monitors), 0)
@@ -275,7 +277,7 @@ class MonitorsManagerTest(ScalyrTestCase):
 
         def mock_get_user_agent_fragment_2():
             fragment_polls.increment()
-            return test_frag + str(fragment_polls.count())
+            return test_frag + six.text_type(fragment_polls.count())
 
         for mon in [patched_monitor_0, patched_monitor_1]:
             mon.get_user_agent_fragment = mock_get_user_agent_fragment_2
@@ -289,7 +291,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         test_manager.set_user_agent_augment_callback(augment_user_agent_2)
 
         self.assertTrue(
-            fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 1)
+            fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 2.5)
         )
         self.assertEquals(counter["callback_invocations"], 10)
 

@@ -17,16 +17,22 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.tomcat_monitor
-import httplib
-import urllib2
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 import socket
-import urlparse
 import base64
 import re
 
+import six.moves.urllib.parse
+import six.moves.http_client
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
+
 from scalyr_agent import (
     ScalyrMonitor,
-    UnsupportedSystem,
     define_config_option,
     define_metric,
     define_log_field,
@@ -50,26 +56,26 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate tomcatql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_url",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
     __monitor__,
     "monitor_user",
     "The username required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_password",
     "The pasword associated with the monitor_user required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -146,21 +152,21 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.request_count",
-    "The value represents the total number of requests made.  ",
+    "The value represents the total number of requests made.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.error_count",
-    "The value represents the total number requests that resulted in errors.  ",
+    "The value represents the total number requests that resulted in errors.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number bytes received by the server.  ",
+    "The value represents the total number bytes received by the server.",
     extra_fields={"type": "received"},
     cumulative=True,
     category="general",
@@ -168,7 +174,7 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number sent by the server.  ",
+    "The value represents the total number sent by the server.",
     extra_fields={"type": "sent"},
     cumulative=True,
     category="general",
@@ -239,7 +245,9 @@ define_log_field(__monitor__, "value", "The metric value.")
 # Note - the use of a global is ugly, but this form is more compatible than with another
 # method mentioned which would not require the global.  (The cleaner version was added
 # in Python 2.7.)
-class BindableHTTPConnection(httplib.HTTPConnection):
+
+
+class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
     def connect(self):
         """Connect to the host and port specified in __init__."""
         self.sock = socket.socket()
@@ -251,14 +259,19 @@ class BindableHTTPConnection(httplib.HTTPConnection):
 
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
-        bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
+        # pylint: disable=unexpected-keyword-arg
+        if six.PY2:
+            kwargs = {"strict": strict}
+        else:
+            kwargs = {}
+        bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc
 
     return _get
 
 
-class BindableHTTPHandler(urllib2.HTTPHandler):
+class BindableHTTPHandler(six.moves.urllib.request.HTTPHandler):
     def http_open(self, req):
         return self.do_open(BindableHTTPConnectionFactory(httpSourceAddress), req)
 
@@ -270,7 +283,7 @@ def _convert_to_megabytes(value):
     if len(parts) < 2:
         return None
     scale_multiplier = {"kb": 0.001, "mb": 1.0, "gb": 1000.0, "tb": 1000000.0}
-    if parts[1].lower() not in scale_multiplier.keys():
+    if parts[1].lower() not in list(scale_multiplier.keys()):
         return None
     multiplier = scale_multiplier[parts[1].lower()]
     try:
@@ -278,7 +291,7 @@ def _convert_to_megabytes(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception, e:
+    except Exception:
         return None
     return val * multiplier
 
@@ -293,7 +306,7 @@ def _convert_to_milliseconds(value):
         "s": 1000.0,
         "ms": 1.0,
     }
-    if parts[1].lower() not in scale_multiplier.keys():
+    if parts[1].lower() not in list(scale_multiplier.keys()):
         return None
     multiplier = scale_multiplier[parts[1].lower()]
     try:
@@ -301,7 +314,7 @@ def _convert_to_milliseconds(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception, e:
+    except Exception:
         return None
     return val * multiplier
 
@@ -412,8 +425,8 @@ instance."""
         data = None
         # verify that the URL is valid
         try:
-            testurl = urlparse.urlparse(url)
-        except Exception, e:
+            six.moves.urllib.parse.urlparse(url)
+        except Exception:
             print(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % url
@@ -421,18 +434,18 @@ instance."""
             return data
         # attempt to request server status
         try:
-            request = urllib2.Request(self._monitor_url)
-            if self._monitor_user != None:
+            request = six.moves.urllib.request.Request(self._monitor_url)
+            if self._monitor_user is not None:
                 b64cred = base64.encodestring(
                     "%s:%s" % (self._monitor_user, self._monitor_password)
                 ).replace("\n", "")
                 request.add_header("Authorization", "Basic %s" % b64cred)
-            opener = urllib2.build_opener(BindableHTTPHandler)
+            opener = six.moves.urllib.request.build_opener(BindableHTTPHandler)
             handle = opener.open(request)
             data = handle.read()
-        except urllib2.HTTPError, err:
+        except six.moves.urllib.error.HTTPError as err:
             message = (
-                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                 err.code,
             )
             if err.code == 404:
@@ -441,15 +454,15 @@ instance."""
                 message = "The server is denying access to the URL specified for requesting the status page.  Please verify that permissions to access the status page are correctly configured in your server configuration and that your apache_monitor configuration reflects the same configuration requirements."
             elif err.code >= 500 or err.code < 600:
                 message = (
-                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                     err.code,
                 )
             self._logger.error(message)
             data = None
-        except urllib2.URLError, err:
+        except six.moves.urllib.error.URLError as err:
             message = (
-                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
-                err,
+                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
+                % str(err)
             )
             if err.reason.errno == 111:
                 message = (
@@ -458,7 +471,7 @@ instance."""
                 )
             self._logger.error(message)
             data = None
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "An error occurred attempting to request the server status: %s" % e
             )
@@ -475,13 +488,15 @@ instance."""
         start = status.find("<h1>JVM</h1>")
         if start > -1:
             m = re.match(
-                r"[\w\W]*Free memory: ([\w\W]*) Total memory: ([\w\W]*) Max memory: ([\w\W]*)<\/p>[\w\W]*"
-                "Max threads: ([\d]*) Current thread count: ([\d]*) Current thread busy: ([\d]*)[\w\W]*"
-                "Max processing time: ([\w\W]*) Processing time: ([\w\W]*)[\w\W]*"
-                "Request count: ([\d]*) Error count: ([\d]*) Bytes received: ([\w\W]*) Bytes sent: ([\w\W]*)<\/p><table[\w\W]*",
+                (
+                    r"[\w\W]*Free memory: ([\w\W]*) Total memory: ([\w\W]*) Max memory: ([\w\W]*)<\/p>[\w\W]*"
+                    r"Max threads: ([\d]*) Current thread count: ([\d]*) Current thread busy: ([\d]*)[\w\W]*"
+                    r"Max processing time: ([\w\W]*) Processing time: ([\w\W]*)[\w\W]*"
+                    r"Request count: ([\d]*) Error count: ([\d]*) Bytes received: ([\w\W]*) Bytes sent: ([\w\W]*)<\/p><table[\w\W]*"
+                ),
                 status[start + 12 :],
             )
-            if m != None:
+            if m is not None:
                 result["memory_free"] = [
                     "memory_bytes",
                     _convert_to_megabytes(m.group(1)),
@@ -505,13 +520,13 @@ instance."""
                     "threads",
                     int(m.group(5)),
                     "type",
-                    "max",
+                    "active",
                 ]
                 result["threads_current_busy"] = [
                     "threads",
                     int(m.group(6)),
                     "type",
-                    "max",
+                    "busy",
                 ]
                 result["processing_time_max"] = [
                     "processing_time_max",
@@ -544,14 +559,16 @@ instance."""
         start = status.find("<h1>JVM</h1>")
         if start > -1:
             m = re.match(
-                r"[\w\W]*CMS Old Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Eden Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Survivor Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*CMS Perm Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Code Cache<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr><\/tbody><\/table>[\w\W]+",
+                (
+                    r"[\w\W]*CMS Old Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Eden Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Survivor Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*CMS Perm Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Code Cache<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr><\/tbody><\/table>[\w\W]+"
+                ),
                 status[start + 12 :],
             )
-            if m != None:
+            if m is not None:
                 # result["cms_old_gen.type"] = m.group(1)
                 result["cms_old_gen.initial"] = [
                     "initial",
@@ -683,31 +700,22 @@ instance."""
         """Invoked once per sample interval to gather a statistic.
         """
 
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is str:
-                return "%r" % value
-            else:
-                return "%r" % value
-
         status = self._get_status(self._monitor_url)
-        if status != None:
+        if status is not None:
+            status = six.ensure_text(status)
             stats = self._parse_general_status(status)
             heap = self._parse_heap_status(status)
 
-            if stats != None:
-                for key in stats.keys():
+            if stats is not None:
+                for key in sorted(stats.keys()):
                     extra = None
                     if len(stats[key]) == 4:
                         extra = {stats[key][2]: stats[key][3]}
                     self._logger.emit_value(
                         "tomcat.runtime.%s" % stats[key][0], stats[key][1], extra
                     )
-            if heap != None:
-                for key in heap.keys():
+            if heap is not None:
+                for key in sorted(heap.keys()):
                     extra = {heap[key][2]: heap[key][3]}
                     self._logger.emit_value(
                         "tomcat.memory_pools.%s" % heap[key][0], heap[key][1], extra

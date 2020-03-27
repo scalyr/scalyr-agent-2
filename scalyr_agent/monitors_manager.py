@@ -14,6 +14,11 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+if False:
+    from typing import List
 
 __author__ = "czerwin@scalyr.com"
 
@@ -24,8 +29,10 @@ from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
 from scalyr_agent.scalyr_monitor import load_monitor_class, ScalyrMonitor
 from scalyr_agent.util import StoppableThread
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController
 
-from __scalyr__ import get_package_root
+from scalyr_agent.__scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -246,23 +253,9 @@ class MonitorsManager(StoppableThread):
         @type configuration: scalyr_agent.Configuration
         @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
-
-        # Get all the monitors we will be running.  This is determined by the config file and the platform's default
-        # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
-        # may need to modify them.
-        all_monitors = []
-
-        for monitor in configuration.monitor_configs:
-            all_monitors.append(monitor.copy())
-
-        for monitor in platform_controller.get_default_monitors(configuration):
-            all_monitors.append(
-                configuration.parse_monitor_config(
-                    monitor,
-                    'monitor with module name "%s" requested by platform'
-                    % monitor["module"],
-                ).copy()
-            )
+        all_monitors = MonitorsManager._get_all_monitor_configs(
+            configuration, platform_controller
+        )
 
         # We need to go back and fill in the monitor id if it is not set.  We do this by keeping a count of
         # how many monitors we have with the same module name (just considering the last element of the module
@@ -274,7 +267,7 @@ class MonitorsManager(StoppableThread):
 
         for entry in all_monitors:
             module_name = entry["module"].split(".")[-1]
-            if not module_name in monitors_by_module_name:
+            if module_name not in monitors_by_module_name:
                 index = 1
             else:
                 index = monitors_by_module_name[module_name] + 1
@@ -289,7 +282,7 @@ class MonitorsManager(StoppableThread):
         # to clean up it's name in the logs.
         for entry in all_monitors:
             module_name = entry["module"].split(".")[-1]
-            if monitors_by_module_name[module_name] == 1 and not module_name in had_id:
+            if monitors_by_module_name[module_name] == 1 and module_name not in had_id:
                 entry["id"] = ""
 
         result = []
@@ -316,8 +309,8 @@ class MonitorsManager(StoppableThread):
         @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
             instantiating the module in case it needs to packages in other directories.
 
-        @type monitor_module: str
-        @type additional_python_paths: str
+        @type monitor_module: six.text_type
+        @type additional_python_paths: six.text_type
 
         @return:  The class for the ScalyrMonitor in the module.
         @rtype: class
@@ -356,7 +349,7 @@ class MonitorsManager(StoppableThread):
         @param global_config: The global configuration object
 
         @type monitor_config: dict
-        @type additional_python_paths: str
+        @type additional_python_paths: six.text_type
 
         @return:  The appropriate ScalyrMonitor instance as controlled by the configuration.
         @rtype: scalyr_monitor.ScalyrMonitor
@@ -379,3 +372,28 @@ class MonitorsManager(StoppableThread):
             scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)),
             global_config=global_config,
         )
+
+    @staticmethod
+    def _get_all_monitor_configs(configuration, platform_controller):
+        # type: (Configuration, PlatformController) -> List[dict]
+        """
+        Return monitor config dictionaries for all the monitors, including the built it ones.
+        """
+        # Get all the monitors we will be running.  This is determined by the config file and the platform's default
+        # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
+        # may need to modify them.
+        all_monitors = []
+
+        for monitor in configuration.monitor_configs:
+            all_monitors.append(monitor.copy())
+
+        for monitor in platform_controller.get_default_monitors(configuration):
+            all_monitors.append(
+                configuration.parse_monitor_config(
+                    monitor,
+                    'monitor with module name "%s" requested by platform'
+                    % monitor["module"],
+                ).copy()
+            )
+
+        return all_monitors

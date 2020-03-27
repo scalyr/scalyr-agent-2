@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: scalyr-agent-2
+spec:
+  template:
+    spec:
+      volumes:
+      - $patch: delete
+        name: checkpoints
+      containers:
+      - env:
+        volumeMounts:
+          - $patch: delete
+            name: checkpoints

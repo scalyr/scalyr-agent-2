@@ -1,0 +1,12 @@
+{
+  api_key: "foobar"
+  scalyr_server: "agent.scalyr.com",
+  debug_level: "5",
+
+  server_attributes: {
+     serverHost: "test",
+     tier: "test"
+  },
+
+  import_vars: [ "TEST_VAR" ],
+}

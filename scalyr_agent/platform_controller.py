@@ -15,22 +15,33 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
+
+if False:
+    from typing import List
+    from typing import Type
 
 
 import sys
 
-from __scalyr__ import INSTALL_TYPE
+from scalyr_agent.__scalyr__ import INSTALL_TYPE
+
+# Holds a reference to the existing PlatformController instance which is populated when first
+# calling "PlatformController.existing_instance()".
+PLATFORM_INSTANCE = None
 
 
-class PlatformController:
+class PlatformController(object):
     def __init__(self):
         """Initializes a platform instance.
         """
         self._install_type = INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
-    __platform_classes__ = []
+    __platform_classes__ = []  # type: List[Type[PlatformController]]
     __platforms_registered__ = False
 
     @staticmethod
@@ -73,6 +84,21 @@ class PlatformController:
             if result.can_handle_current_platform():
                 return result
         return None
+
+    @staticmethod
+    def existing_platform():
+        """
+        Return an existing instance of the previously registered platform class.
+
+        The instance is instantiated on first call to the this method. On subsequent calls, existing
+        cached instance is returned.
+        """
+        global PLATFORM_INSTANCE
+
+        if not PLATFORM_INSTANCE:
+            PLATFORM_INSTANCE = PlatformController.new_platform()
+
+        return PLATFORM_INSTANCE
 
     @property
     def install_type(self):
@@ -127,7 +153,7 @@ class PlatformController:
         @param path_to_config: The full path to file that was read to create the config object.
 
         @type config: configuration.Configuration
-        @type path_to_config: str
+        @type path_to_config: six.text_type
         """
         pass
 
@@ -174,10 +200,10 @@ class PlatformController:
         """Returns the user name of the owner of the specified file.
 
         @param file_path: The path of the file.
-        @type file_path: str
+        @type file_path: six.text_type
 
         @return: The user name of the owner.
-        @rtype: str
+        @rtype: six.text_type
         """
         pass
 
@@ -187,8 +213,8 @@ class PlatformController:
         @param file_path: The path of the file.
         @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
             `get_current_user`.
-        @type file_path: str
-        @type owner: str
+        @type file_path: six.text_type
+        @type owner: six.text_type
         """
         pass
 
@@ -199,7 +225,7 @@ class PlatformController:
         privileges.
 
         @return: The name of the effective user running this process.
-        @rtype: str
+        @rtype: six.text_type
         """
         pass
 
@@ -224,10 +250,10 @@ class PlatformController:
 
         @return The status code for the executed script, if it returns at all.
 
-        @type user_name: str
-        @type script_file: str|None
-        @type script_binary: str|None
-        @type script_arguments: list<str>
+        @type user_name: six.text_type
+        @type script_file: six.text_type|None
+        @type script_binary: six.text_type|None
+        @type script_arguments: list<six.text_type>
 
         @rtype int
 

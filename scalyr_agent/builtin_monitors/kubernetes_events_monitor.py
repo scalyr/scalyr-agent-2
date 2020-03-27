@@ -13,8 +13,12 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
+
+from scalyr_agent import compat
 
 from scalyr_agent.monitor_utils.k8s import (
     KubernetesApi,
@@ -27,14 +31,17 @@ import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 import datetime
-import os
 import re
 import traceback
 import time
-import urllib
-
 import logging
 import logging.handlers
+
+import six
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
+
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -42,7 +49,6 @@ from scalyr_agent import (
     AutoFlushingRotatingFileHandler,
 )
 from scalyr_agent.scalyr_logging import BaseFormatter
-from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
@@ -51,7 +57,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
 
-SCALYR_CONFIG_ANNOTATION_RE = re.compile("^(agent\.config\.scalyr\.com/)(.+)")
+SCALYR_CONFIG_ANNOTATION_RE = re.compile(r"^(agent\.config\.scalyr\.com/)(.+)")
 
 __monitor__ = __name__
 
@@ -59,7 +65,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -104,7 +110,7 @@ define_config_option(
     "Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages "
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
-    convert_to=str,
+    convert_to=six.text_type,
     default="kubernetes_events.log",
     env_name="SCALYR_K8S_MESSAGE_LOG",
 )
@@ -125,7 +131,7 @@ define_config_option(
     "event_object_filter",
     "Optional (defaults to %s). A list of event object types to filter on. "
     "If set, only events whose `involvedObject` `kind` is on this list will be included."
-    % str(EVENT_OBJECT_FILTER_DEFAULTS),
+    % six.text_type(EVENT_OBJECT_FILTER_DEFAULTS),
     convert_to=ArrayOfStrings,
     default=EVENT_OBJECT_FILTER_DEFAULTS,
     env_name="SCALYR_K8S_EVENT_OBJECT_FILTER",
@@ -144,7 +150,7 @@ define_config_option(
     __monitor__,
     "leader_node",
     "Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node.",
-    convert_to=str,
+    convert_to=six.text_type,
     default=None,
     env_name="SCALYR_K8S_LEADER_NODE",
 )
@@ -186,102 +192,102 @@ class EventLogFormatter(BaseFormatter):
 
 class KubernetesEventsMonitor(ScalyrMonitor):
     """
-    # Kubernetes Events Monitor
+# Kubernetes Events Monitor
 
-    The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
+The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
 
-    This monitor fetches Kubernetes Events from the Kubernetes API server and uploads them to Scalyr. [Kubernetes Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.10/#event-v1-core) record actions taken by the Kubernetes master, such as starting or killing pods. This information can be extremely useful in debugging issues with your Pods and investigating the general health of your K8s cluster. By default, this monitor collects all events related to Pods (including objects that control Pods such as DaemonSets and Deployments) as well as Nodes.
+This monitor fetches Kubernetes Events from the Kubernetes API server and uploads them to Scalyr. [Kubernetes Events](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.10/#event-v1-core) record actions taken by the Kubernetes master, such as starting or killing pods. This information can be extremely useful in debugging issues with your Pods and investigating the general health of your K8s cluster. By default, this monitor collects all events related to Pods (including objects that control Pods such as DaemonSets and Deployments) as well as Nodes.
 
-    Each Event is uploaded to Scalyr as a single log line. The format is described in detail below, but in general, it has two JSON objects, one holding the contents of the Event as described by the Kubernetes API and the second holding additional information the Scalyr Agent has added to provide more context for the Event, such as the Deployment to which the Pod belongs.
+Each Event is uploaded to Scalyr as a single log line. The format is described in detail below, but in general, it has two JSON objects, one holding the contents of the Event as described by the Kubernetes API and the second holding additional information the Scalyr Agent has added to provide more context for the Event, such as the Deployment to which the Pod belongs.
 
-    This monitor powers the [Kubernetes Events dashboard](https://www.scalyr.com/dash?page=k8s%20Events). Additionally, you can see all Events uploaded by [searching for monitor="kubernetes_events_monitor"](https://www.scalyr.com/events?filter=monitor%3D%22kubernetes_events_monitor%22)
+This monitor powers the [Kubernetes Events dashboard](https://www.scalyr.com/dash?page=k8s%20Events). Additionally, you can see all Events uploaded by [searching for monitor="kubernetes_events_monitor"](https://www.scalyr.com/events?filter=monitor%3D%22kubernetes_events_monitor%22)
 
-    ## Event Collection Leader
+## Event Collection Leader
 
-    The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster (and not necessarily just one Node). Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
+The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster (and not necessarily just one Node). Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
 
-    By default, the leader election algorithm selects the Scalyr Agent Pod running on the oldest Node, excluding the Node running the master. To determine which is the oldest node, each Scalyr Agent Pod will retrieve the entire cluster Node list at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large clusters, performing these checks can place noticeable load on the K8s API server. There are two ways to address this issue, with different impacts on load and flexibility.
+By default, the leader election algorithm selects the Scalyr Agent Pod running on the oldest Node, excluding the Node running the master. To determine which is the oldest node, each Scalyr Agent Pod will retrieve the entire cluster Node list at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large clusters, performing these checks can place noticeable load on the K8s API server. There are two ways to address this issue, with different impacts on load and flexibility.
 
-    ### Node Labels
+### Node Labels
 
-    The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
+The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
 
-    `kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
+`kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
 
-    Where `<nodename>` is the name of the node in question.  You can set this label on multiple nodes, and the agent will use the oldest of them as the event collector leader.  If the leader node is shutdown, it will fallback to the next oldest node and so on.
+Where `<nodename>` is the name of the node in question.  You can set this label on multiple nodes, and the agent will use the oldest of them as the event collector leader.  If the leader node is shutdown, it will fallback to the next oldest node and so on.
 
-    Once the labels have been set, you also need to configure the agent to query these labels.  This is done via the `check_labels` configuration option in the Kubernetes Events monitor config (which is off by default):
+Once the labels have been set, you also need to configure the agent to query these labels.  This is done via the `check_labels` configuration option in the Kubernetes Events monitor config (which is off by default):
+
+```
+...
+monitors: [
+    {
+    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+    ...
+    "check_labels": true
+    }
+]
+...
+```
+
+If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for nodes with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of nodes.
+
+This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when an exister event collector leader node is shutdown.
+
+### Hardcoded Event Collector
+
+The second approach is to manually assign a leader node in the agent config.  This is done via the `leader_node` option of the Kubernetes Events monitor:
+
+```
+...
+monitors: [
+    {
+    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+    ...
+    "leader_node": "<name of leader node>"
+    }
+]
+...
+```
+
+When the leader node is explicitly set like this, no API queries are made to the K8s API server and only the node with that name will be used to query K8s events.  The downside to this approach is that it is less flexible, especially in the event of the node shutting down unexpectedly.
+
+The leader election algorithm relies on a few assumptions to work correctly and could, for large clusters, impact performance. If necessary, the events monitor can also be disabled.
+
+## Disabling the Kubernetes Events Monitor
+
+This monitor was released and enabled by default in Scalyr Agent version `2.0.43`. If you wish to disable this monitor, you may do so by setting `k8s_events_disable` to `true` in the `scalyr-config` ConfigMap used to run your ScalyrAgent DaemonSet. You must restart the ScalyrAgent DaemonSet once you have made this configuration change. Here is one way to perform these actions:
+
+1. Fetch the `scalyr-config` ConfigMap from your cluster.
 
     ```
-    ...
-    monitors: [
-      {
-        "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
-        ...
-        "check_labels": true
-      }
-    ]
-    ...
+    kubectl get configmap scalyr-config -o yaml --export >> scalyr-config.yaml
     ```
 
-    If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for nodes with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of nodes.
-
-    This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when an exister event collector leader node is shutdown.
-
-    ### Hardcoded Event Collector
-
-    The second approach is to manually assign a leader node in the agent config.  This is done via the `leader_node` option of the Kubernetes Events monitor:
+2. Add the following line to the data section of scalyr-config.yaml:
 
     ```
-    ...
-    monitors: [
-      {
-        "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
-        ...
-        "leader_node": "<name of leader node>"
-      }
-    ]
-    ...
+    k8s_events_disable: true
     ```
 
-    When the leader node is explicitly set like this, no API queries are made to the K8s API server and only the node with that name will be used to query K8s events.  The downside to this approach is that it is less flexible, especially in the event of the node shutting down unexpectedly.
+3. Update the scalyr-config ConfigMap.
 
-    The leader election algorithm relies on a few assumptions to work correctly and could, for large clusters, impact performance. If necessary, the events monitor can also be disabled.
+    ```
+    kubectl delete configmap scalyr-config
+    kubectl create -f scalyr-config.yaml
+    ```
 
-    ## Disabling the Kubernetes Events Monitor
+4. Delete the existing Scalyr k8s DaemonSet.
 
-    This monitor was released and enabled by default in Scalyr Agent version `2.0.43`. If you wish to disable this monitor, you may do so by setting `k8s_events_disable` to `true` in the `scalyr-config` ConfigMap used to run your ScalyrAgent DaemonSet. You must restart the ScalyrAgent DaemonSet once you have made this configuration change. Here is one way to perform these actions:
+    ```
+    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
+    ```
 
-    1. Fetch the `scalyr-config` ConfigMap from your cluster.
+5. Run the new Scalyr k8s DaemonSet.
 
-       ```
-       kubectl get configmap scalyr-config -o yaml --export >> scalyr-config.yaml
-       ```
-
-    2. Add the following line to the data section of scalyr-config.yaml:
-
-      ```
-      k8s_events_disable: true
-      ```
-
-    3. Update the scalyr-config ConfigMap.
-
-       ```
-       kubectl delete configmap scalyr-config
-       kubectl create -f scalyr-config.yaml
-       ```
-
-    4. Delete the existing Scalyr k8s DaemonSet.
-
-       ```
-       kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
-       ```
-
-    5. Run the new Scalyr k8s DaemonSet.
-
-       ```
-       kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
-       ```
+    ```
+    kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
+    ```
     """
 
     def _initialize(self):
@@ -314,7 +320,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         try:
             attributes = JsonObject({"monitor": "json"})
             self.log_config["attributes"] = attributes
-        except Exception, e:
+        except Exception:
             global_log.error(
                 "Error setting monitor attribute in KubernetesEventMonitor"
             )
@@ -353,12 +359,12 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             self.__max_log_rotations = default_rotation_count
 
         # Support legacy disabling of k8s_events via the K8S_EVENTS_DISABLE environment variable
-        k8s_events_disable_envar = os.environ.get("K8S_EVENTS_DISABLE")
+        k8s_events_disable_envar = compat.os_environ_unicode.get("K8S_EVENTS_DISABLE")
         if k8s_events_disable_envar is not None:
             global_log.warn(
                 "The K8S_EVENTS_DISABLE environment variable is deprecated. Please use SCALYR_K8S_EVENTS_DISABLE instead."
             )
-            legacy_disable = str(k8s_events_disable_envar).lower()
+            legacy_disable = six.text_type(k8s_events_disable_envar).lower()
         else:
             legacy_disable = "false"
 
@@ -395,9 +401,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 self.__disk_logger.setLevel(logging.INFO)
                 self.__disk_logger.propagate = False
                 success = True
-            except Exception, e:
+            except Exception as e:
                 global_log.error(
-                    "Unable to open KubernetesEventsMonitor log file: %s" % str(e)
+                    "Unable to open KubernetesEventsMonitor log file: %s"
+                    % six.text_type(e)
                 )
 
         return success
@@ -417,15 +424,14 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         if node is None:
             return False
 
-        result = {}
         try:
             # this call will throw an exception on failure
-            result = k8s.query_api_with_retries(
+            k8s.query_api_with_retries(
                 "/api/v1/nodes/%s" % node,
                 retry_error_context=node,
                 retry_error_limit_key="k8se_check_if_alive",
             )
-        except Exception, e:
+        except Exception:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node
             )
@@ -523,7 +529,9 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             # alive
             if self._check_labels:
                 query = "?labelSelector=%s" % (
-                    urllib.quote("agent.config.scalyr.com/events_leader_candidate=true")
+                    six.moves.urllib.parse.quote(
+                        "agent.config.scalyr.com/events_leader_candidate=true"
+                    )
                 )
                 new_leader = self._check_nodes_for_leader(k8s, query)
 
@@ -564,9 +572,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             )
             self._current_leader = None
             return None
-        except K8sApiException, e:
+        except K8sApiException as e:
             global_log.error(
-                "get current leader: %s, %s" % (str(e), traceback.format_exc())
+                "get current leader: %s, %s"
+                % (six.text_type(e), traceback.format_exc())
             )
 
         return self._current_leader
@@ -587,10 +596,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 leader = self._get_current_leader(k8s)
 
             # check if this node is the current leader node
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Unexpected error checking for leader: %s" % (str(e)),
+                "Unexpected error checking for leader: %s" % (six.text_type(e)),
             )
 
         return leader is not None and self._node_name == leader
@@ -637,8 +646,8 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             return
 
         try:
-            k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
+            self._global_config.k8s_api_url
+            self._global_config.k8s_verify_api_queries
 
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
@@ -676,7 +685,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             last_check = time.time() - self._leader_check_interval
 
             last_reported_leader = None
-            while not self._is_stopped():
+            while not self._is_thread_stopped():
                 current_time = time.time()
 
                 # if we are the leader, we could be going through this loop before the leader_check_interval
@@ -688,7 +697,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                         # if not, then sleep and try again
                         global_log.log(
                             scalyr_logging.DEBUG_LEVEL_1,
-                            "Leader is %s" % (str(self._current_leader)),
+                            "Leader is %s" % (six.text_type(self._current_leader)),
                         )
                         if (
                             self._current_leader is not None
@@ -696,7 +705,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                         ):
                             global_log.info(
                                 "Kubernetes event leader is %s"
-                                % str(self._current_leader)
+                                % six.text_type(self._current_leader)
                             )
                             last_reported_leader = self._current_leader
                         if k8s_cache is not None:
@@ -707,7 +716,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
 
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_1,
-                        "Leader is %s" % (str(self._current_leader)),
+                        "Leader is %s" % (six.text_type(self._current_leader)),
                     )
                 try:
                     if last_reported_leader != self._current_leader:
@@ -725,10 +734,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                     for line in lines:
                         try:
                             json = scalyr_util.json_decode(line)
-                        except Exception, e:
+                        except Exception as e:
                             global_log.warning(
                                 "Error parsing event json: %s, %s, %s"
-                                % (line, str(e), traceback.format_exc())
+                                % (line, six.text_type(e), traceback.format_exc())
                             )
                             continue
 
@@ -781,7 +790,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 global_log.log(
                                     scalyr_logging.DEBUG_LEVEL_1,
                                     "Ignoring event due to unknown kind %s - %s"
-                                    % (kind, str(metadata)),
+                                    % (kind, six.text_type(metadata)),
                                 )
                                 continue
 
@@ -830,8 +839,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                             self.__disk_logger.info(
                                 "event=%s extra=%s"
                                 % (
-                                    str(scalyr_util.json_encode(obj)),
-                                    str(scalyr_util.json_encode(extra_fields)),
+                                    six.text_type(scalyr_util.json_encode(obj)),
+                                    six.text_type(
+                                        scalyr_util.json_encode(extra_fields)
+                                    ),
                                 )
                             )
 
@@ -843,10 +854,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 )
                                 break
 
-                        except Exception, e:
+                        except Exception as e:
                             global_log.exception(
                                 "Failed to process single k8s event line due to following exception: %s, %s, %s"
-                                % (repr(e), str(e), traceback.format_exc()),
+                                % (repr(e), six.text_type(e), traceback.format_exc()),
                                 limit_once_per_x_secs=300,
                                 limit_key="k8s-stream-events-general-exception",
                             )
@@ -865,10 +876,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 except ConnectionError:
                     # ignore these, and just carry on querying in the next loop
                     pass
-                except Exception, e:
+                except Exception as e:
                     global_log.exception(
                         "Failed to stream k8s events due to the following exception: %s, %s, %s"
-                        % (repr(e), str(e), traceback.format_exc())
+                        % (repr(e), six.text_type(e), traceback.format_exc())
                     )
 
             if k8s_cache is not None:

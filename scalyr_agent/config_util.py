@@ -15,10 +15,11 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
-
-import os
 import re
 
 import scalyr_agent.util as scalyr_util
@@ -30,6 +31,11 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
+from scalyr_agent import compat
+
+import six
+
+# 2->TODO remove 'str' where is the type check
 
 
 def parse_array_of_strings(strlist, separators=[","]):
@@ -84,27 +90,39 @@ def parse_array_of_strings(strlist, separators=[","]):
     return ArrayOfStrings(elems)
 
 
-NUMERIC_TYPES = set([int, long, float])
-STRING_TYPES = set([str, unicode])
-PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
+NUMERIC_TYPES = set(six.integer_types + (float,))
+STRING_TYPES = set([six.text_type])
+PRIMITIVE_TYPES = NUMERIC_TYPES | set([six.text_type, bool])
 SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
     [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
 )
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
-    int: set([str, unicode, long, float]),
-    long: set([str, unicode, float]),
     float: STRING_TYPES,
     list: set(
-        [str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [
+            six.text_type,
+            JsonArray,
+            ArrayOfStrings,
+            SpaceAndCommaSeparatedArrayOfStrings,
+        ]
     ),
     JsonArray: set(
-        [str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonObject: STRING_TYPES,
-    str: SUPPORTED_TYPES,
-    unicode: SUPPORTED_TYPES,
+    six.text_type: SUPPORTED_TYPES,
 }
+
+# [start of 2->TODO]
+# The review of this solution is needed.
+# In python 2.6, 2.7 long can be converted to int without error,
+# so we can keep only int as allowed conversion for both int and long input values.
+ALLOWED_CONVERSIONS.update(
+    ((int_type, set([six.text_type, int, float])) for int_type in six.integer_types)
+)
+
+# [end of 2->TOD0]
 
 
 def convert_config_param(field_name, value, convert_to, is_environment_variable=False):
@@ -174,10 +192,13 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     if convert_from in STRING_TYPES:
 
         if convert_to == bool:
-            return str(value).lower() == "true"
+            return six.text_type(value).lower() == "true"
 
         elif convert_to in (JsonArray, JsonObject):
             try:
+                # Special case for empty objects
+                if convert_to == JsonObject and not value:
+                    return JsonObject()
                 # Needs to be json_lib.parse since it is parsing configuration.
                 return scalyr_util.json_scalyr_config_decode(value)
             except JsonParseException:
@@ -236,10 +257,10 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     # At this point, we are trying to convert a number to another number type.  We only allow int to long
     # and long, int to float.
-    if convert_to == float and convert_from in (long, int):
+    if convert_to == float and convert_from in six.integer_types:
         return float(value)
-    if convert_to == long and convert_from == int:
-        return long(value)
+    if convert_to in six.integer_types:
+        return int(value)
 
     raise BadConfiguration(
         'A numeric value of %s was given for field "%s" but a %s is required.'
@@ -276,11 +297,12 @@ def get_config_from_env(
         env_name = "SCALYR_%s" % param_name
 
     env_name = env_name.upper()
-    strval = os.getenv(env_name)
+    # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+    strval = compat.os_getenv_unicode(env_name)
 
     if strval is None:
         env_name = env_name.lower()
-        strval = os.getenv(env_name)
+        strval = compat.os_getenv_unicode(env_name)
 
     if strval is None or convert_to is None:
         return strval

@@ -74,7 +74,7 @@ kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key=${SCA
 # Create configmap
 kubectl create configmap scalyr-config \
 --from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-${CIRCLE_BUILD_NUM} \
---from-literal=SCALYR_SERVER=https://app-qatesting.scalyr.com
+--from-literal=SCALYR_SERVER=${SCALYR_SERVER}
 
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
@@ -85,7 +85,7 @@ echo "Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
-python build_package.py k8s_builder
+python build_package.py k8s_builder --coverage
 TARBALL=$(ls scalyr-k8s-agent-*)
 
 TEMP_DIRECTORY=~/temp_directory
@@ -104,10 +104,10 @@ echo "Customizing daemonset YAML & starting agent"
 echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
-cp k8s/scalyr-agent-2-envfrom.yaml .
-perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2-envfrom.yaml
-perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-envfrom.yaml
-kubectl create -f scalyr-agent-2-envfrom.yaml
+cp k8s/scalyr-agent-2.yaml .
+perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2.yaml
+perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2.yaml
+kubectl create -f scalyr-agent-2.yaml
 # Capture agent pod
 agent_hostname=$(kubectl get pods | fgrep scalyr-agent-2 | awk {'print $1'})
 echo "Agent pod == ${agent_hostname}"
@@ -131,7 +131,6 @@ ${contname_uploader} ${max_wait} \
 uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
 
-
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 echo ""
@@ -147,3 +146,10 @@ ${contname_verifier} ${max_wait} \
 --agent_hostname ${agent_hostname} \
 --uploader_hostname ${uploader_hostname} \
 --debug true"
+
+
+echo "Stopping agent"
+k8s_docker_id=$(docker ps | grep k8s_scalyr-agent_scalyr-agent-2 | awk {'print$1'})
+docker stop ${k8s_docker_id}
+echo "Agent stopped copying .coverage results."
+docker cp ${k8s_docker_id}:/.coverage .

@@ -19,12 +19,15 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from scalyr_agent import compat
+
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
+import io
 import errno
 import socket
-import SocketServer
+import six.moves.socketserver
 import struct
 import time
 
@@ -33,7 +36,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 global_log = scalyr_logging.getLogger(__name__)
 
 
-class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ServerProcessor(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+):
     """Base class for simple servers that only need to accept incoming connections, perform some actions on
     individual commands, and return no output.
 
@@ -85,7 +90,9 @@ class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         if run_state is not None:
             self.run_state.register_on_stop_callback(self.shutdown)
 
-        SocketServer.TCPServer.__init__(self, server_address, ConnectionHandler)
+        six.moves.socketserver.TCPServer.__init__(
+            self, server_address, ConnectionHandler
+        )
 
     def run(self):
         """Begins accepting new connections and processing the incoming requests.
@@ -186,7 +193,8 @@ class LineRequestParser(object):
             # it will return whatever line was left without a newline.
             return_line = False
             if bytes_received > 0:
-                if line[-1] == "\n":
+                # 2->TODO use slicing to get bytes on bith python versions.
+                if line[-1:] == b"\n":
                     return_line = True
                 else:
                     # check if we want to return the remaining text when EOF is hit
@@ -246,8 +254,10 @@ class Int32RequestParser(object):
             # Make sure we have 4 bytes so that we can at least read the length prefix, and then try to read
             # the complete data payload.
             if num_bytes > self.__prefix_length:
-                (length,) = struct.unpack(
-                    self.__format, input_buffer.read(self.__prefix_length)
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
+                (length,) = compat.struct_unpack_unicode(
+                    six.ensure_str(self.__format),
+                    input_buffer.read(self.__prefix_length),
                 )
                 if length > self.__max_request_size:
                     raise RequestSizeExceeded(length, self.__max_request_size)
@@ -354,7 +364,7 @@ class ConnectionProcessor(object):
         return self.__run_state.is_running() and not self.__request_stream.at_end()
 
 
-class ConnectionHandler(SocketServer.BaseRequestHandler):
+class ConnectionHandler(six.moves.socketserver.BaseRequestHandler):
     """The handler class that is used by ServerProcess to handle incoming connections.
     """
 
@@ -377,7 +387,7 @@ class ConnectionHandler(SocketServer.BaseRequestHandler):
                 self.server.max_connection_idle_time,
             )
             processor.run()
-        except Exception, e:
+        except Exception as e:
             self.server.report_connection_problem(e)
 
 
@@ -434,7 +444,7 @@ class RequestStream(object):
 
         # The actual buffer.  We will maintain an invariant that the position of the buffer is always pointing at
         # the next byte to read.
-        self.__buffer = cStringIO.StringIO()
+        self.__buffer = io.BytesIO()
 
     def read_request(self, timeout=0.5, run_state=None):
         """Attempts to read the next complete request from the socket and return it.
@@ -533,7 +543,7 @@ class RequestStream(object):
             except socket.timeout:
                 self.__socket_error = True
                 return None
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EAGAIN:
                     return None
                 else:
@@ -626,7 +636,7 @@ class RequestStream(object):
         # Read the leftover data and write it into a new buffer.
         remaining_data = self.__buffer.read()
         self.__buffer.close()
-        self.__buffer = cStringIO.StringIO()
+        self.__buffer = io.BytesIO()
         self.__buffer.write(remaining_data)
         self.__current_buffer_size = self.__buffer.tell()
         self.__buffer.seek(0)
@@ -637,5 +647,5 @@ class RequestStream(object):
         """
         if self.__get_buffer_read_position() == self.__get_buffer_write_position():
             self.__buffer.close()
-            self.__buffer = cStringIO.StringIO()
+            self.__buffer = io.BytesIO()
             self.__current_buffer_size = 0

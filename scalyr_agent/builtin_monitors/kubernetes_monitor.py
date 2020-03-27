@@ -14,7 +14,13 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
+
+import six
+
 
 import datetime
 import docker
@@ -28,6 +34,10 @@ import stat
 from string import Template
 import threading
 import time
+from io import open
+
+from scalyr_agent import compat
+
 from scalyr_agent import (
     ScalyrMonitor,
     define_config_option,
@@ -67,7 +77,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.kubernetes_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -77,7 +87,7 @@ define_config_option(
     "Optional (defaults to None). Defines a regular expression that matches the name given to the "
     "container running the scalyr-agent.\n"
     "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n",
-    convert_to=str,
+    convert_to=six.text_type,
     default=None,
 )
 
@@ -98,7 +108,7 @@ define_config_option(
     "`docker_api_socket` configuration option in the syslog monitor to this same value\n"
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n"
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
 )
 
@@ -108,15 +118,15 @@ define_config_option(
     "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
     "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
     "syslog monitor to this same value\n",
-    convert_to=str,
+    convert_to=six.text_type,
     default="auto",
 )
 
 define_config_option(
     __monitor__,
     "docker_log_prefix",
-    "Optional (defaults to docker). Prefix added to the start of all docker logs. ",
-    convert_to=str,
+    "Optional (defaults to docker). Prefix added to the start of all docker logs.",
+    convert_to=six.text_type,
     default="docker",
 )
 
@@ -134,7 +144,7 @@ define_config_option(
     __monitor__,
     "docker_percpu_metrics",
     "Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by "
-    "default because it can result in an excessive amount of metric data on cpus with a large number of cores ",
+    "default because it can result in an excessive amount of metric data on cpus with a large number of cores",
     convert_to=bool,
     default=False,
     env_aware=True,
@@ -168,7 +178,7 @@ define_config_option(
     'to push logs to this one using the syslog Docker log plugin.  Currently, "syslog" is the '
     "preferred method due to bugs/issues found with the docker API.  It is not the default to protect "
     "legacy behavior.\n",
-    convert_to=str,
+    convert_to=six.text_type,
     default="docker_api",
 )
 
@@ -257,7 +267,7 @@ define_config_option(
     __monitor__,
     "k8s_api_url",
     "DEPRECATED.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="https://kubernetes.default",
 )
 
@@ -306,7 +316,7 @@ define_config_option(
     "to extract log and timestamp fields.  If `raw`, the raw contents of the log will be uploaded to Scalyr. "
     "(Note: An incorrect setting can cause parsing to fail which will result in raw logs being uploaded to Scalyr, so please leave "
     "this as `auto` if in doubt.)",
-    convert_to=str,
+    convert_to=six.text_type,
     default="auto",
     env_aware=True,
 )
@@ -373,8 +383,17 @@ define_config_option(
     __monitor__,
     "k8s_kubelet_host_ip",
     "Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it",
-    convert_to=str,
+    convert_to=six.text_type,
     default=None,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
+    "k8s_kubelet_api_url_template",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API",
+    convert_to=six.text_type,
+    default="https://${host_ip}:10250",
     env_aware=True,
 )
 
@@ -811,6 +830,7 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
@@ -828,6 +848,7 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
@@ -843,13 +864,13 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(
+        for item in super(  # pylint: disable=bad-super-call
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.APIClient):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -1038,7 +1059,7 @@ class ControlledCacheWarmer(StoppableThread):
         """
         self.__lock.acquire()
         try:
-            for value in self.__active_pods.itervalues():
+            for value in six.itervalues(self.__active_pods):
                 value.is_recently_marked = False
         finally:
             self.__lock.release()
@@ -1059,7 +1080,7 @@ class ControlledCacheWarmer(StoppableThread):
         # has already been warmed.
         self.__lock.acquire()
         try:
-            if not container_id in self.__active_pods:
+            if container_id not in self.__active_pods:
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(
                     pod_namespace, pod_name
                 )
@@ -1079,7 +1100,7 @@ class ControlledCacheWarmer(StoppableThread):
         already_warmed = None
         self.__lock.acquire()
         try:
-            for key, value in self.__active_pods.iteritems():
+            for key, value in six.iteritems(self.__active_pods):
                 if value.is_recently_marked:
                     new_active_pods[key] = value
             self.__active_pods = new_active_pods
@@ -1128,7 +1149,6 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: dict  (int, int)
         """
         self.__lock.acquire()
-        result = {}
         try:
             return self.__gather_report_stats()
         finally:
@@ -1176,7 +1196,7 @@ class ControlledCacheWarmer(StoppableThread):
 
             warm_attempts_info = ""
             stats = self.__gather_report_stats()
-            for category, (current_amount, previous_amount) in stats.iteritems():
+            for category, (current_amount, previous_amount) in six.iteritems(stats):
                 warm_attempts_info += "%s=%d(delta=%d) " % (
                     category,
                     current_amount,
@@ -1202,7 +1222,7 @@ class ControlledCacheWarmer(StoppableThread):
         :rtype: int
         """
         result = 0
-        for value in self.__active_pods.itervalues():
+        for value in six.itervalues(self.__active_pods):
             if value.blacklisted_until is not None:
                 result += 1
         return result
@@ -1223,7 +1243,7 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: [str]
         """
         already_warmed = []
-        for key, entry in self.__active_pods.iteritems():
+        for key, entry in six.iteritems(self.__active_pods):
             was_warm = entry.is_warm
             # Check the actual cache.
             entry.is_warm = self.is_warm(entry.pod_namespace, entry.pod_name)
@@ -1246,7 +1266,7 @@ class ControlledCacheWarmer(StoppableThread):
         @param current_time:  The current time in seconds past epoch.
         @type current_time: Number
         """
-        for value in self.__active_pods.itervalues():
+        for value in six.itervalues(self.__active_pods):
             if (
                 value.blacklisted_until is not None
                 and value.blacklisted_until < current_time
@@ -1273,7 +1293,7 @@ class ControlledCacheWarmer(StoppableThread):
         original_to_warm_count = len(self.__containers_to_warm)
         self.__containers_to_warm = []
 
-        for key, value in self.__active_pods.iteritems():
+        for key, value in six.iteritems(self.__active_pods):
             if not value.is_warm and value.blacklisted_until is None:
                 self.__containers_to_warm.append(key)
                 if value.start_time is None:
@@ -1344,7 +1364,7 @@ class ControlledCacheWarmer(StoppableThread):
         result = []
         self.__lock.acquire()
         try:
-            for container_id, entry in self.__active_pods.iteritems():
+            for container_id, entry in six.iteritems(self.__active_pods):
                 if entry.blacklisted_until is not None:
                     result.append(container_id)
             result.sort()
@@ -1468,8 +1488,8 @@ class ControlledCacheWarmer(StoppableThread):
                     "An error of type %s was seen when warming container %s.  Exception was %s: %s",
                     result_type,
                     container_id,
-                    str(exception_to_report),
-                    str(traceback_report),
+                    six.text_type(exception_to_report),
+                    six.text_type(traceback_report),
                     limit_once_per_x_secs=300,
                     limit_key="warmer-record-result-%s" % result_type,
                 )
@@ -1500,19 +1520,19 @@ class ControlledCacheWarmer(StoppableThread):
                             pod_namespace, pod_name, allow_expired=False
                         )
                         self.__record_warming_result(container_id, success=True)
-                    except K8sApiPermanentError, e:
+                    except K8sApiPermanentError as e:
                         self.__record_warming_result(
                             container_id,
                             permanent_error=e,
                             traceback_report=traceback.format_exc(),
                         )
-                    except K8sApiTemporaryError, e:
+                    except K8sApiTemporaryError as e:
                         self.__record_warming_result(
                             container_id,
                             temporary_error=e,
                             traceback_report=traceback.format_exc(),
                         )
-                    except Exception, e:
+                    except Exception as e:
                         self.__record_warming_result(
                             container_id,
                             unknown_error=e,
@@ -1668,8 +1688,8 @@ def _get_containers(
 
                     if glob_list:
                         add_container = False
-                        for glob in glob_list:
-                            if fnmatch.fnmatch(name, glob):
+                        for glob_pattern in glob_list:
+                            if fnmatch.fnmatch(name, glob_pattern):
                                 add_container = True
                                 break
 
@@ -1697,7 +1717,7 @@ def _get_containers(
                                     k8s_info = {}
                                     missing_field = False
 
-                                    for key, label in k8s_labels.iteritems():
+                                    for key, label in six.iteritems(k8s_labels):
                                         value = labels.get(label)
                                         if value:
                                             k8s_info[key] = value
@@ -1809,7 +1829,9 @@ def _get_containers(
                                                         "Excluding container '%s' based on pod annotations, %s"
                                                         % (
                                                             short_cid,
-                                                            str(pod.annotations),
+                                                            six.text_type(
+                                                                pod.annotations
+                                                            ),
                                                         ),
                                                     )
                                                 continue
@@ -1819,10 +1841,13 @@ def _get_containers(
                                                 logger.log(
                                                     scalyr_logging.DEBUG_LEVEL_2,
                                                     "Including container '%s' based on pod annotations, %s"
-                                                    % (short_cid, str(pod.annotations)),
+                                                    % (
+                                                        short_cid,
+                                                        six.text_type(pod.annotations),
+                                                    ),
                                                 )
 
-                            except Exception, e:
+                            except Exception as e:
                                 logger.error(
                                     "Error inspecting container '%s' - %s, %s"
                                     % (cid, e, traceback.format_exc()),
@@ -1844,10 +1869,10 @@ def _get_containers(
             if controlled_warmer is not None:
                 controlled_warmer.end_marking()
 
-    except Exception, e:  # container querying failed
+    except Exception as e:  # container querying failed
         logger.exception(
             "Error querying running containers: %s, filters=%s, only_running_containers=%s"
-            % (str(e), filters, only_running_containers),
+            % (six.text_type(e), filters, only_running_containers),
             limit_once_per_x_secs=300,
             limit_key="k8s-docker-api-running-containers",
         )
@@ -1923,7 +1948,7 @@ class ContainerEnumerator(object):
         # This is done in the parent ContainerEnumerator class so it doesn't have to be duplicated in the
         # DockerEnumerator and CRIEnumerator
         filtered_containers = {}
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_info = info.get("k8s_info", {})
             pod_name = k8s_info.get("pod_name", None)
             pod_namespace = k8s_info.get("pod_namespace", None)
@@ -1996,6 +2021,7 @@ class CRIEnumerator(ContainerEnumerator):
         k8s_api_url,
         query_filesystem,
         kubelet_api_host_ip,
+        kubelet_api_url_template,
         is_sidecar_mode=False,
     ):
         """
@@ -2011,15 +2037,19 @@ class CRIEnumerator(ContainerEnumerator):
         """
         super(CRIEnumerator, self).__init__(agent_pod, is_sidecar_mode=is_sidecar_mode)
         k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi(k8s, host_ip=kubelet_api_host_ip)
+        self._kubelet = KubeletApi(
+            k8s,
+            host_ip=kubelet_api_host_ip,
+            kubelet_url_template=Template(kubelet_api_url_template),
+        )
         self._query_filesystem = query_filesystem
 
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
         self._container_glob = "%s/*.log" % self._log_base
-        self._pod_re = re.compile("^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
+        self._pod_re = re.compile(r"^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
         self._info_re = re.compile(
-            "^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
+            r"^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
         )
 
     def _get_containers(
@@ -2059,8 +2089,8 @@ class CRIEnumerator(ContainerEnumerator):
                 add_container = True
                 if glob_list:
                     add_container = False
-                    for glob in glob_list:
-                        if fnmatch.fnmatch(cname, glob):
+                    for glob_pattern in glob_list:
+                        if fnmatch.fnmatch(cname, glob_pattern):
                             add_container = True
                             break
 
@@ -2140,9 +2170,10 @@ class CRIEnumerator(ContainerEnumerator):
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
-        except Exception, e:
+        except Exception as e:
             global_log.error(
-                "Error querying containers %s - %s" % (str(e), traceback.format_exc()),
+                "Error querying containers %s - %s"
+                % (six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="query-cri-containers",
             )
@@ -2211,7 +2242,6 @@ class CRIEnumerator(ContainerEnumerator):
                 metadata = pod.get("metadata", {})
                 pod_name = metadata.get("name", "")
                 pod_namespace = metadata.get("namespace", "")
-                pod_uid = metadata.get("uid", "")
 
                 # ignore anything that is in an excluded namespace
                 if pod_namespace in k8s_namespaces_to_exclude:
@@ -2284,15 +2314,15 @@ class CRIEnumerator(ContainerEnumerator):
 
                     result.append((pod_name, pod_namespace, cname, cid))
 
-        except ConnectionError, e:
+        except ConnectionError as e:
             global_log.error(
                 "Error connecting to kubelet API endpoint - %s. The Scalyr Agent will now monitor containers from the filesystem"
-                % str(e),
+                % six.text_type(e),
                 limit_once_per_x_secs=300,
                 limit_key="kubelet-api-connect",
             )
             self._query_filesystem = True
-        except Exception, e:
+        except Exception:
             global_log.exception(
                 "Error querying kubelet API for running pods and containers",
                 limit_once_per_x_secs=300,
@@ -2439,30 +2469,45 @@ class ContainerChecker(object):
 
     def get_cluster_name(self, k8s_cache):
         """ Gets the cluster name that the agent is running on """
-
-        cluster_name = os.environ.get("SCALYR_K8S_CLUSTER_NAME")
+        cluster_name = compat.os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME")
         if cluster_name is not None:
+            # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+            cluster_name = six.ensure_text(cluster_name)
             return cluster_name
 
         return (k8s_cache and k8s_cache.get_cluster_name()) or None
 
     def _get_node_name(self):
         """ Gets the node name of the node running the agent from downward API """
-        return os.environ.get("SCALYR_K8S_NODE_NAME")
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        node_name = compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
+        if node_name is not None:
+            node_name = six.ensure_text(node_name)
+        return node_name
 
     def _get_pod_name(self):
         """ Gets the pod name of the pod running the agent from downward API"""
-        return os.environ.get("SCALYR_K8S_POD_NAME")
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        pod_name = compat.os_environ_unicode.get("SCALYR_K8S_POD_NAME")
+        if pod_name is not None:
+            pod_name = six.ensure_text(pod_name)
+        return pod_name
 
     def _get_container_runtime(self):
         """ Gets the container runtime currently in use """
+        if not self.k8s_cache:
+            global_log.warning(
+                "Coud not determine K8s CRI because no k8 cache.",
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_cache",
+            )
         return (self.k8s_cache and self.k8s_cache.get_container_runtime()) or "unknown"
 
     def start(self):
 
         try:
             k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._config.get("k8s_verify_api_queries")
+            self._config.get("k8s_verify_api_queries")
 
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache(self._global_config)
@@ -2543,7 +2588,7 @@ class ContainerChecker(object):
                 query_fs = self.__cri_query_filesystem
                 global_log.info(
                     "kubernetes_monitor is using CRI with fs=%s for listing containers"
-                    % str(query_fs)
+                    % six.text_type(query_fs)
                 )
                 self._container_enumerator = CRIEnumerator(
                     self._global_config,
@@ -2551,6 +2596,7 @@ class ContainerChecker(object):
                     k8s_api_url,
                     query_fs,
                     self._config.get("k8s_kubelet_host_ip"),
+                    self._config.get("k8s_kubelet_api_url_template"),
                     is_sidecar_mode=self.__sidecar_mode,
                 )
 
@@ -2584,18 +2630,19 @@ class ContainerChecker(object):
                 "Initialization complete.  Starting k8s monitor for Scalyr",
             )
             self.__thread.start()
+
         except K8sInitException as e:
-            e_as_text = str(e)
+            e_as_text = six.text_type(e)
             global_log.warn(
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
                 % e_as_text
             )
             k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Failed to start container checker - %s\n%s"
-                % (str(e), traceback.format_exc())
+                % (six.text_type(e), traceback.format_exc())
             )
 
     def stop(self, wait_on_join=True, join_timeout=5):
@@ -2627,9 +2674,10 @@ class ContainerChecker(object):
         result = {}
         try:
             result = self.k8s_cache.pods_shallow_copy()
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
-                "Failed to get k8s data: %s\n%s" % (str(e), traceback.format_exc()),
+                "Failed to get k8s data: %s\n%s"
+                % (six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="get_k8s_data",
             )
@@ -2694,18 +2742,18 @@ class ContainerChecker(object):
                 changed = {}
                 digests = {}
 
-                for cid, info in running_containers.iteritems():
+                for cid, info in six.iteritems(running_containers):
                     pod = None
                     if "k8s_info" in info:
-                        pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                        pod_namespace = info["k8s_info"].get(
-                            "pod_namespace", "invalid_namespace"
-                        )
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
                             pass
                             # Don't log any warnings here for now
+                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            # pod_namespace = info["k8s_info"].get(
+                            #     "pod_namespace", "invalid_namespace"
+                            # )
                             # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                             #                      limit_once_per_x_secs=300,
                             #                      limit_key='check-container-pod-info-%s' % cid)
@@ -2733,7 +2781,7 @@ class ContainerChecker(object):
 
                 # get the containers that have stopped
                 stopping = {}
-                for cid, info in self.containers.iteritems():
+                for cid, info in six.iteritems(self.containers):
                     if cid not in running_containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -2770,10 +2818,10 @@ class ContainerChecker(object):
                             self.__log_watcher.update_log_config(
                                 self.__module.module_name, new_config
                             )
-            except Exception, e:
+            except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
 
             run_state.sleep_but_awaken_if_stopped(self.__delay)
@@ -2857,8 +2905,8 @@ class ContainerChecker(object):
                 if dt:
                     result = dt
             fp.close()
-        except Exception, e:
-            global_log.info("%s", str(e))
+        except Exception as e:
+            global_log.info("%s", six.text_type(e))
 
         return scalyr_util.seconds_since_epoch(result)
 
@@ -2879,7 +2927,7 @@ class ContainerChecker(object):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception, e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in KubernetesMonitor")
             raise
 
@@ -2947,7 +2995,7 @@ class ContainerChecker(object):
                 elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes["k8s_node"] = pod.node_name
 
-                for label, value in pod.labels.iteritems():
+                for label, value in six.iteritems(pod.labels):
                     container_attributes[label] = value
 
                 if "parser" in pod.labels:
@@ -2971,7 +3019,7 @@ class ContainerChecker(object):
                 container_specific_annotations = False
 
                 # get any common annotations for all containers
-                for annotation, value in all_annotations.iteritems():
+                for annotation, value in six.iteritems(all_annotations):
                     if annotation in pod.container_names:
                         container_specific_annotations = True
                     else:
@@ -2995,7 +3043,7 @@ class ContainerChecker(object):
                                     pod.namespace,
                                     pod.name,
                                     k8s_container_name,
-                                    str(type(container_annotations)),
+                                    six.text_type(type(container_annotations)),
                                 ),
                                 limit_once_per_x_secs=300,
                                 limit_key="k8s-invalid-container-config-%s" % cid,
@@ -3083,7 +3131,7 @@ class ContainerChecker(object):
 
         # set config items, ignoring invalid options and taking care to
         # handle attributes
-        for key, value in annotations.iteritems():
+        for key, value in six.iteritems(annotations):
             if key in skip_keys:
                 continue
 
@@ -3128,9 +3176,7 @@ class ContainerChecker(object):
 
         attributes = self.__get_base_attributes()
 
-        prefix = self.__log_prefix + "-"
-
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             log_config = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
             )
@@ -3156,129 +3202,128 @@ class ContainerChecker(object):
 
 class KubernetesMonitor(ScalyrMonitor):
     """
-    # Kubernetes Monitor
+# Kubernetes Monitor
 
-    This monitor is based of the docker_monitor plugin, and uses the raw logs mode of the docker
-    plugin to send Kubernetes logs to Scalyr.  It also reads labels from the Kubernetes API and
-    associates them with the appropriate logs.
+This monitor is based of the docker_monitor plugin, and uses the raw logs mode of the docker
+plugin to send Kubernetes logs to Scalyr.  It also reads labels from the Kubernetes API and
+associates them with the appropriate logs.
 
-    ## Log Config via Annotations
+## Log Config via Annotations
 
-    The logs collected by the Kubernetes monitor can be configured via k8s pod annotations.
-    The monitor examines all annotations on all pods, and for any annotation that begins with the
-    prefix log.config.scalyr.com/, it extracts the
-    entries (minus the prefix) and maps them to the log_config stanza for that pod's containers.
-    The mapping is described below.
+The logs collected by the Kubernetes monitor can be configured via k8s pod annotations.
+The monitor examines all annotations on all pods, and for any annotation that begins with the
+prefix log.config.scalyr.com/, it extracts the
+entries (minus the prefix) and maps them to the log_config stanza for that pod's containers.
+The mapping is described below.
 
-    The following fields can be configured a log via pod annotations:
+The following fields can be configured a log via pod annotations:
 
-    * parser
-    * attributes
-    * sampling_rules
-    * rename_logfile
-    * redaction_rules
+* parser
+* attributes
+* sampling_rules
+* rename_logfile
+* redaction_rules
 
-    These behave in the same way as specified in the main [Scalyr help
-    docs](https://www.scalyr.com/help/scalyr-agent#logUpload). The following configuration
-    fields behave differently when configured via k8s annotations:
+These behave in the same way as specified in the main [Scalyr help
+docs](https://www.scalyr.com/help/scalyr-agent#logUpload). The following configuration
+fields behave differently when configured via k8s annotations:
 
-    * exclude (see below)
-    * lineGroupers (not supported at all)
-    * path (the path is always fixed for k8s container logs)
+* exclude (see below)
+* lineGroupers (not supported at all)
+* path (the path is always fixed for k8s container logs)
 
-    ### Excluding Logs
+### Excluding Logs
 
-    Containers and pods can be specifically included/excluded from having their logs collected and
-    sent to Scalyr.  Unlike the normal log_config `exclude` option which takes an array of log path
-    exclusion globs, annotations simply support a Boolean true/false for a given container/pod.
-    Both `include` and `exclude` are supported, with `include` always overriding `exclude` if both
-    are set. e.g.
+Containers and pods can be specifically included/excluded from having their logs collected and
+sent to Scalyr.  Unlike the normal log_config `exclude` option which takes an array of log path
+exclusion globs, annotations simply support a Boolean true/false for a given container/pod.
+Both `include` and `exclude` are supported, with `include` always overriding `exclude` if both
+are set. e.g.
 
-        log.config.scalyr.com/exclude: true
+    log.config.scalyr.com/exclude: true
 
-    has the same effect as
+has the same effect as
 
-        log.config.scalyr.com/include: false
+    log.config.scalyr.com/include: false
 
-    By default the agent monitors the logs of all pods/containers, and you have to manually exclude
-    pods/containers you don't want.  You can also set `k8s_include_all_containers: false` in the
-    kubernetes_monitor monitor config section of `agent.d/docker.json`, in which case all containers are
-    excluded by default and have to be manually included.
+By default the agent monitors the logs of all pods/containers, and you have to manually exclude
+pods/containers you don't want.  You can also set `k8s_include_all_containers: false` in the
+kubernetes_monitor monitor config section of `agent.d/docker.json`, in which case all containers are
+excluded by default and have to be manually included.
 
-    ### Specifying Config Options
+### Specifying Config Options
 
-    The Kubernetes monitor takes the string value of each annotation and maps it to a dict, or
-    array value according to the following format:
+The Kubernetes monitor takes the string value of each annotation and maps it to a dict, or
+array value according to the following format:
 
-    Values separated by a period are mapped to dict keys e.g. if one annotation on a given pod was
-    specified as:
+Values separated by a period are mapped to dict keys e.g. if one annotation on a given pod was
+specified as:
 
-          log.config.scalyr.com/attributes.parser: accessLog
+        log.config.scalyr.com/attributes.parser: accessLog
 
-    Then this would be mapped to the following dict, which would then be applied to the log config
-    for all containers in that pod:
+Then this would be mapped to the following dict, which would then be applied to the log config
+for all containers in that pod:
 
-        { "attributes": { "parser": "accessLog" } }
+    { "attributes": { "parser": "accessLog" } }
 
-    Arrays can be specified by using one or more digits as the key, e.g. if the annotation was
+Arrays can be specified by using one or more digits as the key, e.g. if the annotation was
 
-          log.config.scalyr.com/sampling_rules.0.match_expression: INFO
-          log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
-          log.config.scalyr.com/sampling_rules.1.match_expression: FINE
-          log.config.scalyr.com/sampling_rules.1.sampling_rate: 0
+        log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+        log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
+        log.config.scalyr.com/sampling_rules.1.match_expression: FINE
+        log.config.scalyr.com/sampling_rules.1.sampling_rate: 0
 
-    This will be mapped to the following structure:
+This will be mapped to the following structure:
 
-        { "sampling_rules":
-          [
-            { "match_expression": "INFO", "sampling_rate": 0.1 },
-            { "match_expression": "FINE", "sampling_rate": 0 }
-          ]
-        }
+    { "sampling_rules":
+        [
+        { "match_expression": "INFO", "sampling_rate": 0.1 },
+        { "match_expression": "FINE", "sampling_rate": 0 }
+        ]
+    }
 
-    Array keys are sorted by numeric order before processing and unique objects need to have
-    different digits as the array key. If a sub-key has an identical array key as a previously seen
-    sub-key, then the previous value of the sub-key is overwritten
+Array keys are sorted by numeric order before processing and unique objects need to have
+different digits as the array key. If a sub-key has an identical array key as a previously seen
+sub-key, then the previous value of the sub-key is overwritten
 
-    There is no guarantee about the order of processing for items with the same numeric array key,
-    so if the config was specified as:
+There is no guarantee about the order of processing for items with the same numeric array key,
+so if the config was specified as:
 
-          log.config.scalyr.com/sampling_rules.0.match_expression: INFO
-          log.config.scalyr.com/sampling_rules.0.match_expression: FINE
+        log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+        log.config.scalyr.com/sampling_rules.0.match_expression: FINE
 
-    It is not defined or guaranteed what the actual value will be (INFO or FINE).
+It is not defined or guaranteed what the actual value will be (INFO or FINE).
 
-    ### Applying config options to specific containers in a pod
+### Applying config options to specific containers in a pod
 
-    If a pod has multiple containers and you only want to apply log configuration options to a
-    specific container you can do so by prefixing the option with the container name, e.g. if you
-    had a pod with two containers `nginx` and `helper1` and you wanted to exclude `helper1` logs you
-    could specify the following annotation:
+If a pod has multiple containers and you only want to apply log configuration options to a
+specific container you can do so by prefixing the option with the container name, e.g. if you
+had a pod with two containers `nginx` and `helper1` and you wanted to exclude `helper1` logs you
+could specify the following annotation:
 
-        log.config.scalyr.com/helper1.exclude: true
+    log.config.scalyr.com/helper1.exclude: true
 
-    Config items specified without a container name are applied to all containers in the pod, but
-    container specific settings will override pod-level options, e.g. in this example:
+Config items specified without a container name are applied to all containers in the pod, but
+container specific settings will override pod-level options, e.g. in this example:
 
-        log.config.scalyr.com/exclude: true
-        log.config.scalyr.com/nginx.include: true
+    log.config.scalyr.com/exclude: true
+    log.config.scalyr.com/nginx.include: true
 
-    All containers in the pod would be excluded *except* for the nginx container, which is included.
+All containers in the pod would be excluded *except* for the nginx container, which is included.
 
-    This technique is applicable for all log config options, not just include/exclude.  For
-    example you could set the line sampling rules for all containers in a pod, but use a different set
-    of line sampling rules for one specific container in the pod if needed.
+This technique is applicable for all log config options, not just include/exclude.  For
+example you could set the line sampling rules for all containers in a pod, but use a different set
+of line sampling rules for one specific container in the pod if needed.
 
-    ### Dynamic Updates
+### Dynamic Updates
 
-    Currently all annotation config options except `exclude: true`/`include: false` can be
-    dynamically updated using the `kubectl annotate` command.
+Currently all annotation config options except `exclude: true`/`include: false` can be
+dynamically updated using the `kubectl annotate` command.
 
-    For `exclude: true`/`include: false` once a pod/container has started being logged, then while the
-    container is still running, there is currently no way to dynamically start/stop logging of that
-    container using annotations without updating the config yaml, and applying the updated config to the
-    cluster.
-
+For `exclude: true`/`include: false` once a pod/container has started being logged, then while the
+container is still running, there is currently no way to dynamically start/stop logging of that
+container using annotations without updating the config yaml, and applying the updated config to the
+cluster.
     """
 
     def __get_socket_file(self):
@@ -3331,7 +3376,6 @@ class KubernetesMonitor(ScalyrMonitor):
 
     def _initialize(self):
         """This method gets called every 30 seconds regardless"""
-        data_path = ""
         log_path = ""
         host_hostname = ""
 
@@ -3350,7 +3394,6 @@ class KubernetesMonitor(ScalyrMonitor):
         )
 
         if self._global_config:
-            data_path = self._global_config.agent_data_path
             log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
@@ -3403,9 +3446,11 @@ class KubernetesMonitor(ScalyrMonitor):
         self.__verify_required_env_var("SCALYR_K8S_POD_NAMESPACE")
         self.__verify_required_env_var("SCALYR_K8S_NODE_NAME")
 
-        self.__agent_pod = QualifiedName(
-            os.getenv("SCALYR_K8S_POD_NAMESPACE"), os.getenv("SCALYR_K8S_POD_NAME")
-        )
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        pod_namespace = compat.os_getenv_unicode("SCALYR_K8S_POD_NAMESPACE")
+        pod_name = compat.os_getenv_unicode("SCALYR_K8S_POD_NAME")
+
+        self.__agent_pod = QualifiedName(pod_namespace, pod_name)
 
         # create controlled cache warmers for logs and metrics
         self.__logs_controlled_warmer = ControlledCacheWarmer(
@@ -3531,7 +3576,7 @@ class KubernetesMonitor(ScalyrMonitor):
         return result
 
     def __verify_required_env_var(self, env_var_name):
-        if len(os.environ.get(env_var_name, "")) == 0:
+        if len(compat.os_environ_unicode.get(env_var_name, "")) == 0:
             self._logger.error(
                 "ERROR: Missing required environment variable for kubenetes_monitor: %s"
                 % env_var_name
@@ -3549,7 +3594,7 @@ class KubernetesMonitor(ScalyrMonitor):
         if metrics is None:
             return
 
-        for key, value in metrics_to_emit.iteritems():
+        for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
                 # Note, we do a bit of a hack to pretend the monitor's name include the container/pod's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
@@ -3645,12 +3690,12 @@ class KubernetesMonitor(ScalyrMonitor):
             @param metrics: a dict of metrics keys/values to emit
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        for key, value in metrics.iteritems():
+        for key, value in six.iteritems(metrics):
             if value is None:
                 continue
 
             if key == "networks":
-                for interface, network_metrics in value.iteritems():
+                for interface, network_metrics in six.iteritems(value):
                     self.__log_network_interface_metrics(
                         container, network_metrics, interface, k8s_extra=k8s_extra
                     )
@@ -3723,10 +3768,10 @@ class KubernetesMonitor(ScalyrMonitor):
 
         cluster_info = self.__get_cluster_info(cluster_name)
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             self.__metric_fetcher.prefetch_metrics(info["name"])
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_extra = {}
             if self.__include_controller_info:
                 k8s_extra = self.__get_k8s_controller_info(info)
@@ -3752,7 +3797,7 @@ class KubernetesMonitor(ScalyrMonitor):
         node_extra = {"node_name": name}
         node_extra.update(extra)
 
-        for key, metrics in node.iteritems():
+        for key, metrics in six.iteritems(node):
             if key == "network":
                 self.__log_metrics(
                     name, self.__k8s_node_network_metrics, metrics, node_extra
@@ -3771,7 +3816,7 @@ class KubernetesMonitor(ScalyrMonitor):
 
         extra.update(k8s_extra)
 
-        for key, metrics in pod_metrics.iteritems():
+        for key, metrics in six.iteritems(pod_metrics):
             if key == "network":
                 self.__log_metrics(
                     pod_info.uid, self.__k8s_pod_network_metrics, metrics, extra
@@ -3791,7 +3836,7 @@ class KubernetesMonitor(ScalyrMonitor):
 
         # get set of pods we are interested in querying
         pod_info = {}
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_info = info.get("k8s_info", {})
             pod = k8s_info.get("pod_info", None)
             if pod is None:
@@ -3823,16 +3868,16 @@ class KubernetesMonitor(ScalyrMonitor):
                     controller_info.update(cluster_info)
                 self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
 
-        except ConnectionError, e:
+        except ConnectionError as e:
             self._logger.warning(
                 "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
-                % str(e),
+                % six.text_type(e),
                 limit_once_per_x_secs=3600,
                 limit_key="kubelet-api-connection-stats",
             )
-        except KubeletApiException, e:
+        except KubeletApiException as e:
             self._logger.warning(
-                "Error querying kubelet API: %s" % str(e),
+                "Error querying kubelet API: %s" % six.text_type(e),
                 limit_once_per_x_secs=300,
                 limit_key="kubelet-api-query-stats",
             )
@@ -3904,18 +3949,20 @@ class KubernetesMonitor(ScalyrMonitor):
                     self.__gather_k8s_metrics_from_kubelet(
                         containers, self.__kubelet_api, cluster_name
                     )
-        except Exception, e:
-            self._logger.exception("Unexpected error logging metrics: %s" % (str(e)))
+        except Exception as e:
+            self._logger.exception(
+                "Unexpected error logging metrics: %s" % (six.text_type(e))
+            )
 
         if self.__gather_k8s_pod_info:
             cluster_info = self.__get_cluster_info(cluster_name)
 
-            containers = self._container_enumerator.get_containers(
+            containers = self._container_enumerator.get_containers(  # pylint: disable=no-member
                 k8s_cache=k8s_cache,
                 k8s_include_by_default=self.__include_all,
                 k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
             )
-            for cid, info in containers.iteritems():
+            for cid, info in six.iteritems(containers):
                 try:
                     extra = info.get("k8s_info", {})
                     extra["status"] = info.get("status", "unknown")
@@ -3926,21 +3973,22 @@ class KubernetesMonitor(ScalyrMonitor):
 
                     namespace = extra.get("pod_namespace", "invalid-namespace")
                     self._logger.emit_value(
-                        "%s.container_name" % (self._container_runtime),
+                        "%s.container_name"
+                        % (self._container_runtime),  # pylint: disable=no-member
                         info["name"],
                         extra,
                         monitor_id_override="namespace:%s" % namespace,
                     )
-                except Exception, e:
+                except Exception as e:
                     self._logger.error(
                         "Error logging container information for %s: %s"
-                        % (_get_short_cid(cid), str(e))
+                        % (_get_short_cid(cid), six.text_type(e))
                     )
 
             if self.__container_checker:
                 namespaces = self.__container_checker.get_k8s_data()
-                for namespace, pods in namespaces.iteritems():
-                    for pod_name, pod in pods.iteritems():
+                for namespace, pods in six.iteritems(namespaces):
+                    for pod_name, pod in six.iteritems(pods):
                         try:
                             extra = {
                                 "pod_uid": pod.uid,
@@ -3960,17 +4008,17 @@ class KubernetesMonitor(ScalyrMonitor):
                                 extra,
                                 monitor_id_override="namespace:%s" % pod.namespace,
                             )
-                        except Exception, e:
+                        except Exception as e:
                             self._logger.error(
                                 "Error logging pod information for %s: %s"
-                                % (pod.name, str(e))
+                                % (pod.name, six.text_type(e))
                             )
 
     def run(self):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()
@@ -4009,11 +4057,12 @@ class KubernetesMonitor(ScalyrMonitor):
             "SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR",
             "SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY",
             "SCALYR_K8S_SIDECAR_MODE",
+            "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
         ]
         for envar in envars_to_log:
             self._logger.info(
                 "Environment variable %s : %s"
-                % (envar, os.environ.get(envar, "<Not set>"))
+                % (envar, compat.os_environ_unicode.get(envar, "<Not set>"))
             )
 
         try:
@@ -4053,12 +4102,16 @@ class KubernetesMonitor(ScalyrMonitor):
                     self._global_config, k8s_api_url=self.__k8s_api_url
                 )
                 self.__kubelet_api = KubeletApi(
-                    k8s, host_ip=self._config.get("k8s_kubelet_host_ip")
+                    k8s,
+                    host_ip=self._config.get("k8s_kubelet_host_ip"),
+                    kubelet_url_template=Template(
+                        self._config.get("k8s_kubelet_api_url_template")
+                    ),
                 )
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s"
-                % str(e)
+                % six.text_type(e)
             )
             self.__report_k8s_metrics = False
 

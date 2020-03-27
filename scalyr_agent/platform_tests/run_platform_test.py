@@ -15,6 +15,8 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "saurabh@scalyr.com"
 
 """
@@ -36,6 +38,7 @@ from subprocess import call
 import os
 
 from scalyr_agent.test_base import skipUnless
+from scalyr_agent import compat
 
 
 class WorkingDirectory:
@@ -50,7 +53,7 @@ class WorkingDirectory:
         self.savedPath = os.getcwd()
         os.chdir(self.newPath)
 
-    def __exit__(self, etype, value, traceback):
+    def __exit__(self, etype=None, value=None, traceback=None):
         os.chdir(self.savedPath)
 
 
@@ -59,7 +62,7 @@ class RunPlatformTests(unittest.TestCase):
     Runs Scalyr Agent Tests on all platforms
     """
 
-    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(compat.os_environ_unicode.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_alpine(self):
         wd = WorkingDirectory("scalyr_agent/platform_tests/alpine")
         try:
@@ -80,7 +83,7 @@ class RunPlatformTests(unittest.TestCase):
         finally:
             wd.__exit__()
 
-    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(compat.os_environ_unicode.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_wheezy(self):
         wd = WorkingDirectory("scalyr_agent/platform_tests/wheezy")
         try:
@@ -101,7 +104,7 @@ class RunPlatformTests(unittest.TestCase):
         finally:
             wd.__exit__()
 
-    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(compat.os_environ_unicode.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_jessie(self):
         wd = WorkingDirectory("scalyr_agent/platform_tests/jessie")
         try:
@@ -123,7 +126,7 @@ class RunPlatformTests(unittest.TestCase):
             wd.__exit__()
 
     @classmethod
-    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(compat.os_environ_unicode.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def tearDownClass(cls):
         call(
             [

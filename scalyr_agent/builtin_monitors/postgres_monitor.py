@@ -17,13 +17,17 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import sys
-import re
-import os
-import stat
-import errno
 import string
 from datetime import datetime
+
+import pg8000  # pylint: disable=import-error
+import six
+from six.moves import zip
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -36,8 +40,6 @@ from scalyr_agent import (
 # We must require 2.5 or greater right now because pg8000 requires it.
 if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 5):
     raise UnsupportedSystem("postgresql_monitor", "Requires Python 2.5 or greater.")
-
-import pg8000
 
 __monitor__ = __name__
 
@@ -55,37 +57,37 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate postgresql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_host",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_port",
     "Name of port on the host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_name",
     "Name of database the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username which the agent uses to connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password for connecting to PostgreSQL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 # Metric definitions.
@@ -281,11 +283,11 @@ class PostgreSQLDb(object):
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
-        except pg8000.Error, me:
+        except pg8000.Error as me:
             self._db = None
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
-        except Exception, ex:
+        except Exception as ex:
             self._logger.error("Exception trying to connect occured:  %s" % ex)
             raise Exception("Exception trying to connect:  %s" % ex)
 
@@ -329,7 +331,7 @@ class PostgreSQLDb(object):
                 version = self._version.split(".")
                 self._major = int(version[0])
                 self._medium = int(version[1])
-        except (ValueError, IndexError), e:
+        except (ValueError, IndexError):
             self._major = self._medium = 0
             self._version = "unknown"
         except:
@@ -356,7 +358,8 @@ class PostgreSQLDb(object):
                 "select * from %s where datname = '%s';" % (table, self._database)
             )
             data = self._cursor.fetchone()
-        except pg8000.OperationalError, (errcode, msg):
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()
@@ -376,7 +379,7 @@ class PostgreSQLDb(object):
         result = {}
         for i in self._database_stats.keys():
             tmp = self._retrieve_database_table_stats(i)
-            if tmp != None:
+            if tmp is not None:
                 result.update(tmp)
         return result
 
@@ -384,7 +387,8 @@ class PostgreSQLDb(object):
         try:
             self._cursor.execute("select pg_database_size('%s');" % self._database)
             size = self._cursor.fetchone()[0]
-        except pg8000.OperationalError, (errcode, msg):
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()
@@ -521,9 +525,9 @@ instance."""
 
         try:
             self._db.reconnect()
-        except Exception, e:
+        except Exception as e:
             self._logger.warning(
-                "Unable to gather stats for postgres database - %s" % str(e)
+                "Unable to gather stats for postgres database - %s" % six.text_type(e)
             )
             return
 
@@ -534,13 +538,13 @@ instance."""
             return
 
         dbsize = self._db.retrieve_database_size()
-        if dbsize != None:
+        if dbsize is not None:
             self._logger.emit_value("postgres.database.size", dbsize)
         dbstats = self._db.retrieve_database_stats()
-        if dbstats != None:
+        if dbstats is not None:
             for table in self._db._database_stats.keys():
                 for key in self._db._database_stats[table].keys():
-                    if key in dbstats.keys():
+                    if key in list(dbstats.keys()):
                         if key != "stats_reset":
                             extra = None
                             if len(self._db._database_stats[table][key]) == 3:

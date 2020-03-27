@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 #
 # author:  Edward Chee <echee@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
@@ -24,32 +26,39 @@ import unittest
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
 
+import six
+
 JSON = 1
 UJSON = 2
+ORJSON = 3
 
 
 class EncodeDecodeTest(ScalyrTestCase):
-    """This test ensures that JsonObject and JsonArray can be correctly encoded/decoded with different JSON libraries"""
+    """This test ensures that the different json libraries can correctly encode/decode with the same results."""
 
     def _setlib(self, library):
         if library == JSON:
-            util._set_json_lib("json")
+            util.set_json_lib("json")
+        elif library == UJSON:
+            util.set_json_lib("ujson")
+        elif library == ORJSON:
+            util.set_json_lib("orjson")
         else:
-            util._set_json_lib("ujson")
+            raise ValueError("Invalid library name: %s" % (library))
 
     def test_invalid_lib(self):
         self.assertRaises(
-            ValueError, lambda: util._set_json_lib("BAD JSON LIBRARY NAME")
+            ValueError, lambda: util.set_json_lib("BAD JSON LIBRARY NAME")
         )
 
     def test_dict(self):
-        self.__test_encode_decode('{"a":1,"b":2}', {u"a": 1, u"b": 2})
+        self.__test_encode_decode('{"a":1,"b":2}', {"a": 1, "b": 2})
 
     def test_dict2(self):
-        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {u"a": 1, u"b": {u"c": 2}})
+        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {"a": 1, "b": {"c": 2}})
 
     def test_str(self):
-        self.__test_encode_decode(r'"a"', u"a")
+        self.__test_encode_decode(r'"a"', "a")
 
     def test_int(self):
         self.__test_encode_decode(r"1", 1)
@@ -77,7 +86,7 @@ class EncodeDecodeTest(ScalyrTestCase):
         self.__test_encode_decode(r"[1,2,3]", [1, 2, 3])
 
     def test_list2(self):
-        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u"a"])
+        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, "a"])
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):
@@ -86,17 +95,33 @@ class EncodeDecodeTest(ScalyrTestCase):
             self._setlib(library)
             try:
                 text2 = util.json_encode(obj)
-                self.assertEquals(text, text2)
+                self.assertEquals(
+                    sorted(six.ensure_text(text)),
+                    sorted(text2),
+                    "%s != %s" % (str(text), str(text2)),
+                )
                 obj2 = util.json_decode(text2)
                 text3 = util.json_encode(obj2)
-                self.assertEquals(text, text3)
+                self.assertEquals(
+                    sorted(six.ensure_text(text)),
+                    sorted(text3),
+                    "%s != %s" % (str(text), str(text3)),
+                )
+                obj3 = util.json_decode(text)
+                self.assertEquals(obj3, obj)
             finally:
-                util._set_json_lib(original_lib)
+                util.set_json_lib(original_lib)
 
-        if sys.version_info[:2] > (2, 4):
+        if sys.version_info[:2] > (2, 4) and sys.version_info[:2] != (2, 6):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
+        if sys.version_info[:2] >= (3, 5):
+            __runtest(ORJSON)
+
+        # do the same check but now with binary string.
+        if isinstance(text, six.text_type):
+            self.__test_encode_decode(text.encode("utf-8"), obj)
 
 
 def main():

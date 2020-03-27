@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #----------------------------------------------------------------------------------------
 # Runs agent smoketest for docker:
 #    - Assumes that the current scalyr-agent-2 root directory contains the test branch and that
@@ -79,7 +80,7 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-python build_package.py docker_${syslog_or_json}_builder
+python build_package.py docker_${syslog_or_json}_builder --coverage
 
 # Extract and build agent docker image
 ./scalyr-docker-agent-${syslog_or_json}-${fakeversion} --extract-packages
@@ -123,4 +124,8 @@ bash -c "${smoketest_script} ${contname_verifier} ${max_wait} \
 --uploader_hostname ${uploader_hostname} \
 --debug true"
 
+echo "Stopping agent."
+docker stop ${contname_agent}
+echo "Agent stopped, copying .coverage results."
+docker cp ${contname_agent}:/.coverage .
 kill_and_delete_docker_test_containers

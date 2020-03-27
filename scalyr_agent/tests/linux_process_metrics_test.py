@@ -15,16 +15,47 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from io import open
+
 __author__ = "saurabh@scalyr.com"
+
+import os
 
 from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent.builtin_monitors.linux_process_metrics import (
     ProcessMonitor,
     Metric,
     ProcessList,
+    StatReader,
 )
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.scalyr_monitor import MonitorInformation
+
+from six.moves import range
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES_DIR = os.path.join(BASE_DIR, "fixtures")
+
+
+class MetricInformationTestCase(ScalyrTestCase):
+    def test_define_metric_metric_units(self):
+        # Verify all the metrics have the correct type defined
+        monitor_info = MonitorInformation.get_monitor_info(
+            "scalyr_agent.builtin_monitors.linux_process_metrics"
+        )
+        metrics = monitor_info.metrics
+
+        self.assertEqual(len(metrics), 16)
+        disk_requests_metrics = [
+            m for m in metrics if m.metric_name == "app.disk.requests"
+        ]
+
+        self.assertEqual(len(disk_requests_metrics), 2)
+        self.assertEqual(disk_requests_metrics[0].unit, None)
+        self.assertEqual(disk_requests_metrics[1].unit, None)
 
 
 class TestMetricClass(ScalyrTestCase):
@@ -72,7 +103,7 @@ class TestMetricClass(ScalyrTestCase):
         self.assertEquals(m.type, 123)
 
         # Non-existent
-        self.assertRaises(AttributeError, lambda: m.asdf)
+        self.assertRaises(AttributeError, lambda: m.asdf)  # pylint: disable=no-member
 
         # Ensure cannot mutate
         def mutate():
@@ -550,3 +581,22 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             self.monitor._ProcessMonitor__aggregated_metrics,
             {metric1: (25 - 20) + (46 - 40)},
         )
+
+
+class StatReaderTestCase(ScalyrTestCase):
+    def test_gather_sample(self):
+        stat_reader = StatReader(pid=1, monitor_id=1, logger=None)
+        stat_reader._StatReader__get_uptime_ms = lambda: 5 * 60 * 60 * 1000
+
+        stat_file = os.path.join(FIXTURES_DIR, "proc_1125_stat")
+        with open(stat_file, "r") as fp:
+            result = stat_reader.gather_sample(stat_file=fp)
+
+        self.assertEqual(len(result), 7)
+        self.assertEqual(result[Metric("app.cpu", "user")], 0)
+        self.assertEqual(result[Metric("app.cpu", "system")], 277)
+        self.assertEqual(result[Metric("app.uptime", None)], 17993090)
+        self.assertEqual(result[Metric("app.nice", None)], -20.0)
+        self.assertEqual(result[Metric("app.threads", None)], 1)
+        self.assertEqual(result[Metric("app.mem.majflt", None)], 0)
+        self.assertEqual(result[Metric("app.io.wait", None)], 0)

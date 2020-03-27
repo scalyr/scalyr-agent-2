@@ -38,7 +38,8 @@ from .auth import _basic_auth_str
 
 try:
     from .packages.urllib3.contrib.socks import SOCKSProxyManager
-except ImportError, e:
+    # 2->TODO this change made by scalyr, so it needs to be modernized too.
+except ImportError as e:
     def SOCKSProxyManager(*args, **kwargs):
         raise InvalidSchema("Missing dependencies for SOCKS support. %s", str( e ))
 

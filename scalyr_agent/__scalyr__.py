@@ -15,11 +15,30 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
+
+# [start of 2->TODO]
+# "Modernize" tool added "six" library as a dependency in this file.
+# But in case of absence of six in site-packages we can not import "six" before scalyr_init.
+# The first option is to provide 2->3 compatibility without "six". This is easy for now,
+# because there is only one incompatible piece of code here.
+# and it can be fixed in code below...
+try:
+    # Python2
+    text_type = unicode  # type: ignore
+except NameError:
+    # Python3
+    text_type = str
+# The second option is to assure that "six" library installed in current python environment.
+# [end of 2->TOD0]
+
 
 import inspect
 import os
 import sys
+from io import open
 
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
 # type :
@@ -98,7 +117,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(text_type(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 
@@ -110,7 +129,7 @@ def get_package_root():
     """Returns the absolute path to the scalyr_agent Python package, including the scalyr_agent directory name.
 
     @return: The path to the scalyr_agent directory (which contains the Python package).
-    @rtype: str
+    @rtype: six.text_type
     """
     return __package_root__
 
@@ -124,7 +143,7 @@ def get_install_root():
     the top of the repository when running from the source tree.
 
     @return:  The path to the scalyr-agent-2 directory.
-    @rtype: str
+    @rtype: six.text_type
     """
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
     parent_of_package_install = os.path.dirname(get_package_root())

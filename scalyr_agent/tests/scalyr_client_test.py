@@ -14,10 +14,14 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-from cStringIO import StringIO
+from io import BytesIO
+
+import mock
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
@@ -28,9 +32,11 @@ from scalyr_agent.scalyr_client import (
     EventSequencer,
     Event,
     ScalyrClientSession,
+    MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 
 
 import scalyr_agent.test_util as test_util
@@ -49,16 +55,16 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 0)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message(b"eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
-            """, logs: [], threads: [], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            b""", logs: [], threads: [], client_time: 1 }""",
         )
         self.assertEquals(request.total_events, 2)
         request.close()
@@ -68,10 +74,10 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message(b"eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
 
         self.assertEquals(request.get_payload(), request.get_payload())
@@ -84,18 +90,18 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 0)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message(b"eventOne"), timestamp=1)
         )
         self.assertTrue(request.add_log_and_thread("t1", "n1", {"l1": "L1"}))
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
         self.assertTrue(request.add_log_and_thread("t2", "n2", {"l2": "L2"}))
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
-            """, logs: [{"attrs":{"l1":"L1"},"id":"t1"},{"attrs":{"l2":"L2"},"id":"t2"}], threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            b""", logs: [{"attrs":{"l1":"L1"},"id":"t1"},{"attrs":{"l2":"L2"},"id":"t2"}], threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""",
         )
 
         self.assertEquals(request.total_events, 2)
@@ -105,16 +111,14 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body, max_size=112)
         request.set_client_time(1)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
         self.assertFalse(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], logs: [], threads: [], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], logs: [], threads: [], client_time: 1 }""",
         )
         request.close()
 
@@ -127,7 +131,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [], logs: [{"attrs":{},"id":"t1"}], threads: [{"id":"t1","name":"name1"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [], logs: [{"attrs":{},"id":"t1"}], threads: [{"id":"t1","name":"name1"}], client_time: 1 }""",
         )
 
         request.close()
@@ -137,20 +141,20 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         position = request.position()
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message(b"eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
 
         request.set_position(position)
         self.assertTrue(
-            request.add_event(Event().set_message("eventThree"), timestamp=3L)
+            request.add_event(Event().set_message(b"eventThree"), timestamp=3)
         )
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], logs: [], threads: [], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], logs: [], threads: [], client_time: 1 }""",
         )
 
         request.close()
@@ -160,23 +164,19 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         position = request.position()
         request.add_log_and_thread("log1", "Hi there", {})
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         request.set_position(position)
         self.assertTrue(request.add_log_and_thread("log2", "Log two", {}))
         self.assertTrue(
-            request.add_event(Event().set_message("eventThree"), timestamp=3L)
+            request.add_event(Event().set_message("eventThree"), timestamp=3)
         )
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], """
-            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], """
+            b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
 
         request.close()
@@ -193,8 +193,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
-            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
 
         request.close()
@@ -219,8 +219,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
-            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
         request.close()
 
@@ -228,24 +228,20 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
-            """, logs: [], threads: [], client_time: 100 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            b""", logs: [], threads: [], client_time: 100 }""",
         )
 
         request.set_client_time(2)
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
-            """, logs: [], threads: [], client_time: 2 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            b""", logs: [], threads: [], client_time: 2 }""",
         )
         request.close()
 
@@ -254,7 +250,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         self.assertTrue(
             request.add_event(
-                Event().set_message("eventOne"), timestamp=1L, sequence_id=1234
+                Event().set_message("eventOne"), timestamp=1, sequence_id=1234
             )
         )
         self.assertEquals(request.total_events, 1)
@@ -272,7 +268,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         self.assertTrue(
             request.add_event(
-                Event().set_message("eventOne"), timestamp=1L, sequence_number=1234
+                Event().set_message("eventOne"), timestamp=1, sequence_number=1234
             )
         )
         self.assertEquals(request.total_events, 1)
@@ -293,7 +289,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=expected_id,
                 sequence_number=expected_number,
             )
@@ -309,7 +305,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_same_sequence_id(self):
-        expected_id = "1234"
+        expected_id = b"1234"
         expected_number = 1234
         expected_delta = 1
         request = AddEventsRequest(self.__body)
@@ -317,7 +313,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=expected_id,
                 sequence_number=expected_number,
             )
@@ -325,7 +321,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=expected_id,
                 sequence_number=expected_number + expected_delta,
             )
@@ -350,7 +346,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -358,7 +354,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=first_id,
                 sequence_number=first_number + 1,
             )
@@ -366,7 +362,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventThree"),
-                timestamp=3L,
+                timestamp=3,
                 sequence_id=second_id,
                 sequence_number=second_number,
             )
@@ -392,7 +388,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -401,16 +397,16 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(
                 Event(
                     attrs={"name": "eventTwo", "long": "some really long text"}
-                ).set_message("eventTwo"),
-                timestamp=2L,
+                ).set_message(b"eventTwo"),
+                timestamp=2,
                 sequence_id=second_id,
                 sequence_number=second_number,
             )
         )
         self.assertTrue(
             request.add_event(
-                Event().set_message("eventThree"),
-                timestamp=3L,
+                Event().set_message(b"eventThree"),
+                timestamp=3,
                 sequence_id=first_id,
                 sequence_number=first_number + expected_delta,
             )
@@ -427,7 +423,6 @@ class AddEventsRequestTest(ScalyrTestCase):
 
     def test_set_position_resets_sequence_compression(self):
         first_id = "1234"
-        second_id = "1235"
         first_number = 1234
         second_number = 4321
         expected_delta = 10
@@ -436,7 +431,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -445,7 +440,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=first_id,
                 sequence_number=first_number + expected_delta,
             )
@@ -454,7 +449,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventThree"),
-                timestamp=3L,
+                timestamp=3,
                 sequence_id=first_id,
                 sequence_number=second_number,
             )
@@ -470,36 +465,37 @@ class AddEventsRequestTest(ScalyrTestCase):
 
     def test_timing_data(self):
         request = AddEventsRequest(self.__body)
-        request.increment_timing_data(foo=1, bar=2)
+        request.increment_timing_data(**{"foo": 1, "bar": 2})
         request.increment_timing_data(foo=5)
 
-        self.assertEquals(request.get_timing_data(), "foo=6.0 bar=2.0")
+        # can't rely on stable order in "get_timing_data()" return value
+        self.assertEquals(sorted(request.get_timing_data()), sorted("foo=6.0 bar=2.0"))
 
 
 class EventTest(ScalyrTestCase):
     def test_all_fields(self):
         x = Event(thread_id="foo", attrs={"parser": "bar"})
-        x.set_message("my_message")
+        x.set_message(b"my_message")
         x.set_sampling_rate(0.5)
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
         self.assertEquals(
             {
-                "log": u"foo",
-                "thread": u"foo",
-                "ts": u"42",
-                "si": u"1",
+                "log": "foo",
+                "thread": "foo",
+                "ts": "42",
+                "si": "1",
                 "sn": 2,
                 "sd": 3,
                 "attrs": {"parser": "bar", "message": "my_message", "sample_rate": 0.5},
@@ -509,29 +505,29 @@ class EventTest(ScalyrTestCase):
 
     def test_fast_path_fields(self):
         x = Event(thread_id="foo", attrs={"parser": "bar"})
-        x.set_message("my_message")
+        x.set_message(b"my_message")
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
             output_buffer.getvalue(),
         )
 
     def test_individual_fields(self):
         # snd
         x = Event(thread_id="foo", attrs={"parser": "bar"})
-        x.set_message("my_message")
+        x.set_message(b"my_message")
         x.set_sequence_number_delta(3)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -540,11 +536,11 @@ class EventTest(ScalyrTestCase):
         x.set_message("my_message")
         x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},ts:"42"}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},ts:"42"}',
             output_buffer.getvalue(),
         )
 
@@ -553,11 +549,11 @@ class EventTest(ScalyrTestCase):
         x.set_message("my_message")
         x.set_sampling_rate(0.5)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
             output_buffer.getvalue(),
         )
 
@@ -566,11 +562,11 @@ class EventTest(ScalyrTestCase):
         x.set_message("my_message")
         x.set_sequence_id("hi")
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},si:"hi"}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},si:"hi"}',
             output_buffer.getvalue(),
         )
 
@@ -579,11 +575,11 @@ class EventTest(ScalyrTestCase):
         x.set_message("my_message")
         x.set_sequence_number(5)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
             output_buffer.getvalue(),
         )
 
@@ -591,11 +587,11 @@ class EventTest(ScalyrTestCase):
         x = Event()
         x.set_message("my_message")
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            "{attrs:{message:`s\x00\x00\x00\nmy_message}}", output_buffer.getvalue()
+            b"{attrs:{message:`s\x00\x00\x00\nmy_message}}", output_buffer.getvalue()
         )
 
     def test_no_thread_id(self):
@@ -605,13 +601,13 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            b'{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -622,13 +618,13 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"biz", log:"biz", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            b'{thread:"biz", log:"biz", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -640,13 +636,13 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -658,15 +654,15 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         x.add_attributes({"trigger_update": "yes"})
 
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{"trigger_update":"yes",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            b'{thread:"foo", log:"foo", attrs:{"trigger_update":"yes",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -698,7 +694,7 @@ class EventSequencerTest(ScalyrTestCase):
         event = Event()
         self.event_sequencer.add_sequence_fields(event, expected_id, expected_number)
 
-        self.assertEquals(expected_id, event.sequence_id)
+        self.assertEquals(expected_id.encode("utf-8"), event.sequence_id)
         self.assertEquals(expected_number, event.sequence_number)
         self.assertIsNone(event.sequence_number_delta)
 
@@ -734,7 +730,7 @@ class EventSequencerTest(ScalyrTestCase):
         event = Event()
         self.event_sequencer.add_sequence_fields(event, second_id, second_number)
 
-        self.assertEquals(second_id, event.sequence_id)
+        self.assertEquals(second_id.encode("utf-8"), event.sequence_id)
         self.assertEquals(second_number, event.sequence_number)
         self.assertIsNone(event.sequence_number_delta)
 
@@ -777,7 +773,7 @@ class EventSequencerTest(ScalyrTestCase):
             event, expected_id, expected_number + expected_delta
         )
 
-        self.assertEqual(expected_id, event.sequence_id)
+        self.assertEqual(expected_id.encode("utf-8"), event.sequence_id)
         self.assertEqual(expected_number + expected_delta, event.sequence_number)
         self.assertIsNone(event.sequence_number_delta)
 
@@ -785,7 +781,7 @@ class EventSequencerTest(ScalyrTestCase):
 class PostFixBufferTest(ScalyrTestCase):
     def setUp(self):
         super(PostFixBufferTest, self).setUp()
-        self.__format = "], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }"
+        self.__format = b"], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }"
 
     def test_basic_case(self):
         test_buffer = PostFixBuffer(self.__format)
@@ -794,7 +790,7 @@ class PostFixBufferTest(ScalyrTestCase):
         test_buffer.add_log_and_thread_entry("log_5", "histogram_builder", {})
         self.assertEquals(
             test_buffer.content(),
-            """], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
+            b"""], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
         )
 
     def test_set_client_time(self):
@@ -806,7 +802,7 @@ class PostFixBufferTest(ScalyrTestCase):
 
         content = test_buffer.content(cache_size=False)
 
-        self.assertEquals(content, "], logs: [], threads: [], client_time: 433423 }")
+        self.assertEquals(content, b"], logs: [], threads: [], client_time: 433423 }")
         self.assertEquals(expected_length, len(content))
 
     def test_set_client_time_fail(self):
@@ -824,7 +820,7 @@ class PostFixBufferTest(ScalyrTestCase):
 
         content = test_buffer.content(cache_size=False)
 
-        self.assertEquals(content, "], logs: [], threads: [], client_time: 1 }")
+        self.assertEquals(content, b"], logs: [], threads: [], client_time: 1 }")
         self.assertEquals(expected_length, len(content))
 
     def test_add_thread(self):
@@ -854,10 +850,10 @@ class PostFixBufferTest(ScalyrTestCase):
 
         self.assertEquals(
             test_buffer.content(),
-            """], logs: [{"attrs":{},"id":"log_5"},{"attrs":{},"id":"log_12"},{"attrs":{},"id":"log"}], """
-            """threads: [{"id":"log_5","name":"histogram_builder"},"""
-            """{"id":"log_12","name":"ok_builder"},"""
-            """{"id":"log","name":"histogram_builder_foo"}], client_time: 1 }""",
+            b"""], logs: [{"attrs":{},"id":"log_5"},{"attrs":{},"id":"log_12"},{"attrs":{},"id":"log"}], """
+            b"""threads: [{"id":"log_5","name":"histogram_builder"},"""
+            b"""{"id":"log_12","name":"ok_builder"},"""
+            b"""{"id":"log","name":"histogram_builder_foo"}], client_time: 1 }""",
         )
 
     def test_add_thread_fail(self):
@@ -885,8 +881,8 @@ class PostFixBufferTest(ScalyrTestCase):
 
         self.assertEquals(
             test_buffer.content(),
-            """], logs: [{"attrs":{},"id":"log_5"}], """
-            """threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
+            b"""], logs: [{"attrs":{},"id":"log_5"}], """
+            b"""threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
         )
 
     def test_set_position(self):
@@ -911,12 +907,12 @@ class PostFixBufferTest(ScalyrTestCase):
 
         self.assertEquals(
             test_buffer.content(),
-            """], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], """
-            """client_time: 1 }""",
+            b"""], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], """
+            b"""client_time: 1 }""",
         )
 
 
-class ClientSessionTest(ScalyrTestCase):
+class ClientSessionTest(BaseScalyrLogCaptureTestCase):
     def test_user_agent_callback(self):
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -929,3 +925,73 @@ class ClientSessionTest(ScalyrTestCase):
         frags = ["frag1", "frag2", "frag3"]
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_body_is_logged_raw_uncompressed(self):
+        """
+        When sending a request with compression available / enabled, raw (uncompressed) request
+        body (payload) should be logged under DEBUG log level.
+        """
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+        session._ScalyrClientSession__compress = mock.Mock(return_value="compressed")
+
+        add_events_request = AddEventsRequest({"foo": "bar"})
+        event1 = Event(thread_id="foo1", attrs={"parser": "bar1"}).set_message(
+            "eventOne"
+        )
+        event2 = Event(thread_id="foo2", attrs={"parser": "bar2"}).set_message(
+            "eventTwo"
+        )
+        add_events_request.add_event(event=event1, timestamp=1)
+        add_events_request.add_event(event=event2, timestamp=2)
+
+        session.send(add_events_request=add_events_request)
+
+        # Should log raw (uncompressed) request body / payload
+        expected_body = r'{"foo":"bar", events: \[{thread:"foo1", .*'
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )
+        expected_body = r'.*,{thread:"foo2", log:"foo2", attrs:{"parser":"bar2",.*'
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )
+
+        # Verify that the compression was indeed enabled since that's the scenario we are testing
+        call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
+        self.assertEqual(call_kwargs["body"], "compressed")
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_body_is_logged_raw_uncompressed_long_body_is_truncated(self):
+        # Verify that very large bodies are truncated to avoid increased memory usage issues under
+        # Python 2.7
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+        session._ScalyrClientSession__compress = mock.Mock(return_value="compressed")
+
+        add_events_request = AddEventsRequest({"bar": "baz"})
+        event1 = Event(thread_id="foo4", attrs={"parser": "bar2"}).set_message(
+            "a" * (MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT + 1)
+        )
+
+        add_events_request.add_event(event=event1, timestamp=1)
+
+        session.send(add_events_request=add_events_request)
+
+        # Should log raw (uncompressed) request body / payload
+        expected_body = (
+            r'Sending POST /addEvents with body "{"bar":"baz".*\.\.\. \[body truncated to %s chars\] \.\.\.'
+            % (MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT)
+        )
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )

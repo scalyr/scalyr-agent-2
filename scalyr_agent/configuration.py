@@ -16,13 +16,19 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import os
 import re
 import socket
 import time
-import urlparse
+
+import six
+import six.moves.urllib.parse
+from six.moves import range
 
 import scalyr_agent.util as scalyr_util
 
@@ -37,7 +43,8 @@ from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
-from __scalyr__ import get_install_root
+from scalyr_agent.__scalyr__ import get_install_root
+from scalyr_agent.compat import os_environ_unicode
 
 
 class Configuration(object):
@@ -108,8 +115,8 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException, e:
-                raise BadConfiguration(str(e), None, "fileParseError")
+            except JsonReadFileException as e:
+                raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
@@ -164,7 +171,7 @@ class Configuration(object):
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                for (key, value) in content.iteritems():
+                for (key, value) in six.iteritems(content):
                     if key not in allowed_multiple_keys:
                         self.__config.put(key, value)
 
@@ -191,7 +198,7 @@ class Configuration(object):
                 server = self.__config["scalyr_server"].strip()
                 https_server = server
 
-                parts = urlparse.urlparse(server)
+                parts = six.moves.urllib.parse.urlparse(server)
 
                 # use index-based addressing for 2.4 compatibility
                 scheme = parts[0]
@@ -237,22 +244,44 @@ class Configuration(object):
                     parser="scalyrAgentProfiling",
                 )
                 self.__verify_log_entry_and_set_defaults(
-                    profile_config, description="profile log config"
+                    profile_config, description="CPU profile log config"
                 )
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
-
-        except BadConfiguration, e:
+        except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def apply_config(self):
+        """
+        Apply global configuration object based on the configuration values.
+
+        At this point this only applies to the JSON library which is used.
+        """
+        if not self.__config:
+            # parse() hasn't been called yet. We should probably throw here
+            return
+
+        # Set json library based on the config value. If "auto" is provided this means we use
+        # default behavior which is try to use ujson and if that's not available fall back to
+        # stdlib json
+        json_library = self.json_library
+        current_json_library = scalyr_util.get_json_lib()
+
+        if json_library != "auto" and json_library != current_json_library:
+            self.__logger.debug(
+                'Changing JSON library from "%s" to "%s"'
+                % (current_json_library, json_library)
+            )
+            scalyr_util.set_json_lib(json_library)
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
         @return: The default hostname for this host.
         @rtype: str
         """
-        result = socket.gethostname()
+        result = six.ensure_text(socket.gethostname())
         if result is not None and self.strip_domain_from_default_server_host:
             result = result.split(".")[0]
         return result
@@ -343,10 +372,6 @@ class Configuration(object):
     @property
     def k8s_cache_query_timeout_secs(self):
         return self.__get_config().get_int("k8s_cache_query_timeout_secs")
-
-    @property
-    def k8s_cache_expiry_secs(self):
-        return self.__get_config().get_int("k8s_cache_expiry_secs")
 
     @property
     def k8s_cache_expiry_secs(self):
@@ -488,8 +513,16 @@ class Configuration(object):
         return self.__get_config().get_string("profile_log_name")
 
     @property
+    def memory_profile_log_name(self):
+        return self.__get_config().get_string("memory_profile_log_name")
+
+    @property
     def disable_logfile_addevents_format(self):
         return self.__get_config().get_bool("disable_logfile_addevents_format")
+
+    @property
+    def json_library(self):
+        return self.__get_config().get_string("json_library")
 
     # Debug leak flags
     @property
@@ -534,6 +567,10 @@ class Configuration(object):
         return self.__get_config().get_bool("disable_leak_update_debug_log_level")
 
     @property
+    def enable_gc_stats(self):
+        return self.__get_config().get_bool("enable_gc_stats")
+
+    @property
     def disable_all_config_updates(self):
         return self.__get_config().get_int(
             "disable_leak_all_config_updates", none_if_missing=True
@@ -566,6 +603,14 @@ class Configuration(object):
     @property
     def config_change_check_interval(self):
         return self.__get_config().get_float("config_change_check_interval")
+
+    @property
+    def overall_stats_log_interval(self):
+        return self.__get_config().get_float("overall_stats_log_interval")
+
+    @property
+    def bandwidth_stats_log_interval(self):
+        return self.__get_config().get_float("bandwidth_stats_log_interval")
 
     @property
     def user_agent_refresh_interval(self):
@@ -1076,7 +1121,7 @@ class Configuration(object):
         if api_key:
             config.put("api_key", api_key)
 
-        if not "api_key" in config:
+        if "api_key" not in config:
             raise BadConfiguration(
                 'The configuration file is missing the required field "api_key" that '
                 "sets the authentication key to use when writing logs to Scalyr.  Please update "
@@ -1184,7 +1229,7 @@ class Configuration(object):
             config, "compression_level", 9, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_attributes(
-            config, "server_attributes", description, apply_defaults
+            config, "server_attributes", description, apply_defaults, env_aware=True,
         )
         self.__verify_or_set_optional_string(
             config,
@@ -1217,6 +1262,15 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "json_library",
+            "auto",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            apply_defaults,
+            env_aware=True,
+            valid_values=["auto", "json", "ujson", "orjson"],
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -1573,6 +1627,7 @@ class Configuration(object):
                 "debug_level",
                 "badDebugLevel",
             )
+
         self.__verify_or_set_optional_float(
             config,
             "request_deadline",
@@ -1615,7 +1670,6 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config, "https_proxy", None, description, apply_defaults, env_aware=True
         )
-
         self.__verify_or_set_optional_array_of_strings(
             config,
             "k8s_ignore_namespaces",
@@ -1918,6 +1972,14 @@ class Configuration(object):
             apply_defaults,
             env_aware=True,
         )
+        self.__verify_or_set_optional_string(
+            config,
+            "memory_profile_log_name",
+            "agent.meminfo",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
 
         # AGENT-263: controls sending in the new format or not as a safety in case it is broken somewhere in the chain
         # TODO: Remove this in a future release once we are more certain that it works
@@ -1970,7 +2032,9 @@ class Configuration(object):
             description,
             apply_defaults,
         )
-
+        self.__verify_or_set_optional_bool(
+            config, "enable_gc_stats", False, description, apply_defaults
+        )
         self.__verify_or_set_optional_int(
             config, "disable_leak_all_config_updates", None, description, apply_defaults
         )
@@ -1999,6 +2063,26 @@ class Configuration(object):
             config,
             "config_change_check_interval",
             30,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # How often to capture and log overall agent stats (in seconds).
+        # NOTE: This values must be >= config_change_check_interval.
+        self.__verify_or_set_optional_float(
+            config,
+            "overall_stats_log_interval",
+            600,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # How often to capture and log bandwidth related stats (in seconds).
+        # NOTE: This values must be >= config_change_check_interval.
+        self.__verify_or_set_optional_float(
+            config,
+            "bandwidth_stats_log_interval",
+            60,
             description,
             apply_defaults,
             env_aware=True,
@@ -2073,7 +2157,7 @@ class Configuration(object):
             config_val = config_object.get_bool(param_name, none_if_missing=True)
         elif param_type == float:
             config_val = config_object.get_float(param_name, none_if_missing=True)
-        elif param_type == str:
+        elif param_type == six.text_type:
             config_val = config_object.get_string(param_name, none_if_missing=True)
         elif param_type == JsonObject:
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
@@ -2428,14 +2512,14 @@ class Configuration(object):
         if count == 0:
             raise BadConfiguration(
                 'A required field is missing.  Object must contain one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
         elif count > 1:
             raise BadConfiguration(
                 'A required field has too many options.  Object must contain only one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
@@ -2449,6 +2533,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        valid_values=None,
     ):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
@@ -2464,10 +2549,11 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param valid_values: Optional list with valid values for this string.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, str, env_aware, env_name
+                config_object, field, six.text_type, env_aware, env_name
             )
 
             if value is None:
@@ -2481,6 +2567,14 @@ class Configuration(object):
                 % (field, config_description),
                 field,
                 "notString",
+            )
+
+        if value is not None and valid_values and value not in valid_values:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Valid values are: %s'
+                % (value, field, ", ".join(valid_values)),
+                field,
+                "invalidValue",
             )
 
     def __verify_or_set_optional_int(
@@ -2708,7 +2802,7 @@ class Configuration(object):
                     raise BadConfiguration(
                         "The element at index=%i is not a json object as required in the array "
                         'field "%s (%s, %s)".  Error is in %s'
-                        % (index, field, type(x), str(x), config_description),
+                        % (index, field, type(x), six.text_type(x), config_description),
                         field,
                         "notJsonObject",
                     )
@@ -2749,7 +2843,8 @@ class Configuration(object):
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         """
-        separators.sort()
+        # 2->TODO Python3 can not sort None values
+        separators.sort(key=lambda s: s if s is not None else "")
         # For legacy reasons, must support space-separated array of strings
         cls = ArrayOfStrings
         if separators == [None, ","]:
@@ -2766,7 +2861,7 @@ class Configuration(object):
 
             index = 0
             for x in array_of_strings:
-                if not isinstance(x, basestring):
+                if not isinstance(x, six.string_types):
                     raise BadConfiguration(
                         "The element at index=%i is not a string or unicode object as required in the array "
                         'field "%s".  Error is in %s'
@@ -2862,93 +2957,110 @@ class Configuration(object):
         @param source_config:  The configuration to rewrite, represented as key/value pairs.
         @type source_config: JsonObject
         """
-
-        def import_shell_variables():
-            """Creates a dict mapping variables listed in the `import_vars` field of `source_config` to their
-            values from the environment.
-            """
-            result = dict()
-            if "import_vars" in source_config:
-                for entry in source_config.get_json_array("import_vars"):
-                    # Allow for an entry of the form { var: "foo", default: "bar"}
-                    if isinstance(entry, JsonObject):
-                        var_name = entry["var"]
-                        default_value = entry["default"]
-                    else:
-                        var_name = entry
-                        default_value = ""
-
-                    if var_name in os.environ and len(os.environ[var_name]) > 0:
-                        result[var_name] = os.environ[var_name]
-                    else:
-                        result[var_name] = default_value
-            return result
-
-        def perform_generic_substitution(value):
-            """Takes a given JSON value and performs the appropriate substitution.
-
-            This method will return a non-None value if the value has to be replaced with the returned value.
-            Otherwise, this will attempt to perform in-place substitutions.
-
-            For str, unicode, it substitutes the variables and returns the result.  For
-            container objects, it does the recursive substitution.
-
-            @param value: The JSON value
-            @type value: Any valid element of a JsonObject
-            @return: The value that should replace the original, if any.  If no replacement is necessary, returns None
-            """
-            result = None
-            value_type = type(value)
-
-            if (value_type is str or value_type is unicode) and "$" in value:
-                result = perform_str_substitution(value)
-            elif isinstance(value, JsonObject):
-                perform_object_substitution(value)
-            elif isinstance(value, JsonArray):
-                perform_array_substitution(value)
-            return result
-
-        def perform_object_substitution(object_value):
-            """Performs the in-place substitution for a JsonObject.
-
-            @param object_value: The object to perform substitutions on.
-            @type object_value: JsonObject
-            """
-            # We collect the new values and apply them later to avoid messing up the iteration.
-            new_values = {}
-            for (key, value) in object_value.iteritems():
-                replace_value = perform_generic_substitution(value)
-                if replace_value is not None:
-                    new_values[key] = replace_value
-
-            for (key, value) in new_values.iteritems():
-                object_value[key] = value
-
-        def perform_str_substitution(str_value):
-            """Performs substitutions on the given string.
-
-            @param str_value: The input string.
-            @type str_value: str or unicode
-            @return: The resulting value after substitution.
-            @rtype: str or unicode
-            """
-            result = str_value
-            for (var_name, value) in substitutions.iteritems():
-                result = result.replace("$%s" % var_name, value)
-            return result
-
-        def perform_array_substitution(array_value):
-            """Perform substitutions on the JsonArray.
-
-            @param array_value: The array
-            @type array_value: JsonArray
-            """
-            for i in range(len(array_value)):
-                replace_value = perform_generic_substitution(array_value[i])
-                if replace_value is not None:
-                    array_value[i] = replace_value
-
-        # Actually do the work.
-        substitutions = import_shell_variables()
+        substitutions = import_shell_variables(source_config=source_config)
         if len(substitutions) > 0:
-            perform_object_substitution(source_config)
+            perform_object_substitution(
+                object_value=source_config, substitutions=substitutions
+            )
+
+
+"""
+Utility functions related to shell variable handling and substition.
+
+NOTE: Those functions are intentionally not defined inside "__perform_substitutions" to avoid memory
+leaks.
+"""
+
+
+def import_shell_variables(source_config):
+    """Creates a dict mapping variables listed in the `import_vars` field of `source_config` to their
+    values from the environment.
+    """
+    result = dict()
+    if "import_vars" in source_config:
+        for entry in source_config.get_json_array("import_vars"):
+            # Allow for an entry of the form { var: "foo", default: "bar"}
+            if isinstance(entry, JsonObject):
+                var_name = entry["var"]
+                default_value = entry["default"]
+            else:
+                var_name = entry
+                default_value = ""
+
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            var_value = os_environ_unicode.get(var_name)
+            if var_value:
+                result[var_name] = var_value
+            else:
+                result[var_name] = default_value
+    return result
+
+
+def perform_generic_substitution(value, substitutions):
+    """Takes a given JSON value and performs the appropriate substitution.
+
+    This method will return a non-None value if the value has to be replaced with the returned value.
+    Otherwise, this will attempt to perform in-place substitutions.
+
+    For str, unicode, it substitutes the variables and returns the result.  For
+    container objects, it does the recursive substitution.
+
+    @param value: The JSON value
+    @type value: Any valid element of a JsonObject
+    @return: The value that should replace the original, if any.  If no replacement is necessary, returns None
+    """
+    result = None
+    value_type = type(value)
+
+    if value_type is six.text_type and "$" in value:
+        result = perform_str_substitution(value, substitutions=substitutions)
+    elif isinstance(value, JsonObject):
+        perform_object_substitution(value, substitutions=substitutions)
+    elif isinstance(value, JsonArray):
+        perform_array_substitution(value, substitutions=substitutions)
+    return result
+
+
+def perform_object_substitution(object_value, substitutions):
+    """Performs the in-place substitution for a JsonObject.
+
+    @param object_value: The object to perform substitutions on.
+    @type object_value: JsonObject
+    """
+    # We collect the new values and apply them later to avoid messing up the iteration.
+    new_values = {}
+    for (key, value) in six.iteritems(object_value):
+        replace_value = perform_generic_substitution(value, substitutions=substitutions)
+        if replace_value is not None:
+            new_values[key] = replace_value
+
+    for (key, value) in six.iteritems(new_values):
+        object_value[key] = value
+
+
+def perform_str_substitution(str_value, substitutions):
+    """Performs substitutions on the given string.
+
+    @param str_value: The input string.
+    @type str_value: str or unicode
+    @return: The resulting value after substitution.
+    @rtype: str or unicode
+    """
+    result = str_value
+    for (var_name, value) in six.iteritems(substitutions):
+        result = result.replace("$%s" % var_name, value)
+    return result
+
+
+def perform_array_substitution(array_value, substitutions):
+    """Perform substitutions on the JsonArray.
+
+    @param array_value: The array
+    @type array_value: JsonArray
+    """
+    for i in range(len(array_value)):
+        replace_value = perform_generic_substitution(
+            array_value[i], substitutions=substitutions
+        )
+        if replace_value is not None:
+            array_value[i] = replace_value

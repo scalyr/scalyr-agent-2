@@ -1,5 +1,5 @@
 [tool.black]
-#line-length = 88
+#line-length = 100
 #target_version = ['py37']
 include = '\.pyi?$'
 exclude = '''
@@ -13,6 +13,7 @@ exclude = '''
     | __pycache__
     | third_party
     | third_party_tls
+    | third_party_python2
   )/
 )
 '''

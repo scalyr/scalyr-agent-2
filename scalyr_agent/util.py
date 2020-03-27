@@ -14,12 +14,22 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
+if False:
+    from typing import Union
 
 import codecs
 import sys
-import struct
-import thread
+from io import open
+
+import six
+import six.moves._thread
+from six.moves import range
+from scalyr_agent import compat
 
 
 __author__ = "czerwin@scalyr.com"
@@ -29,13 +39,9 @@ import base64
 import calendar
 import datetime
 import os
-import random
-import sys
 import threading
 import time
 import uuid
-
-from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
@@ -47,7 +53,7 @@ from scalyr_agent.platform_controller import CannotExecuteAsUser
 try:
     from hashlib import sha1
 except ImportError:
-    from sha import sha as sha1
+    from sha import sha as sha1  # type: ignore
 
 
 try:
@@ -56,23 +62,58 @@ try:
 
     new_md5 = True
 except ImportError:
-    import md5
+    import md5  # type: ignore
 
     new_md5 = False
 
 
+USJON_NOT_AVAILABLE_MSG = """
+ujson library is not available. You can install it using pip:
+
+    pip install usjon
+
+Original error: %s
+""".strip()
+
+ORJSON_NOT_AVAILABLE_MSG = """
+orjson library is not available. You can install it using pip.
+
+Python 3.5:
+
+    pip install "orjson==2.0.11"
+
+Python >= 3.6:
+
+    pip install orjson
+
+Original error: %s
+""".strip()
+
+
 def get_json_implementation(lib_name):
+    if lib_name not in ["json", "ujson", "orjson"]:
+        raise ValueError("Unsupported json library %s" % lib_name)
+
+    if lib_name == "orjson" and not six.PY3:
+        raise ValueError('"orjson" is only available under Python 3')
 
     if lib_name == "ujson":
-        import ujson
+        try:
+            import ujson  # pylint: disable=import-error
+        except ImportError as e:
+            raise ImportError(USJON_NOT_AVAILABLE_MSG % (str(e)))
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
@@ -87,6 +128,16 @@ def get_json_implementation(lib_name):
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
+    elif lib_name == "orjson":
+        # todo: throw a more friendly error message on import error with info on how to install it
+        # special case for 3.5
+        try:
+            import orjson  # pylint: disable=import-error
+        except ImportError as e:
+            raise ImportError(ORJSON_NOT_AVAILABLE_MSG % (str(e)))
+
+        return lib_name, orjson.dumps, orjson.loads
+
     else:
         if lib_name != "json":
             raise ValueError("Unsupported json library %s" % lib_name)
@@ -95,11 +146,15 @@ def get_json_implementation(lib_name):
 
         def json_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
 
             if fp is not None:
@@ -108,7 +163,16 @@ def get_json_implementation(lib_name):
             else:
                 return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
-        return lib_name, json_dumps_custom, json.loads
+        if sys.version_info[0] == 3 and sys.version_info[1] < 6:
+            # wrap native json library 'loads' in Python3.5 and below, because it does not accept bytes.
+            def json_loads(string, *args, **kwargs):
+                string = six.ensure_text(string)
+                return json.loads(string, *args, **kwargs)
+
+        else:
+            json_loads = json.loads
+
+        return lib_name, json_dumps_custom, json_loads
 
 
 _json_lib = None
@@ -116,20 +180,24 @@ _json_encode = None
 _json_decode = None
 
 
-def _set_json_lib(lib_name):
+def set_json_lib(lib_name):
     # This function is not meant to be invoked at runtime.  It exists primarily for testing.
     global _json_lib, _json_encode, _json_decode
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
 try:
-    _set_json_lib("ujson")
+    set_json_lib("ujson")
 except ImportError:
     try:
-        _set_json_lib("json")
+        set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        print(
+            "No default json library found which should be present in all Python >= 2.6.  "
+            "Python < 2.6 is not supported.  Exiting.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
@@ -137,15 +205,25 @@ def get_json_lib():
     return _json_lib
 
 
-def json_encode(obj, output=None):
+def json_encode(obj, output=None, binary=False):
     """Encodes an object into a JSON string.
 
     @param obj: The object to serialize
     @param output: If not None, a file-like object to which the serialization should be written.
-
-    @type obj: dict|list
+    @param binary: If True return binary string, otherwise text string.
+    @type obj: dict|list|six.text_type
+    @type binary: bool
     """
-    return _json_encode(obj, output)
+    # 2->TODO encode json according to 'binary' flag.
+    if binary:
+
+        result = six.ensure_binary(_json_encode(obj, None))
+        if output:
+            output.write(result)
+        else:
+            return result
+    else:
+        return six.ensure_text(_json_encode(obj, output))
 
 
 def json_decode(text):
@@ -185,6 +263,9 @@ def json_scalyr_config_decode(text):
     return json_lib.parse(text)
 
 
+_NUMERIC_TYPES = six.integer_types + (float,)
+
+
 def value_to_bool(value):
     """
     Duplicates "JsonObject.__num_to_bool" functionality.
@@ -193,20 +274,21 @@ def value_to_bool(value):
     value_type = type(value)
     if value_type is bool:
         return value
-    elif value_type in (int, long, float):
+    elif value_type in _NUMERIC_TYPES:
         value = float(value)
         # return True if the value is one, False if it is zero
         if abs(value) < 1e-10:
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is str or value_type is unicode:
+    elif value_type is six.text_type:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
 
     raise ValueError(
-        "Cannot convert %s value to bool: %s" % (str(value_type), str(value))
+        "Cannot convert %s value to bool: %s"
+        % (six.text_type(value_type), six.text_type(value))
     )
 
 
@@ -236,16 +318,18 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
                 f = open(file_path, "r")
             data = f.read()
             return json_parser(data)
-        except IOError, e:
-            raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
-        except JsonParseException, e:
+        except IOError as e:
+            raise JsonReadFileException(
+                file_path, "Read error occurred: " + six.text_type(e)
+            )
+        except JsonParseException as e:
             raise JsonReadFileException(
                 file_path,
                 "JSON parsing error occurred: %s (line %i, byte position %i)"
                 % (e.raw_message, e.line_number, e.position),
             )
-        except UnicodeDecodeError, e:
-            raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
+        except UnicodeDecodeError as e:
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + six.text_type(e))
     finally:
         if f is not None:
             f.close()
@@ -291,7 +375,9 @@ def read_file_as_json(file_path, strict_utf8=False):
         try:
             return json_decode(text)
         except ValueError as e:
-            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+            raise JsonParseException(
+                "JSON parsing failed due to: %s" % six.text_type(e)
+            )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
 
@@ -328,32 +414,50 @@ def create_unique_id():
     """
     @return: A value that will be unique for all values generated by all machines.  The value
         is also encoded so that is safe to be used in a web URL.
-    @rtype: str
+    @rtype: six.text_type
     """
-    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    # 2->TODO this function should return unicode.
+    base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    return base64_id.decode("utf-8")
+
+
+def create_uuid3(namespace, name):
+    """
+    Return new UUID based on a hash of a UUID namespace and a string.
+    :param namespace: The namespace
+    :param name: The string
+    :type namespace: uuid.UUID
+    :type name: six.text
+    :return:
+    :rtype: uuid.UUID
+    """
+    return uuid.uuid3(namespace, six.ensure_str(name))
 
 
 def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
-    @type data: str
-    @rtype: str
+    @type data: six.binary_type
+    @rtype: six.text_type
     """
 
-    if not (data and isinstance(data, basestring)):
+    if not (data and isinstance(data, six.text_type)):
         raise Exception("invalid data to be hashed: %s", repr(data))
+
+    encoded_data = data.encode("utf-8")
 
     if not new_md5:
         m = md5.new()
     else:
         m = md5()
-    m.update(data)
+    m.update(encoded_data)
 
     return m.hexdigest()
 
 
 def remove_newlines_and_truncate(input_string, char_limit):
+    # type: (Union[str, bytes], int) -> str
     """Returns the input string but with all newlines removed and truncated.
 
     The newlines are replaced with spaces.  This is done both for carriage return and newline.
@@ -363,12 +467,13 @@ def remove_newlines_and_truncate(input_string, char_limit):
     @param input_string: The string to transform
     @param char_limit: The maximum number of characters the resulting string should be
 
-    @type input_string: str
+    @type input_string: str or bytes
     @type char_limit: int
 
     @return:  The string with all newlines replaced with spaces and truncated.
     @rtype: str
     """
+    input_string = six.ensure_text(input_string)
     return input_string.replace("\n", " ").replace("\r", " ")[0:char_limit]
 
 
@@ -431,7 +536,7 @@ def rfc3339_to_datetime(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError:
         return None
 
     dt = datetime.datetime(*(tm[0:6]))
@@ -482,10 +587,10 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError:
         return None
 
-    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000L
+    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
     nanos = 0
 
     # now add the fractional part
@@ -503,7 +608,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = long(long(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10 ** to_nanos)
 
     return nano_seconds + nanos
 
@@ -537,13 +642,16 @@ def format_time(time_value):
 def get_pid_tid():
     """Returns a string containing the current process and thread id in the format "(pid=%pid) (tid=%tid)".
     @return: The string containing the process and thread id.
-    @rtype: str
+    @rtype: six.text_type
     """
     # noinspection PyBroadException
     try:
-        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(thread.get_ident()))
+        return "(pid=%s) (tid=%s)" % (
+            six.text_type(os.getpid()),
+            six.text_type(six.moves._thread.get_ident()),
+        )
     except:
-        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
+        return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
 
 
 def is_list_of_strings(vals):
@@ -551,7 +659,7 @@ def is_list_of_strings(vals):
     try:
         # check if everything is a string
         for val in vals:
-            if not isinstance(val, basestring):
+            if not isinstance(val, six.string_types):
                 return False
     except:
         # vals is not enumerable
@@ -985,7 +1093,10 @@ class StoppableThread(threading.Thread):
                 name = "%s%s" % (name_prefix, name)
             else:
                 name = name_prefix
-        threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        # NOTE: We explicitly don't pass target= argument to the parent constructor since this
+        # creates a cycle and a memory leak
+        threading.Thread.__init__(self, name=name)
+
         if is_daemon:
             self.setDaemon(True)
         self.__target = target
@@ -998,7 +1109,7 @@ class StoppableThread(threading.Thread):
         """Sets a prefix to add to the beginning of all threads from this point forward.
 
         @param name_prefix: The prefix or None if no prefix should be used.
-        @type name_prefix: str or None
+        @type name_prefix: six.text_type or None
         """
         StoppableThread.__name_lock.acquire()
         try:
@@ -1018,6 +1129,15 @@ class StoppableThread(threading.Thread):
         finally:
             StoppableThread.__name_lock.release()
 
+    def run(self):
+        """
+        NOTE: This is a workaround for using threading.Thread constructor target argument which
+        results in a cycle and a memory leak.
+
+        See https://bugs.python.org/issue704180 for details.
+        """
+        return self.__run_impl()
+
     def __run_impl(self):
         """Internal run implementation.
         """
@@ -1027,10 +1147,11 @@ class StoppableThread(threading.Thread):
                 self.__target(self._run_state)
             else:
                 self.run_and_propagate()
-        except Exception, e:
+        except Exception as e:
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
-                "Received exception from run method in StoppableThread %s" % str(e)
+                "Received exception from run method in StoppableThread %s"
+                % six.text_type(e)
             )
             return None
 
@@ -1040,6 +1161,13 @@ class StoppableThread(threading.Thread):
         This allows for the base class to catch any raised exceptions and propagate them during the join call.
         """
         pass
+
+    def is_running(self):
+        # type: () -> bool
+        """
+        Return True if this thread is running.
+        """
+        return self._run_state.is_running()
 
     def stop(self, wait_on_join=True, join_timeout=5):
         """Stops the thread from running.
@@ -1076,9 +1204,11 @@ class StoppableThread(threading.Thread):
         """
         threading.Thread.join(self, timeout)
         if not self.isAlive() and self.__exception_info is not None:
-            raise self.__exception_info[0], self.__exception_info[
-                1
-            ], self.__exception_info[2]
+            six.reraise(
+                self.__exception_info[0],
+                self.__exception_info[1],
+                self.__exception_info[2],
+            )
 
 
 class RateLimiter(object):
@@ -1218,7 +1348,7 @@ class ScriptEscalator(object):
             else:
                 # We use the __main__ symbolic module to determine which file was invoked by the python script.
                 # noinspection PyUnresolvedReferences
-                import __main__
+                import __main__  # type: ignore
 
                 script_file_path = __main__.__file__
                 if not os.path.isabs(script_file_path):
@@ -1229,10 +1359,10 @@ class ScriptEscalator(object):
             return self.__controller.run_as_user(
                 self.__desired_user, script_file_path, script_binary, script_args
             )
-        except CannotExecuteAsUser, e:
+        except CannotExecuteAsUser as e:
             if not handle_error:
                 raise e
-            print >>sys.stderr, (
+            print(
                 "Failing, cannot %s as the correct user.  The command must be executed using the "
                 "same account that owns the configuration file.  The configuration file is owned by "
                 "%s whereas the current user is %s.  Changing user failed due to the following "
@@ -1243,7 +1373,8 @@ class ScriptEscalator(object):
                     self.__running_user,
                     e.error_message,
                     self.__desired_user,
-                )
+                ),
+                file=sys.stderr,
             )
             return 1
 
@@ -1339,7 +1470,7 @@ class RedirectorServer(object):
         """
         # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
         # serialize it that way.
-        encoded_content = unicode(content).encode("utf-8")
+        encoded_content = six.text_type(content).encode("utf-8")
         # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
         # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
         # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is
@@ -1349,7 +1480,10 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                self.__channel.write(struct.pack("i", code) + encoded_content)
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
+                self.__channel.write(
+                    compat.struct_pack_unicode("i", code) + encoded_content
+                )
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -1506,7 +1640,10 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                code = struct.unpack("i", self.__channel.read(4))[0]  # Read str length
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
+                code = compat.struct_unpack_unicode("i", self.__channel.read(4))[
+                    0
+                ]  # Read str length
 
                 # The server sends -1 when it wishes to close the stream.
                 if code < 0:
@@ -1581,7 +1718,7 @@ class RedirectorClient(StoppableThread):
 
         @type deadline: float
         @type last_loop_time: float
-        @type description: str
+        @type description: six.text_type
         """
         current_time = self.__time()
         poll_deadline = RedirectorClient.BUSY_LOOP_POLL_INTERVAL + last_loop_time
@@ -1672,7 +1809,7 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = "a" * 100
+COMPRESSION_TEST_STR = b"a" * 100
 
 
 def get_compress_module(compression_type):

@@ -14,10 +14,15 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import gc
 import traceback
+
+import six
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
@@ -32,7 +37,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.garbage_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -147,9 +152,11 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
             object_dump_types = []
 
         for t in object_dump_types:
-            if not isinstance(t, basestring):
+            if not isinstance(t, six.string_types):
                 raise BadMonitorConfiguration(
-                    "object_dump_types contains a non-string value: %s" % str(t)
+                    "object_dump_types contains a non-string value: %s"
+                    % six.text_type(t),
+                    "object_dump_types",
                 )
 
         # and convert the JsonArray to a python list
@@ -182,7 +189,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         if len(self._object_dump_types):
             self._logger.info(
                 "\tDumping %d objects of type(s) %s"
-                % (self._max_object_dump, str(self._object_dump_types))
+                % (self._max_object_dump, six.text_type(self._object_dump_types))
             )
         else:
             self._logger.info("\tNot dumping individual objects.")
@@ -193,9 +200,9 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         if hasattr(rubbish, "__name__"):
             if rubbish.__name__ == "function":
                 return rubbish.__name__
-            return str(rubbish)
+            return six.text_type(rubbish)
         else:
-            return str(rubbish)
+            return six.text_type(rubbish)
 
     def _dump_objects(
         self, all_objects, object_dump_types, max_type_dump, max_object_dump, dump_kind
@@ -215,7 +222,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
 
         # get the top objects, sorted by descending object count
         sorted_objects = sorted(
-            type_count.items(), key=lambda (k, v): len(v), reverse=True
+            list(type_count.items()), key=lambda k_v: len(k_v[1]), reverse=True
         )[:max_type_dump]
 
         # print the overview
@@ -268,7 +275,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
                     dump_kind="live",
                 )
 
-        except Exception, e:
+        except Exception:
             global_log.info("error gathering sample %s", traceback.format_exc())
 
     def stop(self, wait_on_join=True, join_timeout=5):

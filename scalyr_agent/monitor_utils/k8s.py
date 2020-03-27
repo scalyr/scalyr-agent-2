@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import hashlib
 import os
 import random
@@ -8,20 +11,24 @@ import threading
 import time
 from time import strftime, gmtime
 import traceback
+from io import open
+
+import six
+import six.moves.urllib.request
+import six.moves.urllib.parse
+import six.moves.urllib.error
+from six.moves import range
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
-import scalyr_agent.util as util
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
-import threading
-import time
-from time import strftime, gmtime
-import traceback
+
 import scalyr_agent.scalyr_logging as scalyr_logging
-import urllib
+import scalyr_agent.util as util
+from scalyr_agent.compat import os_environ_unicode
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -90,6 +97,10 @@ _OBJECT_ENDPOINTS = {
         "list-all": "/apis/apps/v1/statefulsets",
     },
 }
+
+# Template for an older kubelet endpoint that we may want to fall back to if the new one is unavailable due to an
+# older kubernetes version
+FALLBACK_KUBELET_URL_TEMPLATE = Template("http://${host_ip}:10255")
 
 
 def cache(global_config):
@@ -203,6 +214,8 @@ class QualifiedName(object):
     Represents a fully qualified name for a Kubernetes object using both its name and namespace.
     """
 
+    __slots__ = ("namespace", "name")
+
     def __init__(self, namespace, name):
         self.namespace = namespace
         self.name = name
@@ -257,7 +270,7 @@ class PodInfo(object):
         # just the object id, we explicitly create a flattened string of
         # key/value pairs
         flattened = []
-        for k, v in labels.iteritems():
+        for k, v in six.iteritems(labels):
             flattened.append(k)
             flattened.append(v)
         md5.update("".join(flattened))
@@ -269,9 +282,9 @@ class PodInfo(object):
         # flatten the annotations dict in to a single string
         # see previous comment for why flattening is necessary
         flattened = []
-        for k, v in annotations.iteritems():
+        for k, v in six.iteritems(annotations):
             flattened.append(k)
-            flattened.append(str(v))
+            flattened.append(six.text_type(v))
 
         md5.update("".join(flattened))
 
@@ -331,7 +344,7 @@ class Controller(object):
         self.parent_name = parent_name
         self.parent_kind = parent_kind
         flat_labels = []
-        for key, value in labels.iteritems():
+        for key, value in six.iteritems(labels):
             flat_labels.append("%s=%s" % (key, value))
 
         self.flat_labels = ",".join(flat_labels)
@@ -398,7 +411,7 @@ class _K8sCache(object):
         result = {}
         self._lock.acquire()
         try:
-            for k, v in self._objects.iteritems():
+            for k, v in six.iteritems(self._objects):
                 result[k] = v
         finally:
             self._lock.release()
@@ -408,8 +421,8 @@ class _K8sCache(object):
     def __get_stale_objects(self, access_time):
         """Get all stale objects.  Caller should first obtain lock on self._objects"""
         stale = []
-        for namespace, objs in self._objects.iteritems():
-            for obj_name, obj in objs.iteritems():
+        for namespace, objs in six.iteritems(self._objects):
+            for obj_name, obj in six.iteritems(objs):
                 if hasattr(obj, "access_time"):
                     if obj.access_time is None or obj.access_time < access_time:
                         stale.append((namespace, obj_name))
@@ -505,8 +518,8 @@ class _K8sCache(object):
         @param allow_expired: If true, return the object if it exists in the cache even if expired.
             If false, return None if the object exists but is expired.
 
-        @type namespace: str
-        @type name: str
+        @type namespace: six.text_type
+        @type name: six.text_type
         @type current_time: epoch seconds
         @type allow_expired: bool
         """
@@ -540,8 +553,8 @@ class _K8sCache(object):
         @param name: The object's name
         @param allow_expired: If True, an object is considered present in cache even if it is expired.
 
-        @type namespace: str
-        @type name: str
+        @type namespace: six.text_type
+        @type name: six.text_type
         @type allow_expired: bool
 
         @return: True if the object is cached.  If check_expiration is True and an expiration
@@ -754,10 +767,10 @@ class PodProcessor(_K8sProcessor):
 
         try:
             annotations = annotation_config.process_annotations(annotations)
-        except BadAnnotationConfig, e:
+        except BadAnnotationConfig as e:
             global_log.warning(
                 "Bad Annotation config for %s/%s.  All annotations ignored. %s"
-                % (namespace, pod_name, str(e)),
+                % (namespace, pod_name, six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="bad-annotation-config-%s"
                 % metadata.get("uid", "invalid-uid"),
@@ -765,7 +778,8 @@ class PodProcessor(_K8sProcessor):
             annotations = JsonObject()
 
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % (str(annotations))
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Annotations: %s" % (six.text_type(annotations)),
         )
 
         # create the PodInfo
@@ -1013,7 +1027,7 @@ class _CacheConfigState(object):
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Got new config %s",
-                    str(self.cache_config),
+                    six.text_type(self.cache_config),
                 )
 
         finally:
@@ -1190,6 +1204,12 @@ class KubernetesCache(object):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod(k8s.namespace, pod_name)
         if pod is None:
+            global_log.warning(
+                "Coud not determine K8s CRI because could not find agent pod: %s"
+                % pod_name,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_pod",
+            )
             return None
 
         status = pod.get("status", {})
@@ -1217,6 +1237,11 @@ class KubernetesCache(object):
 
                     return None
 
+        global_log.warning(
+            "Coud not determine K8s CRI because could not find agent container in pod.",
+            limit_once_per_x_secs=300,
+            limit_key="k8s_cri_no_agent_container",
+        )
         return None
 
     def update_cache(self, run_state):
@@ -1260,15 +1285,15 @@ class KubernetesCache(object):
                     self._last_initialization_error = None
                 finally:
                     self._lock.release()
-            except K8sApiException, e:
+            except K8sApiException as e:
                 global_log.warn(
                     "K8s API exception while updating %s in K8s cache (will retry) - %s"
-                    % (component, str(e)),
+                    % (component, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_init_cache",
                 )
                 self._update_initialization_error(
-                    component, "K8s API error %s" % str(e)
+                    component, "K8s API error %s" % six.text_type(e)
                 )
                 # Delay a fixed amount.  TODO: Maybe do exponential backoff here?
                 retry_delay_secs = 0.5
@@ -1285,12 +1310,12 @@ class KubernetesCache(object):
             except Exception as e:
                 global_log.warn(
                     "Exception occurred when updating %s in K8s cache (will retry) - %s\n%s"
-                    % (component, str(e), traceback.format_exc()),
+                    % (component, six.text_type(e), traceback.format_exc()),
                     limit_once_per_x_secs=60,
                     limit_key="k8s_init_generic_error",
                 )
                 self._update_initialization_error(
-                    component, "Unhandled error %s" % str(e)
+                    component, "Unhandled error %s" % six.text_type(e)
                 )
                 # Unknown error.  TODO: Maybe do exponential backoff here?
                 retry_delay_secs = 0.5
@@ -1343,16 +1368,17 @@ class KubernetesCache(object):
                     self._pods_cache.purge_unused(last_purge)
                     last_purge = current_time
 
-            except K8sApiException, e:
+            except K8sApiException as e:
                 global_log.warn(
-                    "Exception occurred when updating k8s cache - %s" % (str(e)),
+                    "Exception occurred when updating k8s cache - %s"
+                    % (six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_update_cache",
                 )
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "Exception occurred when updating k8s cache - %s\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
 
             # Fuzz how much time we spend until the next cycle.  This should spread out when the agents query the
@@ -1584,14 +1610,14 @@ class KubernetesApi(object):
 
         # The k8s API requires us to pass in an authentication token
         # which we can obtain from a token file in a 'well known' location
-        token = ""
+        self.token = ""
 
         try:
             # using with is ok here, because we need to be running
             # a recent version of python for various 3rd party libs
             f = open(token_file, "r")
             try:
-                token = f.read()
+                self.token = f.read()
             finally:
                 f.close()
         except IOError:
@@ -1610,7 +1636,7 @@ class KubernetesApi(object):
         except IOError:
             pass
 
-        self._standard_headers["Authorization"] = "Bearer %s" % (token)
+        self._standard_headers["Authorization"] = "Bearer %s" % (self.token)
 
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
@@ -1640,11 +1666,15 @@ class KubernetesApi(object):
 
     def get_pod_name(self):
         """ Gets the pod name of the pod running the scalyr-agent """
-        return os.environ.get("SCALYR_K8S_POD_NAME") or os.environ.get("HOSTNAME")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        return os_environ_unicode.get("SCALYR_K8S_POD_NAME") or os_environ_unicode.get(
+            "HOSTNAME"
+        )
 
     def get_node_name(self, pod_name):
         """ Gets the node name of the node running the agent """
-        node = os.environ.get("SCALYR_K8S_NODE_NAME")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        node = os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
         if not node:
             pod = self.query_pod(self.namespace, pod_name)
             spec = pod.get("spec", {})
@@ -1677,7 +1707,8 @@ class KubernetesApi(object):
         Otherwise return None
         """
 
-        cluster = os.environ.get("SCALYR_K8S_CLUSTER_NAME")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        cluster = os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME", "")
         if cluster:
             return cluster
 
@@ -1751,7 +1782,7 @@ class KubernetesApi(object):
                 # will return a 404.  Then if you query again a few seconds later everything works.
                 rate_limit_outcome = True
                 raise
-            except K8sApiTemporaryError, e:
+            except K8sApiTemporaryError as e:
                 rate_limit_outcome = False
                 if retries_left <= 0:
                     raise e
@@ -1785,13 +1816,13 @@ class KubernetesApi(object):
         try:
             kapi = os.path.join(self.agent_log_path, "kapi")
             if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
+                os.mkdir(kapi, 0o755)
             if rate_limited:
                 kapi = os.path.join(kapi, "limited")
             else:
                 kapi = os.path.join(kapi, "limited")
             if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
+                os.mkdir(kapi, 0o755)
             fname = "%s_%.20f_%s_%s" % (
                 strftime("%Y%m%d-%H-%M-%S", gmtime()),
                 time.time(),
@@ -1882,10 +1913,11 @@ class KubernetesApi(object):
                     url, verify=self._verify_connection(), timeout=self.query_timeout
                 )
                 response.encoding = "utf-8"
-            except Exception, e:
+            except Exception as e:
                 if return_temp_errors:
                     raise K8sApiTemporaryError(
-                        "Temporary error seen while accessing api: %s" % str(e)
+                        "Temporary error seen while accessing api: %s"
+                        % six.text_type(e)
                     )
                 else:
                     raise
@@ -1919,13 +1951,13 @@ class KubernetesApi(object):
                 if return_temp_errors:
                     raise K8sApiTemporaryError(
                         "Invalid response from Kubernetes API when querying '%s': %s"
-                        % (path, str(response)),
+                        % (path, six.text_type(response)),
                         status_code=response.status_code,
                     )
                 else:
                     raise K8sApiException(
                         "Invalid response from Kubernetes API when querying '%s': %s"
-                        % (path, str(response)),
+                        % (path, six.text_type(response)),
                         status_code=response.status_code,
                     )
 
@@ -1982,9 +2014,9 @@ class KubernetesApi(object):
             query = _OBJECT_ENDPOINTS[kind]["single"].substitute(
                 name=name, namespace=namespace
             )
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
-                "k8s API - failed to build query string - %s" % (str(e)),
+                "k8s API - failed to build query string - %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="k8s_api_build_query-%s" % kind,
             )
@@ -2016,16 +2048,19 @@ class KubernetesApi(object):
         if namespace:
             try:
                 query = _OBJECT_ENDPOINTS[kind]["list"].substitute(namespace=namespace)
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "k8s API - failed to build namespaced query list string - %s"
-                    % (str(e)),
+                    % (six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_build_list_query-%s" % kind,
                 )
 
         if filter:
-            query = "%s?fieldSelector=%s" % (query, urllib.quote(filter))
+            query = "%s?fieldSelector=%s" % (
+                query,
+                six.moves.urllib.parse.quote(filter),
+            )
 
         return self.query_api_with_retries(
             query,
@@ -2055,7 +2090,7 @@ class KubernetesApi(object):
         url = self._http_host + path
 
         if last_event:
-            resource = "resourceVersion=%s" % str(last_event)
+            resource = "resourceVersion=%s" % six.text_type(last_event)
             if "?" in url:
                 resource = "&%s" % resource
             else:
@@ -2079,7 +2114,7 @@ class KubernetesApi(object):
             )
             raise K8sApiException(
                 "Invalid response from Kubernetes API when querying %d - '%s': %s"
-                % (response.status_code, path, str(response)),
+                % (response.status_code, path, six.text_type(response)),
                 status_code=response.status_code,
             )
 
@@ -2093,16 +2128,22 @@ class KubeletApi(object):
         A class for querying the kubelet API
     """
 
-    def __init__(self, k8s, port=10255, host_ip=None):
+    def __init__(
+        self,
+        k8s,
+        host_ip=None,
+        kubelet_url_template=Template("https://${host_ip}:10250"),
+    ):
         """
         @param k8s - a KubernetesApi object
         """
-        if host_ip is None:
+        self._host_ip = host_ip
+        if self._host_ip is None:
             try:
                 pod_name = k8s.get_pod_name()
                 pod = k8s.query_pod(k8s.namespace, pod_name)
                 status = pod.get("status", {})
-                host_ip = status.get("hostIP", None)
+                self._host_ip = status.get("hostIP", None)
                 # Don't raise exception for now
                 # if host_ip is None:
                 #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
@@ -2113,36 +2154,59 @@ class KubeletApi(object):
         self._session = requests.Session()
         headers = {
             "Accept": "application/json",
+            "Authorization": "Bearer %s" % k8s.token,
         }
         self._session.headers.update(headers)
 
-        global_log.info("KubeletApi host ip = %s" % host_ip)
-        if host_ip:
-            self._http_host = "http://%s:%d" % (host_ip, port)
-        else:
-            self._http_host = None
+        global_log.info("KubeletApi host ip = %s" % self._host_ip)
+        self._kubelet_url = self._build_kubelet_url(kubelet_url_template, host_ip)
+        self._fallback_kubelet_url = self._build_kubelet_url(
+            FALLBACK_KUBELET_URL_TEMPLATE, host_ip
+        )
         self._timeout = 20.0
+
+    @staticmethod
+    def _build_kubelet_url(kubelet_url, host_ip):
+        if host_ip:
+            return kubelet_url.substitute(host_ip=host_ip)
+        return None
+
+    def _switch_to_fallback(self):
+        self._kubelet_url = self._fallback_kubelet_url
 
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
-        url = self._http_host + path
-        response = self._session.get(url, timeout=self._timeout)
-        response.encoding = "utf-8"
-        if response.status_code != 200:
-            global_log.log(
-                scalyr_logging.DEBUG_LEVEL_3,
-                "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                % (url, response.status_code, len(response.text)),
-                limit_once_per_x_secs=300,
-                limit_key="kubelet_api_query",
-            )
-            raise KubeletApiException(
-                "Invalid response from Kubelet API when querying '%s': %s"
-                % (path, str(response))
-            )
+        while True:
+            url = self._kubelet_url + path
+            response = self._session.get(url, timeout=self._timeout, verify=False)
+            response.encoding = "utf-8"
+            if response.status_code != 200:
+                if (
+                    response.status_code == 403
+                    and self._kubelet_url != self._fallback_kubelet_url
+                ):
+                    global_log.warning(
+                        scalyr_logging.DEBUG_LEVEL_3,
+                        "Invalid response while querying the Kubelet API: %d. Falling back to older endpoint."
+                        % response.status_code,
+                    )
+                    self._switch_to_fallback()
+                    continue
+                else:
+                    global_log.warning(
+                        scalyr_logging.DEBUG_LEVEL_3,
+                        "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                        % (url, response.status_code, len(response.text)),
+                        limit_once_per_x_secs=300,
+                        limit_key="kubelet_api_query",
+                    )
+                    raise KubeletApiException(
+                        "Invalid response from Kubelet API when querying '%s': %s"
+                        % (path, six.text_type(response))
+                    )
 
-        return util.json_decode(response.text)
+            return util.json_decode(response.text)
 
     def query_pods(self):
         return self.query_api("/pods")
@@ -2341,10 +2405,10 @@ class DockerMetricFetcher(object):
                 result = self.__docker_client.stats(
                     container=container_id, stream=False
                 )
-            except Exception, e:
+            except Exception as e:
                 global_log.error(
                     "Error readings stats for '%s': %s\n%s"
-                    % (container_id, str(e), traceback.format_exc()),
+                    % (container_id, six.text_type(e), traceback.format_exc()),
                     limit_once_per_x_secs=300,
                     limit_key="api-stats-%s" % container_id,
                 )

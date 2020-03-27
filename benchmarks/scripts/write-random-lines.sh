@@ -46,13 +46,13 @@ echo "WRITE_DELAY=${WRITE_DELAY}"
 echo ""
 
 i=1
-while [ $i -le ${CHUNKS_COUNT} ]
+while [ $i -le "${CHUNKS_COUNT}" ]
 do
     echo "Writting chunk ${i} to file ${FILE_PATH}"
-    < /dev/urandom tr -d -c '[:alpha:]' | head -c ${CHUNK_SIZE} | fold -w${WORD_LENGTH} >> ${FILE_PATH}
-    i=$(( $i + 1 ))
+    < /dev/urandom tr -d -c '[:alpha:]' | head -c "${CHUNK_SIZE}" | fold -w"${WORD_LENGTH}" >> "${FILE_PATH}"
+    i=$(( i + 1 ))
 
-    if [ $i -le ${CHUNKS_COUNT} ]; then
-        sleep ${WRITE_DELAY}
+    if [ $i -le "${CHUNKS_COUNT}" ]; then
+        sleep "${WRITE_DELAY}"
     fi
 done

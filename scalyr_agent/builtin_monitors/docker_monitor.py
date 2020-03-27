@@ -14,6 +14,9 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import datetime
@@ -28,6 +31,13 @@ import socket
 import stat
 import time
 import threading
+from io import open
+
+import six
+from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
+    ProtocolError,
+)
+
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -37,19 +47,18 @@ from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from scalyr_agent.util import StoppableThread
 
-from requests.packages.urllib3.exceptions import ProtocolError
 
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
-DOCKER_LABEL_CONFIG_RE = re.compile("^(com\.scalyr\.config\.log\.)(.+)")
+DOCKER_LABEL_CONFIG_RE = re.compile(r"^(com\.scalyr\.config\.log\.)(.+)")
 
 define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.docker_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -59,7 +68,7 @@ define_config_option(
     "Optional (defaults to None). Defines a regular expression that matches the name given to the "
     "container running the scalyr-agent.\n"
     "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n",
-    convert_to=str,
+    convert_to=six.text_type,
     default=None,
 )
 
@@ -80,7 +89,7 @@ define_config_option(
     "`docker_api_socket` configuration option in the syslog monitor to this same value\n"
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n"
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
 )
 
@@ -90,7 +99,7 @@ define_config_option(
     "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
     "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
     "syslog monitor to this same value\n",
-    convert_to=str,
+    convert_to=six.text_type,
     default="auto",
     env_aware=True,
 )
@@ -98,8 +107,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_log_prefix",
-    "Optional (defaults to docker). Prefix added to the start of all docker logs. ",
-    convert_to=str,
+    "Optional (defaults to docker). Prefix added to the start of all docker logs.",
+    convert_to=six.text_type,
     default="docker",
     env_aware=True,
 )
@@ -142,7 +151,7 @@ define_config_option(
     'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
     "preferred method due to bugs/issues found with the docker API (To protect legacy behavior, "
     'the default method is "docker_api").',
-    convert_to=str,
+    convert_to=six.text_type,
     default="docker_api",
     env_aware=True,
     env_name="SCALYR_DOCKER_LOG_MODE",
@@ -208,7 +217,7 @@ define_config_option(
     "Optional (defaults to ['*']). If `labels_as_attributes` is True then this option is a list of glob strings used to "
     "include labels that should be uploaded as log attributes.  The docker monitor first gets all container labels that "
     "match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then "
-    "uploaded as log attributes. ",
+    "uploaded as log attributes.",
     convert_to=ArrayOfStrings,
     default=["*"],
     env_aware=True,
@@ -239,8 +248,8 @@ define_config_option(
     __monitor__,
     "label_prefix",
     'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
-    "adding it to the log attributes ",
-    convert_to=str,
+    "adding it to the log attributes",
+    convert_to=six.text_type,
     default="",
     env_aware=True,
 )
@@ -600,6 +609,7 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
@@ -617,6 +627,7 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
@@ -632,13 +643,14 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.APIClient):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -754,7 +766,7 @@ def _get_containers(
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
-                        except Exception, e:
+                        except Exception:
                             logger.error(
                                 "Error inspecting container '%s'" % cid,
                                 limit_once_per_x_secs=300,
@@ -766,10 +778,10 @@ def _get_containers(
             else:
                 result[cid] = {"name": cid, "log_path": None, "labels": None}
 
-    except Exception, e:  # container querying failed
+    except Exception as e:  # container querying failed
         logger.exception(
             "Error querying running containers: %s, filters=%s, only_running_containers=%s"
-            % (str(e), filters, only_running_containers),
+            % (six.text_type(e), filters, only_running_containers),
             limit_once_per_x_secs=300,
             limit_key="docker-api-running-containers",
         )
@@ -800,14 +812,14 @@ def get_attributes_and_config_from_labels(labels, docker_options):
 
             included = {}
             # apply include globs
-            for key, value in labels.iteritems():
+            for key, value in six.iteritems(labels):
                 for glob in docker_options.label_include_globs:
                     if fnmatch.fnmatch(key, glob):
                         included[key] = value
                         break
 
             # filter excluded labels
-            for key, value in included.iteritems():
+            for key, value in six.iteritems(included):
                 add_label = True
                 for glob in docker_options.label_exclude_globs:
                     if fnmatch.fnmatch(key, glob):
@@ -938,7 +950,7 @@ class ContainerChecker(StoppableThread):
         )
 
         # if querying the docker api fails, set the container list to empty
-        if self.containers == None:
+        if self.containers is None:
             self.containers = {}
 
         self.docker_logs = self.__get_docker_logs(self.containers)
@@ -1023,7 +1035,7 @@ class ContainerChecker(StoppableThread):
                 # get the containers that have started since the last sample
                 starting = {}
 
-                for cid, info in running_containers.iteritems():
+                for cid, info in six.iteritems(running_containers):
                     if cid not in self.containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1033,7 +1045,7 @@ class ContainerChecker(StoppableThread):
 
                 # get the containers that have stopped
                 stopping = {}
-                for cid, info in self.containers.iteritems():
+                for cid, info in six.iteritems(self.containers):
                     if cid not in running_containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1053,10 +1065,10 @@ class ContainerChecker(StoppableThread):
                 # start the new ones
                 self.__start_loggers(starting)
 
-            except Exception, e:
+            except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
 
             run_state.sleep_but_awaken_if_stopped(self.__delay)
@@ -1144,7 +1156,7 @@ class ContainerChecker(StoppableThread):
             checkpoints = {}
 
         if checkpoints:
-            for name, last_request in checkpoints.iteritems():
+            for name, last_request in six.iteritems(checkpoints):
                 self.__checkpoints[name] = last_request
 
     def __stop_loggers(self, stopping):
@@ -1209,7 +1221,7 @@ class ContainerChecker(StoppableThread):
                     log["log_config"] = self.__log_watcher.add_log_config(
                         self.__module.module_name, log["log_config"]
                     )
-                except Exception, e:
+                except Exception as e:
                     global_log.info(
                         "Error adding log '%s' to log watcher - %s"
                         % (log["log_config"]["path"], e)
@@ -1259,8 +1271,8 @@ class ContainerChecker(StoppableThread):
                 if dt:
                     result = dt
             fp.close()
-        except Exception, e:
-            global_log.info("%s", str(e))
+        except Exception as e:
+            global_log.info("%s", six.text_type(e))
 
         return scalyr_util.seconds_since_epoch(result)
 
@@ -1272,8 +1284,8 @@ class ContainerChecker(StoppableThread):
         @param path: the path of the log file being configured
         @param attributes: Any attributes to include as part of the log_config['attributes']
         @param base_config: A base set of configuration options to build the log_config from
-        @type parser: str
-        @type path: str
+        @type default_parser: six.text_type
+        @type path: six.text_type
         @type attributes: dict of JsonObject
         @type base_config: dict or JsonObject
         """
@@ -1314,13 +1326,13 @@ class ContainerChecker(StoppableThread):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception, e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in DockerMonitor")
             raise
 
         prefix = self.__log_prefix + "-"
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             container_attributes = attributes.copy()
             container_attributes["containerName"] = info["name"]
             container_attributes["containerId"] = cid
@@ -1482,7 +1494,7 @@ class DockerLogger(object):
 
             self.__logger.log(
                 scalyr_logging.DEBUG_LEVEL_3,
-                "Starting to retrieve logs for cid=%s" % str(self.cid),
+                "Starting to retrieve logs for cid=%s" % six.text_type(self.cid),
             )
             self.__client = DockerClient(
                 base_url=("unix:/%s" % self.__socket_file),
@@ -1493,7 +1505,7 @@ class DockerLogger(object):
             while run_state.is_running():
                 self.__logger.log(
                     scalyr_logging.DEBUG_LEVEL_3,
-                    "Attempting to retrieve logs for cid=%s" % str(self.cid),
+                    "Attempting to retrieve logs for cid=%s" % six.text_type(self.cid),
                 )
                 sout = False
                 serr = False
@@ -1515,7 +1527,7 @@ class DockerLogger(object):
                 # self.__logs is a generator so don't call len( self.__logs )
                 self.__logger.log(
                     scalyr_logging.DEBUG_LEVEL_3,
-                    "Found log lines for cid=%s" % (str(self.cid)),
+                    "Found log lines for cid=%s" % (six.text_type(self.cid)),
                 )
                 try:
                     for line in self.__logs:
@@ -1544,13 +1556,13 @@ class DockerLogger(object):
                             self.__logger.log(
                                 scalyr_logging.DEBUG_LEVEL_3,
                                 "Exiting out of container log for cid=%s"
-                                % str(self.cid),
+                                % six.text_type(self.cid),
                             )
                             break
-                except ProtocolError, e:
+                except ProtocolError as e:
                     if run_state.is_running():
                         global_log.warning(
-                            "Stream closed due to protocol error: %s" % str(e)
+                            "Stream closed due to protocol error: %s" % six.text_type(e)
                         )
 
                 if run_state.is_running():
@@ -1573,10 +1585,10 @@ class DockerLogger(object):
 
             self.__last_request_lock.release()
 
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s"
-                % (self.name, str(e))
+                % (self.name, six.text_type(e))
             )
 
 
@@ -1606,8 +1618,8 @@ class ContainerIdResolver:
             is performed lazily).
         @param cache_clean_secs:  The number of seconds between sweeps to clean the cache.
         @param logger: The logger to use.  This MUST be supplied.
-        @type docker_api_socket: str
-        @type docker_api_version: str
+        @type docker_api_socket: six.text_type
+        @type docker_api_version: six.text_type
         @type cache_expiration_secs: double
         @type cache_clean_secs: double
         @type logger: Logger
@@ -1619,7 +1631,7 @@ class ContainerIdResolver:
         self.__last_cache_clean = time.time()
         self.__cache_expiration_secs = cache_expiration_secs
         self.__cache_clean_secs = cache_clean_secs
-        self.__docker_client = docker.Client(
+        self.__docker_client = docker.APIClient(  # pylint: disable=no-member
             base_url=("unix:/%s" % docker_api_socket), version=docker_api_version
         )
         # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.
@@ -1669,7 +1681,7 @@ class ContainerIdResolver:
 
             # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
 
-        except Exception, e:
+        except Exception:
             self.__logger.error(
                 'Error seen while attempting resolving docker cid="%s"', container_id
             )
@@ -1753,7 +1765,7 @@ class ContainerIdResolver:
 
         # Note, the cid used as the key for the returned matches is the long container id, not the short one that
         # we were passed in as `container_id`.
-        match = matches[matches.keys()[0]]
+        match = matches[list(matches.keys())[0]]
         labels = match.get("labels", {})
         if labels is None:
             labels = {}
@@ -1889,11 +1901,11 @@ class DockerOptions(object):
         return (
             "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s"
             % (
-                str(self.labels_as_attributes),
+                six.text_type(self.labels_as_attributes),
                 self.label_prefix,
-                str(self.label_include_globs),
-                str(self.label_exclude_globs),
-                str(self.use_labels_for_log_config),
+                six.text_type(self.label_include_globs),
+                six.text_type(self.label_exclude_globs),
+                six.text_type(self.use_labels_for_log_config),
             )
         )
 
@@ -1918,147 +1930,149 @@ class DockerOptions(object):
             self.use_labels_for_log_config = monitor.use_labels_for_log_config
             self.label_prefix = monitor.label_prefix
             self.labels_as_attributes = monitor.labels_as_attributes
-        except Exception, e:
+        except Exception as e:
+            # Configuration from monitor failes (values not available on the monitor),
+            # fall back to the default configuration
             global_log.warning(
                 "Error getting docker config from docker monitor - %s.  Using defaults"
-                % str(e)
+                % six.text_type(e)
             )
-            # if there was an error, reset all values back to defaults
-            label_exclude_globs = self.label_exclude_globs
-            label_include_globs = self.label_include_globs
-            use_labels_for_log_config = self.use_labels_for_log_config
-            label_prefix = self.label_prefix
-            labels_as_attributes = self.labels_as_attributes
+            self.label_exclude_globs = label_exclude_globs
+            self.label_include_globs = label_include_globs
+            self.use_labels_for_log_config = use_labels_for_log_config
+            self.label_prefix = label_prefix
+            self.labels_as_attributes = labels_as_attributes
 
 
 class DockerMonitor(ScalyrMonitor):
-    """Monitor plugin for docker containers
+    """
+# Docker Monitor
 
-    This plugin uses the Docker API to detect all containers running on the local host, retrieves metrics for each of
-    them, and logs them to the Scalyr servers.
+This plugin uses the Docker API to detect all containers running on the local host, retrieves metrics for each of
+them, and logs them to the Scalyr servers.
 
-    It can also collect all log messages written to stdout and stderr by those containers, in conjunction with syslog.
-    See the online documentation for more details.
+It can also collect all log messages written to stdout and stderr by those containers, in conjunction with syslog.
+See the online documentation for more details.
 
-    ## Docker Labels
+## Docker Labels
 
-    You can configure the Scalyr Agent to upload customer attributes for your containers based on the labels you set on the container itself. This can be used to easily set the parser that should be used to parse the container's log, as well as adding in arbitrary labels on the container's log.
+You can configure the Scalyr Agent to upload customer attributes for your containers based on the labels you set on the container itself. This can be used to easily set the parser that should be used to parse the container's log, as well as adding in arbitrary labels on the container's log.
 
-    To use this functionality, you must properly configure the agent by setting the `labels_as_attributes` configuration option to `true`. All of the docker monitor configuration options related to this feature are as follows:`
+To use this functionality, you must properly configure the agent by setting the `labels_as_attributes` configuration option to `true`. All of the docker monitor configuration options related to this feature are as follows:`
 
-    * **labels\_as\_attributes** - When `true` upload labels that pass the include/exclude filters (see below) as log attributes for the logs generated by the container.  Defaults to `false`
-    *  **label\_include\_globs** - A list of [glob strings](https://docs.python.org/2/library/fnmatch.html) used to include labels to be uploaded as log attributes.  Any label that matches any glob in this list will be included as an attribute, as long as it not excluded by `label_exclude_globs`.  Defaults to `[ '*' ]` (everything)
-    *  **label\_exclude\_globs** - A list of glob strings used to exclude labels from being uploaded as log attributes.  Any label that matches any glob on this list will be excluded as an attribute.  Exclusion rules are applied *after* inclusion rules.  Defaults to `[ 'com.scalyr.config.*' ]`
-    *  **label_prefix** - A string to add to the beginning of any label key before uploading it as a log attribute.  e.g. if the value for `label_prefix` is `docker_` then the container labels `app` and `tier` will be uploaded to Scalyr with attribute keys `docker_app` and `docker_tier`.  Defaults to ''
+* **labels\\_as\\_attributes** - When `true` upload labels that pass the include/exclude filters (see below) as log attributes for the logs generated by the container.  Defaults to `false`
+*  **label\\_include\\_globs** - A list of [glob strings](https://docs.python.org/2/library/fnmatch.html) used to include labels to be uploaded as log attributes.  Any label that matches any glob in this list will be included as an attribute, as long as it not excluded by `label_exclude_globs`.  Defaults to `[ '*' ]` (everything)
+*  **label\\_exclude\\_globs** - A list of glob strings used to exclude labels from being uploaded as log attributes.  Any label that matches any glob on this list will be excluded as an attribute.  Exclusion rules are applied *after* inclusion rules.  Defaults to `[ 'com.scalyr.config.*' ]`
+*  **label_prefix** - A string to add to the beginning of any label key before uploading it as a log attribute.  e.g. if the value for `label_prefix` is `docker_` then the container labels `app` and `tier` will be uploaded to Scalyr with attribute keys `docker_app` and `docker_tier`.  Defaults to ''
 
-    You can change these config options by editing the `agent.d/docker.json` file. Please [follow the instructions here](https://www.scalyr.com/help/install-agent-docker#modify-config) to export the configuration of your running Scalyr Agent.
+You can change these config options by editing the `agent.d/docker.json` file. Please [follow the instructions here](https://www.scalyr.com/help/install-agent-docker#modify-config) to export the configuration of your running Scalyr Agent.
 
-    A sample configuration that uploaded the attributes `tier`, `app` and `region`, with the prefix `dl_` would look like this:
+A sample configuration that uploaded the attributes `tier`, `app` and `region`, with the prefix `dl_` would look like this:
 
-    ```
-    monitors: [
-      {
-        "module": "scalyr_agent.builtin_monitors.docker_monitor",
-        ...
-        labels_as_attributes: true,
-        label_include_globs: ['tier', 'app', 'region' ],
-        label_prefix: 'dl_'
-      }
-    ]
-    ```
-
-    Note: Log attributes contribute towards your total log volume, so it is wise to limit the labels to a small set of approved values, to avoid paying for attributes that you don't need.
-
-    ## Using Docker Labels for Configuration
-
-    You can also use docker labels to configure the log settings for a specific container, such as setting the parser or setting redaction rules.
-
-    The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix).
-
-    For example, if you add the following label to your container:
-
-    ```
-    com.scalyr.config.log.parser=accessLog
-    ```
-
-    The Scalyr Agent will automatically use the following for that containers's `log_config` stanza:
-
-    ```
-    { "parser": "accessLog" }
-    ```
-
-    This feature is enabled by default, and by default any configuration labels are ignored by the `labels_as_attributes` option.  To turn off this feature entirely, you can set the `use_labels_for_log_config` option to `false` in the docker monitor configuration, and the agent will not process container labels for configuration options.
-
-    The following fields can be configured via container labels and behave as described in the [Scalyr help docs](https://www.scalyr.com/help/scalyr-agent#logUpload):
-
-    * parser
-    * attributes
-    * sampling_rules
-    * rename_logfile
-    * redaction_rules
-
-    Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels:
-
-    ```
-    com.scalyr.config.log.rename-logfile
-    ```
-
-    Would be mapped to `rename_logfile`
-
-    ### Mapping Configuration Options
-
-    The rules for mapping labels to objects and arrays are as follows:
-
-    Values separated by a period are mapped to object keys e.g. if a label on a given container was specified as:
-
-    ```
-    com.scalyr.config.log.attributes.tier=prod
-    ```
-
-    Then this would be mapped to the following object, which would then be applied to the log config for that container:
-
-    ```
-    { "attributes": { "tier": "prod" } }
-    ```
-
-    Arrays can be specified by using one or more digits as the key, e.g. if the labels were
-
-    ```
-    com.scalyr.config.log.sampling-rules.0.match-expression=INFO
-    com.scalyr.config.log.sampling-rules.0.sampling-rate=0.1
-    com.scalyr.config.log.sampling-rules.1.match-expression=FINE
-    com.scalyr.config.log.sampling-rules.1.sampling-rate=0
-    ```
-
-    This will be mapped to the following structure:
-
-    ```
-    { "sampling_rules":
-      [
-        { "match_expression": "INFO", "sampling_rate": 0.1 },
-        { "match_expression": "FINE", "sampling_rate": 0 }
-      ]
+```
+monitors: [
+    {
+    "module": "scalyr_agent.builtin_monitors.docker_monitor",
+    ...
+    labels_as_attributes: true,
+    label_include_globs: ['tier', 'app', 'region' ],
+    label_prefix: 'dl_'
     }
-    ```
+]
+```
 
-    Note: The Scalyr agent will automatically convert hyphens in the docker label keys to underscores.
+Note: Log attributes contribute towards your total log volume, so it is wise to limit the labels to a small set of approved values, to avoid paying for attributes that you don't need.
 
-    Array keys are sorted by numeric order before processing and unique objects need to have different digits as the array key. If a sub-key has an identical array key as a previously seen sub-key, then the previous value of the sub-key is overwritten
+## Using Docker Labels for Configuration
 
-    There is no guarantee about the order of processing for items with the same numeric array key, so if the config was specified as:
+You can also use docker labels to configure the log settings for a specific container, such as setting the parser or setting redaction rules.
 
-    ```
-    com.scalyr.config.log.sampling_rules.0.match_expression=INFO
-    com.scalyr.config.log.sampling_rules.0.match_expression=FINE
-    ```
+The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix).
 
-    It is not defined or guaranteed what the actual value will be (INFO or FINE).
+For example, if you add the following label to your container:
 
-    ## Syslog Monitor
+```
+com.scalyr.config.log.parser=accessLog
+```
 
-    If you wish to use labels and label configuration when using the syslog monitor to upload docker logs, you must still specify a docker monitor in your agent config, and set the docker label options in the docker monitor configuration.  These will then be used by the syslog monitor.
+The Scalyr Agent will automatically use the following for that containers's `log_config` stanza:
 
-    TODO:  Back fill the instructions here.
+```
+{ "parser": "accessLog" }
+```
+
+This feature is enabled by default, and by default any configuration labels are ignored by the `labels_as_attributes` option.  To turn off this feature entirely, you can set the `use_labels_for_log_config` option to `false` in the docker monitor configuration, and the agent will not process container labels for configuration options.
+
+The following fields can be configured via container labels and behave as described in the [Scalyr help docs](https://www.scalyr.com/help/scalyr-agent#logUpload):
+
+* parser
+* attributes
+* sampling_rules
+* rename_logfile
+* redaction_rules
+
+Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels:
+
+```
+com.scalyr.config.log.rename-logfile
+```
+
+Would be mapped to `rename_logfile`
+
+### Mapping Configuration Options
+
+The rules for mapping labels to objects and arrays are as follows:
+
+Values separated by a period are mapped to object keys e.g. if a label on a given container was specified as:
+
+```
+com.scalyr.config.log.attributes.tier=prod
+```
+
+Then this would be mapped to the following object, which would then be applied to the log config for that container:
+
+```
+{ "attributes": { "tier": "prod" } }
+```
+
+Arrays can be specified by using one or more digits as the key, e.g. if the labels were
+
+```
+com.scalyr.config.log.sampling-rules.0.match-expression=INFO
+com.scalyr.config.log.sampling-rules.0.sampling-rate=0.1
+com.scalyr.config.log.sampling-rules.1.match-expression=FINE
+com.scalyr.config.log.sampling-rules.1.sampling-rate=0
+```
+
+This will be mapped to the following structure:
+
+```
+{ "sampling_rules":
+    [
+    { "match_expression": "INFO", "sampling_rate": 0.1 },
+    { "match_expression": "FINE", "sampling_rate": 0 }
+    ]
+}
+```
+
+Note: The Scalyr agent will automatically convert hyphens in the docker label keys to underscores.
+
+Array keys are sorted by numeric order before processing and unique objects need to have different digits as the array key. If a sub-key has an identical array key as a previously seen sub-key, then the previous value of the sub-key is overwritten
+
+There is no guarantee about the order of processing for items with the same numeric array key, so if the config was specified as:
+
+```
+com.scalyr.config.log.sampling_rules.0.match_expression=INFO
+com.scalyr.config.log.sampling_rules.0.match_expression=FINE
+```
+
+It is not defined or guaranteed what the actual value will be (INFO or FINE).
+
+## Syslog Monitor
+
+If you wish to use labels and label configuration when using the syslog monitor to upload docker logs, you must still specify a docker monitor in your agent config, and set the docker label options in the docker monitor configuration.  These will then be used by the syslog monitor.
+
+TODO:  Back fill the instructions here.
     """
 
     def __get_socket_file(self):
@@ -2120,14 +2134,14 @@ class DockerMonitor(ScalyrMonitor):
         if not scalyr_util.is_list_of_strings(self.label_include_globs):
             raise BadMonitorConfiguration(
                 "label_include_globs contains a non-string value: %s"
-                % str(self.label_include_globs),
+                % six.text_type(self.label_include_globs),
                 "label_include_globs",
             )
 
         if not scalyr_util.is_list_of_strings(self.label_exclude_globs):
             raise BadMonitorConfiguration(
                 "label_exclude_globs contains a non-string value: %s"
-                % str(self.label_exclude_globs),
+                % six.text_type(self.label_exclude_globs),
                 "label_exclude_globs",
             )
 
@@ -2231,7 +2245,7 @@ class DockerMonitor(ScalyrMonitor):
         if metrics is None:
             return
 
-        for key, value in metrics_to_emit.iteritems():
+        for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
                 # Note, we do a bit of a hack to pretend the monitor's name include the container's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
@@ -2285,12 +2299,12 @@ class DockerMonitor(ScalyrMonitor):
             )
 
     def __log_json_metrics(self, container, metrics):
-        for key, value in metrics.iteritems():
+        for key, value in six.iteritems(metrics):
             if value is None:
                 continue
 
             if key == "networks":
-                for interface, network_metrics in value.iteritems():
+                for interface, network_metrics in six.iteritems(value):
                     self.__log_network_interface_metrics(
                         container, network_metrics, interface
                     )
@@ -2310,17 +2324,17 @@ class DockerMonitor(ScalyrMonitor):
             result = self.__client.stats(container=container, stream=False)
             if result is not None:
                 self.__log_json_metrics(container, result)
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "Error readings stats for '%s': %s\n%s"
-                % (container, str(e), traceback.format_exc()),
+                % (container, six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="api-stats-%s" % container,
             )
 
     def __gather_metrics_from_api(self, containers):
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             self.__gather_metrics_from_api_for_container(info["name"])
 
     def get_user_agent_fragment(self):
@@ -2388,7 +2402,7 @@ class DockerMonitor(ScalyrMonitor):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()

@@ -15,10 +15,17 @@
 #
 # A ScalyrMonitor which retrieves a specified URL and records the response status and body.
 
-import httplib
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import re
-import urllib2
-import cookielib
+
+import six
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
+import six.moves.http_cookiejar
+import six.moves.http_client
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib.objects import JsonArray
@@ -30,7 +37,7 @@ define_config_option(
     "module",
     "Always ``scalyr_agent.builtin_monitors.url_monitor``",
     required_option=True,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -125,7 +132,7 @@ first_line_pattern = re.compile("[^\r\n]+")
 
 
 # Redirect handler that doesn't follow any redirects
-class NoRedirection(urllib2.HTTPErrorProcessor):
+class NoRedirection(six.moves.urllib.request.HTTPErrorProcessor):
     def __init__(self):
         pass
 
@@ -183,7 +190,7 @@ class UrlMonitor(ScalyrMonitor):
         @return: Request object
         """
 
-        request = urllib2.Request(self.url, data=self.request_data)
+        request = six.moves.urllib.request.Request(self.url, data=self.request_data)
         if self.request_headers:
             for header in self.request_headers:
                 request.add_header(header["header"], header["value"])
@@ -197,18 +204,21 @@ class UrlMonitor(ScalyrMonitor):
 
         # Query the URL
         try:
-            opener = urllib2.build_opener(
-                NoRedirection, urllib2.HTTPCookieProcessor(cookielib.CookieJar())
+            opener = six.moves.urllib.request.build_opener(
+                NoRedirection,
+                six.moves.urllib.request.HTTPCookieProcessor(
+                    six.moves.http_cookiejar.CookieJar()
+                ),
             )
             request = self.build_request()
             response = opener.open(request, timeout=self.timeout)
-        except urllib2.HTTPError, e:
+        except six.moves.urllib.error.HTTPError as e:
             self._record_error(e, "http_error")
             return
-        except urllib2.URLError, e:
+        except six.moves.urllib.error.URLError as e:
             self._record_error(e, "url_error")
             return
-        except Exception, e:
+        except Exception as e:
             self._record_error(e, "unknown_error")
             return
 
@@ -216,12 +226,14 @@ class UrlMonitor(ScalyrMonitor):
         try:
             response_body = response.read()
             response.close()
-        except httplib.IncompleteRead, e:
+        except six.moves.http_client.IncompleteRead as e:
             self._record_error(e, "incomplete_read")
             return
-        except Exception, e:
+        except Exception as e:
             self._record_error(e, "unknown_error")
             return
+
+        response_body = six.ensure_text(response_body, errors="replace")
 
         if self.extractor is not None:
             match = self.extractor.search(response_body)
@@ -260,7 +272,7 @@ class UrlMonitor(ScalyrMonitor):
         @type error_type: str
         """
         # Convert the exception to a string, truncated to 20 chars.
-        e_to_str = str(e)
+        e_to_str = six.text_type(e)
         if len(e_to_str) > 20:
             e_to_str = e_to_str[0:20]
         self._logger.emit_value(

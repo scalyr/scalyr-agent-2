@@ -15,6 +15,9 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
 from scalyr_agent.monitors_manager import MonitorsManager
@@ -30,7 +33,8 @@ class TestSystemMetricConfiguration(TestConfigurationBase):
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [
                 {
-                    module: "scalyr_agent.builtin_monitors.linux_system_metrics",
+                    "module": "scalyr_agent.builtin_monitors.linux_system_metrics",
+                    "id": "system-metrics-1",
                     "monitor_log_write_rate": -1,
                     "monitor_log_max_write_burst": -1
                 }

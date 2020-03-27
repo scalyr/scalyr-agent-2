@@ -14,17 +14,55 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+__author__ = "czerwin@scalyr.com"
+
 import os
 import tempfile
 import errno
 import fcntl
+import signal
+from io import open
 
-__author__ = "czerwin@scalyr.com"
+import mock
 
 
 from scalyr_agent.platform_posix import StatusReporter, PidfileManager
+from scalyr_agent.platform_posix import PosixPlatformController
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+
+class PosixPlatformControllerTestCase(ScalyrTestCase):
+    @mock.patch("signal.signal")
+    @mock.patch("scalyr_agent.platform_posix.sys.exit", mock.Mock())
+    def test_signal_handlers(self, mock_signal):
+        # Verify that signal handlers for all the signals are registered.
+        # NOTE: Right now we don't have a good end to end testing framework in place yet so we don't
+        # test the actual signal handler functionality itself
+        self.assertEqual(mock_signal.call_count, 0)
+
+        controller = PosixPlatformController()
+        controller._PosixPlatformController__write_pidfile = mock.Mock()
+        controller.start_agent_service(
+            agent_run_method=lambda x: 0, quiet=True, fork=False
+        )
+        self.assertEqual(mock_signal.call_count, 3 + 3)
+
+        self.assertEqual(mock_signal.call_args_list[0][0][0], signal.SIGTERM)
+        self.assertEqual(
+            mock_signal.call_args_list[0][0][1].__name__, "handle_terminate"
+        )
+
+        self.assertEqual(mock_signal.call_args_list[1][0][0], signal.SIGINT)
+        self.assertEqual(
+            mock_signal.call_args_list[1][0][1].__name__, "handle_interrupt"
+        )
+
+        self.assertEqual(mock_signal.call_args_list[2][0][0], signal.SIGUSR1)
+        self.assertEqual(mock_signal.call_args_list[2][0][1].__name__, "handle_sigusr1")
 
 
 class TestStatusReporter(ScalyrTestCase):
@@ -230,7 +268,7 @@ class TestPidfileManager(ScalyrTestCase):
         while True:
             try:
                 os.kill(result, 0)
-            except OSError, e:
+            except OSError as e:
                 # ESRCH indicates the process is not running, in which case we ignore the pidfile.
                 if e.errno == errno.ESRCH:
                     return result
@@ -239,5 +277,5 @@ class TestPidfileManager(ScalyrTestCase):
 
 # Disable these tests on non-POSIX
 if os.name != "posix":
-    TestStatusReporter = None
-    TestPidfileManager = None
+    TestStatusReporter = None  # type: ignore # NOQA
+    TestPidfileManager = None  # type: ignore # NOQA
