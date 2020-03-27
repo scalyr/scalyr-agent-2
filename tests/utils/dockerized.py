@@ -56,20 +56,37 @@ def dockerized_case(builder_cls, file_path):
             if artifacts_path is not None:
                 artifacts_path = Path(artifacts_path)
                 if artifacts_path.exists():
-                    # fetch log as tar file stream.
-                    stream, _ = container.get_archive(
-                        "/var/log/scalyr-agent-2/agent.log"
-                    )
-                    agent_log_tar_path = artifacts_path / "agent.tar"
-                    # write it to file.
-                    with agent_log_tar_path.open("wb") as agent_file:
-                        for b in stream:
-                            agent_file.write(b)
-                    # extract tar file.
-                    with tarfile.open(agent_log_tar_path) as tar_file:
-                        tar_file.extractall(artifacts_path)
-                    # remove tar file.
-                    os.remove(agent_log_tar_path)
+                    # fetch log as tar file stream if it exists
+                    agent_log_file_exists = True
+
+                    try:
+                        stream, _ = container.get_archive(
+                            "/var/log/scalyr-agent-2/agent.log"
+                        )
+                    except Exception as e:
+                        # Not all the test files produce agent.log so we simply ignore the error
+                        # if agent log file doesn't exist
+                        msg = str(e).lower()
+
+                        if "could not find the file" in msg:
+                            agent_log_file_exists = False
+                            return
+
+                        raise e
+
+                    if agent_log_file_exists:
+                        agent_log_tar_path = artifacts_path / "agent.tar"
+                        # write it to file.
+                        with agent_log_tar_path.open("wb") as agent_file:
+                            for b in stream:
+                                agent_file.write(b)
+                        # extract tar file.
+                        with tarfile.open(agent_log_tar_path) as tar_file:
+                            tar_file.extractall(artifacts_path)
+                        # remove tar file.
+                        os.remove(agent_log_tar_path)
+                    else:
+                        print("Agent log file doesn't exist, skipping copy.")
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
