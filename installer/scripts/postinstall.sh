@@ -49,7 +49,7 @@ check_python_version() {
     fi
   fi
 
-  echo "The defaut 'python' command is not found, will use python2 binary (/usr/bin/env python2) for running the agent."
+  echo "The default 'python' command not found, will use python2 binary (/usr/bin/env python2) for running the agent."
   if is_python_valid python2; then
     if [[ ${config_base_name} != "config_main_py3.py" ]]; then
       # if python version was not switched to python3 use python2
@@ -61,7 +61,7 @@ check_python_version() {
     fi
   fi
 
-  echo "The 'python2' command is not found, will use python3 binary (/usr/bin/env python3) for running the agent."
+  echo "The 'python2' command not found, will use python3 binary (/usr/bin/env python3) for running the agent."
   if is_python_valid python3; then
       if [[ ${config_base_name} == "config_main_py3.py" ]]; then
         echo "Using python3 entry point symlink from previous installation."

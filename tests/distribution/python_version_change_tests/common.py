@@ -172,8 +172,8 @@ def common_test_no_python(install_package_fn):
 
     excepton = err_info.value
 
-    # make sure that python is not found by searching needed output.
-    assert "Python interpreter is not found." in excepton.stdout
+    # make sure that python not found by searching needed output.
+    assert "Suitable Python interpreter not found." in excepton.stdout
 
 
 def common_test_only_python_mapped_to_python2(
@@ -192,7 +192,7 @@ def common_test_only_python_mapped_to_python2(
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python2
-    assert "The Scalyr agent will use the default python." in stdout
+    assert "The Scalyr agent will use the default system python binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
@@ -227,7 +227,7 @@ def common_test_only_python_mapped_to_python3(
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python3
-    assert "The Scalyr agent will use the default python." in stdout
+    assert "The Scalyr agent will use the default system python binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
@@ -259,7 +259,7 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python2'.
-    assert "The defaut 'python' command is not found, will use python2 binary for running the agent."
+    assert "The default 'python' command not found, will use python2 binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main_py2.py
     assert _get_current_config_script_name() == "config_main_py2.py"
@@ -291,8 +291,8 @@ def common_test_python3(install_package_fn, install_next_version_fn):
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python3'.
-    assert "The defaut 'python' command is not found, will use python2 binary for running the agent."
-    assert "The 'python2' command is not found, will use python3 binary for running the agent."
+    assert "The default 'python' command not found, will use python2 binary" in stdout
+    assert "The 'python2' command not found, will use python3 binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to config_main_py3.py
     assert _get_current_config_script_name() == "config_main_py3.py"
@@ -325,7 +325,7 @@ def common_test_switch_default_to_python2(install_package_fn, install_next_versi
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python2.
-    assert "The Scalyr agent will use the default python." in stdout
+    assert "The Scalyr agent will use the default system python binary" in stdout
 
     assert _get_current_config_script_name() == "config_main.py"
 
@@ -347,7 +347,7 @@ def common_test_switch_default_to_python2(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Use python2 version from previous installation." in stdout
+    assert "Using python2 entry point symlink from previous installation" in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py2.py"
 
@@ -372,7 +372,7 @@ def common_test_switch_default_to_python3(install_package_fn, install_next_versi
     stdout, _ = install_package_fn()
 
     # make sure that installer has found 'python' mapped on to python3.
-    assert "The Scalyr agent will use the default python." in stdout
+    assert "The Scalyr agent will use the default system python binary" in stdout
 
     assert _get_current_config_script_name() == "config_main.py"
 
@@ -394,7 +394,7 @@ def common_test_switch_default_to_python3(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Use python3 version from previous installation." in stdout
+    assert "Using python3 entry point symlink from previous installation" in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py3.py"
 
@@ -514,7 +514,7 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     # install next version of the package and check that links are the same.
     stdout, _ = install_next_version_fn()
     # Installer must not switch to default python.
-    assert "Use python3 version from previous installation." in stdout
+    assert "Using python3 entry point symlink from previous installation" in stdout
     # the source file should be "config_main_py3.py"
     assert _get_current_config_script_name() == "config_main_py3.py"
 

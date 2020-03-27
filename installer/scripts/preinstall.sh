@@ -36,7 +36,6 @@ is_python_valid() {
     echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
     return 1
   else
-    echo "Found suitable python version: ${version}"
     return 0
   fi
 }
