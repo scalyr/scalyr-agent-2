@@ -13,15 +13,27 @@ from tests.utils.compat import Path
 from scalyr_agent import compat
 
 
-def dockerized_case(builder_cls, file_path):
-    """Decorator that makes decorated test case run inside docker container."""
+DEFAULT_FILE_PATHS_TO_COPY = ["/var/log/scalyr-agent-2/agent.log"]
+
+
+def dockerized_case(builder_cls, file_path, file_paths_to_copy=None):
+    """
+    Decorator that makes decorated test case run inside docker container.
+
+    :param file_paths_to_copy: A list of file paths to copy from the container to the artifacts
+                               directory specified --artifacts-path option.
+    """
+    # We always include agent log file
+    file_paths_to_copy = set(file_paths_to_copy or [])
+    file_paths_to_copy.update(set(DEFAULT_FILE_PATHS_TO_COPY))
 
     def dockerized_real(f):
+        func_name = f.__name__
         root = Path(__file__).parent.parent.parent
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
         command = "python3 -u -m pytest {0}::{1} -s --color=yes --no-dockerize".format(
-            rel_path, f.__name__
+            rel_path, func_name
         )
 
         def wrapper(request, *args, **kwargs):
@@ -56,37 +68,51 @@ def dockerized_case(builder_cls, file_path):
             if artifacts_path is not None:
                 artifacts_path = Path(artifacts_path)
                 if artifacts_path.exists():
-                    # fetch log as tar file stream if it exists
-                    agent_log_file_exists = True
+                    for file_path in file_paths_to_copy:
+                        # fetch file as tar file stream if it exists
 
-                    try:
-                        stream, _ = container.get_archive(
-                            "/var/log/scalyr-agent-2/agent.log"
+                        try:
+                            stream, _ = container.get_archive(file_path)
+                        except docker.errors.NotFound as e:
+                            # Not all the test files produce agent.log so we simply ignore the error
+                            # if agent log file doesn't exist
+                            msg = str(e).lower()
+
+                            if "could not find the file" in msg:
+                                print(
+                                    "File path %s doesn't exist, skipping copy"
+                                    % (file_path)
+                                )
+                                continue
+
+                            raise e
+
+                        # We run each test case in a new container instance so we make sure we store
+                        # logs under a sub-directory which matches the test function name
+                        destination_path = artifacts_path / func_name
+
+                        try:
+                            os.makedirs(destination_path)
+                        except OSError:
+                            pass
+
+                        print(
+                            'Copying file path "%s" to "%s"'
+                            % (file_path, destination_path)
                         )
-                    except docker.errors.NotFound as e:
-                        # Not all the test files produce agent.log so we simply ignore the error
-                        # if agent log file doesn't exist
-                        msg = str(e).lower()
 
-                        if "could not find the file" in msg:
-                            agent_log_file_exists = False
-                            return
-
-                        raise e
-
-                    if agent_log_file_exists:
-                        agent_log_tar_path = artifacts_path / "agent.tar"
+                        data_tar_path = destination_path / "data.tar"
                         # write it to file.
-                        with agent_log_tar_path.open("wb") as agent_file:
+                        with data_tar_path.open("wb") as data_fp:
                             for b in stream:
-                                agent_file.write(b)
-                        # extract tar file.
-                        with tarfile.open(agent_log_tar_path) as tar_file:
-                            tar_file.extractall(artifacts_path)
+                                data_fp.write(b)
+
+                        # extract tar file in a directory for this function
+                        with tarfile.open(data_tar_path) as tar_file:
+                            tar_file.extractall(destination_path)
+
                         # remove tar file.
-                        os.remove(agent_log_tar_path)
-                    else:
-                        print("Agent log file doesn't exist, skipping copy.")
+                        os.remove(data_tar_path)
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
