@@ -14,6 +14,8 @@
 # limitations under the License.
 
 
+echo "Entering postinstall"
+ls -l /etc/init.d
 
 # Used below to execute a command to retrieve the Python interpreter version.
 run_and_check_persion_version() {
@@ -80,7 +82,7 @@ check_python_version() {
   echo "Warning, no valid Python interpreter found."
 }
 
-check_python_version
+#check_python_version
 
 config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
 script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
@@ -90,6 +92,7 @@ script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 # has a different user.  If so, then make sure the newly installed files
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
+  echo "Resetting owner"
   /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
 fi
 
