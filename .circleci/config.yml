@@ -908,7 +908,7 @@ jobs:
       - package-test:
           distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_amazonlinux
+          command: tox -eagent_distributions_tests_amazonlinux2
 
   package-test-deb:
     working_directory: ~/scalyr-agent-2
@@ -918,7 +918,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_ubuntu
+          command: tox -eagent_distributions_tests_ubuntu1804
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
