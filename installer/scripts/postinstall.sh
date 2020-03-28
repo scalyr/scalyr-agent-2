@@ -16,6 +16,10 @@
 
 echo "Entering postinstall"
 ls -l /etc/init.d
+echo "Second"
+ls -l /etc/init.d/
+echo "Third"
+ls -l /etc/init.d/scalyr-agent-2
 
 # Used below to execute a command to retrieve the Python interpreter version.
 run_and_check_persion_version() {

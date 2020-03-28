@@ -17,6 +17,14 @@
 # (rather than just removing this version because we are upgrading to
 # a new one).  An uninstall is indicated by $1 == 0 for
 # RPM and $1 == "remove" for Debian.
+
+echo "Entering preuninstall"
+ls -l /etc/init.d
+echo "Second"
+ls -l /etc/init.d/
+echo "Third"
+ls -l /etc/init.d/scalyr-agent-2
+
 if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
   # Stop the service since we are about to completely remove it.
   service scalyr-agent-2 stop > /dev/null 2>&1

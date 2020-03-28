@@ -18,6 +18,12 @@
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
+echo "Entering preinstall"
+ls -l /etc/init.d
+echo "Second"
+ls -l /etc/init.d/
+echo "Third"
+ls -l /etc/init.d/scalyr-agent-2
 
 echo "Checking Python version." >&2
 
