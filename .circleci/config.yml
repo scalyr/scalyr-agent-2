@@ -906,7 +906,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_amazonlinux
 
@@ -916,7 +916,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_ubuntu
 
@@ -926,7 +926,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
           command: tox -eagent_package_smoke_test_amazonlinux_python3
@@ -937,7 +937,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_amazonlinux_python2
 
@@ -947,7 +947,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
 
@@ -957,7 +957,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_ubuntu_python2
 
