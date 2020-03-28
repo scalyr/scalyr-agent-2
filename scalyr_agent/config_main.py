@@ -27,6 +27,7 @@ from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
 import glob
+import platform
 import os
 import re
 import shutil
@@ -1315,6 +1316,15 @@ if __name__ == "__main__":
         help="Switch current python interpreter. Can be selected from python2 and python3.",
     )
 
+    parser.add_option(
+        "",
+        "--report-python-version",
+        action="store_true",
+        dest="report_python_version",
+        default=False,
+        help="Report the version of the python interpreter that is configured to run the Scalyr Agent",
+    )
+
     # TODO: These options are only available on Windows platforms
     if "win32" == sys.platform:
         parser.add_option(
@@ -1396,6 +1406,11 @@ if __name__ == "__main__":
     if options.set_python is not None:
         set_python_version(options.set_python)
         print("Agent switched to {0}.".format(options.set_python))
+        sys.exit(0)
+
+    # NOTE: This option is also intentionally at the top for the same reasons as `set_python`.
+    if options.report_python_version:
+        print("The Scalyr Agent is using Python %s" % platform.python_version())
         sys.exit(0)
 
     if options.config_filename is None:
