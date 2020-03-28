@@ -771,7 +771,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
-        "  -C root usr etc var" % (package_type, version, iteration_arg, description),
+        "  -C root etc usr var" % (package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
     )
