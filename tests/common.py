@@ -21,6 +21,7 @@ if False:
     from typing import Union
     from typing import Tuple
 
+import platform
 import subprocess
 
 import six
@@ -51,13 +52,29 @@ def _install_deb(file_path):
         "DEBIAN_FRONTEND": "noninteractive",
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     }
-    cmd = "apt install -y -f {0}".format(file_path)
+
+    if _is_ubuntu_14_04():
+        # apt on Ubuntu 14.04 doesn't support installing from a file so we use dpkg
+        cmd = "dpkg -i {0}".format(file_path)
+    else:
+        cmd = "apt install -y -f {0}".format(file_path)
+
     exit_code, stdout, stderr = _run_command(cmd, shell=True, env=env)
 
     if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
 
     return stdout, stderr
+
+
+def _is_ubuntu_14_04():
+    # type: () -> bool
+    """
+    Return True if we are running on Ubuntu 14.04.
+    """
+    distro = platform.linux_distribution()
+
+    return distro[0].lower() == "ubuntu" and distro[1] == "14.04"
 
 
 def _run_command(cmd, shell=True, env=None):
