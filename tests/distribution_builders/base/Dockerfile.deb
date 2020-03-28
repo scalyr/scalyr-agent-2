@@ -1,0 +1,17 @@
+FROM python:3.6 as fpm_package_build
+
+RUN apt update && apt install -y ruby ruby-dev rubygems rpm build-essential
+
+RUN gem install --no-document fpm
+
+ADD ./agent_source /agent_source
+
+WORKDIR /package
+RUN echo "$(cat /agent_source/VERSION)-$(git --git-dir /agent_source/.git rev-parse --short HEAD)" > /agent_source/VERSION
+RUN python /agent_source/build_package.py deb
+
+# change version and build new package for agent upgrade test.
+RUN echo "$(cat /agent_source/VERSION)-2" > /agent_source/VERSION
+WORKDIR /second_package
+
+RUN python /agent_source/build_package.py deb

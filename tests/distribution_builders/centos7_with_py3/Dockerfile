@@ -1,13 +1,4 @@
-{fpm_package_builder_dockerfile}
-ADD ./agent_source /agent_source
-WORKDIR /package
-RUN python /agent_source/build_package.py rpm
-# change version and build new package for agent upgrade test.
-RUN echo "$(cat /agent_source/VERSION).1" > /agent_source/VERSION
-WORKDIR /second_package
-RUN python /agent_source/build_package.py rpm
-
-FROM centos:7
+{fpm_package_builder_dockerfile_rpm}
 
 # Needed for python-pip package
 RUN yum update -y
