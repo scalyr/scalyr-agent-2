@@ -39,7 +39,7 @@ from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(AmazonlinuxBuilder, __file__)
+@dockerized_case(AmazonlinuxBuilder, __file__, file_paths_to_copy=["/scalyr-agent.rpm"])
 def test_amazonlinux_test_versions(request):
     runner = AgentRunner(PACKAGE_INSTALL)
     common_version_test(

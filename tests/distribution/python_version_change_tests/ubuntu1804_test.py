@@ -37,7 +37,7 @@ from tests.common import install_deb, install_next_version_deb
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, file_paths_to_copy=["/scalyr-agent.deb"])
 def test_ubuntu_test_versions(request):
     common_test_ubuntu_versions()
 
