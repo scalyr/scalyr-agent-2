@@ -8,9 +8,10 @@ WORKDIR /second_package
 RUN python /agent_source/build_package.py deb
 
 FROM ubuntu:14.04
-RUN apt-get update -y
-RUN apt-get install -y apt-utils build-essential
 
+RUN apt-get update -y
+
+RUN apt-get install -y apt-utils build-essential
 RUN apt-get install -y python python-pip python-dev
 
 COPY agent_source/dev-requirements.txt dev-requirements.txt

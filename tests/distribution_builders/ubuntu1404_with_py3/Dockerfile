@@ -8,7 +8,9 @@ WORKDIR /second_package
 RUN python /agent_source/build_package.py deb
 
 FROM ubuntu:14.04
+
 RUN apt-get update -y
+
 RUN apt-get install -y apt-utils build-essential
 RUN apt-get install -y software-properties-common python-software-properties
 
@@ -17,7 +19,10 @@ RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update -y
 
 RUN apt-get install -y python python-pip python-dev
-RUN apt-get install -y python3.5 python3.5-dev
+RUN apt-get install -y python3.5 python3.5-dev python3-pip
+
+RUN rm /usr/bin/python3
+RUN ln -s /usr/bin/python3.5 /usr/bin/python3
 
 # Upgrade pip so it supports Python version markers we use in our requirements file
 RUN python2 -m pip install --upgrade --force-reinstall "pip==9.0.3"
