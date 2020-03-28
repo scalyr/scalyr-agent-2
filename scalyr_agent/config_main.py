@@ -39,7 +39,6 @@ import traceback
 import errno
 from io import open
 
-from distutils import spawn
 from optparse import OptionParser
 
 # TODO: The following two imports have been modified to facilitate Windows platforms
@@ -76,6 +75,7 @@ set_log_destination(use_stdout=True)
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
+from scalyr_agent import compat
 
 import scalyr_agent.util as scalyr_util
 
@@ -398,7 +398,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                 )
 
             # We rely on the current installation being included in the PATH variable.
-            if spawn.find_executable("scalyr-agent-2-config") is None:
+            if compat.find_executable("scalyr-agent-2-config") is None:
                 raise UpgradeFailure(
                     "Could not locate the scalyr-agent-2-config command from the current "
                     "installation. Please ensure that the agent's bin directory is in the system's "
