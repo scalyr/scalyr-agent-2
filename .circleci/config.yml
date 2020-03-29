@@ -2,6 +2,13 @@
 #
 # Check https://circleci.com/docs/2.2/language-python/ for more details
 
+master_and_release_only: &master_and_release_only
+  filters:
+    branches:
+      only:
+        - master
+        - release
+
 master_only: &master_only
   filters:
     branches:
@@ -979,10 +986,75 @@ jobs:
 
 workflows:
   version: 2
+  unittest:
+    jobs:
+      - lint-checks
+      - unittest-38
+      - unittest-37
+      - unittest-36
+      - unittest-35
+      - unittest-27
+      - unittest-26
+      - smoke-standalone-38
+      - smoke-standalone-37
+      - smoke-standalone-36
+      - smoke-standalone-35
+      - smoke-standalone-27
+      - smoke-standalone-26
+      # smoke test jobs above are still uses old smoke tests.
+      - smoke-docker-json
+      - smoke-docker-syslog
+      - smoke-k8s
+      - smoke-standalone-27-tls12
+      - smoke-standalone-26-tls12
+      - coverage:
+          requires:
+            - unittest-27
+            - smoke-docker-json
+            - smoke-docker-syslog
+            - smoke-k8s
   package-tests:
     jobs:
-      - package-test-rpm
-      - package-test-deb
+      - package-test-rpm:
+          <<: *master_only
+      - package-test-deb:
+           <<: *master_and_release_only
+      - smoke-rpm-package-py2:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
+      - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
+  benchmarks:
+    jobs:
+      - benchmarks-idle-agent-py-27:
+          <<: *master_and_release_only
+      - benchmarks-idle-agent-py-35:
+          <<: *master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+          <<: *master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
