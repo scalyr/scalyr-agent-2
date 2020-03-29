@@ -75,6 +75,13 @@ PACKAGE_TYPES = [
     "k8s_builder",
 ]
 
+# Content for Debian conffiles. Sadly we need to manually manage that
+# NOTE: It's important that's /etc/init.d is included otherwise creating rc.d symlinks won't work
+DEBIAN_CONFFILES_CONTENT = """
+/etc/init.d/scalyr-agent-2
+/etc/scalyr-agent-2/agent.json
+""".strip()
+
 
 def build_package(package_type, variant, no_versioned_file_name, coverage_enabled):
     """Builds the scalyr-agent-2 package specified by the arguments.
@@ -785,6 +792,47 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         files = glob.glob("*.rpm")
     else:
         files = glob.glob("*.deb")
+
+    package_filename = files[0]
+
+    # Workaround for conffiles not being set up correctly when using fpm.
+    # We need to manually edit conffiles and make sure it's correct.
+    # This means we need to unpack and repack the deb with correct conffiles content
+    if package_type == "deb":
+        cwd = os.getcwd()
+
+        new_package_path = os.path.join(cwd, "new_package")
+        old_package_path = os.path.join(cwd, "old_package")
+        old_package_debian_path = os.path.join(old_package_path, "DEBIAN")
+        conffiles_path = os.path.join(old_package_debian_path, "conffiles")
+
+        os.makedirs(new_package_path)
+        os.makedirs(old_package_debian_path)
+
+        # TODO: Escape strings to avoid shell injection
+        # Unpackage the original deb and write correct conffiles content
+        run_command(
+            "dpkg-deb -x %s %s" % (package_filename, old_package_path),
+            exit_on_fail=True,
+        )
+        run_command(
+            "dpkg-deb -e %s %s" % (package_filename, old_package_debian_path),
+            exit_on_fail=True,
+        )
+
+        with open(conffiles_path, "w") as fp:
+            fp.write(DEBIAN_CONFFILES_CONTENT + "\n")
+
+        # Repackage it
+        run_command(
+            "dpkg-deb -Z gzip -b %s %s" % (old_package_path, new_package_path),
+            exit_on_fail=True,
+        )
+
+        # Rename it
+        run_command(
+            "mv %s/*.deb %s" % (new_package_path, package_filename), exit_on_fail=True
+        )
 
     if len(files) != 1:
         raise Exception(
