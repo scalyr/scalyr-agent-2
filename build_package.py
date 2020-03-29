@@ -765,6 +765,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --before-install preinstall.sh "
         "  --after-install postinstall.sh "
         "  --before-remove preuninstall.sh "
+        "  --deb-no-default-config-files "
+        "  --no-deb-auto-config-files "
         "  --config-files /etc/scalyr-agent-2/agent.json "
         "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
         "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
