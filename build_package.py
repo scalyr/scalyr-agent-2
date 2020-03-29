@@ -775,8 +775,6 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --deb-no-default-config-files "
         "  --no-deb-auto-config-files "
         "  --config-files /etc/scalyr-agent-2/agent.json "
-        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
-        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
@@ -796,6 +794,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
     package_filename = files[0]
 
     # Workaround for conffiles not being set up correctly when using fpm.
+    # FPM doesn't allow us to include /etc/init.d/scalyr-agent-2 as conffile, but that is needed for
+    # package to work correctly and that was the case for older releases.
     # We need to manually edit conffiles and make sure it's correct.
     # This means we need to unpack and repack the deb with correct conffiles content
     if package_type == "deb":
