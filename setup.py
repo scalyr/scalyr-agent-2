@@ -231,6 +231,10 @@ setup(
     options={
         "py2exe": {
             # TODO(windows): Auto-generate this list based on contents of the monitors directory.
+            # TODO(czerwin): Add in check to guard against new six.move
+            # dependencies.  py2exe does not properly follow dependencies
+            # imported via six.move since they are proxied, so we must
+            # manually add the dependencies here.
             "includes": "scalyr_agent.builtin_monitors.windows_system_metrics,"
             "scalyr_agent.builtin_monitors.windows_process_metrics,"
             "scalyr_agent.builtin_monitors.apache_monitor,"
@@ -241,7 +245,9 @@ setup(
             "scalyr_agent.builtin_monitors.syslog_monitor,"
             "scalyr_agent.builtin_monitors.test_monitor,"
             "scalyr_agent.builtin_monitors.url_monitor,"
-            "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+            "scalyr_agent.builtin_monitors.windows_event_log_monitor,"
+            "urlparse,urllib,urllib2,SocketServer,_winreg,cookielib,"
+            "httplib,thread,cPickle,itertools",
             "dll_excludes": ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
         }
     },
