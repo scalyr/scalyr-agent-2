@@ -30,6 +30,7 @@ Bugs
 * Fix invalid extra field for two ``tomcat.runtime.threads`` metrics in the Tomcat monitor (all of the metrics had type set to ``max`` whereas one should have type set to ``active`` and the other to ``busy``).
 
 Minor updates
+* The ``/etc/init.d/scalyr-agent-2`` symlink is no longer marked as a conf file in Debian packages.
 * Update of embedded ecsda library to 0.13.3
 * Docker support now requires the docker 4.1 client library
 * Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
