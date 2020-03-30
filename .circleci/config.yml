@@ -15,6 +15,13 @@ master_only: &master_only
       only:
         - master
 
+non_master_and_release: &non_master_and_release
+  filters:
+    branches:
+      ignore:
+        - master
+        - release
+
 version: 2.1
 parameters:
   default_tox_version:
@@ -907,7 +914,6 @@ jobs:
           tox_target: "py2.6-smoke-tests"
           apt_dependencies: "procps build-essential"
 
-
   package-test-rpm:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -927,6 +933,28 @@ jobs:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_ubuntu1804
+
+  # Circle CI jobs which build agent packages for each PR.
+  # TODO: They should run much faster once image caching is fixed
+  package-build-deb:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu1804"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_deb_package
+
+  package-build-rpm:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "centos8"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_rpm_package
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -1015,8 +1043,14 @@ workflows:
             - smoke-k8s
   package-tests:
     jobs:
-      - package-test-rpm
-      - package-test-deb
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
+      - package-test-rpm:
+          <<: *master_and_release_only
+      - package-test-deb:
+          <<: *master_and_release_only
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
