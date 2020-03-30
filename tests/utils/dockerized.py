@@ -12,11 +12,10 @@ from tests.utils.compat import Path
 
 from scalyr_agent import compat
 
-
 DEFAULT_FILE_PATHS_TO_COPY = ["/var/log/scalyr-agent-2/agent.log"]
 
 
-def dockerized_case(builder_cls, file_path, file_paths_to_copy=None):
+def dockerized_case(builder_cls, file_path, file_paths_to_copy=None, python_executable="python3"):
     """
     Decorator that makes decorated test case run inside docker container.
 
@@ -32,8 +31,8 @@ def dockerized_case(builder_cls, file_path, file_paths_to_copy=None):
         root = Path(__file__).parent.parent.parent
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
-        command = "python3 -u -m pytest {0}::{1} -s --color=yes --no-dockerize".format(
-            rel_path, func_name
+        command = "{0} -m pytest {1}::{2} -s --color=yes --no-dockerize".format(
+            python_executable, rel_path, func_name
         )
 
         def wrapper(request, *args, **kwargs):
@@ -49,6 +48,7 @@ def dockerized_case(builder_cls, file_path, file_paths_to_copy=None):
 
             docker_client = docker.from_env()
 
+            print("Create container from '{0}' image.".format(builder.image_tag))
             container = docker_client.containers.run(
                 builder.image_tag,
                 detach=True,
@@ -113,6 +113,9 @@ def dockerized_case(builder_cls, file_path, file_paths_to_copy=None):
 
                         # remove tar file.
                         os.remove(data_tar_path)
+
+            container.remove()
+            print("Container '{0}' removed.".format(builder.image_tag))
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:

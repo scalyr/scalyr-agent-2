@@ -19,9 +19,15 @@ from __future__ import absolute_import
 import shutil
 import docker
 import argparse
+import hashlib
+import base64
 
 if False:
     from typing import Optional
+    from typing import List
+    from typing import Type
+    from typing import Dict
+    from typing import Callable
 
 from abc import ABCMeta, abstractmethod
 
@@ -32,23 +38,18 @@ from tests.utils.common import create_tmp_directory
 from tests.utils.compat import Path
 
 
-def _copy_agent_source(dest_path):
-    root_path = Path(get_package_root()).parent
-    gitignore_path = root_path / ".gitignore"
+def _copy_agent_source(src_path, dest_path):
+    gitignore_path = src_path / ".gitignore"
     patterns = [
         p[:-1] if p.endswith("/") else p
         for p in gitignore_path.read_text().splitlines()
         if not p.startswith("#")
     ]
     shutil.copytree(
-        six.text_type(root_path),
+        six.text_type(src_path),
         six.text_type(dest_path),
         ignore=shutil.ignore_patterns(*patterns),
     )
-    # test_config_path = Path(root_path, "test", "config.yml")
-    # if test_config_path.exists():
-    #     config_dest = Path(dest_path, "tests", "config.yml")
-    #     shutil.copy(test_config_path, config_dest)
 
 
 @six.add_metaclass(ABCMeta)
@@ -59,12 +60,39 @@ class AgentImageBuilder(object):
 
     IMAGE_TAG = None  # type: six.text_type
     DOCKERFILE = None  # type: Path
+    REQUIRED_IMAGES = []  # type: List[ClassType[AgentImageBuilder]]
 
     # add agent source code to the build context of the image
     COPY_AGENT_SOURCE = False  # type: bool
 
+    # Do not use image cache for this image builder even if 'build' method was called with 'image_cache_path' parameter.
+    # Note. This flag does not affect images in requirements.
+    IGNORE_CACHING = False
+
     def __init__(self):
         self._docker = None  # type: Optional
+
+        # dict with files which need to be copied to build_context.
+        # New paths can be added by using 'add_to_build_context' method.
+        self._things_copy_to_build_context = dict()  # type: Dict[Path, Dict]
+
+        # copy agent course code if needed.
+        if type(self).COPY_AGENT_SOURCE:
+            root_path = Path(get_package_root()).parent
+            self.add_to_build_context(
+                root_path,
+                "agent_source",
+                custom_copy_function=_copy_agent_source
+            )
+
+        # this part iterate through all attributes of the current class and get alla that starts with 'INCLUDE_PATH_'.
+        # the value of this attribute is the path to the file to be copied to the image build context.
+        for name, value in type(self).__dict__.items():
+            if name.startswith("INCLUDE_PATH_"):
+                self.add_to_build_context(
+                    value,
+                    value.name
+                )
 
     @property
     def _docker_client(self):
@@ -78,24 +106,67 @@ class AgentImageBuilder(object):
         return type(self).IMAGE_TAG
 
     @property
-    def _copy_agent_source(self):  # type: () -> bool
+    def _is_copy_agent_source(self):  # type: () -> bool
         return type(self).COPY_AGENT_SOURCE
 
     @classmethod
-    @abstractmethod
     def get_dockerfile_content(cls):  # type: () -> six.text_type
         """
         Get the content of the Dockerfile.
         """
         return cls.DOCKERFILE.read_text()
 
+    def add_to_build_context(self, path, name, custom_copy_function=None):
+        # type: (Path, six.text_type, Optional[Callable]) -> None
+        """
+        Add file or directory to image build context.
+        :param path: path to file or directory.
+        :param name: name if the file or directory after copying.
+        It will be placed in the root of the  build context directory.
+        :param custom_copy_function: Custom copy function. Can be used, for example, to filter files that not needed.
+        :return:
+        """
+        self._things_copy_to_build_context[path] = {
+            "name": name,
+            "copy_function": custom_copy_function
+        }
+
+    def _copy_to_build_context(self, context_path):  # type: (Path) -> None
+        for path, info in self._things_copy_to_build_context.items():
+            copy_function = info.get("copy_function")
+            dest_path = context_path / info["name"]
+            if copy_function is not None:
+                copy_function(path, dest_path)
+            else:
+                if path.is_dir():
+                    shutil.copytree(six.text_type(path), six.text_type(dest_path))
+                else:
+                    shutil.copy(six.text_type(path), six.text_type(dest_path))
+
+    def _is_image_exists(self):
+        try:
+            self._docker_client.images.get(self.image_tag)
+            return True
+        except docker.errors.ImageNotFound:
+            return False
+
     def build(self, image_cache_path=None):
         """
         Build docker image.
         :param image_cache_path: import image from .tar files located in this directory, if exist.
         """
-
+        # if image caching is enabled and image exists we assume that image has already built in previous test cases.
         if image_cache_path is not None:
+            if self._is_image_exists():
+                print("Image '{0}' already exists. Skip build.".format(self.IMAGE_TAG))
+                return
+
+        # build all required images.
+        for required_image_builder_cls in type(self).REQUIRED_IMAGES:
+            builder = required_image_builder_cls()
+            builder.build(image_cache_path=image_cache_path)
+
+        if not type(self).IGNORE_CACHING and image_cache_path is not None:
             self.build_with_cache(Path(image_cache_path))
             return
 
@@ -106,9 +177,7 @@ class AgentImageBuilder(object):
 
         dockerfile_path = build_context_path / "Dockerfile"
         dockerfile_path.write_text(self.get_dockerfile_content())
-        if self._copy_agent_source:
-            agent_source_path = build_context_path / "agent_source"
-            _copy_agent_source(agent_source_path)
+        self._copy_to_build_context(build_context_path)
 
         _, output_gen = self._docker_client.images.build(
             tag=self.image_tag,
@@ -127,14 +196,11 @@ class AgentImageBuilder(object):
         This is convenient to use for example with CI caches.
         :param dir_path: Path to the directory with cached image or where to save it.
         """
-        try:
-            # if image is loaded earlier - skip to avoid the multiple loading of the same image
-            # if we build it multiple times.
-            self._docker_client.images.get(self.image_tag)
-            print("The Image is already loaded.")
+        # if image is loaded earlier - skip to avoid the multiple loading of the same image
+        # if we build it multiple times.
+        if self._is_image_exists():
+            print("The image  '{0}' is already loaded.".format(self.image_tag))
             return
-        except docker.errors.ImageNotFound:
-            pass
 
         image_file_path = dir_path / self.image_tag
         if not image_file_path.exists():
@@ -173,6 +239,36 @@ class AgentImageBuilder(object):
             print("Image '{0}' saved.".format(self.image_tag))
 
     @classmethod
+    def get_checksum(cls, hash_object=None):  # type: () -> hashlib.sha256
+        """
+        Get sha265 checksum of the dockerfile and included files.
+        Also, include checksums of all required builders.
+        """
+
+        if hash_object is None:
+            hash_object = hashlib.sha256()
+
+        for builder_cls in cls.REQUIRED_IMAGES:
+            hash_object = builder_cls.get_checksum(hash_object=hash_object)
+
+        if cls.IGNORE_CACHING:
+            return hash_object
+
+        dockerfile = cls.get_dockerfile_content()
+        hash_object.update(dockerfile.encode("utf-8"))
+
+        for name, path in cls.__dict__.items():
+            if not name.startswith("INCLUDE_PATH"):
+                continue
+            if path.is_dir():
+                # TODO implement checksum calculation for directories.
+                pass
+            else:
+                hash_object.update(path.read_bytes())
+
+        return hash_object
+
+    @classmethod
     def handle_command_line(cls):
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -181,7 +277,17 @@ class AgentImageBuilder(object):
             help="Print dockerfile content of the image.",
         )
 
+        parser.add_argument(
+            "--checksum",
+            action="store_true",
+            help="Print base64 encoded sha256 checksum of the Dockerfile of this builder. "
+                 "Also, it counts checksum of all required builders."
+        )
+
         args = parser.parse_args()
 
-        if args.dockerfile is not None:
-            print(cls.get_dockerfile_content())
+        if args.checksum is not None:
+            checksum_object = cls.get_checksum()
+
+            base64_checksum = base64.b64encode(checksum_object.digest())
+            print(base64_checksum)

@@ -13,27 +13,15 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 from tests.utils.compat import Path
 
 from tests.utils.image_builder import AgentImageBuilder
 
 import six
 
-dockerfile_deb = Path(Path(__file__).parent, "Dockerfile.deb")
-dockerfile_rpm = Path(Path(__file__).parent, "Dockerfile.rpm")
 
-
-class BaseDistributionBuilder(AgentImageBuilder):
-    COPY_AGENT_SOURCE = True
-
-    @classmethod
-    def get_dockerfile_content(cls):  # type: () -> six.text_type
-        content = super(BaseDistributionBuilder, cls).get_dockerfile_content()
-
-        deb_content = dockerfile_deb.read_text()
-        rpm_content = dockerfile_rpm.read_text()
-
-        return content.format(
-            fpm_package_builder_dockerfile_deb=deb_content,
-            fpm_package_builder_dockerfile_rpm=rpm_content,
-        )
+class FpmPackageBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-fpm_package-builder"
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"

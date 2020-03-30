@@ -16,14 +16,22 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from scalyr_agent.__scalyr__ import get_install_root
 from tests.utils.compat import Path
-from tests.distribution_builders.base import BaseDistributionBuilder
+from tests.distribution_builders.fpm_package_builder import FpmPackageBuilder
+from tests.utils.image_builder import AgentImageBuilder
 
 
-class CentOSBuilder(BaseDistributionBuilder):
+class CentOSBuilderBase(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-centos6-base"
+    DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
+    INCLUDE_PATH_DEV_REQUIREMENTS_PATH = Path(get_install_root(), "dev-requirements.txt")
+    INCLUDE_PATH_PY2_DEV_REQUIREMENTS_PATH = Path(get_install_root(),  "py26-unit-tests-requirements.txt")
+
+
+class CentOSBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-centos6"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
-
-
-if __name__ == "__main__":
-    CentOSBuilder.handle_command_line()
+    REQUIRED_IMAGES = [FpmPackageBuilder, CentOSBuilderBase]
+    COPY_AGENT_SOURCE = True
+    IGNORE_CACHING = True

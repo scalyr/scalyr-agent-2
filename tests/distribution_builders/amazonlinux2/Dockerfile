@@ -1,13 +1,10 @@
-{fpm_package_builder_dockerfile_rpm}
+FROM scalyr-agent-testings-fpm_package-builder as fpm_package_build
 
-FROM amazonlinux:2
-RUN yum install -y initscripts python2 python3 gcc
-RUN yum install -y python2-pip python2-devel python3-pip python3-devel
+ADD ./agent_source /agent_source
 
-COPY agent_source/dev-requirements.txt dev-requirements.txt
+RUN /agent_source/tests/distribution_builders/base/build_packages.sh rpm
 
-RUN python -m pip install -r dev-requirements.txt
-RUN python3 -m pip install -r dev-requirements.txt
+FROM scalyr-agent-testings-amazonlinux2-base
 
 COPY --from=fpm_package_build /package/scalyr-agent*.rpm /scalyr-agent.rpm
 COPY --from=fpm_package_build /second_package/scalyr-agent*.rpm /scalyr-agent-second.rpm

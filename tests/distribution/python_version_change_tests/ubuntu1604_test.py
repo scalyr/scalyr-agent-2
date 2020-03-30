@@ -18,7 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import pytest
 
-from tests.distribution_builders.ubuntu1604_with_py3 import UbuntuBuilder
+from tests.distribution_builders.ubuntu1604 import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
@@ -32,66 +32,61 @@ from tests.distribution.python_version_change_tests.common import (
     common_test_switch_default_to_python2,
     common_test_switch_default_to_python3,
     common_test_switch_python2_to_python3,
+    common_version_test
 )
-from tests.common import install_deb, install_next_version_deb
+from tests.common import install_deb, install_next_version_deb, remove_deb
+from tests.utils.agent_runner import PACKAGE_INSTALL, AgentRunner
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_ubuntu_test_versions(request):
-    common_test_ubuntu_versions()
+@dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
+def test_centos_test_versions(request):
+    runner = AgentRunner(PACKAGE_INSTALL)
+    common_version_test(
+        runner,
+        install_deb,
+        remove_deb,
+        None,
+        "2.5.1",
+        "2.5.1",
+        "3.4.1",
+        install_fails=True,
+    )
+
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main_py2.py", "2.5.1", "", ""
+    )
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main_py2.py", "2.5.1", "", ""
+    )
+
+    common_version_test(runner, install_deb, remove_deb, "config_main.py", "", "", "")
+
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main.py", "", "2.5.1", ""
+    )
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_no_python(request):
     common_test_no_python(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_only_python_mapped_to_python2(request):
     common_test_only_python_mapped_to_python2(install_deb, install_next_version_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_deb_switch_command_works_without_agent_config(request):
-    common_test_switch_command_works_without_agent_config(install_deb)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_ubuntu_only_python_mapped_to_python3(request):
-    common_test_only_python_mapped_to_python3(install_deb, install_next_version_deb)
-
-
-@pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(30)
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_python2(request):
     common_test_python2(install_deb, install_next_version_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_ubuntu_python3(request):
-    common_test_python3(install_deb, install_next_version_deb)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_switch_default_to_python2(request):
     common_test_switch_default_to_python2(install_deb, install_next_version_deb)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_ubuntu_switch_default_to_python3(request):
-    common_test_switch_default_to_python3(install_deb, install_next_version_deb)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
-def test_ubuntu_switch_python2_to_python3(request):
-    common_test_switch_python2_to_python3(install_deb, install_next_version_deb)
