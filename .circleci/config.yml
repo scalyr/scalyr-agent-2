@@ -2,11 +2,25 @@
 #
 # Check https://circleci.com/docs/2.2/language-python/ for more details
 
+master_and_release_only: &master_and_release_only
+  filters:
+    branches:
+      only:
+        - master
+        - release
+
 master_only: &master_only
   filters:
     branches:
       only:
         - master
+
+non_master_and_release: &non_master_and_release
+  filters:
+    branches:
+      ignore:
+        - master
+        - release
 
 version: 2.1
 parameters:
@@ -900,16 +914,15 @@ jobs:
           tox_target: "py2.6-smoke-tests"
           apt_dependencies: "procps build-essential"
 
-
   package-test-rpm:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_amazonlinux
+          command: tox -eagent_distributions_tests_amazonlinux2
 
   package-test-deb:
     working_directory: ~/scalyr-agent-2
@@ -917,9 +930,31 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_ubuntu
+          command: tox -eagent_distributions_tests_ubuntu1804
+
+  # Circle CI jobs which build agent packages for each PR.
+  # TODO: They should run much faster once image caching is fixed
+  package-build-deb:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu1804"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_deb_package
+
+  package-build-rpm:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "centos8"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_rpm_package
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -927,7 +962,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
           command: tox -eagent_package_smoke_test_amazonlinux_python3
@@ -938,7 +973,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_amazonlinux_python2
 
@@ -948,7 +983,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
 
@@ -958,7 +993,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_ubuntu_python2
 
@@ -974,7 +1009,7 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests --status=success --branch=all --limit=5 \
+                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success --branch=all --limit=5 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
@@ -1008,46 +1043,50 @@ workflows:
             - smoke-k8s
   package-tests:
     jobs:
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
       - package-test-rpm:
-           <<: *master_only
+          <<: *master_and_release_only
       - package-test-deb:
-           <<: *master_only
+          <<: *master_and_release_only
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-rpm-package-py3:
           requires:
             - package-test-rpm
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-deb-package-py2:
           requires:
             - package-test-deb
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-deb-package-py3:
           requires:
             - package-test-deb
-          <<: *master_only
+          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

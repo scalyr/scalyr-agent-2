@@ -16,7 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.distribution_builders.amazonlinux import AmazonlinuxBuilder
+from tests.distribution_builders.ubuntu1604_with_py3 import UbuntuBuilder
 
 if __name__ == "__main__":
-    AmazonlinuxBuilder.handle_command_line()
+    UbuntuBuilder.handle_command_line()

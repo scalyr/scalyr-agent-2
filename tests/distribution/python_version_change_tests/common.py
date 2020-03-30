@@ -32,8 +32,11 @@ from tests.utils.compat import Path
 from tests.utils.common import get_shebang_from_file
 from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
 from tests.common import PackageInstallationError
+from tests.common import install_deb, remove_deb
 
 SCALYR_PACKAGE_BIN_PATH = Path("/", "usr", "share", "scalyr-agent-2", "bin")
+
+# NOTE: Binary dir path is different across distros that's why we use which to locate it
 BINARY_DIR_PATH = Path("/", "usr", "bin")
 
 
@@ -67,12 +70,16 @@ def _link_to_default_python(command):
     :return:
     """
     python_path = six.text_type(BINARY_DIR_PATH / "python")
+    real_executable_path = os.readlink(six.text_type(BINARY_DIR_PATH / command))
+
+    if _python_binary_is_symlink() and command == "python2":
+        return
+
     try:
         os.remove(python_path)
     except:
         pass
 
-    real_executable_path = os.readlink(six.text_type(BINARY_DIR_PATH / command))
     os.symlink(six.text_type(BINARY_DIR_PATH / real_executable_path), python_path)
 
 
@@ -98,7 +105,7 @@ def _mock_python_binary_version(python_binary_name, version):
     if not binary_path.exists():
         return
 
-    # make backup of the original binary in case if we want to keep useing it.
+    # make backup of the original binary in case if we want to keep using it.
     shutil.copy(six.text_type(binary_path), six.text_type(binary_path_backup_path))
     os.remove(six.text_type(binary_path))
 
@@ -114,6 +121,36 @@ def _mock_binaries(python, python2, python3):
     _mock_python_binary_version("python", python)
     _mock_python_binary_version("python2", python2)
     _mock_python_binary_version("python3", python3)
+
+
+def common_test_ubuntu_versions():
+    runner = AgentRunner(PACKAGE_INSTALL)
+    common_version_test(
+        runner,
+        install_deb,
+        remove_deb,
+        None,
+        "2.5.1",
+        "2.5.1",
+        "3.4.1",
+        install_fails=True,
+    )
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main.py", "", "2.5.1", "3.4.1"
+    )
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main_py2.py", "2.5.1", "", "3.4.1"
+    )
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main_py3.py", "2.5.1", "2.5.1", ""
+    )
+    common_version_test(runner, install_deb, remove_deb, "config_main.py", "", "", "")
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main_py2.py", "2.5.1", "", ""
+    )
+    common_version_test(
+        runner, install_deb, remove_deb, "config_main.py", "", "2.5.1", ""
+    )
 
 
 def common_version_test(
@@ -147,7 +184,9 @@ def common_version_test(
     else:
         stdout, _ = install_package_fn()
 
-    assert _get_current_config_script_name() == expected_conf_file_name
+    current_config_script_file_name = _get_current_config_script_name()
+
+    assert current_config_script_file_name == expected_conf_file_name
 
     _mock_binaries("", "", "")
 
@@ -183,10 +222,12 @@ def common_test_only_python_mapped_to_python2(
     Test package installation on the machine with python2 but there is only 'python' command which is mapped on to it.
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
-
     # map 'python' command on to python2
     _link_to_default_python("python2")
-    _remove_python("python2")
+    if not _python_binary_is_symlink():
+        # On some older distros python2 is mapped to python and not vice-versa so we only remove
+        # that binary if that is not the case
+        _remove_python("python2")
     _remove_python("python3")
 
     stdout, _ = install_package_fn()
@@ -254,7 +295,6 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
 
-    # remove python and python3 to make installer see only python2
     _remove_python("python")
     _remove_python("python3")
 
@@ -518,7 +558,6 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     Package installer should pick python2 by default and then we switch to the python3.
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
-
     _remove_python("python")
 
     install_package_fn()
@@ -552,3 +591,22 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     runner.start()
     time.sleep(1)
     assert _get_python_major_version(runner) == 2
+
+
+def _python_binary_is_symlink():
+    # type: () -> bool
+    """
+    Return true if python binary is a symlink to a specific version (e.g. python -> python2 instead
+    of the more usal python2 -> python).
+
+    This affects our tests because we need to handle those scenarios separately.
+    """
+    try:
+        os.readlink(six.text_type(BINARY_DIR_PATH / "python"))
+    except OSError as e:
+        msg = str(e).lower()
+
+        if "invalid argument" in msg:
+            return True
+
+    return False

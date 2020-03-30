@@ -19,7 +19,8 @@ from tests.utils.image_builder import AgentImageBuilder
 
 import six
 
-dockerfile = Path(Path(__file__).parent, "Dockerfile")
+dockerfile_deb = Path(Path(__file__).parent, "Dockerfile.deb")
+dockerfile_rpm = Path(Path(__file__).parent, "Dockerfile.rpm")
 
 
 class BaseDistributionBuilder(AgentImageBuilder):
@@ -28,4 +29,11 @@ class BaseDistributionBuilder(AgentImageBuilder):
     @classmethod
     def get_dockerfile_content(cls):  # type: () -> six.text_type
         content = super(BaseDistributionBuilder, cls).get_dockerfile_content()
-        return content.format(fpm_package_builder_dockerfile=dockerfile.read_text())
+
+        deb_content = dockerfile_deb.read_text()
+        rpm_content = dockerfile_rpm.read_text()
+
+        return content.format(
+            fpm_package_builder_dockerfile_deb=deb_content,
+            fpm_package_builder_dockerfile_rpm=rpm_content,
+        )

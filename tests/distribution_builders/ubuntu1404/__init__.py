@@ -16,7 +16,14 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.distribution_builders.centos import CentOSBuilder
+from tests.utils.compat import Path
+from tests.distribution_builders.base import BaseDistributionBuilder
+
+
+class UbuntuBuilder(BaseDistributionBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-ubuntu1404"
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"
+
 
 if __name__ == "__main__":
-    CentOSBuilder.handle_command_line()
+    UbuntuBuilder.handle_command_line()
