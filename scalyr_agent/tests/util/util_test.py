@@ -565,6 +565,40 @@ class TestStoppableThread(ScalyrTestCase):
 
         self.assertTrue(caught_it)
 
+    def test_is_alive(self):
+        class TestThread(StoppableThread):
+            def __init__(self):
+                self.run_counter = 0
+                StoppableThread.__init__(self, "Test thread")
+
+            def run_and_propagate(self):
+                while self._run_state.is_running():
+                    self._run_state.sleep_but_awaken_if_stopped(0.03)
+
+        test_thread_1 = TestThread()
+        test_thread_2 = StoppableThread("Testing", self._run_method)
+
+        test_threads = [test_thread_1, test_thread_2]
+
+        for test_thread in test_threads:
+            self.assertFalse(test_thread.isAlive())
+
+            if six.PY3:
+                self.assertFalse(test_thread.is_alive())
+
+            test_thread.start()
+
+            self.assertTrue(test_thread.isAlive())
+
+            if six.PY3:
+                self.assertTrue(test_thread.is_alive())
+
+            test_thread.stop()
+            self.assertFalse(test_thread.isAlive())
+
+            if six.PY3:
+                self.assertFalse(test_thread.is_alive())
+
     def _run_method(self, run_state):
         self._run_counter += 1
         while run_state.is_running():
