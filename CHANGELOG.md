@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.1 "Millenium Falcon" - TBD
+## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 27, 2020 10:30 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 30, 2020 16:30 -0800
 --->
-
-Note, this release is still under development.  Actual release date TBD
 
 Features
 * Major update of code base to support running under Python 2 and 3.  See [release notes](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more information.
