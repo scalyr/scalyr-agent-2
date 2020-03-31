@@ -60,13 +60,17 @@ if False:
 
 import os
 import sys
+import time
 
 import random
 import argparse
 from io import open
 
 from libcloud.compute.types import Provider
-from libcloud.compute.base import NodeImage, NodeSize
+from libcloud.compute.types import StorageVolumeState
+from libcloud.compute.base import NodeImage
+from libcloud.compute.base import NodeSize
+from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
 
@@ -182,27 +186,31 @@ def main(
     )
     step = ScriptDeployment(script_content)
 
-    node = driver.deploy_node(
-        name=name,
-        image=image,
-        size=size,
-        ssh_key=PRIVATE_KEY_PATH,
-        ex_keyname=KEY_NAME,
-        ex_security_groups=SECURITY_GROUPS,
-        ssh_username=distro_details["ssh_username"],
-        ssh_alternate_usernames=["root", "ec2-user"],
-        ssh_timeout=10,
-        timeout=120,
-        deploy=step,
-    )
+    try:
+        node = driver.deploy_node(
+            name=name,
+            image=image,
+            size=size,
+            ssh_key=PRIVATE_KEY_PATH,
+            ex_keyname=KEY_NAME,
+            ex_security_groups=SECURITY_GROUPS,
+            ssh_username=distro_details["ssh_username"],
+            ssh_alternate_usernames=["root", "ec2-user"],
+            ssh_timeout=10,
+            timeout=120,
+            deploy=step,
+        )
+    except DeploymentError as e:
+        print("Deployment failed")
+        node = e.node
+        step.exit_status = 1
 
     success = step.exit_status == 0
 
     # We don't destroy node if destroy_node is False (e.g. to aid with troubleshooting on failure
     # and similar)
     if node and destroy_node:
-        print(('Destroying node "%s"...' % (name)))
-        node.destroy()
+        destroy_node_and_cleanup(driver=driver, node=node)
 
     if success:
         print("Script successfully completed.")
@@ -216,6 +224,36 @@ def main(
 
     if not success:
         sys.exit(1)
+
+
+def destroy_node_and_cleanup(driver, node):
+    """
+    Destroy the provided node and cleanup any left over EBS volumes.
+    """
+    volumes = driver.list_volumes(node=node)
+
+    print(('Destroying node "%s"...' % (node.name)))
+    node.destroy()
+
+    assert len(volumes) <= 1
+    print("Cleaning up any left-over EBS volumes for this node...")
+
+    # Give it some time for the volume to become detached from the node
+    time.sleep(5)
+
+    for volume in volumes:
+        # Additional safety checks
+        if volume.extra.get("instance_id", None) != node.id:
+            continue
+
+        if volume.size != 8:
+            # All the volumes we use are 8 GB EBS volumes
+            continue
+
+        if volume.state != StorageVolumeState.AVAILABLE:
+            continue
+
+        driver.destroy_volume(volume=volume)
 
 
 if __name__ == "__main__":
