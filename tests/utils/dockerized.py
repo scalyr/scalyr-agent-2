@@ -15,12 +15,26 @@ from scalyr_agent import compat
 DEFAULT_FILE_PATHS_TO_COPY = ["/var/log/scalyr-agent-2/agent.log"]
 
 
-def dockerized_case(builder_cls, file_path, file_paths_to_copy=None, python_executable="python3"):
+def dockerized_case(
+    builder_cls,
+    file_path,
+    file_paths_to_copy=None,
+    artifacts_use_subdirectory=True,
+    remove_container=True,
+    python_executable="python3",
+):
     """
     Decorator that makes decorated test case run inside docker container.
 
+    :param builder_cls: Image builder class to use.
+    :param file_path: Path to the test file.
     :param file_paths_to_copy: A list of file paths to copy from the container to the artifacts
                                directory specified --artifacts-path option.
+    :param artifacts_use_subdirectory: True to store artifacts in a subdirectory which matches the
+                                       test name. This comes handy in scenarios where single test
+                                       file contains multiple test functions.
+    :param remove_container: True to remove container after run.
+    :param python_executable: Python executable to use to run tests with (aka pytest).
     """
     # We always include agent log file
     file_paths_to_copy = set(file_paths_to_copy or [])
@@ -65,57 +79,23 @@ def dockerized_case(builder_cls, file_path, file_paths_to_copy=None, python_exec
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
-            if artifacts_path is not None:
+            if artifacts_path:
                 artifacts_path = Path(artifacts_path)
-                if artifacts_path.exists():
-                    for file_path in file_paths_to_copy:
-                        # fetch file as tar file stream if it exists
 
-                        try:
-                            stream, _ = container.get_archive(file_path)
-                        except docker.errors.NotFound as e:
-                            # Not all the test files produce agent.log so we simply ignore the error
-                            # if agent log file doesn't exist
-                            msg = str(e).lower()
+                if artifacts_use_subdirectory:
+                    # We run each test case in a new container instance so we make sure we store
+                    # logs under a sub-directory which matches the test function name
+                    artifacts_path = artifacts_path / func_name
 
-                            if "could not find the file" in msg:
-                                print(
-                                    "File path %s doesn't exist, skipping copy"
-                                    % (file_path)
-                                )
-                                continue
+                copy_artifacts(
+                    container=container,
+                    file_paths=file_paths_to_copy,
+                    destination_path=artifacts_path,
+                )
 
-                            raise e
-
-                        # We run each test case in a new container instance so we make sure we store
-                        # logs under a sub-directory which matches the test function name
-                        destination_path = artifacts_path / func_name
-
-                        try:
-                            os.makedirs(destination_path)
-                        except OSError:
-                            pass
-
-                        print(
-                            'Copying file path "%s" to "%s"'
-                            % (file_path, destination_path)
-                        )
-
-                        data_tar_path = destination_path / "data.tar"
-                        # write it to file.
-                        with data_tar_path.open("wb") as data_fp:
-                            for b in stream:
-                                data_fp.write(b)
-
-                        # extract tar file in a directory for this function
-                        with tarfile.open(data_tar_path) as tar_file:
-                            tar_file.extractall(destination_path)
-
-                        # remove tar file.
-                        os.remove(data_tar_path)
-
-            container.remove()
-            print("Container '{0}' removed.".format(builder.image_tag))
+            if remove_container:
+                container.remove()
+                print("Container '{0}' removed.".format(builder.image_tag))
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
@@ -124,3 +104,54 @@ def dockerized_case(builder_cls, file_path, file_paths_to_copy=None, python_exec
         return wrapper
 
     return dockerized_real
+
+
+def copy_artifacts(container, file_paths, destination_path):
+    """
+    Copy provided file paths from Docker container to a destination on a host.
+
+    :param container: Container instance to use.
+    :param file_paths: A list of file paths inside the Docker container to copy over.
+    :param destination_path: Destination directory on the host where the files should be copied to.
+    """
+    if not file_paths:
+        return
+
+    if not destination_path.exists():
+        return
+
+    for file_path in file_paths:
+        # fetch file as tar file stream if it exists
+        try:
+            stream, _ = container.get_archive(file_path)
+        except docker.errors.NotFound as e:
+            # Not all the test files produce agent.log so we simply ignore the error
+            # if agent log file doesn't exist
+            msg = str(e).lower()
+
+            if "could not find the file" in msg:
+                print("File path %s doesn't exist, skipping copy" % (file_path))
+                continue
+
+            raise e
+
+        try:
+            os.makedirs(destination_path)
+        except OSError:
+            pass
+
+        print('Copying file path "%s" to "%s"' % (file_path, destination_path))
+
+        data_tar_path = destination_path / "data.tar"
+
+        # write it to file.
+        with data_tar_path.open("wb") as data_fp:
+            for b in stream:
+                data_fp.write(b)
+
+        # extract tar file in a directory for this function
+        with tarfile.open(data_tar_path) as tar_file:
+            tar_file.extractall(destination_path)
+
+        # remove tar file.
+        os.remove(data_tar_path)
