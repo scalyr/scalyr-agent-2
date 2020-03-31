@@ -49,7 +49,7 @@ sudo /etc/init.d/scalyr-agent-2 restart
 Selecting Python 3:
 
 ```bash
-sudo scalyr-switch-python python2
+sudo scalyr-switch-python python3
 sudo /etc/init.d/scalyr-agent-2 restart
 ```
 
