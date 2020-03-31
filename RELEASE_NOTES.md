@@ -17,6 +17,9 @@ include:
   customization via `kustomize`.
 * Collection of two new metrics (``app.io.wait`` and ``app.mem.majflt``) in the
   ``linux_process_metrics`` monitor.  See below for instructions on disabling their collection.
+* The ``/etc/init.d/scalyr-agent-2`` symlink is no longer marked as a conf
+  file in the Debian package.  If you have created a customized version of this
+  file, you will need to copy it before upgrading to this new version.
 
 For additional changes, please read the detailed release notes below.
 
