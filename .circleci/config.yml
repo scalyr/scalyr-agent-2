@@ -983,7 +983,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu1804"
+          distribution: "ubuntu1804_with_py3"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
 
