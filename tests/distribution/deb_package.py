@@ -24,7 +24,12 @@ from tests.distribution_builders.ubuntu1804_with_py3 import UbuntuBuilder
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__, file_paths_to_copy=["/scalyr-agent.deb"])
+@dockerized_case(
+    UbuntuBuilder,
+    __file__,
+    file_paths_to_copy=["/scalyr-agent.deb"],
+    artifacts_use_subdirectory=False,
+)
 def test_build_deb_package(request):
     """
     Mock function which is used to build agent debian package.
