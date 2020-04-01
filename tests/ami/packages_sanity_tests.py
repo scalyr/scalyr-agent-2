@@ -41,16 +41,28 @@ Usage:
 
 1. Fresh install tests
 
-python3 tests/libcloud/package_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=2.1.1
-python3 tests/libcloud/package_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=2.1.1
-python3 tests/libcloud/package_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=2.1.1 --python-package=python3
-python3 tests/libcloud/package_sanity_tests.py --distro=centos8 --type=install --to-version=2.1.1
-python3 tests/libcloud/package_sanity_tests.py --distro=centos8 --type=install --to-version=2.1.1 --python-package=python3
+Installation from stable apt repo:
+
+python3 package_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=2.1.1
+python3 package_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=2.1.1 --python-package=python3
+python3 package_sanity_tests.py --distro=centos8 --type=install --to-version=2.1.1
+
+Installation from package URL:
+
+python3 package_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=https://28747-23852161-gh.circle-artifacts.com/0/~/artifacts/test_build_deb_package/scalyr-agent.deb
 
 2. Upgrade tests
 
-python3 tests/libcloud/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=2.0.59 --to-version=2.1.1
-python3 tests/libcloud/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=2.0.59 --to-version=2.1.1
+Installation and upgrade from stable apt repo:
+
+python3 packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=2.0.59 --to-version=2.1.1
+python3 packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=2.0.59 --to-version=2.1.1
+
+Installation and upgrade from package URL:
+python3 package_sanity_tests.py --distro=ubuntu1404 --type=install --from-version=https://28747-23852161-gh.circle-artifacts.com/0/~/artifacts/test_build_deb_package/scalyr-agent.deb --to-version=https://28747-23852161-gh.circle-artifacts.com/0/~/artifacts/test_build_deb_package/scalyr-agent.deb
+
+NOTE: You can't mix version strings and package URLs. You need to use one or the other, but not
+combination of both.
 """
 
 from __future__ import absolute_import
@@ -68,7 +80,10 @@ import random
 import argparse
 from io import open
 
+from jinja2 import Template
+
 from libcloud.compute.types import Provider
+from libcloud.compute.base import NodeDriver
 from libcloud.compute.base import NodeImage
 from libcloud.compute.base import NodeSize
 from libcloud.compute.base import StorageVolume
@@ -151,9 +166,9 @@ def main(
     distro_details = EC2_DISTRO_DETAILS_MAP[distro]
 
     if test_type == "install":
-        script_filename = "fresh_install_%s.sh"
+        script_filename = "fresh_install_%s.sh.j2"
     else:
-        script_filename = "upgrade_install_%s.sh"
+        script_filename = "upgrade_install_%s.sh.j2"
 
     script_filename = script_filename % (
         "deb" if distro.startswith("ubuntu") else "rpm"
@@ -163,14 +178,13 @@ def main(
     with open(script_file_path, "r") as fp:
         script_content = fp.read()
 
-    format_values = distro_details.copy()
-    format_values["scalyr_api_key"] = SCALYR_API_KEY
-    format_values["python_package"] = (
-        python_package or distro_details["default_python_package_name"]
+    rendered_template = render_script_template(
+        script_template=script_content,
+        distro_details=distro_details,
+        python_package=python_package,
+        from_version=from_version,
+        to_version=to_version,
     )
-    format_values["package_from_version"] = from_version
-    format_values["package_to_version"] = to_version
-    script_content = script_content.format(**format_values)
 
     cls = get_driver(Provider.EC2)
     driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
@@ -186,7 +200,11 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
-    step = ScriptDeployment(script_content, timeout=120)
+    step = ScriptDeployment(rendered_template, timeout=120)
+
+    print("Starting node provisioning and tests...")
+
+    start_time = int(time.time())
 
     try:
         node = driver.deploy_node(
@@ -208,6 +226,7 @@ def main(
         step.exit_status = 1
 
     success = step.exit_status == 0
+    duration = int(time.time()) - start_time
 
     if success:
         print("Script successfully completed.")
@@ -218,6 +237,7 @@ def main(
     print(("stderr: %s" % (step.stderr)))
     print(("exit_code: %s" % (step.exit_status)))
     print(("succeeded: %s" % (str(success))))
+    print(("duration: %s seconds" % (duration)))
 
     # We don't destroy node if destroy_node is False (e.g. to aid with troubleshooting on failure
     # and similar)
@@ -226,6 +246,36 @@ def main(
 
     if not success:
         sys.exit(1)
+
+
+def render_script_template(
+    script_template, distro_details, python_package, from_version=None, to_version=None
+):
+    # type: (str, dict, str, Optional[str], Optional[str]) -> str
+    """
+    Render the provided script template with common context.
+    """
+    from_version = from_version or ""
+    to_version = to_version or ""
+
+    template_context = distro_details.copy()
+    template_context["scalyr_api_key"] = SCALYR_API_KEY
+    template_context["python_package"] = (
+        python_package or distro_details["default_python_package_name"]
+    )
+    template_context["package_from_version"] = from_version
+    template_context["package_from_version_is_url"] = (
+        "http://" in from_version or "https://" in from_version
+    )
+    template_context["package_to_version"] = to_version
+    template_context["package_to_version_is_url"] = (
+        "http://" in to_version or "https://" in to_version
+    )
+
+    template = Template(script_template)
+    rendered_template = template.render(**template_context)
+
+    return rendered_template
 
 
 def destroy_node_and_cleanup(driver, node):
@@ -257,7 +307,7 @@ def destroy_node_and_cleanup(driver, node):
 
 
 def destroy_volume_with_retry(driver, volume, max_retries=8, retry_sleep_delay=5):
-    # type: (StorageVolume, Optional[int], Optional[int]) -> bool
+    # type: (NodeDriver, StorageVolume, int, int) -> bool
     """
     Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
     is still attached to the node.
@@ -316,13 +366,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--from-version",
-        help=("Package version to use for upgrade tests."),
+        help=("Package version or URL to the package to use for upgrade tests."),
         default=None,
         required=False,
     )
     parser.add_argument(
         "--to-version",
-        help=("Package version to use for fresh install and upgrade tests."),
+        help=(
+            "Package version or URL to the package to use for fresh install and upgrade tests."
+        ),
         required=True,
     )
     parser.add_argument(
@@ -345,6 +397,14 @@ if __name__ == "__main__":
             "upgrade test is not supported on CentOS 8, because scalyr-agent-2 "
             '2.0.x package depends on "python" package which is not available on '
             "CentOS 8."
+        )
+
+    if args.type == "install" and not args.to_version:
+        raise ValueError("--to-version needs to be provided for install test")
+
+    if args.type == "upgrade" and (not args.from_version or not args.to_version):
+        raise ValueError(
+            "--from-version and to --to-version needs to be provided for upgrade test"
         )
 
     main(

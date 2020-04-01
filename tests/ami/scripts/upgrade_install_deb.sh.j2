@@ -19,13 +19,24 @@ set -e
 sleep 10
 
 sudo apt-get update -y
-sudo apt-get install -y {python_package}
+sudo apt-get install -y "{{python_package}}"
 
+{% if not package_from_version_is_url -%}
 wget -q https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh
-sudo bash ./install-scalyr-agent-2.sh --set-api-key "{scalyr_api_key}"
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+{% endif -%}
 
 # Install old version
-sudo apt-get install -y --allow-downgrades "scalyr-agent-2={package_from_version}"
+{% if package_from_version_is_url -%}
+wget -O package-from.deb "{{ package_from_version }}"
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i package-from.deb
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export PACKAGE_FROM_VERSION=$(dpkg-deb -f "package-from.deb" Version)
+{% else -%}
+sudo apt-get install -y --allow-downgrades "scalyr-agent-2={{package_from_version}}"
+export PACKAGE_FROM_VERSION="{{package_from_version}}"
+{% endif -%}
+
 sudo /etc/init.d/scalyr-agent-2 restart
 
 sleep 5
@@ -34,7 +45,7 @@ sleep 5
 sudo scalyr-agent-2 status -v
 echo ""
 
-sudo scalyr-agent-2 status -v | grep "{package_from_version}"
+sudo scalyr-agent-2 status -v | grep "${PACKAGE_FROM_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
@@ -46,7 +57,15 @@ echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
 # Upgrade to new version
-sudo apt-get install -y "scalyr-agent-2={package_to_version}"
+{% if package_to_version_is_url -%}
+wget -O package-to.deb "{{ package_from_version }}"
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i package-to.deb
+export PACKAGE_TO_VERSION=$(dpkg-deb -f "package-to.deb" Version)
+{% else -%}
+sudo apt-get install -y "scalyr-agent-2={{package_to_version}}"
+export PACKAGE_TO_VERSION="{{package_to_version}}"
+{% endif -%}
+
 sudo /etc/init.d/scalyr-agent-2 restart
 
 sleep 5
@@ -55,7 +74,7 @@ sleep 5
 sudo scalyr-agent-2 status -v
 echo ""
 
-sudo scalyr-agent-2 status -v | grep "{package_to_version}"
+sudo scalyr-agent-2 status -v | grep "${PACKAGE_TO_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics

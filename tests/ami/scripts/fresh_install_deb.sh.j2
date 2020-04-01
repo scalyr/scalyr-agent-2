@@ -18,14 +18,28 @@ set -e
 # cloud-init fully finished
 sleep 10
 
-sudo yum install -y wget
-sudo yum install -y {python_package}
+uname -a
+cat /etc/*-release
 
+sudo apt-get update -y
+sudo apt-get install -y "{{python_package}}"
+
+{% if not package_to_version_is_url -%}
 wget -q https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh
-sudo bash ./install-scalyr-agent-2.sh --set-api-key "{scalyr_api_key}"
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+{% endif -%}
 
-# Install latest version
-sudo yum install -y "scalyr-agent-2-{package_to_version}"
+# Install provided version
+{% if "http://" in package_to_version or "https://" in package_to_version -%}
+wget -O package.deb "{{ package_to_version }}"
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i package.deb
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export PACKAGE_TO_VERSION=$(dpkg-deb -f "package.deb" Version)
+{% else -%}
+sudo apt-get install -y "scalyr-agent-2={{package_to_version}}"
+export PACKAGE_TO_VERSION="{{package_to_version}}"
+{% endif -%}
+
 sudo /etc/init.d/scalyr-agent-2 restart
 
 sleep 5
@@ -34,7 +48,7 @@ sleep 5
 sudo scalyr-agent-2 status -v
 echo ""
 
-sudo scalyr-agent-2 status -v | grep "{package_to_version}"
+sudo scalyr-agent-2 status -v | grep "${PACKAGE_TO_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
@@ -42,5 +56,4 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 # Verify rc*.d symlinks are in place
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
-
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
