@@ -199,9 +199,10 @@ def main(
             ssh_timeout=10,
             timeout=120,
             deploy=step,
+            at_exit_func=destroy_node_and_cleanup,
         )
     except DeploymentError as e:
-        print("Deployment failed")
+        print("Deployment failed: %s" % (str(e)))
         node = e.node
         step.exit_status = 1
 
@@ -298,7 +299,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args(sys.argv[1:])
 
-    if args.distro == "centos8" and args.type == "install":
+    if args.distro == "centos8" and args.type == "upgrade":
         raise ValueError(
             "upgrade test is not supported on CentOS 8, because scalyr-agent-2 "
             '2.0.x package depends on "python" package which is not available on '
