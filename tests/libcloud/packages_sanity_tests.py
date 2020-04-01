@@ -185,7 +185,7 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
-    step = ScriptDeployment(script_content)
+    step = ScriptDeployment(script_content, timeout=120)
 
     try:
         node = driver.deploy_node(
@@ -196,9 +196,8 @@ def main(
             ex_keyname=KEY_NAME,
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
-            ssh_alternate_usernames=["root", "ec2-user"],
             ssh_timeout=10,
-            timeout=120,
+            timeout=100,
             deploy=step,
             at_exit_func=destroy_node_and_cleanup,
         )
