@@ -234,6 +234,7 @@ def destroy_node_and_cleanup(driver, node):
     """
     volumes = driver.list_volumes(node=node)
 
+    print("")
     print(('Destroying node "%s"...' % (node.name)))
     node.destroy()
 
