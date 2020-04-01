@@ -15,7 +15,7 @@ To learn more about Scalyr, visit https://www.scalyr.com.
 The Scalyr Agent is designed to be lightweight, easy to install, and safe to run on production systems.
 Key features:
 
-  * Pure Python implementation, supporting Python versions 2.4 and up
+  * Pure Python implementation, supporting Python versions 2.6, 2.7 and >= 3.5
   * Lightweight (typically 15 MB RAM, 2% CPU or less)
   * Easy-to-use troubleshooting features
   * Modular configuration files
