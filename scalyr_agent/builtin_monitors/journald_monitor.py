@@ -557,9 +557,7 @@ seconds and then polls again.
     ):
         string_buffer = six.StringIO()
 
-        string_buffer.write(
-            "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
-        )
+        string_buffer.write("%s %s" % (metric_name, metric_value))
 
         if extra_fields is not None:
             for field_name in extra_fields:
