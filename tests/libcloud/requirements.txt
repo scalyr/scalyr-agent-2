@@ -1,2 +1,2 @@
-apache-libcloud==2.8.1
+git+https://github.com/apache/libcloud.git@trunk#egg=libcloud
 paramiko==2.7.1

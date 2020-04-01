@@ -287,6 +287,13 @@ def destroy_volume_with_retry(driver, volume, max_retries=8, retry_sleep_delay=5
             else:
                 raise e
 
+    if destroyed:
+        print("Volume %s successfully destroyed." % (volume.id))
+    else:
+        print(
+            "Failed to destroy volume %s after %s attempts." % (volume.id, max_retries)
+        )
+
     return True
 
 
