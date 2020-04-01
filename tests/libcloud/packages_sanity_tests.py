@@ -13,9 +13,10 @@
 # limitations under the License.
 
 """
-Script which runs basic package fresh install or upgrade sanity tests on a fresh EC2 instance.
+Script which runs basic package fresh install or upgrade sanity tests on a fresh short lived
+EC2 instance.
 
-It depends on the following environment variables:
+It depends on the following environment variables being set:
 
 - ACCESS_KEY - AWS access key.
 - SECRET_KEY - AWS secret key.
@@ -74,7 +75,7 @@ from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
 
-from scalyr_agent import compat
+from tests.libcloud.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
@@ -126,20 +127,20 @@ EC2_DISTRO_DETAILS_MAP = {
     },
 }
 
-ACCESS_KEY = compat.os_getenv_unicode("ACCESS_KEY", "")
-SECRET_KEY = compat.os_getenv_unicode("SECRET_KEY", "")
-REGION = compat.os_getenv_unicode("REGION", "us-east-1")
+ACCESS_KEY = get_env_throw_if_not_set("ACCESS_KEY")
+SECRET_KEY = get_env_throw_if_not_set("SECRET_KEY")
+REGION = get_env_throw_if_not_set("REGION", "us-east-1")
 
-KEY_NAME = compat.os_getenv_unicode("KEY_NAME", "")
-PRIVATE_KEY_PATH = compat.os_getenv_unicode("PRIVATE_KEY_PATH", "~")
+KEY_NAME = get_env_throw_if_not_set("KEY_NAME")
+PRIVATE_KEY_PATH = get_env_throw_if_not_set("PRIVATE_KEY_PATH")
 PRIVATE_KEY_PATH = os.path.expanduser(PRIVATE_KEY_PATH)
 
-SECURITY_GROUPS_STR = compat.os_getenv_unicode(
+SECURITY_GROUPS_STR = get_env_throw_if_not_set(
     "SECURITY_GROUPS", "allow-ssh"
 )  # sg-02efe05c115d41622
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
-SCALYR_API_KEY = compat.os_getenv_unicode("SCALYR_API_KEY", "")
+SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
 
 def main(
