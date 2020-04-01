@@ -1,4 +1,4 @@
-# AMI based Package Tests
+# AWS AMI Based Package Tests
 
 This directory contains scalyr-agent-2 package install and upgrade sanity
 tests.

@@ -76,7 +76,7 @@ from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
 
-from tests.libcloud.utils import get_env_throw_if_not_set
+from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
