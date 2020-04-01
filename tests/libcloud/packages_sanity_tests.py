@@ -58,6 +58,7 @@ from __future__ import print_function
 
 if False:
     from typing import List
+    from typing import Optional
 
 import os
 import sys
@@ -68,9 +69,9 @@ import argparse
 from io import open
 
 from libcloud.compute.types import Provider
-from libcloud.compute.types import StorageVolumeState
 from libcloud.compute.base import NodeImage
 from libcloud.compute.base import NodeSize
+from libcloud.compute.base import StorageVolume
 from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
@@ -208,11 +209,6 @@ def main(
 
     success = step.exit_status == 0
 
-    # We don't destroy node if destroy_node is False (e.g. to aid with troubleshooting on failure
-    # and similar)
-    if node and destroy_node:
-        destroy_node_and_cleanup(driver=driver, node=node)
-
     if success:
         print("Script successfully completed.")
     else:
@@ -222,6 +218,11 @@ def main(
     print(("stderr: %s" % (step.stderr)))
     print(("exit_code: %s" % (step.exit_status)))
     print(("succeeded: %s" % (str(success))))
+
+    # We don't destroy node if destroy_node is False (e.g. to aid with troubleshooting on failure
+    # and similar)
+    if node and destroy_node:
+        destroy_node_and_cleanup(driver=driver, node=node)
 
     if not success:
         sys.exit(1)
@@ -240,7 +241,7 @@ def destroy_node_and_cleanup(driver, node):
     print("Cleaning up any left-over EBS volumes for this node...")
 
     # Give it some time for the volume to become detached from the node
-    time.sleep(5)
+    time.sleep(10)
 
     for volume in volumes:
         # Additional safety checks
@@ -251,10 +252,42 @@ def destroy_node_and_cleanup(driver, node):
             # All the volumes we use are 8 GB EBS volumes
             continue
 
-        if volume.state != StorageVolumeState.AVAILABLE:
-            continue
+        destroy_volume_with_retry(driver=driver, volume=volume)
 
-        driver.destroy_volume(volume=volume)
+
+def destroy_volume_with_retry(driver, volume, max_retries=8, retry_sleep_delay=5):
+    # type: (StorageVolume, Optional[int], Optional[int]) -> bool
+    """
+    Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
+    is still attached to the node.
+    """
+    retry_count = 0
+    destroyed = False
+
+    while not destroyed and retry_count < max_retries:
+        try:
+            try:
+                driver.destroy_volume(volume=volume)
+            except Exception as e:
+                if "InvalidVolume.NotFound" in str(e):
+                    pass
+                else:
+                    raise e
+            destroyed = True
+        except Exception as e:
+            if "VolumeInUse" in str(e):
+                # Retry in 5 seconds
+                print(
+                    "Volume in use, re-attempting destroy in %s seconds (attempt %s/%s)..."
+                    % (retry_sleep_delay, retry_count + 1, max_retries)
+                )
+
+                retry_count += 1
+                time.sleep(retry_sleep_delay)
+            else:
+                raise e
+
+    return True
 
 
 if __name__ == "__main__":
