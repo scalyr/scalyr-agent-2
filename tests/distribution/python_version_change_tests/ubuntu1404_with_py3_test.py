@@ -32,7 +32,7 @@ from tests.distribution.python_version_change_tests.common import (
     common_test_switch_default_to_python2,
     common_test_switch_default_to_python3,
     common_test_switch_python2_to_python3,
-    common_version_test
+    common_version_test,
 )
 from tests.common import install_deb, install_next_version_deb, remove_deb
 from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL

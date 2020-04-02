@@ -19,8 +19,6 @@ from tests.utils.compat import Path
 
 from tests.utils.image_builder import AgentImageBuilder
 
-import six
-
 
 class FpmPackageBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-fpm_package-builder"

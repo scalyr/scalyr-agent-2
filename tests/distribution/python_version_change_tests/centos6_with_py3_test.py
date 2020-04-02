@@ -29,10 +29,8 @@ from tests.distribution.python_version_change_tests.common import (
     common_test_no_python,
     common_test_switch_default_to_python2,
     common_test_switch_default_to_python3,
-    common_version_test
 )
-from tests.common import install_rpm, install_next_version_rpm, remove_rpm
-from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
+from tests.common import install_rpm, install_next_version_rpm
 
 
 @pytest.mark.usefixtures("agent_environment")

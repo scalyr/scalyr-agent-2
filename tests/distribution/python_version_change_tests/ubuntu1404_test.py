@@ -22,16 +22,11 @@ from tests.distribution_builders.ubuntu1404 import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
-    common_test_ubuntu_versions,
     common_test_switch_command_works_without_agent_config,
     common_test_python2,
-    common_test_python3,
     common_test_only_python_mapped_to_python2,
-    common_test_only_python_mapped_to_python3,
     common_test_no_python,
     common_test_switch_default_to_python2,
-    common_test_switch_default_to_python3,
-    common_test_switch_python2_to_python3,
     common_version_test,
 )
 from tests.common import install_deb, install_next_version_deb, remove_deb

@@ -22,14 +22,10 @@ from tests.distribution_builders.centos6 import CentOSBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
-    common_test_switch_command_works_without_agent_config,
-    common_test_python3,
     common_test_python2,
     common_test_only_python_mapped_to_python2,
-    common_test_only_python_mapped_to_python3,
     common_test_no_python,
     common_test_switch_default_to_python2,
-    common_test_switch_default_to_python3,
 )
 from tests.common import install_rpm, install_next_version_rpm
 
@@ -38,6 +34,7 @@ from tests.common import install_rpm, install_next_version_rpm
 @dockerized_case(CentOSBuilder, __file__, python_executable="python_for_tests")
 def test_centos_no_python(request):
     common_test_no_python(install_rpm)
+
 
 # TODO: in centos6 python2 command is a symlink to python.
 #  The current implementation of this test can not handle this.
