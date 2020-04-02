@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
-from __future__ import print_function
+PACKAGE_TYPE=${1}
 
-from __future__ import absolute_import
+echo "$(cat /agent_source/VERSION)-$(git --git-dir /agent_source/.git rev-parse --short HEAD)" >/agent_source/VERSION
 
-import pytest
+mkdir -p /package
+cd /package || exit 1
+echo "${PACKAGE_TYPE}"
+python /agent_source/build_package.py "${PACKAGE_TYPE}"
 
-from tests.utils.dockerized import dockerized_case
-from tests.distribution_builders.ubuntu1804_with_py3 import UbuntuBuilder
+# change version and build new package for agent upgrade test.
+echo "$(cat /agent_source/VERSION)-2" >/agent_source/VERSION
+mkdir -p /second_package
+cd /second_package || exit 1
 
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(
-    UbuntuBuilder,
-    __file__,
-    file_paths_to_copy=["/scalyr-agent.deb"],
-    artifacts_use_subdirectory=False,
-)
-def test_build_deb_package(request):
-    """
-    Mock function which is used to build agent debian package.
-    """
-    pass
+python /agent_source/build_package.py "${PACKAGE_TYPE}"

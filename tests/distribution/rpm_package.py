@@ -24,7 +24,12 @@ from tests.distribution_builders.centos8 import CentOSBuilder
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(CentOSBuilder, __file__, file_paths_to_copy=["/scalyr-agent.rpm"])
+@dockerized_case(
+    CentOSBuilder,
+    __file__,
+    file_paths_to_copy=["/scalyr-agent.rpm"],
+    artifacts_use_subdirectory=False,
+)
 def test_build_rpm_package(request):
     """
     Mock function which is used to build agent rpm package.

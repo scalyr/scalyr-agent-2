@@ -1,0 +1,24 @@
+FROM centos:6
+
+# Needed for python-pip package
+RUN yum update -y
+RUN yum install -y epel-release
+
+# Needed for python35 package (epel-release only contains 3.4 which we don't support)
+RUN curl 'https://setup.ius.io/' -o setup-ius.sh
+RUN sh setup-ius.sh
+
+RUN yum update -y
+RUN yum install -y initscripts gcc
+RUN yum install -y python2 python2-devel python-pip
+RUN yum install -y python35u python35u-devel python35u-pip
+
+# We need to run tests in python3 but system must not have python3,
+# so we create symlink to python3.5 with different name only to run tests.
+RUN ln -sf /usr/bin/python3.5 /usr/bin/python_for_tests
+
+COPY py26-unit-tests-requirements.txt py26-unit-tests-requirements.txt
+COPY dev-requirements.txt dev-requirements.txt
+
+RUN pip install -r py26-unit-tests-requirements.txt
+RUN python_for_tests -m pip install -r dev-requirements.txt
