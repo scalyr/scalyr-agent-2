@@ -80,19 +80,14 @@ class AgentImageBuilder(object):
         if type(self).COPY_AGENT_SOURCE:
             root_path = Path(get_package_root()).parent
             self.add_to_build_context(
-                root_path,
-                "agent_source",
-                custom_copy_function=_copy_agent_source
+                root_path, "agent_source", custom_copy_function=_copy_agent_source
             )
 
         # this part iterate through all attributes of the current class and get alla that starts with 'INCLUDE_PATH_'.
         # the value of this attribute is the path to the file to be copied to the image build context.
         for name, value in type(self).__dict__.items():
             if name.startswith("INCLUDE_PATH_"):
-                self.add_to_build_context(
-                    value,
-                    value.name
-                )
+                self.add_to_build_context(value, value.name)
 
     @property
     def _docker_client(self):
@@ -128,7 +123,7 @@ class AgentImageBuilder(object):
         """
         self._things_copy_to_build_context[path] = {
             "name": name,
-            "copy_function": custom_copy_function
+            "copy_function": custom_copy_function,
         }
 
     def _copy_to_build_context(self, context_path):  # type: (Path) -> None
@@ -281,7 +276,7 @@ class AgentImageBuilder(object):
             "--checksum",
             action="store_true",
             help="Print base64 encoded sha256 checksum of the Dockerfile of this builder. "
-                 "Also, it counts checksum of all required builders."
+            "Also, it counts checksum of all required builders.",
         )
 
         args = parser.parse_args()
@@ -289,5 +284,5 @@ class AgentImageBuilder(object):
         if args.checksum is not None:
             checksum_object = cls.get_checksum()
 
-            base64_checksum = base64.b64encode(checksum_object.digest())
+            base64_checksum = checksum_object.hexdigest()
             print(base64_checksum)
