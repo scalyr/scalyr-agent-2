@@ -143,6 +143,10 @@ EC2_DISTRO_DETAILS_MAP = {
     },
 }
 
+DEFAULT_INSTALLER_SCRIPT_URL = (
+    "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
+)
+
 ACCESS_KEY = get_env_throw_if_not_set("ACCESS_KEY")
 SECRET_KEY = get_env_throw_if_not_set("SECRET_KEY")
 REGION = get_env_throw_if_not_set("REGION", "us-east-1")
@@ -160,9 +164,15 @@ SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
 
 def main(
-    distro, test_type, from_version, to_version, python_package, destroy_node=False
+    distro,
+    test_type,
+    from_version,
+    to_version,
+    python_package,
+    installer_script_url,
+    destroy_node=False,
 ):
-    # type: (str, str, str, str, str, bool) -> None
+    # type: (str, str, str, str, str, str, bool) -> None
     distro_details = EC2_DISTRO_DETAILS_MAP[distro]
 
     if test_type == "install":
@@ -184,6 +194,7 @@ def main(
         python_package=python_package,
         from_version=from_version,
         to_version=to_version,
+        installer_script_url=installer_script_url,
     )
 
     cls = get_driver(Provider.EC2)
@@ -249,9 +260,14 @@ def main(
 
 
 def render_script_template(
-    script_template, distro_details, python_package, from_version=None, to_version=None
+    script_template,
+    distro_details,
+    python_package,
+    from_version=None,
+    to_version=None,
+    installer_script_url=None,
 ):
-    # type: (str, dict, str, Optional[str], Optional[str]) -> str
+    # type: (str, dict, str, Optional[str], Optional[str], Optional[str]) -> str
     """
     Render the provided script template with common context.
     """
@@ -259,6 +275,9 @@ def render_script_template(
     to_version = to_version or ""
 
     template_context = distro_details.copy()
+    template_context["installer_script_url"] = (
+        installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
+    )
     template_context["scalyr_api_key"] = SCALYR_API_KEY
     template_context["python_package"] = (
         python_package or distro_details["default_python_package_name"]
@@ -385,6 +404,12 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--installer-script-url",
+        help=("URL to the installer script to use."),
+        default=DEFAULT_INSTALLER_SCRIPT_URL,
+        required=False,
+    )
+    parser.add_argument(
         "--no-destroy-node",
         help=("True to not destroy the node at the end."),
         action="store_true",
@@ -413,5 +438,6 @@ if __name__ == "__main__":
         from_version=args.from_version,
         to_version=args.to_version,
         python_package=args.python_package,
+        installer_script_url=args.installer_script_url,
         destroy_node=not args.no_destroy_node,
     )

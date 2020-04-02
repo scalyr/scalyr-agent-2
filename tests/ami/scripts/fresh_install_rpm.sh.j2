@@ -25,7 +25,7 @@ sudo yum install -y wget
 sudo yum install -y "{{python_package}}"
 
 {% if not package_to_version_is_url -%}
-wget -q https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh
+wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
 {% endif -%}
 
