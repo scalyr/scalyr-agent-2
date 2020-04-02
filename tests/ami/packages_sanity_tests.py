@@ -171,8 +171,9 @@ def main(
     python_package,
     installer_script_url,
     destroy_node=False,
+    verbose=False,
 ):
-    # type: (str, str, str, str, str, str, bool) -> None
+    # type: (str, str, str, str, str, str, bool, bool) -> None
     distro_details = EC2_DISTRO_DETAILS_MAP[distro]
 
     if test_type == "install":
@@ -195,6 +196,7 @@ def main(
         from_version=from_version,
         to_version=to_version,
         installer_script_url=installer_script_url,
+        verbose=verbose,
     )
 
     cls = get_driver(Provider.EC2)
@@ -266,8 +268,9 @@ def render_script_template(
     from_version=None,
     to_version=None,
     installer_script_url=None,
+    verbose=False,
 ):
-    # type: (str, dict, str, Optional[str], Optional[str], Optional[str]) -> str
+    # type: (str, dict, str, Optional[str], Optional[str], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -290,6 +293,7 @@ def render_script_template(
     template_context["package_to_version_is_url"] = (
         "http://" in to_version or "https://" in to_version
     )
+    template_context["verbose"] = verbose
 
     template = Template(script_template)
     rendered_template = template.render(**template_context)
@@ -325,7 +329,7 @@ def destroy_node_and_cleanup(driver, node):
         destroy_volume_with_retry(driver=driver, volume=volume)
 
 
-def destroy_volume_with_retry(driver, volume, max_retries=8, retry_sleep_delay=5):
+def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=5):
     # type: (NodeDriver, StorageVolume, int, int) -> bool
     """
     Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
@@ -410,6 +414,14 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--verbose",
+        help=(
+            "True to enable verbose mode where every executed shell command is logged."
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--no-destroy-node",
         help=("True to not destroy the node at the end."),
         action="store_true",
@@ -440,4 +452,5 @@ if __name__ == "__main__":
         python_package=args.python_package,
         installer_script_url=args.installer_script_url,
         destroy_node=not args.no_destroy_node,
+        verbose=args.verbose,
     )

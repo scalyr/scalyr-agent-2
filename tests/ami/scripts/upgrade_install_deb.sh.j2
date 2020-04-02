@@ -14,6 +14,10 @@
 # limitations under the License.
 set -e
 
+{% if verbose -%}
+set -x
+{% endif -%}
+
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 sleep 10

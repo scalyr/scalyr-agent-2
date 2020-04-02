@@ -14,6 +14,10 @@
 # limitations under the License.
 set -e
 
+{% if verbose -%}
+set -x
+{% endif -%}
+
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 sleep 10
@@ -22,11 +26,7 @@ uname -a
 cat /etc/*-release
 
 sudo apt-get update -y
-#sudo apt-get install -y "{{python_package}}"
-
-sudo apt-get remove -y python
-
-set -x
+sudo apt-get install -y "{{python_package}}"
 
 {% if not package_to_version_is_url -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
@@ -34,7 +34,7 @@ sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
 {% endif -%}
 
 # Install provided version
-{% if not package_to_version_is_url -%}
+{% if package_to_version_is_url -%}
 wget -O package.deb "{{ package_to_version }}"
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
