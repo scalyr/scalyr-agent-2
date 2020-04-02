@@ -236,9 +236,15 @@ def main(
     except DeploymentError as e:
         print("Deployment failed: %s" % (str(e)))
         node = e.node
+        success = False
         step.exit_status = 1
+        stdout = getattr(e.original_error, "stdout", None)
+        stderr = getattr(e.original_error, "stderr", None)
+    else:
+        success = step.exit_status == 0
+        stdout = step.stdout
+        stderr = step.stderr
 
-    success = step.exit_status == 0
     duration = int(time.time()) - start_time
 
     if success:
@@ -246,8 +252,8 @@ def main(
     else:
         print("Script failed.")
 
-    print(("stdout: %s" % (step.stdout)))
-    print(("stderr: %s" % (step.stderr)))
+    print(("stdout: %s" % (stdout)))
+    print(("stderr: %s" % (stderr)))
     print(("exit_code: %s" % (step.exit_status)))
     print(("succeeded: %s" % (str(success))))
     print(("duration: %s seconds" % (duration)))
