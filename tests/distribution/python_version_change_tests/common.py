@@ -20,6 +20,8 @@ import os
 import time
 import json
 import shutil
+import re
+import glob
 import stat
 from io import open
 
@@ -293,14 +295,24 @@ def common_test_only_python_mapped_to_python3(
 
 def common_test_python2(install_package_fn, install_next_version_fn):
     """
-    Test package installation on machine with python2
+    Test package installation on machine with python2.
+
+    The function also verifies correct rc*.d symlinks are created.
+
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
 
     _remove_python("python")
     _remove_python("python3")
 
+    # rc.d symlinks shouldn't exist before install
+    files = _get_agent_rc_d_symlinks()
+    assert len(files) == 0
+
     stdout, _ = install_package_fn()
+
+    # But they should have been created during the postinst step
+    _assert_rc_d_symlinks_exist()
 
     # make sure that installer has found 'python2'.
     assert "The default 'python' command not found, will use python2 binary" in stdout
@@ -332,7 +344,14 @@ def common_test_python3(install_package_fn, install_next_version_fn):
     _remove_python("python")
     _remove_python("python2")
 
+    # rc.d symlinks shouldn't exist before install
+    files = _get_agent_rc_d_symlinks()
+    assert len(files) == 0
+
     stdout, _ = install_package_fn()
+
+    # But they should have been created during the postinst step
+    _assert_rc_d_symlinks_exist()
 
     # make sure that installer has found 'python3'.
     assert "The default 'python' command not found, will use python2 binary" in stdout
@@ -612,3 +631,25 @@ def _python_binary_is_symlink():
             return True
 
     return False
+
+
+def _assert_rc_d_symlinks_exist():
+    """
+    Assert that rc*.d symlinks which ensure agent is started on process exist.
+    """
+    # run levels for which we create symlinks
+    expected_rc_levels = [0, 1, 2, 3, 4, 5, 6]
+    files = _get_agent_rc_d_symlinks()
+    assert len(files) == len(expected_rc_levels)
+
+    actual_rc_levels = []
+    for file_name in files:
+        rc_level = int(re.match(r".*(rc(\d)\.d).*", file_name).groups()[1])
+        actual_rc_levels.append(rc_level)
+
+    assert sorted(expected_rc_levels) == sorted(actual_rc_levels)
+
+
+def _get_agent_rc_d_symlinks():
+    files = glob.glob("/etc/rc*.d/*scalyr-agent-2*")
+    return files

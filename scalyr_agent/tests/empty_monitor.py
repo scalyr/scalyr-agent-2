@@ -22,9 +22,17 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+import time
+
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 
 class EmptyMonitor(ScalyrMonitor):
-    def run(self):
-        pass
+    """
+    Monitor class which is running for run_time seconds.
+    """
+
+    def run(self, run_time=0.5):
+        # We need to eventually call stop otherwise the tests will hang and run forever
+        time.sleep(run_time)
+        self._run_state.stop()

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+set -e
+
+{% if verbose -%}
+set -x
+{% endif -%}
+
+# Give it some time to finish provisioning process. It's possible that we can SSH in before
+# cloud-init fully finished
+sleep 10
+
+uname -a
+cat /etc/*-release
+
+sudo yum install -y wget
+sudo yum install -y "{{python_package}}"
+
+{% if not package_from_version_is_url -%}
+wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+{% endif -%}
+
+# Install old version
+{% if package_from_version_is_url -%}
+wget -O package-from.rpm "{{ package_from_version }}"
+sudo rpm -iv package-from.rpm
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export PACKAGE_FROM_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "package-from.rpm" | sed "s/_.*//g")
+{% else -%}
+sudo yum downgrade -y "scalyr-agent-2-{{package_from_version}}"
+export PACKAGE_FROM_VERSION="{{package_from_version}}"
+{% endif -%}
+
+sudo /etc/init.d/scalyr-agent-2 restart
+
+sleep 5
+
+# Run some basic sanity checks
+sudo scalyr-agent-2 status -v
+echo ""
+
+sudo scalyr-agent-2 status -v | grep "${PACKAGE_FROM_VERSION}"
+sudo scalyr-agent-2 status -v | grep agent.log
+sudo scalyr-agent-2 status -v | grep linux_system_metrics
+sudo scalyr-agent-2 status -v | grep linux_process_metrics
+
+# Verify rc*.d symlinks are in place
+ls -la /etc/rc*.d/ | grep scalyr-agent
+echo ""
+
+ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+# Upgrade to new version
+{% if package_to_version_is_url -%}
+wget -O package-to.rpm "{{ package_to_version }}"
+sudo rpm -Uv package-to.rpm
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export PACKAGE_TO_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "package-to.rpm" | sed "s/_.*//g")
+{% else -%}
+sudo yum install -y "scalyr-agent-2-{{package_to_version}}"
+export PACKAGE_TO_VERSION="{{package_to_version}}"
+{% endif -%}
+
+sudo /etc/init.d/scalyr-agent-2 restart
+
+sleep 5
+
+# Verify status works and symlinks are in place
+sudo scalyr-agent-2 status -v
+echo ""
+
+sudo scalyr-agent-2 status -v | grep "${PACKAGE_TO_VERSION}"
+sudo scalyr-agent-2 status -v | grep agent.log
+sudo scalyr-agent-2 status -v | grep linux_system_metrics
+sudo scalyr-agent-2 status -v | grep linux_process_metrics
+
+# Verify rc*.d symlinks are in place
+ls -la /etc/rc*.d/ | grep scalyr-agent
+echo ""
+ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7

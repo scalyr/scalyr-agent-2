@@ -1210,6 +1210,32 @@ class StoppableThread(threading.Thread):
                 self.__exception_info[2],
             )
 
+    def isAlive(self):
+        """
+        Here for compatibility with Python 2.
+        """
+        return self.is_alive()
+
+    def is_alive(self):
+        """
+        Custom isAlive() implementation because previously we relied on "_is_stopped" class instance
+        variable which is reserved / used by actual "is_alive()" implementation under Python 3.
+        """
+        # TODO: This is not 100% correct, but that's the behavior our code relies ON.
+        # Eventually we need to fix the implementation on StoppableThread so RunState defaults
+        # "_is_running" to False and then set it to True inside "run()" and only check that value
+        # here.
+        if six.PY2:
+            return super(StoppableThread, self).isAlive()
+
+        if (
+            not self._run_state.is_running()
+            or not super(StoppableThread, self).is_alive()
+        ):
+            return False
+
+        return True
+
 
 class RateLimiter(object):
     """An abstraction that can be used to enforce some sort of rate limit, expressed as a maximum number
