@@ -20,7 +20,6 @@ import shutil
 import docker
 import argparse
 import hashlib
-import base64
 
 if False:
     from typing import Optional
@@ -29,7 +28,7 @@ if False:
     from typing import Dict
     from typing import Callable
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 import six
 
@@ -60,7 +59,7 @@ class AgentImageBuilder(object):
 
     IMAGE_TAG = None  # type: six.text_type
     DOCKERFILE = None  # type: Path
-    REQUIRED_IMAGES = []  # type: List[ClassType[AgentImageBuilder]]
+    REQUIRED_IMAGES = []  # type: List[Type[AgentImageBuilder]]
 
     # add agent source code to the build context of the image
     COPY_AGENT_SOURCE = False  # type: bool
@@ -68,6 +67,11 @@ class AgentImageBuilder(object):
     # Do not use image cache for this image builder even if 'build' method was called with 'image_cache_path' parameter.
     # Note. This flag does not affect images in requirements.
     IGNORE_CACHING = False
+
+    # List of file paths which should be added to the build context and used when generating the
+    # checksum used for image caching.
+    # Any change to the included path will result in cache being invalidated.
+    INCLUDE_PATHS = []  # type: List[Path]
 
     def __init__(self):
         self._docker = None  # type: Optional
@@ -83,11 +87,10 @@ class AgentImageBuilder(object):
                 root_path, "agent_source", custom_copy_function=_copy_agent_source
             )
 
-        # this part iterate through all attributes of the current class and get alla that starts with 'INCLUDE_PATH_'.
-        # the value of this attribute is the path to the file to be copied to the image build context.
-        for name, value in type(self).__dict__.items():
-            if name.startswith("INCLUDE_PATH_"):
-                self.add_to_build_context(value, value.name)
+        # the value of this attribute is the path to the file to be copied to the image build
+        # context.
+        for path in self.INCLUDE_PATHS:
+            self.add_to_build_context(path, path.name)
 
     @property
     def _docker_client(self):
@@ -234,7 +237,8 @@ class AgentImageBuilder(object):
             print("Image '{0}' saved.".format(self.image_tag))
 
     @classmethod
-    def get_checksum(cls, hash_object=None):  # type: () -> hashlib.sha256
+    def get_checksum(cls, hash_object=None):
+        # type: (Optional[hashlib._Hash]) -> hashlib._Hash
         """
         Get sha265 checksum of the dockerfile and included files.
         Also, include checksums of all required builders.
@@ -252,9 +256,7 @@ class AgentImageBuilder(object):
         dockerfile = cls.get_dockerfile_content()
         hash_object.update(dockerfile.encode("utf-8"))
 
-        for name, path in cls.__dict__.items():
-            if not name.startswith("INCLUDE_PATH"):
-                continue
+        for path in cls.INCLUDE_PATHS:
             if path.is_dir():
                 # TODO implement checksum calculation for directories.
                 pass

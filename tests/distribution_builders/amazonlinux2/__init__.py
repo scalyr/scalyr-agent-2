@@ -25,7 +25,9 @@ from tests.distribution_builders.fpm_package_builder import FpmPackageBuilder
 class AmazonlinuxBuilderBase(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-amazonlinux2-base"
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
-    INCLUDE_PATH_DEV_REQUIREMENTS_PATH = Path(get_install_root(), "dev-requirements.txt")
+    INCLUDE_PATHS = [
+        Path(get_install_root(), "dev-requirements.txt"),
+    ]
 
 
 class AmazonlinuxBuilder(AgentImageBuilder):

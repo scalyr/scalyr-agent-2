@@ -25,8 +25,10 @@ from tests.utils.image_builder import AgentImageBuilder
 class CentOSBuilderBase(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-centos6-base"
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
-    INCLUDE_PATH_DEV_REQUIREMENTS_PATH = Path(get_install_root(), "dev-requirements.txt")
-    INCLUDE_PATH_PY2_DEV_REQUIREMENTS_PATH = Path(get_install_root(),  "py26-unit-tests-requirements.txt")
+    INCLUDE_PATHS = [
+        Path(get_install_root(), "dev-requirements.txt"),
+        Path(get_install_root(), "py26-unit-tests-requirements.txt"),
+    ]
 
 
 class CentOSBuilder(AgentImageBuilder):

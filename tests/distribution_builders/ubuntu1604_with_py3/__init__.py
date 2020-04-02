@@ -25,7 +25,9 @@ from tests.utils.image_builder import AgentImageBuilder
 class UbuntuBuilderBase(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-ubuntu1604-with-py3-base"
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
-    INCLUDE_PATH_DEV_REQUIREMENTS_PATH = Path(get_install_root(), "dev-requirements.txt")
+    INCLUDE_PATHS = [
+        Path(get_install_root(), "dev-requirements.txt"),
+    ]
 
 
 class UbuntuBuilder(AgentImageBuilder):
@@ -34,4 +36,3 @@ class UbuntuBuilder(AgentImageBuilder):
     REQUIRED_IMAGES = [FpmPackageBuilder, UbuntuBuilderBase]
     COPY_AGENT_SOURCE = True
     IGNORE_CACHING = True
-
