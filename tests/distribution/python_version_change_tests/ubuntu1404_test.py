@@ -35,7 +35,7 @@ from tests.utils.agent_runner import PACKAGE_INSTALL, AgentRunner
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
-def test_centos_test_versions(request):
+def test_ubuntu_test_versions(request):
     runner = AgentRunner(PACKAGE_INSTALL)
     common_version_test(
         runner,
@@ -66,7 +66,6 @@ def test_centos_test_versions(request):
 @dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_no_python(request):
     common_test_no_python(install_deb)
-    assert True is False
 
 
 @pytest.mark.usefixtures("agent_environment")
