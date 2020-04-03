@@ -765,7 +765,12 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --before-install preinstall.sh "
         "  --after-install postinstall.sh "
         "  --before-remove preuninstall.sh "
+        "  --deb-no-default-config-files "
+        "  --no-deb-auto-config-files "
         "  --config-files /etc/scalyr-agent-2/agent.json "
+        # NOTE: We leave those two files in place since they are symlinks which might have been
+        # updated by scalyr-switch-python and we want to leave this in place - aka make sure
+        # selected Python version is preserved on upgrade
         "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
         "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
         "  --directories /usr/share/scalyr-agent-2 "
@@ -966,8 +971,8 @@ def build_base_files(base_configs="config"):
     # Create symlinks for the two commands
     os.chdir("bin")
 
-    make_soft_link("../py/scalyr_agent/agent_main_py2.py", "scalyr-agent-2")
-    make_soft_link("../py/scalyr_agent/config_main_py2.py", "scalyr-agent-2-config")
+    make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
+    make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
 
     # add switch python version script.
     shutil.copy(

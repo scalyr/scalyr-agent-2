@@ -2,11 +2,25 @@
 #
 # Check https://circleci.com/docs/2.2/language-python/ for more details
 
+master_and_release_only: &master_and_release_only
+  filters:
+    branches:
+      only:
+        - master
+        - release
+
 master_only: &master_only
   filters:
     branches:
       only:
         - master
+
+non_master_and_release: &non_master_and_release
+  filters:
+    branches:
+      ignore:
+        - master
+        - release
 
 version: 2.1
 parameters:
@@ -280,6 +294,7 @@ commands:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: false
+
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
@@ -293,13 +308,12 @@ commands:
           command: |
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
-            # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
-            python -m tests.distribution_builders.<< parameters.distribution >>.cmd --dockerfile > ~/Dockerfile
-            cat ~/Dockerfile
+            # generate file with checksum that is calculated for every required file.
+            python -m tests.distribution_builders.<< parameters.distribution >>.cmd --checksum > ~/checksum
 
       - restore_cache:
-          # here the 'tar' file of the docker image is stored. Use it to restore agent image without building it.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
+          # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -325,9 +339,10 @@ commands:
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
+          # TODO: Workaround for incorrect handle of caching since we cache the whole agent_source/ directory.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
-            - "~/agent_image"
+           - "~/agent_image"
 
       - save_cache:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
@@ -410,6 +425,7 @@ jobs:
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
+
   smoke-standalone-26-tls12:
     docker:
       - image: circleci/python:2.7-jessie
@@ -666,13 +682,14 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
-          name: Install APT dependencies
+          name: Install Dependencies
           command: |
-            # We add unstable repo to make sure latest version of shellchcek (>=
-            # 0.7.0 is installed)
-            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
-            sudo apt-get update -y
-            sudo apt-get install -y shellcheck
+            # NOTE: We use precompiled binary since debian sid which contains shellcheck 0.7.0 which we depend on
+            # currently (March 25, 2020) contains broken libc version
+            sudo wget https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz
+            sudo tar xvf shellcheck-stable.linux.x86_64.tar.xz
+            sudo cp shellcheck-stable/shellcheck /usr/local/bin
+            sudo rm -rf shellcheck-stable*
       - run:
           name: Install Python dependencies
           command: |
@@ -897,16 +914,15 @@ jobs:
           tox_target: "py2.6-smoke-tests"
           apt_dependencies: "procps build-essential"
 
-
   package-test-rpm:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_amazonlinux
+          command: tox -eagent_distributions_tests_amazonlinux2
 
   package-test-deb:
     working_directory: ~/scalyr-agent-2
@@ -914,9 +930,31 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804_with_py3"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_ubuntu
+          command: tox -eagent_distributions_tests_ubuntu1804
+
+  # Circle CI jobs which build agent packages for each PR.
+  # TODO: They should run much faster once image caching is fixed
+  package-build-deb:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu1804"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_deb_package
+
+  package-build-rpm:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "centos8"
+          agent_host_name_prefix: "-test"
+          command: tox -eagent_rpm_package
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -924,7 +962,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
           command: tox -eagent_package_smoke_test_amazonlinux_python3
@@ -935,7 +973,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "amazonlinux"
+          distribution: "amazonlinux2"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_amazonlinux_python2
 
@@ -945,7 +983,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804_with_py3"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
 
@@ -955,7 +993,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu"
+          distribution: "ubuntu1804"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_ubuntu_python2
 
@@ -971,7 +1009,7 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests --status=success --branch=all --limit=5 \
+                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success --branch=all --limit=5 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
@@ -1005,46 +1043,50 @@ workflows:
             - smoke-k8s
   package-tests:
     jobs:
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
       - package-test-rpm:
-           <<: *master_only
+          <<: *master_and_release_only
       - package-test-deb:
-           <<: *master_only
+          <<: *master_and_release_only
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-rpm-package-py3:
           requires:
             - package-test-rpm
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-deb-package-py2:
           requires:
             - package-test-deb
-          <<: *master_only
+          <<: *master_and_release_only
       - smoke-deb-package-py3:
           requires:
             - package-test-deb
-          <<: *master_only
+          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_only
+          <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *master_only
+          <<: *master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

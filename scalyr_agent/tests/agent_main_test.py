@@ -14,13 +14,28 @@
 
 from __future__ import absolute_import
 
+from io import open
+
 import mock
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.__scalyr__ import MSI_INSTALL
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent import agent_main
 
 __all__ = ["AgentMainTestCase"]
+
+CORRECT_INIT_PRAGMA = """
+### BEGIN INIT INFO
+# Provides: scalyr-agent-2
+# Required-Start: $network
+# Required-Stop: $network
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Description: Manages the Scalyr Agent 2, which provides log copying
+#     and back system metric collection.
+### END INIT INFO
+"""
 
 
 class AgentMainTestCase(ScalyrTestCase):
@@ -131,3 +146,21 @@ class AgentMainTestCase(ScalyrTestCase):
         config.intermediate_certs_path = "/tmp/doesnt.exist"
 
         self.assertTrue(agent._ScalyrAgent__create_client())
+
+    def test_agent_main_file_contains_correct_init_pragma(self):
+        """
+        Verify that agent_main.py contains correct init.d comment. It's important that
+        "BEGIN INIT INFO" and "END" line contains 3 # (###).
+
+        sys-v is more forgiving and works if there are only two comment marks, but newer versions
+        of systemd are not forgiving and don't work with it which means rc.d targets can't be
+        created.
+        """
+        with open(agent_main.__file__, "r") as fp:
+            content = fp.read()
+
+        msg = (
+            "agent_main.py doesn't contain correct init pragma comment. Make sure the comment "
+            " is correct and contains thre leading ### on BEGIN and END lines."
+        )
+        self.assertTrue(CORRECT_INIT_PRAGMA in content, msg)

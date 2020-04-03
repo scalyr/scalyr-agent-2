@@ -173,7 +173,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 
         output = stderr_text
         if len(stderr_text) > 0 and len(stdout_text) > 0:
-            output += "\n"
+            output += b"\n"
         output += stdout_text
 
         output = six.ensure_text(output)

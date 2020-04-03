@@ -20,8 +20,11 @@ from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import os
+import sys
 import tempfile
 from io import open
+
+import mock
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -37,6 +40,7 @@ from scalyr_agent.json_lib.objects import (
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
@@ -132,6 +136,8 @@ class TestConfigurationBase(ScalyrTestCase):
         @return:  The test instance
         @rtype: Configuration
         """
+        logger = logger or mock.Mock()
+
         default_paths = DefaultPaths(
             self.convert_path("/var/log/scalyr-agent-2"),
             self.convert_path("/etc/scalyr-agent-2/agent.json"),
@@ -1235,6 +1241,7 @@ class TestConfiguration(TestConfigurationBase):
             "logs": [{"path": "/var/log/tomcat6/$DIR_VAR.log"}],
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
+            "json_library": "auto",
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
@@ -1583,6 +1590,47 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
+
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
+    def test_set_json_library_on_apply_config(self):
+        current_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(current_json_lib, "ujson")
+
+        self._write_file_with_separator_conversion(
+            """{
+             api_key: "hi there",
+            json_library: "json"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+        config.apply_config()
+
+        new_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(new_json_lib, "json")
+
+        # auth should fall back to ujson again
+        self._write_file_with_separator_conversion(
+            """{
+             api_key: "hi there",
+            json_library: "ujson"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+        config.apply_config()
+
+        new_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(new_json_lib, "ujson")
+
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
+    def test_apply_config_without_parse(self):
+        config = self._create_test_configuration_instance()
+        config.apply_config()
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):
