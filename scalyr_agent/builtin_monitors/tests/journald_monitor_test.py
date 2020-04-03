@@ -31,7 +31,6 @@ import mock
 
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClock
-from io import open
 
 
 def empty():
@@ -71,10 +70,10 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
                     "Test message: {key: value} !@#$%^&*()",
                     extra_fields={"key": "value", "key1": "value1", "key2": "value2"},
                 )
-                self.assertEqual(
-                    "details Test message: {key: value} !@#$%^&*() key2=value2 key1=value1 key=value",
-                    msg,
-                )
+                self.assertTrue("details Test message: {key: value} !@#$%^&*()" in msg)
+                self.assertTrue("key2=value2" in msg)
+                self.assertTrue("key1=value1" in msg)
+                self.assertTrue("key=value" in msg)
 
     @mock.patch(
         "scalyr_agent.builtin_monitors.journald_monitor.verify_systemd_library_is_available",
@@ -144,14 +143,35 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
 
             monitor.gather_sample()
 
-            with open(os.path.join(journal_directory, "journald_monitor.log")) as f:
-                print(f.read())
-
             self.assertLogFileContainsLineRegex(
                 "....\\-..\\-.. ..\\:..\\:..\\....."
                 + re.escape(
                     " [journald_monitor()] details testing 1,2,3 timestamp=2015-09-05 13:17:04.944355 machine_id=263bb31e-3e13-4062-9bdb-f1f4518999d2 pid=7733 unit=session-52.scope boot_id=958b7e26-df4c-453a-a0f9-a8406cb508f2"
                 ),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape(" [journald_monitor()] details testing 1,2,3"),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape("timestamp=2015-09-05 13:17:04.944355"),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape("machine_id=263bb31e-3e13-4062-9bdb-f1f4518999d2"),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape("pid=7733"),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape("unit=session-52.scope"),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+            self.assertLogFileContainsLineRegex(
+                re.escape("boot_id=958b7e26-df4c-453a-a0f9-a8406cb508f2"),
                 file_path=os.path.join(journal_directory, "journald_monitor.log"),
             )
 
