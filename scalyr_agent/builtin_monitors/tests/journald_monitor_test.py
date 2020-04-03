@@ -143,7 +143,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             monitor.gather_sample()
 
             self.assertLogFileContainsLineRegex(
-                "....\\-..\\-.. ..\\:..\\:..\\....Z"
+                "....\\-..\\-.. ..\\:..\\:..\\....."
                 + re.escape(
                     " [journald_monitor()] details testing 1,2,3 timestamp=2015-09-05 13:17:04.944355 machine_id=263bb31e-3e13-4062-9bdb-f1f4518999d2 pid=7733 unit=session-52.scope boot_id=958b7e26-df4c-453a-a0f9-a8406cb508f2"
                 ),
@@ -222,7 +222,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             monitor.gather_sample()
 
             self.assertLogFileContainsLineRegex(
-                "....\\-..\\-.. ..\\:..\\:..\\....Z"
+                "....\\-..\\-.. ..\\:..\\:..\\....."
                 + re.escape(
                     " [journald_monitor()] details testing 1,2,3 transport=journal"
                 ),
