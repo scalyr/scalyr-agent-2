@@ -77,11 +77,12 @@ following actions to upgrade your existing Scalyr Agent K8s instance:
 
   4.  Delete the existing Scalyr Agent DaemonSet.
 
-    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/default-namespace
+    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/default-namespace/scalyr-agent-2.yaml
 
   5.  Create the Scalyr Agent service account and DaemonSet in the ``scalyr`` namespace.
 
-    kubectl apply -k https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s
+    kubectl apply -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/no-kustomize/scalyr-service-account.yaml
+    kubectl apply -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/no-kustomize/scalyr-agent-2.yaml
 
 ### Preventing collection of metrics using ``metric_name_blacklist``
 

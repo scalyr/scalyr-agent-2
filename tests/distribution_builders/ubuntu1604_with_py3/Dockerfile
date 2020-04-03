@@ -1,16 +1,10 @@
-{fpm_package_builder_dockerfile_deb}
+FROM scalyr-agent-testings-fpm_package-builder as fpm_package_build
 
-FROM ubuntu:16.04
-RUN apt update
-RUN apt install -y apt-utils build-essential
+ADD ./agent_source /agent_source
 
-RUN apt install -y build-essential python python-pip python-dev
-RUN apt install -y python3 python3-pip python3-dev
+RUN /agent_source/tests/distribution_builders/base/build_packages.sh deb
 
-COPY agent_source/dev-requirements.txt dev-requirements.txt
-
-RUN python2 -m pip install -r dev-requirements.txt
-RUN python3 -m pip install -r dev-requirements.txt
+FROM scalyr-agent-testings-ubuntu1604-with-py3-base
 
 COPY --from=fpm_package_build /package/scalyr-agent*.deb /scalyr-agent.deb
 COPY --from=fpm_package_build /second_package/scalyr-agent*.deb /scalyr-agent-second.deb

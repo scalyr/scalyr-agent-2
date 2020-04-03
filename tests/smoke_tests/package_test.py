@@ -23,7 +23,7 @@ from tests.utils.agent_runner import PACKAGE_INSTALL
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution_builders.amazonlinux2 import AmazonlinuxBuilder
-from tests.distribution_builders.ubuntu1804_with_py3 import UbuntuBuilder
+from tests.distribution_builders.ubuntu import UbuntuBuilder
 from tests.common import install_rpm, install_deb
 
 

@@ -102,6 +102,7 @@ def _mock_python_binary_version(python_binary_name, version):
         os.remove(six.text_type(binary_path_backup_path))
 
     if not version:
+        os.system("python2 --version")
         return
 
     if not binary_path.exists():
@@ -182,6 +183,7 @@ def common_version_test(
     if install_fails:
         with pytest.raises(PackageInstallationError):
             install_package_fn()
+        _mock_binaries("", "", "")
         return
     else:
         stdout, _ = install_package_fn()
