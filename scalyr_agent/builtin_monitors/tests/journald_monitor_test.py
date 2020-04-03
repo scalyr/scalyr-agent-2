@@ -15,6 +15,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 import datetime
 import os
 import re
@@ -30,6 +31,7 @@ import mock
 
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClock
+from io import open
 
 
 def empty():
@@ -141,6 +143,9 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             monitor.log_manager.set_log_watcher(LogWatcher())
 
             monitor.gather_sample()
+
+            with open(os.path.join(journal_directory, "journald_monitor.log")) as f:
+                print(f.read())
 
             self.assertLogFileContainsLineRegex(
                 "....\\-..\\-.. ..\\:..\\:..\\....."
