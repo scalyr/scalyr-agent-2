@@ -562,9 +562,7 @@ seconds and then polls again.
         if extra_fields is not None:
             for field_name in extra_fields:
                 field_value = extra_fields[field_name]
-                string_buffer.write(
-                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
-                )
+                string_buffer.write(" %s=%s" % (field_name, field_value))
 
         msg = string_buffer.getvalue()
         string_buffer.close()
