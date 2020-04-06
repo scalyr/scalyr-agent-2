@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+import pytest
+
+# A list of custom metrics which should be included in the generated pytest benchmark result JSON
+# file
+CUSTOM_METRICS = [
+    "compression_ratio",
+]
+
 
 def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
     """
@@ -30,3 +39,23 @@ def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
         raise RuntimeError("Unexpected measurement unit %r" % unit)
 
     return prefix, scale
+
+
+@pytest.mark.hookwrapper
+def pytest_benchmark_generate_json(
+    config, benchmarks, include_data, machine_info, commit_info
+):
+    """
+    Hook which makes sure we include custom metrics such as compression_ratio in the output JSON.
+    """
+    for benchmark in benchmarks:
+        for metric_name in CUSTOM_METRICS:
+            metric_value = getattr(benchmark.stats, "compression_ratio", None)
+
+            if metric_value is None:
+                continue
+
+            benchmark.stats.fields = list(benchmark.stats.fields)
+            benchmark.stats.fields += [metric_name]
+
+    yield

@@ -20,6 +20,9 @@ TODO:
     - Record compression ratio
     - Record CPU utilization
     - Use more realistic log like data
+
+NOTE: We also want to measure CPU utilization for those benchmarks which means we should also run
+them using "time.process_time" timer which contains sum of system and user CPU time.
 """
 
 from __future__ import absolute_import
@@ -82,7 +85,7 @@ def test_zstandard_compress_small_json_string(benchmark):
 
 @pytest.mark.skipif(not brotli, reason="brotli library not available")
 def test_brotli_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=10)
+    data = generate_random_dict(keys_count=1)
     data = json.dumps(data).encode("utf-8")
 
     _test_compress_string(benchmark, data, "brotli")
@@ -105,16 +108,15 @@ def _test_compress_string(benchmark, data, compression_algorithm):
             raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
 
     size_before_compression = len(data)
     size_after_compression = len(result)
     compression_ratio = size_before_compression / size_after_compression
 
-    # TODO: Store that in result file
-    print(size_before_compression)
-    print(size_after_compression)
-    print(compression_ratio)
+    benchmark.stats.size_before_compression = size_before_compression
+    benchmark.stats.size_after_compression = size_after_compression
+    benchmark.stats.stats.compression_ratio = compression_ratio
 
     assert result is not None
     assert size_after_compression < size_before_compression
