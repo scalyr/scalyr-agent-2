@@ -31,31 +31,18 @@ Benchmarks which test JSON serialization and deserialization for various json li
 """
 
 
-def test_json_json_encode(benchmark):
-    _test_json_encode(benchmark, "json")
+@pytest.mark.parametrize("json_lib", ["json", "ujson", "orjson"])
+def test_json_encode(benchmark, json_lib):
+    if not six.PY3 and json_lib == "orjson":
+        pytest.skip("Skipping under Python 2, orjson is only available for Python 3")
+        return
+
+    _test_json_encode(benchmark, json_lib)
 
 
-def test_json_json_decode(benchmark):
-    _test_json_decode(benchmark, "json")
-
-
-def test_ujson_json_encode(benchmark):
-    _test_json_encode(benchmark, "ujson")
-
-
-def test_ujson_json_decode(benchmark):
-    _test_json_decode(benchmark, "ujson")
-
-
-@pytest.mark.skipif(
-    not six.PY3, reason="Skipping under Python 2, orjson is only available for Python 3"
-)
-def test_orjson_json_encode(benchmark):
-    _test_json_encode(benchmark, "orjson")
-
-
-def test_orjson_json_decode(benchmark):
-    _test_json_decode(benchmark, "orjson")
+@pytest.mark.parametrize("json_lib", ["json", "ujson", "orjson"])
+def test_json_decode(benchmark, json_lib):
+    _test_json_decode(benchmark, json_lib)
 
 
 def _test_json_encode(benchmark, json_lib):
