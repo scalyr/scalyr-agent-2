@@ -1015,8 +1015,10 @@ class RateLimiterLogFilter(object):
             return False
 
 
-class ForceStdoutFilter(object):
-    """A filter that includes any record if it has `force_stdout` as True
+class StdoutFilter(object):
+    """A filter for outputting logs to stdout.
+    Will output the record if `no_fork` is true and the record has a severity of `stdout_severity` or higher.
+    Alternatively if `force_stdout` is true in the record it will always be output to stdout.
     """
 
     def __init__(self, no_fork, stdout_severity):
@@ -1039,7 +1041,7 @@ class ForceStdoutFilter(object):
         )
 
 
-class ForceStderrFilter(object):
+class StderrFilter(object):
     """A filter that includes any record if it has `force_stderr` as True
     """
 
@@ -1626,10 +1628,10 @@ class AgentLogManager(object):
         # Create the right type of handler.
         if is_force_stdout:
             handler = logging.StreamHandler(sys.stdout)
-            handler.addFilter(ForceStdoutFilter(self.__no_fork, self.__stdout_severity))
+            handler.addFilter(StdoutFilter(self.__no_fork, self.__stdout_severity))
         elif is_force_stderr:
             handler = logging.StreamHandler(sys.stderr)
-            handler.addFilter(ForceStderrFilter())
+            handler.addFilter(StderrFilter())
         elif self.__use_stdout:
             handler = logging.StreamHandler(sys.stdout)
             handler.addFilter(AgentLogFilter(is_debug))
