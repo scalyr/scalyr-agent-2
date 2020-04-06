@@ -11,6 +11,9 @@ data is tracked and compared over time.
 
 ## Directory / File Structure
 
+* ``benchmarks/micro/`` - contains Python code for micro benchmark. Micro
+  benchmarks record performance for specific performance critical pieces of
+  code.
 * ``benchmarks/scripts/`` - contains various scripts used for running the
    benchmark and submitting data to CodeSpeed.
 * ``benchmarks/scripts/requirements.txt`` - contains Python requirements for
@@ -27,6 +30,8 @@ configuration which we use to run a particular benchmark.
 
 For example - ``Python 2.7.17 - idle conf 1`` represents an idle agent process
 (no logs configured to watch) which runs under Python 2.7.17.
+
+### Code / Function Level Micro Benchmarks
 
 ### Agent Process Level Benchmarks
 
