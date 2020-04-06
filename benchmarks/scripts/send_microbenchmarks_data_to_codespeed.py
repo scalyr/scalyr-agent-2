@@ -138,6 +138,7 @@ if __name__ == "__main__":
         include_branch_arg=False,
         include_commit_id_arg=False,
         include_commit_date_arg=False,
+        use_defaults_from_env_variables=True,
     )
 
     # Add arguments which are specific to this script

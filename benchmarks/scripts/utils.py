@@ -32,6 +32,8 @@ import logging
 
 import requests
 
+from scalyr_agent import compat
+
 __all__ = [
     "initialize_logging",
     "send_payload_to_codespeed",
@@ -94,11 +96,15 @@ def add_common_parser_arguments(
     include_branch_arg=True,
     include_commit_id_arg=True,
     include_commit_date_arg=True,
+    use_defaults_from_env_variables=False,
 ):
-    # type: (ArgumentParser, bool, bool, bool) -> ArgumentParser
+    # type: (ArgumentParser, bool, bool, bool, bool) -> ArgumentParser
     """
     Add arguments to the provided parser instance which are common to all the scripts which send
     data to CodeSpeed (--codespeed-url, --codespeed-auth, etc.).
+
+    :param use_defaults_from_env_variables: True to use default values from corresponding env
+                                            variables.
     """
     parser.add_argument(
         "--codespeed-url",
@@ -166,6 +172,31 @@ def add_common_parser_arguments(
         default=False,
         help=("Set script log level to DEBUG."),
     )
+
+    if not use_defaults_from_env_variables:
+        return parser
+
+    # Add in default values for all the arguments which name starts with code_speed.
+    # For example, if the argument name is "codespeed-url" and variable destination is
+    # "codespeed_url", it will look for a default value in the environment variable named
+    # CODESPEED_URL
+    default_values = {}
+    for action in parser._actions:
+        dest = action.dest
+
+        if not dest.startswith("codespeed"):
+            continue
+
+        env_var_name = dest.upper()
+        env_var_value = compat.os_environ_unicode.get(env_var_name, None)
+
+        if env_var_value is None:
+            continue
+
+        default_values[dest] = env_var_value
+        action.required = False
+
+    parser.set_defaults(**default_values)
 
     return parser
 
