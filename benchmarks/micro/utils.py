@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from __future__ import absolute_import
-from io import open
 
 if False:
     from typing import Dict
+    from typing import Callable
 
 import os
+import gzip
+from io import open
 
 from six.moves import range
 
@@ -82,7 +84,12 @@ def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
     """
     file_path = os.path.join(LOGS_FIXTURES_DIR, file_name)
 
-    with open(file_path, "rb") as fp:
+    if file_name.endswith("gz"):
+        open_func = gzip.open  # type: Callable
+    else:
+        open_func = open  # type: ignore
+
+    with open_func(file_path) as fp:
         data = fp.read(bytes_to_read)
 
     last_newline_index = data.rfind(b"\n")
