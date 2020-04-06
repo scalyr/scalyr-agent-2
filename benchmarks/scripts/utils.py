@@ -89,8 +89,13 @@ def send_payload_to_codespeed(codespeed_url, codespeed_auth, commit_id, payload)
     logger.info("Report should now be available at %s" % (view_report_url))
 
 
-def add_common_parser_arguments(parser):
-    # type: (ArgumentParser) -> ArgumentParser
+def add_common_parser_arguments(
+    parser,
+    include_branch_arg=True,
+    include_commit_id_arg=True,
+    include_commit_date_arg=True,
+):
+    # type: (ArgumentParser, bool, bool, bool) -> ArgumentParser
     """
     Add arguments to the provided parser instance which are common to all the scripts which send
     data to CodeSpeed (--codespeed-url, --codespeed-auth, etc.).
@@ -126,28 +131,35 @@ def add_common_parser_arguments(parser):
         required=True,
         help=("Name of the CodeSpeed environment to submit metrics for."),
     )
-    parser.add_argument(
-        "--branch",
-        type=str,
-        required=True,
-        default="master",
-        help=("Name of the branch this capture belongs to."),
-    )
-    parser.add_argument(
-        "--commit-id",
-        type=str,
-        required=True,
-        help=("Git commit hash (revision) this capture belongs to."),
-    )
-    parser.add_argument(
-        "--commit-date",
-        type=str,
-        required=False,
-        help=(
-            "Date of a git commit in YYYY-MM-DD HH:MM:SS format. If not "
-            "provided, it defaults to current date."
-        ),
-    )
+
+    if include_branch_arg:
+        parser.add_argument(
+            "--branch",
+            type=str,
+            required=True,
+            default="master",
+            help=("Name of the branch this capture belongs to."),
+        )
+
+    if include_commit_id_arg:
+        parser.add_argument(
+            "--commit-id",
+            type=str,
+            required=True,
+            help=("Git commit hash (revision) this capture belongs to."),
+        )
+
+    if include_commit_date_arg:
+        parser.add_argument(
+            "--commit-date",
+            type=str,
+            required=False,
+            help=(
+                "Date of a git commit in YYYY-MM-DD HH:MM:SS format. If not "
+                "provided, it defaults to current date."
+            ),
+        )
+
     parser.add_argument(
         "--debug",
         action="store_true",
