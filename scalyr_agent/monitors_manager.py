@@ -17,6 +17,9 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+if False:
+    from typing import List
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -26,10 +29,14 @@ from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
 from scalyr_agent.scalyr_monitor import load_monitor_class, ScalyrMonitor
 from scalyr_agent.util import StoppableThread
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController
 
 from scalyr_agent.__scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+import six
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -122,7 +129,25 @@ class MonitorsManager(StoppableThread):
                 if monitor.open_metric_log():
                     monitor.config_from_monitors(self)
                     log.info("Starting monitor %s", monitor.monitor_name)
+
+                    # NOTE: Workaround for a not so great behavior with out code where we create
+                    # thread instances before forking. This causes issues because "_is_stopped"
+                    # instance attribute gets set to "True" and never gets reset to "False". This
+                    # means isAlive() will correctly return that the threat is not alive is it was
+                    # created before forking.
+                    # See the following for details:
+                    #
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L800
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L806
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L817
+                    #
+                    # Long term and correct solution is making sure we don't create any threads
+                    # before we fork
+                    if six.PY3:
+                        monitor._is_stopped = False
+
                     monitor.start()
+
                     self.__running_monitors.append(monitor)
                 else:
                     log.warn(
@@ -248,23 +273,9 @@ class MonitorsManager(StoppableThread):
         @type configuration: scalyr_agent.Configuration
         @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
-
-        # Get all the monitors we will be running.  This is determined by the config file and the platform's default
-        # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
-        # may need to modify them.
-        all_monitors = []
-
-        for monitor in configuration.monitor_configs:
-            all_monitors.append(monitor.copy())
-
-        for monitor in platform_controller.get_default_monitors(configuration):
-            all_monitors.append(
-                configuration.parse_monitor_config(
-                    monitor,
-                    'monitor with module name "%s" requested by platform'
-                    % monitor["module"],
-                ).copy()
-            )
+        all_monitors = MonitorsManager._get_all_monitor_configs(
+            configuration, platform_controller
+        )
 
         # We need to go back and fill in the monitor id if it is not set.  We do this by keeping a count of
         # how many monitors we have with the same module name (just considering the last element of the module
@@ -381,3 +392,28 @@ class MonitorsManager(StoppableThread):
             scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)),
             global_config=global_config,
         )
+
+    @staticmethod
+    def _get_all_monitor_configs(configuration, platform_controller):
+        # type: (Configuration, PlatformController) -> List[dict]
+        """
+        Return monitor config dictionaries for all the monitors, including the built it ones.
+        """
+        # Get all the monitors we will be running.  This is determined by the config file and the platform's default
+        # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
+        # may need to modify them.
+        all_monitors = []
+
+        for monitor in configuration.monitor_configs:
+            all_monitors.append(monitor.copy())
+
+        for monitor in platform_controller.get_default_monitors(configuration):
+            all_monitors.append(
+                configuration.parse_monitor_config(
+                    monitor,
+                    'monitor with module name "%s" requested by platform'
+                    % monitor["module"],
+                ).copy()
+            )
+
+        return all_monitors

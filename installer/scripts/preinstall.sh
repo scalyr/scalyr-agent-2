@@ -18,10 +18,30 @@
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
-echo "Check for python."
-# if command was not successful, print hint message and exit.
-if ! /usr/bin/env python --version; then
-  echo -e "\e[31mCommand 'python' is not found.\e[0m"
+
+echo "Checking Python version." >&2
+
+is_python_valid() {
+  command=$1
+  version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
+  exit_code=$?
+
+  # shellcheck disable=SC2072,SC2071
+  if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
+    return 1
+  elif [[ "$version" < "2.6" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
+    return 1
+  elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
+    return 1
+  else
+    return 0
+  fi
+}
+
+if ! is_python_valid python && ! is_python_valid python2 && ! is_python_valid python3; then
+  echo -e "\e[31mSuitable Python interpreter not found.\e[0m"
   echo "You can install it by running command:"
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
   if [[ -f "/etc/os-release" ]]; then
@@ -40,26 +60,6 @@ if ! /usr/bin/env python --version; then
   fi
   exit 1
 fi
-
-echo "Check python version."
-
-current_version=$(/usr/bin/env python --version 2>&1 | grep -o "[0-9].[0-9].")
-
-# shellcheck disable=SC2072
-if [[ "$current_version" < "2.6" ]]; then
-  echo -e "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${current_version}. Aborting.\e[0m" >&2
-  exit 1
-fi
-
-# shellcheck disable=SC2072
-if [[ "$current_version" > "3.0" ]]; then
-  if [[ "$current_version" < "3.5" ]]; then
-    echo -e "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${current_version}. Aborting.\e[0m" >&2
-    exit 1
-  fi
-fi
-
-echo -e "\e[36mPython interpreter is found. Version: ${current_version}\e[0m"
 
 # Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.

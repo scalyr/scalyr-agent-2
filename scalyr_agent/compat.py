@@ -1,4 +1,8 @@
 from __future__ import absolute_import
+
+if False:
+    from typing import Union, Tuple, Any, Generator, Iterable, Optional
+
 import sys
 import struct
 import os
@@ -64,6 +68,7 @@ if six.PY2:
 
         @staticmethod
         def _iterable_elements_to_unicode_generator(iterable):
+            # type: (Iterable) -> Generator[Union[Tuple, Any]]
             """Generator that gets values from original iterable and converts its 'str' values to 'unicode'"""
             for element in iterable:
                 if type(element) is tuple:
@@ -102,6 +107,9 @@ if six.PY2:
                 self._iterable_elements_to_unicode_generator(os.environ.values())
             )
 
+        def copy(self):
+            return dict(self.items())
+
         def __iter__(self):
             return self.iterkeys()
 
@@ -137,3 +145,33 @@ if sys.version_info[:3] < (2, 7, 7):
 else:
     struct_pack_unicode = struct.pack
     struct_unpack_unicode = struct.unpack
+
+
+def which(executable):
+    # type: (str) -> Optional[str]
+    """
+    Search for the provided executable in PATH and return path to it if found.
+    """
+    paths = os.environ["PATH"].split(os.pathsep)
+    for path in paths:
+        full_path = os.path.join(path, executable)
+
+        if os.path.exists(full_path) and os.access(full_path, os.X_OK):
+            return full_path
+
+    return None
+
+
+def find_executable(executable):
+    # type: (str) -> Optional[str]
+    """
+    Wrapper around distutils.spawn.find_executable which is not available in some default Python 3
+    installations where full blown python3-distutils package is not installed.
+    """
+    try:
+        from distutils.spawn import find_executable as distutils_find_executable
+    except ImportError:
+        # Likely Ubuntu 18.04 where python3-distutils package is not present (default behavior)
+        return which(executable)
+
+    return distutils_find_executable(executable)

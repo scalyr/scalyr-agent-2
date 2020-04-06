@@ -1,0 +1,9 @@
+FROM centos:8
+RUN yum update -y
+RUN yum install -y initscripts python2 python3 gcc
+RUN yum install -y python2-devel python2-pip python3-devel python3-pip
+
+COPY dev-requirements.txt dev-requirements.txt
+
+RUN python2 -m pip install -r dev-requirements.txt
+RUN python3 -m pip install -r dev-requirements.txt

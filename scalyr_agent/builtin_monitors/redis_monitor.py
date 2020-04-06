@@ -277,19 +277,28 @@ to the Scalyr servers.
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
+## Sample Configuration
 
-## Configuration
-
-The following example will configure the agent to query a redis server located at localhost:6379 and that does not require
+The following example will configure the agent to query a redis server located at ``localhost:6379`` and that does not require
 a password
 
     monitors: [
       {
-        module:                    "scalyr_agent.builtin_monitors.redis_monitor",
+        module: "scalyr_agent.builtin_monitors.redis_monitor",
       }
     ]
 
-Additional configuration options are as follows:
+Here is an example with two hosts with passwords:
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.redis_monitor",
+        hosts: [
+           { "host": "redis.example.com", "password": "secret" },
+           { "host": "localhost", "password": "anothersecret", port: 6380 }
+        ]
+      }
+    ]
 
 *   hosts - an array of 'host' objects. Each host object can contain any or all of the following keys: "host", "port", "password".
     Missing keys will be filled in with the defaults: 'localhost', 6379, and <None>.

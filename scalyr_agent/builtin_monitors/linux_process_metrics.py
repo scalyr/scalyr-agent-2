@@ -144,6 +144,13 @@ define_metric(
 
 define_metric(
     __monitor__,
+    "app.mem.majflt",
+    "The number of page faults requiring physical I/O.",
+    cumulative=True,
+)
+
+define_metric(
+    __monitor__,
     "app.disk.bytes",
     "Total bytes read from disk.",
     extra_fields={"type": "read"},
@@ -181,6 +188,14 @@ define_metric(
     "app.io.fds",
     "The number of open file descriptors help by process.",
     extra_fields={"type": "open"},
+)
+
+define_metric(
+    __monitor__,
+    "app.io.wait",
+    "The number of aggregated block I/O delays, in 1/100ths of a second.",
+    unit="secs:0.01",
+    cumulative=True,
 )
 
 define_log_field(__monitor__, "monitor", "Always ``linux_process_metrics``.")
@@ -241,6 +256,8 @@ class Metric(object):
             "app.uptime",
             "app.disk.bytes",
             "app.disk.requests",
+            "app.mem.majflt",
+            "app.io.wait",
         )
 
     def __repr__(self):
@@ -342,8 +359,12 @@ class BaseReader:
                     )
                 elif e.errno == errno.ENOENT:
                     self._logger.error(
-                        "The agent cannot read %s.  Your system may not support that proc file type",
+                        (
+                            "The agent cannot read %s.  Your system may not support that proc file "
+                            'type or the process with pid "%s" doesn\'t exist'
+                        ),
                         filename,
+                        self._pid,
                     )
                 # Ignore 'process not found' errors (likely caused because the process exited
                 # but re-raise the exception for all other errors
@@ -494,9 +515,14 @@ class StatReader(BaseReader):
         # Then the fields we want are just at fixed field positions in the
         # string.  Just grab them.
 
+        # See http://man7.org/linux/man-pages/man5/proc.5.html for reference on field numbers
+        # Keep in mind that we chop first 3 values away (pid, command line, state), so you need to
+        # subtract 3 from the field numbers from the man page (e.g. on the man page nice is number
+        # 19, but in our case it's 16 aka 19 - 3)
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(
             int(fields[19])
         )
+
         collector.update(
             {
                 Metric("app.cpu", "user"): self.__calculate_time_cs(int(fields[11])),
@@ -504,6 +530,10 @@ class StatReader(BaseReader):
                 Metric("app.uptime", None): process_uptime,
                 Metric("app.nice", None): float(fields[16]),
                 Metric("app.threads", None): int(fields[17]),
+                Metric("app.mem.majflt", None): int(fields[9]),
+                Metric("app.io.wait", None): int(fields[39])
+                if len(fields) >= 39
+                else 0,
             }
         )
         return collector
@@ -790,8 +820,7 @@ class FileDescriptorReader:
         @return:
         @rtype:
         """
-
-        num_fds = 0
+        num_fds = None
         try:
             num_fds = len(os.listdir(self.__path))
         except OSError as e:
@@ -803,7 +832,9 @@ class FileDescriptorReader:
 
         if not collector:
             collector = {}
-        collector.update({Metric("app.io.fds", "open"): num_fds})
+
+        if num_fds is not None:
+            collector.update({Metric("app.io.fds", "open"): num_fds})
         return collector
 
     def close(self):
@@ -826,11 +857,13 @@ class ProcessTracker(object):
       app.mem.bytes type=resident:      the number of bytes of resident memory in use
       app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
       app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
+      app.mem.majflt:                   the number of page faults requiring physical I/O.
       app.disk.bytes type=read:         the number of bytes read from disk
       app.disk.requests type=read:      the number of disk requests.
       app.disk.bytes type=write:        the number of bytes written to disk
       app.disk.requests type=write:     the number of disk requests.
       app.io.fds type=open:             the number of file descriptors held open by the process
+      app.io.wait:                      the number of aggregated block I/O delays, in 1/100ths of a second.
     """
 
     def __init__(self, pid, logger, monitor_id=None):
@@ -968,28 +1001,54 @@ class ProcessList(object):
 
 
 class ProcessMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records metrics about a running process.
+    """
+# Linux Process Metrics
 
-    To configure this monitor, you need to provide an id for the instance to identify which process the metrics
-    belong to in the logs and a regular expression to match against the list of running processes to determine which
-    process should be monitored.
+This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process.
+You can use this plugin to record resource usage for a web server, database, or other application.
 
-    Example:
-      monitors: [{
-         module: "builtin_monitors.linux_process_metrics".
-         id: "tomcat",
-         commandline: "java.*tomcat",
-      }]
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-    Instead of 'commandline', you may also define the 'pid' field which should be set to the id of the process to
-    monitor.  However, since ids can change over time, it's better to use the commandline matcher.  The 'pid' field
-    is mainly used the linux process monitor run to monitor the agent itself.
+## Sample Configuration
 
+Here is a simple configuration fragment showing use of the linux_process_metrics plugin. This sample will record
+resource usage for any process whose command line contains a match for the regular expression ``java.*tomcat6``:
 
-    In additional to the fields listed above, each metric will also have a field 'app' set to the monitor id to specify
-    which process the metric belongs to.
+    monitors: [
+      {
+         module:      "scalyr_agent.builtin_monitors.linux_process_metrics",
+         id:          "tomcat",
+         commandline: "java.*tomcat6",
+      }
+    ]
 
-    You can run multiple instances of this monitor per agent to monitor different processes.
+To record information for more than one process, use several copies of the linux_process_metrics plugin in
+your configuration.
+
+## Viewing Data
+
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux Process Metrics}}. (The dashboard will not be
+listed until the agent begins sending data.)
+
+You'll have to edit the dashboard file for each ``id`` value you've used. From the dashboard page, click the
+{{menuRef:Edit Dashboard}} link. Look for the following bit of code, near the top of the file:
+
+      // On the next line, list each "id" that you've used in a linux_process_metrics
+      // clause in the Scalyr Agent configuration file (agent.json).
+      values: [ "agent" ]
+
+Edit the ``values`` list according to the list of ids you've used. For instance, if you've used "tomcat"
+(as in the example above), the list would look like this:
+
+      values: [ "agent", "tomcat" ]
+
+The "agent" ID is used to report metrics for the Scalyr Agent itself.
+
+You can now return to the dashboard. Use the dropdowns near the top of the page to select the host and process
+you'd like to view.
     """
 
     def _initialize(self):
