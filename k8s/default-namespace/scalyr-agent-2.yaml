@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: scalyr-agent-2
+  name: scalyr-agent-2
+  namespace: default
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: scalyr-agent-2
+  template:
+    metadata:
+      labels:
+        app: scalyr-agent-2
+    spec:
+      containers:
+      - env:
+        - name: SCALYR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: scalyr-api-key
+              name: scalyr-api-key
+        - name: SCALYR_K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: SCALYR_K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: SCALYR_K8S_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: SCALYR_K8S_POD_UID
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.uid
+        - name: SCALYR_K8S_KUBELET_HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        envFrom:
+        - configMapRef:
+            name: scalyr-config
+        image: scalyr/scalyr-k8s-agent:2.0.59
+        imagePullPolicy: Always
+        name: scalyr-agent
+        resources:
+          limits:
+            memory: 500Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /var/log/pods
+          name: varlogpods
+          readOnly: true
+        - mountPath: /var/log/containers
+          name: varlogcontainers
+          readOnly: true
+        - mountPath: /var/scalyr/docker.sock
+          name: dockersock
+        - mountPath: /var/lib/scalyr-agent-2
+          name: checkpoints
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: scalyr-service-account
+      serviceAccountName: scalyr-service-account
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /var/lib/docker/containers
+          type: ""
+        name: varlibdockercontainers
+      - hostPath:
+          path: /var/log/pods
+          type: ""
+        name: varlogpods
+      - hostPath:
+          path: /var/log/containers
+          type: ""
+        name: varlogcontainers
+      - hostPath:
+          path: /var/run/docker.sock
+          type: ""
+        name: dockersock
+      - hostPath:
+          path: /tmp/scalyr-agent-2
+          type: DirectoryOrCreate
+        name: checkpoints
+      # comment this section if you do not want to run on the master
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists

@@ -36,6 +36,8 @@ from scalyr_agent.__scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+import six
+
 log = scalyr_logging.getLogger(__name__)
 
 
@@ -127,7 +129,25 @@ class MonitorsManager(StoppableThread):
                 if monitor.open_metric_log():
                     monitor.config_from_monitors(self)
                     log.info("Starting monitor %s", monitor.monitor_name)
+
+                    # NOTE: Workaround for a not so great behavior with out code where we create
+                    # thread instances before forking. This causes issues because "_is_stopped"
+                    # instance attribute gets set to "True" and never gets reset to "False". This
+                    # means isAlive() will correctly return that the threat is not alive is it was
+                    # created before forking.
+                    # See the following for details:
+                    #
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L800
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L806
+                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L817
+                    #
+                    # Long term and correct solution is making sure we don't create any threads
+                    # before we fork
+                    if six.PY3:
+                        monitor._is_stopped = False
+
                     monitor.start()
+
                     self.__running_monitors.append(monitor)
                 else:
                     log.warn(

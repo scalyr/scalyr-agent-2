@@ -839,6 +839,27 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline().line, b"L001")
         self.assertEquals(self.readline().line, b"L002")
 
+    def test_parse_as_json_timestamp_field(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L004", "time": "2015-08-03T09:12:43Z", "foo": "bar"}\n',
+        )
+        self.scan_for_new_bytes()
+
+        record = self.readline()
+        self.assertEquals(record.line, b"L004")
+        self.assertEqual(record.timestamp, 1438593163000000000)
+        self.assertEqual(record.attrs["raw_timestamp"], "2015-08-03T09:12:43Z")
+        self.assertEqual(record.attrs["foo"], "bar")
+
     def test_extend_log_line_parsing(self):
         self.log_file.close()
         self.log_file = self._create_iterator(

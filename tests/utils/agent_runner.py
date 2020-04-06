@@ -25,6 +25,8 @@ if False:
 import json
 import subprocess
 
+from distutils.spawn import find_executable
+
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL, get_package_root
 from scalyr_agent import compat
 from scalyr_agent.platform_controller import PlatformController
@@ -162,9 +164,16 @@ class AgentRunner(object):
         if self._installation_type == PACKAGE_INSTALL:
             # use service command to start agent, because stop command hands on some of the RHEL based distributions
             # if agent is started differently.
-            self._agent_process = subprocess.Popen(
-                "service scalyr-agent-2 --no-fork --no-change-user start", shell=True
-            )
+            service_executable = find_executable("service")
+            if service_executable:
+                cmd = "%s scalyr-agent-2 --no-fork --no-change-user start" % (
+                    service_executable
+                )
+            else:
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
+
+            self._agent_process = subprocess.Popen(cmd, shell=True)
         else:
             self._agent_process = subprocess.Popen(
                 "python {0} --no-fork --no-change-user start".format(_AGENT_MAIN_PATH),
@@ -176,7 +185,7 @@ class AgentRunner(object):
     def status(self):
         if self._installation_type == PACKAGE_INSTALL:
             process = subprocess.check_output(
-                "service scalyr-agent-2 status -v", shell=True
+                "/usr/sbin/scalyr-agent-2 status -v", shell=True
             )
 
             return process
@@ -190,33 +199,53 @@ class AgentRunner(object):
     def status_json(self):
         if self._installation_type == PACKAGE_INSTALL:
             result = subprocess.check_output(
-                "scalyr-agent-2 status -v --format=json", shell=True
+                "/usr/sbin/scalyr-agent-2 status -v --format=json", shell=True
             )
-
-            return result
 
         else:
             result = subprocess.check_call(
                 "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
                 shell=True,
             )
-            return result
 
-    def switch_version(self, version):
+        result = six.ensure_text(result)
+        return result
+
+    def switch_version(self, version, env=None):
+        # type: (str, Optional[dict]) -> None
+        """
+        :param version: Python version to switch the agent to.
+        :param env: Environment to use with this command.
+        :param clean_env: True to perform the switch in a clean environment without the agent config
+                          being present and any SCALYR_ environment variables being set.
+        """
+        if env:
+            kwargs = {"env": env}
+        else:
+            kwargs = {}
         if self._installation_type == PACKAGE_INSTALL:
             subprocess.check_call(
                 "/usr/sbin/scalyr-agent-2-config --set-python {0}".format(version),
                 shell=True,
+                **kwargs  # type: ignore
             )
         else:
             subprocess.check_call(
-                "python {0} --set=python {1}".format(_CONFIG_MAIN_PATH, version),
+                "python {0} --set-python {1}".format(_CONFIG_MAIN_PATH, version),
                 shell=True,
+                **kwargs  # type: ignore
             )
 
     def stop(self):
         if self._installation_type == PACKAGE_INSTALL:
-            result = subprocess.check_call("/usr/sbin/scalyr-agent-2 stop", shell=True)
+            service_executable = find_executable("service")
+            if service_executable:
+                cmd = "%s scalyr-agent-2 stop" % (service_executable)
+            else:
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 stop"
+
+            result = subprocess.check_call(cmd, shell=True)
 
             return result
 
