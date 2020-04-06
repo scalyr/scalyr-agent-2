@@ -13,14 +13,20 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+from io import open
 
 if False:
     from typing import Dict
+
+import os
 
 from six.moves import range
 
 from scalyr_agent.scalyr_client import Event
 from scalyr_agent.scalyr_client import AddEventsRequest
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/logs"))
 
 
 def generate_random_dict(keys_count=10):
@@ -66,3 +72,21 @@ def generate_add_events_request(num_events, line_length, attributes_count):
         add_events_request.add_event(event)
 
     return add_events_request
+
+
+def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
+    # type: (str, int) -> bytes
+    """
+    Function which reads bytes_to_read from a log ficiture file and "rounding" it to the last
+    complete line.
+    """
+    file_path = os.path.join(LOGS_FIXTURES_DIR, file_name)
+
+    with open(file_path, "rb") as fp:
+        data = fp.read(bytes_to_read)
+
+    last_newline_index = data.rfind(b"\n")
+    if last_newline_index != len(data):
+        data = data[: last_newline_index + 1]
+
+    return data
