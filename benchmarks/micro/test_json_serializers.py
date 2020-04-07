@@ -102,7 +102,7 @@ def _test_json_encode(benchmark, json_lib, log_tuple):
     def run_benchmark():
         return json_encode(data)
 
-    result = benchmark.pedantic(run_benchmark, iterations=30, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=20, rounds=50)
 
     assert get_json_lib() == json_lib
     assert isinstance(result, six.text_type)
@@ -133,7 +133,7 @@ def _test_json_decode(benchmark, json_lib, log_tuple):
     def run_benchmark():
         return json_decode(data)
 
-    result = benchmark.pedantic(run_benchmark, iterations=30, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=20, rounds=50)
 
     assert get_json_lib() == json_lib
     assert isinstance(result, dict)
