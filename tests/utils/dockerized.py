@@ -12,16 +12,19 @@ from tests.utils.compat import Path
 
 from scalyr_agent import compat
 
-DEFAULT_FILE_PATHS_TO_COPY = ["/var/log/scalyr-agent-2/agent.log"]
+DEFAULT_FILE_PATHS_TO_COPY = [
+    "/var/log/scalyr-agent-2/agent.log",
+    "/root/scalyr-agent-dev/log/agent.log",
+]
 
 
 def dockerized_case(
-    builder_cls,
-    file_path,
-    file_paths_to_copy=None,
-    artifacts_use_subdirectory=True,
-    remove_container=True,
-    python_executable="python3",
+        builder_cls,
+        file_path,
+        file_paths_to_copy=None,
+        artifacts_use_subdirectory=True,
+        remove_container=True,
+        python_executable="python3",
 ):
     """
     Decorator that makes decorated test case run inside docker container.
@@ -79,6 +82,8 @@ def dockerized_case(
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
+
+            coverage_file_path = Path("/", ".coverage")
             if artifacts_path:
                 artifacts_path = Path(artifacts_path)
 
@@ -86,6 +91,8 @@ def dockerized_case(
                     # We run each test case in a new container instance so we make sure we store
                     # logs under a sub-directory which matches the test function name
                     artifacts_path = artifacts_path / func_name
+
+                file_paths_to_copy.add(six.text_type(coverage_file_path))
 
                 copy_artifacts(
                     container=container,

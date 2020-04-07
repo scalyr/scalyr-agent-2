@@ -63,7 +63,7 @@ class AgentRunner(object):
        Agent runner provides ability to launch Scalyr agent with needed configuration settings.
        """
 
-    def __init__(self, installation_type=DEV_INSTALL):  # type: (int) -> None
+    def __init__(self, installation_type=DEV_INSTALL, enable_coverage=False):  # type: (int) -> None
 
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
@@ -85,6 +85,8 @@ class AgentRunner(object):
         # This is useful when agent was installed from package,
         # and agent runner needs to know it where files are located.
         self._installation_type = installation_type
+
+        self._enable_coverage = enable_coverage
 
         self._init_agent_paths()
 
@@ -157,7 +159,7 @@ class AgentRunner(object):
 
         self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
-    def start(self):
+    def start(self, executable="python"):
         # important to call this function before agent was started.
         self._create_agent_files()
 
@@ -173,10 +175,13 @@ class AgentRunner(object):
                 # Special case for CentOS 6 where we need to use absolute path to service command
                 cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
 
-            self._agent_process = subprocess.Popen(cmd, shell=True)
+            self._agent_process = subprocess.Popen(cmd, shell=True, env=os.environ.copy())
         else:
+
+            if self._enable_coverage:
+                executable = "coverage run"
             self._agent_process = subprocess.Popen(
-                "python {0} --no-fork --no-change-user start".format(_AGENT_MAIN_PATH),
+                "{0} {1} --no-fork --no-change-user start".format(executable, _AGENT_MAIN_PATH),
                 shell=True,
             )
 
@@ -212,7 +217,7 @@ class AgentRunner(object):
         return result
 
     def switch_version(self, version, env=None):
-        # type: (str, Optional[dict]) -> None
+        # type: (six.text_type, Optional[dict]) -> None
         """
         :param version: Python version to switch the agent to.
         :param env: Environment to use with this command.
@@ -236,7 +241,7 @@ class AgentRunner(object):
                 **kwargs  # type: ignore
             )
 
-    def stop(self):
+    def stop(self, executable="python"):
         if self._installation_type == PACKAGE_INSTALL:
             service_executable = find_executable("service")
             if service_executable:
@@ -250,10 +255,16 @@ class AgentRunner(object):
             return result
 
         else:
-            self._agent_process = subprocess.Popen(
-                "python {0} stop".format(_AGENT_MAIN_PATH), shell=True
+            process = subprocess.Popen(
+                "{0} {1} stop".format(executable, _AGENT_MAIN_PATH), shell=True
             )
+
+            process.wait()
+            self._agent_process.wait()
         print("Agent stopped.")
+
+    def __del__(self):
+        self.stop()
 
     @property
     def _server_host(self):  # type: () -> six.text_type
@@ -271,6 +282,7 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
+            "monitors": [],
         }
 
     @staticmethod

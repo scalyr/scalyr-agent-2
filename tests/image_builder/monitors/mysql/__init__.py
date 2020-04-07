@@ -16,7 +16,18 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.images_builder.distribution_builders.amazonlinux import AmazonlinuxBuilder
+from tests.utils.compat import Path
+from tests.utils.image_builder import AgentImageBuilder
+from tests.image_builder.monitors.base import BaseMonitorBuilder
 
-if __name__ == "__main__":
-    AmazonlinuxBuilder.handle_command_line()
+
+class MySqlBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-mysql"
+    COPY_AGENT_SOURCE = True
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"
+    INCLUDE_PATHS = [
+        Path(__file__).parent / "init.sql"
+    ]
+    REQUIRED_IMAGES = [BaseMonitorBuilder]
+
+    IGNORE_CACHING = True

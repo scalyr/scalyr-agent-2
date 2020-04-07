@@ -17,6 +17,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import time
+import os
 
 import pytest
 
@@ -25,88 +26,69 @@ from scalyr_agent.third_party import pymysql
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.images_builder.monitors.nginx import NginxBuilder
+from tests.image_builder.monitors.nginx import NginxBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
 
-HOST = "localhost"
-USERNAME = "scalyr_test_user"
-PASSWORD = "scalyr_test_password"
-DATABASE = "scalyr_test_db"
-
-
-@pytest.fixture()
-def mysql_client():
-    client = None
-    while True:
-        try:
-            client = pymysql.connect(
-                host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE
-            )
-            break
-        except pymysql.Error:
-            time.sleep(0.1)
-            continue
-
-    yield client
-    client.close()
-
-
-@pytest.fixture()
-def mysql_cursor(mysql_client):
-    cursor = mysql_client.cursor()
-
-    yield cursor
-
-    cursor.close()
-
-
-def _clear(cursor):
-    cursor.execute("DROP TABLE IF EXISTS test_table;")
-    return
-
-
-@pytest.fixture()
-def clear_db(mysql_cursor):
-    _clear(mysql_cursor)
-
 
 class NginxAgentRunner(AgentRunner):
-    def __init__(self, python_version="python2"):
-        super(NginxAgentRunner, self).__init__(python_version=python_version)
+    def __init__(self):
+        super(NginxAgentRunner, self).__init__(enable_coverage=True)
 
-        # self.nginx_log_path = self.add_log_file(self.agent_logs_dir_path / "mysql_monitor.log")
+        self.nginx_log_path = self.add_log_file(self.agent_logs_dir_path / "nginx_monitor.log")
 
     @property
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
-        config = super(MysqlAgentRunner, self)._agent_config
+        config = super(NginxAgentRunner, self)._agent_config
         config["monitors"].append(
             {
-                "monitors": [
-                    {
-                        "module": "scalyr_agent.builtin_monitors.nginx_monitor",
-                        "status_url": "http://localhost:80/nginx_status",
-                    }
-                ]
+
+                "module": "scalyr_agent.builtin_monitors.nginx_monitor",
+                "status_url": "http://localhost:80/nginx_status",
+
             }
         )
 
         return config
 
 
-def _test(request, python_version):
+class NginxLogReader(LogMetricReader):
+    LINE_PATTERN = "\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[nginx_monitor\((?P<instance_id>[^\]]*)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
 
-    a = 10
+
+def _test(request, python_version):
+    os.system("service nginx start")
+
+    runner = NginxAgentRunner()
+    runner.start(executable=python_version)
+
+    reader = NginxLogReader(runner.nginx_log_path)
+
+    reader.start()
+
+    metric_names = [
+        "nginx.connections.active",
+        "nginx.connections.reading",
+        "nginx.connections.writing",
+        "nginx.connections.waiting"
+    ]
+    metrics = reader.get_metrics(
+        metric_names
+    )
+
+    assert list(sorted(metrics.keys())) == sorted(metric_names)
+
+    runner.stop()
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__, second_exec=True)
+@dockerized_case(NginxBuilder, __file__)
 def test_nginx_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__, second_exec=True)
+@dockerized_case(NginxBuilder, __file__)
 def test_nginx_python3(request):
     _test(request, python_version="python3")

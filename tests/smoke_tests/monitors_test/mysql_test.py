@@ -17,6 +17,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import time
+import os
 
 import pytest
 
@@ -25,7 +26,7 @@ from scalyr_agent.third_party import pymysql
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.images_builder.monitors.mysql import MySqlBuilder
+from tests.image_builder.monitors.mysql import MySqlBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
@@ -38,16 +39,15 @@ DATABASE = "scalyr_test_db"
 
 @pytest.fixture()
 def mysql_client():
-    client = None
-    while True:
-        try:
-            client = pymysql.connect(
-                host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE
-            )
-            break
-        except pymysql.Error:
-            time.sleep(0.1)
-            continue
+    os.system("service mysql start")
+
+    os.system("mysql < /agent_source/tests/image_builder/monitors/mysql/init.sql")
+
+    time.sleep(3)
+
+    client = pymysql.connect(
+        host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE
+    )
 
     yield client
     client.close()
@@ -62,19 +62,9 @@ def mysql_cursor(mysql_client):
     cursor.close()
 
 
-def _clear(cursor):
-    cursor.execute("DROP TABLE IF EXISTS test_table;")
-    return
-
-
-@pytest.fixture()
-def clear_db(mysql_cursor):
-    _clear(mysql_cursor)
-
-
 class MysqlAgentRunner(AgentRunner):
-    def __init__(self, python_version="python2"):
-        super(MysqlAgentRunner, self).__init__(python_version=python_version)
+    def __init__(self):
+        super(MysqlAgentRunner, self).__init__(enable_coverage=True)
 
         self.mysql_log_path = self.add_log_file(
             self.agent_logs_dir_path / "mysql_monitor.log"
@@ -101,12 +91,11 @@ class MySqlLogReader(LogMetricReader):
 
 
 def _test(request, python_version):
-
     mysql_cursor = request.getfixturevalue("mysql_cursor")
 
-    runner = MysqlAgentRunner(python_version=python_version)
+    runner = MysqlAgentRunner()
 
-    runner.start()
+    runner.start(executable=python_version)
 
     time.sleep(5)
     mysql_cursor.execute(
@@ -175,18 +164,17 @@ def _test(request, python_version):
         "mysql.global.com_update": 1,
         "mysql.global.com_insert": 2,
     }
-    print(diff)
+
+    runner.stop()
 
 
-@pytest.mark.usefixtures("clear_db")
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__, second_exec=True)
+@dockerized_case(MySqlBuilder, __file__)
 def test_mysql_python2(request):
     _test(request, python_version="python2")
 
 
-@pytest.mark.usefixtures("clear_db")
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__, second_exec=True)
+@dockerized_case(MySqlBuilder, __file__)
 def test_mysql_python3(request):
     _test(request, python_version="python3")

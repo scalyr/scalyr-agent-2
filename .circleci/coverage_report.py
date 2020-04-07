@@ -31,7 +31,9 @@ import shutil
 import six.moves.configparser
 import argparse
 from io import open
-
+import tempfile
+import subprocess
+import glob
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -43,43 +45,73 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+# create temporary directory
+
+for path in glob.glob(os.path.join(tempfile.gettempdir(), "scalyr_agent_coverage*")):
+    shutil.rmtree(path)
+
+tmp_path = tempfile.mkdtemp(prefix="scalyr_agent_coverage_")
+
+
+copied_coverage_file_path = os.path.join(tmp_path, ".coverage.1")
+
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+coverage_file_path = os.path.join(root, ".coverage")
+coverage_txt_path = os.path.join(root, "coverage.txt")
+renamed_coverage_file = os.path.join(root, "coverage.1")
+
+print(root)
 
 # "rename .coverage file for  "combine" command"
-if os.path.exists("coverage.txt"):
+if os.path.exists(coverage_txt_path):
     # can be useful after downloading from circleci.
-    os.rename("coverage.txt", ".coverage.1")
-elif os.path.exists(".coverage"):
-    os.rename(".coverage", ".coverage.1")
-elif os.path.exists(".coverage.1"):
-    pass
+    #os.rename(coverage_txt_path, renamed_coverage_file)
+    shutil.copy(coverage_txt_path, copied_coverage_file_path)
+elif os.path.exists(coverage_file_path):
+    #os.rename(coverage_file_path, renamed_coverage_file)
+    shutil.copy(coverage_file_path, copied_coverage_file_path)
 else:
     raise OSError("Coverage file not found.")
+
+coverage_rc_path = os.path.join(tmp_path, ".coveragerc")
+
+shutil.copy(os.path.join(root, ".coveragerc"), coverage_rc_path)
 
 # Add current local project path in .coveragrc config file.
 # This is important because html report needs source code to generate results
 # Paths in .coverage and in local project can be different,
 # so we need to specify local project path, so coverage tool can access to source code to generate html.
 parser = six.moves.configparser.ConfigParser()  # type: ignore
-with open(".coveragerc", "r") as f:
+with open(coverage_rc_path, "r") as f:
     parser.readfp(f)  # type: ignore
 
 # add current path to 'paths' section.
-paths = parser.get("paths", "source").split("\n")  # type: ignore
 cwd = os.getcwd()
-if cwd not in paths:
-    paths = ["\n%s" % os.getcwd()] + paths
+paths = ["\n%s" % root, "/agent_source/"]
+parser.add_section("paths")
 parser.set("paths", "source", "\n".join(paths))  # type: ignore
 
-with open(".coveragerc", "w") as f:
+with open(coverage_rc_path, "w") as f:
     parser.write(f)  # type: ignore
 
-os.system("coverage combine")
+subprocess.check_call(
+    "coverage combine",
+    shell=True,
+    cwd=tmp_path
+)
 
-shutil.rmtree("htmlcov", ignore_errors=True)
 
-os.system("coverage html")
+subprocess.check_call(
+    "coverage html",
+    shell=True,
+    cwd=tmp_path
+)
+
+html_report_path = os.path.join(root, "htmlcov")
+shutil.rmtree(html_report_path, ignore_errors=True)
+shutil.copytree(os.path.join(tmp_path, "htmlcov"), html_report_path)
 
 if args.show:
     import webbrowser
 
-    webbrowser.open("htmlcov/index.html")
+    webbrowser.open(os.path.join(html_report_path, "index.html"))

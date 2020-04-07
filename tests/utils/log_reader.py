@@ -58,7 +58,6 @@ class LogReader(threading.Thread):
         with self._start_cv:
             self._has_data = True
             self._start_cv.notify()
-            print("0000")
         self._file.seek(0)
         while not self._stop_event.is_set():
             line = get_line()
@@ -71,7 +70,6 @@ class LogReader(threading.Thread):
         with self._start_cv:
             while not self._has_data:
                 self._start_cv.wait(0.1)
-            print("111")
         return
 
     @property
@@ -136,106 +134,6 @@ class LogMetricReader(LogReader):
     def get_metric(self, name):
         metrics = self.get_metrics([name])
         return metrics[name]
-
-    def wait_for_metrics_change(self, metric_names, previous_values, predicate):
-        while not self._stop_event.is_set():
-            current_values = self.get_metrics(metric_names)
-
-            predicate_results = [
-                predicate(current_values[name], previous_values[name])
-                for name in metric_names
-            ]
-
-            if all(predicate_results):
-                return
-            time.sleep(0.1)
-
-    def wait_for_metrics_increase(self, metric_names, previous_values):
-        self.wait_for_metrics_change(
-            metric_names, previous_values, lambda cur, prev: cur > prev,
-        )
-
-    def wait_for_metrics_increment(self, metric_names, previous_values):
-        self.wait_for_metrics_change(
-            metric_names, previous_values, lambda cur, prev: prev + 1 == cur
-        )
-
-
-class LogReader2(threading.Thread):
-    LINE_PATTERN = None
-
-    def __init__(self, file_path):
-        super(LogMetricReader, self).__init__()
-        self.daemon = True
-        self._file = open(six.text_type(file_path), "r")
-        self._stop_event = threading.Event()
-        self._lines_lock = threading.Lock()
-        self._current_metrics = dict()
-        self._start_cv = threading.Condition()
-        self._has_data = False
-
-    def run(self):
-        def get_line():
-            while not self._stop_event.is_set():
-                _line = self._file.readline()
-                if _line:
-                    return _line
-                time.sleep(0.1)
-
-        get_line()
-        with self._start_cv:
-            self._has_data = True
-            self._start_cv.notify()
-        self._file.seek(0)
-        while not self._stop_event.is_set():
-            line = get_line()
-            name, value = self._parse_line(line)
-            with self._lines_lock:
-                self._current_metrics[name] = value
-
-    def _parse_line(self, line):
-        m = re.match(type(self).LINE_PATTERN, line)
-        metric_name = m.group("metric_name")
-        metric_value_string = m.group("metric_value")
-
-        if metric_value_string.isdigit():
-            metric_value = int(metric_value_string)
-        else:
-            try:
-                metric_value = float(metric_value_string)
-            except ValueError:
-                metric_value = metric_value_string
-
-        return metric_name, metric_value
-
-    def get_metrics(self, names):
-        def get():
-            _metrics = dict()
-            for name in names:
-                metric_value = self._current_metrics.get(name)
-                if metric_value is None:
-                    return None
-                _metrics[name] = metric_value
-            return _metrics
-
-        while not self._stop_event.is_set():
-            with self._lines_lock:
-                metrics = get()
-            if metrics is not None:
-                return metrics
-            time.sleep(0.1)
-
-    def get_metric(self, name):
-        metrics = self.get_metrics([name])
-        return metrics[name]
-
-    def start(self):
-        super(LogMetricReader, self).start()
-        with self._start_cv:
-            while not self._has_data:
-                self._start_cv.wait()
-            print("111")
-        return
 
     def wait_for_metrics_change(self, metric_names, previous_values, predicate):
         while not self._stop_event.is_set():

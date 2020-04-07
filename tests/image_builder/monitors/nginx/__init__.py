@@ -18,9 +18,16 @@ from __future__ import unicode_literals
 
 from tests.utils.compat import Path
 from tests.utils.image_builder import AgentImageBuilder
+from tests.image_builder.monitors.base import BaseMonitorBuilder
 
 
-class BaseMonitorBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-monitor-base"
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
+class NginxBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-nginx"
     COPY_AGENT_SOURCE = True
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"
+    REQUIRED_IMAGES = [BaseMonitorBuilder]
+    INCLUDE_PATHS = [
+        Path(Path(__file__).parent / "config"),
+    ]
+
+    IGNORE_CACHING = True

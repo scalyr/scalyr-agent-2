@@ -310,10 +310,30 @@ commands:
             export PYTHONPATH=.:${PYTHONPATH}
             # generate file with checksum that is calculated for every required file.
             python -m tests.distribution_builders.<< parameters.distribution >>.cmd --checksum > ~/checksum
+            python -m tests.distribution_builders.fpm_package_builder.cmd --checksum > ~/fpm_builder_checksum
+
+      - restore_cache:
+          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
+          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
 
       - restore_cache:
           # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
+
+
+      - run:
+          name: Copy cached images if they exist.
+          command: |
+            mkdir -p ~/agent_image
+            mkdir -p ~/fpm_builder_cache
+            mkdir -p ~/agent_image_cache
+            if [ "$(ls -A ~/fpm_builder_cache)" ]; then
+                 cp ~/fpm_builder_cache/* ~/agent_image/
+            fi
+
+            if [ "$(ls -A ~/agent_image_cache)" ]; then
+                 cp ~/agent_image_cache/* ~/agent_image/
+            fi
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -337,12 +357,24 @@ commands:
                 exit 1
             fi
 
+      - run:
+          name: Copy images to cache folder.
+          command: |
+              cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
+              rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
+              cp ~/agent_image/* ~/agent_image_cache/*
+
+      - save_cache:
+          # save fpm builder image to 'tar' file here, if this file is not found previously.
+          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/fpm_builder_cache"
+
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
-          # TODO: Workaround for incorrect handle of caching since we cache the whole agent_source/ directory.
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
-           - "~/agent_image"
+           - "~/agent_image_cache"
 
       - save_cache:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
@@ -1014,59 +1046,75 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
-    jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
-      - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
+#  unittest:
+#    jobs:
+#      - lint-checks
+#      - unittest-38
+#      - unittest-37
+#      - unittest-36
+#      - unittest-35
+#      - unittest-27
+#      - unittest-26
+#      - smoke-standalone-38
+#      - smoke-standalone-37
+#      - smoke-standalone-36
+#      - smoke-standalone-35
+#      - smoke-standalone-27
+#      - smoke-standalone-26
+#      # smoke test jobs above are still uses old smoke tests.
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - smoke-standalone-27-tls12
+#      - smoke-standalone-26-tls12
+#      - coverage:
+#          requires:
+#            - unittest-27
+#            - smoke-docker-json
+#            - smoke-docker-syslog
+#            - smoke-k8s
   package-tests:
     jobs:
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
+#      - package-build-rpm:
+#          <<: *non_master_and_release
+#      - package-build-deb:
+#          <<: *non_master_and_release
+#      - package-test-rpm:
+#          <<: *master_and_release_only
+#      - package-test-deb:
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py2:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py3:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py2:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py3:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+      - package-build-rpm
+      - package-build-deb
+      - package-test-rpm
+      - package-test-deb
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
-          <<: *master_and_release_only
       - smoke-rpm-package-py3:
           requires:
             - package-test-rpm
-          <<: *master_and_release_only
       - smoke-deb-package-py2:
           requires:
             - package-test-deb
-          <<: *master_and_release_only
       - smoke-deb-package-py3:
           requires:
             - package-test-deb
-          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:

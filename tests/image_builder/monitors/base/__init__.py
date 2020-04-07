@@ -16,7 +16,14 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.images_builder.distribution_builders import UbuntuBuilder
+from scalyr_agent.__scalyr__ import get_install_root
+from tests.utils.compat import Path
+from tests.utils.image_builder import AgentImageBuilder
 
-if __name__ == "__main__":
-    UbuntuBuilder.handle_command_line()
+
+class BaseMonitorBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-monitor-base"
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"
+    INCLUDE_PATHS = [
+        Path(get_install_root(), "dev-requirements.txt"),
+    ]
