@@ -81,6 +81,8 @@ def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
     """
     Function which reads bytes_to_read from a log ficiture file and "rounding" it to the last
     complete line.
+
+    NOTE: -1 indicate read the whole file
     """
     file_path = os.path.join(LOGS_FIXTURES_DIR, file_name)
 
@@ -93,7 +95,7 @@ def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
         data = fp.read(bytes_to_read)
 
     last_newline_index = data.rfind(b"\n")
-    if last_newline_index != len(data):
+    if bytes_to_read != -1 and last_newline_index != len(data):
         data = data[: last_newline_index + 1]
 
     return data

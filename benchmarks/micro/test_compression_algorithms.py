@@ -29,6 +29,7 @@ if False:
     from typing import Tuple
     from typing import Callable
 
+import functools
 import time
 
 import zlib
@@ -64,6 +65,12 @@ from .utils import read_bytes_from_log_fixture_file
         ("json_log_5_mb.log.gz", 3 * 1024),
         ("json_log_5_mb.log.gz", 10 * 1024),
         ("json_log_5_mb.log.gz", 500 * 1024),
+        ("add_events_request_10_events.log.gz", -1),
+        ("add_events_request_100_events.log.gz", -1),
+        ("add_events_request_200_events.log.gz", -1),
+        ("add_events_request_10_events_with_attributes.log.gz", -1),
+        ("add_events_request_100_events_with_attributes.log.gz", -1),
+        ("add_events_request_200_events_with_attributes.log.gz", -1),
     ],
     ids=[
         "agent_debug_log_3k",
@@ -72,6 +79,12 @@ from .utils import read_bytes_from_log_fixture_file
         "json_log_3k",
         "json_log_10k",
         "json_log_500k",
+        "add_events_10_events",
+        "add_events_100_events",
+        "add_events_200_events",
+        "add_events_10_events_with_attributes",
+        "add_events_100_events_with_attributes",
+        "add_events_200_events_with_attributes",
     ],
 )
 # fmt: on
@@ -82,15 +95,19 @@ from .utils import read_bytes_from_log_fixture_file
         ("deflate", {"level": 9}),
         ("bz2", {}),
         ("snappy", {}),
-        ("zstandard", {}),
+        ("zstandard", {"level": 3}),
+        ("zstandard", {"level": 10}),
+        ("zstandard", {"level": 12}),
     ],
     ids=[
         "deflate_level_3",
-        "deflate_level_6",
+        "deflate_level_6_default",
         "deflate_level_9",
         "bz2",
         "snappy",
-        "zstandard",
+        "zstandard_level_3_default",
+        "zstandard_level_10",
+        "zstandard_level_12",
     ],
 )
 @pytest.mark.benchmark(group="compress", timer=time.process_time)
@@ -147,10 +164,10 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm)
+    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
     def run_benchmark():
-        result = compress_func(data, **kwargs)
+        result = compress_func(data)
         return result
 
     result = benchmark.pedantic(run_benchmark, iterations=10, rounds=20)
@@ -175,9 +192,9 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm)
+    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
-    compressed_data = compress_func(data, **kwargs)
+    compressed_data = compress_func(data)
     assert compressed_data != data
 
     def run_benchmark():
@@ -196,24 +213,24 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     assert data == result
 
 
-def _get_compress_and_decompress_func(compression_algorithm):
-    # type: (str) -> Tuple[Callable, Callable]
+def _get_compress_and_decompress_func(compression_algorithm, kwargs):
+    # type: (str, dict) -> Tuple[Callable, Callable]
     if compression_algorithm == "deflate":
-        compress_func = zlib.compress  # type: ignore
+        compress_func = functools.partial(zlib.compress, **kwargs)  # type: ignore
         decompress_func = zlib.decompress  # type: ignore
     elif compression_algorithm == "bz2":
-        compress_func = bz2.compress  # type: ignore
+        compress_func = functools.partial(bz2.compress, **kwargs)  # type: ignore
         decompress_func = bz2.decompress  # type: ignore
     elif compression_algorithm == "snappy":
-        compress_func = snappy.compress  # type: ignore
+        compress_func = functools.partial(snappy.compress, **kwargs)  # type: ignore
         decompress_func = snappy.decompress  # type: ignore
     elif compression_algorithm == "zstandard":
-        compressor = zstandard.ZstdCompressor()
+        compressor = zstandard.ZstdCompressor(**kwargs)
         decompressor = zstandard.ZstdDecompressor()
         compress_func = compressor.compress  # type: ignore
         decompress_func = decompressor.decompress  # type: ignore
     elif compression_algorithm == "brotli":
-        compress_func = brotli.compress  # type: ignore
+        compress_func = functools.partial(brotli.compress, **kwargs)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
