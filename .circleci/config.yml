@@ -328,11 +328,13 @@ commands:
             mkdir -p ~/fpm_builder_cache
             mkdir -p ~/agent_image_cache
             if [ "$(ls -A ~/fpm_builder_cache)" ]; then
+                 echo "fpm builder image is found."
                  cp ~/fpm_builder_cache/* ~/agent_image/
             fi
 
             if [ "$(ls -A ~/agent_image_cache)" ]; then
-                 cp ~/agent_image_cache/* ~/agent_image/
+                echo "agent image cache image is found."
+                cp ~/agent_image_cache/* ~/agent_image/
             fi
 
       - run:
