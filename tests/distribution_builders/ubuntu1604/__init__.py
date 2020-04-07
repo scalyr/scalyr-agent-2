@@ -34,5 +34,6 @@ class UbuntuBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-ubuntu1604"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
     REQUIRED_IMAGES = [FpmPackageBuilder, UbuntuBuilderBase]
+    REQUIRED_CHECKSUM_IMAGES = [UbuntuBuilderBase]
     COPY_AGENT_SOURCE = True
     IGNORE_CACHING = True

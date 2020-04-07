@@ -34,5 +34,6 @@ class CentOSBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-centos8"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
     REQUIRED_IMAGES = [FpmPackageBuilder, CentOSBuilderBase]
+    REQUIRED_CHECKSUM_IMAGES = [CentOSBuilderBase]
     COPY_AGENT_SOURCE = True
     IGNORE_CACHING = True

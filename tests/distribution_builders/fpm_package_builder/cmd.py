@@ -16,24 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from scalyr_agent.__scalyr__ import get_install_root
-from tests.utils.compat import Path
-from tests.utils.image_builder import AgentImageBuilder
 from tests.distribution_builders.fpm_package_builder import FpmPackageBuilder
 
-
-class AmazonlinuxBuilderBase(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-amazonlinux2-base"
-    DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
-    INCLUDE_PATHS = [
-        Path(get_install_root(), "dev-requirements.txt"),
-    ]
-
-
-class AmazonlinuxBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-amazonlinux2"
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
-    REQUIRED_IMAGES = [FpmPackageBuilder, AmazonlinuxBuilderBase]
-    REQUIRED_CHECKSUM_IMAGES = [AmazonlinuxBuilderBase]
-    COPY_AGENT_SOURCE = True
-    IGNORE_CACHING = True
+if __name__ == "__main__":
+    FpmPackageBuilder.handle_command_line()

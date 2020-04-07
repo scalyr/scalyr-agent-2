@@ -61,6 +61,8 @@ class AgentImageBuilder(object):
     DOCKERFILE = None  # type: Path
     REQUIRED_IMAGES = []  # type: List[Type[AgentImageBuilder]]
 
+    REQUIRED_CHECKSUM_IMAGES = []  # type: List[Type[AgentImageBuilder]]
+
     # add agent source code to the build context of the image
     COPY_AGENT_SOURCE = False  # type: bool
 
@@ -247,7 +249,7 @@ class AgentImageBuilder(object):
         if hash_object is None:
             hash_object = hashlib.sha256()
 
-        for builder_cls in cls.REQUIRED_IMAGES:
+        for builder_cls in cls.REQUIRED_CHECKSUM_IMAGES:
             hash_object = builder_cls.get_checksum(hash_object=hash_object)
 
         if cls.IGNORE_CACHING:
@@ -278,7 +280,7 @@ class AgentImageBuilder(object):
             "--checksum",
             action="store_true",
             help="Print base64 encoded sha256 checksum of the Dockerfile of this builder. "
-            "Also, it counts checksum of all required builders.",
+                 "Also, it counts checksum of all required builders.",
         )
 
         args = parser.parse_args()
