@@ -364,7 +364,7 @@ commands:
           command: |
               cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
               rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
-              cp ~/agent_image/* ~/agent_image_cache/*
+              cp ~/agent_image/* ~/agent_image_cache/
 
       - save_cache:
           # save fpm builder image to 'tar' file here, if this file is not found previously.
