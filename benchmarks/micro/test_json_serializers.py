@@ -122,11 +122,12 @@ def _test_json_decode(benchmark, json_lib, log_tuple):
         data = read_bytes_from_log_fixture_file(file_name, bytes_to_read).strip()
         obj = {"lines": []}
         for line in data.split(b"\n"):
-            obj["lines"].append(json.loads(line))
+            line_decoded = json.loads(six.ensure_text(line))
+            obj["lines"].append(line_decoded)
 
         data = json.dumps(obj)
 
-        CACHED_TEST_DATA["decode"][log_tuple] = data
+        CACHED_TEST_DATA["decode"][log_tuple] = six.ensure_text(data)
 
     data = CACHED_TEST_DATA["decode"][log_tuple]
 
