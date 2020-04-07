@@ -4124,11 +4124,12 @@ cluster.
             )
         )
 
+        # TODO: Handle escaping appropriate characters in serverHost string
         server = scalyr_util.get_web_url_from_upload_url(
             self._global_config.scalyr_server
         )
         global_log.info(
-            "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27&log=%%2Fvar%%2Flog%%2Fscalyr-agent-2%%2Fagent.log"
+            "View the log for this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27&log=%%2Fvar%%2Flog%%2Fscalyr-agent-2%%2Fagent.log"
             % (server, self._global_config.server_attributes["serverHost"]),
             force_stdout=True,
         )

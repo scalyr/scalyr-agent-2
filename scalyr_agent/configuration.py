@@ -856,7 +856,7 @@ class Configuration(object):
         """Returns the configuration value for 'stdout_severity'.
         Only used when running in no-fork mode.
         """
-        return self.__get_config().get_string("stdout_severity", default_value="NOTSET")
+        return self.__get_config().get_string("stdout_severity")
 
     @property
     def ca_cert_path(self):

@@ -15,6 +15,7 @@ RUN pip --no-cache-dir install --root /tmp/dependencies -r requirements.txt
 FROM python:2.7-slim as scalyr
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
+# Configure agent to only emit log messages with ERROR and above to stdout by default
 ENV SCALYR_STDOUT_SEVERITY ERROR
 COPY --from=scalyr-dependencies  /tmp/dependencies/ /
 ADD scalyr-k8s-agent.tar.gz /

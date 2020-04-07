@@ -137,7 +137,7 @@ def set_log_destination(
     @param use_stdout: True if the logs should be sent to standard out.  If this is False, then use_disk must be true.
     @param use_disk:  True if the logs should be sent to disk.  If this is False, then use_stdout must be true.
     @param no_fork:  True if we are running in --no-fork mode, logs above a configured severity threshold will be
-    written to stdout.
+        written to stdout.
     @param stdout_severity: Logs at or above this severity level will be written to stdout if no_fork is true.
     @param logs_directory:  The path of the directory to, by default, write log files.
     @param agent_log_file_path: If not None, then the file path where the main agent log file should be written
