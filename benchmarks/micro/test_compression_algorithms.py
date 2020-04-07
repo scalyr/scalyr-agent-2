@@ -15,20 +15,22 @@
 """
 Benchmarks which compare various compression algorithms.
 
-TODO:
-
-    - Record compression ratio
-    - Record CPU utilization
-    - Use more realistic log like data
-
 NOTE: We also want to measure CPU utilization for those benchmarks which means we should also run
-them using "time.process_time" timer which contains sum of system and user CPU time.
+them using "time.process_time" timer which contains sum of system and user CPU time and not wall
+clock time.
+
+This way we get accurate CPU utilization information.
 """
 
 from __future__ import absolute_import
 from __future__ import print_function
 
-import json
+if False:
+    from typing import Tuple
+    from typing import Callable
+
+import time
+
 import zlib
 import bz2
 
@@ -50,65 +52,108 @@ except ImportError:
     brotli = None
 
 
-from .utils import generate_random_dict
+from .utils import read_bytes_from_log_fixture_file
 
 
-def test_deflate_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=100)
-    data = json.dumps(data).encode("utf-8")
+# fmt: off
+@pytest.mark.parametrize("log_tuple",
+    [
+        ("agent_debug_5_mb.log.gz", 3 * 1024),
+        ("agent_debug_5_mb.log.gz", 10 * 1024),
+        ("agent_debug_5_mb.log.gz", 500 * 1024),
+        ("json_log_5_mb.log.gz", 3 * 1024),
+        ("json_log_5_mb.log.gz", 10 * 1024),
+        ("json_log_5_mb.log.gz", 500 * 1024),
+    ],
+    ids=[
+        "agent_debug_log_3k",
+        "agent_debug_log_10k",
+        "agent_debug_log_500k",
+        "json_log_3k",
+        "json_log_10k",
+        "json_log_500k",
+    ],
+)
+# fmt: on
+@pytest.mark.parametrize("compression_algorithm_tuple",
+    [
+        ("deflate", {"level": 3}),
+        ("deflate", {"level": 6}),
+        ("deflate", {"level": 9}),
+        ("bz2", {}),
+        ("snappy", {}),
+        ("zstandard", {}),
+    ],
+    ids=[
+        "deflate_level_3",
+        "deflate_level_6",
+        "deflate_level_9",
+        "bz2",
+        "snappy",
+        "zstandard",
+    ],
+)
+@pytest.mark.benchmark(group="compress", timer=time.process_time)
+def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
+    _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
-    _test_compress_string(benchmark, data, "deflate")
+
+# fmt: off
+@pytest.mark.parametrize("log_tuple",
+    [
+        ("agent_debug_5_mb.log.gz", 3 * 1024),
+        ("agent_debug_5_mb.log.gz", 10 * 1024),
+        ("agent_debug_5_mb.log.gz", 500 * 1024),
+        ("json_log_5_mb.log.gz", 3 * 1024),
+        ("json_log_5_mb.log.gz", 10 * 1024),
+        ("json_log_5_mb.log.gz", 500 * 1024),
+    ],
+    ids=[
+        "agent_debug_log_3k",
+        "agent_debug_log_10k",
+        "agent_debug_log_500k",
+        "json_log_3k",
+        "json_log_10k",
+        "json_log_500k",
+    ],
+)
+# fmt: on
+@pytest.mark.parametrize("compression_algorithm_tuple",
+    [
+        ("deflate", {"level": 3}),
+        ("deflate", {"level": 6}),
+        ("deflate", {"level": 9}),
+        ("bz2", {}),
+        ("snappy", {}),
+        ("zstandard", {}),
+    ],
+    ids=[
+        "deflate_level_3",
+        "deflate_level_6",
+        "deflate_level_9",
+        "bz2",
+        "snappy",
+        "zstandard",
+    ],
+)
+@pytest.mark.benchmark(group="decompress", timer=time.process_time)
+def test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
+    _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
 
-def test_bz2_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=100)
-    data = json.dumps(data).encode("utf-8")
+def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
+    compression_algorithm, kwargs = compression_algorithm_tuple
 
-    _test_compress_string(benchmark, data, "bz2")
+    file_name, bytes_to_read = log_tuple
+    data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
+    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm)
 
-@pytest.mark.skipif(not snappy, reason="python-snappy library not available")
-def test_snappy_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=100)
-    data = json.dumps(data).encode("utf-8")
-
-    _test_compress_string(benchmark, data, "snappy")
-
-
-@pytest.mark.skipif(not zstandard, reason="zstandard library not available")
-def test_zstandard_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=100)
-    data = json.dumps(data).encode("utf-8")
-
-    _test_compress_string(benchmark, data, "zstandard")
-
-
-@pytest.mark.skipif(not brotli, reason="brotli library not available")
-def test_brotli_compress_small_json_string(benchmark):
-    data = generate_random_dict(keys_count=1)
-    data = json.dumps(data).encode("utf-8")
-
-    _test_compress_string(benchmark, data, "brotli")
-
-
-def _test_compress_string(benchmark, data, compression_algorithm):
     def run_benchmark():
-        if compression_algorithm == "deflate":
-            result = zlib.compress(data)
-        elif compression_algorithm == "bz2":
-            result = bz2.compress(data)
-        elif compression_algorithm == "snappy":
-            result = snappy.compress(data)
-        elif compression_algorithm == "zstandard":
-            cctx = zstandard.ZstdCompressor()
-            result = cctx.compress(data)
-        elif compression_algorithm == "brotli":
-            result = brotli.compress(data)
-        else:
-            raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
+        result = compress_func(data, **kwargs)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=10, rounds=20)
 
     size_before_compression = len(data)
     size_after_compression = len(result)
@@ -119,4 +164,58 @@ def _test_compress_string(benchmark, data, compression_algorithm):
     benchmark.stats.stats.compression_ratio = compression_ratio
 
     assert result is not None
+    # assert correctness
     assert size_after_compression < size_before_compression
+    assert data == decompress_func(result)
+
+
+def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
+    compression_algorithm, kwargs = compression_algorithm_tuple
+
+    file_name, bytes_to_read = log_tuple
+    data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
+
+    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm)
+
+    compressed_data = compress_func(data, **kwargs)
+    assert compressed_data != data
+
+    def run_benchmark():
+        result = decompress_func(compressed_data)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=10, rounds=20)
+
+    size_before_decompression = len(compressed_data)
+    size_after_decompression = len(result)
+
+    assert result is not None
+    # assert correctness
+    assert result != compressed_data
+    assert size_after_decompression > size_before_decompression
+    assert data == result
+
+
+def _get_compress_and_decompress_func(compression_algorithm):
+    # type: (str) -> Tuple[Callable, Callable]
+    if compression_algorithm == "deflate":
+        compress_func = zlib.compress  # type: ignore
+        decompress_func = zlib.decompress  # type: ignore
+    elif compression_algorithm == "bz2":
+        compress_func = bz2.compress  # type: ignore
+        decompress_func = bz2.decompress  # type: ignore
+    elif compression_algorithm == "snappy":
+        compress_func = snappy.compress  # type: ignore
+        decompress_func = snappy.decompress  # type: ignore
+    elif compression_algorithm == "zstandard":
+        compressor = zstandard.ZstdCompressor()
+        decompressor = zstandard.ZstdDecompressor()
+        compress_func = compressor.compress  # type: ignore
+        decompress_func = decompressor.decompress  # type: ignore
+    elif compression_algorithm == "brotli":
+        compress_func = brotli.compress  # type: ignore
+        decompress_func = brotli.decompress  # type: ignore
+    else:
+        raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
+
+    return compress_func, decompress_func

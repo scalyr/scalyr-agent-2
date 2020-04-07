@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+
 import pytest
 
 # A list of custom metrics which should be included in the generated pytest benchmark result JSON
