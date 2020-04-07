@@ -135,6 +135,14 @@ define_config_option(
     default=20 * 1024 * 1024,
 )
 
+define_config_option(
+    __monitor__,
+    "format_version",
+    "Version of the output format for journal entries.",
+    convert_to=int,
+    default=2,
+)
+
 # this lock must be held to access the
 # _global_checkpoints dict
 _global_lock = threading.Lock()
@@ -327,6 +335,7 @@ seconds and then polls again.
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
+        self._format_version = self._config.get("format_version")
         if len(self._journal_path) == 0:
             self._journal_path = None
         if self._journal_path and not os.path.exists(self._journal_path):
@@ -557,12 +566,19 @@ seconds and then polls again.
     ):
         string_buffer = six.StringIO()
 
-        string_buffer.write("%s %s" % (metric_name, metric_value))
+        if self._format_version == 2:
+            string_buffer.write('%s "%s"' % (metric_name, metric_value))
+        else:
+            string_buffer.write(
+                "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
+            )
 
         if extra_fields is not None:
-            for field_name in extra_fields:
+            for field_name in sorted(extra_fields):
                 field_value = extra_fields[field_name]
-                string_buffer.write(" %s=%s" % (field_name, field_value))
+                string_buffer.write(
+                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
+                )
 
         msg = string_buffer.getvalue()
         string_buffer.close()

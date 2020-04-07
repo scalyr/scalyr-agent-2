@@ -38,48 +38,91 @@ def empty():
 
 
 class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
-    def test_format_msg(self):
+    def test_format_msg_v1(self):
         def fake_init(self):
-            pass
+            self._format_version = 1
 
         with mock.patch.object(JournaldMonitor, "_initialize", fake_init):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details", "Test message: {key: value} !@#$%^&*()"
+                    "details", 'Test message: {key: value} !@#$%^&*() "wawawa"'
                 )
-                self.assertEqual("details Test message: {key: value} !@#$%^&*()", msg)
+                self.assertEqual(
+                    'details "Test message: {key: value} !@#$%^&*() \\"wawawa\\""', msg
+                )
 
-    def test_format_msg_extra_fields(self):
+    def test_format_msg_extra_fields_v1(self):
         def fake_init(self):
-            pass
+            self._format_version = 1
 
         with mock.patch.object(JournaldMonitor, "_initialize", fake_init):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
                     "details",
-                    "Test message: {key: value} !@#$%^&*()",
+                    'Test message: {key: value} !@#$%^&*() "wawawa"',
                     extra_fields={"key": "value"},
                 )
                 self.assertEqual(
-                    "details Test message: {key: value} !@#$%^&*() key=value", msg
+                    'details "Test message: {key: value} !@#$%^&*() \\"wawawa\\"" key="value"',
+                    msg,
                 )
                 msg = monitor.format_msg(
                     "details",
-                    "Test message: {key: value} !@#$%^&*()",
+                    'Test message: {key: value} !@#$%^&*() "wawawa"',
                     extra_fields={"key": "value", "key1": "value1", "key2": "value2"},
                 )
-                self.assertTrue("details Test message: {key: value} !@#$%^&*()" in msg)
-                self.assertTrue("key2=value2" in msg)
-                self.assertTrue("key1=value1" in msg)
-                self.assertTrue("key=value" in msg)
+                self.assertEqual(
+                    msg,
+                    'details "Test message: {key: value} !@#$%^&*() \\"wawawa\\"" key="value" key1="value1" key2="value2"',
+                )
+
+    def test_format_msg_v2(self):
+        def fake_init(self):
+            self._format_version = 2
+
+        with mock.patch.object(JournaldMonitor, "_initialize", fake_init):
+            with mock.patch.object(JournaldMonitor, "__init__", fake_init):
+                monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
+                msg = monitor.format_msg(
+                    "details", 'Test message: {key: value} !@#$%^&*() "wawawa"'
+                )
+                self.assertEqual(
+                    'details "Test message: {key: value} !@#$%^&*() "wawawa""', msg
+                )
+
+    def test_format_msg_extra_fields_v2(self):
+        def fake_init(self):
+            self._format_version = 2
+
+        with mock.patch.object(JournaldMonitor, "_initialize", fake_init):
+            with mock.patch.object(JournaldMonitor, "__init__", fake_init):
+                monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
+                msg = monitor.format_msg(
+                    "details",
+                    'Test message: {key: value} !@#$%^&*() "wawawa"',
+                    extra_fields={"key": "value"},
+                )
+                self.assertEqual(
+                    'details "Test message: {key: value} !@#$%^&*() "wawawa"" key="value"',
+                    msg,
+                )
+                msg = monitor.format_msg(
+                    "details",
+                    'Test message: {key: value} !@#$%^&*() "wawawa"',
+                    extra_fields={"key": "value", "key1": "value1", "key2": "value2"},
+                )
+                self.assertEqual(
+                    msg,
+                    'details "Test message: {key: value} !@#$%^&*() "wawawa"" key="value" key1="value1" key2="value2"',
+                )
 
     @mock.patch(
         "scalyr_agent.builtin_monitors.journald_monitor.verify_systemd_library_is_available",
         side_effect=empty,
     )
-    def test_write_to_disk(self, verify):
+    def test_write_to_disk_v2(self, verify):
         fake_journal = {
             "_AUDIT_LOGINUID": 1000,
             "_CAP_EFFECTIVE": "0",
@@ -89,7 +132,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             "_HOSTNAME": "...",
             "_SYSTEMD_SESSION": 52,
             "_SYSTEMD_OWNER_UID": 1000,
-            "MESSAGE": "testing 1,2,3",
+            "MESSAGE": 'testing 1,2,3 "test"',
             # '__MONOTONIC_TIMESTAMP':
             # journal.Monotonic(timestamp=datetime.timedelta(2, 76200, 811585), bootid=UUID('958b7e26-df4c-453a-a0f9-a8406cb508f2')),
             "SYSLOG_IDENTIFIER": "python3",
@@ -144,31 +187,10 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             monitor.gather_sample()
 
             self.assertLogFileContainsLineRegex(
-                "....\\-..\\-.. ..\\:..\\:..\\.....",
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape(" [journald_monitor()] details testing 1,2,3"),
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape("timestamp=2015-09-05 13:17:04.944355"),
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape("machine_id=263bb31e-3e13-4062-9bdb-f1f4518999d2"),
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape("pid=7733"),
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape("unit=session-52.scope"),
-                file_path=os.path.join(journal_directory, "journald_monitor.log"),
-            )
-            self.assertLogFileContainsLineRegex(
-                re.escape("boot_id=958b7e26-df4c-453a-a0f9-a8406cb508f2"),
+                "....\\-..\\-.. ..\\:..\\:..\\....."
+                + re.escape(
+                    ' [journald_monitor()] details "testing 1,2,3 "test"" boot_id="958b7e26-df4c-453a-a0f9-a8406cb508f2" machine_id="263bb31e-3e13-4062-9bdb-f1f4518999d2" pid="7733" timestamp="2015-09-05 13:17:04.944355" unit="session-52.scope"'
+                ),
                 file_path=os.path.join(journal_directory, "journald_monitor.log"),
             )
 
@@ -178,7 +200,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
         "scalyr_agent.builtin_monitors.journald_monitor.verify_systemd_library_is_available",
         side_effect=empty,
     )
-    def test_write_to_disk_extra(self, verify):
+    def test_write_to_disk_extra_v2(self, verify):
         fake_journal = {
             "_AUDIT_LOGINUID": 1000,
             "_CAP_EFFECTIVE": "0",
@@ -188,7 +210,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             "_HOSTNAME": "...",
             "_SYSTEMD_SESSION": 52,
             "_SYSTEMD_OWNER_UID": 1000,
-            "MESSAGE": "testing 1,2,3",
+            "MESSAGE": 'testing 1,2,3 "test"',
             # '__MONOTONIC_TIMESTAMP':
             # journal.Monotonic(timestamp=datetime.timedelta(2, 76200, 811585), bootid=UUID('958b7e26-df4c-453a-a0f9-a8406cb508f2')),
             "SYSLOG_IDENTIFIER": "python3",
@@ -246,7 +268,166 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             self.assertLogFileContainsLineRegex(
                 "....\\-..\\-.. ..\\:..\\:..\\....."
                 + re.escape(
-                    " [journald_monitor()] details testing 1,2,3 transport=journal"
+                    ' [journald_monitor()] details "testing 1,2,3 "test"" transport="journal"'
+                ),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+
+            manager.stop_manager(wait_on_join=False)
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.journald_monitor.verify_systemd_library_is_available",
+        side_effect=empty,
+    )
+    def test_write_to_disk_v1(self, verify):
+        fake_journal = {
+            "_AUDIT_LOGINUID": 1000,
+            "_CAP_EFFECTIVE": "0",
+            "_SELINUX_CONTEXT": "unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023",
+            "_GID": 1000,
+            "CODE_LINE": 1,
+            "_HOSTNAME": "...",
+            "_SYSTEMD_SESSION": 52,
+            "_SYSTEMD_OWNER_UID": 1000,
+            "MESSAGE": 'testing 1,2,3 "test"',
+            # '__MONOTONIC_TIMESTAMP':
+            # journal.Monotonic(timestamp=datetime.timedelta(2, 76200, 811585), bootid=UUID('958b7e26-df4c-453a-a0f9-a8406cb508f2')),
+            "SYSLOG_IDENTIFIER": "python3",
+            "_UID": 1000,
+            "_EXE": "/usr/bin/python3",
+            "_PID": 7733,
+            "_COMM": "...",
+            "CODE_FUNC": "<module>",
+            "CODE_FILE": "<doctest journal.rst[4]>",
+            "_SOURCE_REALTIME_TIMESTAMP": datetime.datetime(
+                2015, 9, 5, 13, 17, 4, 944355
+            ),
+            # '__CURSOR': 's=...',
+            "_BOOT_ID": UUID("958b7e26-df4c-453a-a0f9-a8406cb508f2"),
+            "_CMDLINE": "/usr/bin/python3 ...",
+            "_MACHINE_ID": UUID("263bb31e-3e13-4062-9bdb-f1f4518999d2"),
+            "_SYSTEMD_SLICE": "user-1000.slice",
+            "_AUDIT_SESSION": 52,
+            "__REALTIME_TIMESTAMP": datetime.datetime(2015, 9, 5, 13, 17, 4, 945110),
+            "_SYSTEMD_UNIT": "session-52.scope",
+            "_SYSTEMD_CGROUP": "/user.slice/user-1000.slice/session-52.scope",
+            "_TRANSPORT": "journal",
+        }
+
+        def fake_pending_entries(self):
+            self._journal = [fake_journal]
+            return True
+
+        with mock.patch.object(
+            JournaldMonitor, "_has_pending_entries", fake_pending_entries
+        ):
+            journal_directory = tempfile.mkdtemp(suffix="journal")
+            fake_clock = FakeClock()
+            manager_poll_interval = 30
+            manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+                config_monitors=[
+                    {
+                        "module": "scalyr_agent.builtin_monitors.journald_monitor",
+                        "journal_path": journal_directory,
+                        "format_version": 1,
+                    }
+                ],
+                extra_toplevel_config={
+                    "user_agent_refresh_interval": manager_poll_interval,
+                    "agent_log_path": journal_directory,
+                },
+                null_logger=True,
+                fake_clock=fake_clock,
+            )
+            monitor = manager.monitors[0]
+            monitor.log_manager.set_log_watcher(LogWatcher())
+
+            monitor.gather_sample()
+
+            self.assertLogFileContainsLineRegex(
+                "....\\-..\\-.. ..\\:..\\:..\\....."
+                + re.escape(
+                    ' [journald_monitor()] details "testing 1,2,3 \\"test\\"" boot_id="958b7e26-df4c-453a-a0f9-a8406cb508f2" machine_id="263bb31e-3e13-4062-9bdb-f1f4518999d2" pid="7733" timestamp="2015-09-05 13:17:04.944355" unit="session-52.scope"'
+                ),
+                file_path=os.path.join(journal_directory, "journald_monitor.log"),
+            )
+
+            manager.stop_manager(wait_on_join=False)
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.journald_monitor.verify_systemd_library_is_available",
+        side_effect=empty,
+    )
+    def test_write_to_disk_extra_v1(self, verify):
+        fake_journal = {
+            "_AUDIT_LOGINUID": 1000,
+            "_CAP_EFFECTIVE": "0",
+            "_SELINUX_CONTEXT": "unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023",
+            "_GID": 1000,
+            "CODE_LINE": 1,
+            "_HOSTNAME": "...",
+            "_SYSTEMD_SESSION": 52,
+            "_SYSTEMD_OWNER_UID": 1000,
+            "MESSAGE": 'testing 1,2,3 "test"',
+            # '__MONOTONIC_TIMESTAMP':
+            # journal.Monotonic(timestamp=datetime.timedelta(2, 76200, 811585), bootid=UUID('958b7e26-df4c-453a-a0f9-a8406cb508f2')),
+            "SYSLOG_IDENTIFIER": "python3",
+            "_UID": 1000,
+            "_EXE": "/usr/bin/python3",
+            "_PID": 7733,
+            "_COMM": "...",
+            "CODE_FUNC": "<module>",
+            "CODE_FILE": "<doctest journal.rst[4]>",
+            "_SOURCE_REALTIME_TIMESTAMP": datetime.datetime(
+                2015, 9, 5, 13, 17, 4, 944355
+            ),
+            # '__CURSOR': 's=...',
+            "_BOOT_ID": UUID("958b7e26-df4c-453a-a0f9-a8406cb508f2"),
+            "_CMDLINE": "/usr/bin/python3 ...",
+            "_MACHINE_ID": UUID("263bb31e-3e13-4062-9bdb-f1f4518999d2"),
+            "_SYSTEMD_SLICE": "user-1000.slice",
+            "_AUDIT_SESSION": 52,
+            "__REALTIME_TIMESTAMP": datetime.datetime(2015, 9, 5, 13, 17, 4, 945110),
+            "_SYSTEMD_UNIT": "session-52.scope",
+            "_SYSTEMD_CGROUP": "/user.slice/user-1000.slice/session-52.scope",
+            "_TRANSPORT": "journal",
+        }
+
+        def fake_pending_entries(self):
+            self._journal = [fake_journal]
+            return True
+
+        with mock.patch.object(
+            JournaldMonitor, "_has_pending_entries", fake_pending_entries
+        ):
+            journal_directory = tempfile.mkdtemp(suffix="journal")
+            fake_clock = FakeClock()
+            manager_poll_interval = 30
+            manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+                config_monitors=[
+                    {
+                        "module": "scalyr_agent.builtin_monitors.journald_monitor",
+                        "journal_path": journal_directory,
+                        "journal_fields": {"_TRANSPORT": "transport"},
+                        "format_version": 1,
+                    }
+                ],
+                extra_toplevel_config={
+                    "user_agent_refresh_interval": manager_poll_interval,
+                    "agent_log_path": journal_directory,
+                },
+                null_logger=True,
+                fake_clock=fake_clock,
+            )
+            monitor = manager.monitors[0]
+            monitor.log_manager.set_log_watcher(LogWatcher())
+
+            monitor.gather_sample()
+
+            self.assertLogFileContainsLineRegex(
+                "....\\-..\\-.. ..\\:..\\:..\\....."
+                + re.escape(
+                    ' [journald_monitor()] details "testing 1,2,3 \\"test\\"" transport="journal"'
                 ),
                 file_path=os.path.join(journal_directory, "journald_monitor.log"),
             )
