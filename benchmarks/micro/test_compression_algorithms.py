@@ -98,6 +98,9 @@ from .utils import read_bytes_from_log_fixture_file
         ("zstandard", {"level": 3}),
         ("zstandard", {"level": 10}),
         ("zstandard", {"level": 12}),
+        ("brotli", {"quality": 3}),
+        ("brotli", {"quality": 5}),
+        ("brotli", {"quality": 8}),
     ],
     ids=[
         "deflate_level_3",
@@ -108,6 +111,9 @@ from .utils import read_bytes_from_log_fixture_file
         "zstandard_level_3_default",
         "zstandard_level_10",
         "zstandard_level_12",
+        "brotli_quality_3",
+        "brotli_quality_5",
+        "brotli_quality_8",
     ],
 )
 @pytest.mark.benchmark(group="compress", timer=time.process_time)
