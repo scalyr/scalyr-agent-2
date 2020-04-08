@@ -332,6 +332,7 @@ commands:
                  cp ~/fpm_builder_cache/* ~/agent_image/
             fi
             if [ "$(ls -A ~/agent_image_cache)" ]; then
+                ls ~/agent_image_cache
                 echo "agent image cache image is found."
                 cp ~/agent_image_cache/* ~/agent_image/
             fi
