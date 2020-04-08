@@ -29,7 +29,7 @@ parameters:
     default: "3.14.3"
   cache_version:
     type: string
-    default: "v4"
+    default: "v5"
 
 commands:
   unittest_tox:
@@ -331,7 +331,6 @@ commands:
                  echo "fpm builder image is found."
                  cp ~/fpm_builder_cache/* ~/agent_image/
             fi
-            ls ~/agent_image_cache
             if [ "$(ls -A ~/agent_image_cache)" ]; then
                 echo "agent image cache image is found."
                 cp ~/agent_image_cache/* ~/agent_image/
@@ -364,7 +363,6 @@ commands:
           command: |
               cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
               rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
-              ls ~/agent_image/
               cp ~/agent_image/* ~/agent_image_cache/
 
       - save_cache:
