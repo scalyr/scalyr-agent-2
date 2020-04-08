@@ -386,10 +386,9 @@ commands:
                 name: Combine and Submit Coverage Data
                 command: |
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
-                  ls -la
-                  ls -la artifacts
+                  ls -la ~/artifacts
                   mkdir -p coverage_data/
-                  cp artifacts/*/.coverage coverage_data/
+                  cp ~/artifacts/*/.coverage coverage_data/
 
                   cd coverage_data/
                   coverage combine
