@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Benchmarks which measure performance of the Event class serialization.
+Benchmarks which measure performance of date parsing functions.
 """
 
 from __future__ import absolute_import
