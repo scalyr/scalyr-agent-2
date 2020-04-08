@@ -67,6 +67,9 @@ class AgentRunner(object):
         self, installation_type=DEV_INSTALL, enable_coverage=False
     ):  # type: (int, bool) -> None
 
+        if enable_coverage and installation_type != DEV_INSTALL:
+            raise ValueError("Coverage is only supported for dev installs")
+
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
         # agent logs directory path.
@@ -181,14 +184,28 @@ class AgentRunner(object):
                 cmd, shell=True, env=compat.os_environ_unicode.copy()
             )
         else:
+            base_args = [
+                str(_AGENT_MAIN_PATH),
+                "--no-fork",
+                "--no-change-user",
+                "start",
+            ]
 
             if self._enable_coverage:
-                executable = "coverage run"
+                # NOTE: We need to pass in command string as a single argument to coverage run
+                args = [
+                    "coverage",
+                    "run",
+                    "--concurrency=thread",
+                    "--parallel-mode",
+                    " ".join(base_args),
+                ]
+                args = " ".join(args)
+            else:
+                args = [executable] + base_args
+
             self._agent_process = subprocess.Popen(
-                "{0} {1} --no-fork --no-change-user start".format(
-                    executable, _AGENT_MAIN_PATH
-                ),
-                shell=True,
+                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
             )
 
         print("Agent started.")
@@ -248,6 +265,8 @@ class AgentRunner(object):
             )
 
     def stop(self, executable="python"):
+        print("Stopping agent process...")
+
         if self._installation_type == PACKAGE_INSTALL:
             service_executable = find_executable("service")
             if service_executable:
@@ -267,6 +286,21 @@ class AgentRunner(object):
 
             process.wait()
             self._agent_process.wait()
+
+            # Print any output produced by the agent before working which may not end up in the logs
+            if self._agent_process.stdout and self._agent_process.stderr:
+                stdout = self._agent_process.stdout.read().decode("utf-8")
+                stderr = self._agent_process.stderr.read().decode("utf-8")
+
+                print("Agent process stdout: %s" % (stdout))
+                print("Agent process stderr: %s" % (stderr))
+
+            if self._enable_coverage:
+                # Combine all the coverage files for this process and threads into a single file so
+                # we can copy it over.
+                print("Combining coverage data...")
+                print(os.system("coverage combine"))
+
         print("Agent stopped.")
 
     def __del__(self):

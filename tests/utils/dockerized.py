@@ -83,8 +83,8 @@ def dockerized_case(
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
 
-            coverage_file_path = Path("/", ".coverage")
             if artifacts_path:
+                coverage_file_path = Path("/", ".coverage")
                 artifacts_path = Path(artifacts_path)
 
                 if artifacts_use_subdirectory:
