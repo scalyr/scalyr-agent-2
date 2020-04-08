@@ -313,9 +313,11 @@ commands:
           command: |
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
+
             # generate file with checksum that is calculated for every required file.
             python -m tests.image_builder.distributions.<< parameters.distribution >>.cmd --checksum > ~/checksum
             python -m tests.image_builder.distributions.fpm_package_builder.cmd --checksum > ~/fpm_builder_checksum
+            python -m tests.image_builder.monitors.base.cmd --checksum > ~/monitors_builder_checksum
 
       - restore_cache:
           # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
@@ -342,24 +344,12 @@ commands:
 
             << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
 
-      - when:
-          condition: << parameters.submit_coverage >>
-          steps:
-            - run:
-                name: Combine and Submit Coverage Data
-                command: |
-                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
-                  mkdir -p coverage_data/
-                  cp artifacts/*/.coverage coverage_data/
-
-                  cd coverage_data/
-                  coverage combine
-                  coverage report
       - run:
-          name: Copy images to cache folder.
+          name: Copy Created Docker Images to Cache Folders
           command: |
               cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
               rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
+              cp  ~/agent_image/scalyr-agent-testings-monitor-base ~/monitors_builder_cache/scalyr-agent-testings-monitor-base
               cp ~/agent_image/* ~/agent_image_cache/
 
       - save_cache:
@@ -368,6 +358,13 @@ commands:
           key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/fpm_builder_cache"
+
+      - save_cache:
+          name: "Save monitors_builder cache"
+          # save monitors builder image to 'tar' file here, if this file is not found previously.
+          key: fpm-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/monitors_builder_cache"
 
       - save_cache:
           name: "Save agent_image cache"
@@ -381,6 +378,22 @@ commands:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+
+      - when:
+          condition: << parameters.submit_coverage >>
+          steps:
+            - run:
+                name: Combine and Submit Coverage Data
+                command: |
+                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+                  ls -la
+                  ls -la artifacts
+                  mkdir -p coverage_data/
+                  cp artifacts/*/.coverage coverage_data/
+
+                  cd coverage_data/
+                  coverage combine
+                  coverage report
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:

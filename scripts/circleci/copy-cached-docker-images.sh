@@ -16,11 +16,17 @@
 # Script which copies cached Docker images to ~/agent_image/ directory
 mkdir -p ~/agent_image
 mkdir -p ~/fpm_builder_cache
+mkdir -p ~/monitors_builder_cache
 mkdir -p ~/agent_image_cache
 
 if [ "$(ls -A ~/fpm_builder_cache)" ]; then
     echo "fpm builder image is found."
     cp ~/fpm_builder_cache/* ~/agent_image/
+fi
+
+if [ "$(ls -A ~/monitors_builder_cache)" ]; then
+    echo "monitors builder image is found."
+    cp ~/monitors_builder_cache/* ~/agent_image/
 fi
 
 if [ "$(ls -A ~/agent_image_cache)" ]; then

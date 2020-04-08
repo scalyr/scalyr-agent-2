@@ -17,4 +17,3 @@ RUN python2 -m pip install -r dev-requirements.txt
 RUN python3 -m pip install -r dev-requirements.txt
 
 WORKDIR /
-
