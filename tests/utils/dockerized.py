@@ -72,7 +72,7 @@ def dockerized_case(
                 command=command,
                 stdout=True,
                 stderr=True,
-                environment=compat.os_environ_unicode.copy(),
+                environment=get_environment_for_docker_run(),
             )
 
             exit_code = container.wait()["StatusCode"]
@@ -159,3 +159,21 @@ def copy_artifacts(container, file_paths, destination_path):
 
         # remove tar file.
         os.remove(data_tar_path)
+
+
+def get_environment_for_docker_run():
+    """
+    Return sanitized environment to be used with containers.run() command.
+
+    The returned environment excludes any environment variables which could effect tests
+    and cause a failure.
+    """
+    env_vars_to_delete = ["PATH", "HOME"]
+
+    environment = compat.os_environ_unicode.copy()
+
+    for env_var in env_vars_to_delete:
+        if env_var in environment:
+            del environment[env_var]
+
+    return environment
