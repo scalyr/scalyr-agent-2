@@ -345,18 +345,21 @@ commands:
               cp ~/agent_image/* ~/agent_image_cache/
 
       - save_cache:
+          name: "Save fpm_builder cache"
           # save fpm builder image to 'tar' file here, if this file is not found previously.
           key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/fpm_builder_cache"
 
       - save_cache:
+          name: "Save agent_image cache"
           # save agent image to 'tar' file here, if this file is not found previously.
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
            - "~/agent_image_cache"
 
       - save_cache:
+          name: "Save Python dependencies cache"
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
