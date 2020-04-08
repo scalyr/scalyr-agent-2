@@ -408,11 +408,14 @@ commands:
                   # coverage combine and codecov reporting and merging to work.
                   sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
 
+                  cat .coverage
+
                   # Print the report
                   coverage report -i
 
                   # Submit it to codecov.io
                   coverage xml --rcfile=.coveragerc -i -o coverage.xml
+                  cat coverage.xml
                   ./scripts/submit-codecov-data.sh
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
@@ -736,7 +739,9 @@ jobs:
           working_directory: cov
           command: |
             source ../venv/bin/activate
+            cat .coverage
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            cat coverage.xml
             ./../scripts/submit-codecov-data.sh
 
   lint-checks:
@@ -1092,7 +1097,7 @@ jobs:
 workflows:
   version: 2
   unittest:
-    # NOTE: To avoid massive and inflated build matrix, we currently don't run test under multiple
+    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
       - lint-checks
