@@ -104,3 +104,4 @@ Defaults to {:
                                      to a log for sending to Scalyr.
 |||# ``max_log_size``            ||| Max size of a log file before we rotate it out, when writing journal entries to a \
                                      log for sending to Scalyr.
+|||# ``format_version``          ||| Version of the output format for journal entries.
