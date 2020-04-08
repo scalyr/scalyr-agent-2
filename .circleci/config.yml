@@ -394,13 +394,12 @@ commands:
                 name: Combine and Submit Coverage Data
                 command: |
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
-                  ls -la ~/artifacts
-                  mkdir -p coverage_data/
-                  cp ~/artifacts/*/.coverage coverage_data/
+                  ls -la ~/artifacts/*/.coverage
 
-                  cd coverage_data/
-                  coverage combine
-                  coverage report
+                  pip install "coverage==4.5.4"
+
+                  coverage combine ~/artifacts/*/.coverage
+                  coverage report -i
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
