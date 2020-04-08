@@ -297,14 +297,17 @@ class AgentRunner(object):
                 stdout = self._agent_process.stdout.read().decode("utf-8")
                 stderr = self._agent_process.stderr.read().decode("utf-8")
 
-                print("Agent process stdout: %s" % (stdout))
-                print("Agent process stderr: %s" % (stderr))
+                if stdout:
+                    print("Agent process stdout: %s" % (stdout))
+
+                if stderr:
+                    print("Agent process stderr: %s" % (stderr))
 
             if self._enable_coverage:
                 # Combine all the coverage files for this process and threads into a single file so
                 # we can copy it over.
                 print("Combining coverage data...")
-                print(os.system("coverage combine"))
+                os.system("coverage combine")
 
         print("Agent stopped.")
         self._stopped = True
