@@ -1097,52 +1097,46 @@ workflows:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      #- lint-checks
-        #      - unittest-38
-        #      - unittest-37
-        #      - unittest-36
-        #      - unittest-35
+      - lint-checks
+      - unittest-26
       - unittest-27
-        #      - unittest-26
-        #      - smoke-standalone-38
-        #      - smoke-standalone-37
-        #      - smoke-standalone-36
-        #      - smoke-standalone-35
-        #      - smoke-standalone-27
-        #      - smoke-standalone-26
-        #      # smoke test jobs above are still uses old smoke tests.
+      - unittest-35
+      - smoke-standalone-26
+      - smoke-standalone-27
+      - smoke-standalone-35
+      - smoke-standalone-26-tls12
+      - smoke-standalone-27-tls12
+       # NOTE: smoke test jobs below still use old smoke tests framework
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
-        #      - smoke-standalone-27-tls12
-        #      - smoke-standalone-26-tls12
-  #package-tests:
-    #jobs:
-      #- smoke-monitors-tests
-        #      - package-build-rpm:
-        #          <<: *non_master_and_release
-        #      - package-build-deb:
-        #          <<: *non_master_and_release
-        #      - package-test-rpm:
-        #          <<: *master_and_release_only
-        #      - package-test-deb:
-        #          <<: *master_and_release_only
-        #      - smoke-rpm-package-py2:
-        #          requires:
-        #            - package-test-rpm
-        #          <<: *master_and_release_only
-        #      - smoke-rpm-package-py3:
-        #          requires:
-        #            - package-test-rpm
-        #          <<: *master_and_release_only
-        #      - smoke-deb-package-py2:
-        #          requires:
-        #            - package-test-deb
-        #          <<: *master_and_release_only
-        #      - smoke-deb-package-py3:
-        #          requires:
-        #            - package-test-deb
-        #          <<: *master_and_release_only
+  package-tests:
+    jobs:
+      - smoke-monitors-tests
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
+      - package-test-rpm:
+          <<: *master_and_release_only
+      - package-test-deb:
+          <<: *master_and_release_only
+      - smoke-rpm-package-py2:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
+      - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
