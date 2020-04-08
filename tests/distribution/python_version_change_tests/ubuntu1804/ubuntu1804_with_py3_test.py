@@ -18,7 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import pytest
 
-from tests.image_builder.distributions.ubuntu1604_with_py3 import UbuntuBuilder
+from tests.image_builder.distributions.ubuntu1804 import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
@@ -37,7 +37,7 @@ from tests.common import install_deb, install_next_version_deb
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(UbuntuBuilder, __file__)
+@dockerized_case(UbuntuBuilder, __file__, file_paths_to_copy=["/scalyr-agent.deb"])
 def test_ubuntu_test_versions(request):
     common_test_ubuntu_versions()
 
