@@ -117,8 +117,10 @@ def copy_artifacts(container, file_paths, destination_path):
     if not file_paths:
         return
 
-    if not destination_path.exists():
-        return
+    try:
+        os.makedirs(destination_path)
+    except OSError:
+        pass
 
     for file_path in file_paths:
         # fetch file as tar file stream if it exists
@@ -134,11 +136,6 @@ def copy_artifacts(container, file_paths, destination_path):
                 continue
 
             raise e
-
-        try:
-            os.makedirs(destination_path)
-        except OSError:
-            pass
 
         print('Copying file path "%s" to "%s"' % (file_path, destination_path))
 
