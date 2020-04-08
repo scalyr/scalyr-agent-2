@@ -68,7 +68,7 @@ class LogReader(threading.Thread):
             line = get_line()
             self.handle_new_line(line)
 
-    def start(self, wait_for_data=True):
+    def start(self, wait_for_data=False):
         super(LogReader, self).start()
         if not wait_for_data:
             return
@@ -82,9 +82,18 @@ class LogReader(threading.Thread):
         with self._lines_lock:
             return list(self._lines)
 
-    def wait_for_new_line(self):
+    def wait_for_new_line(self, timeout=10):
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
         with self._wait_for_line_cv:
             while not self._has_new_line:
+                if time.time() >= timeout_time:
+                    raise ValueError(
+                        "timeout of %s seconds reached while waiting for metrics"
+                        % (timeout)
+                    )
+
                 self._wait_for_line_cv.wait(0.1)
             self._has_new_line = False
             with self._lines_lock:
@@ -121,7 +130,7 @@ class LogMetricReader(LogReader):
 
         return metric_name, metric_value
 
-    def get_metrics(self, names):
+    def get_metrics(self, names, timeout=10):
         def get():
             _metrics = dict()
             for name in names:
@@ -131,11 +140,21 @@ class LogMetricReader(LogReader):
                 _metrics[name] = metric_value
             return _metrics
 
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
         while not self._stop_event.is_set():
             with self._lines_lock:
                 metrics = get()
             if metrics is not None:
                 return metrics
+
+            if time.time() >= timeout_time:
+                raise ValueError(
+                    "timeout of %s seconds reached while waiting for metrics"
+                    % (timeout)
+                )
+
             time.sleep(0.1)
 
     def get_metric(self, name):
