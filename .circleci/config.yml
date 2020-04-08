@@ -408,14 +408,12 @@ commands:
                   # coverage combine and codecov reporting and merging to work.
                   sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
 
-                  cat .coverage
-
                   # Print the report
                   coverage report -i
 
                   # Submit it to codecov.io
                   coverage xml --rcfile=.coveragerc -i -o coverage.xml
-                  cat coverage.xml
+
                   ./scripts/submit-codecov-data.sh
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
@@ -709,40 +707,31 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install "coverage==4.5.4" "codecov==2.0.15"
-            mkdir -p cov
-            cp .circleci/.coveragerc_ci cov/.coveragerc
+            cp .circleci/.coveragerc_ci .coveragerc
 
       - attach_workspace:
-          at: cov
+          at: .
 
       - run:
-          name: Combine coverage
-          working_directory: cov
+          name: Combine Coverage
           command: |
-            source ../venv/bin/activate
+            source ./venv/bin/activate
             ls -la .
-            ls -la ../*coverage* || true
+            ls -la *coverage* || true
             coverage combine
 
-      - store_artifacts:
-          path: cov
-
       - run:
-          name: Print coverage report
-          working_directory: cov
+          name: Print Coverage Report
           command: |
-            source ../venv/bin/activate
+            source ./venv/bin/activate
             coverage report
 
       - run:
-          name: Upload coverage data to codecov.io
-          working_directory: cov
+          name: Upload Coverage Data To codecov.io
           command: |
-            source ../venv/bin/activate
-            cat .coverage
+            source ./venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            cat coverage.xml
-            ./../scripts/submit-codecov-data.sh
+            ./scripts/submit-codecov-data.sh
 
   lint-checks:
     working_directory: ~/scalyr-agent-2
@@ -1114,20 +1103,20 @@ workflows:
         #      - smoke-standalone-27
         #      - smoke-standalone-26
         #      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
+     # - smoke-docker-json
+     # - smoke-docker-syslog
+     # - smoke-k8s
         #      - smoke-standalone-27-tls12
         #      - smoke-standalone-26-tls12
       - coverage:
           requires:
             - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
-  package-tests:
-    jobs:
-      - smoke-monitors-tests
+         #   - smoke-docker-json
+         #   - smoke-docker-syslog
+         #   - smoke-k8s
+  #package-tests:
+    #jobs:
+      #- smoke-monitors-tests
         #      - package-build-rpm:
         #          <<: *non_master_and_release
         #      - package-build-deb:
