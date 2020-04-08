@@ -399,6 +399,9 @@ commands:
                   pip install "coverage==4.5.4"
 
                   coverage combine ~/artifacts/*/.coverage
+                  # coverage data from inside docker contains uses different paths which we need to normalize for
+                  # coverage combine and codecov reporting and merging to work.
+                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
                   coverage report -i
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
