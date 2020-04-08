@@ -320,21 +320,9 @@ commands:
           # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
 
-
       - run:
-          name: Copy cached images if they exist.
-          command: |
-            mkdir -p ~/agent_image
-            mkdir -p ~/fpm_builder_cache
-            mkdir -p ~/agent_image_cache
-            if [ "$(ls -A ~/fpm_builder_cache)" ]; then
-                 echo "fpm builder image is found."
-                 cp ~/fpm_builder_cache/* ~/agent_image/
-            fi
-            if [ "$(ls -A ~/agent_image_cache)" ]; then
-                echo "agent image cache image is found."
-                cp ~/agent_image_cache/* ~/agent_image/
-            fi
+          name: Copy Cached Docker Images (if they exist)
+          command: ./scripts/circleci/copy-cached-docker-images.sh
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
