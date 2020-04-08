@@ -12,26 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
 from __future__ import print_function
-
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
-import pytest
+from tests.image_builder.distributions.fpm_package_builder import FpmPackageBuilder
 
-from tests.utils.dockerized import dockerized_case
-from tests.image_builder.distributions import UbuntuBuilder
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(
-    UbuntuBuilder,
-    __file__,
-    file_paths_to_copy=["/scalyr-agent.deb"],
-    artifacts_use_subdirectory=False,
-)
-def test_build_deb_package(request):
-    """
-    Mock function which is used to build agent debian package.
-    """
-    pass
+if __name__ == "__main__":
+    FpmPackageBuilder.handle_command_line()

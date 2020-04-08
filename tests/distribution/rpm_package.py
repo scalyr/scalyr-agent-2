@@ -20,7 +20,7 @@ from __future__ import absolute_import
 import pytest
 
 from tests.utils.dockerized import dockerized_case
-from tests.distribution_builders.centos8 import CentOSBuilder
+from tests.image_builder.distributions.centos8 import CentOSBuilder
 
 
 @pytest.mark.usefixtures("agent_environment")

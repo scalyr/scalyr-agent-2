@@ -26,6 +26,7 @@ import six
 
 
 class LogReader(threading.Thread):
+    """Reader that allows to read file in separate thread and read and wait for new lines"""
     def __init__(self, file_path):
         super(LogReader, self).__init__()
         self.daemon = True
@@ -87,6 +88,7 @@ class LogReader(threading.Thread):
 
 
 class LogMetricReader(LogReader):
+    """Subclass that allows to read and wait for particular metric."""
     LINE_PATTERN = None
 
     def __init__(self, file_path):

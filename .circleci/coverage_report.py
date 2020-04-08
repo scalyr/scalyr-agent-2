@@ -50,6 +50,7 @@ args = parser.parse_args()
 for path in glob.glob(os.path.join(tempfile.gettempdir(), "scalyr_agent_coverage*")):
     shutil.rmtree(path)
 
+# create temporary directory for coverage generation.
 tmp_path = tempfile.mkdtemp(prefix="scalyr_agent_coverage_")
 
 
@@ -60,15 +61,11 @@ coverage_file_path = os.path.join(root, ".coverage")
 coverage_txt_path = os.path.join(root, "coverage.txt")
 renamed_coverage_file = os.path.join(root, "coverage.1")
 
-print(root)
-
 # "rename .coverage file for  "combine" command"
 if os.path.exists(coverage_txt_path):
     # can be useful after downloading from circleci.
-    #os.rename(coverage_txt_path, renamed_coverage_file)
     shutil.copy(coverage_txt_path, copied_coverage_file_path)
 elif os.path.exists(coverage_file_path):
-    #os.rename(coverage_file_path, renamed_coverage_file)
     shutil.copy(coverage_file_path, copied_coverage_file_path)
 else:
     raise OSError("Coverage file not found.")
