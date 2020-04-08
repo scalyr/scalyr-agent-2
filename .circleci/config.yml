@@ -275,7 +275,7 @@ commands:
           path: ~/scalyr-agent-dev/log
 
   package-test:
-    description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
+    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
     parameters:
       distribution:
         description: "The name of the distribution where the agent will be installed."
@@ -285,7 +285,7 @@ commands:
         type: string
         default: ""
       command:
-        description: "Command to run tests."
+        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
         type: string
       agent_host_name_prefix:
         description: "Host name for the agent instances that will be started during job."
@@ -301,6 +301,7 @@ commands:
           docker_layer_caching: false
 
       - restore_cache:
+          name: "Restore Python Dependencies cache"
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
       - run:
@@ -321,10 +322,17 @@ commands:
 
       - restore_cache:
           # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
+          name: "Restore fpm Builder Base Docker Image Cache"
           key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
 
       - restore_cache:
+          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
+          name: "Restore monitors Builder Base Docker Image Cache"
+          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+
+      - restore_cache:
           # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
+          name: "Restore Agent Base Docker Image Cache"
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
 
       - run:
@@ -353,28 +361,28 @@ commands:
               cp ~/agent_image/* ~/agent_image_cache/
 
       - save_cache:
-          name: "Save fpm_builder cache"
           # save fpm builder image to 'tar' file here, if this file is not found previously.
+          name: "Save fpm Builder Base Docker Image Cache"
           key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/fpm_builder_cache"
 
       - save_cache:
-          name: "Save monitors_builder cache"
           # save monitors builder image to 'tar' file here, if this file is not found previously.
-          key: fpm-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+          name: "Save monitors Builder Base Docker Image Cache"
+          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/monitors_builder_cache"
 
       - save_cache:
-          name: "Save agent_image cache"
           # save agent image to 'tar' file here, if this file is not found previously.
+          name: "Save Agent Base Docker Image Cache"
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
            - "~/agent_image_cache"
 
       - save_cache:
-          name: "Save Python dependencies cache"
+          name: "Save Python Dependencies Dache"
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
