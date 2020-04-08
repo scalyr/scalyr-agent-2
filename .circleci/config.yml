@@ -291,8 +291,8 @@ commands:
         description: "Host name for the agent instances that will be started during job."
         type: string
         default: ""
-      submit_coverage:
-        description: "True to combine and submit coverage data to codecov"
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
         type: boolean
         default: false
     steps:
@@ -388,7 +388,7 @@ commands:
             - "~/.cache/pip"
 
       - when:
-          condition: << parameters.submit_coverage >>
+          condition: << parameters.upload_coverage >>
           steps:
             - run:
                 name: Combine and Submit Coverage Data
@@ -1031,7 +1031,7 @@ jobs:
           python_version: "python3"
           agent_host_name_prefix: "monitors-test"
           command: tox -eagent_monitors_ubuntu
-          submit_coverage: true
+          upload_coverage: true
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -1109,17 +1109,17 @@ workflows:
         #      - smoke-standalone-27
         #      - smoke-standalone-26
         #      # smoke test jobs above are still uses old smoke tests.
-        #      - smoke-docker-json
-        #      - smoke-docker-syslog
-        #      - smoke-k8s
+      - smoke-docker-json
+      - smoke-docker-syslog
+      - smoke-k8s
         #      - smoke-standalone-27-tls12
         #      - smoke-standalone-26-tls12
       - coverage:
           requires:
             - unittest-27
-          #   - smoke-docker-json
-          #   - smoke-docker-syslog
-          #   - smoke-k8s
+            - smoke-docker-json
+            - smoke-docker-syslog
+            - smoke-k8s
   package-tests:
     jobs:
       - smoke-monitors-tests
