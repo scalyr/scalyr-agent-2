@@ -135,14 +135,6 @@ define_config_option(
     default=20 * 1024 * 1024,
 )
 
-define_config_option(
-    __monitor__,
-    "format_version",
-    "Version of the output format for journal entries.",
-    convert_to=int,
-    default=2,
-)
-
 # this lock must be held to access the
 # _global_checkpoints dict
 _global_lock = threading.Lock()
@@ -551,8 +543,10 @@ seconds and then polls again.
             try:
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
-                logger = self.log_manager.get_logger(extra.get("unit", ""))
-                logger.info(self.format_msg("details", msg, extra))
+                unit = extra.get("unit", "")
+                logger = self.log_manager.get_logger(unit)
+                config = self.log_manager.get_config(unit)
+                logger.info(self.format_msg("details", msg, config, extra))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
@@ -562,12 +556,22 @@ seconds and then polls again.
                 )
 
     def format_msg(
-        self, metric_name, metric_value, extra_fields=None,
+        self, metric_name, metric_value, log_config, extra_fields=None,
     ):
         string_buffer = six.StringIO()
 
-        if self._format_version == 2:
-            string_buffer.write('%s "%s"' % (metric_name, metric_value))
+        detect_escaped_strings = False
+        emit_raw_details = False
+        if log_config:
+            detect_escaped_strings = log_config.get("detect_escaped_strings", False)
+            emit_raw_details = log_config.get("emit_raw_details", False)
+
+        if emit_raw_details or (
+            detect_escaped_strings
+            and metric_value.startswith('"')
+            and metric_value.endswith('"')
+        ):
+            string_buffer.write("%s %s" % (metric_name, metric_value))
         else:
             string_buffer.write(
                 "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
@@ -576,9 +580,16 @@ seconds and then polls again.
         if extra_fields is not None:
             for field_name in sorted(extra_fields):
                 field_value = extra_fields[field_name]
-                string_buffer.write(
-                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
-                )
+                if (
+                    detect_escaped_strings
+                    and field_value.startswith('"')
+                    and field_value.endswith('"')
+                ):
+                    string_buffer.write(" %s=%s" % (field_name, field_value))
+                else:
+                    string_buffer.write(
+                        " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
+                    )
 
         msg = string_buffer.getvalue()
         string_buffer.close()
