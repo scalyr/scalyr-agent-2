@@ -24,9 +24,9 @@ set -e
 # should be appended
 AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->"
 
-SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+SCRIPT_DIR=$(greadlink -f "$(dirname "${BASH_SOURCE[0]}")")
 
-MONITOR_FILES=$(find scalyr_agent/builtin_monitors/ -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
+MONITOR_FILES=$(find scalyr_agent/builtin_monitors -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
 
 # shellcheck disable=SC2068
 for FILE in ${MONITOR_FILES[@]}; do
