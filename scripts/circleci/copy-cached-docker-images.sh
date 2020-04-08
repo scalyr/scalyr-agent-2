@@ -17,9 +17,10 @@
 mkdir -p ~/agent_image
 mkdir -p ~/fpm_builder_cache
 mkdir -p ~/agent_image_cache
+
 if [ "$(ls -A ~/fpm_builder_cache)" ]; then
-        echo "fpm builder image is found."
-        cp ~/fpm_builder_cache/* ~/agent_image/
+    echo "fpm builder image is found."
+    cp ~/fpm_builder_cache/* ~/agent_image/
 fi
 
 if [ "$(ls -A ~/agent_image_cache)" ]; then
