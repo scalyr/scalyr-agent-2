@@ -513,7 +513,7 @@ def seconds_since_epoch(date_time, epoch=None):
     return microseconds_since_epoch(date_time) / 10.0 ** 6
 
 
-def rfc3339_to_datetime(string):
+def rfc3339_to_datetime(string, use_strptime=True):
     """Returns a date time from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -538,12 +538,20 @@ def rfc3339_to_datetime(string):
         parts[0] = parts[0][:-1]
 
     # create a datetime object
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
+    if use_strptime:
+        try:
+            tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return None
 
-    dt = datetime.datetime(*(tm[0:6]))
+        dt = datetime.datetime(*(tm[0:6]))
+    else:
+        try:
+            dt = datetime.datetime(
+                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+            )
+        except Exception:
+            return None
 
     # now add the fractional part
     if len(parts) > 1:
@@ -588,7 +596,6 @@ def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=True):
     if parts[0].endswith("Z"):
         parts[0] = parts[0][:-1]
 
-    # create a datetime object
     if use_strptime:
         try:
             tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
