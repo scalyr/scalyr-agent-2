@@ -25,9 +25,7 @@ class MySqlBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-mysql"
     COPY_AGENT_SOURCE = True
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
-    INCLUDE_PATHS = [
-        Path(__file__).parent / "init.sql"
-    ]
+    INCLUDE_PATHS = [Path(__file__).parent / "init.sql"]
     REQUIRED_IMAGES = [BaseMonitorBuilder]
     REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
 

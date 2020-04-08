@@ -280,7 +280,7 @@ class AgentImageBuilder(object):
             "--checksum",
             action="store_true",
             help="Print base64 encoded sha256 checksum of the Dockerfile of this builder. "
-                 "Also, it counts checksum of all required builders.",
+            "Also, it counts checksum of all required builders.",
         )
 
         args = parser.parse_args()

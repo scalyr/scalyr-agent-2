@@ -16,6 +16,10 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+if False:
+    from typing import Dict
+    from typing import Any
+
 import time
 import os
 
@@ -45,9 +49,7 @@ def mysql_client():
 
     time.sleep(3)
 
-    client = pymysql.connect(
-        host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE
-    )
+    client = pymysql.connect(host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE)
 
     yield client
     client.close()
@@ -87,7 +89,7 @@ class MysqlAgentRunner(AgentRunner):
 
 
 class MySqlLogReader(LogMetricReader):
-    LINE_PATTERN = "\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[mysql_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
+    LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[mysql_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
 
 
 def _test(request, python_version):

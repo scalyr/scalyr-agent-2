@@ -63,7 +63,9 @@ class AgentRunner(object):
        Agent runner provides ability to launch Scalyr agent with needed configuration settings.
        """
 
-    def __init__(self, installation_type=DEV_INSTALL, enable_coverage=False):  # type: (int) -> None
+    def __init__(
+        self, installation_type=DEV_INSTALL, enable_coverage=False
+    ):  # type: (int, bool) -> None
 
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
@@ -175,13 +177,17 @@ class AgentRunner(object):
                 # Special case for CentOS 6 where we need to use absolute path to service command
                 cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
 
-            self._agent_process = subprocess.Popen(cmd, shell=True, env=os.environ.copy())
+            self._agent_process = subprocess.Popen(
+                cmd, shell=True, env=compat.os_environ_unicode.copy()
+            )
         else:
 
             if self._enable_coverage:
                 executable = "coverage run"
             self._agent_process = subprocess.Popen(
-                "{0} {1} --no-fork --no-change-user start".format(executable, _AGENT_MAIN_PATH),
+                "{0} {1} --no-fork --no-change-user start".format(
+                    executable, _AGENT_MAIN_PATH
+                ),
                 shell=True,
             )
 

@@ -16,12 +16,14 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+if False:
+    from typing import Dict
+    from typing import Any
+
 import time
 import os
 
 import pytest
-
-from scalyr_agent.third_party import pymysql
 
 from tests.utils.agent_runner import AgentRunner
 
@@ -36,17 +38,17 @@ class NginxAgentRunner(AgentRunner):
     def __init__(self):
         super(NginxAgentRunner, self).__init__(enable_coverage=True)
 
-        self.nginx_log_path = self.add_log_file(self.agent_logs_dir_path / "nginx_monitor.log")
+        self.nginx_log_path = self.add_log_file(
+            self.agent_logs_dir_path / "nginx_monitor.log"
+        )
 
     @property
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
         config = super(NginxAgentRunner, self)._agent_config
         config["monitors"].append(
             {
-
                 "module": "scalyr_agent.builtin_monitors.nginx_monitor",
                 "status_url": "http://localhost:80/nginx_status",
-
             }
         )
 
@@ -54,7 +56,7 @@ class NginxAgentRunner(AgentRunner):
 
 
 class NginxLogReader(LogMetricReader):
-    LINE_PATTERN = "\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[nginx_monitor\((?P<instance_id>[^\]]*)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
+    LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[nginx_monitor\((?P<instance_id>[^\]]*)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
 
 
 def _test(request, python_version):
@@ -73,11 +75,9 @@ def _test(request, python_version):
         "nginx.connections.active",
         "nginx.connections.reading",
         "nginx.connections.writing",
-        "nginx.connections.waiting"
+        "nginx.connections.waiting",
     ]
-    metrics = reader.get_metrics(
-        metric_names
-    )
+    metrics = reader.get_metrics(metric_names)
 
     assert list(sorted(metrics.keys())) == sorted(metric_names)
 

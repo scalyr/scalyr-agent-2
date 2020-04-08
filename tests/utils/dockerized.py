@@ -19,12 +19,12 @@ DEFAULT_FILE_PATHS_TO_COPY = [
 
 
 def dockerized_case(
-        builder_cls,
-        file_path,
-        file_paths_to_copy=None,
-        artifacts_use_subdirectory=True,
-        remove_container=True,
-        python_executable="python3",
+    builder_cls,
+    file_path,
+    file_paths_to_copy=None,
+    artifacts_use_subdirectory=True,
+    remove_container=True,
+    python_executable="python3",
 ):
     """
     Decorator that makes decorated test case run inside docker container.

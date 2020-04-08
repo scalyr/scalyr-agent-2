@@ -53,7 +53,6 @@ for path in glob.glob(os.path.join(tempfile.gettempdir(), "scalyr_agent_coverage
 # create temporary directory for coverage generation.
 tmp_path = tempfile.mkdtemp(prefix="scalyr_agent_coverage_")
 
-
 copied_coverage_file_path = os.path.join(tmp_path, ".coverage.1")
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -85,24 +84,15 @@ with open(coverage_rc_path, "r") as f:
 # add current path to 'paths' section.
 cwd = os.getcwd()
 paths = ["\n%s" % root, "/agent_source/"]
-parser.add_section("paths")
+parser.add_section("paths")  # type: ignore
 parser.set("paths", "source", "\n".join(paths))  # type: ignore
 
 with open(coverage_rc_path, "w") as f:
     parser.write(f)  # type: ignore
 
-subprocess.check_call(
-    "coverage combine",
-    shell=True,
-    cwd=tmp_path
-)
+subprocess.check_call("coverage combine", shell=True, cwd=tmp_path)
 
-
-subprocess.check_call(
-    "coverage html",
-    shell=True,
-    cwd=tmp_path
-)
+subprocess.check_call("coverage html", shell=True, cwd=tmp_path)
 
 html_report_path = os.path.join(root, "htmlcov")
 shutil.rmtree(html_report_path, ignore_errors=True)

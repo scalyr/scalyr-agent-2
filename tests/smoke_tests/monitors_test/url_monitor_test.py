@@ -16,12 +16,15 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+if False:
+    from typing import Dict
+    from typing import Any
+
 import time
-import os
 import subprocess
 
 import pytest
-import requests
+import six
 
 from tests.utils.agent_runner import AgentRunner
 from tests.utils.log_reader import LogReader
@@ -47,7 +50,7 @@ class UrlMonitorAgentRunner(AgentRunner):
             {
                 "module": "scalyr_agent.builtin_monitors.url_monitor",
                 "id": "instance",
-                "url": "http://{0}:{1}/test".format(HOST, PORT)
+                "url": "http://{0}:{1}/test".format(HOST, PORT),
             }
         )
 
@@ -56,11 +59,7 @@ class UrlMonitorAgentRunner(AgentRunner):
 
 def _test(python_version):
     process = subprocess.Popen(
-        "python -m flask run",
-        shell=True,
-        env={
-            "FLASK_APP": "/server.py"
-        }
+        "python -m flask run", shell=True, env={"FLASK_APP": "/server.py"}
     )
     runner = UrlMonitorAgentRunner()
 

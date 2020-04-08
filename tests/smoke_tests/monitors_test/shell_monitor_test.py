@@ -16,12 +16,14 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+if False:
+    from typing import Dict
+    from typing import Any
+
 import time
-import os
-import subprocess
 
 import pytest
-import requests
+import six
 
 from tests.utils.agent_runner import AgentRunner
 from tests.utils.log_reader import LogReader
@@ -44,7 +46,7 @@ class ShellMonitorAgentRunner(AgentRunner):
             {
                 "module": "scalyr_agent.builtin_monitors.shell_monitor",
                 "id": "echo",
-                "command": 'echo "Hello"'
+                "command": 'echo "Hello"',
             }
         )
 

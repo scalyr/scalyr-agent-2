@@ -16,6 +16,9 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+if False:
+    from typing import Optional
+
 import re
 import threading
 import time
@@ -27,6 +30,7 @@ import six
 
 class LogReader(threading.Thread):
     """Reader that allows to read file in separate thread and read and wait for new lines"""
+
     def __init__(self, file_path):
         super(LogReader, self).__init__()
         self.daemon = True
@@ -89,7 +93,8 @@ class LogReader(threading.Thread):
 
 class LogMetricReader(LogReader):
     """Subclass that allows to read and wait for particular metric."""
-    LINE_PATTERN = None
+
+    LINE_PATTERN = None  # type: Optional[six.text_type]
 
     def __init__(self, file_path):
         super(LogMetricReader, self).__init__(file_path)
