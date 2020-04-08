@@ -396,8 +396,8 @@ commands:
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
-                  pip install "coverage==4.5.4"
-                  pip install "codecov==2.0.15"
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  cp .circleci/.coveragerc_ci .coveragerc
 
                   cp .circleci/.coveragerc_ci .coveragerc
 
@@ -697,15 +697,14 @@ jobs:
       - restore_cache:
           key: deps2-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
-          name: Install dependencies
+          name: Install Python Dependencies
           command: |
             # Small safety check to make sure the build fails if codecov.yml file is invalid.
             # By default codecov doesn't fail on invalid config and simply falls back to
             # system wide default config in case repo local config is invalid. This usually results
             # in confused and undesired behavior.
-            curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
-            virtualenv venv
-            source venv/bin/activate
+            ./scripts/circleci/verify-circle-ci-config.sh
+
             pip install "coverage==4.5.4" "codecov==2.0.15"
             cp .circleci/.coveragerc_ci .coveragerc
 
@@ -715,21 +714,17 @@ jobs:
       - run:
           name: Combine Coverage
           command: |
-            source ./venv/bin/activate
-            ls -la .
-            ls -la *coverage* || true
+            ls -la .coverage* || true
             coverage combine
 
       - run:
           name: Print Coverage Report
           command: |
-            source ./venv/bin/activate
             coverage report
 
       - run:
           name: Upload Coverage Data To codecov.io
           command: |
-            source ./venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
