@@ -950,7 +950,6 @@ jobs:
           command: tox -eagent_distributions_tests_ubuntu1804
 
   # Circle CI jobs which build agent packages for each PR.
-  # TODO: They should run much faster once image caching is fixed
   package-build-deb:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -970,6 +969,17 @@ jobs:
           distribution: "centos8"
           agent_host_name_prefix: "-test"
           command: tox -eagent_rpm_package
+
+  smoke-monitors-tests:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu1804"
+          python_version: "python3"
+          agent_host_name_prefix: "monitors-test"
+          command: tox -eagent_monitors_ubuntu
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -1032,56 +1042,57 @@ workflows:
   unittest:
     jobs:
       - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
-      - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
+        #      - unittest-38
+        #      - unittest-37
+        #      - unittest-36
+        #      - unittest-35
+        #      - unittest-27
+        #      - unittest-26
+        #      - smoke-standalone-38
+        #      - smoke-standalone-37
+        #      - smoke-standalone-36
+        #      - smoke-standalone-35
+        #      - smoke-standalone-27
+        #      - smoke-standalone-26
+        #      # smoke test jobs above are still uses old smoke tests.
+        #      - smoke-docker-json
+        #      - smoke-docker-syslog
+        #      - smoke-k8s
+        #      - smoke-standalone-27-tls12
+        #      - smoke-standalone-26-tls12
+        #      - coverage:
+        #          requires:
+        #            - unittest-27
+        #            - smoke-docker-json
+        #            - smoke-docker-syslog
+        #            - smoke-k8s
   package-tests:
     jobs:
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
+      - smoke-monitors-test
+        #      - package-build-rpm:
+        #          <<: *non_master_and_release
+        #      - package-build-deb:
+        #          <<: *non_master_and_release
+        #      - package-test-rpm:
+        #          <<: *master_and_release_only
+        #      - package-test-deb:
+        #          <<: *master_and_release_only
+        #      - smoke-rpm-package-py2:
+        #          requires:
+        #            - package-test-rpm
+        #          <<: *master_and_release_only
+        #      - smoke-rpm-package-py3:
+        #          requires:
+        #            - package-test-rpm
+        #          <<: *master_and_release_only
+        #      - smoke-deb-package-py2:
+        #          requires:
+        #            - package-test-deb
+        #          <<: *master_and_release_only
+        #      - smoke-deb-package-py3:
+        #          requires:
+        #            - package-test-deb
+        #          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
