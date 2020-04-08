@@ -309,7 +309,7 @@ commands:
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
             # generate file with checksum that is calculated for every required file.
-            python -m tests.image_builder.distributions<< parameters.distribution >>.cmd --checksum > ~/checksum
+            python -m tests.image_builder.distributions.<< parameters.distribution >>.cmd --checksum > ~/checksum
             python -m tests.image_builder.distributions.fpm_package_builder.cmd --checksum > ~/fpm_builder_checksum
 
       - restore_cache:
