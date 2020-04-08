@@ -164,7 +164,9 @@ class AgentRunner(object):
         for file_path in self._files.values():
             self._create_file(file_path)
 
-        self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
+        self.write_to_file(
+            self._agent_config_path, json.dumps(self._agent_config, indent=4)
+        )
 
     def start(self, executable="python"):
         # important to call this function before agent was started.
