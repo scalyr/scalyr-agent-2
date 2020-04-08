@@ -21,14 +21,11 @@ from tests.utils.image_builder import AgentImageBuilder
 from tests.image_builder.monitors.base import BaseMonitorBuilder
 
 
-class NginxBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-nginx"
+class ShellMonitorBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-shell-monitor"
     COPY_AGENT_SOURCE = True
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
     REQUIRED_IMAGES = [BaseMonitorBuilder]
     REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
-    INCLUDE_PATHS = [
-        Path(Path(__file__).parent / "config"),
-    ]
 
     IGNORE_CACHING = True

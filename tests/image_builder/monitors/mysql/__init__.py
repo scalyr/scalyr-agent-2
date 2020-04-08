@@ -29,5 +29,6 @@ class MySqlBuilder(AgentImageBuilder):
         Path(__file__).parent / "init.sql"
     ]
     REQUIRED_IMAGES = [BaseMonitorBuilder]
+    REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
 
     IGNORE_CACHING = True

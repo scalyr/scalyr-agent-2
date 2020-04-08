@@ -61,7 +61,9 @@ def _test(request, python_version):
     os.system("service nginx start")
 
     runner = NginxAgentRunner()
+
     runner.start(executable=python_version)
+    time.sleep(1)
 
     reader = NginxLogReader(runner.nginx_log_path)
 

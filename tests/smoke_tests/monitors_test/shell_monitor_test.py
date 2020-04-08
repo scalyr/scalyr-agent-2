@@ -18,34 +18,33 @@ from __future__ import absolute_import
 
 import time
 import os
+import subprocess
 
 import pytest
+import requests
 
 from tests.utils.agent_runner import AgentRunner
 from tests.utils.log_reader import LogReader
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.syslog import SyslogBuilder
-
-UDP_PORT = 5140
-TCP_PORT = 6010
+from tests.image_builder.monitors.shell import ShellMonitorBuilder
 
 
-class SyslogAgentRunner(AgentRunner):
+class ShellMonitorAgentRunner(AgentRunner):
     def __init__(self):
-        super(SyslogAgentRunner, self).__init__(enable_coverage=True)
+        super(ShellMonitorAgentRunner, self).__init__(enable_coverage=True)
 
-        self.syslog_log_path = self.add_log_file(
-            self.agent_logs_dir_path / "agent_syslog.log"
+        self.shell_monitor_log_path = self.add_log_file(
+            self.agent_logs_dir_path / "shell_monitor.log"
         )
 
     @property
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
-        config = super(SyslogAgentRunner, self)._agent_config
+        config = super(ShellMonitorAgentRunner, self)._agent_config
         config["monitors"].append(
             {
-                "module": "scalyr_agent.builtin_monitors.syslog_monitor",
-                "protocols": "tcp:{0}, udp:{1}".format(TCP_PORT, UDP_PORT),
-                "accept_remote_connections": False,
+                "module": "scalyr_agent.builtin_monitors.shell_monitor",
+                "id": "echo",
+                "command": 'echo "Hello"'
             }
         )
 
@@ -53,42 +52,28 @@ class SyslogAgentRunner(AgentRunner):
 
 
 def _test(python_version):
-    runner = SyslogAgentRunner()
+    runner = ShellMonitorAgentRunner()
 
     runner.start(executable=python_version)
     time.sleep(1)
-    reader = LogReader(runner.syslog_log_path)
-
+    reader = LogReader(runner.shell_monitor_log_path)
     reader.start(wait_for_data=False)
 
-    os.system("logger message1 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
-
     last_line = reader.wait_for_new_line()
 
-    assert "message1" in last_line
-
-    os.system("logger message2 --port {0} --tcp --server 127.0.0.1".format(TCP_PORT))
-
-    last_line = reader.wait_for_new_line()
-
-    assert "message2" in last_line
-
-    os.system("logger message3 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
-
-    last_line = reader.wait_for_new_line()
-
-    assert "message3" in last_line
+    assert "Hello" in last_line
+    assert "[shell_monitor(echo)]" in last_line
 
     runner.stop()
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(SyslogBuilder, __file__)
-def test_syslog_python2(request):
+@dockerized_case(ShellMonitorBuilder, __file__)
+def test_shell_python2(request):
     _test(python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(SyslogBuilder, __file__)
-def test_syslog_python3(request):
+@dockerized_case(ShellMonitorBuilder, __file__)
+def test_shell_python3(request):
     _test(python_version="python3")

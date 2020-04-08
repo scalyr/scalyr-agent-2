@@ -97,7 +97,7 @@ def _test(request, python_version):
 
     runner.start(executable=python_version)
 
-    time.sleep(5)
+    time.sleep(1)
     mysql_cursor.execute(
         "CREATE TABLE test_table( id INT AUTO_INCREMENT PRIMARY KEY, text VARCHAR(255));"
     )
