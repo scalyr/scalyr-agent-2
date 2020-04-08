@@ -204,12 +204,13 @@ class AgentRunner(object):
                     "--parallel-mode",
                     " ".join(base_args),
                 ]
-                args = " ".join(args)
             else:
                 args = [executable] + base_args
 
+            # NOTE: Using list would be safer since args are then auto escaped
+            cmd = " ".join(args)
             self._agent_process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
             )
 
         print("Agent started.")
