@@ -513,7 +513,7 @@ def seconds_since_epoch(date_time, epoch=None):
     return microseconds_since_epoch(date_time) / 10.0 ** 6
 
 
-def rfc3339_to_datetime(string, use_strptime=True):
+def rfc3339_to_datetime(string, use_strptime=False):
     """Returns a date time from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -525,6 +525,8 @@ def rfc3339_to_datetime(string, use_strptime=True):
     @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
 
     @rtype datetime.datetime
+
+    NOTE: We default to a faster non-strptime version.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
@@ -572,7 +574,7 @@ def rfc3339_to_datetime(string, use_strptime=True):
     return dt
 
 
-def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=True):
+def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=False):
     """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -584,6 +586,8 @@ def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=True):
     @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
 
     @rtype long
+
+    NOTE: We default to a faster non-strptime version.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
