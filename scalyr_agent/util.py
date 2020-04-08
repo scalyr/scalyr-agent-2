@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
+from six.moves import map
 
 if False:
     from typing import Union
@@ -39,6 +40,7 @@ import base64
 import calendar
 import datetime
 import os
+import re
 import threading
 import time
 import uuid
@@ -88,6 +90,8 @@ Python >= 3.6:
 
 Original error: %s
 """.strip()
+
+RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
 
 
 def get_json_implementation(lib_name):
@@ -560,7 +564,7 @@ def rfc3339_to_datetime(string):
     return dt
 
 
-def rfc3339_to_nanoseconds_since_epoch(string):
+def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=True):
     """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -585,12 +589,26 @@ def rfc3339_to_nanoseconds_since_epoch(string):
         parts[0] = parts[0][:-1]
 
     # create a datetime object
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
+    if use_strptime:
+        try:
+            tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return None
 
-    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
+        nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
+    else:
+        try:
+            dt = datetime.datetime(
+                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+            )
+        except Exception:
+            return None
+
+        nano_seconds = (
+            calendar.timegm((dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second))
+            * 1000000000
+        )
+
     nanos = 0
 
     # now add the fractional part
