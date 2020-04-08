@@ -1068,7 +1068,7 @@ workflows:
         #            - smoke-k8s
   package-tests:
     jobs:
-      - smoke-monitors-test
+      - smoke-monitors-tests
         #      - package-build-rpm:
         #          <<: *non_master_and_release
         #      - package-build-deb:
