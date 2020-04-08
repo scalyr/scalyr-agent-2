@@ -89,6 +89,7 @@ commands:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
                   .coverage.unittest-<< parameters.python_version >>
+
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
     parameters:
@@ -290,6 +291,10 @@ commands:
         description: "Host name for the agent instances that will be started during job."
         type: string
         default: ""
+      submit_coverage:
+        description: "True to combine and submit coverage data to codecov"
+        type: boolean
+        default: false
     steps:
       - checkout
       - setup_remote_docker:
@@ -337,6 +342,19 @@ commands:
 
             << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
 
+      - when:
+          condition: << parameters.submit_coverage >>
+          steps:
+            - run:
+                name: Combine and Submit Coverage Data
+                command: |
+                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+                  mkdir -p coverage_data/
+                  cp artifacts/*/.coverage coverage_data/
+
+                  cd coverage_data/
+                  coverage combine
+                  coverage report
       - run:
           name: Copy images to cache folder.
           command: |
@@ -980,6 +998,7 @@ jobs:
           python_version: "python3"
           agent_host_name_prefix: "monitors-test"
           command: tox -eagent_monitors_ubuntu
+          submit_coverage: true
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
