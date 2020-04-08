@@ -333,18 +333,9 @@ commands:
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
             export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
 
-            # NOTE: We don't want the build to immediately fail if tox command fails because we
-            # want to preserve the build logs as artifacts to aid with debugging
-            set +e
             mkdir -p ~/artifacts
-            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
-            EXIT_CODE=$?
-            set -e
 
-            if [ "${EXIT_CODE}" -ne "0" ]; then
-                echo "tox target failed"
-                exit 1
-            fi
+            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
 
       - run:
           name: Copy images to cache folder.
