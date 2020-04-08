@@ -43,6 +43,7 @@ def find_all_tests(directory=None, base_path=None):
 
     @return: List of module names with periods between package names and without the trailing '.py' suffix,
         such as 'scalyr_agent.tests.exceptions_test'.
+
     """
     if directory is None:
         directory = os.path.dirname(os.path.abspath(__file__))
