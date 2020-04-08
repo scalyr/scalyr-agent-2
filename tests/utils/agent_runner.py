@@ -91,6 +91,8 @@ class AgentRunner(object):
         # and agent runner needs to know it where files are located.
         self._installation_type = installation_type
 
+        self._stopped = False
+
         self._enable_coverage = enable_coverage
 
         self._init_agent_paths()
@@ -265,6 +267,9 @@ class AgentRunner(object):
             )
 
     def stop(self, executable="python"):
+        if self._stopped:
+            return
+
         print("Stopping agent process...")
 
         if self._installation_type == PACKAGE_INSTALL:
@@ -302,6 +307,7 @@ class AgentRunner(object):
                 print(os.system("coverage combine"))
 
         print("Agent stopped.")
+        self._stopped = True
 
     def __del__(self):
         self.stop()
