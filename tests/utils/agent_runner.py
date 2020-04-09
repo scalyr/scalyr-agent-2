@@ -17,6 +17,8 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import shutil
+import signal
+import time
 import os
 
 if False:
@@ -217,7 +219,11 @@ class AgentRunner(object):
             # NOTE: Using list would be safer since args are then auto escaped
             cmd = " ".join(args)
             self._agent_process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True,
+                close_fds=True,
             )
 
         print("Agent started.")
@@ -295,11 +301,18 @@ class AgentRunner(object):
             return result
 
         else:
+            # NOTE: Calling stop doesn't work anymore after merging https://github.com/scalyr/scalyr-agent-2/commit/f974270beaced92707cf6b9227d09630042e5f01
+            # so this is a temporary workaround
+            os.kill(self._agent_process.pid, signal.SIGTERM)
+            time.sleep(10)
+            os.kill(self._agent_process.pid, signal.SIGKILL)
+            """
             process = subprocess.Popen(
                 "{0} {1} stop".format(executable, _AGENT_MAIN_PATH), shell=True
             )
 
             process.wait()
+            """
             self._agent_process.wait()
 
             # Print any output produced by the agent before working which may not end up in the logs
