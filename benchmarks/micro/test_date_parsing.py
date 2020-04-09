@@ -23,7 +23,7 @@ import datetime
 from scalyr_agent.util import rfc3339_to_nanoseconds_since_epoch
 from scalyr_agent.util import rfc3339_to_datetime
 
-DATE_STR = "2015-08-03T09:12:43.143757463Z"
+DATE_STR = u"2015-08-03T09:12:43.143757463Z"
 EXPECTED_RESULT_TIMESTAMP = 1438593163143757463
 EXPECTED_RESULT_DT = datetime.datetime(2015, 8, 3, 9, 12, 43, 143757)
 
@@ -33,7 +33,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_with_strptime(benchmark):
         result = rfc3339_to_nanoseconds_since_epoch(DATE_STR, True)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
     assert bool(result)
     assert result == EXPECTED_RESULT_TIMESTAMP
 
@@ -43,7 +43,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_without_strptime(benchmark):
         result = rfc3339_to_nanoseconds_since_epoch(DATE_STR, False)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
     assert bool(result)
     assert result == EXPECTED_RESULT_TIMESTAMP
 
@@ -57,7 +57,7 @@ def test_rfc3339_to_datetime_with_strptime(benchmark):
         result = rfc3339_to_datetime(DATE_STR, True)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
     assert bool(result)
     assert result == EXPECTED_RESULT_DT
 
@@ -67,7 +67,7 @@ def test_rfc3339_to_datetime_without_strptime(benchmark):
         result = rfc3339_to_datetime(DATE_STR, False)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
     assert bool(result)
     assert result == EXPECTED_RESULT_DT
 
