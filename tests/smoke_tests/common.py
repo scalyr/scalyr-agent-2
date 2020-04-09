@@ -39,7 +39,8 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
 
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
-    runner = AgentRunner(agent_installation_type)
+    runner = AgentRunner(agent_installation_type, enable_debug_log=True)
+
     if python_version:
         runner.switch_version(python_version)
 

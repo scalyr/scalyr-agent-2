@@ -64,8 +64,11 @@ class AgentRunner(object):
        """
 
     def __init__(
-        self, installation_type=DEV_INSTALL, enable_coverage=False
-    ):  # type: (int, bool) -> None
+        self,
+        installation_type=DEV_INSTALL,
+        enable_coverage=False,
+        enable_debug_log=False,
+    ):  # type: (int, bool, bool) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")
@@ -94,6 +97,8 @@ class AgentRunner(object):
         self._stopped = False
 
         self._enable_coverage = enable_coverage
+
+        self._enable_debug_log = False
 
         self._init_agent_paths()
 
@@ -329,13 +334,18 @@ class AgentRunner(object):
         Build and return agent configuration.
         :return: dict with configuration.
         """
-        return {
+        config = {
             "api_key": compat.os_environ_unicode["SCALYR_API_KEY"],
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
             "monitors": [],
         }
+
+        if self._enable_debug_log:
+            config["debug_level"] = 5
+
+        return config
 
     @staticmethod
     def _create_file(path, content=None):
