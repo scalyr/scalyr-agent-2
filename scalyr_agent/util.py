@@ -93,7 +93,14 @@ Original error: %s
 
 # Matches RFC3339 date strings in the following format: %Y-%m-%dT%H:%M:%S
 # For example: 2015-08-06T14:40:56Z
-RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
+if six.PY3:
+    # re.ASCII makes this regex only match ASCII digits which is tiny bit faster than the version
+    # without re.ASCII flag
+    RFC3339_STR_REGEX = re.compile(
+        r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})", re.ASCII
+    )
+else:
+    RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
 
 
 def get_json_implementation(lib_name):
