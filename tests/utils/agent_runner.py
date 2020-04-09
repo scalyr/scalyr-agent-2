@@ -20,6 +20,7 @@ import shutil
 import signal
 import time
 import os
+import atexit
 
 if False:
     from typing import Dict, Optional, Any
@@ -227,6 +228,10 @@ class AgentRunner(object):
             )
 
         print("Agent started.")
+
+        # NOTE: We register atexit handler to ensure agent process is always stopped. This means
+        # even if a test failure occurs and we don't get a chance to manually call stop() method.
+        atexit.register(self.stop)
 
     def status(self):
         if self._installation_type == PACKAGE_INSTALL:
