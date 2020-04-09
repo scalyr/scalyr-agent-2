@@ -37,6 +37,7 @@ import six
 from six.moves import zip
 
 import scalyr_agent.util as scalyr_util
+from scalyr_agent import date_parsing_utils
 
 from scalyr_agent.util import (
     JsonReadFileException,
@@ -204,8 +205,10 @@ class TestUtil(ScalyrTestCase):
         ]
 
         for input_str, expected_dt in zip(input_strs, expected_dts):
-            result_with_strptime = scalyr_util.rfc3339_to_datetime(input_str, True)
-            result_without_strptime = scalyr_util.rfc3339_to_datetime(input_str, False)
+            result_with_strptime = date_parsing_utils._rfc3339_to_datetime_strptime(
+                input_str
+            )
+            result_without_strptime = scalyr_util.rfc3339_to_datetime(input_str)
 
             self.assertEqual(result_with_strptime, expected_dt)
             self.assertEqual(result_with_strptime, result_without_strptime)
@@ -276,11 +279,11 @@ class TestUtil(ScalyrTestCase):
         ]
 
         for input_str, expected_ts in zip(input_strs, expected_tss):
-            result_with_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                input_str, True
+            result_with_strptime = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_strptime(
+                input_str
             )
             result_without_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                input_str, False
+                input_str
             )
 
             self.assertEqual(result_with_strptime, expected_ts)

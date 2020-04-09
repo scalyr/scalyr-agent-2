@@ -20,57 +20,187 @@ from __future__ import absolute_import
 
 import datetime
 
-from scalyr_agent.util import rfc3339_to_nanoseconds_since_epoch
-from scalyr_agent.util import rfc3339_to_datetime
+import pytest
 
-DATE_STR = u"2015-08-03T09:12:43.143757463Z"
-EXPECTED_RESULT_TIMESTAMP = 1438593163143757463
-EXPECTED_RESULT_DT = datetime.datetime(2015, 8, 3, 9, 12, 43, 143757)
+from scalyr_agent.date_parsing_utils import _rfc3339_to_nanoseconds_since_epoch_strptime
+from scalyr_agent.date_parsing_utils import _rfc3339_to_nanoseconds_since_epoch_regex
+from scalyr_agent.date_parsing_utils import (
+    _rfc3339_to_nanoseconds_since_epoch_string_split,
+)
+from scalyr_agent.date_parsing_utils import (
+    _rfc3339_to_nanoseconds_since_epoch_udatetime,
+)
+
+from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_strptime
+from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_regex
+from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_string_split
+from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_udatetime
+
+DATE_WITH_FRACTION_STR = u"2015-08-03T09:12:43.143757463Z"
+EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP = 1438593163143757463
+EXPECTED_RESULT_WITH_FRACTION_DT = datetime.datetime(2015, 8, 3, 9, 12, 43, 143757)
+
+DATE_WITHOUT_FRACTION_STR = u"2015-08-03T09:12:43"
+EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP = 1438593163000000000
+EXPECTED_RESULT_WITHOUT_FRACTION_DT = datetime.datetime(2015, 8, 3, 9, 12, 43)
 
 
-def test_rfc3339_to_nanoseconds_since_epoch_with_strptime(benchmark):
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch")
+def test_rfc3339_to_nanoseconds_since_epoch_strptime(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
+
     def run_benchmark():
-        result = rfc3339_to_nanoseconds_since_epoch(DATE_STR, True)
+        result = _rfc3339_to_nanoseconds_since_epoch_strptime(date_str)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
-    assert bool(result)
-    assert result == EXPECTED_RESULT_TIMESTAMP
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
 
 
-def test_rfc3339_to_nanoseconds_since_epoch_without_strptime(benchmark):
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch")
+def test_rfc3339_to_nanoseconds_since_epoch_regex(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
+
     def run_benchmark():
-        result = rfc3339_to_nanoseconds_since_epoch(DATE_STR, False)
+        result = _rfc3339_to_nanoseconds_since_epoch_regex(date_str)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
-    assert bool(result)
-    assert result == EXPECTED_RESULT_TIMESTAMP
-
-    # Verify roundtrip is the same
-    result_with_strptime = rfc3339_to_nanoseconds_since_epoch(DATE_STR, True)
-    assert result == result_with_strptime
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
 
 
-def test_rfc3339_to_datetime_with_strptime(benchmark):
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch")
+def test_rfc3339_to_nanoseconds_since_epoch_string_split(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
+
     def run_benchmark():
-        result = rfc3339_to_datetime(DATE_STR, True)
+        result = _rfc3339_to_nanoseconds_since_epoch_string_split(date_str)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
     assert bool(result)
-    assert result == EXPECTED_RESULT_DT
+    assert result == expected_result
 
 
-def test_rfc3339_to_datetime_without_strptime(benchmark):
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch")
+def test_rfc3339_to_nanoseconds_since_epoch_udatetime(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
+
     def run_benchmark():
-        result = rfc3339_to_datetime(DATE_STR, False)
+        result = _rfc3339_to_nanoseconds_since_epoch_udatetime(date_str)
         return result
 
-    result = benchmark.pedantic(run_benchmark, iterations=1000, rounds=100)
-    assert bool(result)
-    assert result == EXPECTED_RESULT_DT
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
 
-    # Verify roundtrip is the same
-    result_with_strptime = rfc3339_to_datetime(DATE_STR, True)
-    assert result == result_with_strptime
+
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_datetime")
+def test_rfc3339_to_datetime_strptime(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
+
+    def run_benchmark():
+        result = _rfc3339_to_datetime_strptime(date_str)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_datetime")
+def test_rfc3339_to_datetime_regex(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
+
+    def run_benchmark():
+        result = _rfc3339_to_datetime_regex(date_str)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_datetime")
+def test_rfc3339_to_datetime_string_split(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
+
+    def run_benchmark():
+        result = _rfc3339_to_datetime_string_split(date_str)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_datetime")
+def test_rfc3339_to_datetime_udatetime(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
+
+    def run_benchmark():
+        result = _rfc3339_to_datetime_udatetime(date_str)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
