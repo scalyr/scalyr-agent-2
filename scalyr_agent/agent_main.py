@@ -180,8 +180,6 @@ class ScalyrAgent(object):
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
 
-        self.__no_fork = False
-
     @staticmethod
     def agent_run_method(controller, config_file_path, perform_config_check=False):
         """Begins executing the agent service on the current thread.
@@ -241,7 +239,7 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         status_format = command_options.status_format
-        self.__no_fork = command_options.no_fork
+        no_fork = command_options.no_fork
         no_check_remote = False
 
         # We process for the 'version' command early since we do not need the configuration file for it.
@@ -296,7 +294,7 @@ class ScalyrAgent(object):
         try:
             # Execute the command.
             if command == "start":
-                return self.__start(quiet, no_check_remote)
+                return self.__start(quiet, no_fork, no_check_remote)
             elif command == "inner_run_with_checks":
                 self.__perform_config_checks(no_check_remote)
                 return self.__run(self.__controller)
@@ -319,9 +317,9 @@ class ScalyrAgent(object):
                     agent_data_path, status_format=status_format
                 )
             elif command == "restart":
-                return self.__restart(quiet, no_check_remote)
+                return self.__restart(quiet, no_fork, no_check_remote)
             elif command == "condrestart":
-                return self.__condrestart(quiet, no_check_remote)
+                return self.__condrestart(quiet, no_fork, no_check_remote)
             else:
                 print('Unknown command given: "%s".' % command, file=sys.stderr)
                 return 1
@@ -467,8 +465,6 @@ class ScalyrAgent(object):
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
         scalyr_logging.set_log_destination(
             use_disk=True,
-            no_fork=self.__no_fork,
-            stdout_severity=self.__config.stdout_severity,
             max_bytes=self.__config.log_rotation_max_bytes,
             backup_count=self.__config.log_rotation_backup_count,
             logs_directory=self.__config.agent_log_path,
@@ -520,22 +516,25 @@ class ScalyrAgent(object):
             finally:
                 client.close()
 
-    def __start(self, quiet, no_check_remote):
+    def __start(self, quiet, no_fork, no_check_remote):
         """Executes the start command.
 
         This will perform some initial checks to see if the agent can be started, such as making sure it can
         read and write to the logs and data directory, and that it can send a successful message to the
         Scalyr servers (therefore verifying the authentication token is correct.)
 
-        After it determines that the agent is likely to be able to run, it will start the real agent.  If self.__no_fork
+        After it determines that the agent is likely to be able to run, it will start the real agent.  If no_fork
         is False, then a new process will be started in the background and this method will return.  Otherwise,
         this method will not return.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
+        @param no_fork: True if this method should not fork a separate process to run the agent, but run it
+            directly instead.  If it is False, then a daemon process will be forked and will run the agent.
         @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
             verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
             the script exits with a failure.
         @type quiet: bool
+        @type no_fork: bool
         @type no_check_remote: bool
 
         @return:  The exit status code for the process.
@@ -573,7 +572,7 @@ class ScalyrAgent(object):
                 "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019"
             )
 
-        if not self.__no_fork:
+        if not no_fork:
             # Do one last check to just cut down on the window of race conditions.
             self.__fail_if_already_running()
 
@@ -762,17 +761,18 @@ class ScalyrAgent(object):
             print("The agent does not appear to be running.")
             return 4
 
-    def __condrestart(self, quiet, no_check_remote):
+    def __condrestart(self, quiet, no_fork, no_check_remote):
         """Execute the 'condrestart' command which will only restart the agent if it is already running.
-        self.__no_form determines if this method should not fork a separate process to run the agent, but run it
-        directly instead.  If it is False, then a daemon process will be forked and will run the agent.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
+        @param no_fork: True if this method should not fork a separate process to run the agent, but run it
+            directly instead.  If it is False, then a daemon process will be forked and will run the agent.
         @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
             verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
             the script exits with a failure.
 
         @type quiet: bool
+        @type no_fork: bool
         @type no_check_remote: bool
 
         @return: the exit status code
@@ -794,24 +794,25 @@ class ScalyrAgent(object):
                 )
                 return 1
 
-            return self.__start(quiet, no_check_remote)
+            return self.__start(quiet, no_fork, no_check_remote)
         elif not quiet:
             print("Agent is not running, not restarting.")
             return 0
         else:
             return 0
 
-    def __restart(self, quiet, no_check_remote):
+    def __restart(self, quiet, no_fork, no_check_remote):
         """Execute the 'restart' which will start the agent, stopping the existing agent if it is running.
-        self.__no_fork determines if this method should not fork a separate process to run the agent, but run it
-        directly instead.  If it is False, then a daemon process will be forked and will run the agent.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
+        @param no_fork: True if this method should not fork a separate process to run the agent, but run it
+            directly instead.  If it is False, then a daemon process will be forked and will run the agent.
         @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
             verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
             the script exits with a failure.
 
         @type quiet: bool
+        @type no_fork: bool
         @type no_check_remote: bool
 
         @return: the exit status code, zero if it was successfully restarted, non-zero if it was not running or
@@ -834,7 +835,7 @@ class ScalyrAgent(object):
                 )
                 return 1
 
-        return self.__start(quiet, no_check_remote)
+        return self.__start(quiet, no_fork, no_check_remote)
 
     def __print_force_https_message(self, scalyr_server, raw_scalyr_server):
         """Convenience function for printing a message stating whether the scalyr_server was forced to use https"""
@@ -883,8 +884,6 @@ class ScalyrAgent(object):
                 )
                 scalyr_logging.set_log_destination(
                     use_disk=True,
-                    no_fork=self.__no_fork,
-                    stdout_severity=self.__config.stdout_severity,
                     max_bytes=self.__config.log_rotation_max_bytes,
                     backup_count=self.__config.log_rotation_backup_count,
                     logs_directory=self.__config.agent_log_path,

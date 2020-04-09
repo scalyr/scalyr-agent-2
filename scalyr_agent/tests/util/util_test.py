@@ -411,51 +411,6 @@ class TestUtil(ScalyrTestCase):
             "attributes_parser",
         )
 
-    def test_get_web_url_from_upload_url(self):
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://agent.scalyr.com"),
-            "https://www.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://log.scalyr.com"),
-            "https://www.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://upload.scalyr.com"),
-            "https://www.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://app.scalyr.com"),
-            "https://www.scalyr.com",
-        )
-
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://agent.eu.scalyr.com"),
-            "https://www.eu.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://log.eu.scalyr.com"),
-            "https://www.eu.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://upload.eu.scalyr.com"),
-            "https://www.eu.scalyr.com",
-        )
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://app.eu.scalyr.com"),
-            "https://www.eu.scalyr.com",
-        )
-
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://logstaging.scalyr.com"),
-            "https://logstaging.scalyr.com",
-        )
-
-        self.assertEqual(
-            scalyr_util.get_web_url_from_upload_url("https://logstaging.eu.scalyr.com"),
-            "https://logstaging.eu.scalyr.com",
-        )
-
 
 class TestRateLimiter(ScalyrTestCase):
     def setUp(self):
