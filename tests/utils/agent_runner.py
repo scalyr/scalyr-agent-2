@@ -346,6 +346,7 @@ class AgentRunner(object):
 
         if self._enable_debug_log:
             config["debug_level"] = 5
+            config["logs"].append({"path": "agent_debug.log"})  # type: ignore
 
         # Print out the agent config (masking the secrets) to make troubleshooting easier
         config_sanitized = copy.copy(config)
