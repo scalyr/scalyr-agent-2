@@ -1120,10 +1120,8 @@ workflows:
           <<: *non_master_and_release
       - package-build-deb:
           <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
+      - package-test-rpm
+      - package-test-deb
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
