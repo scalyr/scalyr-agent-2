@@ -221,6 +221,7 @@ class AgentRunner(object):
             cmd = " ".join(args)
             self._agent_process = subprocess.Popen(
                 cmd,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=True,
