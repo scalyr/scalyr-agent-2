@@ -243,7 +243,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps3-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -267,7 +267,7 @@ commands:
 
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps3-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
 
@@ -478,7 +478,6 @@ jobs:
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
           apt_dependencies: "procps build-essential"
-
 
   smoke-standalone-27-tls12:
     docker:
@@ -974,7 +973,6 @@ jobs:
       - smoke-standalone-tox:
           python_version: "2.7"
           tox_target: "py2.7-smoke-tests"
-
 
   smoke-standalone-26:
     working_directory: ~/scalyr-agent-2
