@@ -164,7 +164,11 @@ class AgentLogVerifier(AgentVerifier):
 
         if len(found_collectors) != 5:
             print(
-                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+                (
+                    "Not all collectors were found. Expected '{0}', got '{1}'.".format(
+                        5, len(found_collectors)
+                    )
+                )
             )
             return
 
@@ -187,7 +191,11 @@ class AgentLogVerifier(AgentVerifier):
         print("Check that all collectors were found in the log from Scalyr server.")
         if len(found_collectors_remote) != 5:
             print(
-                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+                (
+                    "Not all remote collectors were found. Expected '{0}', got '{1}'.".format(
+                        5, len(found_collectors_remote)
+                    )
+                )
             )
             return
 
