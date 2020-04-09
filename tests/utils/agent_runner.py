@@ -310,7 +310,13 @@ class AgentRunner(object):
             # so this is a temporary workaround
             os.kill(self._agent_process.pid, signal.SIGTERM)
             time.sleep(2)
-            os.kill(self._agent_process.pid, signal.SIGKILL)
+
+            try:
+                os.kill(self._agent_process.pid, signal.SIGKILL)
+            except Exception:
+                # Process is already dead, nothing to do
+                pass
+
             """
             process = subprocess.Popen(
                 "{0} {1} stop".format(executable, _AGENT_MAIN_PATH), shell=True
