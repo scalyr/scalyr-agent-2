@@ -46,7 +46,7 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details", 'Test message: {key: value} !@#$%^&*() "wawawa"', None
+                    'Test message: {key: value} !@#$%^&*() "wawawa"', None
                 )
                 self.assertEqual(
                     'details "Test message: {key: value} !@#$%^&*() \\"wawawa\\""', msg
@@ -60,7 +60,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details",
                     'Test message: {key: value} !@#$%^&*() "wawawa"',
                     None,
                     extra_fields={"key": "value"},
@@ -70,7 +69,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
                     msg,
                 )
                 msg = monitor.format_msg(
-                    "details",
                     'Test message: {key: value} !@#$%^&*() "wawawa"',
                     None,
                     extra_fields={"key": "value", "key1": "value1", "key2": "value2"},
@@ -88,7 +86,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details",
                     'Test message: {key: value} !@#$%^&*() "wawawa"',
                     {"emit_raw_details": True},
                 )
@@ -104,7 +101,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details",
                     'Test message: {key: value} !@#$%^&*() "wawawa"',
                     {"emit_raw_details": True},
                     extra_fields={"key": "value"},
@@ -114,7 +110,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
                     msg,
                 )
                 msg = monitor.format_msg(
-                    "details",
                     'Test message: {key: value} !@#$%^&*() "wawawa"',
                     {"emit_raw_details": True},
                     extra_fields={"key": "value", "key1": "value1", "key2": "value2"},
@@ -132,7 +127,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details",
                     '"Test message: {key: value} !@#$%^&*() "wawawa""',
                     {"detect_escaped_strings": True},
                 )
@@ -148,7 +142,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
             with mock.patch.object(JournaldMonitor, "__init__", fake_init):
                 monitor = JournaldMonitor()  # pylint: disable=no-value-for-parameter
                 msg = monitor.format_msg(
-                    "details",
                     '"Test message: {key: value} !@#$%^&*() "wawawa""',
                     {"detect_escaped_strings": True},
                     extra_fields={"key": '"value"'},
@@ -158,7 +151,6 @@ class JournaldMonitorTest(BaseScalyrLogCaptureTestCase):
                     msg,
                 )
                 msg = monitor.format_msg(
-                    "details",
                     '"Test message: {key: value} !@#$%^&*() "wawawa""',
                     {"detect_escaped_strings": True},
                     extra_fields={
