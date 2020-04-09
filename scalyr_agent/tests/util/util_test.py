@@ -34,6 +34,7 @@ import threading
 import uuid
 from mock import patch, MagicMock
 import six
+from six.moves import zip
 
 import scalyr_agent.util as scalyr_util
 
@@ -189,6 +190,26 @@ class TestUtil(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_datetime(s)
         self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56), actual)
 
+    def test_rfc3339_to_datetime_with_and_without_strptime(self):
+        # Verify corectness between two different implementations of this function
+        input_strs = [
+            "2015-08-06T14:40:56.123456Z",
+            "2015-08-06T14:40:56Z",
+            "2015-08-06T14:40:56.123456",
+        ]
+        expected_dts = [
+            datetime.datetime(2015, 8, 6, 14, 40, 56, 123456),
+            datetime.datetime(2015, 8, 6, 14, 40, 56),
+            datetime.datetime(2015, 8, 6, 14, 40, 56),
+        ]
+
+        for input_str, expected_dt in zip(input_strs, expected_dts):
+            result_with_strptime = scalyr_util.rfc3339_to_datetime(input_str, True)
+            result_without_strptime = scalyr_util.rfc3339_to_datetime(input_str, False)
+
+            self.assertEqual(result_with_strptime, expected_dt)
+            self.assertEqual(result_with_strptime, result_without_strptime)
+
     def test_rfc3339_to_datetime_truncated_nano(self):
         s = "2015-08-06T14:40:56.123456789Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
@@ -230,6 +251,40 @@ class TestUtil(ScalyrTestCase):
         )
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
+
+    def test_rfc3339_to_nanoseconds_since_epoch_with_and_without_strptime(self):
+        # Verify corectness between two different implementations of this function
+        input_strs = [
+            "2015-08-06T14:40:56.123456Z",
+            "2015-08-06T14:40:56Z",
+            "2015-08-06T14:40:56.123456789Z",
+        ]
+        expected_tss = [
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+            )
+            * 1000,
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56)
+            )
+            * 1000,
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+            )
+            * 1000
+            + 789,
+        ]
+
+        for input_str, expected_ts in zip(input_strs, expected_tss):
+            result_with_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
+                input_str, True
+            )
+            result_without_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
+                input_str, False
+            )
+
+            self.assertEqual(result_with_strptime, expected_ts)
+            self.assertEqual(result_with_strptime, result_without_strptime)
 
     def test_rfc3339_to_nanoseconds_since_epoch_no_fractions(self):
         s = "2015-08-06T14:40:56"
