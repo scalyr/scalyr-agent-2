@@ -404,6 +404,7 @@ jobs:
       - unittest_tox:
           python_version: "3.5"
           tox_target: "py3.5-unit-tests"
+          run_microbenchmarks: true
 
   unittest-27:
     working_directory: ~/scalyr-agent-2
