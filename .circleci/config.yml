@@ -99,7 +99,10 @@ commands:
             - run:
                 name: Run Microbenchmarks
                 command: |
+                  mkdir -p microbenchmark_histograms/
                   tox -emicro-benchmarks
+            - store_artifacts:
+                path: ~/scalyr-agent-2/microbenchmark_histograms/
 
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
