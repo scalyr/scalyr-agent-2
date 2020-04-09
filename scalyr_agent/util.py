@@ -91,6 +91,8 @@ Python >= 3.6:
 Original error: %s
 """.strip()
 
+# Matches RFC3339 date strings in the following format: %Y-%m-%dT%H:%M:%S
+# For example: 2015-08-06T14:40:56Z
 RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
 
 
