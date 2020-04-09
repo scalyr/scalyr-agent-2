@@ -288,7 +288,8 @@ class AgentRunner(object):
             )
 
     def stop(self, executable="python"):
-        atexit.unregister(self.stop)
+        if six.PY3:
+            atexit.unregister(self.stop)
 
         if self._stopped:
             return
@@ -310,7 +311,12 @@ class AgentRunner(object):
         else:
             # NOTE: Calling stop doesn't work anymore after merging https://github.com/scalyr/scalyr-agent-2/commit/f974270beaced92707cf6b9227d09630042e5f01
             # so this is a temporary workaround
-            os.kill(self._agent_process.pid, signal.SIGTERM)
+            try:
+                os.kill(self._agent_process.pid, signal.SIGTERM)
+            except Exception:
+                # Process is already dead, nothing to do
+                pass
+
             time.sleep(2)
 
             try:
