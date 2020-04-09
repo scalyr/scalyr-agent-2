@@ -722,7 +722,7 @@ class PosixPlatformController(PlatformController):
             while 1:
                 os.kill(pid, signal.SIGKILL)
                 # Workaround for defunct / hanging process when using --no-fork
-                os.wait()
+                os.waitpid(pid, 0)
                 PosixPlatformController.__sleep(0.1)
 
         except OSError as err:
