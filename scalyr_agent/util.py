@@ -18,7 +18,6 @@ from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
-from six.moves import map
 
 if False:
     from typing import Union
@@ -40,7 +39,6 @@ import base64
 import calendar
 import datetime
 import os
-import re
 import threading
 import time
 import uuid
@@ -90,17 +88,6 @@ Python >= 3.6:
 
 Original error: %s
 """.strip()
-
-# Matches RFC3339 date strings in the following format: %Y-%m-%dT%H:%M:%S
-# For example: 2015-08-06T14:40:56Z
-if six.PY3:
-    # re.ASCII makes this regex only match ASCII digits which is tiny bit faster than the version
-    # without re.ASCII flag
-    RFC3339_STR_REGEX = re.compile(
-        r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})", re.ASCII
-    )
-else:
-    RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
 
 
 def get_json_implementation(lib_name):
@@ -557,9 +544,22 @@ def rfc3339_to_datetime(string, use_strptime=False):
 
         dt = datetime.datetime(*(tm[0:6]))
     else:
+        # NOTE: We benchmarked multiple versions, including regex one and using string.split
+        # appears to be a bit faster than regex
         try:
+            # NOTE: I intentionally access values directly in the list and don't assign them
+            # to intermediate variables since it's faster
+            result = parts[0].split("T")
+            result1 = result[0].split("-")
+            result2 = result[1].split(".")[0].split(":")
+
             dt = datetime.datetime(
-                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+                int(result1[0]),
+                int(result1[1]),
+                int(result1[2]),
+                int(result2[0]),
+                int(result2[1]),
+                int(result2[2]),
             )
         except Exception:
             return None
@@ -617,9 +617,22 @@ def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=False):
 
         nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
     else:
+        # NOTE: We benchmarked multiple versions, including regex one and using string.split
+        # appears to be a bit faster than regex
         try:
+            # NOTE: I intentionally access values directly in the list and don't assign them
+            # to intermediate variables since it's faster
+            result = parts[0].split("T")
+            result1 = result[0].split("-")
+            result2 = result[1].split(".")[0].split(":")
+
             dt = datetime.datetime(
-                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+                int(result1[0]),
+                int(result1[1]),
+                int(result1[2]),
+                int(result2[0]),
+                int(result2[1]),
+                int(result2[2]),
             )
         except Exception:
             return None
