@@ -721,11 +721,13 @@ class PosixPlatformController(PlatformController):
 
             while 1:
                 os.kill(pid, signal.SIGKILL)
+                # Workaround for defunct / hanging process when using --no-fork
+                os.wait()
                 PosixPlatformController.__sleep(0.1)
 
         except OSError as err:
             err = six.text_type(err)
-            if err.find("No such process") > 0:
+            if "No such process" in err or "No child processes" in err:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:

@@ -17,8 +17,6 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import shutil
-import signal
-import time
 import os
 import atexit
 
@@ -310,29 +308,11 @@ class AgentRunner(object):
             return result
 
         else:
-            # NOTE: Calling stop doesn't work anymore after merging https://github.com/scalyr/scalyr-agent-2/commit/f974270beaced92707cf6b9227d09630042e5f01
-            # so this is a temporary workaround
-            try:
-                os.kill(self._agent_process.pid, signal.SIGTERM)
-            except Exception:
-                # Process is already dead, nothing to do
-                pass
-
-            time.sleep(2)
-
-            try:
-                os.kill(self._agent_process.pid, signal.SIGKILL)
-            except Exception:
-                # Process is already dead, nothing to do
-                pass
-
-            """
             process = subprocess.Popen(
                 "{0} {1} stop".format(executable, _AGENT_MAIN_PATH), shell=True
             )
 
             process.wait()
-            """
             self._agent_process.wait()
 
             # Print any output produced by the agent before working which may not end up in the logs
