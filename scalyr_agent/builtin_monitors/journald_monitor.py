@@ -599,7 +599,7 @@ seconds and then polls again.
         ):
             return format % (key, value)
         else:
-            return "%s %s" % (key, scalyr_util.json_encode(value))
+            return format % (key, scalyr_util.json_encode(value))
 
     def gather_sample(self):
 
