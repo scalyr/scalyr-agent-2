@@ -217,6 +217,13 @@ def alternateCurrentFrame():
     return sys._getframe(3)
 
 
+def close_handlers():
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+        handler.close()
+
+
 if hasattr(sys, "_getframe"):
     currentframe = alternateCurrentFrame  # NOQA
 # done filching

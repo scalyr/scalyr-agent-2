@@ -878,6 +878,9 @@ class ScalyrAgent(object):
             # noinspection PyBroadException
             try:
                 self.__run_state = RunState()
+                self.__run_state.register_on_stop_callback(
+                    scalyr_logging.close_handlers()
+                )
                 self.__log_file_path = os.path.join(
                     self.__config.agent_log_path, "agent.log"
                 )
