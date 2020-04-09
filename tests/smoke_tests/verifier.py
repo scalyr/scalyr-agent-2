@@ -92,14 +92,30 @@ class AgentVerifier(object):
         """
         pass
 
-    def verify(self):
+    def verify(self, timeout=5 * 60):
+        # type: (int) -> bool
+        """"
+        :param timeout: How to long to wait (in seconds) before timing out if no successful response is found.
+        """
         self.prepare()
+
         retry_delay = type(self).RETRY_DELAY
+
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
         while True:
             print("========================================================")
             if self._verify():
                 print("Success.")
                 return True
+
+            if time.time() >= timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+
             print(("Retry in {0} sec.".format(retry_delay)))
             print("========================================================")
             time.sleep(retry_delay)
