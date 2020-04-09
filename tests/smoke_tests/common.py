@@ -18,6 +18,9 @@ from __future__ import absolute_import
 
 import os
 import time
+from io import open
+
+import six
 
 from scalyr_agent import compat
 from scalyr_agent.__scalyr__ import DEV_INSTALL, get_package_root
@@ -39,7 +42,8 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
 
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
-    runner = AgentRunner(agent_installation_type)
+    runner = AgentRunner(agent_installation_type, enable_debug_log=True)
+
     if python_version:
         runner.switch_version(python_version)
 
@@ -55,6 +59,22 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
     process_metrics_verifier = ProcessMetricsVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
+
+    # NOTE: It's important that the file exists before starting the agent otherwise it won't be
+    # consumed by the agent and the tests will fail.
+    agent_logs_dir_path = six.text_type(runner.agent_logs_dir_path)
+    data_log_path = six.text_type(data_json_verifier._data_json_log_path)
+
+    if os.path.exists(data_log_path):
+        os.utime(data_log_path, None)
+    else:
+        try:
+            os.makedirs(agent_logs_dir_path)
+        except OSError:
+            pass
+
+        with open(data_log_path, "a") as _:
+            pass
 
     runner.start()
 
