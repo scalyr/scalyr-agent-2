@@ -22,7 +22,9 @@ import os
 if False:
     from typing import Dict, Optional, Any
 
+import copy
 import json
+import pprint
 import subprocess
 
 from distutils.spawn import find_executable
@@ -344,6 +346,12 @@ class AgentRunner(object):
 
         if self._enable_debug_log:
             config["debug_level"] = 5
+
+        # Print out the agent config (masking the secrets) to make troubleshooting easier
+        config_sanitized = copy.copy(config)
+        config_sanitized.pop("api_key", None)
+
+        print("Using agent config: %s" % (pprint.pformat(config_sanitized)))
 
         return config
 
