@@ -304,7 +304,7 @@ class AgentRunner(object):
             # NOTE: Calling stop doesn't work anymore after merging https://github.com/scalyr/scalyr-agent-2/commit/f974270beaced92707cf6b9227d09630042e5f01
             # so this is a temporary workaround
             os.kill(self._agent_process.pid, signal.SIGTERM)
-            time.sleep(10)
+            time.sleep(2)
             os.kill(self._agent_process.pid, signal.SIGKILL)
             """
             process = subprocess.Popen(
