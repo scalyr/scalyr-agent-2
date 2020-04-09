@@ -18,6 +18,15 @@
 #
 # It writes generated documentation files to docs/monitors/<monitor name>.md
 
+# NOTE: On OS X you need to install coreutils package.
+
+# Add gnu version of various utilities such as readlink, etc to PATH
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Detected Darwin, adding \"/usr/local/opt/coreutils/libexec/gnubin\"to \$PATH"
+
+    export PATH="/usr/local/opt/coreutils/libexec/gnubin:${PATH}"
+fi
+
 set -e
 
 # Marker in the Markdown file which marks the line after which automatically generated content
