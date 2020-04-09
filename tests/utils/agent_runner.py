@@ -100,7 +100,7 @@ class AgentRunner(object):
 
         self._enable_coverage = enable_coverage
 
-        self._enable_debug_log = False
+        self._enable_debug_log = enable_debug_log
 
         self._init_agent_paths()
 
