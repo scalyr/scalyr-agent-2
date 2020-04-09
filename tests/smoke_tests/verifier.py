@@ -170,6 +170,7 @@ class AgentLogVerifier(AgentVerifier):
                     )
                 )
             )
+            print("Data received: %s" % (local_agent_log_data))
             return
 
         print("Send query to Scalyr server.")
@@ -197,6 +198,7 @@ class AgentLogVerifier(AgentVerifier):
                     )
                 )
             )
+            print("Data received: %s" % (response_log))
             return
 
         return True
