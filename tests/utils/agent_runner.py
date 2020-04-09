@@ -288,6 +288,8 @@ class AgentRunner(object):
             )
 
     def stop(self, executable="python"):
+        atexit.unregister(self.stop)
+
         if self._stopped:
             return
 

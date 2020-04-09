@@ -107,7 +107,9 @@ class AgentVerifier(object):
         while True:
             print("========================================================")
             if self._verify():
+                end_time = time.time()
                 print("Success.")
+                print("Duration: %s" % (int(end_time - start_time)))
                 return True
 
             if time.time() >= timeout_time:
