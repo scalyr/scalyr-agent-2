@@ -359,11 +359,7 @@ commands:
 
       - run:
           name: Copy Created Docker Images to Cache Folders
-          command: |
-              cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
-              rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
-              cp  ~/agent_image/scalyr-agent-testings-monitor-base ~/monitors_builder_cache/scalyr-agent-testings-monitor-base
-              cp ~/agent_image/* ~/agent_image_cache/
+          command: ./scripts/circleci/copy-docker-images-to-cache.sh
 
       - save_cache:
           # save fpm builder image to 'tar' file here, if this file is not found previously.
