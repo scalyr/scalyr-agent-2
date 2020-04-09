@@ -30,6 +30,10 @@ parameters:
   cache_version:
     type: string
     default: "v7"
+  cache_version_py_dependencies:
+    description: "Cache version suffix to use for all the Python dependency caches."
+    type: string
+    default: "v4"
 
 commands:
   unittest_tox:
@@ -243,7 +247,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps3-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -267,7 +271,7 @@ commands:
 
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps3-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
 
