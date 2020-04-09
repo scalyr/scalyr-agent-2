@@ -22,14 +22,20 @@ mkdir -p ~/agent_image_cache
 if [ "$(ls -A ~/fpm_builder_cache)" ]; then
     echo "fpm builder image is found."
     cp ~/fpm_builder_cache/* ~/agent_image/
+else
+  echo "fpm builder image is not found."
 fi
 
 if [ "$(ls -A ~/monitors_builder_cache)" ]; then
     echo "monitors builder image is found."
     cp ~/monitors_builder_cache/* ~/agent_image/
+else
+  echo "monitors builder image is not found."
 fi
 
 if [ "$(ls -A ~/agent_image_cache)" ]; then
     echo "agent image cache image is found."
     cp ~/agent_image_cache/* ~/agent_image/
+else
+  echo "agent image cache image is not found."
 fi
