@@ -53,6 +53,10 @@ commands:
         description: "True to persist / store coverage data."
         type: boolean
         default: false
+      run_microbenchmarks:
+        description: "True to run microbenchmarks."
+        type: boolean
+        default: false
     steps:
       - checkout
       - restore_cache:
@@ -89,6 +93,14 @@ commands:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
                   .coverage.unittest-<< parameters.python_version >>
+      - when:
+          condition: << parameters.run_microbenchmarks >>
+          steps:
+            - run:
+                name: Run Microbenchmarks
+                command: |
+                  tox -emicro-benchmarks
+
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
     parameters:
@@ -399,6 +411,7 @@ jobs:
           python_version: "2.7"
           tox_target: "coverage"
           store_coverage: true
+          run_microbenchmarks: true
 
   unittest-26:
     working_directory: ~/scalyr-agent-2
