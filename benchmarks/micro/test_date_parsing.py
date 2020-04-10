@@ -18,10 +18,8 @@ Benchmarks which measure performance of date parsing functions.
 
 from __future__ import absolute_import
 
-import time
 import datetime
 
-import six
 import pytest
 
 from scalyr_agent.date_parsing_utils import _rfc3339_to_nanoseconds_since_epoch_strptime
@@ -38,6 +36,8 @@ from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_regex
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_string_split
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_udatetime
 
+from utils import process_time
+
 DATE_WITH_FRACTION_STR = u"2015-08-03T09:12:43.143757463Z"
 EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP = 1438593163143757463
 EXPECTED_RESULT_WITH_FRACTION_DT = datetime.datetime(2015, 8, 3, 9, 12, 43, 143757)
@@ -48,10 +48,8 @@ EXPECTED_RESULT_WITHOUT_FRACTION_DT = datetime.datetime(2015, 8, 3, 9, 12, 43)
 
 # If time.process_time is available, we use that so we get more accurate and less noisy results
 # on Circle CI
-if six.PY3:
-    timer = time.process_time
-else:
-    timer = time.time
+
+timer = process_time
 
 
 @pytest.mark.parametrize(
