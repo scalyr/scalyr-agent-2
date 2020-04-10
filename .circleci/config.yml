@@ -29,7 +29,11 @@ parameters:
     default: "3.14.3"
   cache_version:
     type: string
-    default: "v3"
+    default: "v7"
+  cache_version_py_dependencies:
+    description: "Cache version suffix to use for all the Python dependency caches."
+    type: string
+    default: "v4"
 
 commands:
   unittest_tox:
@@ -49,8 +53,8 @@ commands:
       tox_target:
         description: "Tox target to run."
         type: string
-      store_coverage:
-        description: "True to persist / store coverage data."
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
         type: boolean
         default: false
     steps:
@@ -78,17 +82,23 @@ commands:
           paths:
             - "~/.cache/pip"
       - when:
-          condition: << parameters.store_coverage >>
+          condition: << parameters.upload_coverage >>
           steps:
             - run:
-                name: Move Coverage Data
+                name: Submit Coverage Data to codecov.io
                 command: |
-                  mkdir -p coverage-unittest-<< parameters.python_version >>
-                  mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
-            - persist_to_workspace:
-                root: coverage-unittest-<< parameters.python_version >>
-                paths:
-                  .coverage.unittest-<< parameters.python_version >>
+                  ls -la .coverage* || true
+
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  # Print the report
+                  coverage report -i
+
+                  # Submit it to codecov.io
+                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
+                  ./scripts/submit-codecov-data.sh
+
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
     parameters:
@@ -234,14 +244,10 @@ commands:
       tox_target:
         description: "Tox target to run."
         type: string
-      store_coverage:
-        description: "True to persist / store coverage data."
-        type: boolean
-        default: false
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -265,7 +271,7 @@ commands:
 
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
 
@@ -274,7 +280,7 @@ commands:
           path: ~/scalyr-agent-dev/log
 
   package-test:
-    description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
+    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
     parameters:
       distribution:
         description: "The name of the distribution where the agent will be installed."
@@ -284,18 +290,23 @@ commands:
         type: string
         default: ""
       command:
-        description: "Command to run tests."
+        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
         type: string
       agent_host_name_prefix:
         description: "Host name for the agent instances that will be started during job."
         type: string
         default: ""
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
+        type: boolean
+        default: false
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: false
 
       - restore_cache:
+          name: "Restore Python Dependencies cache"
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
       - run:
@@ -308,12 +319,30 @@ commands:
           command: |
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
+
             # generate file with checksum that is calculated for every required file.
-            python -m tests.distribution_builders.<< parameters.distribution >>.cmd --checksum > ~/checksum
+            python -m tests.image_builder.distributions.<< parameters.distribution >>.cmd --checksum > ~/checksum
+            python -m tests.image_builder.distributions.fpm_package_builder.cmd --checksum > ~/fpm_builder_checksum
+            python -m tests.image_builder.monitors.base.cmd --checksum > ~/monitors_builder_checksum
+
+      - restore_cache:
+          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
+          name: "Restore fpm Builder Base Docker Image Cache"
+          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+
+      - restore_cache:
+          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
+          name: "Restore monitors Builder Base Docker Image Cache"
+          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
 
       - restore_cache:
           # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
+          name: "Restore Agent Base Docker Image Cache"
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
+
+      - run:
+          name: Copy Cached Docker Images (if they exist)
+          command: ./scripts/circleci/copy-cached-docker-images.sh
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -324,30 +353,69 @@ commands:
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
             export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
 
-            # NOTE: We don't want the build to immediately fail if tox command fails because we
-            # want to preserve the build logs as artifacts to aid with debugging
-            set +e
             mkdir -p ~/artifacts
-            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
-            EXIT_CODE=$?
-            set -e
 
-            if [ "${EXIT_CODE}" -ne "0" ]; then
-                echo "tox target failed"
-                exit 1
-            fi
+            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
+
+      - run:
+          name: Copy Created Docker Images to Cache Folders
+          command: ./scripts/circleci/copy-docker-images-to-cache.sh
+
+      - save_cache:
+          # save fpm builder image to 'tar' file here, if this file is not found previously.
+          name: "Save fpm Builder Base Docker Image Cache"
+          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/fpm_builder_cache"
+
+      - save_cache:
+          # save monitors builder image to 'tar' file here, if this file is not found previously.
+          name: "Save monitors Builder Base Docker Image Cache"
+          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/monitors_builder_cache"
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
-          # TODO: Workaround for incorrect handle of caching since we cache the whole agent_source/ directory.
+          name: "Save Agent Base Docker Image Cache"
           key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
-           - "~/agent_image"
+           - "~/agent_image_cache"
 
       - save_cache:
+          name: "Save Python Dependencies Dache"
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+
+      - when:
+          condition: << parameters.upload_coverage >>
+          steps:
+            - run:
+                name: Combine and Submit Coverage Data to codecov.io
+                command: |
+                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+                  ls -la ~/artifacts/*/.coverage
+
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  # Generate combined .coverage file for all our test functions
+                  coverage combine ~/artifacts/*/.coverage
+
+                  # coverage data from inside docker contains uses different paths which we need to normalize for
+                  # coverage combine and codecov reporting and merging to work.
+                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+                  # Print the report
+                  coverage report -i
+
+                  # Submit it to codecov.io
+                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
+
+                  ./scripts/submit-codecov-data.sh
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
@@ -398,7 +466,7 @@ jobs:
       - unittest_tox:
           python_version: "2.7"
           tox_target: "coverage"
-          store_coverage: true
+          upload_coverage: true
 
   unittest-26:
     working_directory: ~/scalyr-agent-2
@@ -410,7 +478,6 @@ jobs:
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
           apt_dependencies: "procps build-essential"
-
 
   smoke-standalone-27-tls12:
     docker:
@@ -441,6 +508,7 @@ jobs:
             docker rm dummy;
 
   smoke-docker-json:
+    working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie
     steps:
@@ -450,26 +518,39 @@ jobs:
       - restore_cache:
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: "Install Python Dependencies"
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
+          name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
+            - "~/.cache/pip"
       - run:
+          name: Run Tests (with coverage)
           command: |
-            mkdir -p coverage-smoke-docker-json
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
-            mv .coverage coverage-smoke-docker-json/.coverage.smoke-docker-json
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
 
-      - persist_to_workspace:
-          root: coverage-smoke-docker-json
-          paths:
-            .coverage.smoke-docker-json
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            source venv/bin/activate
+
+            # Ensure consistent paths for all the code coverage reports
+            sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+            # Submit it to codecov.io
+            ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
 
   smoke-docker-syslog:
+    working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie
     steps:
@@ -479,26 +560,39 @@ jobs:
       - restore_cache:
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: "Install Python Dependencies"
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
+          name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
+            - "~/.cache/pip"
       - run:
+          name: Run Tests (with coverage)
           command: |
-            mkdir -p coverage-smoke-docker-syslog
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
-            mv .coverage coverage-smoke-docker-syslog/.coverage.smoke-docker-syslog
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
 
-      - persist_to_workspace:
-          root: coverage-smoke-docker-syslog
-          paths:
-            .coverage.smoke-docker-syslog
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            source venv/bin/activate
+
+            # Ensure consistent paths for all the code coverage reports
+            sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+            # Submit it to codecov.io
+            ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
 
   smoke-k8s:
+    working_directory: ~/scalyr-agent-2
     machine:
       image: circleci/classic:201808-01
     environment:
@@ -511,6 +605,20 @@ jobs:
       CHANGE_MINIKUBE_NONE_USER: true
     steps:
       - checkout
+      - restore_cache:
+          key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: "Install Python Dependencies"
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+      - save_cache:
+          name: "Save Dependencies Cache"
+          key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+            - "~/.cache/pip"
       - run:
           name: setup kubectl
           command: |
@@ -543,16 +651,27 @@ jobs:
             kubectl cluster-info
             kubectl get po --all-namespaces
       - run:
-          name: build k8s agent and run smoketest
+          name: Run Tests (with coverage)
           command: |
-            mkdir -p coverage-smoke-k8s
             source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs
-            mv .coverage coverage-smoke-k8s/.coverage.smoke-k8s
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .
+            ls -la ~/
+            pwd
+            ls -la .coverage* || true
 
-      - persist_to_workspace:
-          root: coverage-smoke-k8s
-          paths:
-            .coverage.smoke-k8s
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            source venv/bin/activate
+
+            # Ensure consistent paths for all the code coverage reports
+            sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+            # Submit it to codecov.io
+            ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
 
   smoke-k8s-helm:
     machine:
@@ -621,58 +740,6 @@ jobs:
             # dump services
             kubectl get svc  --all-namespaces | grep -vE '(kube-sys|docker)'
 
-  coverage:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:2.7-jessie
-    steps:
-      - checkout
-      - restore_cache:
-          key: deps2-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
-      - run:
-          name: Install dependencies
-          command: |
-            # Small safety check to make sure the build fails if codecov.yml file is invalid.
-            # By default codecov doesn't fail on invalid config and simply falls back to
-            # system wide default config in case repo local config is invalid. This usually results
-            # in confused and undesired behavior.
-            curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
-            virtualenv venv
-            source venv/bin/activate
-            pip install "coverage==4.5.4" "codecov==2.0.15"
-            mkdir -p cov
-            cp .circleci/.coveragerc_ci cov/.coveragerc
-
-      - attach_workspace:
-          at: cov
-
-      - run:
-          name: Combine coverage
-          working_directory: cov
-          command: |
-            source ../venv/bin/activate
-            ls -la .
-            ls -la ../*coverage* || true
-            coverage combine
-
-      - store_artifacts:
-          path: cov
-
-      - run:
-          name: Print coverage report
-          working_directory: cov
-          command: |
-            source ../venv/bin/activate
-            coverage report
-
-      - run:
-          name: Upload coverage data to codecov.io
-          working_directory: cov
-          command: |
-            source ../venv/bin/activate
-            coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            ./../scripts/submit-codecov-data.sh
-
   lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -696,7 +763,12 @@ jobs:
             sudo pip install "tox==3.14.3"
       - run:
           name: Run Python Lint Checks
+        # Small safety check to make sure the build fails if codecov.yml file is invalid.
+        # By default codecov doesn't fail on invalid config and simply falls back to
+        # system wide default config in case repo local config is invalid. This usually results
+        # in confused and undesired behavior.
           command: |
+            ./scripts/circleci/verify-codecov-config.sh
             tox -e lint
       - run:
           name: Run Shell Scripts Lint Checks
@@ -902,7 +974,6 @@ jobs:
           python_version: "2.7"
           tox_target: "py2.7-smoke-tests"
 
-
   smoke-standalone-26:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -930,12 +1001,11 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu1804_with_py3"
+          distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_ubuntu1804
 
   # Circle CI jobs which build agent packages for each PR.
-  # TODO: They should run much faster once image caching is fixed
   package-build-deb:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -955,6 +1025,18 @@ jobs:
           distribution: "centos8"
           agent_host_name_prefix: "-test"
           command: tox -eagent_rpm_package
+
+  smoke-monitors-tests:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu1804"
+          python_version: "python3"
+          agent_host_name_prefix: "monitors-test"
+          command: tox -eagent_monitors_ubuntu
+          upload_coverage: true
 
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -983,7 +1065,7 @@ jobs:
       - image: circleci/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu1804_with_py3"
+          distribution: "ubuntu1804"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
 
@@ -1015,34 +1097,25 @@ jobs:
 workflows:
   version: 2
   unittest:
+    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+    # Python 3 versions
     jobs:
       - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
       - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
+      - unittest-27
+      - unittest-35
       - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
+      - smoke-standalone-27
+      - smoke-standalone-35
+      - smoke-standalone-26-tls12
+      - smoke-standalone-27-tls12
+       # NOTE: smoke test jobs below still use old smoke tests framework
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
   package-tests:
     jobs:
+      - smoke-monitors-tests
       - package-build-rpm:
           <<: *non_master_and_release
       - package-build-deb:

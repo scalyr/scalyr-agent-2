@@ -39,8 +39,6 @@ from scalyr_agent import compat
 
 import six
 
-from six.moves.urllib.parse import quote_plus
-
 
 class BaseAgentStatus(object):
     """
@@ -357,13 +355,15 @@ def report_status(output, status, current_time):
     print("Agent log:        %s" % status.log_path, file=output)
     print("ServerHost:       %s" % status.server_host, file=output)
     print("", file=output)
-    server = scalyr_util.get_web_url_from_upload_url(status.scalyr_server)
+    server = status.scalyr_server
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,
     # you should go to https://www.scalyr.com.  So, we do a little clean up before sticking it in
     # the url.  Same goes for https://log.scalyr.com  -- it is really is just https://www.scalyr.com
+    server = server.replace("https://agent.", "https://www.")
+    server = server.replace("https://log.", "https://www.")
     print(
         "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27"
-        % (server, quote_plus(status.server_host),),
+        % (server, status.server_host,),
         file=output,
     )
     print("", file=output)
