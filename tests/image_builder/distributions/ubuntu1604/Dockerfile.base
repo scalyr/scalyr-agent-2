@@ -1,0 +1,14 @@
+FROM ubuntu:16.04
+RUN apt update
+RUN apt install -y apt-utils build-essential
+
+RUN apt install -y build-essential python python-pip python-dev
+RUN apt install -y python3 python3-pip python3-dev
+
+COPY dev-requirements.txt dev-requirements.txt
+
+RUN python2 -m pip install -r dev-requirements.txt
+
+# so we create symlink to python3.5 with different name only to run tests.
+RUN python3 -m pip install -r dev-requirements.txt
+RUN ln -sf /usr/bin/python3.5 /usr/bin/python_for_tests
