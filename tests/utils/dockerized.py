@@ -59,10 +59,11 @@ def dockerized_case(
                 return result
 
             builder = builder_cls()
-            skip_build = request.config.getoption("--skip-build-if-exists", True)
+            skip_requirements = request.config.getoption(
+                "--skip-builder-requirements", False
+            )
 
-            if not skip_build:
-                builder.build()
+            builder.build(skip_requirements=skip_requirements)
 
             docker_client = docker.from_env()
 

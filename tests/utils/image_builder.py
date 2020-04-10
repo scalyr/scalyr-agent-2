@@ -150,10 +150,11 @@ class AgentImageBuilder(object):
         except docker.errors.ImageNotFound:
             return False
 
-    def build(self, image_cache_path=None):
+    def build(self, image_cache_path=None, skip_requirements=False):
         """
         Build docker image.
         :param image_cache_path: import image from .tar files located in this directory, if exist.
+        :param skip_requirements: Build only image for this builder and skip all required builders.
         """
         # if image caching is enabled and image exists we assume that image has already built in previous test cases.
         if image_cache_path is not None:
@@ -161,10 +162,11 @@ class AgentImageBuilder(object):
                 print("Image '{0}' already exists. Skip build.".format(self.IMAGE_TAG))
                 return
 
-        # build all required images.
-        for required_image_builder_cls in type(self).REQUIRED_IMAGES:
-            builder = required_image_builder_cls()
-            builder.build(image_cache_path=image_cache_path)
+        if not skip_requirements:
+            # build all required images.
+            for required_image_builder_cls in type(self).REQUIRED_IMAGES:
+                builder = required_image_builder_cls()
+                builder.build(image_cache_path=image_cache_path)
 
         if not type(self).IGNORE_CACHING and image_cache_path is not None:
             self.build_with_cache(Path(image_cache_path))

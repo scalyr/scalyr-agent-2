@@ -57,9 +57,9 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--skip-build-if-exists",
+        "--skip-builder-requirements",
         action="store_true",
-        help="Skip building if image already exists.",
+        help="Build only final image and do not build required base images.",
     )
 
     parser.addoption(
