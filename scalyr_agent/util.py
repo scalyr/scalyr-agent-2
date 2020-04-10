@@ -122,9 +122,9 @@ def get_json_implementation(lib_name):
                     "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
             if fp is not None:
-                return ujson.dump(obj, fp, sort_keys=True)
+                return ujson.dump(obj)
             else:
-                return ujson.dumps(obj, sort_keys=True)
+                return ujson.dumps(obj)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
@@ -159,9 +159,9 @@ def get_json_implementation(lib_name):
 
             if fp is not None:
                 # Eliminate spaces by default. Python 2.4 does not support partials.
-                return json.dump(obj, fp, sort_keys=True, separators=(",", ":"))
+                return json.dump(obj, fp)
             else:
-                return json.dumps(obj, sort_keys=True, separators=(",", ":"))
+                return json.dumps(obj)
 
         if sys.version_info[0] == 3 and sys.version_info[1] < 6:
             # wrap native json library 'loads' in Python3.5 and below, because it does not accept bytes.
