@@ -110,7 +110,7 @@ def _rfc3339_to_nanoseconds_since_epoch_regex(string):
 
     try:
         dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))
         )
     except Exception:
         return None
@@ -317,7 +317,7 @@ def _rfc3339_to_datetime_regex(string):
     # create a datetime object
     try:
         dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
+            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))
         )
     except Exception:
         return None
