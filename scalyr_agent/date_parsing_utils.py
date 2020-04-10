@@ -165,16 +165,16 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
         # NOTE: I intentionally access values directly in the list and don't assign them
         # to intermediate variables since it's faster
         result = parts[0].split("T")
-        result1 = result[0].split("-")
-        result2 = result[1].split(".")[0].split(":")
+        date_parts = result[0].split("-")
+        time_parts = result[1].split(":")
 
         dt = datetime.datetime(
-            int(result1[0]),
-            int(result1[1]),
-            int(result1[2]),
-            int(result2[0]),
-            int(result2[1]),
-            int(result2[2]),
+            int(date_parts[0]),
+            int(date_parts[1]),
+            int(date_parts[2]),
+            int(time_parts[0]),
+            int(time_parts[1]),
+            int(time_parts[2]),
         )
     except Exception:
         return None
@@ -374,16 +374,16 @@ def _rfc3339_to_datetime_string_split(string):
         # NOTE: I intentionally access values directly in the list and don't assign them
         # to intermediate variables since it's faster
         result = parts[0].split("T")
-        result1 = result[0].split("-")
-        result2 = result[1].split(".")[0].split(":")
+        date_parts = result[0].split("-")
+        time_parts = result[1].split(":")
 
         dt = datetime.datetime(
-            int(result1[0]),
-            int(result1[1]),
-            int(result1[2]),
-            int(result2[0]),
-            int(result2[1]),
-            int(result2[2]),
+            int(date_parts[0]),
+            int(date_parts[1]),
+            int(date_parts[2]),
+            int(time_parts[0]),
+            int(time_parts[1]),
+            int(time_parts[2]),
         )
     except Exception:
         return None
