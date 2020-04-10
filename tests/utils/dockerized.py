@@ -59,9 +59,10 @@ def dockerized_case(
                 return result
 
             builder = builder_cls()
-            use_cache_path = request.config.getoption("--image-cache-path", None)
+            skip_build = request.config.getoption("--skip-build-if-exists", True)
 
-            builder.build(image_cache_path=use_cache_path)
+            if not skip_build:
+                builder.build()
 
             docker_client = docker.from_env()
 

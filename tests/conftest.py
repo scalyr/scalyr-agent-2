@@ -57,9 +57,9 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--image-cache-path",
-        help="Path to cache. If specified, "
-        "image builders look for cached image .tar files inside it and load them and skip the build process.",
+        "--skip-build-if-exists",
+        action="store_true",
+        help="Skip building if image already exists.",
     )
 
     parser.addoption(

@@ -287,6 +287,10 @@ commands:
       target_name:
         type:
           string
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
+        type: boolean
+        default: false
     steps:
       - run:
           name: "Run tox target: << parameters.target_name >>"
@@ -300,7 +304,38 @@ commands:
             echo "$AGENT_HOST_NAME"
             mkdir -p ~/artifacts
 
-            << parameters.target_name >> -- --artifacts-path ~/artifacts
+            << parameters.target_name >> -- --skip-build-if-exists --artifacts-path ~/artifacts
+      - when:
+          condition: << parameters.upload_coverage >>
+          steps:
+            - run:
+                name: Combine and Submit Coverage Data to codecov.io
+                command: |
+                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+                  ls -la ~/artifacts/*/.coverage
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  # Generate combined .coverage file for all our test functions
+                  coverage combine ~/artifacts/*/.coverage
+
+                  # coverage data from inside docker contains uses different paths which we need to normalize for
+                  # coverage combine and codecov reporting and merging to work.
+                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+                  # Print the report
+                  coverage report -i
+
+                  # Submit it to codecov.io
+                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
+
+                  ./scripts/submit-codecov-data.sh
+
+            # NOTE: We store the logs to ease with troubleshooting / debugging
+            - store_artifacts:
+                path: ~/artifacts
 
   init-cached-docker-image:
     parameters:
@@ -312,27 +347,27 @@ commands:
         type: string
     steps:
       - run:
+          name: "Get checksum file for builder '<< parameters.image-builder-path >>'."
           command: |
-            rm -f ~/image_checksum
             python -m << parameters.image-builder-path >> --checksum > ~/image_checksum
 
       - restore_cache:
-          name: "Restore docker image file for the builder."
+          name: "Restore docker image file for the builder '<< parameters.image-builder-path >>'."
           key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
 
       - run:
+          name: "Build image by '<< parameters.image-builder-path >>' builder."
           command: |
-            #python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
             tox -e_run_command -- python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
 
       - save_cache:
-          name: "Save builders docker image into cache"
+          name: "Save docker image of the builder '<< parameters.image-builder-path >>' into cache."
           key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
           paths:
             - << parameters.cache-path >>
 
       - run:
-          name: Remove image checksum file.
+          name: "Remove image checksum file."
           command: |
             rm -f ~/image_checksum
 
@@ -385,6 +420,7 @@ commands:
       - run-tox-targer:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
           target_name:  << parameters.command >>
+          upload_coverage: << parameters.upload_coverage >>
 
       - save_cache:
           name: "Save Python Dependencies Dache"
@@ -392,37 +428,39 @@ commands:
           paths:
             - "~/.cache/pip"
 
-      - when:
-          condition: << parameters.upload_coverage >>
-          steps:
-            - run:
-                name: Combine and Submit Coverage Data to codecov.io
-                command: |
-                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
-                  ls -la ~/artifacts/*/.coverage
-                  pip install "coverage==4.5.4" "codecov==2.0.15"
-                  cp .circleci/.coveragerc_ci .coveragerc
+#      - when:
+#          condition: << parameters.upload_coverage >>
+#          steps:
+#            - run:
+#                name: Combine and Submit Coverage Data to codecov.io
+#                command: |
+#                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+#                  ls -la ~/artifacts/*/.coverage
+#                  pip install "coverage==4.5.4" "codecov==2.0.15"
+#                  cp .circleci/.coveragerc_ci .coveragerc
+#
+#                  cp .circleci/.coveragerc_ci .coveragerc
+#
+#                  # Generate combined .coverage file for all our test functions
+#                  coverage combine ~/artifacts/*/.coverage
+#
+#                  # coverage data from inside docker contains uses different paths which we need to normalize for
+#                  # coverage combine and codecov reporting and merging to work.
+#                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
+#
+#                  # Print the report
+#                  coverage report -i
+#
+#                  # Submit it to codecov.io
+#                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
+#
+#                  ./scripts/submit-codecov-data.sh
+#
+#      # NOTE: We store the logs to ease with troubleshooting / debugging
+#      - store_artifacts:
+#          path: ~/artifacts
 
-                  cp .circleci/.coveragerc_ci .coveragerc
 
-                  # Generate combined .coverage file for all our test functions
-                  coverage combine ~/artifacts/*/.coverage
-
-                  # coverage data from inside docker contains uses different paths which we need to normalize for
-                  # coverage combine and codecov reporting and merging to work.
-                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
-
-                  # Print the report
-                  coverage report -i
-
-                  # Submit it to codecov.io
-                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
-
-                  ./scripts/submit-codecov-data.sh
-
-      # NOTE: We store the logs to ease with troubleshooting / debugging
-      - store_artifacts:
-          path: ~/artifacts
   package-test2:
     description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
     parameters:
