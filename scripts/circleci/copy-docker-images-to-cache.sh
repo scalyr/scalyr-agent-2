@@ -15,8 +15,8 @@
 
 # Script which copies Docker images created during test runs to directory which
 # is cached
-whoami
-ls ~/agent_image/
+
+
 if [ -f ~/agent_image/scalyr-agent-testings-fpm_package-builder ]; then
     echo "Copy image 'scalyr-agent-testings-fpm_package-builder' to cache."
     cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
@@ -33,6 +33,11 @@ else
   echo "Image 'scalyr-agent-testings-monitor-base' is not found."
 fi
 
-whoami
-ls ~/agent_image/
-cp ~/agent_image/* ~/agent_image_cache/
+# the agent distribution image name should match to this glob.
+if [ "$(ls -A scalyr-agent-testings-distribution-*-base)" ]; then
+    echo "Copy image distribution image to cache."
+    ls ~/agent_image/scalyr-agent-testings-distribution*
+    cp ~/agent_image/scalyr-agent-testings-distribution* ~/agent_image_cache/
+else
+  echo "Agent distribution image is not found."
+fi

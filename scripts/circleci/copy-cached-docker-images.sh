@@ -36,9 +36,10 @@ else
 fi
 
 ls ~/agent_image_cache
-if [ "$(ls -A ~/agent_image_cache)" ]; then
+# the agent distribution image name should match to this glob.
+if [ "$(ls -A ~/agent_image_cache/scalyr-agent-testings-distribution-*-base)" ]; then
     echo "agent image cache image is found."
-    cp ~/agent_image_cache/* ~/agent_image/
+    cp ~/agent_image_cache/scalyr-agent-testings-distribution-*-base ~/agent_image/
 else
   echo "agent image cache image is not found."
 fi
