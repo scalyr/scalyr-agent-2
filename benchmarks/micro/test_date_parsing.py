@@ -53,7 +53,7 @@ timer = process_time
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
 def test_rfc3339_to_nanoseconds_since_epoch_strptime(benchmark, with_fraction):
@@ -73,7 +73,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_strptime(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
 def test_rfc3339_to_nanoseconds_since_epoch_regex(benchmark, with_fraction):
@@ -93,7 +93,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_regex(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
 def test_rfc3339_to_nanoseconds_since_epoch_string_split(benchmark, with_fraction):
@@ -114,7 +114,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_string_split(benchmark, with_fractio
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
 def test_rfc3339_to_nanoseconds_since_epoch_udatetime(benchmark, with_fraction):
@@ -134,7 +134,7 @@ def test_rfc3339_to_nanoseconds_since_epoch_udatetime(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
 def test_rfc3339_to_datetime_strptime(benchmark, with_fraction):
@@ -154,7 +154,7 @@ def test_rfc3339_to_datetime_strptime(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
 def test_rfc3339_to_datetime_regex(benchmark, with_fraction):
@@ -174,7 +174,7 @@ def test_rfc3339_to_datetime_regex(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
 def test_rfc3339_to_datetime_string_split(benchmark, with_fraction):
@@ -194,7 +194,7 @@ def test_rfc3339_to_datetime_string_split(benchmark, with_fraction):
 
 
 @pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["with_fraction", "without_fraction"]
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
 )
 @pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
 def test_rfc3339_to_datetime_udatetime(benchmark, with_fraction):
