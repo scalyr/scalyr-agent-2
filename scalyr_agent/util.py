@@ -126,9 +126,9 @@ def get_json_implementation(lib_name):
                     "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
             if fp is not None:
-                return ujson.dump(obj, fp, sort_keys=True)
+                return ujson.dump(obj, fp)
             else:
-                return ujson.dumps(obj, sort_keys=True)
+                return ujson.dumps(obj)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
