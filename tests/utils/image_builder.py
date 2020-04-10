@@ -189,16 +189,19 @@ class AgentImageBuilder(object):
         for chunk in output_gen:
             print(chunk.get("stream", ""), end="")
 
-    def build_with_cache(self, dir_path):  # type: (Path) -> None
+    def build_with_cache(
+        self, dir_path, skip_if_exists=True
+    ):  # type: (Path, bool) -> None
         """
         Search for 'image.tar' file named in 'path', if it is found, restore image (docker load) from this file.
         If file is not found, build it, and save in 'path'.
         This is convenient to use for example with CI caches.
         :param dir_path: Path to the directory with cached image or where to save it.
+        :param skip_if_exists: Skip the build if set and image already exists.
         """
         # if image is loaded earlier - skip to avoid the multiple loading of the same image
         # if we build it multiple times.
-        if self._is_image_exists():
+        if skip_if_exists and self._is_image_exists():
             print("The image  '{0}' is already loaded.".format(self.image_tag))
             return
 
@@ -283,10 +286,33 @@ class AgentImageBuilder(object):
             "Also, it counts checksum of all required builders.",
         )
 
+        parser.add_argument(
+            "--name",
+            action="store_true",
+            help="Get name of the image which is built by this builder.",
+        )
+
+        parser.add_argument(
+            "--build-with-cache",
+            type=six.text_type,
+            help="Path to cache directory. If specified, firstly, the builder searches for serialized tar file of the image,"
+            "If this file does not exist, builds it from scratch and saves there.",
+        )
+
         args = parser.parse_args()
 
-        if args.checksum is not None:
+        if args.checksum:
             checksum_object = cls.get_checksum()
 
             base64_checksum = checksum_object.hexdigest()
             print(base64_checksum)
+            exit(0)
+
+        if args.name:
+            print(cls.IMAGE_TAG)
+            exit(0)
+
+        if args.build_with_cache:
+            builder = cls()
+            builder.build_with_cache(Path(args.build_with_cache), skip_if_exists=False)
+            exit(0)

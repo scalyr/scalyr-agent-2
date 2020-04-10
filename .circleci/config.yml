@@ -279,7 +279,151 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
 
+  run-tox-targer:
+    parameters:
+      agent_host_name:
+        type:
+          string
+      target_name:
+        type:
+          string
+    steps:
+      - run:
+          name: "Run tox target: << parameters.target_name >>"
+          command: |
+            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+            echo << parameters.agent_host_name >>
+            export AGENT_HOST_NAME=<< parameters.agent_host_name >>-${CIRCLE_BUILD_NUM}
+            echo "$AGENT_HOST_NAME"
+            mkdir -p ~/artifacts
+
+            << parameters.target_name >> -- --artifacts-path ~/artifacts
+
+  init-cached-docker-image:
+    parameters:
+      cache-key-prefix:
+        type: string
+      cache-path:
+        type: string
+      image-builder-path:
+        type: string
+    steps:
+      - run:
+          command: |
+            rm -f ~/image_checksum
+            python -m << parameters.image-builder-path >> --checksum > ~/image_checksum
+
+      - restore_cache:
+          name: "Restore docker image file for the builder."
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
+
+      - run:
+          command: |
+            #python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
+            tox -e_run_command -- python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
+
+      - save_cache:
+          name: "Save builders docker image into cache"
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - << parameters.cache-path >>
+
+      - run:
+          name: Remove image checksum file.
+          command: |
+            rm -f ~/image_checksum
+
+
   package-test:
+    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
+    parameters:
+      distribution:
+        description: "The name of the distribution where the agent will be installed."
+        type: string
+      python_version:
+        description: "The version of the python interpreter to install in distribution."
+        type: string
+        default: ""
+      command:
+        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
+        type: string
+      agent_host_name_prefix:
+        description: "Host name for the agent instances that will be started during job."
+        type: string
+        default: ""
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+
+      - init-cached-docker-image:
+          cache-key-prefix: fpm-builder
+          cache-path: ~/fpm-builder-cache
+          image-builder-path: tests.image_builder.distributions.fpm_package_builder.cmd
+
+      - init-cached-docker-image:
+          cache-key-prefix: << parameters.distribution >>
+          cache-path: ~/<< parameters.distribution >>
+          image-builder-path: tests.image_builder.distributions.<< parameters.distribution >>.cmd
+
+      - run-tox-targer:
+          agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
+          target_name:  << parameters.command >>
+
+      - save_cache:
+          name: "Save Python Dependencies Dache"
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+
+      - when:
+          condition: << parameters.upload_coverage >>
+          steps:
+            - run:
+                name: Combine and Submit Coverage Data to codecov.io
+                command: |
+                  # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
+                  ls -la ~/artifacts/*/.coverage
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  cp .circleci/.coveragerc_ci .coveragerc
+
+                  # Generate combined .coverage file for all our test functions
+                  coverage combine ~/artifacts/*/.coverage
+
+                  # coverage data from inside docker contains uses different paths which we need to normalize for
+                  # coverage combine and codecov reporting and merging to work.
+                  sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+                  # Print the report
+                  coverage report -i
+
+                  # Submit it to codecov.io
+                  coverage xml --rcfile=.coveragerc -i -o coverage.xml
+
+                  ./scripts/submit-codecov-data.sh
+
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/artifacts
+  package-test2:
     description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
     parameters:
       distribution:
@@ -344,18 +488,26 @@ commands:
           name: Copy Cached Docker Images (if they exist)
           command: ./scripts/circleci/copy-cached-docker-images.sh
 
-      - run:
-          name: Run Unit Tests under Python << parameters.python_version >>
-          command: |
-            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
-            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
-            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
-            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-            export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+#      - run:
+#          name: Run Unit Tests under Python << parameters.python_version >>
+#          command: |
+#            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+#            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+#            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+#            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+#            export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+#
+#            mkdir -p ~/artifacts
+#
+#            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
+      - init-cached-docker-image:
+            cache-key: hello
+            cache-path: ~/hello
 
-            mkdir -p ~/artifacts
+      - run-tox-targer:
 
-            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
+          agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
+          target_name:  << parameters.command >>
 
       - run:
           name: Copy Created Docker Images to Cache Folders
@@ -396,7 +548,6 @@ commands:
                 command: |
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
-
                   pip install "coverage==4.5.4" "codecov==2.0.15"
                   cp .circleci/.coveragerc_ci .coveragerc
 
