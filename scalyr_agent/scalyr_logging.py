@@ -1641,14 +1641,14 @@ class AgentLogManager(object):
             handler.addFilter(StderrFilter())
         elif self.__use_stdout:
             handler = logging.StreamHandler(sys.stdout)
-            handler.addFilter(AgentLogFilter(is_debug))
+            # handler.addFilter(AgentLogFilter(is_debug))
         else:
             handler = logging.handlers.RotatingFileHandler(
                 file_path,
                 maxBytes=self.__rotation_max_bytes,
                 backupCount=self.__rotation_backup_count,
             )
-            handler.addFilter(AgentLogFilter(is_debug))
+        handler.addFilter(AgentLogFilter(is_debug))
 
         formatter = AgentLogFormatter()
         # Rate limit the log if this is the main log since we are copying it up to Scalyr as well.
