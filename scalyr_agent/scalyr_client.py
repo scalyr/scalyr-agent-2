@@ -1585,8 +1585,14 @@ class Event(object):
                 tmp_buffer.write(b", ")
         if attributes_to_serialize:
             tmp_buffer.write(b"attrs:")
+            # NOTE: attributes is always a dict so we can simply rewinding logic by assuming }
+            # is always the last character when serializing a dict to json
+            tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True)[:-1])
+            # Old implementation
+            """
             tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True))
             _rewind_past_close_curly(tmp_buffer)
+            """
             tmp_buffer.write(b",")
         else:
             tmp_buffer.write(b"attrs:{")
