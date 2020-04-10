@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 import sys
-import unittest
 import datetime
 
 import importlib
@@ -26,12 +25,13 @@ from six.moves import zip
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import date_parsing_utils
+from scalyr_agent.test_base import ScalyrTestCase
 
 if six.PY3:
     reload = importlib.reload
 
 
-class DateUtilsTestCase(unittest.TestCase):
+class DateUtilsTestCase(ScalyrTestCase):
     def tearDown(self):
         super(DateUtilsTestCase, self).tearDown()
 
