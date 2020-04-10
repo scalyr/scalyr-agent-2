@@ -462,4 +462,4 @@ else:
     rfc3339_to_nanoseconds_since_epoch = (
         _rfc3339_to_nanoseconds_since_epoch_string_split
     )
-    rfc3339_to_datetime = _rfc3339_to_datetime_strptime
+    rfc3339_to_datetime = _rfc3339_to_datetime_string_split
