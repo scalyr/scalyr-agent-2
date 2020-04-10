@@ -17,7 +17,7 @@
 # is cached
 whoami
 ls ~/agent_image/
-if [ -f "~/agent_image/scalyr-agent-testings-fpm_package-builder" ]; then
+if [ -f ~/agent_image/scalyr-agent-testings-fpm_package-builder ]; then
     echo "Copy image 'scalyr-agent-testings-fpm_package-builder' to cache."
     cp  ~/agent_image/scalyr-agent-testings-fpm_package-builder ~/fpm_builder_cache/scalyr-agent-testings-fpm_package-builder
     rm ~/agent_image/scalyr-agent-testings-fpm_package-builder
@@ -25,7 +25,7 @@ else
   echo "Image 'scalyr-agent-testings-fpm_package-builder' is not found."
 fi
 
-if [ -f "~/agent_image/scalyr-agent-testings-monitor-base" ]; then
+if [ -f ~/agent_image/scalyr-agent-testings-monitor-base ]; then
     echo "Copy image 'scalyr-agent-testings-monitor-base' to cache."
     cp  ~/agent_image/scalyr-agent-testings-monitor-base ~/monitors_builder_cache/scalyr-agent-testings-monitor-base
     rm ~/agent_image/scalyr-agent-testings-monitor-base
