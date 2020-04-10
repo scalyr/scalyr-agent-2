@@ -158,9 +158,9 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
         parts[0] = parts[0][:-1]
 
     try:
-        result = parts[0].split("T")
-        date_parts = result[0].split("-")
-        time_parts = result[1].split(":")
+        date_parts, time_parts = parts[0].split("T")
+        date_parts = date_parts.split("-")
+        time_parts = time_parts.split(":")
 
         dt = datetime.datetime(
             int(date_parts[0]),
@@ -363,9 +363,9 @@ def _rfc3339_to_datetime_string_split(string):
 
     # create a datetime object
     try:
-        result = parts[0].split("T")
-        date_parts = result[0].split("-")
-        time_parts = result[1].split(":")
+        date_parts, time_parts = parts[0].split("T")
+        date_parts = date_parts.split("-")
+        time_parts = time_parts.split(":")
 
         dt = datetime.datetime(
             int(date_parts[0]),
