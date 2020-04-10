@@ -38,6 +38,7 @@ if [ "$(ls -A ~/agent_image/scalyr-agent-testings-distribution-*-base)" ]; then
     echo "Copy image distribution image to cache."
     ls ~/agent_image/scalyr-agent-testings-distribution*
     cp ~/agent_image/scalyr-agent-testings-distribution* ~/agent_image_cache/
+    ls ~/agent_image_cache/
 else
   echo "Agent distribution image is not found."
 fi
