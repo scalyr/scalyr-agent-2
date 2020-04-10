@@ -19,6 +19,8 @@ mkdir -p ~/fpm_builder_cache
 mkdir -p ~/monitors_builder_cache
 mkdir -p ~/agent_image_cache
 
+echo "==================================================================="
+echo "Checking fpm_builder_cache."
 ls ~/fpm_builder_cache
 if [ "$(ls -A ~/fpm_builder_cache)" ]; then
     echo "fpm builder image is found."
@@ -26,15 +28,17 @@ if [ "$(ls -A ~/fpm_builder_cache)" ]; then
 else
   echo "fpm builder image is not found."
 fi
-
+echo "==================================================================="
+echo "Checking monitors_builder_cache."
 ls ~/monitors_builder_cache
-if [ "$(ls -A ~/monitors_builder_cache)" ]; then
+if [ "$(ls -A ~/monitors_builder_cache/scalyr-agent-testings-monitor-base)" ]; then
     echo "monitors builder image is found."
-    cp ~/monitors_builder_cache/* ~/agent_image/
+    cp ~/monitors_builder_cache/scalyr-agent-testings-monitor-base ~/agent_image/
 else
   echo "monitors builder image is not found."
 fi
-
+echo "==================================================================="
+echo "Checking agent_image_cache."
 ls ~/agent_image_cache
 # the agent distribution image name should match to this glob.
 if [ "$(ls -A ~/agent_image_cache/scalyr-agent-testings-distribution-*-base)" ]; then
