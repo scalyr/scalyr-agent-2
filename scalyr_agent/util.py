@@ -197,19 +197,34 @@ def set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-try:
-    set_json_lib("ujson")
-except ImportError:
+# Set default json library we will use. We start with the most efficient and falling back to less
+# efficient library as a fallback.
+# We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
+# encoding
+if six.PY3:
+    json_libs_to_use = ["orjson", "ujson", "json"]
+else:
+    json_libs_to_use = ["ujson", "json"]
+
+last_error = None
+for json_lib_to_use in json_libs_to_use:
     try:
-        set_json_lib("json")
-    except ImportError:
-        # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print(
-            "No default json library found which should be present in all Python >= 2.6.  "
-            "Python < 2.6 is not supported.  Exiting.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        set_json_lib(json_lib_to_use)
+    except ImportError as e:
+        last_error = e
+    else:
+        last_error = None
+        break
+
+# Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+if last_error:
+    # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+    print(
+        "No default json library found which should be present in all Python >= 2.6. "
+        "Python < 2.6 is not supported.  Exiting.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def get_json_lib():
