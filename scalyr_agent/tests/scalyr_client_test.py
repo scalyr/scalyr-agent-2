@@ -830,22 +830,29 @@ class PostFixBufferTest(ScalyrTestCase):
         self.assertTrue(
             test_buffer.add_log_and_thread_entry("log_5", "histogram_builder", {})
         )
+
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertTrue(
             test_buffer.add_log_and_thread_entry("log_12", "ok_builder", {})
         )
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertTrue(
             test_buffer.add_log_and_thread_entry("log", "histogram_builder_foo", {})
         )
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertEquals(
@@ -866,7 +873,9 @@ class PostFixBufferTest(ScalyrTestCase):
             )
         )
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertFalse(
@@ -876,7 +885,9 @@ class PostFixBufferTest(ScalyrTestCase):
         )
 
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertEquals(
@@ -902,7 +913,9 @@ class PostFixBufferTest(ScalyrTestCase):
         test_buffer.set_position(position)
 
         self.assertEquals(
-            test_buffer.length, len(test_buffer.content(cache_size=False))
+            test_buffer.length,
+            len(test_buffer.content(cache_size=False)),
+            "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
         self.assertEquals(
