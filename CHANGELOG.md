@@ -1,7 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## in development
+## 2.1.2 "TBD" - April 30, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 30, 2020 16:30 -0800
+--->
 
 Optimizations
 
