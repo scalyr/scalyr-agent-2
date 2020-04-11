@@ -143,6 +143,13 @@ class EncodeDecodeTest(ScalyrTestCase):
 
 
 class TestDefaultJsonLibrary(ScalyrTestCase):
+    def tearDown(self):
+        super(TestDefaultJsonLibrary, self).tearDown()
+
+        for value in ["orjson", "ujson", "json"]:
+            if value in sys.modules:
+                del sys.modules[value]
+
     @skipIf(six.PY2, "Skipping under Python 2")
     def test_correct_default_json_library_is_used_python3(self):
         sys.modules["orjson"] = mock.Mock()
