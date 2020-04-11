@@ -1,6 +1,12 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## in development
+
+Optimizations
+
+* Speed up event serialization under highly loaded scenarios by optimizing json encoding and encoding of event attributes.
+
 ## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
 <!---
