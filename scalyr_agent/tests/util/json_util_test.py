@@ -115,6 +115,18 @@ class EncodeDecodeTest(ScalyrTestCase):
                 )
                 obj3 = util.json_decode(text)
                 self.assertEquals(obj3, obj)
+
+                # Sanity test to ensure curly brace is always the last character when serializing
+                # a dict
+                values = [
+                    {},
+                    {"a": "b"},
+                    {"a": 1, "b": 2},
+                ]
+
+                for value in values:
+                    result = util.json_encode(value)
+                    self.assertEqual(result[-1], "}")
             finally:
                 util.set_json_lib(original_lib)
 
