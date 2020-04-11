@@ -170,6 +170,9 @@ class BaseScalyrTestCase(unittest.TestCase):
         # Enable keys sort for json.dumps to make it easier to assert on the serialized output
         scalyr_util.SORT_KEYS = True
 
+        # NOTE: orjson doesn't support sort_keys so we fallback to implementation which supports it
+        scalyr_util.set_json_lib("json")
+
     def tearDown(self):
         scalyr_util.SORT_KEYS = False
 
