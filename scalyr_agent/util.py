@@ -90,6 +90,13 @@ Original error: %s
 """.strip()
 
 
+# True if json.dumps should sort the keys and use custom ident which doesn't include a whitespace
+# after a comma.
+# This option adds significant overhead so it's only used by the tests to make asserting on the
+# serialized values easier.
+SORT_KEYS = False
+
+
 def get_json_implementation(lib_name):
     if lib_name not in ["json", "ujson", "orjson"]:
         raise ValueError("Unsupported json library %s" % lib_name)
@@ -122,9 +129,9 @@ def get_json_implementation(lib_name):
                     "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
             if fp is not None:
-                return ujson.dump(obj)
+                return ujson.dump(obj, sort_keys=SORT_KEYS)
             else:
-                return ujson.dumps(obj)
+                return ujson.dumps(obj, sort_keys=SORT_KEYS)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
@@ -156,12 +163,16 @@ def get_json_implementation(lib_name):
             :return: If fp is not None, then the string representing the serialization.
             :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
+            if SORT_KEYS:
+                kwargs = {"sort_keys": True, "separators": (",", ":")}
+            else:
+                kwargs = {}
 
             if fp is not None:
                 # Eliminate spaces by default. Python 2.4 does not support partials.
-                return json.dump(obj, fp)
+                return json.dump(obj, fp, **kwargs)
             else:
-                return json.dumps(obj)
+                return json.dumps(obj, **kwargs)
 
         if sys.version_info[0] == 3 and sys.version_info[1] < 6:
             # wrap native json library 'loads' in Python3.5 and below, because it does not accept bytes.
