@@ -26,6 +26,7 @@ import importlib
 
 import six
 import mock
+import pytest
 
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
@@ -142,6 +143,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             self.__test_encode_decode(text.encode("utf-8"), obj)
 
 
+@pytest.mark.json_lib
 class TestDefaultJsonLibrary(ScalyrTestCase):
     def tearDown(self):
         super(TestDefaultJsonLibrary, self).tearDown()
