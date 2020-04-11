@@ -23,10 +23,10 @@ __author__ = "echee@scalyr.com"
 import sys
 import unittest
 
+import six
+
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
-
-import six
 
 JSON = 1
 UJSON = 2
