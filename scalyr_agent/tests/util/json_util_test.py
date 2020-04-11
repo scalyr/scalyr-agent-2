@@ -146,7 +146,7 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
     def tearDown(self):
         super(TestDefaultJsonLibrary, self).tearDown()
 
-        for value in ["orjson", "ujson", "json"]:
+        for value in ["scalyr_agent.util", "orjson", "ujson", "json"]:
             if value in sys.modules:
                 del sys.modules[value]
 

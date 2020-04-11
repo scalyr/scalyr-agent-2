@@ -202,12 +202,12 @@ def set_json_lib(lib_name):
 # We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
 # encoding
 if six.PY3:
-    json_libs_to_use = ["orjson", "ujson", "json"]
+    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
 else:
-    json_libs_to_use = ["ujson", "json"]
+    JSON_LIBS_TO_USE = ["ujson", "json"]
 
 last_error = None
-for json_lib_to_use in json_libs_to_use:
+for json_lib_to_use in JSON_LIBS_TO_USE:
     try:
         set_json_lib(json_lib_to_use)
     except ImportError as e:
