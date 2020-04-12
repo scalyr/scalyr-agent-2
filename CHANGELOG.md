@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.2 "TBD" - April 30, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 30, 2020 16:30 -0800
+--->
+
+Optimizations
+
+* Optimize RFC3339 date strings parsing. This should result in better throughput under highly loaded scenarios (many lines per second) when using Docker / Kubernetes monitor.
+
 ## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
 <!---
