@@ -327,6 +327,7 @@ seconds and then polls again.
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
+        self._format_version = self._config.get("format_version")
         if len(self._journal_path) == 0:
             self._journal_path = None
         if self._journal_path and not os.path.exists(self._journal_path):
@@ -542,8 +543,10 @@ seconds and then polls again.
             try:
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
-                logger = self.log_manager.get_logger(extra.get("unit", ""))
-                logger.info(self.format_msg("details", msg, extra))
+                unit = extra.get("unit", "")
+                logger = self.log_manager.get_logger(unit)
+                config = self.log_manager.get_config(unit)
+                logger.info(self.format_msg(msg, config, extra))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
@@ -553,24 +556,50 @@ seconds and then polls again.
                 )
 
     def format_msg(
-        self, metric_name, metric_value, extra_fields=None,
+        self, message, log_config, extra_fields=None,
     ):
         string_buffer = six.StringIO()
 
+        detect_escaped_strings = False
+        emit_raw_details = False
+        if log_config:
+            # If True, will attempt to see if the values are already escaped strings, and if so, not add in an
+            # additional escaping ourselves
+            detect_escaped_strings = log_config.get("detect_escaped_strings", False)
+            # If True, will always emit values as their original string value instead of attempting to escaping them
+            emit_raw_details = log_config.get("emit_raw_details", False)
+
         string_buffer.write(
-            "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
+            self._format_key_value(
+                "%s %s", "details", message, emit_raw_details, detect_escaped_strings
+            )
         )
 
         if extra_fields is not None:
-            for field_name in extra_fields:
-                field_value = extra_fields[field_name]
+            for field_name in sorted(extra_fields):
                 string_buffer.write(
-                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
+                    self._format_key_value(
+                        " %s=%s",
+                        field_name,
+                        extra_fields[field_name],
+                        False,
+                        detect_escaped_strings,
+                    )
                 )
 
         msg = string_buffer.getvalue()
         string_buffer.close()
         return msg
+
+    def _format_key_value(
+        self, format, key, value, emit_raw_details, detect_escaped_strings
+    ):
+        if emit_raw_details or (
+            detect_escaped_strings and value.startswith('"') and value.endswith('"')
+        ):
+            return format % (key, value)
+        else:
+            return format % (key, scalyr_util.json_encode(value))
 
     def gather_sample(self):
 
