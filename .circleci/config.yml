@@ -372,35 +372,15 @@ commands:
             rm -f ~/image_checksum
 
   install-cached-tox:
-    parameters:
-      tox-target:
-        type: string
     steps:
       - restore_cache:
           name: "Restore Python Dependencies cache"
           key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
-      - restore_cache:
-          name: "Restore tox and its dependencies wheels from cache."
-          key: tox-<< pipeline.parameters.default_tox_version >>-{{ .Branch }}
-
       - run:
-          name: "Download tox wheels or reuse it."
+          name: Install Dependencies
           command: |
-            if [ ! -d ~/tox_cache ]; then
-              mkdir ~/tox_cache
-              pip download -d ~/tox_cache "tox==<< pipeline.parameters.default_tox_version >>"
-            fi
-            pip install --no-index --find-links ~/tox_cache "tox==<< pipeline.parameters.default_tox_version >>"
-            # init test invironment.
-            tox -e<< parameters.tox-target >> --notest
-
-
-      - save_cache:
-          name: "Save tox and all its dependencies wheels."
-          key: tox-<< pipeline.parameters.default_tox_version >>-{{ .Branch }}
-          paths:
-            - "~/tox_cache"
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
 
       - save_cache:
           name: "Save Python Dependencies cache"
@@ -435,8 +415,7 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
 
-      - install-cached-tox:
-          tox-target: << parameters.tox_target >>
+      - install-cached-tox
 
       - init-cached-docker-image:
           cache-key-prefix: fpm-builder
@@ -479,8 +458,7 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
 
-      - install-cached-tox:
-          tox-target: << parameters.tox_target >>
+      - install-cached-tox
 
       - init-cached-docker-image:
           cache-key-prefix: monitors-builder
