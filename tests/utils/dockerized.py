@@ -85,7 +85,7 @@ def dockerized_case(
                 builder.build(skip_requirements=skip_requirements)
 
             container_name = "{0}-{1}-{2}".format(
-                builder.image_tag, file_path, func_name
+                builder.image_tag, Path(file_path).name.replace("py", ""), func_name
             )
 
             print(
