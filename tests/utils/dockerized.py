@@ -84,9 +84,18 @@ def dockerized_case(
             except docker.errors.ImageNotFound:
                 builder.build(skip_requirements=skip_requirements)
 
-            print("Create container from '{0}' image.".format(builder.image_tag))
+            container_name = "{0}-{1}-{2}".format(
+                builder.image_tag, file_path, func_name
+            )
+
+            print(
+                "Create container '{0}' from '{1}' image.".format(
+                    container_name, builder.image_tag
+                )
+            )
             container = docker_client.containers.run(
                 builder.image_tag,
+                name=container_name,
                 detach=True,
                 command=command,
                 stdout=True,

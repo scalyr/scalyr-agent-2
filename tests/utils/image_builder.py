@@ -178,8 +178,6 @@ class AgentImageBuilder(object):
             suffix="{0}-build-context".format(self.image_tag)
         )
 
-        shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
-
         dockerfile_path = build_context_path / "Dockerfile"
         dockerfile_path.write_text(self.get_dockerfile_content())
         self._copy_to_build_context(build_context_path)
@@ -190,6 +188,8 @@ class AgentImageBuilder(object):
             dockerfile=six.text_type(dockerfile_path),
             rm=True,
         )
+
+        shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
 
         for chunk in output_gen:
             print(chunk.get("stream", ""), end="")
