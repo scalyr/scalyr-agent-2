@@ -18,6 +18,9 @@ Module containing various date parsing related utility functions.
 
 from __future__ import absolute_import
 
+if False:
+    from typing import Optional
+
 import re
 import time
 import calendar
@@ -50,6 +53,7 @@ else:
 # code, but there are there so we can test corectness of all the functions and benchmark different
 # implementations and compare them.
 def _rfc3339_to_nanoseconds_since_epoch_strptime(string):
+    # type: (str) -> Optional[int]
     """
     rfc3339_to_nanoseconds_since_epoch variation which utilizes strptime approach.
     """
@@ -94,8 +98,9 @@ def _rfc3339_to_nanoseconds_since_epoch_strptime(string):
 
 
 def _rfc3339_to_nanoseconds_since_epoch_regex(string):
+    # type: (str) -> Optional[int]
     """
-    rfc3339_to_nanoseconds_since_epoch variation which utilizes regex approach
+    rfc3339_to_nanoseconds_since_epoch variation which utilizes regex approach.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
@@ -110,7 +115,7 @@ def _rfc3339_to_nanoseconds_since_epoch_regex(string):
 
     try:
         dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))
+            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
         )
     except Exception:
         return None
@@ -143,8 +148,17 @@ def _rfc3339_to_nanoseconds_since_epoch_regex(string):
 
 
 def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
+    # type: (str) -> Optional[int]
     """
-    rfc3339_to_nanoseconds_since_epoch variation which utilizes string.split approach
+    rfc3339_to_nanoseconds_since_epoch variation which utilizes string.split approach.
+
+    Returns nanoseconds from unix epoch from a rfc3339 formatted timestamp.
+
+    This doesn't do any complex testing and assumes the string is well formed and in UTC (e.g.
+    uses Z at the end rather than a time offset).
+
+    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
+    @rtype int
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
@@ -159,8 +173,8 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
 
     try:
         date_parts, time_parts = parts[0].split("T")
-        date_parts = date_parts.split("-")
-        time_parts = time_parts.split(":")
+        date_parts = date_parts.split("-")  # type: ignore
+        time_parts = time_parts.split(":")  # type: ignore
 
         dt = datetime.datetime(
             int(date_parts[0]),
@@ -248,13 +262,9 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
 
 
 def _rfc3339_to_datetime_strptime(string):
-    """Returns a date time from a rfc3339 formatted timestamp.
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-    @rtype datetime.datetime
+    # type: (str) -> Optional[datetime.datetime]
+    """
+    rfc3339_to_datetime variation which utilizes strptime approach.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
@@ -295,13 +305,9 @@ def _rfc3339_to_datetime_strptime(string):
 
 
 def _rfc3339_to_datetime_regex(string):
-    """Returns a date time from a rfc3339 formatted timestamp.
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-    @rtype datetime.datetime
+    # type: (str) -> Optional[datetime.datetime]
+    """
+    rfc3339_to_datetime variation which utilizes regex approach.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
@@ -317,7 +323,7 @@ def _rfc3339_to_datetime_regex(string):
     # create a datetime object
     try:
         dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))
+            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
         )
     except Exception:
         return None
@@ -342,11 +348,15 @@ def _rfc3339_to_datetime_regex(string):
 
 
 def _rfc3339_to_datetime_string_split(string):
-    """Returns a date time from a rfc3339 formatted timestamp.
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
+    # type: (str) -> Optional[datetime.datetime]
+    """
+    rfc3339_to_datetime variation which utilizes string.split approach.
+
+    Returns a date time from a rfc3339 formatted timestamp.
+
+    This doesn't do any complex testing and assumes the string is well formed and in UTC (e.g.
+    uses Z at the end rather than a time offset).
+
     @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
     @rtype datetime.datetime
     """
@@ -364,8 +374,8 @@ def _rfc3339_to_datetime_string_split(string):
     # create a datetime object
     try:
         date_parts, time_parts = parts[0].split("T")
-        date_parts = date_parts.split("-")
-        time_parts = time_parts.split(":")
+        date_parts = date_parts.split("-")  # type: ignore
+        time_parts = time_parts.split(":")  # type: ignore
 
         dt = datetime.datetime(
             int(date_parts[0]),
@@ -398,13 +408,9 @@ def _rfc3339_to_datetime_string_split(string):
 
 
 def _rfc3339_to_datetime_udatetime(string):
-    """Returns a date time from a rfc3339 formatted timestamp.
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-    @rtype datetime.datetime
+    # type: (str) -> Optional[datetime.datetime]
+    """
+    rfc3339_to_datetime variation which utilizes udatetime library.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
