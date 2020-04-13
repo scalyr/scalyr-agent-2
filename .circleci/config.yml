@@ -389,7 +389,7 @@ commands:
           command: |
             if [ ! -d ~/tox_cache ]; then
               mkdir ~/tox_cache
-              pip download -d ~/tox_cache tox "tox==<< pipeline.parameters.default_tox_version >>"
+              pip download -d ~/tox_cache "tox==<< pipeline.parameters.default_tox_version >>"
             fi
             pip install --no-index --find-links ~/tox_cache "tox==<< pipeline.parameters.default_tox_version >>"
             # init test invironment.
