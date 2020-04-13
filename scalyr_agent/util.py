@@ -36,7 +36,6 @@ __author__ = "czerwin@scalyr.com"
 
 import logging
 import base64
-import calendar
 import datetime
 import os
 import threading
@@ -44,7 +43,6 @@ import time
 import uuid
 
 import scalyr_agent.json_lib as json_lib
-from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
@@ -65,6 +63,11 @@ except ImportError:
     import md5  # type: ignore
 
     new_md5 = False
+
+# Those imports have been moved in #494 so this alias is left here is place just in case for
+# backward compatibility reasons
+from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  # NOQA
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime  # NOQA
 
 
 USJON_NOT_AVAILABLE_MSG = """
@@ -533,110 +536,6 @@ def seconds_since_epoch(date_time, epoch=None):
     @rtype float
     """
     return microseconds_since_epoch(date_time) / 10.0 ** 6
-
-
-def rfc3339_to_datetime(string):
-    """Returns a date time from a rfc3339 formatted timestamp.
-
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-
-    @rtype datetime.datetime
-    """
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    # create a datetime object
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-
-    dt = datetime.datetime(*(tm[0:6]))
-
-    # now add the fractional part
-    if len(parts) > 1:
-        fractions = parts[1]
-        # if we had a fractional component it should terminate in a Z
-        if not fractions.endswith("Z"):
-            # we don't handle non UTC timezones yet
-            if any(c in fractions for c in "+-"):
-                return None
-            return dt
-
-        # remove the Z and just process the fraction.
-        fractions = fractions[:-1]
-        to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
-        dt = dt.replace(microsecond=micro)
-
-    return dt
-
-
-def rfc3339_to_nanoseconds_since_epoch(string):
-    """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
-
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-
-    @rtype long
-    """
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    # create a datetime object
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-
-    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
-    nanos = 0
-
-    # now add the fractional part
-    if len(parts) > 1:
-        fractions = parts[1]
-        # if the fractional part doesn't end in Z we likely have a
-        # malformed time, so just return the current value
-        if not fractions.endswith("Z"):
-            # we don't handle non UTC timezones yet
-            if any(c in fractions for c in "+-"):
-                return None
-
-            return nano_seconds
-
-        # strip the final 'Z' and use the final number for processing
-        fractions = fractions[:-1]
-        to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
-
-    return nano_seconds + nanos
 
 
 def format_time(time_value):
