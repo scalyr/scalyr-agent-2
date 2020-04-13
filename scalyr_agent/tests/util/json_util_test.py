@@ -118,7 +118,9 @@ class EncodeDecodeTest(ScalyrTestCase):
                 self.assertEquals(obj3, obj)
 
                 # Sanity test to ensure curly brace is always the last character when serializing
-                # a dict
+                # a dict.
+                # Our "rewind to last curly brace" logic in scalyr_agent/scalyr_client.py relies on
+                # this behavior.
                 values = [
                     {},
                     {"a": "b"},
