@@ -173,9 +173,12 @@ class AgentImageBuilder(object):
             return
 
         print("Build image: '{0}'".format(self.image_tag))
+
         build_context_path = create_tmp_directory(
             suffix="{0}-build-context".format(self.image_tag)
         )
+
+        shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
 
         dockerfile_path = build_context_path / "Dockerfile"
         dockerfile_path.write_text(self.get_dockerfile_content())
