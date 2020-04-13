@@ -487,8 +487,8 @@ commands:
         description: "The version of the python interpreter to install in distribution."
         type: string
         default: ""
-      command:
-        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
+      tox_target:
+        description: "Tox target name used to run the tests."
         type: string
       agent_host_name_prefix:
         description: "Host name for the agent instances that will be started during job."
@@ -504,7 +504,7 @@ commands:
           docker_layer_caching: false
 
       - install-cached-tox:
-          tox-target: << parameters.command >>
+          tox-target: << parameters.tox_target >>
 
       - init-cached-docker-image:
           cache-key-prefix: monitors-builder
@@ -513,7 +513,7 @@ commands:
 
       - run-tox-targer:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
-          target_name:  << parameters.command >>
+          target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
 
 
@@ -1282,7 +1282,7 @@ jobs:
           distribution: "ubuntu1804"
           python_version: "python3"
           agent_host_name_prefix: "monitors-test"
-          command: tox -eagent_monitors_ubuntu
+          tox_target: agent_monitors_ubuntu
           upload_coverage: true
 
   smoke-rpm-package-py3:
