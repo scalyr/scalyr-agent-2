@@ -17,17 +17,20 @@ from __future__ import absolute_import
 
 import os
 import sys
+import platform
+
+import mock
 
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
 from scalyr_agent.scalyr_monitor import load_monitor_class
 from scalyr_agent.test_base import ScalyrTestCase
-
-import mock
+from scalyr_agent.test_base import skipIf
 
 __all__ = ["LinuxProcessMetricsMonitorTest"]
 
 
 class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_gather_sample_by_pid_success(self):
         monitor_config = {
             "module": "linux_process_metrics",
@@ -45,6 +48,7 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.error.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_gather_sample_by_commandline_success(self):
         monitor_config = {
             "module": "linux_process_metrics",
@@ -62,6 +66,7 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.error.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_gather_sample_by_pid_failure_pid_doesnt_exist(self):
         monitor_config = {
             "module": "linux_process_metrics",

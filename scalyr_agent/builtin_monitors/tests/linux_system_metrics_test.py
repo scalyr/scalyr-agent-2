@@ -24,12 +24,14 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
 import mock
+import platform
 
 __all__ = ["LinuxSystemMetricsMonitorTest"]
 
 
 class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_gather_sample_success(self):
         monitor_config = {
             "module": "linux_system_metrics",
