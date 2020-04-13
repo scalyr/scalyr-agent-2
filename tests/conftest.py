@@ -22,6 +22,7 @@ import tempfile
 
 import pytest
 import yaml
+import six
 
 from scalyr_agent import compat
 from tests.utils.compat import Path
@@ -42,7 +43,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--test-config",
         action="store",
-        default=Path(__file__).parent / "config.yml",
+        default=six.text_type(Path(__file__).parent / "config.yml"),
         help="Path to yaml file with essential agent settings and another test related settings. "
         "Fields from this config file will be set as environment variables.",
     )
