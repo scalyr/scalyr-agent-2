@@ -44,6 +44,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import six
 
 from scalyr_agent.util import StoppableThread
+from scalyr_agent import util as scalyr_util
 
 PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
 
@@ -165,6 +166,15 @@ class BaseScalyrTestCase(unittest.TestCase):
         # whatever object is capturing stdout for this test case.
         scalyr_logging.set_log_destination(use_stdout=True)
         self.__setup_invoked = True
+
+        # Enable keys sort for json.dumps to make it easier to assert on the serialized output
+        scalyr_util.SORT_KEYS = True
+
+        # NOTE: orjson doesn't support sort_keys so we fallback to implementation which supports it
+        scalyr_util.set_json_lib("json")
+
+    def tearDown(self):
+        scalyr_util.SORT_KEYS = False
 
     def run(self, result=None):
         _start_thread_watcher_if_necessary()

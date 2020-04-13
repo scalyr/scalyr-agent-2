@@ -10,6 +10,8 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 30, 2020 16:30 -0800
 Optimizations
 
 * Optimize RFC3339 date strings parsing. This should result in better throughput under highly loaded scenarios (many lines per second) when using Docker / Kubernetes monitor.
+* Speed up event serialization under highly loaded scenarios by optimizing json encoding and encoding of event attributes.
+* We now default to ``orjson`` JSON library under Python 3 (if the library is available). ``orjson`` is substantially faster than ``ujson`` for encoding.
 
 ## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
