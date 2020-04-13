@@ -12,6 +12,7 @@ from __future__ import absolute_import
 
 import ctypes
 import errno
+import platform
 from ctypes.util import find_library
 from functools import partial
 
@@ -49,7 +50,12 @@ def clock_gettime(clk_id):
 try:
     from time import perf_counter, process_time
 except ImportError:  # Python <3.3
-    perf_counter = partial(clock_gettime, CLOCK_MONOTONIC_RAW)
-    perf_counter.__name__ = "perf_counter"  # type: ignore
-    process_time = partial(clock_gettime, CLOCK_PROCESS_CPUTIME_ID)
-    process_time.__name__ = "process_time"  # type: ignore
+    if platform.system() == "Darwin":
+        import time
+        perf_counter = time.time
+        process_time = time.time
+    else:
+        perf_counter = partial(clock_gettime, CLOCK_MONOTONIC_RAW)
+        perf_counter.__name__ = "perf_counter"  # type: ignore
+        process_time = partial(clock_gettime, CLOCK_PROCESS_CPUTIME_ID)
+        process_time.__name__ = "process_time"  # type: ignore
