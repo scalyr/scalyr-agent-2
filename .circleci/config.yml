@@ -304,7 +304,7 @@ commands:
             echo "$AGENT_HOST_NAME"
             mkdir -p ~/artifacts
 
-            << parameters.target_name >> -- --skip-builder-requirements --artifacts-path ~/artifacts
+            tox -e << parameters.target_name >> -- --skip-builder-requirements --artifacts-path ~/artifacts
       - when:
           condition: << parameters.upload_coverage >>
           steps:
