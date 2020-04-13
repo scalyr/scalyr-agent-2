@@ -29,7 +29,7 @@ parameters:
     default: "3.14.3"
   cache_version:
     type: string
-    default: "v11"
+    default: "v12"
   cache_version_py_dependencies:
     description: "Cache version suffix to use for all the Python dependency caches."
     type: string
@@ -1319,20 +1319,24 @@ workflows:
       - smoke-monitors-tests
       - package-build-rpm
       - package-build-deb
-      - package-test-rpm
-      - package-test-deb
+      - package-test-rpm:
+          requires:
+            - package-build-rpm
+      - package-test-deb:
+          requires:
+            - package-build-deb
       - smoke-rpm-package-py2:
           requires:
-            - package-test-rpm
+            - package-build-rpm
       - smoke-rpm-package-py3:
           requires:
-            - package-test-rpm
+            - package-build-rpm
       - smoke-deb-package-py2:
           requires:
-            - package-test-deb
+            - package-build-deb
       - smoke-deb-package-py3:
           requires:
-            - package-test-deb
+            - package-build-deb
 
 
 #      - smoke-monitors-tests
