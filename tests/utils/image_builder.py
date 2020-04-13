@@ -143,9 +143,11 @@ class AgentImageBuilder(object):
                 else:
                     shutil.copy(six.text_type(path), six.text_type(dest_path))
 
-    def _is_image_exists(self):
+    @classmethod
+    def is_image_exists(cls):
+        docker_client = docker.from_env()
         try:
-            self._docker_client.images.get(self.image_tag)
+            docker_client.images.get(cls.IMAGE_TAG)
             return True
         except docker.errors.ImageNotFound:
             return False
@@ -158,7 +160,7 @@ class AgentImageBuilder(object):
         """
         # if image caching is enabled and image exists we assume that image has already built in previous test cases.
         if image_cache_path is not None:
-            if self._is_image_exists():
+            if self.is_image_exists():
                 print("Image '{0}' already exists. Skip build.".format(self.IMAGE_TAG))
                 return
 
@@ -206,7 +208,7 @@ class AgentImageBuilder(object):
         """
         # if image is loaded earlier - skip to avoid the multiple loading of the same image
         # if we build it multiple times.
-        if skip_if_exists and self._is_image_exists():
+        if skip_if_exists and self.is_image_exists():
             print("The image  '{0}' is already loaded.".format(self.image_tag))
             return
 

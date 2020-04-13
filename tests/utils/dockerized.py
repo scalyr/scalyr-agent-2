@@ -73,19 +73,19 @@ def dockerized_case(
                 return result
 
             builder = builder_cls()
-            skip_requirements = request.config.getoption(
-                "--skip-builder-requirements", False
-            )
+
+            use_cache = request.config.getoption("--use-cache", False)
+
+            if not builder.is_image_exists():
+                if use_cache:
+                    builder.build(skip_requirements=False)
+                else:
+                    builder.build(skip_requirements=True)
 
             docker_client = docker.from_env()
 
-            try:
-                docker_client.images.get(builder.image_tag)
-            except docker.errors.ImageNotFound:
-                builder.build(skip_requirements=skip_requirements)
-
             container_name = "{0}-{1}-{2}".format(
-                builder.image_tag, Path(file_path).name.replace("py", ""), func_name
+                builder.image_tag, Path(file_path).name.replace(".py", ""), func_name
             )
 
             print(

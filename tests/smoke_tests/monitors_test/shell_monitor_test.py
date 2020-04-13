@@ -28,7 +28,7 @@ import six
 from tests.utils.agent_runner import AgentRunner
 from tests.utils.log_reader import LogReader
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.shell import ShellMonitorBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 
 
 class ShellMonitorAgentRunner(AgentRunner):
@@ -70,12 +70,12 @@ def _test(python_version):
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(ShellMonitorBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_shell_python2(request):
     _test(python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(ShellMonitorBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_shell_python3(request):
     _test(python_version="python3")

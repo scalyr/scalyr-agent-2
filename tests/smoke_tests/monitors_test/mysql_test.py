@@ -30,7 +30,7 @@ from scalyr_agent.third_party import pymysql
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.mysql import MySqlBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
@@ -171,12 +171,12 @@ def _test(request, python_version):
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python3(request):
     _test(request, python_version="python3")

@@ -28,7 +28,7 @@ import pytest
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.nginx import NginxBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
@@ -85,12 +85,12 @@ def _test(request, python_version):
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_nginx_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_nginx_python3(request):
     _test(request, python_version="python3")
