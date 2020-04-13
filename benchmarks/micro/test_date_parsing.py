@@ -36,7 +36,7 @@ from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_regex
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_string_split
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_udatetime
 
-from utils import process_time
+from time_utils import process_time
 
 DATE_WITH_FRACTION_STR = u"2015-08-03T09:12:43.143757463Z"
 EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP = 1438593163143757463

@@ -1,61 +1,37 @@
-# Based on https://gist.github.com/zed/5073409
-
-"""
-Compatibility layer for Python 2 which exposes time.perf_counter and time.process_time under Python
-2.
-
-This also allows us to utilize time.process_time() counter under Python 2 on CI which results in
-more accurate and less noisy data.
-"""
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import absolute_import
 
-import ctypes
-import errno
-import platform
-from ctypes.util import find_library
-from functools import partial
+if False:
+    from typing import Dict
 
-CLOCK_PROCESS_CPUTIME_ID = 2  # time.h
-CLOCK_MONOTONIC_RAW = 4
+import random
 
-clockid_t = ctypes.c_int
-time_t = ctypes.c_long
+from six.moves import range
 
 
-class timespec(ctypes.Structure):
-    _fields_ = [
-        ("tv_sec", time_t),  # seconds
-        ("tv_nsec", ctypes.c_long),  # nanoseconds
-    ]
+def generate_random_dict(keys_count=10):
+    # type: (int) -> Dict[str, str]
+    """
+    Generate dictionary with fixed random values.
+    """
+    result = {}
+    keys = list(range(0, keys_count))
+    random.shuffle(keys)
 
+    for key in keys:
+        result["key_%s" % (key)] = "value_%s" % (key)
 
-_clock_gettime = ctypes.CDLL(find_library("rt"), use_errno=True).clock_gettime  # type: ignore
-_clock_gettime.argtypes = [clockid_t, ctypes.POINTER(timespec)]
-
-
-def clock_gettime(clk_id):
-    tp = timespec()
-    if _clock_gettime(clk_id, ctypes.byref(tp)) < 0:
-        err = ctypes.get_errno()
-        msg = errno.errorcode[err]
-        if err == errno.EINVAL:
-            msg += (
-                " The clk_id specified is not supported on this system" " clk_id=%r"
-            ) % (clk_id,)
-        raise OSError(err, msg)
-    return tp.tv_sec + tp.tv_nsec * 1e-9
-
-
-try:
-    from time import perf_counter, process_time
-except ImportError:  # Python <3.3
-    if platform.system() == "Darwin":
-        import time
-        perf_counter = time.time
-        process_time = time.time
-    else:
-        perf_counter = partial(clock_gettime, CLOCK_MONOTONIC_RAW)
-        perf_counter.__name__ = "perf_counter"  # type: ignore
-        process_time = partial(clock_gettime, CLOCK_PROCESS_CPUTIME_ID)
-        process_time.__name__ = "process_time"  # type: ignore
+    return result
