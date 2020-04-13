@@ -419,8 +419,8 @@ commands:
         description: "The version of the python interpreter to install in distribution."
         type: string
         default: ""
-      command:
-        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
+      tox_target:
+        description: "Tox target name used to run the tests."
         type: string
       agent_host_name_prefix:
         description: "Host name for the agent instances that will be started during job."
@@ -435,26 +435,8 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
 
-      - restore_cache:
-          name: "Restore Python Dependencies cache"
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-
-      - run:
-          command: |
-            if [ ! -d ~/tox_cache ]; then
-             mkdir ~/tox_cache
-              pip install download -d ~/tox_cache tox "tox==<< pipeline.parameters.default_tox_version >>"
-            fi
-            pip install --no-index --find-links ~/tox_cache "tox==<< pipeline.parameters.default_tox_version >>"
-
-
-
-
-
-#      - run:
-#          name: Install Dependencies
-#          command: |
-#            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+      - install-cached-tox:
+          tox-target: << parameters.tox_target >>
 
       - init-cached-docker-image:
           cache-key-prefix: fpm-builder
@@ -468,14 +450,8 @@ commands:
 
       - run-tox-targer:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
-          target_name:  << parameters.command >>
+          target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
-
-      - save_cache:
-          name: "Save Python Dependencies Dache"
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/.cache/pip"
 
   monitors-tests:
     description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
@@ -1240,7 +1216,7 @@ jobs:
       - package-test:
           distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_amazonlinux2
+          tox_target: agent_distributions_tests_amazonlinux2
 
   package-test-deb:
     working_directory: ~/scalyr-agent-2
@@ -1250,7 +1226,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_ubuntu1804
+          tox_target: agent_distributions_tests_ubuntu1804
 
   # Circle CI jobs which build agent packages for each PR.
   package-build-deb:
@@ -1261,7 +1237,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "-test"
-          command: tox -eagent_deb_package
+          tox_target: agent_deb_package
 
   package-build-rpm:
     working_directory: ~/scalyr-agent-2
@@ -1271,7 +1247,7 @@ jobs:
       - package-test:
           distribution: "centos8"
           agent_host_name_prefix: "-test"
-          command: tox -eagent_rpm_package
+          tox_target: agent_rpm_package
 
   smoke-monitors-tests:
     working_directory: ~/scalyr-agent-2
@@ -1294,7 +1270,7 @@ jobs:
           distribution: "amazonlinux2"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
-          command: tox -eagent_package_smoke_test_amazonlinux_python3
+          tox_target: agent_package_smoke_test_amazonlinux_python3
 
   smoke-rpm-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -1304,7 +1280,7 @@ jobs:
       - package-test:
           distribution: "amazonlinux2"
           python_version: "python2"
-          command: tox -eagent_package_smoke_test_amazonlinux_python2
+          tox_target: agent_package_smoke_test_amazonlinux_python2
 
   smoke-deb-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -1314,7 +1290,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           python_version: "python3"
-          command: tox -eagent_package_smoke_test_ubuntu_python3
+          tox_target: agent_package_smoke_test_ubuntu_python3
 
   smoke-deb-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -1324,7 +1300,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           python_version: "python2"
-          command: tox -eagent_package_smoke_test_ubuntu_python2
+          tox_target: agent_package_smoke_test_ubuntu_python2
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
