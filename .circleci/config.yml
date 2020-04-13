@@ -1339,22 +1339,22 @@ workflows:
   package-tests:
     jobs:
       - smoke-monitors-tests
-#      - package-build-rpm
-#      - package-build-deb
-#      - package-test-rpm
-#      - package-test-deb
-#      - smoke-rpm-package-py2:
-#          requires:
-#            - package-test-rpm
-#      - smoke-rpm-package-py3:
-#          requires:
-#            - package-test-rpm
-#      - smoke-deb-package-py2:
-#          requires:
-#            - package-test-deb
-#      - smoke-deb-package-py3:
-#          requires:
-#            - package-test-deb
+      - package-build-rpm
+      - package-build-deb
+      - package-test-rpm
+      - package-test-deb
+      - smoke-rpm-package-py2:
+          requires:
+            - package-test-rpm
+      - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
+      - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
+      - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
 
 
 #      - smoke-monitors-tests
