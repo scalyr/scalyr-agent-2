@@ -22,8 +22,10 @@ from __future__ import absolute_import
 if False:
     from typing import List
 
+import glob
 import json
 import argparse
+import logging
 from io import open
 
 from scalyr_agent.util import rfc3339_to_datetime
@@ -32,6 +34,8 @@ from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
 from utils import initialize_logging
 from utils import send_payload_to_codespeed
+
+LOG = logging.getLogger(__name__)
 
 
 def parse_data_file(data_path):
@@ -117,23 +121,31 @@ def main(
     codespeed_environment,
     dry_run=False,
 ):
+    data_paths = glob.glob(data_path)
 
-    data = parse_data_file(data_path)
-    payload = format_benchmark_data_for_codespeed(
-        data=data,
-        codespeed_project=codespeed_project,
-        codespeed_executable=codespeed_executable,
-        codespeed_environment=codespeed_environment,
-    )
-    commit_id = payload[0].get("commitid", "unknown")
+    for data_path in data_paths:
+        LOG.info("Processing file: %s" % (data_path))
+        data = parse_data_file(data_path)
 
-    send_payload_to_codespeed(
-        codespeed_url=codespeed_url,
-        codespeed_auth=codespeed_auth,
-        commit_id=commit_id,
-        payload=payload,
-        dry_run=dry_run,
-    )
+        payload = format_benchmark_data_for_codespeed(
+            data=data,
+            codespeed_project=codespeed_project,
+            codespeed_executable=codespeed_executable,
+            codespeed_environment=codespeed_environment,
+        )
+
+        if not payload:
+            continue
+
+        commit_id = payload[0].get("commitid", "unknown")
+
+        send_payload_to_codespeed(
+            codespeed_url=codespeed_url,
+            codespeed_auth=codespeed_auth,
+            commit_id=commit_id,
+            payload=payload,
+            dry_run=dry_run,
+        )
 
 
 if __name__ == "__main__":
