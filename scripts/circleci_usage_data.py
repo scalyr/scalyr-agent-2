@@ -57,8 +57,8 @@ CIRCLE_CI_API_TOKEN = compat.os_environ_unicode.get("CIRCLE_CI_API_TOKEN", None)
 MAILGUN_API_TOKEN = compat.os_environ_unicode.get("MAILGUN_API_TOKEN", None)
 
 
-def get_all_branches_for_repo(project_slug):
-    # type: (str) -> List[str]
+def get_all_branches_for_repo(project_slug, limit=5):
+    # type: (str, int) -> List[str]
     """
     Retrieve all the branches (including deleted ones) for a particular repo.
 
@@ -99,6 +99,9 @@ def get_all_branches_for_repo(project_slug):
             continue
 
         branches.append(branch_ref)
+
+    if limit:
+        return branches[:limit]
 
     return branches
 
@@ -149,6 +152,7 @@ def get_usage_data_for_branch_and_workflow(
 
     if not items:
         buff.write(u"No recent runs which match this criteria.\n\n")
+        buff.write("=" * 100 + "\n\n")
         return
 
     count = 0
@@ -169,14 +173,22 @@ def get_usage_data_for_branch_and_workflow(
         if count >= limit:
             break
 
+    buff.write("=" * 100 + "\n\n")
+
 
 def print_usage_data(
-    project_slug, workflows, status="success", branch="master", limit=10, emails=None
+    project_slug,
+    workflows,
+    status="success",
+    branch="master",
+    limit=5,
+    branch_limit=5,
+    emails=None,
 ):
-    # type: (str, List[str], str, str, int, Optional[List[str]]) -> None
+    # type: (str, List[str], str, str, int, int, Optional[List[str]]) -> None
     if branch == "all":
         branches = get_all_branches_for_repo(
-            project_slug=project_slug.replace("gh/", "")
+            project_slug=project_slug.replace("gh/", ""), limit=branch_limit
         )
         # We always include master branch
         branches.insert(0, "master")
@@ -273,6 +285,13 @@ if __name__ == "__main__":
         default=5,
     )
     parser.add_argument(
+        "--branch-limit",
+        help="Maximum number of most recently active branches to print data for.",
+        type=int,
+        default=5,
+    )
+
+    parser.add_argument(
         "--emails",
         help="If provided, report will also be emailed to those addresses (comma separated list).",
         type=str,
@@ -300,5 +319,6 @@ if __name__ == "__main__":
         status=args.status,
         branch=args.branch,
         limit=args.limit,
+        branch_limit=args.branch_limit,
         emails=emails,
     )
