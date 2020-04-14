@@ -279,7 +279,7 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
 
-  run-tox-targer:
+  run-tox-target:
     parameters:
       agent_host_name:
         type:
@@ -345,6 +345,9 @@ commands:
         type: string
       image-builder-path:
         type: string
+      python_executable_path:
+        type: string
+        default: "/usr/bin/env python"
     steps:
       - run:
           name: "Get checksum file for builder '<< parameters.image-builder-path >>'."
@@ -358,7 +361,8 @@ commands:
       - run:
           name: "Build image by '<< parameters.image-builder-path >>' builder."
           command: |
-            tox -e_run_command -- python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
+             << parameters.python_executable_path >> -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
+            #tox -e_run_command -- python -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
 
       - save_cache:
           name: "Save docker image of the builder '<< parameters.image-builder-path >>' into cache."
@@ -372,6 +376,10 @@ commands:
             rm -f ~/image_checksum
 
   install-cached-tox:
+    parameters:
+      target_name:
+        type: string
+        default: ""
     steps:
       - restore_cache:
           name: "Restore Python Dependencies cache"
@@ -387,6 +395,14 @@ commands:
           key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+
+      - when:
+          condition: << parameters.target_name >>
+          steps:
+            - run:
+                name: "Init tox environment for target: '<< parameters.target_name >>'"
+                command: |
+                  tox -e<< parameters.target_name >> --notest
 
 
   package-test:
@@ -415,19 +431,21 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
 
-      - install-cached-tox
+      - install-cached-tox:
+          target_name: << parameters.tox_target >>
 
       - init-cached-docker-image:
           cache-key-prefix: fpm-builder
           cache-path: ~/fpm-builder-cache
           image-builder-path: tests.image_builder.distributions.fpm_package_builder.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
 
       - init-cached-docker-image:
           cache-key-prefix: << parameters.distribution >>
           cache-path: ~/<< parameters.distribution >>
           image-builder-path: tests.image_builder.distributions.<< parameters.distribution >>.cmd
 
-      - run-tox-targer:
+      - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
           target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
@@ -458,14 +476,15 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
 
-      - install-cached-tox
+      - install-cached-tox:
+          target_name: << parameters.tox_target >>
 
       - init-cached-docker-image:
           cache-key-prefix: monitors-builder
           cache-path: ~/monitors-builder-cache
           image-builder-path: tests.image_builder.monitors.base.cmd
 
-      - run-tox-targer:
+      - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
           target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
@@ -554,8 +573,7 @@ commands:
             cache-key: hello
             cache-path: ~/hello
 
-      - run-tox-targer:
-
+      - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
           target_name:  << parameters.command >>
 
