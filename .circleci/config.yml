@@ -1151,7 +1151,8 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success --branch=all --limit=5 \
+                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success \
+                --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
