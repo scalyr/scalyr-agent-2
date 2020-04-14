@@ -367,6 +367,21 @@ class MonitorConfigTest(ScalyrTestCase):
             True,
         )
 
+    def test_empty_environment_value(self):
+        # Test empty string results in empty list
+        self.assertEquals(
+            self.define_and_get_from_env("", "default value", convert_to=six.text_type),
+            "",
+        )
+
+        # Test empty string results in empty list
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "", "default value", convert_to=ArrayOfStrings
+            ),
+            ArrayOfStrings(),
+        )
+
     def get(
         self,
         original_value,
