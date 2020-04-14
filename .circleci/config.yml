@@ -158,11 +158,10 @@ commands:
           name: Install Dependencies
           command: |
             pip install --user -r benchmarks/scripts/requirements.txt
+
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
-            # TODO: Add another benchmark with ujson
-            # pip install --user "ujson==1.35"
       - run:
           name: Run Agent And Capture Resource Utilization
           # NOTE: The following variables are specified in the Circle CI WebUI
@@ -232,6 +231,10 @@ commands:
   codespeed_micro_benchmarks:
     description: "A base command which runs CodeSpeed code-level micro benchmarks"
     parameters:
+      tox_version:
+        description: "tox package version to use."
+        type: string
+        default: "3.14.3"
       codespeed_executable:
         description: "CodeSpeed executable name."
         type: string
@@ -250,11 +253,14 @@ commands:
       - run:
           name: Install Dependencies
           command: |
+            pip install "tox==<< parameters.tox_version >>"
+
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
+
             # Needed for snappy library
-            apt-get install -y libsnappy-dev
+            sudo apt-get install -y libsnappy-dev
       - run:
           name: Run Micro Benchmarks
           # NOTE: The following variables are specified in the Circle CI WebUI
@@ -1021,7 +1027,7 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
 
-  benchmarks-micro-py-56:
+  benchmarks-micro-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.5.9
@@ -1209,7 +1215,7 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
+  #    #unittest:
       #    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
       #    # Python 3 versions
       #    jobs:
