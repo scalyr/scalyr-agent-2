@@ -18,6 +18,8 @@ This module contains various utility functions for sending data to CodeSpeed.
 
 from __future__ import absolute_import
 
+import pprint
+
 from datetime import datetime
 from argparse import ArgumentParser  # NOQA
 
@@ -62,8 +64,10 @@ def initialize_logging(debug=False):
     logging.basicConfig(level=log_level)
 
 
-def send_payload_to_codespeed(codespeed_url, codespeed_auth, commit_id, payload):
-    # type: (str, Optional[Tuple[str, str]], str, List[Dict]) -> None
+def send_payload_to_codespeed(
+    codespeed_url, codespeed_auth, commit_id, payload, dry_run=False
+):
+    # type: (str, Optional[Tuple[str, str]], str, List[Dict], bool) -> None
     """
     Send provided payload to CodeSpeed.
     """
@@ -74,7 +78,14 @@ def send_payload_to_codespeed(codespeed_url, codespeed_auth, commit_id, payload)
     url = "%s/result/add/json/" % (codespeed_url)
     data = {"json": json.dumps(payload)}
 
-    logger.debug('Sending data to "%s" (data=%s)' % (codespeed_url, data))
+    if dry_run:
+        logger.info("Dry run, not submitting metrics to CodeSpeed...")
+        logger.info(
+            "Would have submit the following data: %s" % (pprint.pformat(payload))
+        )
+        return
+    else:
+        logger.debug('Sending data to "%s" (data=%s)' % (codespeed_url, data))
 
     resp = requests.post(url=url, data=data, auth=codespeed_auth)
 
@@ -166,6 +177,12 @@ def add_common_parser_arguments(
             ),
         )
 
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("Just print the values, but don't submit them to CodeSpeed."),
+    )
     parser.add_argument(
         "--debug",
         action="store_true",

@@ -115,6 +115,7 @@ def main(
     codespeed_project,
     codespeed_executable,
     codespeed_environment,
+    dry_run=False,
 ):
 
     data = parse_data_file(data_path)
@@ -131,6 +132,7 @@ def main(
         codespeed_auth=codespeed_auth,
         commit_id=commit_id,
         payload=payload,
+        dry_run=dry_run,
     )
 
 
@@ -168,4 +170,5 @@ if __name__ == "__main__":
         codespeed_project=args.codespeed_project,
         codespeed_executable=args.codespeed_executable,
         codespeed_environment=args.codespeed_environment,
+        dry_run=args.dry_run,
     )
