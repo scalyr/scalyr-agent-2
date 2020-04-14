@@ -33,6 +33,15 @@ For example - ``Python 2.7.17 - idle conf 1`` represents an idle agent process
 
 ### Code / Function Level Micro Benchmarks
 
+``benchmarks/micro/`` directory contains Python source for for micro
+benchmarks.
+
+Micro benchmarks measure performance of specific performance critical pieces of
+code (think event serialization, JSON serialization, compression, etc.).
+
+Results for those benchmarks are available under
+``scalyr-agent-2-microbenchmarks`` executable on our CodeSpeed instance.
+
 ### Agent Process Level Benchmarks
 
 Those benchmarks are designed to spin up the whole agent process and measure
@@ -46,14 +55,17 @@ We do that under different scenarios:
 * Loaded agent - agent is configured to watch log file(s) for changes and send
   that data to API.
 
+Results for those benchmarks are available under
+``scalyr-agent-2-procbenchmarks`` executable on our CodeSpeed instance.
+
 #### Executables
 
-##### [Python version] - idle conf 3
+##### [Python version] - idle conf 1
 
 Runs agent with an idle configuration with no monitored logs and default built-in monitors
 enabled (Linux process metrics for the agent process and Linux system metrics).
 
-##### [Python version] - idle conf 4
+##### [Python version] - idle conf 2
 
 Runs agent with an idle configuration with no monitored logs and default built-in
 monitors disabled (Linux process metrics for the agent process and Linux system metrics).
@@ -109,12 +121,6 @@ are benchmarks where larger value is better (think throughput).
   log file
 * ``log_lines_error`` (counter) - Number of ERROR log lines emitted during the run in the agent
   log file
-
-### Synthetic Benchmarks
-
-Those benchmarks are designed to measure performance of various pieces of code
-which are critical to the overall agent performance (json serialization and
-deserialization, compression algorithms, disk reader, etc).
 
 ## Fixture Files
 
