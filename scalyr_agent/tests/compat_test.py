@@ -31,7 +31,7 @@ class EnvironUnicode(unittest.TestCase):
     TEST_VAR = "TEST_VAR_ENVIRON_UNICODE"
 
     def test_environ_get(self):
-        os.environ[EnvironUnicode.TEST_VAR] = six.ensure_binary("Test string")
+        os.environ[EnvironUnicode.TEST_VAR] = six.ensure_str("Test string")
         self.assertEqual(
             os_environ_unicode.get(EnvironUnicode.TEST_VAR),
             six.text_type("Test string"),
@@ -41,18 +41,14 @@ class EnvironUnicode(unittest.TestCase):
         )
 
     def test_environ_set(self):
-        os_environ_unicode[EnvironUnicode.TEST_VAR] = six.ensure_binary(
-            "Test two string"
-        )
+        os_environ_unicode[EnvironUnicode.TEST_VAR] = six.ensure_str("Test two string")
         self.assertEqual(
             os_environ_unicode.get(EnvironUnicode.TEST_VAR),
             six.text_type("Test two string"),
         )
 
     def test_environ_pop(self):
-        os_environ_unicode[EnvironUnicode.TEST_VAR] = six.ensure_binary(
-            "Test four string"
-        )
+        os_environ_unicode[EnvironUnicode.TEST_VAR] = six.ensure_str("Test four string")
         value = os_environ_unicode.pop(EnvironUnicode.TEST_VAR)
         self.assertEqual(value, six.text_type("Test four string"))
 
