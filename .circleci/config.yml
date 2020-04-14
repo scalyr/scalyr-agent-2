@@ -1021,23 +1021,23 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
 
-  benchmarks-micro-py-36:
+  benchmarks-micro-py-56:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: circleci/python:3.5.9
     steps:
       - codespeed_micro_benchmarks:
-          codespeed_executable: "Python 3.6"
+          codespeed_executable: "Python 3.5.9"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           cache_key_name: "benchmarks-micro-py36"
 
   benchmarks-micro-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7
+      - image: circleci/python:2.7.17
     steps:
       - codespeed_micro_benchmarks:
-          codespeed_executable: "Python 3.6"
+          codespeed_executable: "Python 2.7.17"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           cache_key_name: "benchmarks-micro-py27"
 
@@ -1210,50 +1210,50 @@ jobs:
 workflows:
   version: 2
   unittest:
-    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-    # Python 3 versions
-    jobs:
-      - lint-checks
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
-      - smoke-standalone-26
-      - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-  package-tests:
-    jobs:
-      - smoke-monitors-tests
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
+      #    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+      #    # Python 3 versions
+      #    jobs:
+      #      - lint-checks
+      #      - unittest-26
+      #      - unittest-27
+      #      - unittest-35
+      #      - unittest-35-osx
+      #      - smoke-standalone-26
+      #      - smoke-standalone-27
+      #      - smoke-standalone-35
+      #      - smoke-standalone-26-tls12
+      #      - smoke-standalone-27-tls12
+      #       # NOTE: smoke test jobs below still use old smoke tests framework
+      #      - smoke-docker-json
+      #      - smoke-docker-syslog
+      #      - smoke-k8s
+      #  package-tests:
+      #    jobs:
+      #      - smoke-monitors-tests
+      #      - package-build-rpm:
+      #          <<: *non_master_and_release
+      #      - package-build-deb:
+      #          <<: *non_master_and_release
+      #      - package-test-rpm:
+      #          <<: *master_and_release_only
+      #      - package-test-deb:
+      #          <<: *master_and_release_only
+      #      - smoke-rpm-package-py2:
+      #          requires:
+      #            - package-test-rpm
+      #          <<: *master_and_release_only
+      #      - smoke-rpm-package-py3:
+      #          requires:
+      #            - package-test-rpm
+      #          <<: *master_and_release_only
+      #      - smoke-deb-package-py2:
+      #          requires:
+      #            - package-test-deb
+      #          <<: *master_and_release_only
+      #      - smoke-deb-package-py3:
+      #          requires:
+      #            - package-test-deb
+      #          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
@@ -1275,7 +1275,7 @@ workflows:
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *master_and_release_only
       - benchmarks-micro-py-27
-      - benchmarks-micro-py-36
+      - benchmarks-micro-py-35
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
