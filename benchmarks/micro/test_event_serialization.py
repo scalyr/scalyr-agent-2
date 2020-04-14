@@ -29,6 +29,7 @@ from .utils import generate_random_dict
 from .utils import generate_random_line
 
 
+@pytest.mark.submit_result_to_codespeed
 @pytest.mark.parametrize("attributes_count", [10, 100, 1000])
 @pytest.mark.benchmark(group="add_attributes")
 def test_event_add_attributes(benchmark, attributes_count):
@@ -45,6 +46,7 @@ def test_event_add_attributes(benchmark, attributes_count):
     assert b"attrs" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 @pytest.mark.skipif(not six.PY2, reason="Skipping under Python 3")
 @pytest.mark.benchmark(group="event_serialize")
 def test_serialize_medium_event_stringio(benchmark):
@@ -82,6 +84,7 @@ def test_serialize_medium_event_stringio(benchmark):
     assert "message" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 @pytest.mark.benchmark(group="event_serialize")
 def test_serialize_small_event(benchmark):
     """
@@ -111,6 +114,7 @@ def test_serialize_small_event(benchmark):
     assert b"message" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 @pytest.mark.benchmark(group="event_serialize")
 def test_serialize_medium_event(benchmark):
     """
@@ -140,6 +144,7 @@ def test_serialize_medium_event(benchmark):
     assert b"message" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 @pytest.mark.benchmark(group="event_serialize")
 def test_serialize_large_event(benchmark):
     """
