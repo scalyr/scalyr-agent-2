@@ -132,6 +132,12 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         ("json_log_5_mb.log.gz", 3 * 1024),
         ("json_log_5_mb.log.gz", 10 * 1024),
         ("json_log_5_mb.log.gz", 500 * 1024),
+        ("add_events_request_10_events.log.gz", -1),
+        ("add_events_request_100_events.log.gz", -1),
+        ("add_events_request_200_events.log.gz", -1),
+        ("add_events_request_10_events_with_attributes.log.gz", -1),
+        ("add_events_request_100_events_with_attributes.log.gz", -1),
+        ("add_events_request_200_events_with_attributes.log.gz", -1),
     ],
     ids=[
         "agent_debug_log_3k",
@@ -140,9 +146,14 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         "json_log_3k",
         "json_log_10k",
         "json_log_500k",
+        "add_events_10_events",
+        "add_events_100_events",
+        "add_events_200_events",
+        "add_events_10_events_with_attributes",
+        "add_events_100_events_with_attributes",
+        "add_events_200_events_with_attributes",
     ],
 )
-# fmt: on
 @pytest.mark.parametrize("compression_algorithm_tuple",
     [
         ("deflate", {"level": 3}),
@@ -150,17 +161,30 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         ("deflate", {"level": 9}),
         ("bz2", {}),
         ("snappy", {}),
-        ("zstandard", {}),
+        ("zstandard", {"level": 3}),
+        ("zstandard", {"level": 5}),
+        ("zstandard", {"level": 10}),
+        ("zstandard", {"level": 12}),
+        ("brotli", {"quality": 3}),
+        ("brotli", {"quality": 5}),
+        ("brotli", {"quality": 8}),
     ],
     ids=[
         "deflate_level_3",
-        "deflate_level_6",
+        "deflate_level_6_default",
         "deflate_level_9",
         "bz2",
         "snappy",
-        "zstandard",
+        "zstandard_level_3_default",
+        "zstandard_level_5",
+        "zstandard_level_10",
+        "zstandard_level_12",
+        "brotli_quality_3",
+        "brotli_quality_5",
+        "brotli_quality_8",
     ],
 )
+# fmt: on
 @pytest.mark.benchmark(group="decompress", timer=process_time)
 def test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
