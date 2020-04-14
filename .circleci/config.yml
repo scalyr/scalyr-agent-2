@@ -185,7 +185,7 @@ commands:
           # and are handles as secrets: CODESPEED_AUTH
           environment:
             CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
-            CODESPEED_PROJECT: "scalyr-agent-2"
+            CODESPEED_PROJECT: "scalyr-agent-2-process-benchmarks"
             CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
             CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
             CODESPEED_BRANCH: "${CIRCLE_BRANCH}"
