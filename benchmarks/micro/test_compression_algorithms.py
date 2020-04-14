@@ -51,6 +51,11 @@ try:
 except ImportError:
     brotli = None
 
+try:
+    import lz4framed as lz4
+except ImportError:
+    lz4 = None
+
 
 from .utils import read_bytes_from_log_fixture_file
 from .time_utils import process_time
@@ -102,6 +107,7 @@ from .time_utils import process_time
         ("brotli", {"quality": 3}),
         ("brotli", {"quality": 5}),
         ("brotli", {"quality": 8}),
+        ("lz4", {}),
     ],
     ids=[
         "deflate_level_3",
@@ -116,6 +122,7 @@ from .time_utils import process_time
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
+        "lz4",
     ],
 )
 @pytest.mark.benchmark(group="compress", timer=process_time)
@@ -168,6 +175,7 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         ("brotli", {"quality": 3}),
         ("brotli", {"quality": 5}),
         ("brotli", {"quality": 8}),
+        ("lz4", {}),
     ],
     ids=[
         "deflate_level_3",
@@ -182,6 +190,7 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
+        "lz4",
     ],
 )
 # fmt: on
@@ -277,6 +286,9 @@ def _get_compress_and_decompress_func(compression_algorithm, kwargs):
     elif compression_algorithm == "brotli":
         compress_func = functools.partial(brotli.compress, **kwargs)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore
+    elif compression_algorithm == "lz4":
+        compress_func = functools.partial(lz4.compress, **kwargs)  # type: ignore
+        decompress_func = lz4.decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
