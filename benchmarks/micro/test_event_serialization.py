@@ -74,7 +74,7 @@ def test_serialize_medium_event_stringio(benchmark):
         event.serialize(output_buffer)
         return output_buffer
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=100, rounds=500)
 
     output_bytes = result.getvalue()
     assert len(output_bytes) >= line_length
@@ -104,7 +104,7 @@ def test_serialize_small_event(benchmark):
         event.serialize(output_buffer)
         return output_buffer
 
-    result = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=100, rounds=500)
 
     output_bytes = result.getvalue()
     assert len(output_bytes) >= line_length
@@ -164,7 +164,7 @@ def test_serialize_large_event(benchmark):
         event.serialize(output_buffer)
         return output_buffer
 
-    result = benchmark.pedantic(run_benchmark, iterations=50, rounds=100)
+    result = benchmark.pedantic(run_benchmark, iterations=20, rounds=100)
 
     output_bytes = result.getvalue()
     assert len(output_bytes) >= line_length
