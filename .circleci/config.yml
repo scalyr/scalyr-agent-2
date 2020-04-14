@@ -57,10 +57,6 @@ commands:
         description: "True to combine and upload coverage data to codecov.io."
         type: boolean
         default: false
-      run_microbenchmarks:
-        description: "True to run microbenchmarks."
-        type: boolean
-        default: false
     steps:
       - checkout
       - restore_cache:
@@ -104,18 +100,6 @@ commands:
                   # Submit it to codecov.io
                   coverage xml --rcfile=.coveragerc -i -o coverage.xml
                   ./scripts/submit-codecov-data.sh
-      - when:
-          condition: << parameters.run_microbenchmarks >>
-          steps:
-            - run:
-                name: Run Microbenchmarks
-                environment:
-                  TERM: "xterm-256color"
-                command: |
-                  mkdir -p microbenchmark_histograms/
-                  tox -emicro-benchmarks
-            - store_artifacts:
-                path: ~/scalyr-agent-2/microbenchmark_histograms/
 
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
@@ -258,7 +242,7 @@ commands:
       cache_key_name:
         description: "Circle CI cache key name"
         type: string
-        default: "Circle CI cache key name"
+        default: "none"
     steps:
       - checkout
       - restore_cache:
@@ -277,7 +261,7 @@ commands:
           # and are handles as secrets: CODESPEED_AUTH
           environment:
             CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
-            CODESPEED_PROJECT: "scalyr-agent-2"
+            CODESPEED_PROJECT: "scalyr-agent-2-microbenchmarks"
             CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
             CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
           command: |
@@ -285,8 +269,11 @@ commands:
             tox -emicro-benchmarks
 
             # Process and submit results to CodeSpeed
-            #python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py \
-            #    --data-path=benchmark-results.json
+            python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py \
+                --data-path="benchmark-results-*.json" \
+                --dry-run
+      - store_artifacts:
+          path: ~/scalyr-agent-2/benchmark_histograms/
       - save_cache:
           key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
@@ -522,7 +509,6 @@ jobs:
       - unittest_tox:
           python_version: "3.5"
           tox_target: "py3.5-unit-tests"
-          run_microbenchmarks: true
 
   unittest-35-osx:
     working_directory: ~/scalyr-agent-2
@@ -573,7 +559,6 @@ jobs:
           python_version: "2.7"
           tox_target: "coverage"
           upload_coverage: true
-          run_microbenchmarks: true
 
   unittest-26:
     working_directory: ~/scalyr-agent-2
@@ -1046,6 +1031,16 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           cache_key_name: "benchmarks-micro-py36"
 
+  benchmarks-micro-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7
+    steps:
+      - codespeed_micro_benchmarks:
+          codespeed_executable: "Python 3.6"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          cache_key_name: "benchmarks-micro-py27"
+
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -1279,6 +1274,7 @@ workflows:
           <<: *master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *master_and_release_only
+      - benchmarks-micro-py-27
       - benchmarks-micro-py-36
   weekly-circle-ci-usage-report:
     triggers:
