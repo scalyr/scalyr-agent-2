@@ -29,11 +29,11 @@ if False:
     from typing import Tuple
     from typing import Callable
 
+import sys
 import zlib
 import bz2
 import functools
 
-import six
 import pytest
 
 try:
@@ -173,8 +173,8 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
     def run_benchmark():
-        # Work around for Python 2 where compress is not a keyword argument, but a regular argument
-        if six.PY2 and compression_algorithm == "deflate":
+        # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular argument
+        if sys.version_info < (3, 6, 0) and compression_algorithm == "deflate":
             result = compress_func(data, kwargs["level"])
         else:
             result = compress_func(data)
@@ -226,8 +226,8 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 def _get_compress_and_decompress_func(compression_algorithm, kwargs):
     # type: (str, dict) -> Tuple[Callable, Callable]
     if compression_algorithm == "deflate":
-        if six.PY2:
-            # Work around for Python 2 where compress is not a keyword argument, but a regular
+        if sys.version_info < (3, 6, 0):
+            # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular
             # argument
             compress_func = zlib.compress  # type: ignore
         else:

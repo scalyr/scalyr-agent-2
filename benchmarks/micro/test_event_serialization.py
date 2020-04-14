@@ -54,7 +54,7 @@ def test_serialize_medium_event_stringio(benchmark):
     Event with a medium log line (2000 bytes) and a couple of attributes.
 
     This benchmark utilizes cStringIO which is only available under Python 2.x and was used
-    the before 2.1.1 release.
+    before the 2.1.1 release.
 
     This should only serve us as a baseline for some comparisons.
     """
