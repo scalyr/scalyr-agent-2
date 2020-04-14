@@ -16,30 +16,56 @@ from __future__ import absolute_import
 
 import pytest
 
+from scalyr_agent import compat
+
 # A list of custom metrics which should be included in the generated pytest benchmark result JSON
 # file
 CUSTOM_METRICS = [
     "compression_ratio",
 ]
 
+# If set, we will force all the pytest benchmark units to the provided values.
+# This comes handy when submitting data to CodeSpeed where we want to use the same and consistent
+# units across multiple runs.
+# By default, pytest benchmark will automatically adjust units based on the actual test results.
+# This may result in different units across different benchmarks and runs.
+PYTEST_BENCH_FORCE_UNIT = compat.os_environ_unicode.get("PYTEST_BENCH_FORCE_UNIT", None)
 
-def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
-    """
-    Custom scale function to ensure we use consistent units for all the micro benchmarks.
-
-    We convert timing data to milliseconds and "throughput" / operations data to 1000s
-    of operations per second.
-    """
-    if unit == "seconds":
-        prefix = "m"
-        scale = 1000
-    elif unit == "operations":
-        prefix = "K"
-        scale = 0.001
+if PYTEST_BENCH_FORCE_UNIT:
+    if PYTEST_BENCH_FORCE_UNIT == "s":
+        UNIT_SCALE = 1
+        UNIT_PREFIX = ""
+    elif PYTEST_BENCH_FORCE_UNIT == "ms":
+        UNIT_SCALE = 1000
+        UNIT_PREFIX = "m"
+    elif PYTEST_BENCH_FORCE_UNIT == "us":
+        UNIT_SCALE = 1000000
+        UNIT_PREFIX = "u"
+    elif PYTEST_BENCH_FORCE_UNIT == "ns":
+        UNIT_SCALE = 1000000000
+        UNIT_PREFIX = "n"
     else:
-        raise RuntimeError("Unexpected measurement unit %r" % unit)
+        raise ValueError("Invalid unit: %s" % (PYTEST_BENCH_FORCE_UNIT))
 
-    return prefix, scale
+if PYTEST_BENCH_FORCE_UNIT:
+
+    def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
+        """
+        Custom scale function to ensure we use consistent units for all the micro benchmarks.
+
+        We convert timing data to milliseconds and "throughput" / operations data to 1000s
+        of operations per second.
+        """
+        if unit == "seconds":
+            prefix = UNIT_PREFIX
+            scale = UNIT_SCALE
+        elif unit == "operations":
+            prefix = "K"
+            scale = 0.001
+        else:
+            raise RuntimeError("Unexpected measurement unit %r" % unit)
+
+        return prefix, scale
 
 
 @pytest.mark.hookwrapper
