@@ -64,7 +64,7 @@ def format_benchmark_data_for_codespeed(
 
     author_time = author_time.split("+")[0]
 
-    revision_date = rfc3339_to_datetime(author_time).strftime("%Y-%m-%d %H:%M:%S")
+    revision_date = rfc3339_to_datetime(author_time).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore
 
     payload = []
 
@@ -76,6 +76,13 @@ def format_benchmark_data_for_codespeed(
         value_stddev = item["stats"]["stddev"]
 
         benchmark = item["name"]
+        submit_result_to_codespeed = item["options"].get(
+            "submit_result_to_codespeed", False
+        )
+
+        if not submit_result_to_codespeed:
+            continue
+
         # Convert all the input values to milliseconds
         # NOTE: Input values are in seconds
         value = seconds_to_ms(value)
