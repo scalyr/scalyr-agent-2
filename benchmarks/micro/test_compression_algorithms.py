@@ -184,7 +184,7 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 
     size_before_compression = len(data)
     size_after_compression = len(result)
-    compression_ratio = size_before_compression / size_after_compression
+    compression_ratio = float(size_before_compression) / size_after_compression
 
     benchmark.stats.size_before_compression = size_before_compression
     benchmark.stats.size_after_compression = size_after_compression
