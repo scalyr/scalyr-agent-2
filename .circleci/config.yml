@@ -275,6 +275,7 @@ commands:
             tox -emicro-benchmarks
 
             # Process and submit results to CodeSpeed
+            export PYTHONPATH=.
             python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py \
                 --data-path="benchmark-results-*.json" \
                 --dry-run
