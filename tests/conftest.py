@@ -45,7 +45,7 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--use-cache",
+        "--no-rebuild",
         action="store_true",
         help="Build only final image and do not build required base images.",
     )

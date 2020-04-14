@@ -38,7 +38,9 @@ TCP_PORT = 6010
 
 class SyslogAgentRunner(AgentRunner):
     def __init__(self):
-        super(SyslogAgentRunner, self).__init__(enable_coverage=True)
+        super(SyslogAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.syslog_log_path = self.add_log_file(
             self.agent_logs_dir_path / "agent_syslog.log"

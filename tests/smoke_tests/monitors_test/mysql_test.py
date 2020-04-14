@@ -45,7 +45,7 @@ DATABASE = "scalyr_test_db"
 def mysql_client():
     os.system("service mysql start")
 
-    os.system("mysql < /agent_source/tests/image_builder/monitors/mysql/init.sql")
+    os.system("mysql < /init.sql")
 
     time.sleep(3)
 
@@ -66,7 +66,9 @@ def mysql_cursor(mysql_client):
 
 class MysqlAgentRunner(AgentRunner):
     def __init__(self):
-        super(MysqlAgentRunner, self).__init__(enable_coverage=True)
+        super(MysqlAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.mysql_log_path = self.add_log_file(
             self.agent_logs_dir_path / "mysql_monitor.log"

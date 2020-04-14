@@ -22,6 +22,7 @@ import os
 import six
 import docker
 
+
 from tests.utils.compat import Path
 
 from scalyr_agent import compat
@@ -74,19 +75,27 @@ def dockerized_case(
 
             builder = builder_cls()
 
-            use_cache = request.config.getoption("--use-cache", False)
+            no_rebuild = request.config.getoption("--no-rebuild", False)
 
-            if not builder.is_image_exists():
-                if use_cache:
-                    builder.build(skip_requirements=False)
-                else:
+            if builder.is_image_exists():
+                # we rebuild image if there is no option to skip rebuild.
+                if not no_rebuild:
                     builder.build(skip_requirements=True)
+            else:
+                builder.build(skip_requirements=no_rebuild)
 
             docker_client = docker.from_env()
 
             container_name = "{0}-{1}-{2}".format(
                 builder.image_tag, Path(file_path).name.replace(".py", ""), func_name
             )
+
+            try:
+                # remove container if it was created previously.
+                container = docker_client.containers.get(container_name)
+                container.remove()
+            except docker.errors.NotFound:
+                pass
 
             print(
                 "Create container '{0}' from '{1}' image.".format(

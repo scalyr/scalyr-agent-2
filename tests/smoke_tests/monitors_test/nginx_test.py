@@ -36,7 +36,9 @@ import six
 
 class NginxAgentRunner(AgentRunner):
     def __init__(self):
-        super(NginxAgentRunner, self).__init__(enable_coverage=True)
+        super(NginxAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.nginx_log_path = self.add_log_file(
             self.agent_logs_dir_path / "nginx_monitor.log"

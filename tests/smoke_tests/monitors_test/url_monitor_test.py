@@ -37,7 +37,9 @@ PORT = 5000
 
 class UrlMonitorAgentRunner(AgentRunner):
     def __init__(self):
-        super(UrlMonitorAgentRunner, self).__init__(enable_coverage=True)
+        super(UrlMonitorAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.url_monitor_log_path = self.add_log_file(
             self.agent_logs_dir_path / "url_monitor.log"
@@ -59,7 +61,7 @@ class UrlMonitorAgentRunner(AgentRunner):
 
 def _test(python_version):
     process = subprocess.Popen(
-        "python -m flask run", shell=True, env={"FLASK_APP": "/server.py"}
+        "python -m flask run", shell=True, env={"FLASK_APP": "/dummy-flask-server.py"}
     )
     runner = UrlMonitorAgentRunner()
 

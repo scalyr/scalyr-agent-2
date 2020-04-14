@@ -33,7 +33,9 @@ from tests.image_builder.monitors.common import CommonMonitorBuilder
 
 class ShellMonitorAgentRunner(AgentRunner):
     def __init__(self):
-        super(ShellMonitorAgentRunner, self).__init__(enable_coverage=True)
+        super(ShellMonitorAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.shell_monitor_log_path = self.add_log_file(
             self.agent_logs_dir_path / "shell_monitor.log"
