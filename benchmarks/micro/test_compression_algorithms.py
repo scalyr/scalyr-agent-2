@@ -228,10 +228,14 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
+    compress_func, _ = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
     compressed_data = compress_func(data)
     assert compressed_data != data
+
+    # NOTE: We intentionally request new decompression function so we get new zstandard context for
+    # decompression (this way we avoid dictionary being already populated).
+    _, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
     def run_benchmark():
         result = decompress_func(compressed_data)
