@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import functools
 
+import six
 import pytest
 
 from scalyr_agent import compat
@@ -103,6 +104,9 @@ def submit_result_to_codespeed(func):
     """
     Decorator which marks a pytest benchmark function with "submit_result_to_codespeed" marker.
     """
+    # NOTE: Python 2 version doesn't support custom decorator so we need to skip if
+    if six.PY2:
+        return func
 
     @functools.wraps(func)
     def wrapped_function(*args, **kwargs):
