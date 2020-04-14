@@ -444,6 +444,7 @@ commands:
           cache-key-prefix: << parameters.distribution >>
           cache-path: ~/<< parameters.distribution >>
           image-builder-path: tests.image_builder.distributions.<< parameters.distribution >>.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
 
       - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
@@ -483,6 +484,8 @@ commands:
           cache-key-prefix: monitors-builder
           cache-path: ~/monitors-builder-cache
           image-builder-path: tests.image_builder.monitors.base.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
+
 
       - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
