@@ -859,10 +859,11 @@ class AddEventsRequest(object):
         # 2->TODO use BytesIO, make all data that is going to be written here - binary
         string_buffer = io.BytesIO()
         serialized_base_body = scalyr_util.json_encode(base_body, binary=True)
-        string_buffer.write(serialized_base_body)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
-        _rewind_past_close_curly(string_buffer)
+        # NOTE: base_body is always a dict so we can simply rewinding logic by assuming }
+        # is always the last character when serializing a dict to json
+        string_buffer.write(serialized_base_body[:-1])
 
         # Append the start of our events field.
         string_buffer.write(b", events: [")
@@ -1585,8 +1586,9 @@ class Event(object):
                 tmp_buffer.write(b", ")
         if attributes_to_serialize:
             tmp_buffer.write(b"attrs:")
-            tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True))
-            _rewind_past_close_curly(tmp_buffer)
+            # NOTE: attributes is always a dict so we can simply rewinding logic by assuming }
+            # is always the last character when serializing a dict to json
+            tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True)[:-1])
             tmp_buffer.write(b",")
         else:
             tmp_buffer.write(b"attrs:{")
