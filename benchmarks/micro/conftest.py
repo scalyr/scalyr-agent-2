@@ -14,6 +14,8 @@
 
 from __future__ import absolute_import
 
+import functools
+
 import pytest
 
 from scalyr_agent import compat
@@ -74,8 +76,16 @@ def pytest_benchmark_generate_json(
 ):
     """
     Hook which makes sure we include custom metrics such as compression_ratio in the output JSON.
+
+    In addition to that, it also adds "submit_result_to_codespeed" to the "options" dict if the
+    original function is decorated with "submit_result_to_codespeed" decorator.
     """
     for benchmark in benchmarks:
+        submit_result_to_codespeed = getattr(
+            benchmark.fixture, "submit_result_to_codespeed", False
+        )
+        benchmark.options["submit_result_to_codespeed"] = submit_result_to_codespeed
+
         for metric_name in CUSTOM_METRICS:
             metric_value = getattr(benchmark.stats, "compression_ratio", None)
 
@@ -84,5 +94,24 @@ def pytest_benchmark_generate_json(
 
             benchmark.stats.fields = list(benchmark.stats.fields)
             benchmark.stats.fields += [metric_name]
+            benchmark.options["has_custom_metrics"] = True
 
     yield
+
+
+def submit_result_to_codespeed(func):
+    """
+    Decorator which marks a pytest benchmark function with "submit_result_to_codespeed" marker.
+    """
+
+    @functools.wraps(func)
+    def wrapped_function(*args, **kwargs):
+        benchmark = kwargs["benchmark"]
+        benchmark.submit_result_to_codespeed = True
+        return func(*args, **kwargs)
+
+    return wrapped_function
+
+
+# Register a custom marker
+pytest.mark.submit_result_to_codespeed = submit_result_to_codespeed
