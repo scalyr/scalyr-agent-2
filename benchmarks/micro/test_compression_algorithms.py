@@ -30,7 +30,6 @@ if False:
     from typing import Callable
 
 import functools
-import time
 
 import zlib
 import bz2
@@ -54,6 +53,7 @@ except ImportError:
 
 
 from .utils import read_bytes_from_log_fixture_file
+from .time_utils import process_time
 
 
 # fmt: off
@@ -116,7 +116,7 @@ from .utils import read_bytes_from_log_fixture_file
         "brotli_quality_8",
     ],
 )
-@pytest.mark.benchmark(group="compress", timer=time.process_time)
+@pytest.mark.benchmark(group="compress", timer=process_time)
 def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
@@ -159,7 +159,7 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         "zstandard",
     ],
 )
-@pytest.mark.benchmark(group="decompress", timer=time.process_time)
+@pytest.mark.benchmark(group="decompress", timer=process_time)
 def test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
