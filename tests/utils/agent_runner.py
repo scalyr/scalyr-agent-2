@@ -18,11 +18,14 @@ from __future__ import absolute_import
 
 import shutil
 import os
+import atexit
 
 if False:
     from typing import Dict, Optional, Any
 
+import copy
 import json
+import pprint
 import subprocess
 
 from distutils.spawn import find_executable
@@ -63,7 +66,15 @@ class AgentRunner(object):
        Agent runner provides ability to launch Scalyr agent with needed configuration settings.
        """
 
-    def __init__(self, installation_type=DEV_INSTALL):  # type: (int) -> None
+    def __init__(
+        self,
+        installation_type=DEV_INSTALL,
+        enable_coverage=False,
+        enable_debug_log=False,
+    ):  # type: (int, bool, bool) -> None
+
+        if enable_coverage and installation_type != DEV_INSTALL:
+            raise ValueError("Coverage is only supported for dev installs")
 
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
@@ -85,6 +96,12 @@ class AgentRunner(object):
         # This is useful when agent was installed from package,
         # and agent runner needs to know it where files are located.
         self._installation_type = installation_type
+
+        self._stopped = False
+
+        self._enable_coverage = enable_coverage
+
+        self._enable_debug_log = enable_debug_log
 
         self._init_agent_paths()
 
@@ -155,9 +172,11 @@ class AgentRunner(object):
         for file_path in self._files.values():
             self._create_file(file_path)
 
-        self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
+        self.write_to_file(
+            self._agent_config_path, json.dumps(self._agent_config, indent=4)
+        )
 
-    def start(self):
+    def start(self, executable="python"):
         # important to call this function before agent was started.
         self._create_agent_files()
 
@@ -173,14 +192,45 @@ class AgentRunner(object):
                 # Special case for CentOS 6 where we need to use absolute path to service command
                 cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
 
-            self._agent_process = subprocess.Popen(cmd, shell=True)
-        else:
             self._agent_process = subprocess.Popen(
-                "python {0} --no-fork --no-change-user start".format(_AGENT_MAIN_PATH),
+                cmd, shell=True, env=compat.os_environ_unicode.copy()
+            )
+        else:
+            base_args = [
+                str(_AGENT_MAIN_PATH),
+                "--no-fork",
+                "--no-change-user",
+                "start",
+            ]
+
+            if self._enable_coverage:
+                # NOTE: We need to pass in command string as a single argument to coverage run
+                args = [
+                    "coverage",
+                    "run",
+                    "--concurrency=thread",
+                    "--parallel-mode",
+                    " ".join(base_args),
+                ]
+            else:
+                args = [executable] + base_args
+
+            # NOTE: Using list would be safer since args are then auto escaped
+            cmd = " ".join(args)
+            self._agent_process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 shell=True,
+                close_fds=True,
             )
 
         print("Agent started.")
+
+        # NOTE: We register atexit handler to ensure agent process is always stopped. This means
+        # even if a test failure occurs and we don't get a chance to manually call stop() method.
+        atexit.register(self.stop)
 
     def status(self):
         if self._installation_type == PACKAGE_INSTALL:
@@ -212,7 +262,7 @@ class AgentRunner(object):
         return result
 
     def switch_version(self, version, env=None):
-        # type: (str, Optional[dict]) -> None
+        # type: (six.text_type, Optional[dict]) -> None
         """
         :param version: Python version to switch the agent to.
         :param env: Environment to use with this command.
@@ -236,7 +286,15 @@ class AgentRunner(object):
                 **kwargs  # type: ignore
             )
 
-    def stop(self):
+    def stop(self, executable="python"):
+        if six.PY3:
+            atexit.unregister(self.stop)
+
+        if self._stopped:
+            return
+
+        print("Stopping agent process...")
+
         if self._installation_type == PACKAGE_INSTALL:
             service_executable = find_executable("service")
             if service_executable:
@@ -250,10 +308,35 @@ class AgentRunner(object):
             return result
 
         else:
-            self._agent_process = subprocess.Popen(
-                "python {0} stop".format(_AGENT_MAIN_PATH), shell=True
+            process = subprocess.Popen(
+                "{0} {1} stop".format(executable, _AGENT_MAIN_PATH), shell=True
             )
+
+            process.wait()
+            self._agent_process.wait()
+
+            # Print any output produced by the agent before working which may not end up in the logs
+            if self._agent_process.stdout and self._agent_process.stderr:
+                stdout = self._agent_process.stdout.read().decode("utf-8")
+                stderr = self._agent_process.stderr.read().decode("utf-8")
+
+                if stdout:
+                    print("Agent process stdout: %s" % (stdout))
+
+                if stderr:
+                    print("Agent process stderr: %s" % (stderr))
+
+            if self._enable_coverage:
+                # Combine all the coverage files for this process and threads into a single file so
+                # we can copy it over.
+                print("Combining coverage data...")
+                os.system("coverage combine")
+
         print("Agent stopped.")
+        self._stopped = True
+
+    def __del__(self):
+        self.stop()
 
     @property
     def _server_host(self):  # type: () -> six.text_type
@@ -266,12 +349,27 @@ class AgentRunner(object):
         Build and return agent configuration.
         :return: dict with configuration.
         """
-        return {
+        config = {
             "api_key": compat.os_environ_unicode["SCALYR_API_KEY"],
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
+            "monitors": [],
         }
+
+        if self._enable_debug_log:
+            # NOTE: We also enable copy_from_start if debug_level is enabled to we ship whole debug
+            # log to scalyr
+            config["debug_level"] = 5
+            config["logs"].append({"path": "agent_debug.log"})  # type: ignore
+
+        # Print out the agent config (masking the secrets) to make troubleshooting easier
+        config_sanitized = copy.copy(config)
+        config_sanitized.pop("api_key", None)
+
+        print("Using agent config: %s" % (pprint.pformat(config_sanitized)))
+
+        return config
 
     @staticmethod
     def _create_file(path, content=None):

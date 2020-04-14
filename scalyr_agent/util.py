@@ -18,7 +18,6 @@ from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
-from six.moves import map
 
 if False:
     from typing import Union
@@ -37,16 +36,13 @@ __author__ = "czerwin@scalyr.com"
 
 import logging
 import base64
-import calendar
 import datetime
 import os
-import re
 import threading
 import time
 import uuid
 
 import scalyr_agent.json_lib as json_lib
-from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
@@ -67,6 +63,11 @@ except ImportError:
     import md5  # type: ignore
 
     new_md5 = False
+
+# Those imports have been moved in #494 so this alias is left here is place just in case for
+# backward compatibility reasons
+from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  # NOQA
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime  # NOQA
 
 
 USJON_NOT_AVAILABLE_MSG = """
@@ -91,7 +92,12 @@ Python >= 3.6:
 Original error: %s
 """.strip()
 
-RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
+
+# True if json.dumps should sort the keys and use custom ident which doesn't include a whitespace
+# after a comma.
+# This option adds significant overhead so it's only used by the tests to make asserting on the
+# serialized values easier.
+SORT_KEYS = False
 
 
 def get_json_implementation(lib_name):
@@ -126,9 +132,9 @@ def get_json_implementation(lib_name):
                     "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
             if fp is not None:
-                return ujson.dump(obj, fp, sort_keys=True)
+                return ujson.dump(obj, sort_keys=SORT_KEYS)
             else:
-                return ujson.dumps(obj, sort_keys=True)
+                return ujson.dumps(obj, sort_keys=SORT_KEYS)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
@@ -160,12 +166,16 @@ def get_json_implementation(lib_name):
             :return: If fp is not None, then the string representing the serialization.
             :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
+            if SORT_KEYS:
+                kwargs = {"sort_keys": True, "separators": (",", ":")}
+            else:
+                kwargs = {}
 
             if fp is not None:
                 # Eliminate spaces by default. Python 2.4 does not support partials.
-                return json.dump(obj, fp, sort_keys=True, separators=(",", ":"))
+                return json.dump(obj, fp, **kwargs)
             else:
-                return json.dumps(obj, sort_keys=True, separators=(",", ":"))
+                return json.dumps(obj, **kwargs)
 
         if sys.version_info[0] == 3 and sys.version_info[1] < 6:
             # wrap native json library 'loads' in Python3.5 and below, because it does not accept bytes.
@@ -190,19 +200,34 @@ def set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-try:
-    set_json_lib("ujson")
-except ImportError:
+# Set default json library we will use. We start with the most efficient and falling back to less
+# efficient library as a fallback.
+# We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
+# encoding
+if six.PY3:
+    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
+else:
+    JSON_LIBS_TO_USE = ["ujson", "json"]
+
+last_error = None
+for json_lib_to_use in JSON_LIBS_TO_USE:
     try:
-        set_json_lib("json")
-    except ImportError:
-        # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print(
-            "No default json library found which should be present in all Python >= 2.6.  "
-            "Python < 2.6 is not supported.  Exiting.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        set_json_lib(json_lib_to_use)
+    except ImportError as e:
+        last_error = e
+    else:
+        last_error = None
+        break
+
+# Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+if last_error:
+    # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+    print(
+        "No default json library found which should be present in all Python >= 2.6. "
+        "Python < 2.6 is not supported.  Exiting.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def get_json_lib():
@@ -511,135 +536,6 @@ def seconds_since_epoch(date_time, epoch=None):
     @rtype float
     """
     return microseconds_since_epoch(date_time) / 10.0 ** 6
-
-
-def rfc3339_to_datetime(string, use_strptime=False):
-    """Returns a date time from a rfc3339 formatted timestamp.
-
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-
-    @rtype datetime.datetime
-
-    NOTE: We default to a faster non-strptime version.
-    """
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    # create a datetime object
-    if use_strptime:
-        try:
-            tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-        except ValueError:
-            return None
-
-        dt = datetime.datetime(*(tm[0:6]))
-    else:
-        try:
-            dt = datetime.datetime(
-                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
-            )
-        except Exception:
-            return None
-
-    # now add the fractional part
-    if len(parts) > 1:
-        fractions = parts[1]
-        # if we had a fractional component it should terminate in a Z
-        if not fractions.endswith("Z"):
-            # we don't handle non UTC timezones yet
-            if any(c in fractions for c in "+-"):
-                return None
-            return dt
-
-        # remove the Z and just process the fraction.
-        fractions = fractions[:-1]
-        to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
-        dt = dt.replace(microsecond=micro)
-
-    return dt
-
-
-def rfc3339_to_nanoseconds_since_epoch(string, use_strptime=False):
-    """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
-
-    We have to do some tricksy things to support python 2.4, which doesn't support
-    datetime.strptime or the fractional component %f in format strings
-
-    This doesn't do any complex testing and assumes the string is well formed
-    and in UTC (e.g. uses Z at the end rather than a time offset)
-
-    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
-
-    @rtype long
-
-    NOTE: We default to a faster non-strptime version.
-    """
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    if use_strptime:
-        try:
-            tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-        except ValueError:
-            return None
-
-        nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
-    else:
-        try:
-            dt = datetime.datetime(
-                *list(map(int, RFC3339_STR_REGEX.match(string).groups()))
-            )
-        except Exception:
-            return None
-
-        nano_seconds = (
-            calendar.timegm((dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second))
-            * 1000000000
-        )
-
-    nanos = 0
-
-    # now add the fractional part
-    if len(parts) > 1:
-        fractions = parts[1]
-        # if the fractional part doesn't end in Z we likely have a
-        # malformed time, so just return the current value
-        if not fractions.endswith("Z"):
-            # we don't handle non UTC timezones yet
-            if any(c in fractions for c in "+-"):
-                return None
-
-            return nano_seconds
-
-        # strip the final 'Z' and use the final number for processing
-        fractions = fractions[:-1]
-        to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
-
-    return nano_seconds + nanos
 
 
 def format_time(time_value):

@@ -18,6 +18,15 @@
 #
 # It writes generated documentation files to docs/monitors/<monitor name>.md
 
+# NOTE: On OS X you need to install coreutils package.
+
+# Add gnu version of various utilities such as readlink, etc to PATH
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Detected Darwin, adding \"/usr/local/opt/coreutils/libexec/gnubin\"to \$PATH"
+
+    export PATH="/usr/local/opt/coreutils/libexec/gnubin:${PATH}"
+fi
+
 set -e
 
 # Marker in the Markdown file which marks the line after which automatically generated content
@@ -26,7 +35,7 @@ AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit ma
 
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 
-MONITOR_FILES=$(find scalyr_agent/builtin_monitors/ -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
+MONITOR_FILES=$(find scalyr_agent/builtin_monitors -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
 
 # shellcheck disable=SC2068
 for FILE in ${MONITOR_FILES[@]}; do

@@ -20,6 +20,7 @@ if False:
 
 import os
 import gzip
+import random
 from io import open
 
 from six.moves import range
@@ -34,12 +35,14 @@ LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/logs"))
 def generate_random_dict(keys_count=10):
     # type: (int) -> Dict[str, str]
     """
-    Generate dictionary with random values.
+    Generate dictionary with fixed random values.
     """
     result = {}
+    keys = list(range(0, keys_count))
+    random.shuffle(keys)
 
-    for index in range(0, keys_count):
-        result["key_%s" % (index)] = "value_%s" % (index)
+    for key in keys:
+        result["key_%s" % (key)] = "value_%s" % (key)
 
     return result
 

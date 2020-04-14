@@ -12,7 +12,10 @@ from tests.utils.compat import Path
 
 from scalyr_agent import compat
 
-DEFAULT_FILE_PATHS_TO_COPY = ["/var/log/scalyr-agent-2/agent.log"]
+DEFAULT_FILE_PATHS_TO_COPY = [
+    "/var/log/scalyr-agent-2/agent.log",
+    "/root/scalyr-agent-dev/log/agent.log",
+]
 
 
 def dockerized_case(
@@ -69,7 +72,7 @@ def dockerized_case(
                 command=command,
                 stdout=True,
                 stderr=True,
-                environment=compat.os_environ_unicode.copy(),
+                environment=get_environment_for_docker_run(),
             )
 
             exit_code = container.wait()["StatusCode"]
@@ -79,13 +82,17 @@ def dockerized_case(
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
+
             if artifacts_path:
+                coverage_file_path = Path("/", ".coverage")
                 artifacts_path = Path(artifacts_path)
 
                 if artifacts_use_subdirectory:
                     # We run each test case in a new container instance so we make sure we store
                     # logs under a sub-directory which matches the test function name
                     artifacts_path = artifacts_path / func_name
+
+                file_paths_to_copy.add(six.text_type(coverage_file_path))
 
                 copy_artifacts(
                     container=container,
@@ -117,8 +124,10 @@ def copy_artifacts(container, file_paths, destination_path):
     if not file_paths:
         return
 
-    if not destination_path.exists():
-        return
+    try:
+        os.makedirs(destination_path)
+    except OSError:
+        pass
 
     for file_path in file_paths:
         # fetch file as tar file stream if it exists
@@ -135,11 +144,6 @@ def copy_artifacts(container, file_paths, destination_path):
 
             raise e
 
-        try:
-            os.makedirs(destination_path)
-        except OSError:
-            pass
-
         print('Copying file path "%s" to "%s"' % (file_path, destination_path))
 
         data_tar_path = destination_path / "data.tar"
@@ -155,3 +159,21 @@ def copy_artifacts(container, file_paths, destination_path):
 
         # remove tar file.
         os.remove(data_tar_path)
+
+
+def get_environment_for_docker_run():
+    """
+    Return sanitized environment to be used with containers.run() command.
+
+    The returned environment excludes any environment variables which could effect tests
+    and cause a failure.
+    """
+    env_vars_to_delete = ["PATH", "HOME"]
+
+    environment = compat.os_environ_unicode.copy()
+
+    for env_var in env_vars_to_delete:
+        if env_var in environment:
+            del environment[env_var]
+
+    return environment

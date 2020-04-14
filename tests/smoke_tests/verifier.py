@@ -92,14 +92,32 @@ class AgentVerifier(object):
         """
         pass
 
-    def verify(self):
+    def verify(self, timeout=2 * 60):
+        # type: (int) -> bool
+        """"
+        :param timeout: How to long to wait (in seconds) before timing out if no successful response is found.
+        """
         self.prepare()
+
         retry_delay = type(self).RETRY_DELAY
+
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
         while True:
             print("========================================================")
             if self._verify():
+                end_time = time.time()
                 print("Success.")
+                print("Duration: %s" % (int(end_time - start_time)))
                 return True
+
+            if time.time() >= timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+
             print(("Retry in {0} sec.".format(retry_delay)))
             print("========================================================")
             time.sleep(retry_delay)
@@ -148,8 +166,13 @@ class AgentLogVerifier(AgentVerifier):
 
         if len(found_collectors) != 5:
             print(
-                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+                (
+                    "Not all collectors were found. Expected '{0}', got '{1}'.".format(
+                        5, len(found_collectors)
+                    )
+                )
             )
+            print("Data received: %s" % (local_agent_log_data))
             return
 
         print("Send query to Scalyr server.")
@@ -171,8 +194,13 @@ class AgentLogVerifier(AgentVerifier):
         print("Check that all collectors were found in the log from Scalyr server.")
         if len(found_collectors_remote) != 5:
             print(
-                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+                (
+                    "Not all remote collectors were found. Expected '{0}', got '{1}'.".format(
+                        5, len(found_collectors_remote)
+                    )
+                )
             )
+            print("Data received: %s" % (response_log))
             return
 
         return True
