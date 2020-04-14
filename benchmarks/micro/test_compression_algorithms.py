@@ -29,11 +29,11 @@ if False:
     from typing import Tuple
     from typing import Callable
 
-import functools
-
 import zlib
 import bz2
+import functools
 
+import six
 import pytest
 
 try:
@@ -173,7 +173,11 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
 
     def run_benchmark():
-        result = compress_func(data)
+        # Work around for Python 2 where compress is not a keyword argument, but a regular argument
+        if six.PY2 and compression_algorithm == "deflate":
+            result = compress_func(data, kwargs["level"])
+        else:
+            result = compress_func(data)
         return result
 
     result = benchmark.pedantic(run_benchmark, iterations=10, rounds=20)
@@ -222,7 +226,12 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 def _get_compress_and_decompress_func(compression_algorithm, kwargs):
     # type: (str, dict) -> Tuple[Callable, Callable]
     if compression_algorithm == "deflate":
-        compress_func = functools.partial(zlib.compress, **kwargs)  # type: ignore
+        if six.PY2:
+            # Work around for Python 2 where compress is not a keyword argument, but a regular
+            # argument
+            compress_func = zlib.compress  # type: ignore
+        else:
+            compress_func = functools.partial(zlib.compress, **kwargs)  # type: ignore
         decompress_func = zlib.decompress  # type: ignore
     elif compression_algorithm == "bz2":
         compress_func = functools.partial(bz2.compress, **kwargs)  # type: ignore
