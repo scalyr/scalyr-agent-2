@@ -1249,8 +1249,17 @@ workflows:
       - smoke-monitors-tests
   package-tests:
     jobs:
-      - package-build-rpm
-      - package-build-deb
+      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
+      # product deb and rpm packages which can be used for testing.
+      # On master build, we run package-test-* jobs which also produce packages which
+      # can be used for testing. This means it's redundant to run both jobs at the same
+      # time since as long as one set of those jobs runs, packages will be produced.
+      # The reason why we run package-build-*, but not package-test-* jobs for each PR
+      # is that those jobs are much faster.
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
       - package-test-rpm:
           requires:
             - package-build-rpm
