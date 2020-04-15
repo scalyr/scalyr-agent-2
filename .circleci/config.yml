@@ -322,7 +322,7 @@ commands:
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
             echo << parameters.agent_host_name >>
             export AGENT_HOST_NAME=<< parameters.agent_host_name >>-${CIRCLE_BUILD_NUM}
-            echo "$AGENT_HOST_NAME"
+            echo "Using agent hostname: ${AGENT_HOST_NAME}"
             mkdir -p ~/artifacts
 
             tox -e << parameters.target_name >> -- --no-rebuild --artifacts-path ~/artifacts -n 2
