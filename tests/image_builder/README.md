@@ -1,4 +1,6 @@
-This directory contains image builder - statically defined abstractions that help to build images for tests.
+# Docker Image Builder
+
+This directory contains image builder - statically defined abstractions that help to build Docker images for tests.
 
 The structure:
 
