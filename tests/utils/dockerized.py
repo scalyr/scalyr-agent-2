@@ -82,7 +82,25 @@ def dockerized_case(
                 if not no_rebuild:
                     builder.build(skip_requirements=True)
             else:
-                builder.build(skip_requirements=no_rebuild)
+                try:
+                    builder.build(skip_requirements=no_rebuild)
+                except docker.errors.BuildError as e:
+                    # Throw a more user-friendly exception if the base image doesn't exist
+                    if "does not exist" in str(e) and "-base" in str(e):
+                        try:
+                            base_image_name = builder.REQUIRED_CHECKSUM_IMAGES[
+                                0
+                            ].IMAGE_TAG
+                        except Exception:
+                            base_image_name = "unknown"
+
+                        msg = (
+                            'Base container image "%s" doesn\'t exist and --no-rebuild flag is '
+                            "used. You need to either manually build the base image or remove "
+                            "the --no-rebuild flag.\n\nOriginal error: %s"
+                            % (base_image_name, str(e))
+                        )
+                        raise Exception(msg)
 
             docker_client = docker.from_env()
 
