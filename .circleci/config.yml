@@ -1221,13 +1221,13 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success \
+                --workflows=unit-tests,smoke-tests,package-tests,benchmarks --status=success \
                 --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
   version: 2
-  unittest:
+  unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
@@ -1236,6 +1236,8 @@ workflows:
       - unittest-27
       - unittest-35
       - unittest-35-osx
+  smoke-tests:
+    jobs:
       - smoke-standalone-26
       - smoke-standalone-27
       - smoke-standalone-35
@@ -1245,11 +1247,11 @@ workflows:
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
+      - smoke-monitors-tests
   package-tests:
     jobs:
       - package-build-rpm
       - package-build-deb
-      - smoke-monitors-tests
       - package-test-rpm:
           requires:
             - package-build-rpm
