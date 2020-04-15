@@ -143,34 +143,39 @@ class AgentImageBuilder(object):
                 else:
                     shutil.copy(six.text_type(path), six.text_type(dest_path))
 
-    def _is_image_exists(self):
+    @classmethod
+    def is_image_exists(cls):
+        docker_client = docker.from_env()
         try:
-            self._docker_client.images.get(self.image_tag)
+            docker_client.images.get(cls.IMAGE_TAG)
             return True
         except docker.errors.ImageNotFound:
             return False
 
-    def build(self, image_cache_path=None):
+    def build(self, image_cache_path=None, skip_requirements=False):
         """
         Build docker image.
         :param image_cache_path: import image from .tar files located in this directory, if exist.
+        :param skip_requirements: Build only image for this builder and skip all required builders.
         """
         # if image caching is enabled and image exists we assume that image has already built in previous test cases.
         if image_cache_path is not None:
-            if self._is_image_exists():
+            if self.is_image_exists():
                 print("Image '{0}' already exists. Skip build.".format(self.IMAGE_TAG))
                 return
 
-        # build all required images.
-        for required_image_builder_cls in type(self).REQUIRED_IMAGES:
-            builder = required_image_builder_cls()
-            builder.build(image_cache_path=image_cache_path)
+        if not skip_requirements:
+            # build all required images.
+            for required_image_builder_cls in type(self).REQUIRED_IMAGES:
+                builder = required_image_builder_cls()
+                builder.build(image_cache_path=image_cache_path)
 
         if not type(self).IGNORE_CACHING and image_cache_path is not None:
             self.build_with_cache(Path(image_cache_path))
             return
 
         print("Build image: '{0}'".format(self.image_tag))
+
         build_context_path = create_tmp_directory(
             suffix="{0}-build-context".format(self.image_tag)
         )
@@ -186,19 +191,24 @@ class AgentImageBuilder(object):
             rm=True,
         )
 
+        shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
+
         for chunk in output_gen:
             print(chunk.get("stream", ""), end="")
 
-    def build_with_cache(self, dir_path):  # type: (Path) -> None
+    def build_with_cache(
+        self, dir_path, skip_if_exists=True
+    ):  # type: (Path, bool) -> None
         """
         Search for 'image.tar' file named in 'path', if it is found, restore image (docker load) from this file.
         If file is not found, build it, and save in 'path'.
         This is convenient to use for example with CI caches.
         :param dir_path: Path to the directory with cached image or where to save it.
+        :param skip_if_exists: Skip the build if set and image already exists.
         """
         # if image is loaded earlier - skip to avoid the multiple loading of the same image
         # if we build it multiple times.
-        if self._is_image_exists():
+        if skip_if_exists and self.is_image_exists():
             print("The image  '{0}' is already loaded.".format(self.image_tag))
             return
 
@@ -283,10 +293,33 @@ class AgentImageBuilder(object):
             "Also, it counts checksum of all required builders.",
         )
 
+        parser.add_argument(
+            "--name",
+            action="store_true",
+            help="Get name of the image which is built by this builder.",
+        )
+
+        parser.add_argument(
+            "--build-with-cache",
+            type=six.text_type,
+            help="Path to cache directory. If specified, firstly, the builder searches for serialized tar file of the image,"
+            "If this file does not exist, builds it from scratch and saves there.",
+        )
+
         args = parser.parse_args()
 
-        if args.checksum is not None:
+        if args.checksum:
             checksum_object = cls.get_checksum()
 
             base64_checksum = checksum_object.hexdigest()
             print(base64_checksum)
+            exit(0)
+
+        if args.name:
+            print(cls.IMAGE_TAG)
+            exit(0)
+
+        if args.build_with_cache:
+            builder = cls()
+            builder.build_with_cache(Path(args.build_with_cache), skip_if_exists=False)
+            exit(0)
