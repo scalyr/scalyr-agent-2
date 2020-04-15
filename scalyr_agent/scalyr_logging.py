@@ -1037,6 +1037,9 @@ class StdoutFilter(object):
     def filter(self, record):
         """Performs the filtering.
 
+        We have a partial copy of the filtering done in AgentLogFilter in this one, because we want the same filtering
+        as a normal agent log, but without the separation into debug and non-debug files.
+
         @param record: The record to filter.
         @type record: logging.LogRecord
 
