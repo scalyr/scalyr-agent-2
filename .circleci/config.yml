@@ -27,11 +27,12 @@ parameters:
   default_tox_version:
     type: string
     default: "3.14.3"
-  cache_version:
+  cache_version_docker_images:
+    description: "Cache version suffix used for all the Docker image caches."
     type: string
     default: "v12"
   cache_version_py_dependencies:
-    description: "Cache version suffix to use for all the Python dependency caches."
+    description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
 
@@ -375,7 +376,7 @@ commands:
 
       - restore_cache:
           name: "Restore docker image file for the builder '<< parameters.image-builder-path >>'."
-          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version_docker_images >>
 
       - run:
           name: "Build image by '<< parameters.image-builder-path >>' builder."
@@ -384,7 +385,7 @@ commands:
 
       - save_cache:
           name: "Save docker image of the builder '<< parameters.image-builder-path >>' into cache."
-          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version >>
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version_docker_images >>
           paths:
             - << parameters.cache-path >>
 
@@ -402,7 +403,7 @@ commands:
     steps:
       - restore_cache:
           name: "Restore Python Dependencies cache"
-          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
+          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version_py_dependencies >>
 
       - run:
           name: Install Dependencies
@@ -411,7 +412,7 @@ commands:
 
       - save_cache:
           name: "Save Python Dependencies cache"
-          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
+          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version_py_dependencies >>
           paths:
             - "~/.cache/pip"
 
