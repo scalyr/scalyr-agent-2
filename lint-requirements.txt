@@ -4,3 +4,4 @@ modernize==0.7
 flake8==3.7.9
 pylint==2.4.4
 mypy==0.761
+bandit==1.6.2
