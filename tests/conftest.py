@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import sys
 
 import pytest
 import yaml
@@ -24,6 +25,12 @@ import six
 
 from scalyr_agent import compat
 from tests.utils.compat import Path
+
+if "PYTEST_XDIST_WORKER" in os.environ:
+    # Workaround when using pytest-xdist plugin which swallows all the output and makes troubleshooting
+    # build failures very hard.
+    # See https://github.com/pytest-dev/pytest-xdist/issues/354 for details
+    sys.stdout = sys.stderr
 
 
 def pytest_addoption(parser):
