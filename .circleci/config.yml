@@ -1261,28 +1261,24 @@ workflows:
       - package-build-deb:
           <<: *non_master_and_release
       - package-test-rpm:
-          requires:
-            - package-build-rpm
           <<: *master_and_release_only
       - package-test-deb:
-          requires:
-            - package-build-deb
           <<: *master_and_release_only
       - smoke-rpm-package-py2:
           requires:
-            - package-build-rpm
+            - package-test-rpm
           <<: *master_and_release_only
       - smoke-rpm-package-py3:
           requires:
-            - package-build-rpm
+            - package-test-rpm
           <<: *master_and_release_only
       - smoke-deb-package-py2:
           requires:
-            - package-build-deb
+            - package-test-deb
           <<: *master_and_release_only
       - smoke-deb-package-py3:
           requires:
-            - package-build-deb
+            - package-test-deb
           <<: *master_and_release_only
   benchmarks:
     jobs:
