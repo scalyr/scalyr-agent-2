@@ -326,6 +326,7 @@ commands:
             mkdir -p ~/artifacts
 
             tox -e << parameters.target_name >> -- --no-rebuild --artifacts-path ~/artifacts -n 2
+
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
           path: ~/artifacts
