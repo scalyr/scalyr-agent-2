@@ -1,5 +1,13 @@
 # Release Notes
 
+## 2.1.2 "Narcissus" - WIP
+
+When running the agent with the `--no-fork` flag it will now output its logs to stdout as well as
+the usual `agent.log` file. The output can be limited with the new top level configuration parameter
+`stdout_severity` which requires a string value of a valid logging level, one of `NOTSET`, `DEBUG`,
+`INFO`, `WARN`, `ERROR`, or `CRITICAL`. Only messages with a severity equal to or higher than this value
+will be output to stdout. The equivalent environment variable for this configuration is `SCALYR_STDOUT_SEVERITY`.
+
 ## 2.1.1 "Millenium Falcon" - Mar 27, 2020
 
 This release includes significant changes to the Scalyr Agent code base.  The release highlights

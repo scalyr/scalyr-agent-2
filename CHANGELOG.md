@@ -1,6 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.2 "Narcissus" - WIP
+
+Features
+* Agent logs will now be output to stdout as well as the `agent.log` file when running with the `--no-fork` flag
+
 ## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
 <!---
