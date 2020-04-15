@@ -298,6 +298,7 @@ commands:
           path: ~/scalyr-agent-dev/log
 
   run-tox-target:
+    description: "Base command which runs the specified tox target."
     parameters:
       agent_host_name:
         type:
@@ -331,9 +332,8 @@ commands:
                 command: |
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
-                  pip install "coverage==4.5.4" "codecov==2.0.15"
-                  cp .circleci/.coveragerc_ci .coveragerc
 
+                  pip install "coverage==4.5.4" "codecov==2.0.15"
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
@@ -356,6 +356,7 @@ commands:
                 path: ~/artifacts
 
   init-cached-docker-image:
+    description: "Base command which initialized Docker image cache."
     parameters:
       cache-key-prefix:
         type: string
@@ -393,6 +394,7 @@ commands:
             rm -f ~/image_checksum
 
   install-cached-tox:
+    description: "Base command which pre-populates cache for a specific tox target without running the tests."
     parameters:
       target_name:
         type: string
@@ -420,7 +422,6 @@ commands:
                 name: "Init tox environment for target: '<< parameters.target_name >>'"
                 command: |
                   tox -e<< parameters.target_name >> --notest
-
 
   package-test:
     description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
@@ -469,7 +470,7 @@ commands:
           upload_coverage: << parameters.upload_coverage >>
 
   monitors-tests:
-    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
+    description: "A base command for monitors smoke tests."
     parameters:
       distribution:
         description: "The name of the distribution where the agent will be installed."
@@ -502,7 +503,6 @@ commands:
           cache-path: ~/monitors-builder-cache
           image-builder-path: tests.image_builder.monitors.base.cmd
           python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
-
 
       - run-tox-target:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
@@ -787,9 +787,6 @@ jobs:
       - run:
           name: Submit Coverage Data to codecov.io
           command: |
-            ls -la .
-            ls -la ~/
-            pwd
             ls -la .coverage* || true
 
             cp .circleci/.coveragerc_ci .coveragerc
