@@ -161,7 +161,10 @@ def dockerized_case(
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
-                raise AssertionError("Test case inside container failed.")
+                raise AssertionError(
+                    "Test case inside container failed (container exited with %s "
+                    "status code)." % (exit_code)
+                )
 
         return wrapper
 
