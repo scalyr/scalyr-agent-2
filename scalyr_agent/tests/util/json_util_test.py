@@ -22,11 +22,18 @@ __author__ = "echee@scalyr.com"
 
 import sys
 import unittest
+import importlib
+
+import six
+import mock
+import pytest
 
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
-import six
+if six.PY3:
+    reload = importlib.reload
 
 JSON = 1
 UJSON = 2
@@ -109,6 +116,20 @@ class EncodeDecodeTest(ScalyrTestCase):
                 )
                 obj3 = util.json_decode(text)
                 self.assertEquals(obj3, obj)
+
+                # Sanity test to ensure curly brace is always the last character when serializing
+                # a dict.
+                # Our "rewind to last curly brace" logic in scalyr_agent/scalyr_client.py relies on
+                # this behavior.
+                values = [
+                    {},
+                    {"a": "b"},
+                    {"a": 1, "b": 2},
+                ]
+
+                for value in values:
+                    result = util.json_encode(value)
+                    self.assertEqual(result[-1], "}")
             finally:
                 util.set_json_lib(original_lib)
 
@@ -122,6 +143,76 @@ class EncodeDecodeTest(ScalyrTestCase):
         # do the same check but now with binary string.
         if isinstance(text, six.text_type):
             self.__test_encode_decode(text.encode("utf-8"), obj)
+
+
+@pytest.mark.json_lib
+class TestDefaultJsonLibrary(ScalyrTestCase):
+    def tearDown(self):
+        super(TestDefaultJsonLibrary, self).tearDown()
+
+        for value in ["scalyr_agent.util", "orjson", "ujson", "json"]:
+            if value in sys.modules:
+                del sys.modules[value]
+
+    @skipIf(six.PY2, "Skipping under Python 2")
+    def test_correct_default_json_library_is_used_python3(self):
+        sys.modules["orjson"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "orjson")
+
+        sys.modules["orjson"] = None
+        sys.modules["ujson"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
+
+        sys.modules["orjson"] = None
+        sys.modules["ujson"] = None
+        sys.modules["json"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
+
+    @skipIf(six.PY3, "Skipping under Python 3")
+    def test_correct_default_json_library_is_used_python2(self):
+        # NOTE: orjson is not available on Python 2 so we should not try and use it
+        sys.modules["orjson"] = mock.Mock()
+        sys.modules["ujson"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
+
+        sys.modules["orjson"] = None
+        sys.modules["ujson"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
+
+        sys.modules["orjson"] = None
+        sys.modules["ujson"] = None
+        sys.modules["json"] = mock.Mock()
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
 
 
 def main():

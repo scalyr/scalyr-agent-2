@@ -57,6 +57,10 @@ commands:
         description: "True to combine and upload coverage data to codecov.io."
         type: boolean
         default: false
+      run_microbenchmarks:
+        description: "True to run microbenchmarks."
+        type: boolean
+        default: false
     steps:
       - checkout
       - restore_cache:
@@ -75,6 +79,8 @@ commands:
             pip install "tox==<< parameters.tox_version >>"
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
+          environment:
+            TERM: "xterm-256color"
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
@@ -98,6 +104,18 @@ commands:
                   # Submit it to codecov.io
                   coverage xml --rcfile=.coveragerc -i -o coverage.xml
                   ./scripts/submit-codecov-data.sh
+      - when:
+          condition: << parameters.run_microbenchmarks >>
+          steps:
+            - run:
+                name: Run Microbenchmarks
+                environment:
+                  TERM: "xterm-256color"
+                command: |
+                  mkdir -p microbenchmark_histograms/
+                  tox -emicro-benchmarks
+            - store_artifacts:
+                path: ~/scalyr-agent-2/microbenchmark_histograms/
 
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
@@ -457,6 +475,47 @@ jobs:
       - unittest_tox:
           python_version: "3.5"
           tox_target: "py3.5-unit-tests"
+          run_microbenchmarks: true
+
+  unittest-35-osx:
+    working_directory: ~/scalyr-agent-2
+    macos:
+      xcode: "11.2.1"
+    environment:
+      PYTHON: 3.5.6
+      # Updating homebrew is slow
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - checkout
+      - run:
+          name: install pyenv
+          command: |
+            brew install pyenv
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: Install Python
+          command: |
+            pyenv install $PYTHON -s
+      - run:
+          name: Install Dependencies
+          command: |
+            eval "$(pyenv init -)"
+            pyenv local $PYTHON
+            python -m pip install virtualenv
+            python -m virtualenv venv
+            ./venv/bin/pip install "tox==3.14.3"
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+            - ~/.pyenv
+      - run:
+          name: Run Unit Tests under Python 3.5
+          command: |
+            pyenv local $PYTHON
+            source ./venv/bin/activate
+            tox -epy3.5-unit-tests
 
   unittest-27:
     working_directory: ~/scalyr-agent-2
@@ -467,6 +526,7 @@ jobs:
           python_version: "2.7"
           tox_target: "coverage"
           upload_coverage: true
+          run_microbenchmarks: true
 
   unittest-26:
     working_directory: ~/scalyr-agent-2
@@ -1091,7 +1151,8 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success --branch=all --limit=5 \
+                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success \
+                --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
@@ -1104,6 +1165,7 @@ workflows:
       - unittest-26
       - unittest-27
       - unittest-35
+      - unittest-35-osx
       - smoke-standalone-26
       - smoke-standalone-27
       - smoke-standalone-35
