@@ -1249,8 +1249,7 @@ workflows:
     jobs:
       - package-build-rpm
       - package-build-deb
-      - smoke-monitors-tests:
-          <<: *master_and_release_only
+      - smoke-monitors-tests
       - package-test-rpm:
           requires:
             - package-build-rpm
