@@ -1,6 +1,6 @@
 # Release Notes
 
-## 2.1.2 "Narcissus" - WIP
+## 2.1.2 "TBD" - April 30, 2020
 
 When running the agent with the `--no-fork` flag it will now output its logs to stdout as well as
 the usual `agent.log` file. The output can be limited with the new top level configuration parameter
