@@ -16,7 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.image_builder.distributions.centos8 import CentOSBuilder
+from tests.image_builder.distributions.centos8 import CentOSBuilderBase
 
 if __name__ == "__main__":
-    CentOSBuilder.handle_command_line()
+    CentOSBuilderBase.handle_command_line()

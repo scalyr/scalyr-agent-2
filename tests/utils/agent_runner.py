@@ -71,7 +71,8 @@ class AgentRunner(object):
         installation_type=DEV_INSTALL,
         enable_coverage=False,
         enable_debug_log=False,
-    ):  # type: (int, bool, bool) -> None
+        send_to_server=True,
+    ):  # type: (int, bool, bool, bool) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")
@@ -102,6 +103,9 @@ class AgentRunner(object):
         self._enable_coverage = enable_coverage
 
         self._enable_debug_log = enable_debug_log
+
+        # if set, the configuration option - 'disable_send_requests' is set to True
+        self._send_to_server = send_to_server
 
         self._init_agent_paths()
 
@@ -362,6 +366,10 @@ class AgentRunner(object):
             # log to scalyr
             config["debug_level"] = 5
             config["logs"].append({"path": "agent_debug.log"})  # type: ignore
+
+        if not self._send_to_server:
+            # do not send requests to server.
+            config["disable_send_requests"] = True
 
         # Print out the agent config (masking the secrets) to make troubleshooting easier
         config_sanitized = copy.copy(config)
