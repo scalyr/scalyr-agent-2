@@ -124,6 +124,7 @@ commands:
                 path: ~/scalyr-agent-2/microbenchmark_histograms/
       - slack/status:
           fail_only: true
+          only_for_branches: master
 
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
@@ -252,6 +253,9 @@ commands:
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-standalone-tox:
     description: "A base command for all tox based smoke test jobs"
@@ -304,6 +308,10 @@ commands:
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   run-tox-target:
     description: "Base command which runs the specified tox target."
@@ -478,6 +486,10 @@ commands:
           target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   monitors-tests:
     description: "A base command for monitors smoke tests."
     parameters:
@@ -517,6 +529,10 @@ commands:
           agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
           target_name:  << parameters.tox_target >>
           upload_coverage: << parameters.upload_coverage >>
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
 jobs:
   unittest-38:
@@ -596,6 +612,10 @@ jobs:
             source ./venv/bin/activate
             tox -epy3.5-unit-tests
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -632,6 +652,10 @@ jobs:
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-standalone-26-tls12:
     docker:
       - image: circleci/python:2.7-jessie
@@ -645,6 +669,10 @@ jobs:
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-docker-json:
     working_directory: ~/scalyr-agent-2
@@ -688,6 +716,10 @@ jobs:
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-docker-syslog:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -729,6 +761,10 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-k8s:
     working_directory: ~/scalyr-agent-2
@@ -809,6 +845,10 @@ jobs:
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-k8s-helm:
     machine:
       image: circleci/classic:201808-01
@@ -876,6 +916,10 @@ jobs:
             # dump services
             kubectl get svc  --all-namespaces | grep -vE '(kube-sys|docker)'
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -925,6 +969,9 @@ jobs:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   benchmarks-idle-agent-py-27:
     working_directory: ~/scalyr-agent-2
