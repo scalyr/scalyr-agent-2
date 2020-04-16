@@ -213,7 +213,6 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
         reload(scalyr_agent.util)
 
         self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
-        self.assertFalse(True, "test a failure")
 
 
 def main():
