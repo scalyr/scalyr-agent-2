@@ -72,6 +72,11 @@ class BaseAgentStatus(object):
             elif hasattr(value, "to_dict"):
                 result[key] = value.to_dict()
 
+            # Ensure each value is text / unicode type since orjson doesn't seem to like bytes
+            if isinstance(value, six.binary_type):
+                value = six.ensure_text(value)
+                result[key] = value
+
         return result
 
 

@@ -21,12 +21,15 @@ from tests.utils.image_builder import AgentImageBuilder
 from tests.image_builder.monitors.base import BaseMonitorBuilder
 
 
-class MySqlBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-mysql"
-    COPY_AGENT_SOURCE = True
+class CommonMonitorBuilder(AgentImageBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-monitor-common"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
-    INCLUDE_PATHS = [Path(__file__).parent / "init.sql"]
+    INCLUDE_PATHS = [
+        Path(__file__).parent / "init.sql",
+        Path(Path(__file__).parent / "nginx-config"),
+        Path(Path(__file__).parent, "dummy-flask-server.py"),
+    ]
     REQUIRED_IMAGES = [BaseMonitorBuilder]
     REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
-
+    COPY_AGENT_SOURCE = True
     IGNORE_CACHING = True
