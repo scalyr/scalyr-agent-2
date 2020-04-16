@@ -80,8 +80,6 @@ commands:
             pip install "tox==<< parameters.tox_version >>"
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
-          environment:
-            TERM: "xterm-256color"
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
@@ -114,8 +112,6 @@ commands:
           steps:
             - run:
                 name: Run Microbenchmarks
-                environment:
-                  TERM: "xterm-256color"
                 command: |
                   mkdir -p microbenchmark_histograms/
                   tox -emicro-benchmarks
