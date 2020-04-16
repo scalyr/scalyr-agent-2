@@ -23,6 +23,11 @@ non_master_and_release: &non_master_and_release
         - release
 
 version: 2.1
+
+orbs:
+  slack: circleci/slack@3.4.2
+
+# Global workflow level parameters
 parameters:
   default_tox_version:
     type: string
@@ -117,6 +122,8 @@ commands:
                   tox -emicro-benchmarks
             - store_artifacts:
                 path: ~/scalyr-agent-2/microbenchmark_histograms/
+      - slack/status:
+          fail_only: true
 
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
