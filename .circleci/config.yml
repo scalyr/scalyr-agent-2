@@ -8,6 +8,7 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        - fixing_stdout
 
 master_only: &master_only
   filters:
