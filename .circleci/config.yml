@@ -88,6 +88,10 @@ commands:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
       - when:
           condition: << parameters.upload_coverage >>
           steps:
