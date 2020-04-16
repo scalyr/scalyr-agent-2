@@ -28,7 +28,7 @@ import pytest
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.nginx import NginxBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
@@ -36,7 +36,9 @@ import six
 
 class NginxAgentRunner(AgentRunner):
     def __init__(self):
-        super(NginxAgentRunner, self).__init__(enable_coverage=True)
+        super(NginxAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.nginx_log_path = self.add_log_file(
             self.agent_logs_dir_path / "nginx_monitor.log"
@@ -85,12 +87,12 @@ def _test(request, python_version):
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_nginx_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(NginxBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_nginx_python3(request):
     _test(request, python_version="python3")
