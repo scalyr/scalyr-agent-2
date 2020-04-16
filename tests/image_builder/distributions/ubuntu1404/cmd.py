@@ -16,7 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.image_builder.distributions.ubuntu1404 import UbuntuBuilder
+from tests.image_builder.distributions.ubuntu1404 import UbuntuBuilderBase
 
 if __name__ == "__main__":
-    UbuntuBuilder.handle_command_line()
+    UbuntuBuilderBase.handle_command_line()
