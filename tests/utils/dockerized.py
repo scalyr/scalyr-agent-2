@@ -1,3 +1,17 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
@@ -7,6 +21,7 @@ import os
 
 import six
 import docker
+
 
 from tests.utils.compat import Path
 
@@ -59,15 +74,55 @@ def dockerized_case(
                 return result
 
             builder = builder_cls()
-            use_cache_path = request.config.getoption("--image-cache-path", None)
 
-            builder.build(image_cache_path=use_cache_path)
+            no_rebuild = request.config.getoption("--no-rebuild", False)
+
+            if builder.is_image_exists():
+                # we rebuild image if there is no option to skip rebuild.
+                if not no_rebuild:
+                    builder.build(skip_requirements=True)
+            else:
+                try:
+                    builder.build(skip_requirements=no_rebuild)
+                except docker.errors.BuildError as e:
+                    # Throw a more user-friendly exception if the base image doesn't exist
+                    if "does not exist" in str(e) and "-base" in str(e):
+                        try:
+                            base_image_name = builder.REQUIRED_CHECKSUM_IMAGES[
+                                0
+                            ].IMAGE_TAG
+                        except Exception:
+                            base_image_name = "unknown"
+
+                        msg = (
+                            'Base container image "%s" doesn\'t exist and --no-rebuild flag is '
+                            "used. You need to either manually build the base image or remove "
+                            "the --no-rebuild flag.\n\nOriginal error: %s"
+                            % (base_image_name, str(e))
+                        )
+                        raise Exception(msg)
 
             docker_client = docker.from_env()
 
-            print("Create container from '{0}' image.".format(builder.image_tag))
+            container_name = "{0}-{1}-{2}".format(
+                builder.image_tag, Path(file_path).name.replace(".py", ""), func_name
+            )
+
+            try:
+                # remove container if it was created previously.
+                container = docker_client.containers.get(container_name)
+                container.remove()
+            except docker.errors.NotFound:
+                pass
+
+            print(
+                "Create container '{0}' from '{1}' image.".format(
+                    container_name, builder.image_tag
+                )
+            )
             container = docker_client.containers.run(
                 builder.image_tag,
+                name=container_name,
                 detach=True,
                 command=command,
                 stdout=True,
@@ -106,7 +161,10 @@ def dockerized_case(
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
-                raise AssertionError("Test case inside container failed.")
+                raise AssertionError(
+                    "Test case inside container failed (container exited with %s "
+                    "status code)." % (exit_code)
+                )
 
         return wrapper
 

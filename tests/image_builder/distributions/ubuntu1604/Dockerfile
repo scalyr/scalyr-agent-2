@@ -4,7 +4,7 @@ ADD ./agent_source /agent_source
 
 RUN /agent_source/tests/image_builder/distributions/base/build_packages.sh deb
 
-FROM scalyr-agent-testings-ubuntu1604-base
+FROM scalyr-agent-testings-distribution-ubuntu1604-base
 
 COPY --from=fpm_package_build /package/scalyr-agent*.deb /scalyr-agent.deb
 COPY --from=fpm_package_build /second_package/scalyr-agent*.deb /scalyr-agent-second.deb
