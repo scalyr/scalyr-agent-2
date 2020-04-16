@@ -61,6 +61,12 @@ if six.PY2:
                 value = six.ensure_text(value)
             return value
 
+        def pop(self, item, default=None):
+            value = os.environ.pop(item, default)
+            if value is not None:
+                value = six.ensure_text(value)
+            return value
+
         def __setitem__(self, key, value):
             key = six.ensure_text(key)
             value = six.ensure_text(value)
