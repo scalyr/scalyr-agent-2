@@ -8,12 +8,20 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
 
 master_only: &master_only
   filters:
     branches:
       only:
         - master
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
 
 non_master_and_release: &non_master_and_release
   filters:
@@ -21,6 +29,10 @@ non_master_and_release: &non_master_and_release
       ignore:
         - master
         - release
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
 
 version: 2.1
 
