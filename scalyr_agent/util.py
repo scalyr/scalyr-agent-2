@@ -623,6 +623,14 @@ def get_parser_from_config(base_config, attributes, default_parser):
     return default_parser
 
 
+def get_web_url_from_upload_url(server):
+    server = server.replace("https://agent.", "https://www.")
+    server = server.replace("https://log.", "https://www.")
+    server = server.replace("https://upload.", "https://www.")
+    server = server.replace("https://app.", "https://www.")
+    return server
+
+
 class JsonReadFileException(Exception):
     """Raised when a failure occurs when reading a file as a JSON object."""
 
