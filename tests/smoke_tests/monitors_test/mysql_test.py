@@ -30,7 +30,7 @@ from scalyr_agent.third_party import pymysql
 from tests.utils.agent_runner import AgentRunner
 
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.monitors.mysql import MySqlBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader
 
 import six
@@ -45,7 +45,7 @@ DATABASE = "scalyr_test_db"
 def mysql_client():
     os.system("service mysql start")
 
-    os.system("mysql < /agent_source/tests/image_builder/monitors/mysql/init.sql")
+    os.system("mysql < /init.sql")
 
     time.sleep(3)
 
@@ -66,7 +66,9 @@ def mysql_cursor(mysql_client):
 
 class MysqlAgentRunner(AgentRunner):
     def __init__(self):
-        super(MysqlAgentRunner, self).__init__(enable_coverage=True)
+        super(MysqlAgentRunner, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
         self.mysql_log_path = self.add_log_file(
             self.agent_logs_dir_path / "mysql_monitor.log"
@@ -171,12 +173,12 @@ def _test(request, python_version):
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
-@dockerized_case(MySqlBuilder, __file__)
+@dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python3(request):
     _test(request, python_version="python3")

@@ -859,7 +859,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__last_attempt_time = current_time
                         self.__last_success_time = last_success
                         self.__last_attempt_size = bytes_sent
-                        self.__last_response = full_response
+                        self.__last_response = six.ensure_text(full_response)
                         self.__last_response_status = result
                         if result == "success":
                             self.__total_bytes_uploaded += bytes_sent

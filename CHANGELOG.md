@@ -1,6 +1,25 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.2 "TBD" - April 30, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 30, 2020 16:30 -0800
+--->
+
+Features
+
+* Agent logs will now be output to stdout as well as the `agent.log` file when running with the `--no-fork` flag
+
+Bugs
+* Fixed monitor configuration bug that prevented config options that did not have a default nor were required from being properly set via environment variables.
+
+Optimizations
+
+* Optimize RFC3339 date strings parsing. This should result in better throughput under highly loaded scenarios (many lines per second) when using Docker / Kubernetes monitor.
+* Speed up event serialization under highly loaded scenarios by optimizing json encoding and encoding of event attributes.
+* We now default to ``orjson`` JSON library under Python 3 (if the library is available). ``orjson`` is substantially faster than ``ujson`` for encoding.
+
 ## 2.1.1 "Millenium Falcon" - Mar 30, 2020
 
 <!---

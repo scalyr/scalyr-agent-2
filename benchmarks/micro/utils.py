@@ -12,23 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 from __future__ import absolute_import
-from __future__ import unicode_literals
 
-from tests.utils.compat import Path
-from tests.utils.image_builder import AgentImageBuilder
-from tests.image_builder.monitors.base import BaseMonitorBuilder
+if False:
+    from typing import Dict
+
+import random
+
+from six.moves import range
 
 
-class UrlMonitorBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-url_monitor"
-    COPY_AGENT_SOURCE = True
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
-    REQUIRED_IMAGES = [BaseMonitorBuilder]
-    REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
-    INCLUDE_PATHS = [
-        Path(Path(__file__).parent, "server.py"),
-    ]
+def generate_random_dict(keys_count=10):
+    # type: (int) -> Dict[str, str]
+    """
+    Generate dictionary with fixed random values.
+    """
+    result = {}
+    keys = list(range(0, keys_count))
+    random.shuffle(keys)
 
-    IGNORE_CACHING = True
+    for key in keys:
+        result["key_%s" % (key)] = "value_%s" % (key)
+
+    return result

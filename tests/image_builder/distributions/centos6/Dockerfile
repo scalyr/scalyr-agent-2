@@ -4,7 +4,7 @@ ADD ./agent_source /agent_source
 
 RUN /agent_source/tests/image_builder/distributions/base/build_packages.sh rpm
 
-FROM scalyr-agent-testings-centos6-base
+FROM scalyr-agent-testings-distribution-centos6-base
 
 COPY --from=fpm_package_build /package/scalyr-agent*.rpm /scalyr-agent.rpm
 COPY --from=fpm_package_build /second_package/scalyr-agent*.rpm /scalyr-agent-second.rpm

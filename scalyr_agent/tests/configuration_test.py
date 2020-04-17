@@ -241,6 +241,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.failure_request_spacing_adjustment, 1.5)
         self.assertEquals(config.request_too_large_adjustment, 0.5)
         self.assertEquals(config.debug_level, 0)
+        self.assertEquals(config.stdout_severity, "NOTSET")
         self.assertEquals(config.request_deadline, 60.0)
 
         self.assertEquals(config.enable_gc_stats, False)
@@ -351,6 +352,7 @@ class TestConfiguration(TestConfigurationBase):
             failure_request_spacing_adjustment: 2.0,
             request_too_large_adjustment: 0.75,
             debug_level: 1,
+            stdout_severity: "WARN",
             request_deadline: 30.0,
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
@@ -442,6 +444,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)
         self.assertEquals(config.debug_level, 1)
+        self.assertEquals(config.stdout_severity, "WARN")
         self.assertEquals(config.request_deadline, 30.0)
         self.assertPathEquals(config.ca_cert_path, "/var/lib/foo.pem")
         self.assertFalse(config.verify_server_certificate)
@@ -1374,10 +1377,15 @@ class TestConfiguration(TestConfigurationBase):
                     fake_env[field] = FAKE_FLOAT
 
                 elif field_type == six.text_type:
-                    self.assertNotEquals(
-                        FAKE_STRING, config_obj.get_string(field, none_if_missing=True)
-                    )
-                    fake_env[field] = FAKE_STRING
+                    # special case : stdout_severity cannot be arbitrary.
+                    if field == "stdout_severity":
+                        fake_env[field] = "WARN"
+                    else:
+                        self.assertNotEquals(
+                            FAKE_STRING,
+                            config_obj.get_string(field, none_if_missing=True),
+                        )
+                        fake_env[field] = FAKE_STRING
 
                 elif field_type == ArrayOfStrings:
                     self.assertNotEquals(
@@ -1411,7 +1419,7 @@ class TestConfiguration(TestConfigurationBase):
                         .replace('u"', '"')
                     )
                 else:
-                    result = six.text_type(fake_field_val).lower()
+                    result = six.text_type(fake_field_val)
                 return result
 
             function_lookup = {"get_environment": fake_environment_value}
@@ -1594,7 +1602,7 @@ class TestConfiguration(TestConfigurationBase):
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
-        self.assertEqual(current_json_lib, "ujson")
+        self.assertEqual(current_json_lib, "json")
 
         self._write_file_with_separator_conversion(
             """{

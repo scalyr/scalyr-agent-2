@@ -156,7 +156,10 @@ class AgentMainTestCase(ScalyrTestCase):
         of systemd are not forgiving and don't work with it which means rc.d targets can't be
         created.
         """
-        with open(agent_main.__file__, "r") as fp:
+        # Make sure we always read the original .py file and not the cached .pyc one
+        file_path = agent_main.__file__.replace(".pyc", ".py")
+
+        with open(file_path, "r") as fp:
             content = fp.read()
 
         msg = (
