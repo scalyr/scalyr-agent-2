@@ -13,6 +13,14 @@ master_and_release_only: &master_and_release_only
         # merging a PR.
         - /automated_tests\/.*/
 
+# NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
+benchmarks_master_and_release_only: &benchmarks_master_and_release_only
+  filters:
+    branches:
+      only:
+        - master
+        - release
+
 master_only: &master_only
   filters:
     branches:
@@ -1349,23 +1357,23 @@ workflows:
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-idle-agent-py-35:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *master_and_release_only
+          <<: *benchmarks_master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
