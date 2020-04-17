@@ -15,8 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 __author__ = "czerwin@scalyr.com"
 
@@ -30,6 +30,7 @@ from scalyr_agent.scalyr_monitor import (
 from scalyr_agent.test_base import ScalyrTestCase
 
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.compat import os_environ_unicode
 
 import six
 
@@ -278,6 +279,109 @@ class MonitorConfigTest(ScalyrTestCase):
             ["x", "y", "z"],
         )
 
+    def test_environment_based_options(self):
+        # Basic case
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "value in env", default_value="default value", convert_to=six.text_type
+            ),
+            "value in env",
+        )
+        # Test uses default value when no environment is set
+        self.assertEquals(
+            self.define_and_get_from_env(
+                None, "default value", convert_to=six.text_type
+            ),
+            "default value",
+        )
+
+        # Test works with no default provided (note, testing conversions also happen because this was previous a bug)
+        self.assertEquals(
+            self.define_and_get_from_env("1,2,3", convert_to=ArrayOfStrings),
+            ArrayOfStrings(["1", "2", "3"]),
+        )
+
+        # Required field
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "value in env",
+                default_value="default value",
+                convert_to=six.text_type,
+                required_field=True,
+            ),
+            "value in env",
+        )
+        self.assertRaises(
+            Exception,
+            lambda: self.define_and_get_from_env(
+                None, convert_to=six.text_type, required_field=True
+            ),
+            None,
+        )
+
+        # Test min/max
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "16", convert_to=float, min_value=10, max_value=20
+            ),
+            16,
+        )
+
+        self.assertRaises(
+            Exception,
+            lambda: self.define_and_get_from_env(
+                "23", convert_to=float, min_value=10, max_value=20
+            ),
+            None,
+        )
+        self.assertRaises(
+            Exception,
+            lambda: self.define_and_get_from_env(
+                "5", convert_to=float, min_value=10, max_value=20
+            ),
+            None,
+        )
+
+        # Test option with non-standard environment name
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "value in env",
+                default_value="default value",
+                env_name="non-std-env-name",
+                convert_to=six.text_type,
+            ),
+            "value in env",
+        )
+
+        # Test other convert to formats
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "1,2,3", default_value="a,b,c", convert_to=ArrayOfStrings
+            ),
+            ArrayOfStrings(["1", "2", "3"]),
+        )
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "True", default_value="False", convert_to=bool
+            ),
+            True,
+        )
+
+    def test_empty_environment_value(self):
+        # Test empty string results in empty list
+        self.assertEquals(
+            self.define_and_get_from_env("", "default value", convert_to=six.text_type),
+            "",
+        )
+
+        # Test empty string results in empty list
+        self.assertEquals(
+            self.define_and_get_from_env(
+                "", "default value", convert_to=ArrayOfStrings
+            ),
+            ArrayOfStrings(),
+        )
+
     def get(
         self,
         original_value,
@@ -294,3 +398,62 @@ class MonitorConfigTest(ScalyrTestCase):
             max_value=max_value,
             min_value=min_value,
         )
+
+    def define_and_get_from_env(
+        self,
+        environment_value,
+        default_value=None,
+        convert_to=None,
+        required_field=None,
+        max_value=None,
+        min_value=None,
+        env_name=None,
+    ):
+        """
+        Tests the entire process of defining a configuration option that can be set via the environment,
+        setting the environment variable, and retrieving its value from an empty MonitorConfig object.
+
+        :param environment_value: The value to set in the environment before trying to retrieve it.  If None, no
+            environment value will be set.
+        :param default_value: The default value to use when defining the option.
+        :param convert_to: The convert_to value to use when defining the option.
+        :param required_field: The required_field value to use when defining the option.
+        :param max_value: The max_value value to use when defining the option.
+        :param min_value: The max_value value to use when defining the option.
+        :param env_name: The env_name value to use when defining the option.
+        :return: The value retrieved from the option
+
+        :type environment_value: six.text_type|None
+        :type convert_to: ArrayOfStrings|JsonArray|six.text_type|Number|bool
+        :type default_value: six.text_type
+        :type required_field: bool
+        :type max_value: Number
+        :type min_value: Number
+        :type env_name: six.text_type
+        :rtype: ArrayOfStrings|JsonArray|six.text_type|Number|bool
+        """
+        define_config_option(
+            "foo_env",
+            "foo",
+            "Some description",
+            default=default_value,
+            convert_to=convert_to,
+            required_option=required_field,
+            max_value=max_value,
+            min_value=min_value,
+            env_aware=True,
+            env_name=env_name,
+        )
+
+        if env_name is None:
+            env_name = "SCALYR_FOO"
+
+        if environment_value is not None:
+            os_environ_unicode[env_name] = environment_value
+        else:
+            os_environ_unicode.pop(env_name, None)
+
+        try:
+            return MonitorConfig(monitor_module="foo_env").get("foo")
+        finally:
+            os_environ_unicode.pop(env_name, None)
