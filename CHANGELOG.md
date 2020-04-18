@@ -7,6 +7,13 @@ Scalyr Agent 2 Changes By Release
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 30, 2020 16:30 -0800
 --->
 
+Features
+
+* Agent logs will now be output to stdout as well as the `agent.log` file when running with the `--no-fork` flag
+
+Bugs
+* Fixed monitor configuration bug that prevented config options that did not have a default nor were required from being properly set via environment variables.
+
 Optimizations
 
 * Optimize RFC3339 date strings parsing. This should result in better throughput under highly loaded scenarios (many lines per second) when using Docker / Kubernetes monitor.

@@ -856,11 +856,15 @@ class MonitorConfig(object):
                 if env_aware:
                     env_name = x.env_name or ("SCALYR_%s" % x.option_name.upper())
                     self._environment_aware_map[x.option_name] = env_name
+                    defined_in_env = env_name in os.environ
+                else:
+                    defined_in_env = False
 
                 if (
                     x.required_option
                     or x.default is not None
                     or x.option_name in self.__map
+                    or defined_in_env
                 ):
                     self.__map[x.option_name] = self.get(
                         x.option_name,
