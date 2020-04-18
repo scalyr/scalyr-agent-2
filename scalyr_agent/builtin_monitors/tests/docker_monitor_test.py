@@ -244,7 +244,7 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.start_manager()
                 fragment_polls.sleep_until_count_or_maxwait(
-                    40, manager_poll_interval, maxwait=2.5
+                    60, manager_poll_interval, maxwait=3.0
                 )
 
                 m1.assert_called()
@@ -254,7 +254,7 @@ class DockerMonitorTest(ScalyrTestCase):
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
 
-                self.assertEquals(fragment_polls.count(), 40)
+                self.assertEquals(fragment_polls.count(), 60)
                 self.assertEquals(counter["callback_invocations"], 4)
                 self.assertEquals(
                     detected_fragment_changes,
