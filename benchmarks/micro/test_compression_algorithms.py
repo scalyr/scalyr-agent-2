@@ -61,6 +61,7 @@ from .utils import read_bytes_from_log_fixture_file
 from .time_utils import process_time
 
 
+@pytest.mark.submit_result_to_codespeed
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
@@ -93,7 +94,8 @@ from .time_utils import process_time
     ],
 )
 # fmt: on
-@pytest.mark.parametrize("compression_algorithm_tuple",
+@pytest.mark.parametrize(
+    "compression_algorithm_tuple",
     [
         ("deflate", {"level": 3}),
         ("deflate", {"level": 6}),
@@ -130,6 +132,7 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
 
+@pytest.mark.submit_result_to_codespeed
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
@@ -205,7 +208,9 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
+    compress_func, decompress_func = _get_compress_and_decompress_func(
+        compression_algorithm, kwargs
+    )
 
     def run_benchmark():
         # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular argument
@@ -244,7 +249,9 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 
     # NOTE: We intentionally request new decompression function so we get new zstandard context for
     # decompression (this way we avoid dictionary being already populated).
-    _, decompress_func = _get_compress_and_decompress_func(compression_algorithm, kwargs)
+    _, decompress_func = _get_compress_and_decompress_func(
+        compression_algorithm, kwargs
+    )
 
     def run_benchmark():
         result = decompress_func(compressed_data)

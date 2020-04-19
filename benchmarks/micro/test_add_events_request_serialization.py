@@ -21,9 +21,12 @@ from __future__ import absolute_import
 
 import time
 
+import pytest
+
 from .utils import generate_add_events_request
 
 
+@pytest.mark.submit_result_to_codespeed
 def test_serialize_small_add_events_request(benchmark):
     """
     AddEvents request with 40 small events.
@@ -50,6 +53,7 @@ def test_serialize_small_add_events_request(benchmark):
     assert b"message" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 def test_serialize_medium_add_events_request(benchmark):
     """
     AddEvents request with 30 medium events.
@@ -76,6 +80,7 @@ def test_serialize_medium_add_events_request(benchmark):
     assert b"message" in output_bytes
 
 
+@pytest.mark.submit_result_to_codespeed
 def test_serialize_large_add_events_request(benchmark):
     """
     AddEvents request with 30 large events.
