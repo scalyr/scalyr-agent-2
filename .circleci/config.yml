@@ -1001,6 +1001,9 @@ jobs:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
+
+            # Needed for snappy library
+            sudo apt-get install -y libsnappy-dev
       - run:
           name: Run Python Lint Checks
         # Small safety check to make sure the build fails if codecov.yml file is invalid.
