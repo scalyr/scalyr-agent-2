@@ -61,7 +61,6 @@ from .utils import read_bytes_from_log_fixture_file
 from .time_utils import process_time
 
 
-@pytest.mark.submit_result_to_codespeed
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
@@ -132,7 +131,6 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple)
 
 
-@pytest.mark.submit_result_to_codespeed
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
