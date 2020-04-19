@@ -160,8 +160,12 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             close_fds = False
 
         # Run the command
+        # NOTE: We intentionally use shell=True to allow users to define commands which are executed
+        # under a shell.
+        # There is no possibility for 3rd part a shell injection here since the command is
+        # controlled by the end user.
         command = self.command
-        p = Popen(
+        p = Popen(  # nosec
             command,
             shell=True,
             stdin=PIPE,

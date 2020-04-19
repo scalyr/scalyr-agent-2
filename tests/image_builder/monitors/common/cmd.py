@@ -12,20 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from tests.utils.compat import Path
-from tests.utils.image_builder import AgentImageBuilder
-from tests.image_builder.monitors.base import BaseMonitorBuilder
+from tests.image_builder.monitors.common import CommonMonitorBuilder
 
-
-class ShellMonitorBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-shell-monitor"
-    COPY_AGENT_SOURCE = True
-    DOCKERFILE = Path(__file__).parent / "Dockerfile"
-    REQUIRED_IMAGES = [BaseMonitorBuilder]
-    REQUIRED_CHECKSUM_IMAGES = [BaseMonitorBuilder]
-
-    IGNORE_CACHING = True
+if __name__ == "__main__":
+    CommonMonitorBuilder.handle_command_line()

@@ -17,32 +17,27 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
-import shutil
-import tempfile
+import sys
 
 import pytest
 import yaml
+import six
 
 from scalyr_agent import compat
 from tests.utils.compat import Path
-from tests.utils.common import TEMP_PREFIX
 
-
-@pytest.fixture(scope="session", autouse=True)
-def clear_tmp():
-    for child in Path(tempfile.gettempdir()).iterdir():
-        if child.name.startswith(TEMP_PREFIX):
-            if child.is_dir():
-                shutil.rmtree(str(child))
-            else:
-                os.remove(str(child))
+if "PYTEST_XDIST_WORKER" in os.environ:
+    # Workaround when using pytest-xdist plugin which swallows all the output and makes troubleshooting
+    # build failures very hard.
+    # See https://github.com/pytest-dev/pytest-xdist/issues/354 for details
+    sys.stdout = sys.stderr
 
 
 def pytest_addoption(parser):
     parser.addoption(
         "--test-config",
         action="store",
-        default=Path(__file__).parent / "config.yml",
+        default=six.text_type(Path(__file__).parent / "config.yml"),
         help="Path to yaml file with essential agent settings and another test related settings. "
         "Fields from this config file will be set as environment variables.",
     )
@@ -57,9 +52,9 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--image-cache-path",
-        help="Path to cache. If specified, "
-        "image builders look for cached image .tar files inside it and load them and skip the build process.",
+        "--no-rebuild",
+        action="store_true",
+        help="Build only final image and do not build required base images.",
     )
 
     parser.addoption(

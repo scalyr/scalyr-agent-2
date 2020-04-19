@@ -761,7 +761,11 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
     output_fp = open(output_file, "w")
 
     try:
-        return_code = subprocess.call(
+        # NOTE: To avoid shell injection we need to be careful that each comamnd_str which is passed
+        # to this function is escaped.
+        # Right now we manually control which static commands are passed to this function so we
+        # should be fine
+        return_code = subprocess.call(  # nosec
             command_str, stdin=None, stderr=output_fp, stdout=output_fp, shell=True
         )
         output_fp.flush()

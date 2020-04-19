@@ -243,8 +243,11 @@ class DataJsonVerifier(AgentVerifier):
             return
 
         matches = response["matches"]
-        if len(matches) != 1000:
-            print("Not all log lines were found.")
+        if len(matches) < 1000:
+            print("Less than all log lines were found.")
+            return
+        if len(matches) > 1000:
+            print("Too many log lines were found.")
             return
 
         matches = [json.loads(m["message"]) for m in matches]

@@ -8,12 +8,28 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
+
+# NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
+benchmarks_master_and_release_only: &benchmarks_master_and_release_only
+  filters:
+    branches:
+      only:
+        - master
+        - release
 
 master_only: &master_only
   filters:
     branches:
       only:
         - master
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
 
 non_master_and_release: &non_master_and_release
   filters:
@@ -21,17 +37,27 @@ non_master_and_release: &non_master_and_release
       ignore:
         - master
         - release
+        # Those short lived branches are automatically created by our StackStorm build automation
+        # so we can ensure all the jobs (including the ones which only run on master) pass before
+        # merging a PR.
+        - /automated_tests\/.*/
 
 version: 2.1
+
+orbs:
+  slack: circleci/slack@3.4.2
+
+# Global workflow level parameters
 parameters:
   default_tox_version:
     type: string
     default: "3.14.3"
-  cache_version:
+  cache_version_docker_images:
+    description: "Cache version suffix used for all the Docker image caches."
     type: string
-    default: "v7"
+    default: "v13"
   cache_version_py_dependencies:
-    description: "Cache version suffix to use for all the Python dependency caches."
+    description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
 
@@ -75,14 +101,16 @@ commands:
             pip install "tox==<< parameters.tox_version >>"
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
-          environment:
-            TERM: "xterm-256color"
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
       - when:
           condition: << parameters.upload_coverage >>
           steps:
@@ -227,6 +255,9 @@ commands:
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   codespeed_micro_benchmarks:
     description: "A base command which runs CodeSpeed code-level micro benchmarks"
@@ -338,114 +369,41 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
 
-  package-test:
-    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
+  run-tox-target:
+    description: "Base command which runs the specified tox target."
     parameters:
-      distribution:
-        description: "The name of the distribution where the agent will be installed."
-        type: string
-      python_version:
-        description: "The version of the python interpreter to install in distribution."
-        type: string
-        default: ""
-      command:
-        description: "Command used to run the tests (e.g. tox -e<tox_target_name>)."
-        type: string
-      agent_host_name_prefix:
-        description: "Host name for the agent instances that will be started during job."
-        type: string
-        default: ""
+      agent_host_name:
+        type:
+          string
+      target_name:
+        type:
+          string
       upload_coverage:
         description: "True to combine and upload coverage data to codecov.io."
         type: boolean
         default: false
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-
-      - restore_cache:
-          name: "Restore Python Dependencies cache"
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-
       - run:
-          name: Install Dependencies
-          command: |
-            pip install "tox==<< pipeline.parameters.default_tox_version >>"
-
-      - run:
-          name: "Get Dockerfile for current agent image."
-          command: |
-            # Add agent source code to PYTHONPATH to be able to import its components.
-            export PYTHONPATH=.:${PYTHONPATH}
-
-            # generate file with checksum that is calculated for every required file.
-            python -m tests.image_builder.distributions.<< parameters.distribution >>.cmd --checksum > ~/checksum
-            python -m tests.image_builder.distributions.fpm_package_builder.cmd --checksum > ~/fpm_builder_checksum
-            python -m tests.image_builder.monitors.base.cmd --checksum > ~/monitors_builder_checksum
-
-      - restore_cache:
-          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
-          name: "Restore fpm Builder Base Docker Image Cache"
-          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
-
-      - restore_cache:
-          # here the 'tar' file for fpm builder image is stored. Use it to restore it without building.
-          name: "Restore monitors Builder Base Docker Image Cache"
-          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
-
-      - restore_cache:
-          # here the 'tar' files of the docker images is stored. Use it to restore agent image without building it.
-          name: "Restore Agent Base Docker Image Cache"
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
-
-      - run:
-          name: Copy Cached Docker Images (if they exist)
-          command: ./scripts/circleci/copy-cached-docker-images.sh
-
-      - run:
-          name: Run Unit Tests under Python << parameters.python_version >>
+          name: "Run tox target: << parameters.target_name >>"
           command: |
             # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
             # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-            export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
-
+            echo << parameters.agent_host_name >>
+            export AGENT_HOST_NAME=<< parameters.agent_host_name >>-${CIRCLE_BUILD_NUM}
+            echo "Using agent hostname: ${AGENT_HOST_NAME}"
             mkdir -p ~/artifacts
 
-            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
+            tox -e << parameters.target_name >> -- --no-rebuild --artifacts-path ~/artifacts -n 2
 
-      - run:
-          name: Copy Created Docker Images to Cache Folders
-          command: ./scripts/circleci/copy-docker-images-to-cache.sh
-
-      - save_cache:
-          # save fpm builder image to 'tar' file here, if this file is not found previously.
-          name: "Save fpm Builder Base Docker Image Cache"
-          key: fpm-builder-{{ .Branch }}-{{ checksum "~/fpm_builder_checksum" }}-<< pipeline.parameters.cache_version >>
-          paths:
-            - "~/fpm_builder_cache"
-
-      - save_cache:
-          # save monitors builder image to 'tar' file here, if this file is not found previously.
-          name: "Save monitors Builder Base Docker Image Cache"
-          key: monitors-builder-{{ .Branch }}-{{ checksum "~/monitors_builder_checksum" }}-<< pipeline.parameters.cache_version >>
-          paths:
-            - "~/monitors_builder_cache"
-
-      - save_cache:
-          # save agent image to 'tar' file here, if this file is not found previously.
-          name: "Save Agent Base Docker Image Cache"
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/checksum" }}-<< pipeline.parameters.cache_version >>
-          paths:
-           - "~/agent_image_cache"
-
-      - save_cache:
-          name: "Save Python Dependencies Dache"
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/.cache/pip"
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/artifacts
 
       - when:
           condition: << parameters.upload_coverage >>
@@ -457,8 +415,6 @@ commands:
                   ls -la ~/artifacts/*/.coverage
 
                   pip install "coverage==4.5.4" "codecov==2.0.15"
-                  cp .circleci/.coveragerc_ci .coveragerc
-
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
@@ -476,9 +432,167 @@ commands:
 
                   ./scripts/submit-codecov-data.sh
 
-      # NOTE: We store the logs to ease with troubleshooting / debugging
-      - store_artifacts:
-          path: ~/artifacts
+  init-cached-docker-image:
+    description: "Base command which initialized Docker image cache."
+    parameters:
+      cache-key-prefix:
+        type: string
+      cache-path:
+        type: string
+      image-builder-path:
+        type: string
+      python_executable_path:
+        type: string
+        default: "/usr/bin/env python"
+    steps:
+      - run:
+          name: "Get checksum file for builder '<< parameters.image-builder-path >>'."
+          command: |
+            python -m << parameters.image-builder-path >> --checksum > ~/image_checksum
+
+      - restore_cache:
+          name: "Restore docker image file for the builder '<< parameters.image-builder-path >>'."
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version_docker_images >>
+
+      - run:
+          name: "Build image by '<< parameters.image-builder-path >>' builder."
+          command: |
+             << parameters.python_executable_path >> -m << parameters.image-builder-path >> --build-with-cache << parameters.cache-path >>
+
+      - save_cache:
+          name: "Save docker image of the builder '<< parameters.image-builder-path >>' into cache."
+          key: << parameters.cache-key-prefix >>-{{ .Branch }}-{{ checksum "~/image_checksum" }}-<< pipeline.parameters.cache_version_docker_images >>
+          paths:
+            - << parameters.cache-path >>
+
+      - run:
+          name: "Remove image checksum file."
+          command: |
+            rm -f ~/image_checksum
+
+  install-cached-tox:
+    description: "Base command which pre-populates cache for a specific tox target without running the tests."
+    parameters:
+      target_name:
+        type: string
+        default: ""
+    steps:
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version_py_dependencies >>
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+
+      - save_cache:
+          name: "Save Python Dependencies cache"
+          key: deps-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version_py_dependencies >>
+          paths:
+            - "~/.cache/pip"
+
+      - when:
+          condition: << parameters.target_name >>
+          steps:
+            - run:
+                name: "Init tox environment for target: '<< parameters.target_name >>'"
+                command: |
+                  tox -e<< parameters.target_name >> --notest
+
+  package-test:
+    description: "A base command for package smoke tests. It invokes tox / shell command with name '<parameters.command>'"
+    parameters:
+      distribution:
+        description: "The name of the distribution where the agent will be installed."
+        type: string
+      python_version:
+        description: "The version of the python interpreter to install in distribution."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target name used to run the tests."
+        type: string
+      agent_host_name_prefix:
+        description: "Host name for the agent instances that will be started during job."
+        type: string
+        default: ""
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+
+      - install-cached-tox:
+          target_name: << parameters.tox_target >>
+
+      - init-cached-docker-image:
+          cache-key-prefix: fpm-builder
+          cache-path: ~/fpm-builder-cache
+          image-builder-path: tests.image_builder.distributions.fpm_package_builder.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
+
+      - init-cached-docker-image:
+          cache-key-prefix: << parameters.distribution >>
+          cache-path: ~/<< parameters.distribution >>
+          image-builder-path: tests.image_builder.distributions.<< parameters.distribution >>.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
+
+      - run-tox-target:
+          agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
+          target_name:  << parameters.tox_target >>
+          upload_coverage: << parameters.upload_coverage >>
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
+  monitors-tests:
+    description: "A base command for monitors smoke tests."
+    parameters:
+      distribution:
+        description: "The name of the distribution where the agent will be installed."
+        type: string
+      python_version:
+        description: "The version of the python interpreter to install in distribution."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target name used to run the tests."
+        type: string
+      agent_host_name_prefix:
+        description: "Host name for the agent instances that will be started during job."
+        type: string
+        default: ""
+      upload_coverage:
+        description: "True to combine and upload coverage data to codecov.io."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+
+      - install-cached-tox:
+          target_name: << parameters.tox_target >>
+
+      - init-cached-docker-image:
+          cache-key-prefix: monitors-builder
+          cache-path: ~/monitors-builder-cache
+          image-builder-path: tests.image_builder.monitors.base.cmd
+          python_executable_path: ./.tox/<< parameters.tox_target >>/bin/python
+
+      - run-tox-target:
+          agent_host_name: << parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>
+          target_name:  << parameters.tox_target >>
+          upload_coverage: << parameters.upload_coverage >>
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
 jobs:
   unittest-38:
@@ -557,6 +671,10 @@ jobs:
             source ./venv/bin/activate
             tox -epy3.5-unit-tests
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -592,6 +710,10 @@ jobs:
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-standalone-26-tls12:
     docker:
       - image: circleci/python:2.7-jessie
@@ -605,6 +727,10 @@ jobs:
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-docker-json:
     working_directory: ~/scalyr-agent-2
@@ -648,6 +774,10 @@ jobs:
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-docker-syslog:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -689,6 +819,10 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-k8s:
     working_directory: ~/scalyr-agent-2
@@ -756,9 +890,6 @@ jobs:
       - run:
           name: Submit Coverage Data to codecov.io
           command: |
-            ls -la .
-            ls -la ~/
-            pwd
             ls -la .coverage* || true
 
             cp .circleci/.coveragerc_ci .coveragerc
@@ -771,6 +902,10 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-k8s-helm:
     machine:
@@ -839,6 +974,10 @@ jobs:
             # dump services
             kubectl get svc  --all-namespaces | grep -vE '(kube-sys|docker)'
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -888,6 +1027,9 @@ jobs:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   benchmarks-idle-agent-py-27:
     working_directory: ~/scalyr-agent-2
@@ -1112,7 +1254,7 @@ jobs:
       - package-test:
           distribution: "amazonlinux2"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_amazonlinux2
+          tox_target: agent_distributions_tests_amazonlinux2
 
   package-test-deb:
     working_directory: ~/scalyr-agent-2
@@ -1122,7 +1264,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "package-test"
-          command: tox -eagent_distributions_tests_ubuntu1804
+          tox_target: agent_distributions_tests_ubuntu1804
 
   # Circle CI jobs which build agent packages for each PR.
   package-build-deb:
@@ -1133,7 +1275,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           agent_host_name_prefix: "-test"
-          command: tox -eagent_deb_package
+          tox_target: agent_deb_package
 
   package-build-rpm:
     working_directory: ~/scalyr-agent-2
@@ -1143,18 +1285,18 @@ jobs:
       - package-test:
           distribution: "centos8"
           agent_host_name_prefix: "-test"
-          command: tox -eagent_rpm_package
+          tox_target: agent_rpm_package
 
   smoke-monitors-tests:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - package-test:
+      - monitors-tests:
           distribution: "ubuntu1804"
           python_version: "python3"
           agent_host_name_prefix: "monitors-test"
-          command: tox -eagent_monitors_ubuntu
+          tox_target: agent_monitors_ubuntu
           upload_coverage: true
 
   smoke-rpm-package-py3:
@@ -1166,7 +1308,7 @@ jobs:
           distribution: "amazonlinux2"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
-          command: tox -eagent_package_smoke_test_amazonlinux_python3
+          tox_target: agent_package_smoke_test_amazonlinux_python3
 
   smoke-rpm-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -1176,7 +1318,7 @@ jobs:
       - package-test:
           distribution: "amazonlinux2"
           python_version: "python2"
-          command: tox -eagent_package_smoke_test_amazonlinux_python2
+          tox_target: agent_package_smoke_test_amazonlinux_python2
 
   smoke-deb-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -1186,7 +1328,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           python_version: "python3"
-          command: tox -eagent_package_smoke_test_ubuntu_python3
+          tox_target: agent_package_smoke_test_ubuntu_python3
 
   smoke-deb-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -1196,7 +1338,7 @@ jobs:
       - package-test:
           distribution: "ubuntu1804"
           python_version: "python2"
-          command: tox -eagent_package_smoke_test_ubuntu_python2
+          tox_target: agent_package_smoke_test_ubuntu_python2
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -1210,79 +1352,88 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflows=unittest,benchmarks,package-smoke-tests,package-tests --status=success \
+                --workflows=unit-tests,smoke-tests,package-tests,benchmarks --status=success \
                 --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
   version: 2
-  #    #unittest:
-      #    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-      #    # Python 3 versions
-      #    jobs:
-      #      - lint-checks
-      #      - unittest-26
-      #      - unittest-27
-      #      - unittest-35
-      #      - unittest-35-osx
-      #      - smoke-standalone-26
-      #      - smoke-standalone-27
-      #      - smoke-standalone-35
-      #      - smoke-standalone-26-tls12
-      #      - smoke-standalone-27-tls12
-      #       # NOTE: smoke test jobs below still use old smoke tests framework
-      #      - smoke-docker-json
-      #      - smoke-docker-syslog
-      #      - smoke-k8s
-      #  package-tests:
-      #    jobs:
-      #      - smoke-monitors-tests
-      #      - package-build-rpm:
-      #          <<: *non_master_and_release
-      #      - package-build-deb:
-      #          <<: *non_master_and_release
-      #      - package-test-rpm:
-      #          <<: *master_and_release_only
-      #      - package-test-deb:
-      #          <<: *master_and_release_only
-      #      - smoke-rpm-package-py2:
-      #          requires:
-      #            - package-test-rpm
-      #          <<: *master_and_release_only
-      #      - smoke-rpm-package-py3:
-      #          requires:
-      #            - package-test-rpm
-      #          <<: *master_and_release_only
-      #      - smoke-deb-package-py2:
-      #          requires:
-      #            - package-test-deb
-      #          <<: *master_and_release_only
-      #      - smoke-deb-package-py3:
-      #          requires:
-      #            - package-test-deb
-      #          <<: *master_and_release_only
+  #  unit-tests:
+  #    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+  #    # Python 3 versions
+  #    jobs:
+  #      - lint-checks
+  #      - unittest-26
+  #      - unittest-27
+  #      - unittest-35
+  #      - unittest-35-osx
+  #  smoke-tests:
+  #    jobs:
+  #      - smoke-standalone-26
+  #      - smoke-standalone-27
+  #      - smoke-standalone-35
+  #      - smoke-standalone-26-tls12
+  #      - smoke-standalone-27-tls12
+  #       # NOTE: smoke test jobs below still use old smoke tests framework
+  #      - smoke-docker-json
+  #      - smoke-docker-syslog
+  #      - smoke-k8s
+  #      - smoke-monitors-tests
+  #  package-tests:
+  #    jobs:
+  #      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
+  #      # product deb and rpm packages which can be used for testing.
+  #      # On master build, we run package-test-* jobs which also produce packages which
+  #      # can be used for testing. This means it's redundant to run both jobs at the same
+  #      # time since as long as one set of those jobs runs, packages will be produced.
+  #      # The reason why we run package-build-*, but not package-test-* jobs for each PR
+  #      # is that those jobs are much faster.
+  #      - package-build-rpm:
+  #          <<: *non_master_and_release
+  #      - package-build-deb:
+  #          <<: *non_master_and_release
+  #      - package-test-rpm:
+  #          <<: *master_and_release_only
+  #      - package-test-deb:
+  #          <<: *master_and_release_only
+  #      - smoke-rpm-package-py2:
+  #          requires:
+  #            - package-test-rpm
+  #          <<: *master_and_release_only
+  #      - smoke-rpm-package-py3:
+  #          requires:
+  #            - package-test-rpm
+  #          <<: *master_and_release_only
+  #      - smoke-deb-package-py2:
+  #          requires:
+  #            - package-test-deb
+  #          <<: *master_and_release_only
+  #      - smoke-deb-package-py3:
+  #          requires:
+  #            - package-test-deb
+  #          <<: *master_and_release_only
   benchmarks:
     jobs:
-      - benchmarks-idle-agent-py-27:
-          <<: *master_and_release_only
-      - benchmarks-idle-agent-py-35:
-          <<: *master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *master_and_release_only
       - benchmarks-micro-py-27
       - benchmarks-micro-py-35
+      - benchmarks-idle-agent-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+          <<: *benchmarks_master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

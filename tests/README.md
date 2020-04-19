@@ -26,7 +26,9 @@ The main purpose of this file(and the option in general) is to be a centralized 
 when they are running locally.
 
 
-###smoke_tests
+##smoke_tests
+
+###standalone_test.py
 It contains basic test cases for agent which is running on the same machine
 directly from source or as installed package.
 
@@ -42,8 +44,8 @@ For more options see `custom options:` section by running
 py.test tests/smoke_tests/standalone_smoke_tests --help
 ```
 
-### package_smoke_tests
-This directory contains tests cases for agent which is installed from package, for example `rpm` or `deb`.
+### package_test.py
+Contains tests cases for agent which is installed from package, for example `rpm` or `deb`.
 
 Package smoke tests run inside docker containers because they are too specific to run locally, for example:
 - agent installation from package will interfere with system files, this is not safe.
@@ -57,10 +59,4 @@ The main job for package smoke test is to prepare image with needed environment,
 To run test use following command:
 ```
 py.test tests/smoke_tests/package_test.py
-```
-
-### Python interpreter switching test.
-
-```
-tests/distribution/python_version_change_tests
 ```

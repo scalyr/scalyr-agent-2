@@ -20,10 +20,16 @@ from scalyr_agent.__scalyr__ import get_install_root
 from tests.utils.compat import Path
 from tests.image_builder.distributions.fpm_package_builder import FpmPackageBuilder
 from tests.utils.image_builder import AgentImageBuilder
+from tests.image_builder.distributions.base import (
+    create_distribution_base_image_name,
+    create_distribution_image_name,
+)
+
+DISTRIBUTION_NAME = "centos6"
 
 
 class CentOSBuilderBase(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-centos6-base"
+    IMAGE_TAG = create_distribution_base_image_name(DISTRIBUTION_NAME)
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
     INCLUDE_PATHS = [
         Path(get_install_root(), "dev-requirements.txt"),
@@ -32,7 +38,7 @@ class CentOSBuilderBase(AgentImageBuilder):
 
 
 class CentOSBuilder(AgentImageBuilder):
-    IMAGE_TAG = "scalyr-agent-testings-centos6"
+    IMAGE_TAG = create_distribution_image_name(DISTRIBUTION_NAME)
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
     REQUIRED_IMAGES = [FpmPackageBuilder, CentOSBuilderBase]
     REQUIRED_CHECKSUM_IMAGES = [CentOSBuilderBase]

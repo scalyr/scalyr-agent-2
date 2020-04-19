@@ -623,6 +623,14 @@ def get_parser_from_config(base_config, attributes, default_parser):
     return default_parser
 
 
+def get_web_url_from_upload_url(server):
+    server = server.replace("https://agent.", "https://www.")
+    server = server.replace("https://log.", "https://www.")
+    server = server.replace("https://upload.", "https://www.")
+    server = server.replace("https://app.", "https://www.")
+    return server
+
+
 class JsonReadFileException(Exception):
     """Raised when a failure occurs when reading a file as a JSON object."""
 
@@ -1301,8 +1309,10 @@ class ScriptEscalator(object):
                 # noinspection PyUnresolvedReferences
                 import __main__  # type: ignore
 
-                script_file_path = __main__.__file__
-                if not os.path.isabs(script_file_path):
+                # NOTE: Under some scenarios when running in parallel with pytest __file__ attribute
+                # won't be set.
+                script_file_path = getattr(__main__, "__file__", None)
+                if script_file_path and not os.path.isabs(script_file_path):
                     script_file_path = os.path.normpath(
                         os.path.join(self.__cwd, script_file_path)
                     )
