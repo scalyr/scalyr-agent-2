@@ -16,4 +16,6 @@ pathlib2==2.3.5
 PyYAML==4.2b4
 psutil==5.7.0
 # Needed by MockHTTPServer class and related tests
+# NOTE: We can't use flask >= 1.1.0 because we still run tests under Python 2.6.
+# Actual library is also only used by the tests.
 flask==0.12.5

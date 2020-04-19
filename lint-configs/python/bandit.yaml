@@ -1,0 +1,8 @@
+exclude_dirs:
+  - .tox
+  - .git
+  - build
+  - dist
+  - "*third_party*"
+  - "scalyr_agent/tests/*"
+  - "scalyr_agent/builtin_monitors/tests/*"

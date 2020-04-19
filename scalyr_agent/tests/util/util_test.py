@@ -27,11 +27,13 @@ from scalyr_agent import scalyr_init
 
 scalyr_init()
 
+import sys
 import datetime
 import os
 import tempfile
 import threading
 import uuid
+import mock
 from mock import patch, MagicMock
 import six
 
@@ -522,6 +524,12 @@ class TestStoppableThread(ScalyrTestCase):
 
 
 class TestScriptEscalator(ScalyrTestCase):
+    def tearDown(self):
+        super(TestScriptEscalator, self).tearDown()
+
+        if "__main__" in sys.modules:
+            del sys.modules["__main__"]
+
     def test_is_user_change_required(self):
         (test_instance, controller) = self.create_instance("czerwin", "fileA", "steve")
         self.assertTrue(test_instance.is_user_change_required())
@@ -532,12 +540,17 @@ class TestScriptEscalator(ScalyrTestCase):
         self.assertFalse(test_instance.is_user_change_required())
 
     def test_change_user_and_rerun_script(self):
+        # NOTE: __main__.__file__ might not be set when running tests under pytests or nosetests
+        mock_main = mock.Mock()
+        mock_main.__file__ = "/tmp/file.py"
+        sys.modules["__main__"] = mock_main
+
         (test_instance, controller) = self.create_instance("czerwin", "fileA", "steve")
         self.assertEquals(test_instance.change_user_and_rerun_script("random"), 0)
 
         self.assertEquals(controller.call_count, 1)
         self.assertEquals(controller.last_call["user"], "steve")
-        self.assertIsNotNone(controller.last_call["script_file"])
+        self.assertEqual(controller.last_call["script_file"], "/tmp/file.py")
 
     def create_instance(self, current_user, config_file, config_owner):
         controller = TestScriptEscalator.ControllerMock(
