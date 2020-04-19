@@ -64,3 +64,9 @@ docs/_build/
 
 # MyPy
 .mypy_cache/
+
+# Test and benchmark data
+test-results/
+microbenchmark_histograms/
+benchmark_histograms:
+benchmark-results*.json

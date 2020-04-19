@@ -137,8 +137,9 @@ def send_data_to_codespeed(
     commit_id,
     result,
     commit_date=None,
+    dry_run=False,
 ):
-    # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, dict, Optional[datetime]) -> None
+    # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, dict, Optional[datetime], bool) -> None
     """
     Submit captured data to CodeSpeed instance.
     """
@@ -171,6 +172,7 @@ def send_data_to_codespeed(
         codespeed_auth=codespeed_auth,
         commit_id=commit_id,
         payload=payload,
+        dry_run=dry_run,
     )
 
 
@@ -347,10 +349,6 @@ def main(
 
     logger.debug("Captured data: %s" % (str(result)))
 
-    if dry_run:
-        logger.info("Dry run, not submitting metrics to CodeSpeed...")
-        return
-
     logger.info("Capture complete, submitting metrics to CodeSpeed...")
     send_data_to_codespeed(
         codespeed_url=codespeed_url,
@@ -362,6 +360,7 @@ def main(
         commit_id=commit_id,
         result=result,
         commit_date=commit_date,
+        dry_run=dry_run,
     )
 
 
@@ -404,12 +403,6 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help=("True to also capture additional metrics using agent status file."),
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help=("Just capture metrics, but don't submit them to CodeSpeed."),
     )
 
     args = parser.parse_args()
