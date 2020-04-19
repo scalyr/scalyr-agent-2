@@ -30,7 +30,21 @@ from .utils import generate_random_line
 
 
 @pytest.mark.submit_result_to_codespeed
-@pytest.mark.parametrize("attributes_count", [10, 100, 1000])
+# fmt: off
+@pytest.mark.parametrize(
+    "attributes_count",
+    [
+        10,
+        100,
+        1000
+    ],
+    ids=[
+        "10_attributes",
+        "100_attributes",
+        "1000_attributes",
+    ],
+)
+# fmt: on
 @pytest.mark.benchmark(group="add_attributes")
 def test_event_add_attributes(benchmark, attributes_count):
     attributes = generate_random_dict(keys_count=attributes_count)
