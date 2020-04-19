@@ -218,6 +218,7 @@ commands:
             # branch / revision
             export TZ=UTC
             export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
+            export PYTHONPATH=.
 
             # Run any pre agent run script (if defined)
             if [ ! -z "<< parameters.agent_pre_run_command >>" ]; then
