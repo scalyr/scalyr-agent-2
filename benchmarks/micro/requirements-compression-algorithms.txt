@@ -1,5 +1,3 @@
-# Depends on libsnappy-dev / snappy-devel
-python-snappy==0.5.4
 zstandard
 brotli
 py-lz4framed
