@@ -14,10 +14,10 @@
 
 from __future__ import absolute_import
 
-import functools
-
-import six
+import decorator
 import pytest
+
+from pytest_benchmark.fixture import BenchmarkFixture
 
 from scalyr_agent import compat
 
@@ -104,17 +104,16 @@ def submit_result_to_codespeed(func):
     """
     Decorator which marks a pytest benchmark function with "submit_result_to_codespeed" marker.
     """
-    # NOTE: Python 2 version doesn't support custom decorator so we need to skip if
-    if six.PY2:
-        return func
+    # NOTE: functools.wraps doesn't work well enough under Python 2 so we need to use decorator
+    # package
+    def wrapped_function(func, *args, **kwargs):
+        if isinstance(args[0], BenchmarkFixture):
+            benchmark = args[0]
 
-    @functools.wraps(func)
-    def wrapped_function(*args, **kwargs):
-        benchmark = kwargs["benchmark"]
         benchmark.submit_result_to_codespeed = True
         return func(*args, **kwargs)
 
-    return wrapped_function
+    return decorator.decorator(wrapped_function, func)
 
 
 # Register a custom marker
