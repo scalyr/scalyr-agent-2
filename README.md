@@ -39,7 +39,10 @@ For information on the agent architecture and code abstractions, please refer to
 
 ### Local Development Environment, Tests and Lint Checks
 
-This repository utilizes ``tox`` Python project for running various lint checks and tests.
+This repository utilizes ``tox`` Python project for running various lint checks and tests in
+isolated virtual environment.
+
+Underneath, we use ``py.test`` test runner for running the tests.
 
 For it to work, you need to have ``tox`` Python package installed on the system or inside the virtual
 environment which you use for the development.
@@ -62,13 +65,40 @@ In addition to that, you can also run a specific target or a set of targets usin
 ```bash
 # run all the lint targets
 tox -elint
+
 # run flake8 and mypy tox target
 tox -eflake8,mypy
+
 # run py2.7-unit-tests tox target
 tox -epy2.7-unit-tests
+
 # run coverage tox target
 tox -ecoverage
 ```
+
+To run a sub-set of tests or a single test from a test file, you can directly invoke ``pytest``
+from a specific tox virtual environment as shown below:
+
+```bash
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "<test file>::<test class name>" -k "<test method name>"
+```
+
+For example:
+
+```bash
+# This will run all the tests in scalyr_agent/tests/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py"
+
+# This will run all the test methods on the ``UrlMonitorTestRequest`` class in the
+# scalyr_agent/tests/url_monitor_test.py file
+
+# This will run ``UrlMonitorTestRequest.test_get_request_no_headers`` test method from the
+# scalyr_agent/tests/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py::UrlMonitorTestRequest" -k test_get_request_no_headers
+```
+
+This will run ``UrlMonitorTestRequest.test_get_request_no_headers`` test method from the
+``scalyr_agent/tests/url_monitor_test.py``` file.
 
 ### Monitor Plugins
 
