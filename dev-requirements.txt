@@ -14,6 +14,7 @@ pytest-benchmark==3.2.3
 pytest-xdist==1.31.0
 coverage==4.5.4
 codecov==2.0.15
+decorator==4.4.1
 PyYAML==5.3
 six==1.13.0
 docker==4.1.0
