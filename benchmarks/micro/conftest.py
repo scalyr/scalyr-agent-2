@@ -109,6 +109,10 @@ def submit_result_to_codespeed(func):
     def wrapped_function(func, *args, **kwargs):
         if isinstance(args[0], BenchmarkFixture):
             benchmark = args[0]
+        elif "benchmark" in kwargs:
+            benchmark = kwargs["benchmark"]
+        else:
+            raise ValueError('Unable to detect "benchmark" kwarg')
 
         benchmark.submit_result_to_codespeed = True
         return func(*args, **kwargs)
