@@ -26,6 +26,7 @@ import mock
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
 from scalyr_agent import scalyr_client
+from scalyr_agent import util as scalyr_util
 from scalyr_agent.scalyr_client import (
     AddEventsRequest,
     PostFixBuffer,
@@ -1030,4 +1031,84 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         )
         self.assertLogFileContainsRegex(
             expected_body, file_path=self.agent_debug_log_path
+        )
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_body_compression(self):
+        add_events_request = AddEventsRequest({"bar": "baz"})
+        event1 = Event(thread_id="foo4", attrs={"parser": "bar2"}).set_message(
+            "test message 1"
+        )
+        event2 = Event(thread_id="foo5", attrs={"parser": "bar2"}).set_message(
+            "test message 2"
+        )
+        add_events_request.add_event(event=event1, timestamp=1)
+        add_events_request.add_event(event=event2, timestamp=2)
+
+        serialized_data = add_events_request.get_payload()
+
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            session = ScalyrClientSession(
+                "https://dummserver.com",
+                "DUMMY API KEY",
+                SCALYR_VERSION,
+                compression_type=compression_type,
+            )
+
+            session._ScalyrClientSession__connection = mock.Mock()
+            session._ScalyrClientSession__receive_response = mock.Mock()
+
+            session.send(add_events_request=add_events_request)
+
+            (
+                path,
+                request,
+            ) = session._ScalyrClientSession__connection.post.call_args_list[0]
+
+            _, decompress_func = scalyr_util.get_compress_and_decompress_func(
+                compression_type
+            )
+
+            self.assertEqual(path[0], "/addEvents")
+            self.assertEqual(
+                session._ScalyrClientSession__standard_headers["Content-Encoding"],
+                compression_type,
+            )
+
+            # Verify decompressed data matches the raw body
+            self.assertTrue(b"test message 1" not in request["body"])
+            self.assertTrue(b"test message 2" not in request["body"])
+            self.assertFalse(serialized_data == request["body"])
+            self.assertEqual(serialized_data, decompress_func(request["body"]))
+
+        # Compression is disabled
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            compression_type=None,
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+
+        session.send(add_events_request=add_events_request)
+
+        serialized_data = add_events_request.get_payload()
+
+        (path, request,) = session._ScalyrClientSession__connection.post.call_args_list[
+            0
+        ]
+
+        _, decompress_func = scalyr_util.get_compress_and_decompress_func(
+            compression_type
+        )
+
+        self.assertEqual(path[0], "/addEvents")
+
+        self.assertTrue(b"test message 1" in request["body"])
+        self.assertTrue(b"test message 2" in request["body"])
+        self.assertEqual(serialized_data, request["body"])
+        self.assertTrue(
+            "Content-Encoding" not in session._ScalyrClientSession__standard_headers
         )
