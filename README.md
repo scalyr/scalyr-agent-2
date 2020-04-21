@@ -133,6 +133,15 @@ checks which run on every PR commit have passed, PR has been approved and it's i
 If the build has failed, you can re-trigger it by adding the same comment again after you made any
 changes / fixes (if necessary).
 
+After the PR has been merged, you should wait for the ``benchmarks`` workflow to complete and then
+check our [CodeSpeed instance](https://scalyr-agent-codespeed.herokuapp.com/) to ensure there are
+no regressions in terms of the resource utilization (memory and CPU usage) and things such as
+increased number of error or warning log lines.
+
+Here is an example which demonstrates a regression in number of error level lines being printed to
+the agent log which likely indicates a bug / regression in the code -
+https://github.com/scalyr/scalyr-agent-2/pull/513#issuecomment-617228472.
+
 ### Monitor Plugins
 
 Monitor plugins are one of the key features for Scalyr Agent 2.  These plugins can be used to augment the
