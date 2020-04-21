@@ -39,7 +39,10 @@ For information on the agent architecture and code abstractions, please refer to
 
 ### Local Development Environment, Tests and Lint Checks
 
-This repository utilizes ``tox`` Python project for running various lint checks and tests.
+This repository utilizes ``tox`` Python project for running various lint checks and tests in
+isolated virtual environment.
+
+Underneath, we use ``py.test`` test runner for running the tests.
 
 For it to work, you need to have ``tox`` Python package installed on the system or inside the virtual
 environment which you use for the development.
@@ -62,13 +65,73 @@ In addition to that, you can also run a specific target or a set of targets usin
 ```bash
 # run all the lint targets
 tox -elint
+
 # run flake8 and mypy tox target
 tox -eflake8,mypy
+
 # run py2.7-unit-tests tox target
 tox -epy2.7-unit-tests
+
 # run coverage tox target
 tox -ecoverage
 ```
+
+To run a sub-set of tests or a single test from a test file, you can directly invoke ``pytest``
+from a specific tox virtual environment as shown below:
+
+```bash
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "<test file>::<test class name>" -k "<test method name>"
+```
+
+For example:
+
+```bash
+# This will run all the tests in scalyr_agent/tests/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py"
+
+# This will run all the test methods on the ``UrlMonitorTestRequest`` class in the
+# scalyr_agent/tests/url_monitor_test.py file
+
+# This will run ``UrlMonitorTestRequest.test_get_request_no_headers`` test method from the
+# scalyr_agent/tests/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py::UrlMonitorTestRequest" -k test_get_request_no_headers
+```
+
+### Continuous Integration
+
+We run all the tox checks described above (+ more) continuously as part of our Circle CI based
+build system.
+
+Each push to a branch / pull request will trigger a build and a subset of the Circle CI jobs.
+
+Additional jobs will run once the PR has been merged into master. The reason we do that is to
+speed the PR builds and increase the developer feedback loop (some of the tests and checks we
+run are slow so running them on every push to a branch would be slow and wasteful).
+
+Before merging a pull request you need to ensure that all the checks have passed, pull
+request has been approved and it's in sync / up to date with latest master.
+
+When all the checks have passed, you should see something like this:
+
+<a href="https://user-images.githubusercontent.com/125088/79736603-59e77f80-82fa-11ea-9e33-b5279a030e8b.png"><img src="https://user-images.githubusercontent.com/125088/79736603-59e77f80-82fa-11ea-9e33-b5279a030e8b.png" width="450px" /></a>
+
+In addition to that, you should trigger a full build (basically all the jobs which run on merge to
+master minus the agent process level benchmarks), by adding ``/run build`` comment to the PR (to
+avoid abuse, right now the builds can only be triggered by direct collaborators to this
+repository).
+
+This will kick off our StackStorm based build automation and ensure that the whole build passes.
+
+If the build passes, you should see a comment similar to the one below and you are free to merge
+your pull request.
+
+<a href="https://user-images.githubusercontent.com/125088/79735434-93b78680-82f8-11ea-804a-43fbe7c543eb.png"><img src="https://user-images.githubusercontent.com/125088/79735434-93b78680-82f8-11ea-804a-43fbe7c543eb.png" width="400px" /></a>
+
+To avoid wasting the build cycles, please make sure you only trigger the whole build once other
+checks which run on every PR commit have passed, PR has been approved and it's in sync with master.
+
+If the build has failed, you can re-trigger it by adding the same comment again after you made any
+changes / fixes (if necessary).
 
 ### Monitor Plugins
 
