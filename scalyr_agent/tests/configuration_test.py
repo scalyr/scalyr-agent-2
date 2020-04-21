@@ -1377,9 +1377,11 @@ class TestConfiguration(TestConfigurationBase):
                     fake_env[field] = FAKE_FLOAT
 
                 elif field_type == six.text_type:
-                    # special case : stdout_severity cannot be arbitrary.
+                    # Special cases for fields which can't contain arbitrary values
                     if field == "stdout_severity":
                         fake_env[field] = "WARN"
+                    elif field == "compression_type":
+                        fake_env[field] = "deflate"
                     else:
                         self.assertNotEquals(
                             FAKE_STRING,
@@ -1639,6 +1641,51 @@ class TestConfiguration(TestConfigurationBase):
     def test_apply_config_without_parse(self):
         config = self._create_test_configuration_instance()
         config.apply_config()
+
+    def test_parse_unsupported_compression_type(self):
+        # Valid values
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            self._write_file_with_separator_conversion(
+                """{
+                api_key: "hi there",
+                compression_type: "%s",
+            }
+            """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+        # Invalid value
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                compression_type: "invalid",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        expected_msg = 'Got invalid value "invalid" for field "compression_type"'
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
+
+    @mock.patch(
+        "scalyr_agent.util.get_compress_and_decompress_func",
+        mock.Mock(side_effect=ImportError("")),
+    )
+    def test_parse_library_for_specified_compression_type_not_available(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                compression_type: "zstandard",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        expected_msg = "Make sure that the corresponding Python library is available"
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):
