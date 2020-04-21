@@ -102,7 +102,7 @@ class ScalyrClientSession(object):
             certificate authorities. This is used for the SSL connections to verify the connection is to Scalyr.
         @param proxies:  A dict describing the network proxies to use (such as a mapping for `https`) or None.
         @param compression_type:  A string containing the compression method to use.
-            Valid options are bz2, deflate or None.  Defaults to None.
+            Valid options are bz2, deflate, lz4, zstandard or None.  Defaults to None.
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
 
         @type server: six.text_type
@@ -158,15 +158,28 @@ class ScalyrClientSession(object):
         }
 
         # Configure compression type
+        self.__compression_type = compression_type
+
         self.__compress = None
         encoding = None
 
+        if compression_level < 1 or compression_level > 9:
+            # Ensure valid level is used.
+            # TODO: Should we expose more levels for zstandard?
+            log.warning(
+                "Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression."
+                % (compression_level)
+            )
+            compression_level = 9
+
         if compression_type:
-            if compression_type in ("deflate", "bz2"):
-                compress_func = verify_and_get_compress_func(compression_type)
-                if compress_func:
-                    self.__compress = compress_func
-                    encoding = compression_type
+            compress_func = verify_and_get_compress_func(
+                compression_type, compression_level
+            )
+
+            if compress_func:
+                self.__compress = compress_func
+                encoding = compression_type
 
             if not self.__compress:
                 log.warning(
@@ -178,14 +191,6 @@ class ScalyrClientSession(object):
             self.__standard_headers["Content-Encoding"] = encoding
 
         # Configure compression level
-        if self.__compress:
-            if compression_level < 1 or compression_level > 9:
-                log.warning(
-                    "Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression."
-                    % (compression_level)
-                )
-                compression_level = 9
-
         self.__compression_level = compression_level
 
         # The number of sconds to wait for a blocking operation on the connection before considering it to have
@@ -324,7 +329,7 @@ class ScalyrClientSession(object):
             self.total_request_bytes_sent += len(body_str) + len(request_path)
 
             if self.__compress:
-                body_str = self.__compress(body_str, self.__compression_level)
+                body_str = self.__compress(body_str)
 
             self.total_compressed_request_bytes_sent += len(body_str) + len(
                 request_path
