@@ -277,22 +277,6 @@ class Configuration(object):
             )
             scalyr_util.set_json_lib(json_library)
 
-        # Verify that the specified compression algorithm library is available
-        compression_type = self.compression_type
-        library_name = scalyr_util.COMPRESSION_TYPE_TO_PYTHON_LIBRARY.get(
-            compression_type, "unknown"
-        )
-
-        try:
-            _, _ = scalyr_util.get_compress_and_decompress_func(compression_type)
-        except (ImportError, ValueError) as e:
-            msg = (
-                'Failed to set compression type to "%s". Make sure that the corresponding Python '
-                "library is available. You can install it using this command:\n\npip install %s\n\n "
-                "Original error: %s" % (compression_type, library_name, str(e))
-            )
-            raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
-
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
         @return: The default hostname for this host.
@@ -1250,6 +1234,7 @@ class Configuration(object):
             env_aware=True,
             valid_values=["deflate", "bz2", "lz4", "zstandard"],
         )
+        self.__verify_compression_type(self.compression_type)
         self.__verify_or_set_optional_int(
             config, "compression_level", 9, description, apply_defaults, env_aware=True
         )
@@ -2166,6 +2151,24 @@ class Configuration(object):
             description,
             apply_defaults,
         )
+
+    def __verify_compression_type(self, compression_type):
+        """
+        Verify that the library for the specified compression type (algorithm) is available.
+        """
+        library_name = scalyr_util.COMPRESSION_TYPE_TO_PYTHON_LIBRARY.get(
+            compression_type, "unknown"
+        )
+
+        try:
+            _, _ = scalyr_util.get_compress_and_decompress_func(compression_type)
+        except (ImportError, ValueError) as e:
+            msg = (
+                'Failed to set compression type to "%s". Make sure that the corresponding Python '
+                "library is available. You can install it using this command:\n\npip install %s\n\n "
+                "Original error: %s" % (compression_type, library_name, str(e))
+            )
+            raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
 
     def __get_config_or_environment_val(
         self, config_object, param_name, param_type, env_aware, custom_env_name
