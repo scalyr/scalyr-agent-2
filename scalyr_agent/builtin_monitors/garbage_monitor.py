@@ -104,7 +104,8 @@ define_config_option(
 )
 
 
-class GarbageMonitor(ScalyrMonitor):
+# TODO: Probably we should include this monitor for Windows builds, but currently we do not.
+class GarbageMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # GarbageMonitor
 

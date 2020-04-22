@@ -264,7 +264,7 @@ class RedisHost(object):
         return self.__redis
 
 
-class RedisMonitor(ScalyrMonitor):
+class RedisMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # Redis Monitor
 

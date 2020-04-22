@@ -1944,7 +1944,7 @@ class DockerOptions(object):
             self.labels_as_attributes = labels_as_attributes
 
 
-class DockerMonitor(ScalyrMonitor):
+class DockerMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # Docker Monitor
 

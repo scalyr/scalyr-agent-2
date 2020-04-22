@@ -256,7 +256,7 @@ class Checkpoint(object):
             self._lock.release()
 
 
-class JournaldMonitor(ScalyrMonitor):
+class JournaldMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # Journald Monitor
 
