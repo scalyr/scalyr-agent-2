@@ -39,7 +39,6 @@ import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
 
-
 # noinspection PyBroadException
 try:
     import ssl
@@ -61,13 +60,28 @@ MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT = 2048
 
 log = scalyr_logging.getLogger(__name__)
 
+# The timestamp of the previous message - onlyl used when `enforce_monotonic_timestamps` is True.
+# This is used to support an old requirement on the `addEvents` API.  It used to be the
+# server required that all events uploaded in the same session must have monotonically
+# increasing event timestamps.  It was illegal to add an event with a lower timestamp than
+# any event previously uploaded to the session.  This is no longer a requirement, but we are
+# protecting the enforcement behind a flag in case any issues arise.  We can delete this
+# code once it has been out for a few months with no problems.
+__last_time_stamp__ = None
+
+
+def _set_last_timestamp(val):
+    """
+    exposed for testing
+    """
+    global __last_time_stamp__
+    __last_time_stamp__ = val
+
 
 class ScalyrClientSession(object):
     """Encapsulates the connection between the agent and the Scalyr servers.
 
     It is a session in that we generally only have one connection open to the Scalyr servers at any given time.
-    The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
-    are monotonically increasing within a session.
     """
 
     def __init__(
@@ -86,6 +100,7 @@ class ScalyrClientSession(object):
         compression_level=9,
         disable_send_requests=False,
         disable_logfile_addevents_format=False,
+        enforce_monotonic_timestamps=False,
     ):
         """Initializes the connection.
 
@@ -104,6 +119,8 @@ class ScalyrClientSession(object):
         @param compression_type:  A string containing the compression method to use.
             Valid options are bz2, deflate or None.  Defaults to None.
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
+        @param enforce_monotonic_timestamps: A bool that indicates whether event timestamps in the same session
+            should be monotonically increasing or not.  Defaults to False
 
         @type server: six.text_type
         @type api_key: six.text_type
@@ -115,6 +132,7 @@ class ScalyrClientSession(object):
         @type proxies: dict
         @type compression_type: six.text_type
         @type compression_level: int
+        @type enforce_monotonic_timestamps: bool
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
@@ -219,6 +237,9 @@ class ScalyrClientSession(object):
 
         # flag to disable new addEvents format, TODO: remove this when we are confident it works
         self.__disable_logfile_addevents_format = disable_logfile_addevents_format
+
+        # whether or not to monotonically increase event timestamps within the same session
+        self.__enforce_monotonic_timestamps = enforce_monotonic_timestamps
 
     def augment_user_agent(self, fragments):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
@@ -649,6 +670,7 @@ class ScalyrClientSession(object):
             body,
             max_size=max_size,
             disable_logfile_addevents_format=self.__disable_logfile_addevents_format,
+            enforce_monotonic_timestamps=self.__enforce_monotonic_timestamps,
         )
 
     def __get_user_agent(self, agent_version, fragments=None):
@@ -833,6 +855,7 @@ class AddEventsRequest(object):
         base_body,
         max_size=1 * 1024 * 1024,
         disable_logfile_addevents_format=False,
+        enforce_monotonic_timestamps=False,
     ):
         """Initializes the instance.
 
@@ -842,6 +865,8 @@ class AddEventsRequest(object):
             required by the server.
         @param max_size: The maximum number of bytes this request can consume when it is serialized to JSON.
         @param disable_logfile_addevents_format: Flag to disable the improved addEvents format
+        @param enforce_monotonic_timestamps: A bool that indicates whether event timestamps in the same session
+            should be monotonically increasing or not.  Defaults to False
         """
         assert len(base_body) > 0, "The base_body object must have some fields defined."
         assert (
@@ -890,6 +915,9 @@ class AddEventsRequest(object):
         self.__max_size = max_size
 
         self.__events_added = 0
+
+        # Whether or not to enforce monotonically increasing timestamps
+        self.__enforce_monotonic_timestamps = enforce_monotonic_timestamps
 
         # If we have finished serializing the body, it is stored here until the close() method is invoked.
         self.__body = None
@@ -1107,24 +1135,20 @@ class AddEventsRequest(object):
 
     def __get_valid_timestamp(self, timestamp=None):
         """
-        Gets a timestamp in nanoseconds since the Epoch, ensuring that the result is at least 1 nanosecond
-        greater than previously returned results.
-        @param timestamp: A timestamp to validate.  If it is greater than the result of a previous call the value will
-                          be returned with no changes.  If less than the result of a previous call the result will
-                          be 1 nanosecond greater than the previous result.
-                          If None, time.time() is used for the value of timestamp.
-        @return: The next timestamp to use for events.  This is guaranteed to be monotonically increasing.
-        @rtype: long
+        Gets a timestamp in nanoseconds since the Epoch
+        @param timestamp: A timestamp to validate. If None, time.time() is used for the value of timestamp.
+        @return: The next timestamp to use for events.
+        @rtype: int
         """
-        global __last_time_stamp__
-
         if timestamp is None:
-            timestamp = int(time.time() * 1000000000)
+            timestamp = int(time.time() * 1e9)
 
-        # pylint: disable=used-before-assignment
-        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
-            timestamp = __last_time_stamp__ + 1
-        __last_time_stamp__ = timestamp
+        if self.__enforce_monotonic_timestamps:
+            global __last_time_stamp__
+            # pylint: disable=used-before-assignment
+            if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
+                timestamp = __last_time_stamp__ + 1
+            __last_time_stamp__ = timestamp
 
         return timestamp
 
@@ -1903,19 +1927,6 @@ def _rewind_past_close_curly(output_buffer):
     location += 1
     output_buffer.seek(location)
     output_buffer.truncate()
-
-
-# The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically
-# increasing so we track it in a global var.
-__last_time_stamp__ = None
-
-
-def _set_last_timestamp(val):
-    """
-    exposed for testing
-    """
-    global __last_time_stamp__
-    __last_time_stamp__ = val
 
 
 def create_connection_helper(host, port, timeout=None, source_address=None):
