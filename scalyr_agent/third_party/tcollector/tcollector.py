@@ -20,7 +20,7 @@
 # by Mark Smith <msmith@stumbleupon.com>.
 #
 
-#pylint: disable=six-moves-import-not-included-for-win32
+# pylint: disable=six-moves-import-not-included-for-win32
 
 from __future__ import absolute_import
 from __future__ import print_function
