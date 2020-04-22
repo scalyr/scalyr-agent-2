@@ -494,6 +494,19 @@ class Configuration(object):
         return self.__get_config().get_int("k8s_ratelimit_max_concurrency")
 
     @property
+    def enforce_monotonic_timestamps(self):
+        # UNDOCUMENTED_CONFIG
+        return self.__get_config().get_bool("enforce_monotonic_timestamps")
+
+    @property
+    def include_raw_timestamp_field(self):
+        """If True, adds an attribute called `raw_timestamp` to all events parsed using the
+        parse_as_json or parse_as_cri features.  This field will be set to the timestamp included in the JSON or
+        CRI line.  When parsing Docker or K8s logs, this represents the timestamp of the log
+        message as recorded by those systems."""
+        return self.__get_config().get_bool("include_raw_timestamp_field")
+
+    @property
     def enable_profiling(self):
         return self.__get_config().get_bool("enable_profiling")
 
@@ -1951,6 +1964,24 @@ class Configuration(object):
             config,
             "disable_send_requests",
             False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enforce_monotonic_timestamps",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "include_raw_timestamp_field",
+            True,
             description,
             apply_defaults,
             env_aware=True,
