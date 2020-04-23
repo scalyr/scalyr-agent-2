@@ -68,5 +68,5 @@ docs/_build/
 # Test and benchmark data
 test-results/
 microbenchmark_histograms/
-benchmark_histograms:
-benchmark-results*.json
+benchmark_histograms/
+benchmark_results/
