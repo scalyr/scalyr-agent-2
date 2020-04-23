@@ -281,7 +281,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
       - run:
           name: Install Dependencies
           command: |
@@ -318,7 +318,7 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-2/benchmark_histograms/
       - save_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
             - "~/.cache/pip"
 
