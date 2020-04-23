@@ -310,9 +310,11 @@ commands:
             if [[ "${CIRCLE_BRANCH}" == "master" ]]; then
               export PYTHONPATH=.
               python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py \
-                  --data-path="benchmark-results-*.json" \
+                  --data-path="benchmark_results/*.json" \
                   --debug
             fi
+      - store_artifacts:
+          path: ~/scalyr-agent-2/benchmark_results/
       - store_artifacts:
           path: ~/scalyr-agent-2/benchmark_histograms/
       - save_cache:
