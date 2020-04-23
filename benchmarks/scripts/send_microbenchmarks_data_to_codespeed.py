@@ -26,9 +26,10 @@ import glob
 import json
 import argparse
 import logging
+import time
 from io import open
 
-from scalyr_agent.util import rfc3339_to_datetime
+import udatetime
 
 from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
@@ -66,9 +67,10 @@ def format_benchmark_data_for_codespeed(
     branch = data["commit_info"]["branch"]
     author_time = data["commit_info"]["author_time"]
 
-    author_time = author_time.split("+")[0]
-
-    revision_date = rfc3339_to_datetime(author_time).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore
+    # This value can contain a timezone so we rely on 3rd party library to parse it.
+    # Our performance optimized version of the function doesn't support timezones.
+    author_time = udatetime.from_string(author_time)
+    revision_date = time.strftime("%Y-%m-%d %H:%M:%S", author_time.utctimetuple())
 
     payload = []
 
