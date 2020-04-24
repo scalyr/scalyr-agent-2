@@ -76,7 +76,7 @@ define_log_field(
 define_log_field(__monitor__, "value", "The value reported by the device.")
 
 
-class SNMPMonitor(ScalyrMonitor):
+class SNMPMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # SNMP Monitor
 The SNMP Monitor polls SNMP-enabled devices on the network to collect values specified in the configuration

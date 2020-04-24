@@ -319,7 +319,7 @@ def _convert_to_milliseconds(value):
     return val * multiplier
 
 
-class TomcatMonitor(ScalyrMonitor):
+class TomcatMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # Tomcat Monitor
 

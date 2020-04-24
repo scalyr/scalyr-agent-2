@@ -27,7 +27,7 @@ import time
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 
-class EmptyMonitor(ScalyrMonitor):
+class EmptyMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
     Monitor class which is running for run_time seconds.
     """

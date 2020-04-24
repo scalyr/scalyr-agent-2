@@ -3201,7 +3201,9 @@ class ContainerChecker(object):
             )
 
 
-class KubernetesMonitor(ScalyrMonitor):
+class KubernetesMonitor(
+    ScalyrMonitor
+):  # pylint: disable=monitor-not-included-for-win32
     """
 # Kubernetes Monitor
 
