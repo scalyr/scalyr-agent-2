@@ -323,6 +323,9 @@ commands:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-standalone-tox:
     description: "A base command for all tox based smoke test jobs"
