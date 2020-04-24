@@ -158,12 +158,14 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.set_parameters(max_line_length=5, page_size=20)
         self.scan_for_new_bytes()
 
-    def _create_iterator(self, log_config, checkpoint=None):
+    def _create_iterator(self, log_config, checkpoint=None, config=None):
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        if config is None:
+            config = DEFAULT_CONFIG
 
         return LogFileIterator(
             log_config.get("path", self.__path),
-            DEFAULT_CONFIG,
+            config,
             log_config,
             file_system=self.__file_system,
             checkpoint=checkpoint,
@@ -859,6 +861,73 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEqual(record.timestamp, 1438593163000000000)
         self.assertEqual(record.attrs["raw_timestamp"], "2015-08-03T09:12:43Z")
         self.assertEqual(record.attrs["foo"], "bar")
+
+    def test_parse_as_json_no_raw_timestamp_field(self):
+        extra = {"include_raw_timestamp_field": False}
+        config = _create_configuration(extra)
+
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L004", "time": "2015-08-03T09:12:43Z", "foo": "bar"}\n',
+        )
+        self.scan_for_new_bytes()
+
+        record = self.readline()
+        self.assertEquals(record.line, b"L004")
+        self.assertEqual(record.timestamp, 1438593163000000000)
+        self.assertTrue("raw_timestamp" not in record.attrs)
+        self.assertEqual(record.attrs["foo"], "bar")
+
+    def test_parse_as_cri_timestamp_field(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.log_file.set_parameters(
+            max_line_length=60, page_size=60, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path, b"2015-08-03T09:12:43.56064743Z stdout P message\n"
+        )
+        self.scan_for_new_bytes()
+
+        record = self.readline()
+        self.assertEquals(record.line, b"message\n")
+        self.assertEqual(record.timestamp, 1438593163560647430)
+        self.assertEqual(record.attrs["raw_timestamp"], 1438593163560647430)
+        self.assertEqual(record.attrs["stream"], "stdout")
+
+    def test_parse_as_cri_no_raw_timestamp_field(self):
+        extra = {"include_raw_timestamp_field": False}
+        config = _create_configuration(extra)
+
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}, config=config
+        )
+        self.log_file.set_parameters(
+            max_line_length=60, page_size=60, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path, b"2015-08-03T09:12:43.56064743Z stdout P message\n"
+        )
+        self.scan_for_new_bytes()
+
+        record = self.readline()
+        self.assertEquals(record.line, b"message\n")
+        self.assertEqual(record.timestamp, 1438593163560647430)
+        self.assertTrue("raw_timestamp" not in record.attrs)
+        self.assertEqual(record.attrs["stream"], "stdout")
 
     def test_extend_log_line_parsing(self):
         self.log_file.close()

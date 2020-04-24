@@ -285,6 +285,7 @@ class LogFileIterator(object):
 
         self.__json_log_key = log_config.get("json_message_field", "log")
         self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
+        self.__include_raw_timestamp_field = config.include_raw_timestamp_field
 
         if self.__parse_format == "json" or self.__parse_format == "cri":
             self.__max_extended_line_length = config.internal_parse_max_line_size
@@ -611,9 +612,7 @@ class LogFileIterator(object):
 
         'json_timestamp_field' defaults to 'time', and the value of this field is required to be in rfc3339 format
         otherwise an error will occur.  If the field does not exist in the json object, then the agent will use
-        the current time instead.  Note, the value specified in the timestamp field might not be the final value uploaded
-        to the server, as the agent ensures that the timestamps of all messages are monotonically increasing.  For
-        this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
+        the current time instead.
 
         All other fields of the json object will be stored in the attrs dict of the LogLine object.
 
@@ -716,7 +715,9 @@ class LogFileIterator(object):
             else:
                 result.line = message.encode("utf-8")
                 result.timestamp = timestamp
-                result.attrs = {"raw_timestamp": timestamp, "stream": stream}
+                result.attrs = {"stream": stream}
+                if self.__include_raw_timestamp_field:
+                    result.attrs["raw_timestamp"] = timestamp
 
         # or see if we need to parse it as json
         elif self.__parse_format == "json":
@@ -736,7 +737,10 @@ class LogFileIterator(object):
                         original_timestamp
                     )
 
-                    if "raw_timestamp" not in attrs:
+                    if (
+                        self.__include_raw_timestamp_field
+                        and "raw_timestamp" not in attrs
+                    ):
                         attrs["raw_timestamp"] = original_timestamp
                 else:
                     timestamp = None
