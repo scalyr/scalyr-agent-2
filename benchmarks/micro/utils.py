@@ -17,6 +17,7 @@ from __future__ import absolute_import
 if False:
     from typing import Dict
     from typing import Callable
+    from typing import Optional
 
 import os
 import gzip
@@ -57,13 +58,17 @@ def generate_random_line(length):
     return b"a" * length
 
 
-def generate_add_events_request(num_events, line_length, attributes_count):
-    # type: (int, int, int) -> AddEventsRequest
+def generate_add_events_request(
+    num_events, line_length, attributes_count, base_body=None
+):
+    # type: (int, int, int, Optional[dict]) -> AddEventsRequest
     """
     Generate AddEventsRequest object with the num_events number of events with the same payload
     payload (line length) size.
     """
-    base_body = {"token": "api key", "session": "sessionbar", "threads": []}
+    if not base_body:
+        base_body = {"token": "api key", "session": "sessionbar", "threads": []}
+
     add_events_request = AddEventsRequest(base_body=base_body)
 
     for index in range(0, num_events):
