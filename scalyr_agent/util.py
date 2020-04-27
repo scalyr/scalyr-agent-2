@@ -1847,6 +1847,9 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
     level.
 
     This function atakes into account function argument differences between various Python versions.
+
+    NOTE: For benchmark purposes this function right now also supports algorithms (snappy, brotly)
+    which are not exposed and supported for the end user setups.
     """
     if compression_algorithm in ["deflate", "zlib"]:
         import zlib
@@ -1883,6 +1886,16 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
             return lz4.compress(data, compression_level)
 
         decompress_func = lz4.decompress  # type: ignore
+    elif compression_algorithm == "snappy":
+        import snappy  # pylint: disable=import-error
+
+        compress_func = snappy.compress  # type: ignore
+        decompress_func = snappy.decompress  # type: ignore
+    elif compression_algorithm == "brotli":
+        import brotli
+
+        compress_func = functools.partial(brotli.compress, quality=compression_level)  # type: ignore
+        decompress_func = brotli.decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
