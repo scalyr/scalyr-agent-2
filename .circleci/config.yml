@@ -281,7 +281,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
       - run:
           name: Install Dependencies
           command: |
@@ -290,6 +290,8 @@ commands:
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
+            # Add udatetime which is needed by send_microbenchmarks_data_to_codespeed.py
+            pip install --user "udatetime==0.0.16"
 
             # Needed for snappy library
             sudo apt-get install -y libsnappy-dev
@@ -310,15 +312,20 @@ commands:
             if [[ "${CIRCLE_BRANCH}" == "master" ]]; then
               export PYTHONPATH=.
               python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py \
-                  --data-path="benchmark-results-*.json" \
+                  --data-path="benchmark_results/*.json" \
                   --debug
             fi
       - store_artifacts:
+          path: ~/scalyr-agent-2/benchmark_results/
+      - store_artifacts:
           path: ~/scalyr-agent-2/benchmark_histograms/
       - save_cache:
-          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
             - "~/.cache/pip"
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
   smoke-standalone-tox:
     description: "A base command for all tox based smoke test jobs"

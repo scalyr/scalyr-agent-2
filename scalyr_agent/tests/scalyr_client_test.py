@@ -22,6 +22,7 @@ __author__ = "czerwin@scalyr.com"
 from io import BytesIO
 
 import mock
+import time
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
@@ -47,7 +48,6 @@ class AddEventsRequestTest(ScalyrTestCase):
     def setUp(self):
         super(AddEventsRequestTest, self).setUp()
         self.__body = {"token": "fakeToken"}
-        scalyr_client._set_last_timestamp(0)
 
     def test_basic_case(self):
         request = AddEventsRequest(self.__body)
@@ -245,6 +245,56 @@ class AddEventsRequestTest(ScalyrTestCase):
             b""", logs: [], threads: [], client_time: 2 }""",
         )
         request.close()
+
+    def test_monotonically_increasing_timestamp(self):
+        request = AddEventsRequest(self.__body, enforce_monotonic_timestamps=True)
+        scalyr_client._set_last_timestamp(0)
+
+        ts = 2000
+
+        expected = str(ts + 1)
+
+        self.assertTrue(
+            request.add_event(Event().set_message("eventOne"), timestamp=ts)
+        )
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=1))
+
+        json = test_util.parse_scalyr_request(request.get_payload())
+        event = json["events"][1]
+        self.assertEquals(event["ts"], expected)
+
+    def test_no_monotonically_increasing_timestamp(self):
+        request = AddEventsRequest(self.__body)
+
+        ts = 2000
+
+        self.assertTrue(
+            request.add_event(Event().set_message("eventOne"), timestamp=ts)
+        )
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=1))
+
+        json = test_util.parse_scalyr_request(request.get_payload())
+        event = json["events"][1]
+        self.assertEquals(event["ts"], "1")
+
+    def test_timestamp_none(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(100)
+
+        ts = int(time.time() * 1e9)
+
+        self.assertTrue(
+            request.add_event(Event().set_message("eventOne"), timestamp=None)
+        )
+
+        json = test_util.parse_scalyr_request(request.get_payload())
+        event = json["events"][0]
+        event_ts = int(event["ts"])
+        threshold = abs(event_ts - ts)
+
+        # allow a threshold of 1 second to have elapsed between reading the time.time and
+        # setting the event timestamp in add_event
+        self.assertTrue(threshold < 1e9)
 
     def test_sequence_id_but_no_number(self):
         request = AddEventsRequest(self.__body)
@@ -1002,6 +1052,51 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         # Verify that the compression was indeed enabled since that's the scenario we are testing
         call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
         self.assertEqual(call_kwargs["body"], "compressed")
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_timestamp_doesnt_increases_monotonically(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION,
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+
+        add_events_request = session.add_events_request()
+
+        ts = 2000
+
+        add_events_request.add_event(Event().set_message("eventOne"), timestamp=ts)
+        add_events_request.add_event(Event().set_message("eventTwo"), timestamp=1)
+
+        json = test_util.parse_scalyr_request(add_events_request.get_payload())
+        event = json["events"][1]
+        self.assertEquals(event["ts"], "1")
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_timestamp_increases_monotonically(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            enforce_monotonic_timestamps=True,
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+        scalyr_client._set_last_timestamp(0)
+
+        add_events_request = session.add_events_request()
+
+        ts = 2000
+        expected = str(ts + 1)
+
+        add_events_request.add_event(Event().set_message("eventOne"), timestamp=ts)
+        add_events_request.add_event(Event().set_message("eventTwo"), timestamp=1)
+
+        json = test_util.parse_scalyr_request(add_events_request.get_payload())
+        event = json["events"][1]
+        self.assertEquals(event["ts"], expected)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed_long_body_is_truncated(self):

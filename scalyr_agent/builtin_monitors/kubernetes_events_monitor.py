@@ -190,7 +190,9 @@ class EventLogFormatter(BaseFormatter):
         )
 
 
-class KubernetesEventsMonitor(ScalyrMonitor):
+class KubernetesEventsMonitor(
+    ScalyrMonitor
+):  # pylint: disable=monitor-not-included-for-win32
     """
 # Kubernetes Events Monitor
 

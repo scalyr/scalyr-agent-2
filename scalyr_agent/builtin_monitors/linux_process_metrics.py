@@ -1000,7 +1000,7 @@ class ProcessList(object):
         return list(set(matched_pids))
 
 
-class ProcessMonitor(ScalyrMonitor):
+class ProcessMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # Linux Process Metrics
 

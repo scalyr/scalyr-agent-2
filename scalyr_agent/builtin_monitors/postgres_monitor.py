@@ -422,7 +422,7 @@ class PostgreSQLDb(object):
         self._cursor = None
 
 
-class PostgresMonitor(ScalyrMonitor):
+class PostgresMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     """
 # PostgreSQL Monitor
 

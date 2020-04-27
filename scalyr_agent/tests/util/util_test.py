@@ -559,6 +559,29 @@ class TestStoppableThread(ScalyrTestCase):
             self._run_counter += 1
             run_state.sleep_but_awaken_if_stopped(0.03)
 
+    def test_register_on_stop_callback(self):
+        self.callback_called = False
+
+        def fake_callback():
+            self.callback_called = True
+
+        run_state = scalyr_util.RunState()
+        run_state.register_on_stop_callback(fake_callback)
+        run_state.stop()
+        self.assertTrue(self.callback_called)
+
+    def test_remove_on_stop_callback(self):
+        self.callback_called = False
+
+        def fake_callback():
+            self.callback_called = True
+
+        run_state = scalyr_util.RunState()
+        run_state.register_on_stop_callback(fake_callback)
+        run_state.remove_on_stop_callback(fake_callback)
+        run_state.stop()
+        self.assertFalse(self.callback_called)
+
 
 class TestScriptEscalator(ScalyrTestCase):
     def tearDown(self):

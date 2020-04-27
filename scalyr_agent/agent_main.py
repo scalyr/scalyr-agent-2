@@ -879,7 +879,7 @@ class ScalyrAgent(object):
             try:
                 self.__run_state = RunState()
                 self.__run_state.register_on_stop_callback(
-                    scalyr_logging.close_handlers()
+                    scalyr_logging.close_handlers
                 )
                 self.__log_file_path = os.path.join(
                     self.__config.agent_log_path, "agent.log"
@@ -1325,6 +1325,7 @@ class ScalyrAgent(object):
             proxies=self.__config.network_proxies,
             disable_send_requests=self.__config.disable_send_requests,
             disable_logfile_addevents_format=self.__config.disable_logfile_addevents_format,
+            enforce_monotonic_timestamps=self.__config.enforce_monotonic_timestamps,
         )
 
     def __get_file_initial_position(self, path):

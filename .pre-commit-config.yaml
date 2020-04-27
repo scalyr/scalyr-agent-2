@@ -35,6 +35,13 @@ repos:
       types: [file, python]
   - repo: local
     hooks:
+    - id: bandit
+      name: bandit
+      entry: .tox/lint/bin/bandit --configfile lint-configs/python/bandit.yaml -lll
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
     - id: mypy
       name: mypy
       # NOTE: We intentionally want to run in incremental mode to speed this check up
