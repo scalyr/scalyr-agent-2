@@ -2180,6 +2180,9 @@ class KubeletApi(object):
         """
         while True:
             url = self._kubelet_url + path
+            # We suppress warnings here to avoid spam about an unverified connection going to stderr.
+            # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
+            # other threads if they are emitted while this request is going.
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=Warning)
                 response = self._session.get(url, timeout=self._timeout, verify=False)
