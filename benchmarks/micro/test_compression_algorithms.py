@@ -52,7 +52,7 @@ except ImportError:
     brotli = None
 
 try:
-    import lz4framed as lz4
+    import lz4.frame
 except ImportError:
     lz4 = None
 
@@ -108,13 +108,15 @@ from .time_utils import process_time
         ("brotli", {"quality": 3}),
         ("brotli", {"quality": 5}),
         ("brotli", {"quality": 8}),
-        ("lz4", {}),
+        ("lz4", {"compresslevel": 0}),
+        ("lz4", {"compresslevel": 3}),
+        ("lz4", {"compresslevel": 16}),
     ],
     ids=[
         "deflate_level_3",
         "deflate_level_6_default",
         "deflate_level_9",
-        "bz2",
+        "bz2_level_6_default",
         "snappy",
         "zstandard_level_3_default",
         "zstandard_level_5",
@@ -123,7 +125,9 @@ from .time_utils import process_time
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
-        "lz4",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
     ],
 )
 @pytest.mark.benchmark(group="compress", timer=process_time)
@@ -176,13 +180,15 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         ("brotli", {"quality": 3}),
         ("brotli", {"quality": 5}),
         ("brotli", {"quality": 8}),
-        ("lz4", {}),
+        ("lz4", {"compresslevel": 0}),
+        ("lz4", {"compresslevel": 3}),
+        ("lz4", {"compresslevel": 16}),
     ],
     ids=[
         "deflate_level_3",
         "deflate_level_6_default",
         "deflate_level_9",
-        "bz2",
+        "bz2_level_6_default",
         "snappy",
         "zstandard_level_3_default",
         "zstandard_level_5",
@@ -191,7 +197,9 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
-        "lz4",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
     ],
 )
 # fmt: on
@@ -214,6 +222,8 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular argument
         if sys.version_info < (3, 6, 0) and compression_algorithm == "deflate":
             result = compress_func(data, kwargs["level"])
+        elif compression_algorithm == "lz4":
+            result = compress_func(data, kwargs["compresslevel"])
         else:
             result = compress_func(data)
         return result
@@ -292,8 +302,8 @@ def _get_compress_and_decompress_func(compression_algorithm, kwargs):
         compress_func = functools.partial(brotli.compress, **kwargs)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore
     elif compression_algorithm == "lz4":
-        compress_func = functools.partial(lz4.compress, **kwargs)  # type: ignore
-        decompress_func = lz4.decompress  # type: ignore
+        compress_func = lz4.frame.compress  # type: ignore
+        decompress_func = lz4.frame.decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
