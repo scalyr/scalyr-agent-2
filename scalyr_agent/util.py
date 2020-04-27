@@ -105,7 +105,15 @@ Original error: %s
 SORT_KEYS = False
 
 # Maps user-friendly string we expose in the configuration to the internal Python module name
-SUPPORTED_COMPRESSION_ALGORITHMS = ["deflate", "bz2", "lz4", "zstandard"]
+SUPPORTED_COMPRESSION_ALGORITHMS = [
+    "deflate",
+    "bz2",
+]
+
+# lz4 and zstandard library is not available for Python 2.5
+if sys.version_info >= (2, 7, 0):
+    SUPPORTED_COMPRESSION_ALGORITHMS.append("lz4")
+    SUPPORTED_COMPRESSION_ALGORITHMS.append("zstandard")
 
 # Maps compression type (deflate, bz2, lz4, zstandard) to the corresponding Python package name
 COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {

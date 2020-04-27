@@ -1245,7 +1245,7 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
-            valid_values=["deflate", "bz2", "lz4", "zstandard"],
+            valid_values=scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS,
         )
         self.__verify_compression_type(self.compression_type)
 

@@ -1642,7 +1642,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.apply_config()
 
-    def test_parse_unsupported_compression_type(self):
+    def test_parse_valid_compression_type(self):
         # Valid values
         for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
             self._write_file_with_separator_conversion(
@@ -1656,7 +1656,9 @@ class TestConfiguration(TestConfigurationBase):
 
             config = self._create_test_configuration_instance()
             config.parse()
+            self.assertEqual(config.compression_type, compression_type)
 
+    def test_parse_unsupported_compression_type(self):
         # Invalid value
         self._write_file_with_separator_conversion(
             """{
@@ -1678,26 +1680,23 @@ class TestConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """{
                 api_key: "hi there",
-                compression_type: "zstandard",
+                compression_type: "deflate",
             }
             """
         )
 
         config = self._create_test_configuration_instance()
-        expected_msg = "Make sure that the corresponding Python library is available"
+        expected_msg = (
+            ".*Make sure that the corresponding Python library is available.*"
+        )
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     def test_parse_compression_algorithm_specific_default_value_is_used_for_level(self):
-        # lz4 is not available for Python 2.6
-        if sys.version_info < (2, 7, 0):
-            # lz4 and zstandard Python package is not available for Python 2.6
-            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL.copy()
-            del compression_types["zstandard"]
-            del compression_types["lz4"]
-        else:
-            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            default_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+                compression_type
+            ]
 
-        for (compression_type, default_level,) in compression_types.items():
             self._write_file_with_separator_conversion(
                 """{
                     api_key: "hi there",
