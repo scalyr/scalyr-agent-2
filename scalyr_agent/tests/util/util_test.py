@@ -57,6 +57,7 @@ from scalyr_agent.json_lib import JsonObject
 
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 
 class TestUtilCompression(ScalyrTestCase):
@@ -82,6 +83,7 @@ class TestUtilCompression(ScalyrTestCase):
 
         self.assertEqual(data, bz2.decompress(compress(data)))
 
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping Python < 2.7")
     def test_lz4(self):
         data = self._data
         compress = verify_and_get_compress_func("lz4")
@@ -91,6 +93,7 @@ class TestUtilCompression(ScalyrTestCase):
 
         self.assertEqual(data, lz4.decompress(compress(data)))
 
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping Python < 2.7")
     def test_zstandard(self):
         data = self._data
         compress = verify_and_get_compress_func("zstandard")

@@ -1688,10 +1688,15 @@ class TestConfiguration(TestConfigurationBase):
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     def test_parse_compression_algorithm_specific_default_value_is_used_for_level(self):
-        for (
-            compression_type,
-            default_level,
-        ) in scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL.items():
+        # lz4 is not available for Python 2.6
+        if sys.version_info < (2, 7, 0):
+            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL.copy()
+            del compression_types["zstandard"]
+            del compression_types["lz4"]
+        else:
+            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL
+
+        for (compression_type, default_level,) in compression_types.items():
             self._write_file_with_separator_conversion(
                 """{
                     api_key: "hi there",
