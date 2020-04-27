@@ -19,6 +19,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import sys
 from io import BytesIO
 
 import mock
@@ -1142,7 +1143,15 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         serialized_data = add_events_request.get_payload()
 
-        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+        if sys.version_info < (2, 7, 0):
+            # lz4 and zstandard Python package is not available for Python 2.6
+            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL.copy()
+            del compression_types["zstandard"]
+            del compression_types["lz4"]
+        else:
+            compression_types = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL
+
+        for compression_type in compression_types:
             session = ScalyrClientSession(
                 "https://dummserver.com",
                 "DUMMY API KEY",
