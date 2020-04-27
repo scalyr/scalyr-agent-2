@@ -1248,8 +1248,19 @@ class Configuration(object):
             valid_values=["deflate", "bz2", "lz4", "zstandard"],
         )
         self.__verify_compression_type(self.compression_type)
+
+        # NOTE: If not explicitly specified by the user, we use compression algorithm specific
+        # default value
+        default_compression_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+            self.compression_type
+        ]
         self.__verify_or_set_optional_int(
-            config, "compression_level", 9, description, apply_defaults, env_aware=True
+            config,
+            "compression_level",
+            default_compression_level,
+            description,
+            apply_defaults,
+            env_aware=True,
         )
         self.__verify_or_set_optional_attributes(
             config, "server_attributes", description, apply_defaults, env_aware=True,

@@ -1687,6 +1687,39 @@ class TestConfiguration(TestConfigurationBase):
         expected_msg = "Make sure that the corresponding Python library is available"
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
+    def test_parse_compression_algorithm_specific_default_value_is_used_for_level(self):
+        for (
+            compression_type,
+            default_level,
+        ) in scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL.items():
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                }
+                """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+            self.assertEqual(config.compression_level, default_level)
+
+            # Explicitly provided value by the user should always have precedence
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    "compression_level": 5,
+                }
+                """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+            self.assertEqual(config.compression_level, 5)
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):

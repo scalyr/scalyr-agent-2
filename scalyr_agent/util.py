@@ -115,6 +115,17 @@ COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
     "zstandard": "zstandard",
 }
 
+# Maps compression type to a default compression level which is used if one is not specified by the
+# end user.
+# For more context on those defaults, please refer to micro benchmarks results.
+COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
+    "deflate": 9,
+    "bz2": 9,
+    "lz4": 0,  # the fastest, but not the best compression ratio
+    "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
+}
+
+
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
 
