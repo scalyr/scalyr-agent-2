@@ -185,7 +185,7 @@ class ScalyrClientSession(object):
             # Ensure valid level is used.
             # TODO: Should we expose more levels for zstandard?
             log.warning(
-                "Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression."
+                "Invalid compression level used - %s.  Range must be 1-9.  Defaulting to 9 - maximum compression."
                 % (compression_level)
             )
             compression_level = 9

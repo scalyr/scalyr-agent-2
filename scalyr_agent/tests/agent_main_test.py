@@ -47,6 +47,7 @@ class AgentMainTestCase(ScalyrTestCase):
         # 1. file doesn't exist but cert verification is disabled
         config = mock.Mock()
         config.scalyr_server = "foo.bar.com"
+        config.compression_level = 1
 
         config.verify_server_certificate = False
         config.ca_cert_path = "/tmp/doesnt.exist"
@@ -103,6 +104,7 @@ class AgentMainTestCase(ScalyrTestCase):
         # ca_cert_path file doesn't exist
         config = mock.Mock()
         config.scalyr_server = "foo.bar.com"
+        config.compression_level = 1
 
         config.verify_server_certificate = True
         config.ca_cert_path = "/tmp/doesnt.exist"
@@ -124,6 +126,7 @@ class AgentMainTestCase(ScalyrTestCase):
 
         config = mock.Mock()
         config.scalyr_server = "foo.bar.com"
+        config.compression_level = 1
 
         config.verify_server_certificate = True
         config.ca_cert_path = "/tmp/doesnt.exist"
