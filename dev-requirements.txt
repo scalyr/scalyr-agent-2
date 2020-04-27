@@ -30,6 +30,3 @@ flask==1.1.1
 pathlib2==2.3.5; python_version <= '2.7'
 # Used for performanice optimized versions of rfc3339_to_* functions
 udatetime==0.0.16
-# Used for compression algorithm tests
-zstandard==0.13.0
-py-lz4framed==0.14.0

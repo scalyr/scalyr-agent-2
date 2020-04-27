@@ -111,7 +111,7 @@ SUPPORTED_COMPRESSION_ALGORITHMS = ["deflate", "bz2", "lz4", "zstandard"]
 COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
     "deflate": "zlib",
     "bz2": "bz2",
-    "lz4": "py-lz4framed",
+    "lz4": "lz4",
     "zstandard": "zstandard",
 }
 
@@ -1877,9 +1877,11 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         compress_func = compressor.compress  # type: ignore
         decompress_func = decompressor.decompress  # type: ignore
     elif compression_algorithm == "lz4":
-        import lz4framed as lz4
+        import lz4.frame as lz4
 
-        compress_func = functools.partial(lz4.compress, level=compression_level)  # type: ignore
+        def compress_func(data):
+            return lz4.compress(data, compression_level)
+
         decompress_func = lz4.decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))

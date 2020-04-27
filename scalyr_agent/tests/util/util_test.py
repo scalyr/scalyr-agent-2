@@ -87,7 +87,7 @@ class TestUtilCompression(ScalyrTestCase):
         compress = verify_and_get_compress_func("lz4")
         self.assertIsNotNone(compress)
 
-        import lz4framed as lz4
+        import lz4.frame as lz4
 
         self.assertEqual(data, lz4.decompress(compress(data)))
 
