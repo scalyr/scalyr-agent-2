@@ -5,6 +5,7 @@ import hashlib
 import os
 import random
 import re
+import warnings
 from string import Template
 import sys
 import threading
@@ -2179,7 +2180,9 @@ class KubeletApi(object):
         """
         while True:
             url = self._kubelet_url + path
-            response = self._session.get(url, timeout=self._timeout, verify=False)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=Warning)
+                response = self._session.get(url, timeout=self._timeout, verify=False)
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
