@@ -34,6 +34,8 @@ limitations under the License.
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
+
 __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
@@ -102,8 +104,10 @@ def _gather_metric(method, attribute=None, transform=None):
     def gather_metric():
         """Dynamically Generated """
         try:
+            print(attribute)
             metric = methodcaller(method)  # pylint: disable=redefined-outer-name
             value = metric(psutil)
+
             if attribute:
                 value = attrgetter(attribute)(value)
             if transform is not None:
@@ -373,7 +377,7 @@ _PHYSICAL_MEMORY_METRICS = [
 # =================================================================================
 _NETWORK_IO_METRICS = [
     # TODO: Add in per-interface metrics.  This can be gathered using psutils.  You just have to set pernic=True
-    # on the call to network_io_counters.  The current structure of this code makes it difficult though.
+    # on the call to net_io_counters.  The current structure of this code makes it difficult though.
     METRIC(  # ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.bytes",
@@ -383,7 +387,7 @@ _NETWORK_IO_METRICS = [
             cumulative=True,
             extra_fields={"direction": "sent"},
         ),
-        GATHER_METRIC("network_io_counters", "bytes_sent"),
+        GATHER_METRIC("net_io_counters", "bytes_sent"),
     ),
     METRIC(  # ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
@@ -394,7 +398,7 @@ _NETWORK_IO_METRICS = [
             cumulative=True,
             extra_fields={"direction": "recv"},
         ),
-        GATHER_METRIC("network_io_counters", "bytes_recv"),
+        GATHER_METRIC("net_io_counters", "bytes_recv"),
     ),
     METRIC(  # ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
@@ -405,7 +409,7 @@ _NETWORK_IO_METRICS = [
             cumulative=True,
             extra_fields={"direction": "sent"},
         ),
-        GATHER_METRIC("network_io_counters", "packets_sent"),
+        GATHER_METRIC("net_io_counters", "packets_sent"),
     ),
     METRIC(  # ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
@@ -416,7 +420,7 @@ _NETWORK_IO_METRICS = [
             cumulative=True,
             extra_fields={"direction": "recv"},
         ),
-        GATHER_METRIC("network_io_counters", "packets_recv"),
+        GATHER_METRIC("net_io_counters", "packets_recv"),
     ),
     # TODO: Additional attributes for this section
     #  * dropped packets in/out
