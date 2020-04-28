@@ -4,6 +4,9 @@
 # python -m scalyr_agent.run_monitor
 # scalyr_agent.builtin_monitors.apache_monitor
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
+import six
 import six.moves.http_client
 import six.moves.urllib.request
 import six.moves.urllib.error
@@ -25,7 +28,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.apache_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
@@ -35,7 +38,7 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple Apache instances on a single server; you can monitor each "
     "instance with a separate apache_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -327,7 +330,7 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
         except six.moves.urllib.error.URLError as err:
             message = (
                 "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
-                % (str(err))
+                % (six.text_type(err))
             )
             if err.reason.errno == 111:
                 message = (
