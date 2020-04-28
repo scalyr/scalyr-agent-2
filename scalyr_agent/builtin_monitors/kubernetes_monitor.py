@@ -2021,6 +2021,7 @@ class CRIEnumerator(ContainerEnumerator):
         agent_pod,
         k8s_api_url,
         query_filesystem,
+        node_name,
         kubelet_api_host_ip,
         kubelet_api_url_template,
         is_sidecar_mode=False,
@@ -2041,7 +2042,9 @@ class CRIEnumerator(ContainerEnumerator):
         self._kubelet = KubeletApi(
             k8s,
             host_ip=kubelet_api_host_ip,
+            node_name=node_name,
             kubelet_url_template=Template(kubelet_api_url_template),
+            ca_file=global_config.k8s_service_account_cert,
         )
         self._query_filesystem = query_filesystem
 
@@ -2596,6 +2599,7 @@ class ContainerChecker(object):
                     self.__agent_pod,
                     k8s_api_url,
                     query_fs,
+                    self._get_node_name(),
                     self._config.get("k8s_kubelet_host_ip"),
                     self._config.get("k8s_kubelet_api_url_template"),
                     is_sidecar_mode=self.__sidecar_mode,
@@ -4106,10 +4110,14 @@ cluster.
                 )
                 self.__kubelet_api = KubeletApi(
                     k8s,
+                    node_name=compat.os_environ_unicode.get(
+                        "SCALYR_K8S_NODE_NAME", None
+                    ),  # TODO: unicode conversion
                     host_ip=self._config.get("k8s_kubelet_host_ip"),
                     kubelet_url_template=Template(
                         self._config.get("k8s_kubelet_api_url_template")
                     ),
+                    ca_file=self._global_config.k8s_service_account_cert,
                 )
         except Exception as e:
             self._logger.error(

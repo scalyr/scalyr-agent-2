@@ -2132,11 +2132,14 @@ class KubeletApi(object):
         self,
         k8s,
         host_ip=None,
+        node_name=None,
         kubelet_url_template=Template("https://${host_ip}:10250"),
+        ca_file="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
     ):
         """
         @param k8s - a KubernetesApi object
         """
+        self._ca_file = ca_file
         self._host_ip = host_ip
         if self._host_ip is None:
             try:
@@ -2159,14 +2162,18 @@ class KubeletApi(object):
         self._session.headers.update(headers)
 
         global_log.info("KubeletApi host ip = %s" % self._host_ip)
-        self._kubelet_url = self._build_kubelet_url(kubelet_url_template, host_ip)
+        self._kubelet_url = self._build_kubelet_url(
+            kubelet_url_template, host_ip, node_name
+        )
         self._fallback_kubelet_url = self._build_kubelet_url(
-            FALLBACK_KUBELET_URL_TEMPLATE, host_ip
+            FALLBACK_KUBELET_URL_TEMPLATE, host_ip, node_name
         )
         self._timeout = 20.0
 
     @staticmethod
-    def _build_kubelet_url(kubelet_url, host_ip):
+    def _build_kubelet_url(kubelet_url, host_ip, node_name):
+        if node_name:
+            return kubelet_url.substitute(host_ip=node_name)
         if host_ip:
             return kubelet_url.substitute(host_ip=host_ip)
         return None
@@ -2174,12 +2181,23 @@ class KubeletApi(object):
     def _switch_to_fallback(self):
         self._kubelet_url = self._fallback_kubelet_url
 
+    def _verify_connection(self):
+        """ Return whether or not to use SSL verification
+        """
+        if self._ca_file:
+            return self._ca_file
+        return False
+
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
         while True:
             url = self._kubelet_url + path
-            response = self._session.get(url, timeout=self._timeout, verify=False)
+            response = self._session.get(
+                url,
+                timeout=self._timeout,
+                verify="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+            )
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
