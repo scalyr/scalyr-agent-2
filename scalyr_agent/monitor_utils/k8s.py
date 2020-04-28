@@ -2186,6 +2186,12 @@ class KubeletApi(object):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=Warning)
                 response = self._session.get(url, timeout=self._timeout, verify=False)
+            if self._kubelet_url.startswith("https://"):
+                global_log.warn(
+                    "Accessing Kubelet with an unverified HTTPS request.",
+                    limit_once_per_x_secs=3600,
+                    limit_key="unverified-kubelet-request",
+                )
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
