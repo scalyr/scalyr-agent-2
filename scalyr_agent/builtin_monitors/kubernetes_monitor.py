@@ -392,8 +392,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_kubelet_api_url_template",
-    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API,"
-    "allowed template variables are `node_name` and `host_ip`.",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API. "
+    "Allowed template variables are `node_name` and `host_ip`.",
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,

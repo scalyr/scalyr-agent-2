@@ -18,6 +18,18 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import re
+import warnings
+from string import Template
+
+import sys
+
+from scalyr_agent.monitor_utils.k8s import KubeletApi, KubeletApiException
+from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
+    InsecureRequestWarning,
+)
+from scalyr_agent.third_party.six import StringIO
+
 __author__ = "echee@scalyr.com"
 
 
@@ -27,7 +39,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
 )
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
-from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.tests.copying_manager_test import FakeMonitor
 from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache
@@ -555,3 +567,145 @@ class TestExtraServerAttributes(ScalyrTestCase):
             )
 
         run_test()
+
+
+class FakeKubernetesApi:
+    def __init__(self):
+        self.token = "FakeToken"
+
+
+class FakeResponse:
+    def __init__(self):
+        self.status_code = 200
+        self.text = "{}"
+
+
+class TestKubeletApi(BaseScalyrLogCaptureTestCase):
+    def test_basic_case(self):
+        def fake_get(self, url, verify):
+            resp = FakeResponse()
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            api = KubeletApi(
+                FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode"
+            )
+            result = api.query_stats()
+            self.assertEqual(result, {})
+
+    def test_unverified_https(self):
+        def fake_get(self, url, verify):
+            resp = FakeResponse()
+            warnings.warn(
+                (
+                    "Unverified HTTPS request is being made. "
+                    "Adding certificate verification is strongly advised. See: "
+                    "https://urllib3.readthedocs.io/en/latest/advanced-usage.html"
+                    "#ssl-warnings"
+                ),
+                InsecureRequestWarning,
+            )
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            new_out, new_err = StringIO(), StringIO()
+            old_out, old_err = sys.stdout, sys.stderr
+            try:
+                sys.stdout, sys.stderr = new_out, new_err
+                api = KubeletApi(
+                    FakeKubernetesApi(),
+                    host_ip="127.0.0.1",
+                    node_name="FakeNode",
+                    kubelet_url_template=Template("https://${host_ip}"),
+                    verify_https=False,
+                )
+                result = api.query_stats()
+                self.assertEqual(result, {})
+                self.assertLogFileContainsLineRegex(
+                    ".*"
+                    + re.escape(
+                        "WARNING [core] [k8s.py:2215] Accessing Kubelet with an unverified HTTPS request."
+                    )
+                )
+                self.assertFalse(new_err.getvalue())
+                self.assertFalse(new_out.getvalue())
+            finally:
+                sys.stdout, sys.stderr = old_out, old_err
+
+    def test_unverified_http(self):
+        def fake_get(self, url, verify):
+            resp = FakeResponse()
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            new_out, new_err = StringIO(), StringIO()
+            old_out, old_err = sys.stdout, sys.stderr
+            try:
+                sys.stdout, sys.stderr = new_out, new_err
+                api = KubeletApi(
+                    FakeKubernetesApi(),
+                    host_ip="127.0.0.1",
+                    node_name="FakeNode",
+                    kubelet_url_template=Template("http://${host_ip}"),
+                    verify_https=False,
+                )
+                result = api.query_stats()
+                self.assertEqual(result, {})
+                self.assertLogFileDoesntContainsLineRegex(
+                    ".*"
+                    + re.escape(
+                        "WARNING [core] [k8s.py:2215] Accessing Kubelet with an unverified HTTPS request."
+                    )
+                )
+                self.assertFalse(new_err.getvalue())
+                self.assertFalse(new_out.getvalue())
+            finally:
+                sys.stdout, sys.stderr = old_out, old_err
+
+    def test_error_response(self):
+        def fake_get(self, url, verify):
+            resp = FakeResponse()
+            resp.status_code = 404
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            try:
+                api = KubeletApi(
+                    FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode",
+                )
+                api.query_stats()
+                self.assertTrue(False)
+            except KubeletApiException:
+                pass
+
+    def test_host_ip_format(self):
+        def fake_get(self2, url, verify):
+            resp = FakeResponse()
+            self.assertEqual(url, "http://127.0.0.1/stats/summary")
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            api = KubeletApi(
+                FakeKubernetesApi(),
+                host_ip="127.0.0.1",
+                node_name="FakeNode",
+                kubelet_url_template=Template("http://${host_ip}"),
+            )
+            result = api.query_stats()
+            self.assertEqual(result, {})
+
+    def test_node_name_format(self):
+        def fake_get(self2, url, verify):
+            resp = FakeResponse()
+            self.assertEqual(url, "http://FakeNode/stats/summary")
+            return resp
+
+        with mock.patch.object(KubeletApi, "_get", fake_get):
+            api = KubeletApi(
+                FakeKubernetesApi(),
+                host_ip="127.0.0.1",
+                node_name="FakeNode",
+                kubelet_url_template=Template("http://${node_name}"),
+            )
+            result = api.query_stats()
+            self.assertEqual(result, {})

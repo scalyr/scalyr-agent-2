@@ -2134,7 +2134,7 @@ class KubeletApi(object):
         k8s,
         host_ip=None,
         node_name=None,
-        verify_https=False,
+        verify_https=True,
         kubelet_url_template=Template("https://${host_ip}:10250"),
         ca_file="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
     ):
@@ -2175,7 +2175,7 @@ class KubeletApi(object):
 
     @staticmethod
     def _build_kubelet_url(kubelet_url, host_ip, node_name):
-        if node_name or host_ip:
+        if node_name and host_ip:
             return kubelet_url.substitute(node_name=node_name, host_ip=host_ip)
         return None
 
@@ -2188,6 +2188,9 @@ class KubeletApi(object):
         if self._verify_https and self._ca_file:
             return self._ca_file
         return False
+
+    def _get(self, url, verify):
+        return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
@@ -2204,9 +2207,7 @@ class KubeletApi(object):
                         "ignore",
                         category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
                     )
-                    response = self._session.get(
-                        url, timeout=self._timeout, verify=False
-                    )
+                    response = self._get(url, False)
                 if self._kubelet_url.startswith("https://"):
                     global_log.warn(
                         "Accessing Kubelet with an unverified HTTPS request.",
@@ -2214,9 +2215,7 @@ class KubeletApi(object):
                         limit_key="unverified-kubelet-request",
                     )
             else:
-                response = self._session.get(
-                    url, timeout=self._timeout, verify=verify_connection
-                )
+                response = self._get(url, verify_connection)
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
