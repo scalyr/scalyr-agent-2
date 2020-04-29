@@ -283,6 +283,13 @@ class TestConfiguration(TestConfigurationBase):
             config.k8s_service_account_namespace,
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
         )
+        self.assertEquals(
+            config.k8s_kubelet_ca_cert,
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+        )
+        self.assertEquals(
+            config.k8s_verify_kubelet_queries, True,
+        )
 
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(
@@ -384,6 +391,9 @@ class TestConfiguration(TestConfigurationBase):
             k8s_service_account_cert: "foo_cert",
             k8s_service_account_token: "foo_token",
             k8s_service_account_namespace: "foo_namespace",
+            k8s_kubelet_ca_cert: "kubelet_cert",
+            k8s_verify_kubelet_queries: false,
+
 
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
             journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ]
@@ -454,6 +464,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.k8s_service_account_cert, "foo_cert")
         self.assertEquals(config.k8s_service_account_token, "foo_token")
         self.assertEquals(config.k8s_service_account_namespace, "foo_namespace")
+        self.assertEquals(config.k8s_kubelet_ca_cert, "kubelet_cert")
+        self.assertEquals(config.k8s_verify_kubelet_queries, False)
 
         self.assertTrue(config.log_configs[0].get_bool("ignore_stale_files"))
         self.assertEqual(

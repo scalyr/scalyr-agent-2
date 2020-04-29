@@ -4067,6 +4067,8 @@ cluster.
             "SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY",
             "SCALYR_K8S_SIDECAR_MODE",
             "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
+            "SCALYR_K8S_VERIFY_KUBELET_QUERIES",
+            "SCALYR_K8S_KUBELET_CA_CERT",
         ]
         for envar in envars_to_log:
             self._logger.info(
