@@ -1890,8 +1890,17 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
     elif compression_algorithm == "lz4":
         import lz4.frame as lz4
 
+        # NOTE: Java implementation which we currently use on the server side doesn't support
+        # dependent block stream.
+        # See https://github.com/Parsely/pykafka/issues/914 for details
         def compress_func(data):
-            return lz4.compress(data, compression_level)
+            try:
+                # For lz4 >= 0.12.0
+                return lz4.compress(data, compression_level, block_linked=False)
+            except TypeError:
+                # For older versions
+                # For earlier versions of lz4
+                return lz4.compress(data, compression_level, block_mode=1)
 
         decompress_func = lz4.decompress  # type: ignore
     elif compression_algorithm == "snappy":
