@@ -277,6 +277,63 @@ class Configuration(object):
             )
             scalyr_util.set_json_lib(json_library)
 
+    def print_useful_settings(self, other_config=None):
+        """
+        Prints various useful configuration settings to the agent log, so we have a record
+        in the log of the settings that are currently in use.
+
+        @param other_config: Another configuration option.  If not None, this function will
+        only print configuration options that are different between the two objects.
+        """
+
+        options = [
+            "compression_type",
+            "compression_level",
+            "pipeline_threshold",
+            "min_allowed_request_size",
+            "max_allowed_request_size",
+            "min_request_spacing_interval",
+            "max_request_spacing_interval",
+            "read_page_size",
+            "max_line_size",
+            "internal_parse_max_line_size",
+            "line_completion_wait_time",
+            "max_log_offset_size",
+            "max_existing_log_offset_size",
+        ]
+
+        # get options (if any) from the other configuration object
+        other_options = None
+        if other_config is not None:
+            other_options = {}
+            for option in options:
+                other_options[option] = getattr(other_config, option, None)
+
+        first = True
+        for option in options:
+            value = getattr(self, option, None)
+            print_value = False
+
+            # check to see if we should be printing this option which will will
+            # be True if other_config is None or if the other_config had a setting
+            # that was different from our current setting
+            if other_config is None:
+                print_value = True
+            elif (
+                other_options is not None
+                and option in other_options
+                and other_options[option] != value
+            ):
+                print_value = True
+
+            if print_value:
+                # if this is the first option we are printing, output a header
+                if first:
+                    self.__logger.info("Configuration settings")
+                    first = False
+
+                self.__logger.info("\t%s: %s" % (option, value))
+
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
         @return: The default hostname for this host.
