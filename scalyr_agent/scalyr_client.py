@@ -1762,7 +1762,6 @@ class Event(object):
         # We have to cut off the quotes we surrounded the field with when we serialized it.
         if self.__sequence_id is not None:
             return self.__sequence_id[1:-1]
-        self.__has_non_optimal_fields = True
         return None
 
     def set_sequence_number(self, sequence_number):

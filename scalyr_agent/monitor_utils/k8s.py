@@ -5,6 +5,7 @@ import hashlib
 import os
 import random
 import re
+import warnings
 from string import Template
 import sys
 import threading
@@ -2179,7 +2180,18 @@ class KubeletApi(object):
         """
         while True:
             url = self._kubelet_url + path
-            response = self._session.get(url, timeout=self._timeout, verify=False)
+            # We suppress warnings here to avoid spam about an unverified connection going to stderr.
+            # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
+            # other threads if they are emitted while this request is going.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=Warning)
+                response = self._session.get(url, timeout=self._timeout, verify=False)
+            if self._kubelet_url.startswith("https://"):
+                global_log.warn(
+                    "Accessing Kubelet with an unverified HTTPS request.",
+                    limit_once_per_x_secs=3600,
+                    limit_key="unverified-kubelet-request",
+                )
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
