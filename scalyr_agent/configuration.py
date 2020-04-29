@@ -371,6 +371,14 @@ class Configuration(object):
         return self.__get_config().get_bool("k8s_verify_api_queries")
 
     @property
+    def k8s_verify_kubelet_queries(self):
+        return self.__get_config().get_bool("k8s_verify_kubelet_queries")
+
+    @property
+    def k8s_kubelet_ca_cert(self):
+        return self.__get_config().get_string("k8s_kubelet_ca_cert")
+
+    @property
     def k8s_cache_query_timeout_secs(self):
         return self.__get_config().get_int("k8s_cache_query_timeout_secs")
 
@@ -1728,6 +1736,22 @@ class Configuration(object):
             config,
             "k8s_verify_api_queries",
             True,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_verify_kubelet_queries",
+            True,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_kubelet_ca_cert",
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
             description,
             apply_defaults,
             env_aware=True,

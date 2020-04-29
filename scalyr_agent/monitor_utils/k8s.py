@@ -2134,6 +2134,7 @@ class KubeletApi(object):
         k8s,
         host_ip=None,
         node_name=None,
+        verify_https=False,
         kubelet_url_template=Template("https://${host_ip}:10250"),
         ca_file="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
     ):
@@ -2142,6 +2143,7 @@ class KubeletApi(object):
         """
         self._ca_file = ca_file
         self._host_ip = host_ip
+        self._verify_https = verify_https
         if self._host_ip is None:
             try:
                 pod_name = k8s.get_pod_name()
@@ -2173,10 +2175,8 @@ class KubeletApi(object):
 
     @staticmethod
     def _build_kubelet_url(kubelet_url, host_ip, node_name):
-        if node_name:
-            return kubelet_url.substitute(host_ip=node_name)
-        if host_ip:
-            return kubelet_url.substitute(host_ip=host_ip)
+        if node_name or host_ip:
+            return kubelet_url.substitute(node_name=node_name, host_ip=host_ip)
         return None
 
     def _switch_to_fallback(self):
@@ -2185,7 +2185,7 @@ class KubeletApi(object):
     def _verify_connection(self):
         """ Return whether or not to use SSL verification
         """
-        if self._ca_file:
+        if self._verify_https and self._ca_file:
             return self._ca_file
         return False
 
@@ -2197,14 +2197,25 @@ class KubeletApi(object):
             # We suppress warnings here to avoid spam about an unverified connection going to stderr.
             # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
             # other threads if they are emitted while this request is going.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=Warning)
-                response = self._session.get(url, timeout=self._timeout, verify=False)
-            if self._kubelet_url.startswith("https://"):
-                global_log.warn(
-                    "Accessing Kubelet with an unverified HTTPS request.",
-                    limit_once_per_x_secs=3600,
-                    limit_key="unverified-kubelet-request",
+            verify_connection = self._verify_connection()
+            if not verify_connection:
+                with warnings.catch_warnings():
+                    warnings.simplefilter(
+                        "ignore",
+                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
+                    )
+                    response = self._session.get(
+                        url, timeout=self._timeout, verify=False
+                    )
+                if self._kubelet_url.startswith("https://"):
+                    global_log.warn(
+                        "Accessing Kubelet with an unverified HTTPS request.",
+                        limit_once_per_x_secs=3600,
+                        limit_key="unverified-kubelet-request",
+                    )
+            else:
+                response = self._session.get(
+                    url, timeout=self._timeout, verify=verify_connection
                 )
             response.encoding = "utf-8"
             if response.status_code != 200:

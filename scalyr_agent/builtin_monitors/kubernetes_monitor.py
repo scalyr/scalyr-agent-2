@@ -392,7 +392,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_kubelet_api_url_template",
-    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API,"
+    "allowed template variables are `node_name` and `host_ip`.",
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,
@@ -2044,7 +2045,8 @@ class CRIEnumerator(ContainerEnumerator):
             host_ip=kubelet_api_host_ip,
             node_name=node_name,
             kubelet_url_template=Template(kubelet_api_url_template),
-            ca_file=global_config.k8s_service_account_cert,
+            verify_https=global_config.k8s_verify_kubelet_queries,
+            ca_file=global_config.k8s_kubelet_ca_cert,
         )
         self._query_filesystem = query_filesystem
 
@@ -4112,12 +4114,13 @@ cluster.
                     k8s,
                     node_name=compat.os_environ_unicode.get(
                         "SCALYR_K8S_NODE_NAME", None
-                    ),  # TODO: unicode conversion
+                    ),
                     host_ip=self._config.get("k8s_kubelet_host_ip"),
                     kubelet_url_template=Template(
                         self._config.get("k8s_kubelet_api_url_template")
                     ),
-                    ca_file=self._global_config.k8s_service_account_cert,
+                    ca_file=self._global_config.k8s_kubelet_ca_cert,
+                    verify_https=self._global_config.k8s_verify_kubelet_queries,
                 )
         except Exception as e:
             self._logger.error(
