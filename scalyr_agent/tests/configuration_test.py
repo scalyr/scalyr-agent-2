@@ -51,7 +51,7 @@ from scalyr_agent.compat import os_environ_unicode
 
 import six
 from six.moves import range
-from mock import patch, Mock
+from mock import patch, Mock, call
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -1568,6 +1568,74 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(config.api_key, "hi")
+
+    def test_print_config(self):
+        """Make sure that when we print the config options that we
+        don't throw any exceptions
+        """
+
+        self._write_file_with_separator_conversion("""{api_key: "hi there"}""")
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call("\tmax_line_size: 9900")
+
+    def test_print_config_when_changed(self):
+        """
+        Test that `print_useful_settings` only outputs changed settings when compared to another
+        configuration object
+        """
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there"
+            }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there"
+            max_line_size: 49900,
+            }
+        """
+        )
+        new_config = self._create_test_configuration_instance(logger=mock_logger)
+        new_config.parse()
+
+        new_config.print_useful_settings(other_config=config)
+
+        calls = [
+            call("Configuration settings"),
+            call("\tmax_line_size: 49900"),
+        ]
+        mock_logger.info.assert_has_calls(calls)
+
+    def test_print_config_when_not_changed(self):
+        """
+        Test that `print_useful_settings` doesn't output anything if configuration
+        options haven't changed
+        """
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            max_line_size: 49900
+            }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        other_config = self._create_test_configuration_instance(logger=mock_logger)
+        other_config.parse()
+
+        config.print_useful_settings(other_config=other_config)
+        mock_logger.info.assert_not_called()
 
     def test_import_vars_in_configuration_directory(self):
         os.environ["TEST_VAR"] = "bye"
