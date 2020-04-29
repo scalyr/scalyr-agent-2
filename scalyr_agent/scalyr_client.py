@@ -494,6 +494,11 @@ class ScalyrClientSession(object):
                     )
                 return "requestFailed", len(body_str), response
 
+            try:
+                response = six.ensure_text(response)
+            except Exception:
+                pass
+
             log.log(
                 scalyr_logging.DEBUG_LEVEL_5,
                 'Response was received with body "%s"',
