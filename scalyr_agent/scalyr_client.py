@@ -350,7 +350,23 @@ class ScalyrClientSession(object):
             self.total_request_bytes_sent += len(body_str) + len(request_path)
 
             if self.__compress:
+                size_before_compress = len(body_str)
                 body_str = self.__compress(body_str)
+                size_after_compress = len(body_str)
+                compression_ratio = float(size_before_compress) / size_after_compress
+
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    'Compressed add event request data using "%s" algorithm and level "%s": '
+                    "original_size=%s compressed_size=%s compression_ratio=%s"
+                    % (
+                        self.__compression_type,
+                        self.__compression_level,
+                        size_before_compress,
+                        size_after_compress,
+                        compression_ratio,
+                    ),
+                )
 
             self.total_compressed_request_bytes_sent += len(body_str) + len(
                 request_path
