@@ -351,20 +351,28 @@ class ScalyrClientSession(object):
 
             if self.__compress:
                 size_before_compress = len(body_str)
+
+                start_time = time.time()
                 body_str = self.__compress(body_str)
+                end_time = time.time()
+
                 size_after_compress = len(body_str)
                 compression_ratio = float(size_before_compress) / size_after_compress
+                duration = round((end_time - start_time), 4)
 
+                # TODO: Should we sample this log message aka only log and perform the calculations
+                # every X requests?
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     'Compressed add event request data using "%s" algorithm and level "%s": '
-                    "original_size=%s compressed_size=%s compression_ratio=%s"
+                    "original_size=%s compressed_size=%s compression_ratio=%s duration=%ss"
                     % (
                         self.__compression_type,
                         self.__compression_level,
                         size_before_compress,
                         size_after_compress,
                         compression_ratio,
+                        duration,
                     ),
                 )
 
