@@ -510,8 +510,10 @@ class ScalyrClientSession(object):
                 return "requestFailed", len(body_str), response
 
             try:
-                response = six.ensure_text(response)
+                response = six.ensure_text(response, "utf-8", "ignore")
             except Exception:
+                # We ignore the exception since we still want to log the response even if it
+                # contains non utf-8 characters
                 pass
 
             log.log(
