@@ -133,6 +133,14 @@ COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
     "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
 }
 
+# Maps compression type to valid compression levels minimum and maximum compression level (inclusive)
+COMPRESSION_TYPE_TO_VALID_LEVELS = {
+    "deflate": [1, 9],
+    "bz2": [1, 9],
+    "lz4": [0, 16],
+    "zstandard": [1, 22],
+}
+
 
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100

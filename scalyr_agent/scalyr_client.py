@@ -181,15 +181,6 @@ class ScalyrClientSession(object):
         self.__compress = None
         encoding = None
 
-        if compression_level < 1 or compression_level > 9:
-            # Ensure valid level is used.
-            # TODO: Should we expose more levels for zstandard?
-            log.warning(
-                "Invalid compression level used - %s.  Range must be 1-9.  Defaulting to 9 - maximum compression."
-                % (compression_level)
-            )
-            compression_level = 9
-
         if compression_type:
             compress_func = verify_and_get_compress_func(
                 compression_type, compression_level
