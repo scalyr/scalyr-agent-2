@@ -928,6 +928,8 @@ class ScalyrAgent(object):
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
+                self.__config.print_useful_settings()
+
                 self.__scalyr_client = self.__create_client()
 
                 def start_worker_thread(config, logs_initial_positions=None):
@@ -1175,6 +1177,8 @@ class ScalyrAgent(object):
                     worker_thread.stop()
 
                     worker_thread = None
+
+                    new_config.print_useful_settings(self.__config)
 
                     self.__config = new_config
                     self.__controller.consume_config(new_config, new_config.file_path)
