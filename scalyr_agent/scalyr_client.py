@@ -348,7 +348,9 @@ class ScalyrClientSession(object):
                 end_time = time.time()
 
                 size_after_compress = len(body_str)
-                compression_ratio = float(size_before_compress) / size_after_compress
+                compression_ratio = round(
+                    (float(size_before_compress) / size_after_compress), 2
+                )
                 duration = round((end_time - start_time), 4)
 
                 # TODO: Should we sample this log message aka only log and perform the calculations
