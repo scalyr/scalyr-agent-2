@@ -110,7 +110,7 @@ SUPPORTED_COMPRESSION_ALGORITHMS = [
     "bz2",
 ]
 
-# lz4 and zstandard library is not available for Python 2.5
+# lz4 and zstandard library is not available for Python 2.6
 if sys.version_info >= (2, 7, 0):
     SUPPORTED_COMPRESSION_ALGORITHMS.append("lz4")
     SUPPORTED_COMPRESSION_ALGORITHMS.append("zstandard")
