@@ -669,11 +669,10 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
             return resp
 
         with mock.patch.object(KubeletApi, "_get", fake_get):
-            with self.assertRaises(KubeletApiException):
-                api = KubeletApi(
-                    FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode",
-                )
-                api.query_stats()
+            api = KubeletApi(
+                FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode",
+            )
+            self.assertRaisesRegexp(KubeletApiException, ".*", api.query_stats)
 
     def test_fallback(self):
         self._fake_get_called = False
