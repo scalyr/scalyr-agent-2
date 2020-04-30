@@ -4,6 +4,7 @@ import os
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
+from scalyr_agent.monitor_utils.k8s import K8sNamespaceFilter
 from scalyr_agent.config_util import BadConfiguration
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingManager
@@ -30,11 +31,10 @@ class TestConfigurationK8s(TestConfigurationBase):
         def fake_init(self):
             # Initialize some requisite variables so that the k8s monitor loop can run
             self._KubernetesMonitor__container_checker = None
-            self._KubernetesMonitor__namespaces_to_ignore = []
             self._KubernetesMonitor__include_controller_info = None
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
-            self._set_ignore_namespaces()
+            self._set_namespaces_to_include()
 
         mock_logger = Mock()
 
@@ -306,10 +306,13 @@ class TestConfigurationK8s(TestConfigurationBase):
         _assert_environment_variable("SCALYR_K8S_EVENTS_DISABLE", "F", False)
 
     def test_k8s_ignore_namespaces(self):
-        def _verify(expected):
+        def _verify(expected_ignore_list):
             monitors_manager, config, mock_logger = self._create_test_objects()
             k8s_monitor = monitors_manager.monitors[0]
-            result = k8s_monitor._get_ignore_namespaces()
+            expected = K8sNamespaceFilter(
+                global_include=["*"], global_ignore=expected_ignore_list
+            )
+            result = k8s_monitor._get_namespaces_to_include()
             self.assertEquals(expected, result)
 
         def _test_k8s_ignore_namespaces_local(test_str, expected):

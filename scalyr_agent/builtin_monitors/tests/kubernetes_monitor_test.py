@@ -24,7 +24,11 @@ from string import Template
 
 import sys
 
-from scalyr_agent.monitor_utils.k8s import KubeletApi, KubeletApiException
+from scalyr_agent.monitor_utils.k8s import (
+    KubeletApi,
+    KubeletApiException,
+    K8sNamespaceFilter,
+)
 from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
     InsecureRequestWarning,
 )
@@ -64,7 +68,9 @@ class KubernetesMonitorTest(ScalyrTestCase):
         def fake_init(self):
             # Initialize variables that would have been
             self._KubernetesMonitor__container_checker = None
-            self._KubernetesMonitor__namespaces_to_ignore = []
+            self._KubernetesMonitor__namespaces_to_include = (
+                K8sNamespaceFilter.default_value()
+            )
             self._KubernetesMonitor__include_controller_info = None
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
@@ -539,7 +545,9 @@ class TestExtraServerAttributes(ScalyrTestCase):
         def fake_init(self):
             # Initialize variables that would have been
             self._KubernetesMonitor__container_checker = None
-            self._KubernetesMonitor__namespaces_to_ignore = []
+            self._KubernetesMonitor__namespaces_to_include = (
+                K8sNamespaceFilter.default_value()
+            )
             self._KubernetesMonitor__include_controller_info = None
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
@@ -622,10 +630,7 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
                 result = api.query_stats()
                 self.assertEqual(result, {})
                 self.assertLogFileContainsLineRegex(
-                    ".*"
-                    + re.escape(
-                        "WARNING [core] [k8s.py:2215] Accessing Kubelet with an unverified HTTPS request."
-                    )
+                    r".*WARNING \[core\] \[k8s.py:\d+\] Accessing Kubelet with an unverified HTTPS request\."
                 )
                 self.assertFalse(new_err.getvalue())
                 self.assertFalse(new_out.getvalue())

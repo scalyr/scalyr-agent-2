@@ -47,7 +47,6 @@ from scalyr_agent import (
 )
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import (
     JsonObject,
     ArrayOfStrings,
@@ -58,6 +57,7 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
     K8sApiTemporaryError,
+    K8sNamespaceFilter,
 )
 from scalyr_agent.monitor_utils.k8s import (
     K8sApiPermanentError,
@@ -1611,7 +1611,7 @@ def _get_containers(
     include_log_path=False,
     k8s_cache=None,
     k8s_include_by_default=True,
-    k8s_namespaces_to_exclude=None,
+    k8s_namespaces_to_include=None,
     ignore_pod_sandboxes=True,
     current_time=None,
     controlled_warmer=None,
@@ -1631,7 +1631,7 @@ def _get_containers(
         @param k8s_cache: KubernetesCache.  If not None, k8s information (if it exists) for the container will be added as part of the extra info mapped to the container id
         @param k8s_include_by_default: Boolean.  If True, then all k8s containers are included by default, unless an include/exclude annotation excludes them.
             If False, then all k8s containers are excluded by default, unless an include/exclude annotation includes them.
-        @param k8s_namespaces_to_exclude: List  The of namespaces whose containers should be excluded.
+        @param k8s_namespaces_to_include: K8sNamespaceFilter  The filter for namespaces whose containers should be included.  If None, all will be included.
         @param ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
         @param current_time: Timestamp since the epoch
         @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
@@ -1646,6 +1646,9 @@ def _get_containers(
         "pod_namespace": "io.kubernetes.pod.namespace",
         "k8s_container_name": "io.kubernetes.container.name",
     }
+
+    if k8s_namespaces_to_include is None:
+        k8s_namespaces_to_include = K8sNamespaceFilter.include_all()
 
     if running_or_created_after is not None:
         only_running_containers = False
@@ -1747,10 +1750,10 @@ def _get_containers(
                                         "pod_name" in k8s_info
                                         and "pod_namespace" in k8s_info
                                     ):
+                                        # TODOOcz:
                                         if (
-                                            k8s_namespaces_to_exclude is not None
-                                            and k8s_info["pod_namespace"]
-                                            in k8s_namespaces_to_exclude
+                                            k8s_info["pod_namespace"]
+                                            not in k8s_namespaces_to_include
                                         ):
                                             logger.log(
                                                 scalyr_logging.DEBUG_LEVEL_2,
@@ -1758,7 +1761,7 @@ def _get_containers(
                                                 % (
                                                     short_cid,
                                                     k8s_info["pod_namespace"],
-                                                    k8s_namespaces_to_exclude,
+                                                    k8s_namespaces_to_include,
                                                 ),
                                             )
                                             continue
@@ -1908,7 +1911,7 @@ class ContainerEnumerator(object):
         glob_list=None,
         k8s_cache=None,
         k8s_include_by_default=True,
-        k8s_namespaces_to_exclude=None,
+        k8s_namespaces_to_include=None,
         current_time=None,
     ):
         raise NotImplementedError()
@@ -1919,16 +1922,15 @@ class ContainerEnumerator(object):
         glob_list=None,
         k8s_cache=None,
         k8s_include_by_default=True,
-        k8s_namespaces_to_exclude=None,
+        k8s_namespaces_to_include=None,
         current_time=None,
     ):
-
         containers = self._get_containers(
             running_or_created_after=running_or_created_after,
             glob_list=glob_list,
             k8s_cache=k8s_cache,
             k8s_include_by_default=k8s_include_by_default,
-            k8s_namespaces_to_exclude=k8s_namespaces_to_exclude,
+            k8s_namespaces_to_include=k8s_namespaces_to_include,
             current_time=current_time,
         )
 
@@ -1993,7 +1995,7 @@ class DockerEnumerator(ContainerEnumerator):
         glob_list=None,
         k8s_cache=None,
         k8s_include_by_default=True,
-        k8s_namespaces_to_exclude=None,
+        k8s_namespaces_to_include=None,
         current_time=None,
     ):
         return _get_containers(
@@ -2004,7 +2006,7 @@ class DockerEnumerator(ContainerEnumerator):
             include_log_path=True,
             k8s_cache=k8s_cache,
             k8s_include_by_default=k8s_include_by_default,
-            k8s_namespaces_to_exclude=k8s_namespaces_to_exclude,
+            k8s_namespaces_to_include=k8s_namespaces_to_include,
             current_time=current_time,
             controlled_warmer=self.__controlled_warmer,
         )
@@ -2064,14 +2066,14 @@ class CRIEnumerator(ContainerEnumerator):
         glob_list=None,
         k8s_cache=None,
         k8s_include_by_default=True,
-        k8s_namespaces_to_exclude=None,
+        k8s_namespaces_to_include=None,
         current_time=None,
     ):
         result = {}
         container_info = []
 
-        if k8s_namespaces_to_exclude is None:
-            k8s_namespaces_to_exclude = []
+        if k8s_namespaces_to_include is None:
+            k8s_namespaces_to_include = K8sNamespaceFilter.include_all()
 
         if current_time is None:
             current_time = time.time()
@@ -2080,11 +2082,11 @@ class CRIEnumerator(ContainerEnumerator):
             # see if we should query the container list from the filesystem or the kubelet API
             if self._query_filesystem:
                 container_info = self._get_containers_from_filesystem(
-                    k8s_namespaces_to_exclude
+                    k8s_namespaces_to_include
                 )
             else:
                 container_info = self._get_containers_from_kubelet(
-                    k8s_namespaces_to_exclude
+                    k8s_namespaces_to_include
                 )
 
             # process the container info
@@ -2185,7 +2187,7 @@ class CRIEnumerator(ContainerEnumerator):
             )
         return result
 
-    def _get_containers_from_filesystem(self, k8s_namespaces_to_exclude):
+    def _get_containers_from_filesystem(self, k8s_namespaces_to_include):
 
         result = []
 
@@ -2209,7 +2211,7 @@ class CRIEnumerator(ContainerEnumerator):
             cid = m.group(4)
 
             # ignore any unwanted namespaces
-            if pod_namespace in k8s_namespaces_to_exclude:
+            if pod_namespace not in k8s_namespaces_to_include:
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_2,
                     "Excluding container '%s' because namespace '%s' is excluded"
@@ -2234,7 +2236,7 @@ class CRIEnumerator(ContainerEnumerator):
 
         return result
 
-    def _get_containers_from_kubelet(self, k8s_namespaces_to_exclude):
+    def _get_containers_from_kubelet(self, k8s_namespaces_to_include):
 
         result = []
 
@@ -2250,7 +2252,7 @@ class CRIEnumerator(ContainerEnumerator):
                 pod_namespace = metadata.get("namespace", "")
 
                 # ignore anything that is in an excluded namespace
-                if pod_namespace in k8s_namespaces_to_exclude:
+                if pod_namespace not in k8s_namespaces_to_include:
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_2,
                         "Excluding pod '%s' because namespace '%s' is excluded"
@@ -2355,7 +2357,7 @@ class ContainerChecker(object):
         log_path,
         include_all,
         include_controller_info,
-        namespaces_to_ignore,
+        namespaces_to_include,
         ignore_pod_sandboxes,
         controlled_warmer=None,
     ):
@@ -2370,7 +2372,7 @@ class ContainerChecker(object):
         @param log_path: The path to the container logs
         @param include_all: Whether or not include all container by default
         @param include_controller_info: Whether or not to include the controller information for all pods upload
-        @param namespaces_to_ignore: The namespaces whose pods should not be uploaded
+        @param namespaces_to_include: The namespaces whose pods should be uploaded.
         @param ignore_pod_sandboxes: Whether or not to recognize pod sandboxes
         @param controlled_warmer: If the pod cache should be proactively warmed using the controlled
             cache warmer strategy, the instance to use.
@@ -2384,7 +2386,7 @@ class ContainerChecker(object):
         @type log_path: str
         @type include_all: bool
         @type include_controller_info: bool
-        @type namespaces_to_ignore: [str]
+        @type namespaces_to_include: [K8sNamespaceFilter]
         @type ignore_pod_sandboxes: bool
         @type controlled_warmer: ControlledCacheWarmer or None
         """
@@ -2432,8 +2434,8 @@ class ContainerChecker(object):
 
         self.__glob_list = config.get("container_globs")
 
-        # The namespace whose logs we should not collect.
-        self.__namespaces_to_ignore = namespaces_to_ignore
+        # The namespaces of pods whose containers we should return.
+        self.__namespaces_to_include = namespaces_to_include
 
         self.__ignore_pod_sandboxes = ignore_pod_sandboxes
 
@@ -2619,7 +2621,7 @@ class ContainerChecker(object):
                 glob_list=self.__glob_list,
                 k8s_cache=self.k8s_cache,
                 k8s_include_by_default=self.__include_all,
-                k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                k8s_namespaces_to_include=self.__namespaces_to_include,
             )
 
             # if querying the docker api fails, set the container list to empty
@@ -2725,7 +2727,7 @@ class ContainerChecker(object):
                     glob_list=self.__glob_list,
                     k8s_cache=self.k8s_cache,
                     k8s_include_by_default=self.__include_all,
-                    k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                    k8s_namespaces_to_include=self.__namespaces_to_include,
                     current_time=current_time,
                 )
 
@@ -3352,36 +3354,16 @@ cluster.
 
         return api_socket
 
-    def _set_ignore_namespaces(self):
+    def _set_namespaces_to_include(self):
         """This function is separated out for better testability
         (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
         """
-        # The namespace whose logs we should not collect.
-        global_namespaces_to_ignore = self._global_config.k8s_ignore_namespaces
-        default_val = Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
-        if (
-            global_namespaces_to_ignore is not None
-            and [g for g in global_namespaces_to_ignore] != default_val
-        ):
-            # use global value
-            result = global_namespaces_to_ignore
-        else:
-            # use local value
-            local_namespaces_to_ignore = self._config.get("k8s_ignore_namespaces")
-            if (
-                local_namespaces_to_ignore is not None
-                and [l for l in local_namespaces_to_ignore] != default_val
-            ):
-                result = local_namespaces_to_ignore
-            else:
-                result = default_val
+        self.__namespaces_to_include = K8sNamespaceFilter.from_config(
+            global_config=self._global_config, local_config=self._config
+        )
 
-        self.__namespaces_to_ignore = []
-        for x in result:
-            self.__namespaces_to_ignore.append(x.strip())
-
-    def _get_ignore_namespaces(self):
-        return self.__namespaces_to_ignore
+    def _get_namespaces_to_include(self):
+        return self.__namespaces_to_include
 
     def _initialize(self):
         """This method gets called every 30 seconds regardless"""
@@ -3421,7 +3403,7 @@ cluster.
                 "k8s_parse_format",
             )
 
-        self._set_ignore_namespaces()
+        self._set_namespaces_to_include()
 
         self.__ignore_pod_sandboxes = self._config.get("k8s_ignore_pod_sandboxes")
         self.__socket_file = self.__get_socket_file()
@@ -3489,7 +3471,7 @@ cluster.
                 log_path,
                 self.__include_all,
                 self.__include_controller_info,
-                self.__namespaces_to_ignore,
+                self.__namespaces_to_include,
                 self.__ignore_pod_sandboxes,
                 controlled_warmer=self.__logs_controlled_warmer,
             )
@@ -3937,7 +3919,7 @@ cluster.
                 glob_list=self.__glob_list,
                 k8s_cache=k8s_cache,
                 k8s_include_by_default=self.__include_all,
-                k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                k8s_namespaces_to_include=self.__namespaces_to_include,
                 controlled_warmer=self.__metrics_controlled_warmer,
             )
         try:
@@ -3969,7 +3951,7 @@ cluster.
             containers = self._container_enumerator.get_containers(  # pylint: disable=no-member
                 k8s_cache=k8s_cache,
                 k8s_include_by_default=self.__include_all,
-                k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                k8s_namespaces_to_include=self.__namespaces_to_include,
             )
             for cid, info in six.iteritems(containers):
                 try:
@@ -4134,7 +4116,7 @@ cluster.
         global_log.info(
             "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, report_metrics: %s"
             % (
-                self.__namespaces_to_ignore,
+                self.__namespaces_to_include,
                 self.__include_controller_info,
                 self.__report_container_metrics,
             )

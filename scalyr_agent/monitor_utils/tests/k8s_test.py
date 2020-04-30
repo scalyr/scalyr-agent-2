@@ -30,6 +30,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sApiTemporaryError,
     K8sApiPermanentError,
     ApiQueryOptions,
+    K8sNamespaceFilter,
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
@@ -511,6 +512,68 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         value = self._fetcher.get_metrics("foo")
         self.assertEqual(1, self._fetcher.idle_workers())
         self.assertEqual(10, value)
+
+
+class TestK8sNamespaceFilter(ScalyrTestCase):
+    """Tests the DockerMetricFetch abstraction.
+    """
+
+    def test_basic_blacklist(self):
+        test_filter = K8sNamespaceFilter(global_include=["*"], global_ignore=["kube"])
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertFalse(test_filter.passes("kube"))
+        self.assertTrue("scalyr" in test_filter)
+        self.assertTrue("kube" not in test_filter)
+
+        test_filter = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube", "test"]
+        )
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertFalse(test_filter.passes("kube"))
+        self.assertFalse(test_filter.passes("test"))
+
+    def test_basic_whitelist(self):
+        test_filter = K8sNamespaceFilter(global_include=["scalyr"], global_ignore=[])
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertFalse(test_filter.passes("kube"))
+
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "your-app"], global_ignore=[]
+        )
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertTrue(test_filter.passes("your-app"))
+        self.assertFalse(test_filter.passes("kube"))
+
+    def test_basic_whitelist_and_blacklist(self):
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "your-app", "kube"],
+            global_ignore=["kube", "testing"],
+        )
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertTrue(test_filter.passes("your-app"))
+        self.assertFalse(test_filter.passes("kube"))
+
+    def test_local_blacklist_overrides(self):
+        pass
+
+    def test_include_all(self):
+        test_filter = K8sNamespaceFilter.include_all()
+        self.assertTrue(test_filter.passes("foo"))
+
+    def test_from_config(self):
+        pass
+
+    def test_from_config_with_local(self):
+        pass
+
+    def test_default_value(self):
+        pass
+
+    def test_str(self):
+        pass
+
+    def test_eq(self):
+        pass
 
 
 class DockerClientFaker(object):
