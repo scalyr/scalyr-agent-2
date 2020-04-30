@@ -392,7 +392,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_kubelet_api_url_template",
-    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API. "
+    "Allowed template variables are `node_name` and `host_ip`.",
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,
@@ -2021,6 +2022,7 @@ class CRIEnumerator(ContainerEnumerator):
         agent_pod,
         k8s_api_url,
         query_filesystem,
+        node_name,
         kubelet_api_host_ip,
         kubelet_api_url_template,
         is_sidecar_mode=False,
@@ -2041,7 +2043,10 @@ class CRIEnumerator(ContainerEnumerator):
         self._kubelet = KubeletApi(
             k8s,
             host_ip=kubelet_api_host_ip,
+            node_name=node_name,
             kubelet_url_template=Template(kubelet_api_url_template),
+            verify_https=global_config.k8s_verify_kubelet_queries,
+            ca_file=global_config.k8s_kubelet_ca_cert,
         )
         self._query_filesystem = query_filesystem
 
@@ -2596,6 +2601,7 @@ class ContainerChecker(object):
                     self.__agent_pod,
                     k8s_api_url,
                     query_fs,
+                    self._get_node_name(),
                     self._config.get("k8s_kubelet_host_ip"),
                     self._config.get("k8s_kubelet_api_url_template"),
                     is_sidecar_mode=self.__sidecar_mode,
@@ -4061,6 +4067,8 @@ cluster.
             "SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY",
             "SCALYR_K8S_SIDECAR_MODE",
             "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
+            "SCALYR_K8S_VERIFY_KUBELET_QUERIES",
+            "SCALYR_K8S_KUBELET_CA_CERT",
         ]
         for envar in envars_to_log:
             self._logger.info(
@@ -4106,10 +4114,15 @@ cluster.
                 )
                 self.__kubelet_api = KubeletApi(
                     k8s,
+                    node_name=compat.os_environ_unicode.get(
+                        "SCALYR_K8S_NODE_NAME", None
+                    ),
                     host_ip=self._config.get("k8s_kubelet_host_ip"),
                     kubelet_url_template=Template(
                         self._config.get("k8s_kubelet_api_url_template")
                     ),
+                    ca_file=self._global_config.k8s_kubelet_ca_cert,
+                    verify_https=self._global_config.k8s_verify_kubelet_queries,
                 )
         except Exception as e:
             self._logger.error(

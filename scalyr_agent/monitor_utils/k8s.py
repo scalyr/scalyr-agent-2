@@ -2133,12 +2133,17 @@ class KubeletApi(object):
         self,
         k8s,
         host_ip=None,
+        node_name=None,
+        verify_https=True,
         kubelet_url_template=Template("https://${host_ip}:10250"),
+        ca_file="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
     ):
         """
         @param k8s - a KubernetesApi object
         """
+        self._ca_file = ca_file
         self._host_ip = host_ip
+        self._verify_https = verify_https
         if self._host_ip is None:
             try:
                 pod_name = k8s.get_pod_name()
@@ -2160,20 +2165,32 @@ class KubeletApi(object):
         self._session.headers.update(headers)
 
         global_log.info("KubeletApi host ip = %s" % self._host_ip)
-        self._kubelet_url = self._build_kubelet_url(kubelet_url_template, host_ip)
+        self._kubelet_url = self._build_kubelet_url(
+            kubelet_url_template, host_ip, node_name
+        )
         self._fallback_kubelet_url = self._build_kubelet_url(
-            FALLBACK_KUBELET_URL_TEMPLATE, host_ip
+            FALLBACK_KUBELET_URL_TEMPLATE, host_ip, node_name
         )
         self._timeout = 20.0
 
     @staticmethod
-    def _build_kubelet_url(kubelet_url, host_ip):
-        if host_ip:
-            return kubelet_url.substitute(host_ip=host_ip)
+    def _build_kubelet_url(kubelet_url, host_ip, node_name):
+        if node_name and host_ip:
+            return kubelet_url.substitute(node_name=node_name, host_ip=host_ip)
         return None
 
     def _switch_to_fallback(self):
         self._kubelet_url = self._fallback_kubelet_url
+
+    def _verify_connection(self):
+        """ Return whether or not to use SSL verification
+        """
+        if self._verify_https and self._ca_file:
+            return self._ca_file
+        return False
+
+    def _get(self, url, verify):
+        return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
@@ -2183,15 +2200,22 @@ class KubeletApi(object):
             # We suppress warnings here to avoid spam about an unverified connection going to stderr.
             # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
             # other threads if they are emitted while this request is going.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=Warning)
-                response = self._session.get(url, timeout=self._timeout, verify=False)
-            if self._kubelet_url.startswith("https://"):
-                global_log.warn(
-                    "Accessing Kubelet with an unverified HTTPS request.",
-                    limit_once_per_x_secs=3600,
-                    limit_key="unverified-kubelet-request",
-                )
+            verify_connection = self._verify_connection()
+            if not verify_connection:
+                with warnings.catch_warnings():
+                    warnings.simplefilter(
+                        "ignore",
+                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
+                    )
+                    response = self._get(url, False)
+                if self._kubelet_url.startswith("https://"):
+                    global_log.warn(
+                        "Accessing Kubelet with an unverified HTTPS request.",
+                        limit_once_per_x_secs=3600,
+                        limit_key="unverified-kubelet-request",
+                    )
+            else:
+                response = self._get(url, verify_connection)
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
