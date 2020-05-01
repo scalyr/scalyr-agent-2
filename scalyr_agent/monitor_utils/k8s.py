@@ -345,9 +345,9 @@ class K8sNamespaceFilter(object):
 
     def __str__(self):
         if self.__whitelist is not None:
-            return "include_only=%s" % ",".join(self.__whitelist)
+            return "include_only=%s" % ",".join(sorted(self.__whitelist))
         else:
-            return "exclude=%s" % ",".join(self.__blacklist)
+            return "exclude=%s" % ",".join(sorted(self.__blacklist))
 
     def __eq__(self, other):
         if self.__whitelist is not None:
