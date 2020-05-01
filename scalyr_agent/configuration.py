@@ -73,6 +73,7 @@ class Configuration(object):
     """
 
     DEFAULT_K8S_IGNORE_NAMESPACES = ["kube-system"]
+    DEFAULT_K8S_INCLUDE_NAMESPACES = ["*"]
 
     def __init__(self, file_path, default_paths, logger):
         # Captures all environment aware variables for testing purposes
@@ -418,6 +419,10 @@ class Configuration(object):
     @property
     def k8s_ignore_namespaces(self):
         return self.__get_config().get_json_array("k8s_ignore_namespaces")
+
+    @property
+    def k8s_include_namespaces(self):
+        return self.__get_config().get_json_array("k8s_include_namespaces")
 
     @property
     def k8s_api_url(self):
@@ -1776,6 +1781,15 @@ class Configuration(object):
             config,
             "k8s_ignore_namespaces",
             Configuration.DEFAULT_K8S_IGNORE_NAMESPACES,
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "k8s_include_namespaces",
+            Configuration.DEFAULT_K8S_INCLUDE_NAMESPACES,
             description,
             apply_defaults,
             separators=[None, ","],
