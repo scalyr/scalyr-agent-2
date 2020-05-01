@@ -630,7 +630,7 @@ class TestK8sNamespaceFilter(ScalyrTestCase):
         test_filter = K8sNamespaceFilter(
             global_include=["scalyr", "foo"], global_ignore=["bar"]
         )
-        self.assertEquals("include_only=scalyr,foo", six.text_type(test_filter))
+        self.assertEquals("include_only=foo,scalyr", six.text_type(test_filter))
 
         test_filter = K8sNamespaceFilter(
             global_include=["scalyr", "foo"], global_ignore=["foo"]
