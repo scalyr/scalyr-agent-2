@@ -36,6 +36,8 @@ from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.configuration import Configuration
+
 import time
 
 import mock
@@ -552,28 +554,131 @@ class TestK8sNamespaceFilter(ScalyrTestCase):
         self.assertTrue(test_filter.passes("scalyr"))
         self.assertTrue(test_filter.passes("your-app"))
         self.assertFalse(test_filter.passes("kube"))
+        self.assertFalse(test_filter.passes("testing"))
 
     def test_local_blacklist_overrides(self):
-        pass
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "your-app", "kube"],
+            global_ignore=Configuration.DEFAULT_K8S_IGNORE_NAMESPACES,
+            local_ignore=["kube", "testing"],
+        )
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertTrue(test_filter.passes("your-app"))
+        self.assertFalse(test_filter.passes("kube"))
+        self.assertFalse(test_filter.passes("testing"))
+
+    def test_default_global_ignore(self):
+        # Make sure, even if global ignore is the default, we use it if the local
+        # blacklist is None.
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "your-app", "kube-system"],
+            global_ignore=Configuration.DEFAULT_K8S_IGNORE_NAMESPACES,
+            local_ignore=None,
+        )
+        self.assertTrue(test_filter.passes("scalyr"))
+        self.assertTrue(test_filter.passes("your-app"))
+        self.assertFalse(test_filter.passes("kube-system"))
 
     def test_include_all(self):
         test_filter = K8sNamespaceFilter.include_all()
         self.assertTrue(test_filter.passes("foo"))
 
+    def test_default_value(self):
+        test_filter = K8sNamespaceFilter.default_value()
+        self.assertTrue(test_filter.passes("foo"))
+        self.assertFalse(test_filter.passes("kube-system"))
+
     def test_from_config(self):
-        pass
+        config = mock.Mock()
+        config.k8s_include_namespaces = ["foo", "bar", "baz"]
+        config.k8s_ignore_namespaces = ["baz"]
+
+        test_filter = K8sNamespaceFilter.from_config(global_config=config)
+        self.assertTrue(test_filter.passes("foo"))
+        self.assertTrue(test_filter.passes("bar"))
+        self.assertFalse(test_filter.passes("baz"))
+        self.assertFalse(test_filter.passes("bez"))
 
     def test_from_config_with_local(self):
-        pass
+        config = mock.Mock()
+        config.k8s_include_namespaces = Configuration.DEFAULT_K8S_INCLUDE_NAMESPACES
+        config.k8s_ignore_namespaces = Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
 
-    def test_default_value(self):
-        pass
+        monitor_config = {
+            "k8s_ignore_namespaces": ["baz"],
+        }
+
+        test_filter = K8sNamespaceFilter.from_config(
+            global_config=config, local_config=monitor_config
+        )
+        self.assertTrue(test_filter.passes("foo"))
+        self.assertTrue(test_filter.passes("bar"))
+        self.assertFalse(test_filter.passes("baz"))
 
     def test_str(self):
-        pass
+        test_filter = K8sNamespaceFilter(global_include=["*"], global_ignore=["kube"])
+        self.assertEquals("exclude=kube", six.text_type(test_filter))
+
+        test_filter = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube,foo"]
+        )
+        self.assertEquals("exclude=kube,foo", six.text_type(test_filter))
+
+        test_filter = K8sNamespaceFilter(global_include=["scalyr"], global_ignore=[])
+        self.assertEquals("include_only=scalyr", six.text_type(test_filter))
+
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "foo"], global_ignore=["bar"]
+        )
+        self.assertEquals("include_only=scalyr,foo", six.text_type(test_filter))
+
+        test_filter = K8sNamespaceFilter(
+            global_include=["scalyr", "foo"], global_ignore=["foo"]
+        )
+        self.assertEquals("include_only=scalyr", six.text_type(test_filter))
 
     def test_eq(self):
-        pass
+        blacklist_filter_a = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube"]
+        )
+        blacklist_filter_b = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube-system"]
+        )
+        blacklist_filter_c = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube"]
+        )
+
+        whitelist_filter_a = K8sNamespaceFilter(
+            global_include=["scalyr"], global_ignore=["kube"]
+        )
+        whitelist_filter_b = K8sNamespaceFilter(
+            global_include=["scalyr", "foo"], global_ignore=["kube"]
+        )
+        whitelist_filter_c = K8sNamespaceFilter(
+            global_include=["scalyr"], global_ignore=[]
+        )
+
+        self.assertFalse(blacklist_filter_a == blacklist_filter_b)
+        self.assertTrue(blacklist_filter_a == blacklist_filter_c)
+        self.assertFalse(blacklist_filter_a == whitelist_filter_a)
+
+        self.assertFalse(whitelist_filter_a == whitelist_filter_b)
+        self.assertTrue(whitelist_filter_a == whitelist_filter_c)
+        self.assertFalse(whitelist_filter_a == blacklist_filter_a)
+
+    def test_ne(self):
+        blacklist_filter_a = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube"]
+        )
+        blacklist_filter_b = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube-system"]
+        )
+        blacklist_filter_c = K8sNamespaceFilter(
+            global_include=["*"], global_ignore=["kube"]
+        )
+
+        self.assertTrue(blacklist_filter_a != blacklist_filter_b)
+        self.assertFalse(blacklist_filter_a != blacklist_filter_c)
 
 
 class DockerClientFaker(object):

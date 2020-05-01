@@ -111,9 +111,6 @@ def cache(global_config):
         @param config: The configuration
         @type config: A Scalyr Configuration object
     """
-    # split comma delimited string of namespaces to ignore in to a list of strings
-    # TODOcz:
-
     cache_config = _CacheConfig(
         api_url=global_config.k8s_api_url,
         verify_api_queries=global_config.k8s_verify_api_queries,
@@ -282,7 +279,7 @@ class K8sNamespaceFilter(object):
         :rtype: K8sNamespaceFilter
         """
         return K8sNamespaceFilter(
-            global_include=["*"],
+            global_include=Configuration.DEFAULT_K8S_INCLUDE_NAMESPACES,
             global_ignore=Configuration.DEFAULT_K8S_IGNORE_NAMESPACES,
         )
 
@@ -357,6 +354,9 @@ class K8sNamespaceFilter(object):
             return self.__whitelist == other.__whitelist
         else:
             return self.__blacklist == other.__blacklist
+
+    def __ne__(self, other):
+        return not self == other
 
 
 class QualifiedName(object):
