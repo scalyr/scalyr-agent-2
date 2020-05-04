@@ -1,5 +1,37 @@
 # Release Notes
 
+## in development
+
+* We now default to ``zstandard`` compression algorithm for compressing data which is sent to
+  Scalyr on servers where ``zstandard`` Python library is available.
+
+  Previously we used ``deflate`` with a compression level of ``9``. For most workloads / datasets,
+  ``zstandard`` is about 5-10x faster / more CPU efficient than deflate and it also results in a
+  slightly better compression ratio (it depends on data which is compressed, but for access log like
+  log files, it results in around 5%-10% better compression ratio).
+
+  If for some reason you want to switch back to deflate, you can do that by adding the following line
+  to your scalyr agent config (``/etc/scalyr-agent-2/agent.json``):
+
+  ```javascript
+  compression_type: "deflate"
+  ```
+
+  If you want to use zstandard compression algorithm on servers where ``zstandard`` Python library
+  is not available, you can do that by installing the library using pip:
+
+  ```bash
+  # At the time of this writting the latest version which we performed extensive testings with was
+  # 0.13.0
+  pip install zstandard
+  ```
+
+  And restarting the agent:
+
+  ```bash
+  /etc/init.d/scalyr-agent-2 restart
+  ```
+
 ## 2.1.3 "Orion" - May 1, 2020
 
 * You may now restrict which namespaces for which logs and events are collected
