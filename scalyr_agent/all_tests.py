@@ -46,7 +46,7 @@ def find_all_tests(directory=None, base_path=None):
     @param base_path: The root directory for the module names (defaults to the directory containing script).
 
     @return: List of module names with periods between package names and without the trailing '.py' suffix,
-        such as 'scalyr_agent.tests.exceptions_test'.
+        such as 'tests.unit.exceptions_test'.
     """
     if directory is None:
         directory = os.path.dirname(os.path.abspath(__file__))
