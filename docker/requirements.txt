@@ -7,3 +7,4 @@ yappi==1.2.3
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.15.1
 docker==4.1.0
+zstandard==0.13.0
