@@ -1,15 +1,28 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.3 "TBD" - April 30, 2020
+## 2.1.4 "TBD" - April 30, 2020
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 23, 2020 08:30 -0800
 --->
 
 Features
-
 * Add support for ``zstandard`` and ``lz4`` compression of outgoing requests to the Scalyr API. For backward compatibility reasons, the default value for ``compression_type`` configuration option still is ``deflate``.
+
+## 2.1.3 "Orion" - May 1, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 1, 2020 09:30 -0800
+--->
+
+Features
+* The Kubernetes and Kubernetes event monitors now allow you to restrict the namespaces for which the Scalyr Agent will collect logs and events.  This may be controlled via the `SCALYR_K8S_INCLUDE_NAMESPACES` environment variable or `k8s_include_namespaces` configuration option.  See [release notes](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#213-orion---may-1-2020) for more information.
+
+Bugs
+* Fixed Kubernetes monitor to verify by default TLS connections made to the local Kubelet.  This was causing an excessive amount of warnings to be emitted to the stdout.  See [release notes](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#213-orion---may-1-2020) for details on how to disable verification if this causes issues.
+* Fixed issue preventing the Apache monitor from running under Python 2.
+* Fixed some issues causing some logging to fail due to incorrect arguments.
 
 ## 2.1.2 "Nostromo" - April 23, 2020
 

@@ -280,7 +280,7 @@ def perform_setup():
             "py2exe": {
                 # Need to manually add in monitor modules and those imported via `six.moves` because
                 # those are loaded dynamically and py2exe is not able to determine them through its static analysis.
-                "includes": modules_to_include,
+                "includes": list(modules_to_include),
                 "dll_excludes": [
                     "IPHLPAPI.DLL",
                     "NSI.dll",
