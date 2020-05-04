@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.4 "TBD" - April 30, 2020
+## 2.1.4 "TBD" - May 5, 2020
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 23, 2020 08:30 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 5, 2020 08:30 -0800
 --->
 
 Features
