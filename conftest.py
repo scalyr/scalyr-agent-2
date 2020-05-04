@@ -43,20 +43,20 @@ GLOBAL_WHITELIST = [
 # A list of Python module FQDNs or file paths relative to this directory (repo
 # root) to be ignored under Python 2.4
 PYTHON24_WHITELIST = [
-    "scalyr_agent.tests.url_monitor_test",
+    "tests.unit.url_monitor_test",
 ]
 
 # A list of Python module FQDNs or file paths relative to this directory (repo
 # root to be ignored under Python < 2.7
 PRE_PYTHON27_WHITELIST = [
-    "scalyr_agent.tests.configuration_docker_test",
-    "scalyr_agent.tests.configuration_k8s_test",
-    "scalyr_agent.builtin_monitors.tests.docker_monitor_test",
-    "scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test",
-    "scalyr_agent.monitor_utils.tests.k8s_test",
-    "scalyr_agent.tests.syslog_request_parser_test",
-    "scalyr_agent.tests.syslog_monitor_test",
-    "scalyr_agent.tests.redis_monitor_test",
+    "tests.unit.configuration_docker_test",
+    "tests.unit.configuration_k8s_test",
+    "tests.unit.builtin_monitors.docker_monitor_test",
+    "tests.unit.builtin_monitors.kubernetes_monitor_test",
+    "tests.unit.monitor_utils.k8s_test",
+    "tests.unit.syslog_request_parser_test",
+    "tests.unit.syslog_monitor_test",
+    "tests.unit.redis_monitor_test",
 ]
 
 collect_ignore_glob = []
@@ -95,7 +95,13 @@ def get_module_fqdn_for_path(module_path):
     index = module_path.find("scalyr_agent")
     if index != -1:
         module_path = module_path[module_path.find("scalyr_agent") :]
+
+    index = module_path.find("tests/unit")
+    if index != -1:
+        module_path = module_path[module_path.find("tests/unit") :]
+
     module_fqdn = module_path.replace(os.path.sep, ".").replace(".py", "")
+
     return module_fqdn
 
 

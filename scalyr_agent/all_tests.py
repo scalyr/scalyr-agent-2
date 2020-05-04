@@ -29,10 +29,14 @@ import sys
 import traceback
 
 # NOTE: We ensure repo root is in PYTHONPATH so we can import conftest module
-REPO_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+REPO_ROOT_PATH = os.path.abspath(os.path.join(BASE_DIR, "../"))
 sys.path.insert(0, REPO_ROOT_PATH)
 from conftest import collect_ignore
 from conftest import get_module_fqdn_for_path
+
+
+UNIT_TESTS_DIRECTORY = os.path.abspath(os.path.join(BASE_DIR, "../tests/unit"))
 
 
 def find_all_tests(directory=None, base_path=None):
@@ -57,7 +61,7 @@ def find_all_tests(directory=None, base_path=None):
             # We need to strip off the leading directory and replace the
             # directory separators with periods.
             x = full_path[len(base_path) + 1 : len(full_path) - 3]
-            result.append("scalyr_agent." + x.replace(os.sep, "."))
+            result.append("tests.unit." + x.replace(os.sep, "."))
 
     return result
 
@@ -72,7 +76,7 @@ def run_all_tests():
     suites = []
     error = False
 
-    test_modules = find_all_tests()
+    test_modules = find_all_tests(UNIT_TESTS_DIRECTORY, UNIT_TESTS_DIRECTORY)
     # Remove all modules which are to be ignored
     ignored_test_modules = [
         get_module_fqdn_for_path(module_path) for module_path in collect_ignore

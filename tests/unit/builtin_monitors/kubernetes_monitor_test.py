@@ -45,8 +45,9 @@ from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
-from scalyr_agent.tests.copying_manager_test import FakeMonitor
-from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache
+
+from tests.unit.monitor_utils.k8s_test import FakeCache
+from tests.unit.copying_manager_test import FakeMonitor
 
 import mock
 from mock import patch

@@ -12,11 +12,12 @@ from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import QualifiedName
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
-from scalyr_agent.tests.configuration_test import TestConfigurationBase
 from scalyr_agent.test_base import ScalyrTestCase
 
 from mock import patch, Mock
 import six
+
+from tests.unit.configuration_test import TestConfigurationBase
 
 
 class TestConfigurationK8s(TestConfigurationBase):

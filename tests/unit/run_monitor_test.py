@@ -33,7 +33,7 @@ class RunMonitorTest(ScalyrTestCase):
                  }"""
 
         run_standalone_monitor(
-            "scalyr_agent.tests.empty_monitor",
+            "tests.unit.empty_monitor",
             ".",
             config,
             float(0.5),
