@@ -31,6 +31,11 @@ import six
 import six.moves.urllib.parse
 from six.moves import range
 
+try:
+    import zstandard
+except ImportError:
+    zstandard = None
+
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
@@ -1308,10 +1313,16 @@ class Configuration(object):
             apply_defaults,
             env_aware=True,
         )
+
+        if zstandard is not None:
+            default_compression_type = "zstandard"
+        else:
+            default_compression_type = "deflate"
+
         self.__verify_or_set_optional_string(
             config,
             "compression_type",
-            "deflate",
+            default_compression_type,
             description,
             apply_defaults,
             env_aware=True,
