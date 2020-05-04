@@ -353,8 +353,6 @@ class ScalyrClientSession(object):
                 )
                 duration = round((end_time - start_time), 4)
 
-                # TODO: Should we sample this log message aka only log and perform the calculations
-                # every X requests?
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     'Compressed add event request data using "%s" algorithm and level "%s": '
