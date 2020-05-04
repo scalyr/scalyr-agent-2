@@ -1315,10 +1315,25 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+            valid_values=scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS,
         )
+        self.__verify_compression_type(self.compression_type)
+
+        # NOTE: If not explicitly specified by the user, we use compression algorithm specific
+        # default value
+        default_compression_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+            self.compression_type
+        ]
         self.__verify_or_set_optional_int(
-            config, "compression_level", 9, description, apply_defaults, env_aware=True
+            config,
+            "compression_level",
+            default_compression_level,
+            description,
+            apply_defaults,
+            env_aware=True,
         )
+        self.__verify_compression_level(self.compression_level)
+
         self.__verify_or_set_optional_attributes(
             config, "server_attributes", description, apply_defaults, env_aware=True,
         )
@@ -2275,6 +2290,44 @@ class Configuration(object):
             description,
             apply_defaults,
         )
+
+    def __verify_compression_type(self, compression_type):
+        """
+        Verify that the library for the specified compression type (algorithm) is available.
+        """
+        library_name = scalyr_util.COMPRESSION_TYPE_TO_PYTHON_LIBRARY.get(
+            compression_type, "unknown"
+        )
+
+        try:
+            _, _ = scalyr_util.get_compress_and_decompress_func(compression_type)
+        except (ImportError, ValueError) as e:
+            msg = (
+                'Failed to set compression type to "%s". Make sure that the corresponding Python '
+                "library is available. You can install it using this command:\n\npip install %s\n\n "
+                "Original error: %s" % (compression_type, library_name, str(e))
+            )
+            raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
+
+    def __verify_compression_level(self, compression_level):
+        """
+        Verify that the provided compression level is valid for the configured compression type.
+
+        If it's not, we use a default value for that compression algorithm. Keep in mind that this
+        behavior is there for backward compatibility reasons, otherwise it would be better to just
+        throw in such scenario
+        """
+        compression_type = self.compression_type
+
+        valid_level_min, valid_level_max = scalyr_util.COMPRESSION_TYPE_TO_VALID_LEVELS[
+            compression_type
+        ]
+
+        if compression_level < valid_level_min or compression_level > valid_level_max:
+            self.__config.put(
+                "compression_level",
+                scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[compression_type],
+            )
 
     def __get_config_or_environment_val(
         self, config_object, param_name, param_type, env_aware, custom_env_name

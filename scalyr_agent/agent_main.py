@@ -950,7 +950,13 @@ class ScalyrAgent(object):
                 # JSON library setting is applied as part of __create_worker_thread method
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "JSON library is %s" % (scalyr_util.get_json_lib()),
+                    'Using JSON library "%s"' % (scalyr_util.get_json_lib()),
+                )
+
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    'Using "%s" compression algorithm with level "%s"'
+                    % (self.__config.compression_type, self.__config.compression_level),
                 )
 
                 current_time = time.time()

@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.4 "TBD" - May 5, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 5, 2020 08:30 -0800
+--->
+
+Features
+* Add support for ``zstandard`` and ``lz4`` compression of outgoing requests to the Scalyr API. For backward compatibility reasons, the default value for ``compression_type`` configuration option still is ``deflate``.
+
 ## 2.1.3 "Orion" - May 1, 2020
 
 <!---

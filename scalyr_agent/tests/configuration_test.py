@@ -1376,6 +1376,8 @@ class TestConfiguration(TestConfigurationBase):
                     if field == "debug_level":
                         existing_level = config_obj.get_int(field, none_if_missing=True)
                         fake_env[field] = existing_level + 1
+                    elif field == "compression_level":
+                        fake_env[field] = 8
                     else:
                         self.assertNotEquals(
                             FAKE_INT, config_obj.get_int(field, none_if_missing=True)
@@ -1389,9 +1391,11 @@ class TestConfiguration(TestConfigurationBase):
                     fake_env[field] = FAKE_FLOAT
 
                 elif field_type == six.text_type:
-                    # special case : stdout_severity cannot be arbitrary.
+                    # Special cases for fields which can't contain arbitrary values
                     if field == "stdout_severity":
                         fake_env[field] = "WARN"
+                    elif field == "compression_type":
+                        fake_env[field] = "deflate"
                     else:
                         self.assertNotEquals(
                             FAKE_STRING,
@@ -1719,6 +1723,170 @@ class TestConfiguration(TestConfigurationBase):
     def test_apply_config_without_parse(self):
         config = self._create_test_configuration_instance()
         config.apply_config()
+
+    def test_parse_valid_compression_type(self):
+        # Valid values
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            self._write_file_with_separator_conversion(
+                """{
+                api_key: "hi there",
+                compression_type: "%s",
+            }
+            """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+            self.assertEqual(config.compression_type, compression_type)
+
+    def test_parse_unsupported_compression_type(self):
+        # Invalid value
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                compression_type: "invalid",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        expected_msg = 'Got invalid value "invalid" for field "compression_type"'
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
+
+    @mock.patch(
+        "scalyr_agent.util.get_compress_and_decompress_func",
+        mock.Mock(side_effect=ImportError("")),
+    )
+    def test_parse_library_for_specified_compression_type_not_available(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                compression_type: "deflate",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        expected_msg = (
+            ".*Make sure that the corresponding Python library is available.*"
+        )
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
+
+    def test_parse_compression_algorithm_specific_default_value_is_used_for_level(self):
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            default_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+                compression_type
+            ]
+
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                }
+                """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+            self.assertEqual(config.compression_level, default_level)
+
+            # Explicitly provided value by the user should always have precedence
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    "compression_level": 5,
+                }
+                """
+                % (compression_type)
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+            self.assertEqual(config.compression_level, 5)
+
+    def test_parse_compression_algorithm_invalid_compression_level(self):
+        # If invalid compression level is used, we should use a default value for that particular
+        # algorithm. That's in place for backward compatibility reasons.
+        for compression_type in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS:
+            default_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+                compression_type
+            ]
+
+            (
+                valid_level_min,
+                valid_level_max,
+            ) = scalyr_util.COMPRESSION_TYPE_TO_VALID_LEVELS[compression_type]
+
+            # Value is lower than the min value
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    compression_level: "%s",
+                }
+                """
+                % (compression_type, (valid_level_min - 1))
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            msg = "Expected %s for algorithm %s" % (default_level, compression_type)
+            self.assertEqual(config.compression_level, default_level, msg)
+
+            # Value is greater than the min value
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    compression_level: "%s",
+                }
+                """
+                % (compression_type, (valid_level_max + 1))
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            msg = "Expected %s for algorithm %s" % (default_level, compression_type)
+            self.assertEqual(config.compression_level, default_level, msg)
+
+            # Value is min value (valid since we use inclusive range)
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    compression_level: "%s",
+                }
+                """
+                % (compression_type, (valid_level_min))
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            msg = "Expected %s for algorithm %s" % (valid_level_min, compression_type)
+            self.assertEqual(config.compression_level, valid_level_min, msg)
+
+            # Value is max value (valid since we use inclusive range)
+            self._write_file_with_separator_conversion(
+                """{
+                    api_key: "hi there",
+                    compression_type: "%s",
+                    compression_level: "%s",
+                }
+                """
+                % (compression_type, (valid_level_max))
+            )
+
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
+            self.assertEqual(config.compression_level, valid_level_max, msg)
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):

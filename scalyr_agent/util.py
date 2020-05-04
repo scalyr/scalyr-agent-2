@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+
 from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
@@ -21,12 +22,16 @@ from __future__ import print_function
 
 if False:
     from typing import Union
+    from typing import Tuple
+    from typing import Callable
+    from typing import Optional
 
 import codecs
 import sys
 from io import open
 
 import six
+import functools
 import six.moves._thread
 from six.moves import range
 from scalyr_agent import compat
@@ -98,6 +103,47 @@ Original error: %s
 # This option adds significant overhead so it's only used by the tests to make asserting on the
 # serialized values easier.
 SORT_KEYS = False
+
+# Maps user-friendly string we expose in the configuration to the internal Python module name
+SUPPORTED_COMPRESSION_ALGORITHMS = [
+    "deflate",
+    "bz2",
+]
+
+# lz4 and zstandard library is not available for Python 2.6
+if sys.version_info >= (2, 7, 0):
+    SUPPORTED_COMPRESSION_ALGORITHMS.append("lz4")
+    SUPPORTED_COMPRESSION_ALGORITHMS.append("zstandard")
+
+# Maps compression type (deflate, bz2, lz4, zstandard) to the corresponding Python package name
+COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
+    "deflate": "zlib",
+    "bz2": "bz2",
+    "lz4": "lz4",
+    "zstandard": "zstandard",
+}
+
+# Maps compression type to a default compression level which is used if one is not specified by the
+# end user.
+# For more context on those defaults, please refer to micro benchmarks results.
+COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
+    "deflate": 9,
+    "bz2": 9,
+    "lz4": 0,  # the fastest, but not the best compression ratio
+    "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
+}
+
+# Maps compression type to valid compression levels minimum and maximum compression level (inclusive)
+COMPRESSION_TYPE_TO_VALID_LEVELS = {
+    "deflate": [1, 9],
+    "bz2": [1, 9],
+    "lz4": [0, 16],
+    "zstandard": [1, 22],
+}
+
+
+# Value used for testing that the compression works correctly
+COMPRESSION_TEST_STR = b"a" * 100
 
 
 def get_json_implementation(lib_name):
@@ -1770,47 +1816,115 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = b"a" * 100
+def verify_and_get_compress_func(compression_type, compression_level=9):
+    # type: (str, int) -> Optional[Callable]
+    """
+    Given a compression_type (bz2, zlib, lz4, zstandard), verify that compression works and return
+    the compress() function with compression level pre-applied.
 
-
-def get_compress_module(compression_type):
-    if compression_type == "zlib":
-        import zlib
-
-        return zlib
-    elif compression_type == "bz2":
-        import bz2
-
-        return bz2
-    else:
-        raise ValueError("Unsupported compression type")
-
-
-def verify_and_get_compress_func(compression_type):
-    """Given a compression_type (bz2, zlib), verify that compression works and return the compress() function
-
-    @param compression_type: Compression type
+    @param compression_type: Compression type.
     @type compression_type: str
 
-    @returns: The compress() function for the specified compression_type. None, if compression_type is not supported or
-        if underlying libs are not installed properly,
+    @param compression_level: Compression level to use.
+    @ type: compression_level: int
+
+    @returns: The compress() function for the specified compression_type. None, if compression_type
+        is not supported or if underlying libs are not installed properly,
     """
-    compression_type_to_module_name = {
-        "bz2": "bz2",
-        "deflate": "zlib",
-    }
-    if compression_type not in compression_type_to_module_name:
+    if compression_type not in SUPPORTED_COMPRESSION_ALGORITHMS:
         return None
+
     try:
-        compression_module = get_compress_module(
-            compression_type_to_module_name[compression_type]
+        compress_func, decompress_func = get_compress_and_decompress_func(
+            compression_type, compression_level=compression_level
         )
-        cdata = compression_module.compress(COMPRESSION_TEST_STR, 9)
-        if len(cdata) < len(COMPRESSION_TEST_STR):
-            return compression_module.compress
+
+        # Perform a sanity check that data compresses and that it can be decompressed
+        cdata = compress_func(COMPRESSION_TEST_STR)
+
+        if (
+            len(cdata) < len(COMPRESSION_TEST_STR)
+            and decompress_func(cdata) == COMPRESSION_TEST_STR
+        ):
+            return compress_func
     except Exception:
         pass
+
     return None
+
+
+def get_compress_and_decompress_func(compression_algorithm, compression_level=9):
+    # type: (str, int) -> Tuple[Callable, Callable]
+    """
+    Return compression and decompression function for the provided compression algorithm and
+    compression level.
+
+    Returned compression function is already pre-applied / configured with the provided compression
+    level.
+
+    This function atakes into account function argument differences between various Python versions.
+
+    NOTE: For benchmark purposes this function right now also supports algorithms (snappy, brotly)
+    which are not exposed and supported for the end user setups.
+    """
+    if compression_algorithm in ["deflate", "zlib"]:
+        import zlib
+
+        if sys.version_info < (3, 6, 0):
+            # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular
+            # argument
+            @functools.wraps(zlib.compress)
+            def compress_func(data):
+                return zlib.compress(data, compression_level)
+
+        else:
+            compress_func = functools.partial(zlib.compress, level=compression_level)  # type: ignore
+        decompress_func = zlib.decompress  # type: ignore
+    elif compression_algorithm == "bz2":
+        import bz2
+
+        @functools.wraps(bz2.compress)
+        def compress_func(data):
+            return bz2.compress(data, compression_level)
+
+        decompress_func = bz2.decompress  # type: ignore
+    elif compression_algorithm == "zstandard":
+        import zstandard
+
+        compressor = zstandard.ZstdCompressor(level=compression_level)
+        decompressor = zstandard.ZstdDecompressor()
+        compress_func = compressor.compress  # type: ignore
+        decompress_func = decompressor.decompress  # type: ignore
+    elif compression_algorithm == "lz4":
+        import lz4.frame as lz4
+
+        # NOTE: Java implementation which we currently use on the server side doesn't support
+        # dependent block stream.
+        # See https://github.com/Parsely/pykafka/issues/914 for details
+        def compress_func(data):
+            try:
+                # For lz4 >= 0.12.0
+                return lz4.compress(data, compression_level, block_linked=False)
+            except TypeError:
+                # For older versions
+                # For earlier versions of lz4
+                return lz4.compress(data, compression_level, block_mode=1)
+
+        decompress_func = lz4.decompress  # type: ignore
+    elif compression_algorithm == "snappy":
+        import snappy  # pylint: disable=import-error
+
+        compress_func = snappy.compress  # type: ignore
+        decompress_func = snappy.decompress  # type: ignore
+    elif compression_algorithm == "brotli":
+        import brotli
+
+        compress_func = functools.partial(brotli.compress, quality=compression_level)  # type: ignore
+        decompress_func = brotli.decompress  # type: ignore
+    else:
+        raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
+
+    return compress_func, decompress_func
 
 
 class RateLimiterToken(object):
