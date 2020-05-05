@@ -1,4 +1,5 @@
 $python_dir_path=$args[0]
+$ProgressPreference = "SilentlyContinue"
 
 wget https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -OutFile wix311-binaries.zip
 Expand-Archive -LiteralPath wix311-binaries.zip -DestinationPath C:\wix311
