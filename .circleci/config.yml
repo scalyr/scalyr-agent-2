@@ -46,6 +46,7 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
+  win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
 # Global workflow level parameters
 parameters:
@@ -603,6 +604,8 @@ commands:
       - slack/status:
           fail_only: true
           only_for_branches: master
+
+
 
 jobs:
   unittest-38:
@@ -1366,62 +1369,75 @@ jobs:
                 --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
+  windows:
+    executor:
+      name: win/default # executor type
+      size: "medium"
+      shell: powershell.exe
+    steps:
+      # Commands are run in a Windows virtual machine environment
+      - checkout
+      - run:
+          command: |
+             .\win32\build.ps1
+
 workflows:
   version: 2
   unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      - lint-checks
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
-  smoke-tests:
-    jobs:
-      - smoke-standalone-26
-      - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
-  package-tests:
-    jobs:
-      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
-      # product deb and rpm packages which can be used for testing.
-      # On master build, we run package-test-* jobs which also produce packages which
-      # can be used for testing. This means it's redundant to run both jobs at the same
-      # time since as long as one set of those jobs runs, packages will be produced.
-      # The reason why we run package-build-*, but not package-test-* jobs for each PR
-      # is that those jobs are much faster.
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
+      - windows
+#      - lint-checks
+#      - unittest-26
+#      - unittest-27
+#      - unittest-35
+#      - unittest-35-osx
+#  smoke-tests:
+#    jobs:
+#      - smoke-standalone-26
+#      - smoke-standalone-27
+#      - smoke-standalone-35
+#      - smoke-standalone-26-tls12
+#      - smoke-standalone-27-tls12
+#       # NOTE: smoke test jobs below still use old smoke tests framework
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - smoke-monitors-tests
+#  package-tests:
+#    jobs:
+#      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
+#      # product deb and rpm packages which can be used for testing.
+#      # On master build, we run package-test-* jobs which also produce packages which
+#      # can be used for testing. This means it's redundant to run both jobs at the same
+#      # time since as long as one set of those jobs runs, packages will be produced.
+#      # The reason why we run package-build-*, but not package-test-* jobs for each PR
+#      # is that those jobs are much faster.
+#      - package-build-rpm:
+#          <<: *non_master_and_release
+#      - package-build-deb:
+#          <<: *non_master_and_release
+#      - package-test-rpm:
+#          <<: *master_and_release_only
+#      - package-test-deb:
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py2:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py3:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py2:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py3:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-micro-py-27
