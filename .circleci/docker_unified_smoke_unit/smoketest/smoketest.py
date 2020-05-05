@@ -835,8 +835,6 @@ class LogstashActor(DockerSmokeTestActor):
         if not all(
             [
                 # att.get('stream') in stream.name,  # we haven't setup server-side parser so $stream is not available
-                # Since the input streams are locally mounted, the event origins are all the same as the agent hostname
-                att.get("origin") == self._agent_hostname,
                 # the following fields are added on in the logstash pipeline config
                 # and should appear in every event
                 att.get("output_attribute1") == "output_value1",
