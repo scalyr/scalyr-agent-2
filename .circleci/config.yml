@@ -1379,7 +1379,7 @@ jobs:
       - checkout
       - run:
           command: |
-             .\win32\build.ps1
+             .\win32\build.ps1 C:\tools\miniconda3
 
 workflows:
   version: 2
