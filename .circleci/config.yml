@@ -1380,6 +1380,11 @@ jobs:
       - run:
           command: |
              .\win32\build.ps1 C:\tools\miniconda3
+              mkdir package
+              cp .\ScalyrAgentInstaller-*.msi package
+
+      - store_artifacts:
+          path: package
 
 workflows:
   version: 2
