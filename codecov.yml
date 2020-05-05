@@ -25,10 +25,11 @@ fixes:
   - "/home/circleci/scalyr-agent-2/::"
 
 ignore:
-  # Ignore top level tests/ directory with end to end package tests for which we
+  # Ignore tests directories for which we currently don't generate coverage
   # currently don't generate coverage
-  - "/home/circleci/scalyr-agent-2/tests/"
-  - "/home/circleci/scalyr-agent-2/tests/**/*"
+  - "/home/circleci/scalyr-agent-2/tests/ami"
+  - "/home/circleci/scalyr-agent-2/tests/distribution"
+  - "/home/circleci/scalyr-agent-2/tests/distribution_builders"
 
 comment:
   layout: "reach, diff, flags, files"

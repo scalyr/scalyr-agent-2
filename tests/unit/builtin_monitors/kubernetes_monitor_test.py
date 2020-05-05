@@ -19,6 +19,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import re
+import time
 import warnings
 from string import Template
 
@@ -40,13 +41,15 @@ __author__ = "echee@scalyr.com"
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
     ControlledCacheWarmer,
+    _ignore_old_dead_container,
 )
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
-from scalyr_agent.tests.copying_manager_test import FakeMonitor
-from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache
+
+from tests.unit.monitor_utils.k8s_test import FakeCache
+from tests.unit.copying_manager_test import FakeMonitor
 
 import mock
 from mock import patch
@@ -729,3 +732,28 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
             )
             result = api.query_stats()
             self.assertEqual(result, {})
+
+    def test_ignore_old_dead_container(self):
+        now = time.time()
+
+        container = {"State": "stopped", "Created": now}
+        created_before = now - 5
+        result = _ignore_old_dead_container(container, created_before)
+        self.assertFalse(result)
+
+        container = {"State": "stopped", "Created": now - 5}
+        created_before = now
+        result = _ignore_old_dead_container(container, created_before)
+        self.assertTrue(result)
+
+        # Only non-running containers should be filtered
+        container = {"State": "running", "Created": now - 5}
+        created_before = now
+        result = _ignore_old_dead_container(container, created_before)
+        self.assertFalse(result)
+
+        # created_before is None
+        container = {"State": "stopped", "Created": now - 5}
+        created_before = None
+        result = _ignore_old_dead_container(container, created_before)
+        self.assertFalse(result)
