@@ -1377,9 +1377,25 @@ jobs:
     steps:
       # Commands are run in a Windows virtual machine environment
       - checkout
+      - restore_cache:
+          key: windows_python_installer-{{ .Branch }}
+
       - run:
           command: |
-             .\win32\build.ps1 C:\tools\miniconda3
+            mkdir.\python_installer -Force
+            if (!(Test-Path .\python_installer\python-3.8.2-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.2-amd64.exe https://www.python.org/ftp/python/3.8.2/python-3.8.2-amd64.exe;
+            }
+            .\python_installer\python-3.8.2-amd64.exe /install /quiet TargetDir=c:\Python38 Include_tcltk=0
+
+      - save_cache:
+          key: windows_python_installer-{{ .Branch }}
+          paths:
+            - "python_installer"
+
+      - run:
+          command: |
+             .\win32\build.ps1 c:\Python38
               mkdir package
               cp .\ScalyrAgentInstaller-*.msi package
 
