@@ -12,5 +12,6 @@ omit =
     */.virtualenvs/*
     */venv/*
     */third_party*/*
-    /home/circleci/scalyr-agent-2/tests/*
-    /usr/share/scalyr-agent-2/py/tests/*
+    /home/circleci/scalyr-agent-2/tests/ami/*
+    /home/circleci/scalyr-agent-2/tests/distribution/*
+    /home/circleci/scalyr-agent-2/tests/distribution_builders/*

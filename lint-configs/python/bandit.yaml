@@ -4,5 +4,4 @@ exclude_dirs:
   - build
   - dist
   - "*third_party*"
-  - "scalyr_agent/tests/*"
-  - "scalyr_agent/builtin_monitors/tests/*"
+  - "tests/*"
