@@ -1378,16 +1378,16 @@ jobs:
       # Commands are run in a Windows virtual machine environment
       - checkout
       - restore_cache:
-          key: windows_python_installer-{{ .Branch }}
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}
 
       - run:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.8.2-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.8.2-amd64.exe https://www.python.org/ftp/python/3.8.2/python-3.8.2-amd64.exe;
+            if (!(Test-Path .\python_installer\python-3.7.7-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.7.7-amd64.exe https://www.python.org/ftp/python/3.7.7/python-3.7.7-amd64.exe
             }
-            .\python_installer\python-3.8.2-amd64.exe /install /quiet TargetDir=c:\Python38 Include_tcltk=0
+            .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
 
       - save_cache:
           key: windows_python_installer-{{ .Branch }}
@@ -1396,7 +1396,7 @@ jobs:
 
       - run:
           command: |
-             .\win32\build.ps1 c:\Python38
+             .\win32\build.ps1 c:\Python37
               mkdir package
               cp .\ScalyrAgentInstaller-*.msi package
 
