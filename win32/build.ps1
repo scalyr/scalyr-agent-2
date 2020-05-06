@@ -6,5 +6,5 @@ Expand-Archive -LiteralPath wix311-binaries.zip -DestinationPath C:\wix311
 $Env:Path += ";C:\wix311"
 $Env:WIX = "C:\wix311"
 
-& "${python_dir_path}\python.exe" -m pip install psutil pyinstaller
+& "${python_dir_path}\python.exe" -m pip install psutil pyinstaller pywin32
 & "${python_dir_path}\python.exe" build_package.py win32
