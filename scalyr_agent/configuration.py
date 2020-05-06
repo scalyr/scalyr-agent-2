@@ -1314,7 +1314,10 @@ class Configuration(object):
             env_aware=True,
         )
 
-        if zstandard is not None:
+        if (
+            zstandard is not None
+            and "zstandard" in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS
+        ):
             default_compression_type = "zstandard"
         else:
             default_compression_type = "deflate"
