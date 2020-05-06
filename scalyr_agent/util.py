@@ -1831,7 +1831,18 @@ def verify_and_get_compress_func(compression_type, compression_level=9):
     @returns: The compress() function for the specified compression_type. None, if compression_type
         is not supported or if underlying libs are not installed properly,
     """
+    from scalyr_agent import scalyr_logging
+
+    logger = scalyr_logging.getLogger(__name__)
+
     if compression_type not in SUPPORTED_COMPRESSION_ALGORITHMS:
+        logger.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            (
+                "Compression algorithm %s is not defined as part of the supported compression algorithms"
+                % (compression_type)
+            ),
+        )
         return None
 
     try:
@@ -1847,8 +1858,24 @@ def verify_and_get_compress_func(compression_type, compression_level=9):
             and decompress_func(cdata) == COMPRESSION_TEST_STR
         ):
             return compress_func
-    except Exception:
-        pass
+        else:
+            logger.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                (
+                    "Failed to perform compression algorithm sanity check. len_cdata=%s len_test_str=%s decompressed_data=%r test_str=%r"
+                    % (
+                        len(cdata),
+                        len(COMPRESSION_TEST_STR),
+                        decompress_func(cdata),
+                        COMPRESSION_TEST_STR,
+                    )
+                ),
+            )
+    except Exception as e:
+        logger.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            ("Failed to perform compression algorithm sanity check: %s" % (str(e))),
+        )
 
     return None
 
