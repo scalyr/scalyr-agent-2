@@ -81,6 +81,7 @@ import argparse
 from io import open
 
 from jinja2 import Template
+import requests
 
 from libcloud.compute.types import Provider
 from libcloud.compute.base import NodeDriver
@@ -377,6 +378,22 @@ def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=
     return True
 
 
+def verify_url_exists(url, use_head=False):
+    # (str, bool) -> bool
+    """
+    Verify that the provided URL exists (aka doesn't return 404).
+    """
+    try:
+        if use_head:
+            resp = requests.head(url)
+        else:
+            resp = requests.get(url)
+    except requests.exceptions.ConnectionError:
+        return False
+
+    return resp.status_code in [200, 302]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=("Run basic agent installer sanity tests on EC2 instance")
@@ -448,6 +465,29 @@ if __name__ == "__main__":
     if args.type == "upgrade" and (not args.from_version or not args.to_version):
         raise ValueError(
             "--from-version and to --to-version needs to be provided for upgrade test"
+        )
+
+    # Verify installer script exists and fail early if it doesn't to save us some time on typos etc
+    resp = requests.get(args.installer_script_url)
+    if resp.status_code != 200:
+        raise ValueError(
+            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+            % (args.installer_script_url)
+        )
+
+    # Same thing for package URL (if provided) - fail early if it doesn't exist
+    from_version_is_url = args.from_version and (
+        "http://" in args.from_version or "https://" in args.from_version
+    )
+
+    to_version_is_url = args.to_version and (
+        "http://" in args.to_version or "https://" in args.to_version
+    )
+
+    if from_version_is_url and not verify_url_exists(args.from_version, True):
+        raise ValueError(
+            'Failed to retrieve package from "%s". Ensure that the URL is correct.'
+            % (args.from_version)
         )
 
     main(
