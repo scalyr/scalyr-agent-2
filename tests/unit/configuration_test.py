@@ -1888,6 +1888,38 @@ class TestConfiguration(TestConfigurationBase):
             msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
             self.assertEqual(config.compression_level, valid_level_max, msg)
 
+    @mock.patch("scalyr_agent.configuration.zstandard", mock.Mock())
+    def test_zstandard_is_used_by_default_if_python_library_is_available(self):
+        # zstandard Python library is available, should use that
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        self.assertEqual(config.compression_type, "zstandard")
+
+    @mock.patch("scalyr_agent.configuration.zstandard", None)
+    def test_deflate_used_as_fallback_if_zstandard_not_available(self):
+        # zstandard Python library is available, should use that
+        # library not available, should fall back to deflate
+        # Value is lower than the min value
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        self.assertEqual(config.compression_type, "deflate")
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):
