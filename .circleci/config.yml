@@ -1382,7 +1382,8 @@ jobs:
 
       - run:
           command: |
-            mkdir.\python_installer -Force
+            $ProgressPreference = "SilentlyContinue"
+            mkdir python_installer -Force
             if (!(Test-Path .\python_installer\python-3.8.2-amd64.exe -PathType Leaf)) {
                 wget -O .\python_installer\python-3.8.2-amd64.exe https://www.python.org/ftp/python/3.8.2/python-3.8.2-amd64.exe;
             }
