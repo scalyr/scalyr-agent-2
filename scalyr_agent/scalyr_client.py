@@ -565,12 +565,26 @@ class ScalyrClientSession(object):
                         error_code="error/client/badParam",
                     )
                 else:
-                    log.error(
-                        "Request to '%s' failed due to an error.  Returned error code was '%s'",
-                        self.__full_address,
-                        status,
-                        error_code="error/client/badParam",
-                    )
+                    # Special case which shouldn't really never be hit in real life unless user
+                    # manually changes to unsupported algorithm
+                    if status == "error/client/badRequest":
+                        log.error(
+                            (
+                                "Request to '%s' failed due to an error.  Returned error code was '%s'. "
+                                "This error likely indicates client is trying to use a compression "
+                                "algorithm which is not supported by the server."
+                            ),
+                            self.__full_address,
+                            status,
+                            error_code="error/client/badParam",
+                        )
+                    else:
+                        log.error(
+                            "Request to '%s' failed due to an error.  Returned error code was '%s'",
+                            self.__full_address,
+                            status,
+                            error_code="error/client/badParam",
+                        )
                 return status, len(body_str), response
             else:
                 log.error(
