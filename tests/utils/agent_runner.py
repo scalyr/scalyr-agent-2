@@ -257,10 +257,11 @@ class AgentRunner(object):
             )
 
         else:
-            result = subprocess.check_output(
-                "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
-                shell=True,
-            )
+            # NOTE: Python 2.6 doesn't have check_output
+            cmd = "python {0} status -v --format=json".format(_AGENT_MAIN_PATH)
+            result = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, shell=True
+            ).communicate()[0]
 
         result = six.ensure_text(result)
         return result
