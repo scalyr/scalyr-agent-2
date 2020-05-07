@@ -36,7 +36,11 @@ except ImportError:
     from scalyr_agent.__scalyr__ import DEV_INSTALL
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-BUILD_INFO_PATH = os.path.abspath(os.path.join(BASE_DIR, "../build_info"))
+
+# Directory structure for packages looks like this:
+# /usr/share/scalyr-agent-2/py/scalyr_agent/build_info.py
+# /usr/share/scalyr-agent-2/build_info
+BUILD_INFO_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../build_info"))
 
 GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
 
