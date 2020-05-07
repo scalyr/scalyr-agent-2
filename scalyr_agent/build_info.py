@@ -38,6 +38,8 @@ except ImportError:
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 BUILD_INFO_PATH = os.path.abspath(os.path.join(BASE_DIR, "../build_info"))
 
+GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
+
 
 def get_build_info():
     # type: () -> Dict[str, str]
@@ -69,7 +71,7 @@ def get_build_revision_from_git():
 
     NOTE: This function is only used on dev (non-package) installs.
     """
-    cmd = "git rev-parse HEAD"
+    cmd = GIT_GET_HEAD_REVISION_CMD
 
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)

@@ -913,7 +913,7 @@ class ScalyrAgent(object):
 
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
-                    "Starting scalyr agent... (version=%s revision=%s) %s (Python version: %s)"
+                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
