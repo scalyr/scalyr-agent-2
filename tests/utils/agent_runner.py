@@ -257,7 +257,7 @@ class AgentRunner(object):
             )
 
         else:
-            result = subprocess.check_call(
+            result = subprocess.check_output(
                 "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
                 shell=True,
             )
