@@ -56,9 +56,16 @@ def get_build_info():
 
     for line in content.strip().split("\n"):
         line = line.strip()
-        key, value = line.split(":", 1)
+
+        split = line.split(":", 1)
+
+        if len(split) != 2:
+            continue
+
+        key, value = split
         key = key.strip().lower().replace(" ", "_")
         value = value.strip()
+
         result[key] = value
 
     return result
