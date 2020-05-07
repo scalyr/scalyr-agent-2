@@ -1,0 +1,72 @@
+$ProgressPreference = "SilentlyContinue"
+
+function GetMSIVersion {
+    param (
+    [IO.FileInfo] $MSI
+)
+
+if (!(Test-Path $MSI.FullName)) {
+    throw "File '{0}' does not exist" -f $MSI.FullName
+}
+
+try {
+    $windowsInstaller = New-Object -com WindowsInstaller.Installer
+    $database = $windowsInstaller.GetType().InvokeMember(
+        "OpenDatabase", "InvokeMethod", $Null,
+        $windowsInstaller, @($MSI.FullName, 0)
+    )
+
+    $q = "SELECT Value FROM Property WHERE Property = 'ProductVersion'"
+    $View = $database.GetType().InvokeMember(
+        "OpenView", "InvokeMethod", $Null, $database, ($q)
+    )
+
+    $View.GetType().InvokeMember("Execute", "InvokeMethod", $Null, $View, $Null)
+    $record = $View.GetType().InvokeMember( "Fetch", "InvokeMethod", $Null, $View, $Null )
+    $version = $record.GetType().InvokeMember( "StringData", "GetProperty", $Null, $record, 1 )
+
+    return $version
+} catch {
+    throw "Failed to get MSI file version: {0}." -f $_
+}
+}
+
+
+Invoke-WebRequest "{{ package_to_version }}" -OutFile .\package.msi
+$scripts_path=split-path -parent $MyInvocation.MyCommand.Definition
+$msi_version=GetMSIVersion -MSI .\package.msi
+echo $msi_version
+
+
+# rename installer file to more convenient name without version
+#mv ScalyrAgentInstaller-*.msi ScalyrAgentInstaller.msi -Force;
+
+# install scalyr agent and wait untill it is done.
+Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i package.msi /quiet /qn" -wait
+
+# replace api_key and serverHost
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+# After string replacement we need to reencode config file without BOM.
+$ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
+[System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
+
+$Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
+
+scalyr-agent-2 start;
+
+Start-Sleep 5
+
+$status_output=scalyr-agent-2 status -v;
+
+if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
+
+Write-Output $status_output
+
+if ("$status_output" -notmatch "$msi_version")   { Throw "Can not find version." };
+if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
+if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
+if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };

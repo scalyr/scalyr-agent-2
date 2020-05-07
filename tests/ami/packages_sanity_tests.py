@@ -91,6 +91,25 @@ from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
 
+import libcloud.compute.ssh
+import libcloud.compute.base
+
+
+class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
+    def put(self, path, contents=None, chmod=None, mode="w"):
+        result = super(ParamikoSSHClient, self).put(
+            path, contents=contents, chmod=chmod, mode=mode
+        )
+        import re
+
+        if re.match(r"^\/\w\:.*$", result):
+            return result[1:]
+
+
+libcloud.compute.base.SSHClient = ParamikoSSHClient
+# libcloud.compute.ssh.ParamikoSSHClient = ParamikoSSHClient
+# libcloud.compute.ssh.SSHClient = ParamikoSSHClient
+
 from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
@@ -141,6 +160,20 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
+    "WindowsServer2019": {
+        "image_id": "ami-0f1d67545d05b32fd",
+        "image_name": "WindowsServer2019-SSH",
+        "size_id": "t2.micro",
+        "ssh_username": "Administrator",
+        "default_python_package_name": "python2",
+    },
+    "WindowsServer2012": {
+        "image_id": "ami-01003543c21033772",
+        "image_name": "WindowsServer2012R2SSH",
+        "size_id": "t2.micro",
+        "ssh_username": "Administrator",
+        "default_python_package_name": "python2",
+    },
 }
 
 DEFAULT_INSTALLER_SCRIPT_URL = (
@@ -156,7 +189,7 @@ PRIVATE_KEY_PATH = get_env_throw_if_not_set("PRIVATE_KEY_PATH")
 PRIVATE_KEY_PATH = os.path.expanduser(PRIVATE_KEY_PATH)
 
 SECURITY_GROUPS_STR = get_env_throw_if_not_set(
-    "SECURITY_GROUPS", "allow-ssh"
+    "SECURITY_GROUPS", "allow-ssh-rdp"
 )  # sg-02efe05c115d41622
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
@@ -177,13 +210,17 @@ def main(
     distro_details = EC2_DISTRO_DETAILS_MAP[distro]
 
     if test_type == "install":
-        script_filename = "fresh_install_%s.sh.j2"
+        script_filename = "fresh_install_%s.%s.j2"
     else:
-        script_filename = "upgrade_install_%s.sh.j2"
+        script_filename = "upgrade_install_%s.%s.j2"
 
-    script_filename = script_filename % (
-        "deb" if distro.startswith("ubuntu") else "rpm"
-    )
+    if distro.lower().startswith("windows"):
+        script_filename = script_filename % ("windows", "ps1")
+    else:
+        script_filename = script_filename % (
+            "deb" if distro.startswith("ubuntu") else "rpm",
+            "sh",
+        )
     script_file_path = os.path.join(SCRIPTS_DIR, script_filename)
 
     with open(script_file_path, "r") as fp:
@@ -213,7 +250,7 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
-    step = ScriptDeployment(rendered_template, timeout=120)
+    step = ScriptDeployment(rendered_template, name="deploy.ps1", timeout=120)
 
     print("Starting node provisioning and tests...")
 
@@ -228,6 +265,7 @@ def main(
             ex_keyname=KEY_NAME,
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
+            ssh_key_password="3?FjmnjsCV)",  # 9wd$UdVgcPdVWKCkyth*lBRy-$GDhCME # 3?FjmnjsCV)
             ssh_timeout=10,
             timeout=140,
             deploy=step,
