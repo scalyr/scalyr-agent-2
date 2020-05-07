@@ -1436,6 +1436,7 @@ class ScalyrAgent(object):
         result = AgentStatus()
         result.launch_time = self.__start_time
         result.user = self.__controller.get_current_user()
+        result.revision = get_build_revision()
         result.version = SCALYR_VERSION
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server

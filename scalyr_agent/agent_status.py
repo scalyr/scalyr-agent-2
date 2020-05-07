@@ -91,6 +91,8 @@ class AgentStatus(BaseAgentStatus):
         self.user = None
         # The version string for the agent.
         self.version = None
+        # Git revision agent package is based on
+        self.revision = None
         # The name of the host the agent is running on.
         self.server_host = None
         # The URL of the scalyr server that the agent is connected to (such as https://www.scalyr.com/).
