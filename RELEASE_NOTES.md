@@ -32,6 +32,9 @@
   /etc/init.d/scalyr-agent-2 restart
   ```
 
+  Keep in mind that just changing the config value is not enough if the library was not previously
+  installed and you need to restart the agent for changes to take an affect.
+
 ## 2.1.3 "Orion" - May 1, 2020
 
 * You may now restrict which namespaces for which logs and events are collected

@@ -69,6 +69,16 @@ except ImportError:
 
     new_md5 = False
 
+try:
+    import zstandard
+except ImportError:
+    zstandard = None
+
+try:
+    import lz4.frame as lz4
+except ImportError:
+    lz4 = None
+
 # Those imports have been moved in #494 so this alias is left here is place just in case for
 # backward compatibility reasons
 from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  # NOQA
@@ -112,8 +122,11 @@ SUPPORTED_COMPRESSION_ALGORITHMS = [
 
 # lz4 and zstandard library is not available for Python 2.6
 if sys.version_info >= (2, 7, 0):
-    SUPPORTED_COMPRESSION_ALGORITHMS.append("lz4")
-    SUPPORTED_COMPRESSION_ALGORITHMS.append("zstandard")
+    if lz4 is not None:
+        SUPPORTED_COMPRESSION_ALGORITHMS.append("lz4")
+
+    if zstandard is not None:
+        SUPPORTED_COMPRESSION_ALGORITHMS.append("zstandard")
 
 # Maps compression type (deflate, bz2, lz4, zstandard) to the corresponding Python package name
 COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
@@ -144,6 +157,13 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
 
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
+
+# We use zstandard by default on Python >= 2.7 and if the corresponding zstandard library is
+# available, otherwise we fall back to deflate (previous default).
+if "zstandard" in SUPPORTED_COMPRESSION_ALGORITHMS:
+    DEFAULT_COMPRESSION_ALGORITHM = "zstandard"
+else:
+    DEFAULT_COMPRESSION_ALGORITHM = "deflate"
 
 
 def get_json_implementation(lib_name):

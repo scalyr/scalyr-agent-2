@@ -47,6 +47,7 @@ from scalyr_agent.json_lib.objects import (
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
+from scalyr_agent.util import DEFAULT_COMPRESSION_ALGORITHM
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -1314,18 +1315,10 @@ class Configuration(object):
             env_aware=True,
         )
 
-        if (
-            zstandard is not None
-            and "zstandard" in scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS
-        ):
-            default_compression_type = "zstandard"
-        else:
-            default_compression_type = "deflate"
-
         self.__verify_or_set_optional_string(
             config,
             "compression_type",
-            default_compression_type,
+            DEFAULT_COMPRESSION_ALGORITHM,
             description,
             apply_defaults,
             env_aware=True,

@@ -22,6 +22,7 @@ __author__ = "czerwin@scalyr.com"
 import os
 import sys
 import tempfile
+import importlib
 from io import open
 
 import mock
@@ -53,6 +54,9 @@ import six
 from six.moves import range
 from mock import patch, Mock, call
 
+if six.PY3:
+    reload = importlib.reload
+
 
 class TestConfigurationBase(ScalyrTestCase):
     def setUp(self):
@@ -72,6 +76,9 @@ class TestConfigurationBase(ScalyrTestCase):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+        if "zstandard" in sys.modules:
+            del sys.modules["zstandard"]
 
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
@@ -1903,11 +1910,41 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEqual(config.compression_type, "zstandard")
 
-    @mock.patch("scalyr_agent.configuration.zstandard", None)
+    @mock.patch("scalyr_agent.util.zstandard", None)
+    @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
     def test_deflate_used_as_fallback_if_zstandard_not_available(self):
-        # zstandard Python library is available, should use that
-        # library not available, should fall back to deflate
-        # Value is lower than the min value
+        sys.modules["zstandard"] = None
+
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.DEFAULT_COMPRESSION_ALGORITHM, "deflate")
+
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        self.assertEqual(config.compression_type, "deflate")
+
+    @mock.patch.object(sys, "version_info", (2, 6, 7))
+    @mock.patch("scalyr_agent.util.zstandard", mock.Mock())
+    @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
+    def test_deflate_used_as_fallback_if_zstandard_not_available_old_python_version(
+        self,
+    ):
+        import scalyr_agent.util
+
+        reload(scalyr_agent.util)
+
+        self.assertEqual(scalyr_agent.util.DEFAULT_COMPRESSION_ALGORITHM, "deflate")
+
         self._write_file_with_separator_conversion(
             """{
                 api_key: "hi there",
