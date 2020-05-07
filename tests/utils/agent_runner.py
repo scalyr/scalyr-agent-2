@@ -238,33 +238,23 @@ class AgentRunner(object):
 
     def status(self):
         if self._installation_type == PACKAGE_INSTALL:
-            process = subprocess.check_output(
-                "/usr/sbin/scalyr-agent-2 status -v", shell=True
-            )
-
-            return process
-
+            cmd = "/usr/sbin/scalyr-agent-2 status -v"
         else:
-            output = subprocess.check_output(
-                "python {0} status -v".format(_AGENT_MAIN_PATH), shell=True
-            )
-            return output
+            cmd = "python {0} status -v".format(_AGENT_MAIN_PATH)
+
+        output = compat.subprocess_check_output(cmd=cmd, shell=True)
+        output = six.ensure_text(output)
+        return output
 
     def status_json(self):
         if self._installation_type == PACKAGE_INSTALL:
-            result = subprocess.check_output(
-                "/usr/sbin/scalyr-agent-2 status -v --format=json", shell=True
-            )
-
+            cmd = "/usr/sbin/scalyr-agent-2 status -v --format=json"
         else:
-            # NOTE: Python 2.6 doesn't have check_output
             cmd = "python {0} status -v --format=json".format(_AGENT_MAIN_PATH)
-            result = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, shell=True
-            ).communicate()[0]
 
-        result = six.ensure_text(result)
-        return result
+        output = compat.subprocess_check_output(cmd=cmd, shell=True)
+        output = six.ensure_text(output)
+        return output
 
     def switch_version(self, version, env=None):
         # type: (six.text_type, Optional[dict]) -> None
