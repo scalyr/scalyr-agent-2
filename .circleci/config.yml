@@ -337,6 +337,10 @@ commands:
         description: "tox package version to use."
         type: string
         default: "3.14.3"
+      pre_checkout_apt_dependencies:
+        description: "Any optional apt dependencies which are installed before checkout step."
+        type: string
+        default: ""
       apt_dependencies:
         description: "Any optional apt dependencies which should be installed."
         type: string
@@ -345,6 +349,14 @@ commands:
         description: "Tox target to run."
         type: string
     steps:
+      - when:
+          condition: << parameters.pre_checkout_apt_dependencies >>
+          steps:
+            - run:
+                name: Install APT Dependencies (pre checkout)
+                command: |
+                  apt-get update -y
+                  apt-get install -y << parameters.pre_checkout_apt_dependencies >>
       - checkout
       - restore_cache:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
@@ -1254,6 +1266,8 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-smoke-tests"
+          # NOTE: This is needed otherwise it falls back to Circle CI git client
+          pre_checkout_apt_dependencies: "git openssh-client"
           apt_dependencies: "procps build-essential"
 
   package-test-rpm:
