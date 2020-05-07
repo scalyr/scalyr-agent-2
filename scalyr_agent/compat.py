@@ -205,7 +205,7 @@ def subprocess_check_output(cmd, *args, **kwargs):
     if sys.version_info < (2, 7, 0):
         output = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, *args, **kwargs
-        )
+        ).communicate()[0]
     else:
         output = subprocess.check_output(cmd, *args, **kwargs)
 
