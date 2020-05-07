@@ -165,6 +165,8 @@ class AgentLogVerifier(AgentVerifier):
         actual_package_version = status["version"]
         actual_package_revision = status["revision"]
 
+        # NOTE: Ideally we would also pass in expected version and revision to make this more robust
+        # and correct
         if expected_package_version != actual_package_version:
             print(
                 "Expected package version %s, got %s"
