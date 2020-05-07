@@ -1266,6 +1266,7 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-smoke-tests"
+          # NOTE: This is needed otherwise it falls back to Circle CI git client
           pre_checkout_apt_dependencies: "git openssh-client"
           apt_dependencies: "procps build-essential"
 
