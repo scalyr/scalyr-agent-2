@@ -129,6 +129,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.server_host = "test_machine"
         self.status.user = "root"
         self.status.version = "2.0.0.beta.7"
+        self.status.revision = "git revision"
         self.status.python_version = "3.6.8"
 
         config_status = ConfigStatus()
@@ -261,6 +262,7 @@ class TestReportStatus(ScalyrTestCase):
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+VCS revision:     git revision
 Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
@@ -333,6 +335,7 @@ Failed monitors:
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+VCS revision:     git revision
 Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
@@ -401,6 +404,7 @@ Failed monitors:
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+VCS revision:     git revision
 Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
@@ -465,6 +469,7 @@ Failed monitors:
         # Simple value on the OverallStats object
         self.assertEqual(result["user"], "root")
         self.assertEqual(result["version"], "2.0.0.beta.7")
+        self.assertEqual(result["revision"], "git revision")
 
         # Verify nested status objects are recursively serialized to simple native types
         config_status = result["config_status"]
