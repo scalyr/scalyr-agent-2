@@ -1415,7 +1415,7 @@ jobs:
     steps:
       - add_ssh_keys:
             fingerprints:
-              - "7b:26:91:6b:a0:9d:31:50"
+              - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
       - checkout
       - attach_workspace:
           at: /tmp/workspace
@@ -1424,7 +1424,7 @@ jobs:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export KEY_NAME=${AWS_EC2_KEY_NAME}
             export SECRET_KEY=${AWS_SECRET_KEY}
-            export PRIVATE_KEY_PATH=".ssh"
+            export PRIVATE_KEY_PATH="~/.ssh"
             python -m pip install --user -r tests/ami/requirements.txt
             export PYTHONPATH="."
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi
