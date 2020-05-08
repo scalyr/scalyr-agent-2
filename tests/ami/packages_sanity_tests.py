@@ -91,7 +91,6 @@ from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
 from libcloud.compute.deployment import ScriptDeployment
 
-import libcloud.compute.ssh
 import libcloud.compute.base
 
 
@@ -107,8 +106,7 @@ class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
 
 
 libcloud.compute.base.SSHClient = ParamikoSSHClient
-# libcloud.compute.ssh.ParamikoSSHClient = ParamikoSSHClient
-# libcloud.compute.ssh.SSHClient = ParamikoSSHClient
+
 
 from tests.ami.utils import get_env_throw_if_not_set
 
@@ -168,8 +166,8 @@ EC2_DISTRO_DETAILS_MAP = {
         "default_python_package_name": "python2",
     },
     "WindowsServer2012": {
-        "image_id": "ami-01003543c21033772",
-        "image_name": "WindowsServer2012R2SSH",
+        "image_id": "ami-07c7cd02cc0f34cf3",
+        "image_name": "WindowsServer2012R2-SSH",
         "size_id": "t2.micro",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
@@ -189,7 +187,7 @@ PRIVATE_KEY_PATH = get_env_throw_if_not_set("PRIVATE_KEY_PATH")
 PRIVATE_KEY_PATH = os.path.expanduser(PRIVATE_KEY_PATH)
 
 SECURITY_GROUPS_STR = get_env_throw_if_not_set(
-    "SECURITY_GROUPS", "allow-ssh-rdp"
+    "SECURITY_GROUPS", "allow-ssh"
 )  # sg-02efe05c115d41622
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
@@ -265,7 +263,6 @@ def main(
             ex_keyname=KEY_NAME,
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
-            ssh_key_password="3?FjmnjsCV)",  # 9wd$UdVgcPdVWKCkyth*lBRy-$GDhCME # 3?FjmnjsCV)
             ssh_timeout=10,
             timeout=140,
             deploy=step,
