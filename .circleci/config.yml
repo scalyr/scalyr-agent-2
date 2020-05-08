@@ -1414,8 +1414,8 @@ jobs:
             $url = "https://circleci.com/api/v1.1/project/github/scalyr/scalyr-agent-2/latest/artifacts?branch=windows-package-to-pyinstaller"
             $resp = Invoke-RestMethod($url) -Headers @{"accept"="application/json"; "Circle-Token"="$CIRCLE_CI_API_TOKEN"}
             $package_url=$resp[0].url
-            C:\Tools\miniconda\python.exe -m pip install -r tests\ami\requirements.txt
-            C:\Tools\miniconda\python.exe tests\ami\package_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=$package_url
+            C:\tools\miniconda3\python.exe -m pip install -r .\tests\ami\requirements.txt
+            C:\tools\miniconda3\python.exe .\tests\ami\package_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=$package_url
 
 workflows:
   version: 2
