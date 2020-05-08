@@ -1422,9 +1422,9 @@ jobs:
       - run:
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
-            export KEY_NAME=${AWS_EC2_KEY_NAME}
             export SECRET_KEY=${AWS_SECRET_KEY}
-            export PRIVATE_KEY_PATH="~/.ssh"
+            export KEY_NAME=id_rsa_7b26916ba09d31504c8d31a3a6b8f27a
+            export PRIVATE_KEY_PATH="~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
             python -m pip install --user -r tests/ami/requirements.txt
             export PYTHONPATH="."
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi
