@@ -32,9 +32,9 @@ try {
 }
 
 
-Invoke-WebRequest "{{ package_to_version }}" -OutFile .\package.msi
-$scripts_path=split-path -parent $MyInvocation.MyCommand.Definition
-$msi_version=GetMSIVersion -MSI .\package.msi
+#Invoke-WebRequest "{{ package_to_version }}" -OutFile .\package.msi
+#$scripts_path=split-path -parent $MyInvocation.MyCommand.Definition
+$msi_version=GetMSIVersion -MSI .\ScalyrAgentInstaller.msi
 echo $msi_version
 
 
@@ -42,7 +42,7 @@ echo $msi_version
 #mv ScalyrAgentInstaller-*.msi ScalyrAgentInstaller.msi -Force;
 
 # install scalyr agent and wait untill it is done.
-Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i package.msi /quiet /qn" -wait
+Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i ScalyrAgentInstaller.msi /quiet /qn" -wait
 
 # replace api_key and serverHost
 (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `

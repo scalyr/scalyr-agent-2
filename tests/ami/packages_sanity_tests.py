@@ -89,7 +89,11 @@ from libcloud.compute.base import NodeSize
 from libcloud.compute.base import StorageVolume
 from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
-from libcloud.compute.deployment import ScriptDeployment
+from libcloud.compute.deployment import (
+    ScriptDeployment,
+    FileDeployment,
+    MultiStepDeployment,
+)
 
 import libcloud.compute.base
 
@@ -103,6 +107,8 @@ class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
 
         if re.match(r"^\/\w\:.*$", result):
             return result[1:]
+
+        return result
 
 
 libcloud.compute.base.SSHClient = ParamikoSSHClient
@@ -248,7 +254,15 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
-    step = ScriptDeployment(rendered_template, name="deploy.ps1", timeout=120)
+    test_package_step = ScriptDeployment(
+        rendered_template, name="deploy.ps1", timeout=120
+    )
+
+    if os.path.exists(to_version) and os.path.isfile(to_version):
+        put_file_step = FileDeployment(to_version, "./ScalyrAgentInstaller.msi")
+        deployment = MultiStepDeployment(add=[put_file_step, test_package_step])
+    else:
+        deployment = test_package_step  # type: ignore
 
     print("Starting node provisioning and tests...")
 
@@ -264,21 +278,21 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=10,
-            timeout=140,
-            deploy=step,
+            timeout=180,
+            deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
     except DeploymentError as e:
         print("Deployment failed: %s" % (str(e)))
         node = e.node
         success = False
-        step.exit_status = 1
+        test_package_step.exit_status = 1
         stdout = getattr(e.original_error, "stdout", None)
         stderr = getattr(e.original_error, "stderr", None)
     else:
-        success = step.exit_status == 0
-        stdout = step.stdout
-        stderr = step.stderr
+        success = test_package_step.exit_status == 0
+        stdout = test_package_step.stdout
+        stderr = test_package_step.stderr
 
     duration = int(time.time()) - start_time
 
@@ -289,7 +303,7 @@ def main(
 
     print(("stdout: %s" % (stdout)))
     print(("stderr: %s" % (stderr)))
-    print(("exit_code: %s" % (step.exit_status)))
+    print(("exit_code: %s" % (test_package_step.exit_status)))
     print(("succeeded: %s" % (str(success))))
     print(("duration: %s seconds" % (duration)))
 
