@@ -1409,9 +1409,10 @@ jobs:
       size: "medium"
       shell: powershell.exe
     steps:
+      - checkout
       - run:
           command: |
-            $url = "https://circleci.com/api/v1.1/project/github/scalyr/scalyr-agent-2/latest/artifacts?branch=windows-package-to-pyinstaller"
+            $url = "https://circleci.com/api/v1.1/project/github/scalyr/scalyr-agent-2/latest/artifacts?branch=$CIRCLE_BRANCH"
             $resp = Invoke-RestMethod($url) -Headers @{"accept"="application/json"; "Circle-Token"="$CIRCLE_CI_API_TOKEN"}
             $package_url=$resp[0].url
             C:\tools\miniconda3\python.exe -m pip install -r .\tests\ami\requirements.txt
@@ -1423,10 +1424,10 @@ workflows:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      - build-windows-package
-      - windows2012-ami-test:
-          requires:
-            - build-windows-package
+      #- build-windows-package
+      - windows2012-ami-test
+          #requires:
+            #- build-windows-package
 #      - lint-checks
 #      - unittest-26
 #      - unittest-27
