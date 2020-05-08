@@ -1413,10 +1413,18 @@ jobs:
     docker:
       - image: circleci/python:3.6-jessie
     steps:
+      - add_ssh_keys:
+            fingerprints:
+              - "7b:26:91:6b:a0:9d:31:50"
       - checkout
       - attach_workspace:
           at: /tmp/workspace
       - run:
+          environment:
+            ACCESS_KEY: ${AWS_ACCESS_KEY}
+            KEY_NAME: ${AWS_EC2_KEY_NAME}
+            SECRET_KEY: ${AWS_SECRET_KEY}
+            PRIVATE_KEY_PATH: ".ssh"
           command: |
             python -m pip install --user -r tests/ami/requirements.txt
             export PYTHONPATH="."
