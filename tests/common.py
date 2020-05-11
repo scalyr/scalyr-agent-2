@@ -37,7 +37,7 @@ class PackageInstallationError(Exception):
 
 def _install_rpm(file_path, upgrade=False):
     cmd = "rpm -{0} {1}".format("U" if upgrade else "i", file_path)
-    exit_code, stdout, stderr = _run_command(cmd, shell=True)
+    exit_code, stdout, stderr = run_command(cmd, shell=True)
 
     if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
@@ -59,7 +59,7 @@ def _install_deb(file_path):
     else:
         cmd = "apt install -y -f {0}".format(file_path)
 
-    exit_code, stdout, stderr = _run_command(cmd, shell=True, env=env)
+    exit_code, stdout, stderr = run_command(cmd, shell=True, env=env)
 
     if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
@@ -77,7 +77,7 @@ def _is_ubuntu_14_04():
     return distro[0].lower() == "ubuntu" and distro[1] == "14.04"
 
 
-def _run_command(cmd, shell=True, env=None):
+def run_command(cmd, shell=True, env=None):
     # type: (Union[str,list], bool, Optional[dict]) -> Tuple[int, str, str]
     env = env or {}
 
@@ -136,7 +136,7 @@ def remove_deb():
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     }
     cmd = "apt remove -y scalyr-agent-2"
-    exit_code, stdout, stderr = _run_command(cmd, shell=True, env=env)
+    exit_code, stdout, stderr = run_command(cmd, shell=True, env=env)
 
     if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
@@ -146,7 +146,7 @@ def remove_deb():
 
 def remove_rpm():
     cmd = "rpm -e scalyr-agent-2"
-    exit_code, stdout, stderr = _run_command(cmd, shell=True)
+    exit_code, stdout, stderr = run_command(cmd, shell=True)
 
     if exit_code != 0:
         raise PackageInstallationError(stderr=stderr, stdout=stdout)
