@@ -91,6 +91,8 @@ class AgentStatus(BaseAgentStatus):
         self.user = None
         # The version string for the agent.
         self.version = None
+        # Git revision agent package is based on
+        self.revision = None
         # The name of the host the agent is running on.
         self.server_host = None
         # The URL of the scalyr server that the agent is connected to (such as https://www.scalyr.com/).
@@ -357,6 +359,7 @@ def report_status(output, status, current_time):
         file=output,
     )
     print("Version:          %s" % status.version, file=output)
+    print("VCS revision:     %s" % status.revision, file=output)
     print("Python version:   %s" % status.python_version, file=output)
     print("Agent running as: %s" % status.user, file=output)
     print("Agent log:        %s" % status.log_path, file=output)

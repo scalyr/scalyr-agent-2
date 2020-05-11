@@ -97,6 +97,7 @@ from scalyr_agent.platform_controller import (
     CannotExecuteAsUser,
 )
 from scalyr_agent.platform_controller import AgentNotRunning
+from scalyr_agent.build_info import get_build_revision
 
 
 STATUS_FILE = "last_status"
@@ -907,18 +908,22 @@ class ScalyrAgent(object):
                     logs_initial_positions = None
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
-
                 python_version_str = sys.version.replace("\n", "")
+                build_revision = get_build_revision()
 
-                log.info(
-                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str)
+                # TODO: Why do we log the same line under info and debug? Intentional?
+                msg = (
+                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s)"
+                    % (
+                        SCALYR_VERSION,
+                        build_revision,
+                        scalyr_util.get_pid_tid(),
+                        python_version_str,
+                    )
                 )
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
-                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
-                )
+
+                log.info(msg)
+                log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
@@ -1431,6 +1436,7 @@ class ScalyrAgent(object):
         result = AgentStatus()
         result.launch_time = self.__start_time
         result.user = self.__controller.get_current_user()
+        result.revision = get_build_revision()
         result.version = SCALYR_VERSION
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server
