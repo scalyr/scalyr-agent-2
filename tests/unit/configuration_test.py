@@ -16,10 +16,13 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 """
+NOTE:
+
 This module contains some tests which rely on reload() functionality so they need to run isolated
 from other tests in a separate process to avoid cross test pollution and related failures.
 
-Those tests are marked with pytest.mark.forked which ensures they run in a separate subprocess.
+Those tests are mardked with pytest.mark.needs_to_run_isolated and pytest.mark.forked which
+ensures they run in a separate subprocess.
 """
 
 from __future__ import unicode_literals
