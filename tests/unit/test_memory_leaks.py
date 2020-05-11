@@ -15,6 +15,13 @@
 """
 Module which adds tests for previous known memory leaks and makes sure they
 are not present anymore.
+
+NOTE:
+
+This module contains some tests which rely on reload() functionality so they need to run isolated
+from other tests in a separate process to avoid cross test pollution and related failures.
+
+Those tests are marked with pytest.mark.forked which ensures they run in a separate subprocess.
 """
 
 from __future__ import unicode_literals
@@ -56,6 +63,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
         gc.collect()
         self.base_gargage = self._garbage_to_set(gc.garbage)
 
+    @pytest.mark.forked
     def test_config_parse_memory_leak(self):
         # There was a memory leak with config.parse() and underlying __perform_substitutions method
         config_path = os.path.join(BASE_DIR, "fixtures/configs/agent2.json")
@@ -81,6 +89,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
             config.parse()
             self.assertNoNewGarbage()
 
+    @pytest.mark.forked
     def test_stopptable_thread_init_memory_leak(self):
         # There was a bug with StoppableThread constructor having a cycle
         for index in range(0, 50):
@@ -88,6 +97,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
             self.assertTrue(thread)
             self.assertNoNewGarbage()
 
+    @pytest.mark.forked
     def test_json_object_to_dict_memory_leak(self):
         content = {"foo": "bar", "a": 2, "b": [1, 2, 3]}
 
@@ -107,6 +117,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
             self.assertEqual(content, dict_value)
             self.assertNoNewGarbage()
 
+    @pytest.mark.forked
     def test_assertion_methods_work_correctly(self):
         class Object1(object):
             pass

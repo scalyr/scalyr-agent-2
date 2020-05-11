@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This module contains some tests which rely on reload() functionality so they need to run isolated
+from other tests in a separate process to avoid cross test pollution and related failures.
+
+Those tests are marked with pytest.mark.forked which ensures they run in a separate subprocess.
+"""
+
 from __future__ import absolute_import
 
 import sys
@@ -22,6 +29,7 @@ import importlib
 import mock
 import six
 from six.moves import zip
+import pytest
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import date_parsing_utils
@@ -35,6 +43,9 @@ class DateUtilsTestCase(ScalyrTestCase):
     def tearDown(self):
         super(DateUtilsTestCase, self).tearDown()
 
+    @pytest.mark.forked
+    @pytest.mark.relies_on_reload
+    @pytest.mark.needs_to_run_isolated
     def test_verify_correct_default_rfc3339_to_implementation_is_used(self):
         # 1. udatetime is available, we should use that
         sys.modules["udatetime"] = mock.Mock()

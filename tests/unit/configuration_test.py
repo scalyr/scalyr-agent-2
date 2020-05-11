@@ -14,6 +14,14 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+
+"""
+This module contains some tests which rely on reload() functionality so they need to run isolated
+from other tests in a separate process to avoid cross test pollution and related failures.
+
+Those tests are marked with pytest.mark.forked which ensures they run in a separate subprocess.
+"""
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
@@ -26,6 +34,7 @@ import importlib
 from io import open
 
 import mock
+import pytest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -1912,6 +1921,9 @@ class TestConfiguration(TestConfigurationBase):
 
     @mock.patch("scalyr_agent.util.zstandard", None)
     @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
+    @pytest.mark.forked
+    @pytest.mark.relies_on_reload
+    @pytest.mark.needs_to_run_isolated
     def test_deflate_used_as_fallback_if_zstandard_not_available(self):
         sys.modules["zstandard"] = None
 
@@ -1936,6 +1948,9 @@ class TestConfiguration(TestConfigurationBase):
     @mock.patch.object(sys, "version_info", (2, 6, 7))
     @mock.patch("scalyr_agent.util.zstandard", mock.Mock())
     @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
+    @pytest.mark.forked
+    @pytest.mark.relies_on_reload
+    @pytest.mark.needs_to_run_isolated
     def test_deflate_used_as_fallback_if_zstandard_not_available_old_python_version(
         self,
     ):
