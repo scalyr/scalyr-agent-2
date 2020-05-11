@@ -338,6 +338,31 @@ class AgentRunner(object):
         print("Agent stopped.")
         self._stopped = True
 
+    def restart(self, executable="python"):
+        print("Restarting agent process...")
+
+        if self._installation_type == PACKAGE_INSTALL:
+            service_executable = find_executable("service")
+            if service_executable:
+                cmd = "%s scalyr-agent-2 restart" % (service_executable)
+            else:
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 restart"
+
+            result = subprocess.check_call(cmd, shell=True)
+
+            return result
+
+        else:
+            process = subprocess.Popen(
+                "{0} {1} restart".format(executable, _AGENT_MAIN_PATH), shell=True
+            )
+
+            process.wait()
+            self._agent_process.wait()
+
+        print("Agent process restarted.")
+
     def __del__(self):
         self.stop()
 
