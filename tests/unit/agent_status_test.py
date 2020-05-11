@@ -17,6 +17,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 from io import open
 
 __author__ = "czerwin@scalyr.com"
@@ -131,6 +132,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.version = "2.0.0.beta.7"
         self.status.revision = "git revision"
         self.status.python_version = "3.6.8"
+        self.status.compression_algorithm = "deflate"
 
         config_status = ConfigStatus()
         self.status.config_status = config_status
@@ -259,14 +261,15 @@ class TestReportStatus(ScalyrTestCase):
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
-Current time:     Fri Sep  5 23:14:13 2014 UTC
-Agent started at: Thu Sep  4 23:14:13 2014 UTC
-Version:          2.0.0.beta.7
-VCS revision:     git revision
-Python version:   3.6.8
-Agent running as: root
-Agent log:        /var/logs/scalyr-agent/agent.log
-ServerHost:       test_machine
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 
@@ -332,14 +335,15 @@ Failed monitors:
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
-Current time:     Fri Sep  5 23:14:13 2014 UTC
-Agent started at: Thu Sep  4 23:14:13 2014 UTC
-Version:          2.0.0.beta.7
-VCS revision:     git revision
-Python version:   3.6.8
-Agent running as: root
-Agent log:        /var/logs/scalyr-agent/agent.log
-ServerHost:       test_machine
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 
@@ -401,14 +405,15 @@ Failed monitors:
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
-Current time:     Fri Sep  5 23:14:13 2014 UTC
-Agent started at: Thu Sep  4 23:14:13 2014 UTC
-Version:          2.0.0.beta.7
-VCS revision:     git revision
-Python version:   3.6.8
-Agent running as: root
-Agent log:        /var/logs/scalyr-agent/agent.log
-ServerHost:       test_machine
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 

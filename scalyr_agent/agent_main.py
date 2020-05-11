@@ -1438,6 +1438,7 @@ class ScalyrAgent(object):
         result.user = self.__controller.get_current_user()
         result.revision = get_build_revision()
         result.version = SCALYR_VERSION
+        result.compression_algorithm = self.__config.compression_type
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server
         result.log_path = self.__log_file_path
