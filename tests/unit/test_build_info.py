@@ -15,12 +15,15 @@
 from __future__ import absolute_import
 
 import os
+import sys
 import unittest
 
 import mock
 
 from scalyr_agent.build_info import get_build_info
 from scalyr_agent.build_info import get_build_revision
+
+from scalyr_agent.test_base import skipIf
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MOCK_BUILD_INFO_PATH = os.path.abspath(
@@ -51,6 +54,10 @@ class BuildInfoUtilTestCase(unittest.TestCase):
         build_revision = get_build_revision()
         self.assertEqual(build_revision, "7d4c4e2e94242ee25320a75c510d52967cfe50eb")
 
+    @skipIf(
+        sys.version_info < (2, 7, 0),
+        "Skipping under Python < 2.7 (git not available on our Docker image)",
+    )
     @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH", "/tmp/doesnt.exist")
     @mock.patch("scalyr_agent.build_info.DEV_INSTALL", True)
     @mock.patch("scalyr_agent.build_info.GIT_GET_HEAD_REVISION_CMD", "echo 'revision'")

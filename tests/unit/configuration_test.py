@@ -1907,6 +1907,10 @@ class TestConfiguration(TestConfigurationBase):
             msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
             self.assertEqual(config.compression_level, valid_level_max, msg)
 
+    @skipIf(
+        sys.version_info < (2, 7, 0),
+        "Skipping under Python < 2.7 (zstandard not available for Python 2.6)",
+    )
     @mock.patch("scalyr_agent.configuration.zstandard", mock.Mock())
     def test_zstandard_is_used_by_default_if_python_library_is_available(self):
         # zstandard Python library is available, should use that
