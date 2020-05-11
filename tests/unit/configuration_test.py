@@ -1922,6 +1922,10 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEqual(config.compression_type, "zstandard")
 
+    @skipIf(
+        sys.version_info < (2, 7, 0),
+        "Skipping under Python < 2.7 (zstandard not available for Python 2.6)",
+    )
     @mock.patch("scalyr_agent.util.zstandard", None)
     @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
     @pytest.mark.forked
@@ -1948,6 +1952,10 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEqual(config.compression_type, "deflate")
 
+    @skipIf(
+        sys.version_info < (2, 7, 0),
+        "Skipping under Python < 2.7 (zstandard not available for Python 2.6)",
+    )
     @mock.patch.object(sys, "version_info", (2, 6, 7))
     @mock.patch("scalyr_agent.util.zstandard", mock.Mock())
     @mock.patch("scalyr_agent.configuration.DEFAULT_COMPRESSION_ALGORITHM", "deflate")
