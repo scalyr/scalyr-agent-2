@@ -21,7 +21,7 @@ import os
 import atexit
 
 if False:
-    from typing import Dict, Optional, Any
+    from typing import Dict, Optional, Any, Union
 
 import copy
 import json
@@ -246,7 +246,11 @@ class AgentRunner(object):
         output = six.ensure_text(output)
         return output
 
-    def status_json(self):
+    def status_json(self, parse_json=False):
+        # type: (bool) -> Union[six.text_type, dict]
+        """
+        :param parse_json: True to parse result as json and return a dict.
+        """
         if self._installation_type == PACKAGE_INSTALL:
             cmd = "/usr/sbin/scalyr-agent-2 status -v --format=json"
         else:
@@ -254,6 +258,10 @@ class AgentRunner(object):
 
         output = compat.subprocess_check_output(cmd=cmd, shell=True)
         output = six.ensure_text(output)
+
+        if parse_json:
+            return json.loads(output)
+
         return output
 
     def switch_version(self, version, env=None):
