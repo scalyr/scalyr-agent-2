@@ -148,6 +148,39 @@ class AgentLogVerifier(AgentVerifier):
             print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
             return
 
+        print("Check start line contains correct version and revision string")
+        match = re.search(
+            r"Starting scalyr agent... \(version=(.*?)\) \(revision=(.*?)\)",
+            local_agent_log_data,
+        )
+
+        if not match:
+            print("Unable to retrieve package version and revision from agent.log file")
+            return False
+
+        expected_package_version, expected_package_revision = match.groups()
+
+        status = json.loads(self._runner.status_json())
+
+        actual_package_version = status["version"]
+        actual_package_revision = status["revision"]
+
+        # NOTE: Ideally we would also pass in expected version and revision to make this more robust
+        # and correct
+        if expected_package_version != actual_package_version:
+            print(
+                "Expected package version %s, got %s"
+                % (expected_package_version, actual_package_version)
+            )
+            return False
+
+        if expected_package_revision != actual_package_revision:
+            print(
+                "Expected package revision %s, got %s"
+                % (expected_package_revision, actual_package_revision)
+            )
+            return False
+
         print("Check that all collectors were found.")
         collector_line_pattern_str = _make_agent_log_line_pattern(
             level="INFO",
