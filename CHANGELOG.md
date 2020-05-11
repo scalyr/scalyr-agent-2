@@ -10,7 +10,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 5, 2020 08:30 -0800
 Features
 * Add support for ``zstandard`` and ``lz4`` compression of outgoing requests to the Scalyr API. For backward compatibility reasons, the default value for ``compression_type`` configuration option still is ``deflate``.
 * Agent will now default to using ``zstandard`` instead of ``deflate`` for compressing outgoing requests on systems where ``zstandard`` Python library is available. For more information on this change and how to install zstandard library, please refer to the [release notes](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
-* ``scalyr-agent-2 status -v`` command now also outputs compression algorithm used by the agent and git VCS revision the installed agent package corresponds to.
+* ``scalyr-agent-2 status -v`` command now also outputs compression algorithm used by the agent and git VCS revision installed agent package corresponds to.
 
 ## 2.1.3 "Orion" - May 1, 2020
 
