@@ -35,6 +35,7 @@ from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_strptime
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_regex
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_string_split
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_udatetime
+from scalyr_agent.date_parsing_utils import RFC3339Parser
 
 from .time_utils import process_time
 
@@ -86,6 +87,28 @@ def test_rfc3339_to_nanoseconds_since_epoch_regex(benchmark, with_fraction):
 
     def run_benchmark():
         result = _rfc3339_to_nanoseconds_since_epoch_regex(date_str)
+        return result
+
+    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
+)
+@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
+def test_rfc3339_to_nanoseconds_since_epoch_parser(benchmark, with_fraction):
+    if with_fraction:
+        date_str = DATE_WITH_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
+    else:
+        date_str = DATE_WITHOUT_FRACTION_STR
+        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
+
+    parser = RFC3339Parser()
+
+    def run_benchmark():
+        result = parser.nanoseconds_since_epoch(date_str)
         return result
 
     result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)

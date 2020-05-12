@@ -70,6 +70,107 @@ class DateUtilsTestCase(ScalyrTestCase):
             in scalyr_agent.date_parsing_utils.rfc3339_to_datetime.__name__
         )
 
+    def test_rfc3339_parser_first_parse(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06T14:40:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_parser_short_text(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06"
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(None, actual)
+
+    def test_rfc3339_parser_invalid_time(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "YYYY-MM-DDTHH:MM:SSZ"
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(None, actual)
+
+    def test_rfc3339_parser_invalid_seconds(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06T14:40:SSZ"
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(None, actual)
+
+    def test_rfc3339_parser_none(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        actual = parser.nanoseconds_since_epoch(None)
+        self.assertEquals(None, actual)
+
+    def test_rfc3339_parser_same_minute(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06T14:40:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:57.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 57, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_parser_next_minute(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06T14:40:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:41:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 41, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_parser_prev_minute(self):
+        parser = date_parsing_utils.RFC3339Parser()
+        s = "2015-08-06T14:40:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:39:56.123Z"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 39, 56, 123000)
+            )
+            * 1000
+        )
+        actual = parser.nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
     def test_rfc3339_to_datetime(self):
         s = "2015-08-06T14:40:56.123456Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)

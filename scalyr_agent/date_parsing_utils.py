@@ -49,6 +49,159 @@ else:
     RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
 
 
+class RFC3339Parser(object):
+    """ This class parses
+    """
+
+    RFC3339_MINUTE_POSITION = len("YYYY-MM-DDTHH:MM:")
+    RFC3339_MINUTE_END = len("YYYY-MM-DDTHH:MM:SS")
+    RFC3339_FRACTION_POSITION = len("YYYY-MM-DDTHH:MM:SS.")
+
+    def __init__(self):
+        self._previous_time_string = "YYYY"
+        self._previous_nanoseconds = None
+
+    def nanoseconds_since_epoch_orig(self, text):
+
+        if text is None:
+            return None
+
+        if text[: RFC3339Parser.RFC3339_MINUTE_POSITION] != self._previous_time_string:
+            minute = text[: RFC3339Parser.RFC3339_MINUTE_POSITION]
+            minute_timestamp = minute + "00Z"
+            nanoseconds = rfc3339_to_nanoseconds_since_epoch(minute_timestamp)
+
+            if nanoseconds is None:
+                return None
+
+            self._previous_time_string = minute
+            self._previous_nanoseconds = nanoseconds
+
+        seconds = text[
+            RFC3339Parser.RFC3339_MINUTE_POSITION : RFC3339Parser.RFC3339_MINUTE_END
+        ]
+        fractions = text[RFC3339Parser.RFC3339_FRACTION_POSITION :]
+
+        result = self._previous_nanoseconds
+        try:
+            secs = int(seconds)
+            result += secs * 1000000000
+        except Exception:
+            return None
+
+        nanos = 0
+
+        # now add the fractional part
+        if len(fractions) > 1:
+            # if the fractional part doesn't end in Z we likely have a
+            # malformed time, so just return the current value
+            if not fractions.endswith("Z"):
+                # we don't handle non UTC timezones yet
+                if any(c in fractions for c in "+-"):
+                    return None
+
+                return result
+
+            # strip the final 'Z' and use the final number for processing
+            fractions = fractions[:-1]
+            to_nanos = 9 - len(fractions)
+            nanos = int(int(fractions) * 10 ** to_nanos)
+
+        return result + nanos
+
+    def nanoseconds_since_epoch(self, text):
+
+        if text is None:
+            return None
+
+        if not text.startswith(self._previous_time_string):
+            minute = text[: RFC3339Parser.RFC3339_MINUTE_POSITION]
+            minute_timestamp = minute + "00Z"
+            nanoseconds = rfc3339_to_nanoseconds_since_epoch(minute_timestamp)
+
+            if nanoseconds is None:
+                return None
+
+            self._previous_time_string = minute
+            self._previous_nanoseconds = nanoseconds
+
+        seconds = text[
+            RFC3339Parser.RFC3339_MINUTE_POSITION : RFC3339Parser.RFC3339_MINUTE_END
+        ]
+        fractions = text[RFC3339Parser.RFC3339_FRACTION_POSITION :]
+
+        result = self._previous_nanoseconds
+        try:
+            secs = int(seconds)
+            result += secs * 1000000000
+        except Exception:
+            return None
+
+        nanos = 0
+
+        # now add the fractional part
+        if len(fractions) > 1:
+            # if the fractional part doesn't end in Z we likely have a
+            # malformed time, so just return the current value
+            if not fractions.endswith("Z"):
+                # we don't handle non UTC timezones yet
+                if any(c in fractions for c in "+-"):
+                    return None
+
+                return result
+
+            # strip the final 'Z' and use the final number for processing
+            fractions = fractions[:-1]
+            to_nanos = 9 - len(fractions)
+            nanos = int(int(fractions) * 10 ** to_nanos)
+
+        return result + nanos
+
+    TO_NANOS = [0, 100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1]
+
+    def nanoseconds_since_epoch_new(self, text):
+
+        if text is None:
+            return None
+
+        if not text.startswith(self._previous_time_string):
+            minute = text[: RFC3339Parser.RFC3339_MINUTE_POSITION]
+            minute_timestamp = minute + "00Z"
+            nanoseconds = rfc3339_to_nanoseconds_since_epoch(minute_timestamp)
+
+            if nanoseconds is None:
+                return None
+
+            self._previous_time_string = minute
+            self._previous_nanoseconds = nanoseconds
+
+        seconds = text[
+            RFC3339Parser.RFC3339_MINUTE_POSITION : RFC3339Parser.RFC3339_MINUTE_END
+        ]
+        fractions = text[RFC3339Parser.RFC3339_FRACTION_POSITION :]
+
+        try:
+            secs = int(seconds)
+            result = self._previous_nanoseconds + (secs * 1000000000)
+
+            nanos = 0
+
+            if fractions.endswith("Z"):
+                # strip the final 'Z' and use the final number for processing
+                fractions = fractions[:-1]
+                nanos = int(fractions) * RFC3339Parser.TO_NANOS[len(fractions)]
+                return result + nanos
+
+            # we don't handle non UTC timezones yet
+            if any(c in fractions for c in "+-"):
+                return None
+
+            return result
+
+        except Exception:
+            return None
+
+
 # Private versions of datetime parsing functions are below. Those are not used by the production
 # code, but there are there so we can test corectness of all the functions and benchmark different
 # implementations and compare them.
