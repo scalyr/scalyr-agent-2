@@ -301,7 +301,9 @@ def build_win32_installer_package(variant, version):
     )
 
     run_command(
-        "pyinstaller scalyr-agent.spec", exit_on_fail=True, command_name="pyinstaller"
+        "{0} pyinstaller scalyr-agent.spec".format(sys.executable),
+        exit_on_fail=True,
+        command_name="pyinstaller",
     )
 
     make_directory("Scalyr/certs")
