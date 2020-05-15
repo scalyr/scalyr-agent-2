@@ -1,6 +1,35 @@
 # Release Notes
 
-## 2.1.2 "TBD" - April 30, 2020
+## 2.1.3 "Orion" - May 1, 2020
+
+* You may now restrict which namespaces for which logs and events are collected
+  when using the Kubernetes and Kubernetes event monitor using the new `k8s_include_namespaces`
+  top-level configuration option or its equivalent `SCALYR_K8S_INCLUDE_NAMESPACES` environment variable.
+
+  To restrict the namespaces, set `SCALYR_K8S_INCLUDE_NAMESPACES` via your `scalyr-config` configmap.
+  The value should be a comma-separated list of the namespaces for which you wish to collect logs and events.  For example,
+  the following configures the Scalyr Agent to only collect from the `frontends` and `database` namespaces:
+
+  ```
+  SCALYR_K8S_INCLUDE_NAMESPACES: frontends,database
+  ```
+
+  Note, this option to defaults to `*` which indicates to include all namespaces.
+
+  The `SCALYR_K8S_EXCLUDE_NAMESPACES` environment variable (or `k8s_exclude_namespaces` option) is applied after the
+  `SCALYR_K8S_INCLUDE_NAMESPACES` option.  So, if you have a namespace listed in both `SCALYR_K8S_INCLUDE_NAMESPACES`
+  and `SCALYR_K8S_EXCLUDE_NAMESPACES`, then it will not be included.
+
+* By default, the Kubernetes monitor will now verify `https` connections made to the local Kubelet.  The connection
+  is verified using the certificate authority configured via the service account's cert.  If this causes issues for
+  your particular set up, you can either change which certificate is used to verify the connnection or disable verfication.
+
+  To set the certificate used to verify, set `SCALYR_K8S_KUBELET_CA_CERT` in your `scalyr-config` configmap to
+  the path of the certificate.  Be sure that path is properly mapped into the Scalyr Agent container's filesytem.
+
+  To set disable verification, set `SCALYR_K8S_VERIFY_KUBELET_QUERIES` in your `scalyr-config` configmap to `false`
+
+## 2.1.2 "Nostromo" - April 23, 2020
 
 When running the agent with the `--no-fork` flag it will now output its logs to stdout as well as
 the usual `agent.log` file. The output can be limited with the new top level configuration parameter

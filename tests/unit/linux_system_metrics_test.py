@@ -21,8 +21,9 @@ from __future__ import absolute_import
 __author__ = "echee@scalyr.com"
 
 from scalyr_agent.monitors_manager import MonitorsManager
-from scalyr_agent.tests.configuration_test import TestConfigurationBase
 from scalyr_agent.test_util import FakePlatform
+
+from tests.unit.configuration_test import TestConfigurationBase
 
 
 class TestSystemMetricConfiguration(TestConfigurationBase):

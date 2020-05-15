@@ -57,6 +57,7 @@ from scalyr_agent.json_lib import JsonObject
 
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 
 class TestUtilCompression(ScalyrTestCase):
@@ -68,6 +69,7 @@ class TestUtilCompression(ScalyrTestCase):
         """Successful zlib compression"""
         data = self._data
         compress = verify_and_get_compress_func("deflate")
+        self.assertIsNotNone(compress)
         import zlib
 
         self.assertEqual(data, zlib.decompress(compress(data)))
@@ -76,9 +78,32 @@ class TestUtilCompression(ScalyrTestCase):
         """Successful bz2 compression"""
         data = self._data
         compress = verify_and_get_compress_func("bz2")
+        self.assertIsNotNone(compress)
         import bz2
 
         self.assertEqual(data, bz2.decompress(compress(data)))
+
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping Python < 2.7")
+    def test_lz4(self):
+        data = self._data
+        compress = verify_and_get_compress_func("lz4")
+        self.assertIsNotNone(compress)
+
+        import lz4.frame as lz4
+
+        self.assertEqual(data, lz4.decompress(compress(data)))
+
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping Python < 2.7")
+    def test_zstandard(self):
+        data = self._data
+        compress = verify_and_get_compress_func("zstandard")
+        self.assertIsNotNone(compress)
+
+        import zstandard
+
+        decompressor = zstandard.ZstdDecompressor()
+
+        self.assertEqual(data, decompressor.decompress(compress(data)))
 
     def test_bad_compression_type(self):
         """User enters unsupported compression type"""
@@ -87,31 +112,46 @@ class TestUtilCompression(ScalyrTestCase):
     def test_bad_compression_lib_exception_on_import(self):
         """Pretend that import bz2/zlib raises exception"""
 
-        def _mock_get_compress_module(compression_type):
+        def _mock_get_compress_and_decompress_func(
+            compression_type, compression_level=9
+        ):
             raise Exception("Mimic exception when importing compression lib")
 
-        @patch("scalyr_agent.util.get_compress_module", new=_mock_get_compress_module)
+        @patch(
+            "scalyr_agent.util.get_compress_and_decompress_func",
+            new=_mock_get_compress_and_decompress_func,
+        )
         def _test(compression_type):
             self.assertIsNone(verify_and_get_compress_func(compression_type))
 
         _test("deflate")
         _test("bz2")
+        _test("lz4")
+        _test("zstandard")
 
     def test_bad_compression_lib_no_compression(self):
         """Pretend that the zlib/bz2 library compress() method doesn't perform any comnpression"""
 
-        def _mock_get_compress_module(compression_type):
+        def _mock_get_compress_and_decompress_func(
+            compression_type, compression_level=9
+        ):
             m = MagicMock()
             # simulate module.compress() method that does not compress input data string
-            m.compress = lambda data, compression_level: data
-            return m
+            m.compress = lambda data, compression_level=9: data
+            m.decompress = lambda data: data
+            return m.compress, m.decompress
 
-        @patch("scalyr_agent.util.get_compress_module", new=_mock_get_compress_module)
+        @patch(
+            "scalyr_agent.util.get_compress_and_decompress_func",
+            new=_mock_get_compress_and_decompress_func,
+        )
         def _test(compression_type):
             self.assertIsNone(verify_and_get_compress_func(compression_type))
 
         _test("deflate")
         _test("bz2")
+        _test("lz4")
+        _test("zstandard")
 
 
 class TestUtil(ScalyrTestCase):

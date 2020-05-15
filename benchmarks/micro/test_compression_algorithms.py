@@ -25,36 +25,9 @@ This way we get accurate CPU utilization information.
 from __future__ import absolute_import
 from __future__ import print_function
 
-if False:
-    from typing import Tuple
-    from typing import Callable
-
-import sys
-import zlib
-import bz2
-import functools
-
 import pytest
 
-try:
-    import snappy
-except ImportError:
-    snappy = None
-
-try:
-    import zstandard
-except ImportError:
-    zstandard = None
-
-try:
-    import brotli
-except ImportError:
-    brotli = None
-
-try:
-    import lz4framed as lz4
-except ImportError:
-    lz4 = None
+from scalyr_agent.util import get_compress_and_decompress_func
 
 
 from .utils import read_bytes_from_log_fixture_file
@@ -96,25 +69,27 @@ from .time_utils import process_time
 @pytest.mark.parametrize(
     "compression_algorithm_tuple",
     [
-        ("deflate", {"level": 3}),
-        ("deflate", {"level": 6}),
-        ("deflate", {"level": 9}),
-        ("bz2", {}),
-        ("snappy", {}),
-        ("zstandard", {"level": 3}),
-        ("zstandard", {"level": 5}),
-        ("zstandard", {"level": 10}),
-        ("zstandard", {"level": 12}),
-        ("brotli", {"quality": 3}),
-        ("brotli", {"quality": 5}),
-        ("brotli", {"quality": 8}),
-        ("lz4", {}),
+        ("deflate", 3),
+        ("deflate", 6),
+        ("deflate", 9),
+        ("bz2", 9),
+        ("snappy", None),
+        ("zstandard", 3),
+        ("zstandard", 5),
+        ("zstandard", 10),
+        ("zstandard", 12),
+        ("brotli", 3),
+        ("brotli", 5),
+        ("brotli", 8),
+        ("lz4", 0),
+        ("lz4", 3),
+        ("lz4", 16),
     ],
     ids=[
         "deflate_level_3",
         "deflate_level_6_default",
         "deflate_level_9",
-        "bz2",
+        "bz2_level_6_default",
         "snappy",
         "zstandard_level_3_default",
         "zstandard_level_5",
@@ -123,7 +98,9 @@ from .time_utils import process_time
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
-        "lz4",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
     ],
 )
 @pytest.mark.benchmark(group="compress", timer=process_time)
@@ -164,25 +141,27 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 )
 @pytest.mark.parametrize("compression_algorithm_tuple",
     [
-        ("deflate", {"level": 3}),
-        ("deflate", {"level": 6}),
-        ("deflate", {"level": 9}),
-        ("bz2", {}),
-        ("snappy", {}),
-        ("zstandard", {"level": 3}),
-        ("zstandard", {"level": 5}),
-        ("zstandard", {"level": 10}),
-        ("zstandard", {"level": 12}),
-        ("brotli", {"quality": 3}),
-        ("brotli", {"quality": 5}),
-        ("brotli", {"quality": 8}),
-        ("lz4", {}),
+        ("deflate", 3),
+        ("deflate", 6),
+        ("deflate", 9),
+        ("bz2", 9),
+        ("snappy", None),
+        ("zstandard", 3),
+        ("zstandard", 5),
+        ("zstandard", 10),
+        ("zstandard", 12),
+        ("brotli", 3),
+        ("brotli", 5),
+        ("brotli", 8),
+        ("lz4", 0),
+        ("lz4", 3),
+        ("lz4", 16),
     ],
     ids=[
         "deflate_level_3",
         "deflate_level_6_default",
         "deflate_level_9",
-        "bz2",
+        "bz2_level_6_default",
         "snappy",
         "zstandard_level_3_default",
         "zstandard_level_5",
@@ -191,7 +170,9 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
         "brotli_quality_3",
         "brotli_quality_5",
         "brotli_quality_8",
-        "lz4",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
     ],
 )
 # fmt: on
@@ -201,21 +182,17 @@ def test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 
 
 def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
-    compression_algorithm, kwargs = compression_algorithm_tuple
+    compression_algorithm, compression_level = compression_algorithm_tuple
 
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, decompress_func = _get_compress_and_decompress_func(
-        compression_algorithm, kwargs
+    compress_func, decompress_func = get_compress_and_decompress_func(
+        compression_algorithm, compression_level
     )
 
     def run_benchmark():
-        # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular argument
-        if sys.version_info < (3, 6, 0) and compression_algorithm == "deflate":
-            result = compress_func(data, kwargs["level"])
-        else:
-            result = compress_func(data)
+        result = compress_func(data)
         return result
 
     result = benchmark.pedantic(run_benchmark, iterations=10, rounds=20)
@@ -235,20 +212,20 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 
 
 def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
-    compression_algorithm, kwargs = compression_algorithm_tuple
+    compression_algorithm, compression_level = compression_algorithm_tuple
 
     file_name, bytes_to_read = log_tuple
     data = read_bytes_from_log_fixture_file(file_name, bytes_to_read)
 
-    compress_func, _ = _get_compress_and_decompress_func(compression_algorithm, kwargs)
+    compress_func, _ = get_compress_and_decompress_func(compression_algorithm, compression_level)
 
     compressed_data = compress_func(data)
     assert compressed_data != data
 
     # NOTE: We intentionally request new decompression function so we get new zstandard context for
     # decompression (this way we avoid dictionary being already populated).
-    _, decompress_func = _get_compress_and_decompress_func(
-        compression_algorithm, kwargs
+    _, decompress_func = get_compress_and_decompress_func(
+        compression_algorithm, compression_level
     )
 
     def run_benchmark():
@@ -265,36 +242,3 @@ def _test_decompress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     assert result != compressed_data
     assert size_after_decompression > size_before_decompression
     assert data == result
-
-
-def _get_compress_and_decompress_func(compression_algorithm, kwargs):
-    # type: (str, dict) -> Tuple[Callable, Callable]
-    if compression_algorithm == "deflate":
-        if sys.version_info < (3, 6, 0):
-            # Work around for Python <= 3.6 where compress is not a keyword argument, but a regular
-            # argument
-            compress_func = zlib.compress  # type: ignore
-        else:
-            compress_func = functools.partial(zlib.compress, **kwargs)  # type: ignore
-        decompress_func = zlib.decompress  # type: ignore
-    elif compression_algorithm == "bz2":
-        compress_func = functools.partial(bz2.compress, **kwargs)  # type: ignore
-        decompress_func = bz2.decompress  # type: ignore
-    elif compression_algorithm == "snappy":
-        compress_func = functools.partial(snappy.compress, **kwargs)  # type: ignore
-        decompress_func = snappy.decompress  # type: ignore
-    elif compression_algorithm == "zstandard":
-        compressor = zstandard.ZstdCompressor(**kwargs)
-        decompressor = zstandard.ZstdDecompressor()
-        compress_func = compressor.compress  # type: ignore
-        decompress_func = decompressor.decompress  # type: ignore
-    elif compression_algorithm == "brotli":
-        compress_func = functools.partial(brotli.compress, **kwargs)  # type: ignore
-        decompress_func = brotli.decompress  # type: ignore
-    elif compression_algorithm == "lz4":
-        compress_func = functools.partial(lz4.compress, **kwargs)  # type: ignore
-        decompress_func = lz4.decompress  # type: ignore
-    else:
-        raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
-
-    return compress_func, decompress_func

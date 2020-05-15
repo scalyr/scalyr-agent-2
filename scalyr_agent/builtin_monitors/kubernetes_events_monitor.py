@@ -25,6 +25,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sApiException,
     K8sApiAuthorizationException,
     ApiQueryOptions,
+    K8sNamespaceFilter,
 )
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
@@ -190,7 +191,9 @@ class EventLogFormatter(BaseFormatter):
         )
 
 
-class KubernetesEventsMonitor(ScalyrMonitor):
+class KubernetesEventsMonitor(
+    ScalyrMonitor
+):  # pylint: disable=monitor-not-included-for-win32
     """
 # Kubernetes Events Monitor
 
@@ -325,10 +328,10 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 "Error setting monitor attribute in KubernetesEventMonitor"
             )
 
-        # The namespace whose logs we should not collect.
-        self.__k8s_namespaces_to_ignore = []
-        for x in self._global_config.k8s_ignore_namespaces:
-            self.__k8s_namespaces_to_ignore.append(x.strip())
+        # The namespace whose logs we should collect.
+        self.__k8s_namespaces_to_include = K8sNamespaceFilter.from_config(
+            global_config=self._global_config
+        )
 
         (
             default_rotation_count,
@@ -795,7 +798,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                                 continue
 
                             # ignore events that belong to namespaces we are not interested in
-                            if namespace in self.__k8s_namespaces_to_ignore:
+                            if namespace not in self.__k8s_namespaces_to_include:
                                 global_log.log(
                                     scalyr_logging.DEBUG_LEVEL_1,
                                     "Ignoring event due to belonging to an excluded namespace '%s'"

@@ -73,6 +73,7 @@ class Configuration(object):
     """
 
     DEFAULT_K8S_IGNORE_NAMESPACES = ["kube-system"]
+    DEFAULT_K8S_INCLUDE_NAMESPACES = ["*"]
 
     def __init__(self, file_path, default_paths, logger):
         # Captures all environment aware variables for testing purposes
@@ -277,6 +278,63 @@ class Configuration(object):
             )
             scalyr_util.set_json_lib(json_library)
 
+    def print_useful_settings(self, other_config=None):
+        """
+        Prints various useful configuration settings to the agent log, so we have a record
+        in the log of the settings that are currently in use.
+
+        @param other_config: Another configuration option.  If not None, this function will
+        only print configuration options that are different between the two objects.
+        """
+
+        options = [
+            "compression_type",
+            "compression_level",
+            "pipeline_threshold",
+            "min_allowed_request_size",
+            "max_allowed_request_size",
+            "min_request_spacing_interval",
+            "max_request_spacing_interval",
+            "read_page_size",
+            "max_line_size",
+            "internal_parse_max_line_size",
+            "line_completion_wait_time",
+            "max_log_offset_size",
+            "max_existing_log_offset_size",
+        ]
+
+        # get options (if any) from the other configuration object
+        other_options = None
+        if other_config is not None:
+            other_options = {}
+            for option in options:
+                other_options[option] = getattr(other_config, option, None)
+
+        first = True
+        for option in options:
+            value = getattr(self, option, None)
+            print_value = False
+
+            # check to see if we should be printing this option which will will
+            # be True if other_config is None or if the other_config had a setting
+            # that was different from our current setting
+            if other_config is None:
+                print_value = True
+            elif (
+                other_options is not None
+                and option in other_options
+                and other_options[option] != value
+            ):
+                print_value = True
+
+            if print_value:
+                # if this is the first option we are printing, output a header
+                if first:
+                    self.__logger.info("Configuration settings")
+                    first = False
+
+                self.__logger.info("\t%s: %s" % (option, value))
+
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
         @return: The default hostname for this host.
@@ -363,12 +421,24 @@ class Configuration(object):
         return self.__get_config().get_json_array("k8s_ignore_namespaces")
 
     @property
+    def k8s_include_namespaces(self):
+        return self.__get_config().get_json_array("k8s_include_namespaces")
+
+    @property
     def k8s_api_url(self):
         return self.__get_config().get_string("k8s_api_url")
 
     @property
     def k8s_verify_api_queries(self):
         return self.__get_config().get_bool("k8s_verify_api_queries")
+
+    @property
+    def k8s_verify_kubelet_queries(self):
+        return self.__get_config().get_bool("k8s_verify_kubelet_queries")
+
+    @property
+    def k8s_kubelet_ca_cert(self):
+        return self.__get_config().get_string("k8s_kubelet_ca_cert")
 
     @property
     def k8s_cache_query_timeout_secs(self):
@@ -1245,10 +1315,25 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+            valid_values=scalyr_util.SUPPORTED_COMPRESSION_ALGORITHMS,
         )
+        self.__verify_compression_type(self.compression_type)
+
+        # NOTE: If not explicitly specified by the user, we use compression algorithm specific
+        # default value
+        default_compression_level = scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[
+            self.compression_type
+        ]
         self.__verify_or_set_optional_int(
-            config, "compression_level", 9, description, apply_defaults, env_aware=True
+            config,
+            "compression_level",
+            default_compression_level,
+            description,
+            apply_defaults,
+            env_aware=True,
         )
+        self.__verify_compression_level(self.compression_level)
+
         self.__verify_or_set_optional_attributes(
             config, "server_attributes", description, apply_defaults, env_aware=True,
         )
@@ -1716,6 +1801,15 @@ class Configuration(object):
             separators=[None, ","],
             env_aware=True,
         )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "k8s_include_namespaces",
+            Configuration.DEFAULT_K8S_INCLUDE_NAMESPACES,
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
         self.__verify_or_set_optional_string(
             config,
             "k8s_api_url",
@@ -1728,6 +1822,22 @@ class Configuration(object):
             config,
             "k8s_verify_api_queries",
             True,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_verify_kubelet_queries",
+            True,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_kubelet_ca_cert",
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
             description,
             apply_defaults,
             env_aware=True,
@@ -2180,6 +2290,44 @@ class Configuration(object):
             description,
             apply_defaults,
         )
+
+    def __verify_compression_type(self, compression_type):
+        """
+        Verify that the library for the specified compression type (algorithm) is available.
+        """
+        library_name = scalyr_util.COMPRESSION_TYPE_TO_PYTHON_LIBRARY.get(
+            compression_type, "unknown"
+        )
+
+        try:
+            _, _ = scalyr_util.get_compress_and_decompress_func(compression_type)
+        except (ImportError, ValueError) as e:
+            msg = (
+                'Failed to set compression type to "%s". Make sure that the corresponding Python '
+                "library is available. You can install it using this command:\n\npip install %s\n\n "
+                "Original error: %s" % (compression_type, library_name, str(e))
+            )
+            raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
+
+    def __verify_compression_level(self, compression_level):
+        """
+        Verify that the provided compression level is valid for the configured compression type.
+
+        If it's not, we use a default value for that compression algorithm. Keep in mind that this
+        behavior is there for backward compatibility reasons, otherwise it would be better to just
+        throw in such scenario
+        """
+        compression_type = self.compression_type
+
+        valid_level_min, valid_level_max = scalyr_util.COMPRESSION_TYPE_TO_VALID_LEVELS[
+            compression_type
+        ]
+
+        if compression_level < valid_level_min or compression_level > valid_level_max:
+            self.__config.put(
+                "compression_level",
+                scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[compression_type],
+            )
 
     def __get_config_or_environment_val(
         self, config_object, param_name, param_type, env_aware, custom_env_name

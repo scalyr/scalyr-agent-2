@@ -156,7 +156,7 @@ def dockerized_case(
                 )
 
             if remove_container:
-                container.remove()
+                container.remove(force=True)
                 print("Container '{0}' removed.".format(builder.image_tag))
 
             # raise failed assertion, due to non-zero result from container.

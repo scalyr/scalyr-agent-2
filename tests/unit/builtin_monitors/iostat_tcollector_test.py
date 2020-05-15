@@ -26,9 +26,9 @@ import mock
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 MODULE_PATH = os.path.abspath(
-    os.path.join(BASE_DIR, "../../third_party/tcollector/collectors/0")
+    os.path.join(BASE_DIR, "../../../scalyr_agent/third_party/tcollector/collectors/0")
 )
-FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../tests/fixtures/diskstats"))
+FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/diskstats"))
 sys.path.append(MODULE_PATH)
 
 # pylint: disable=import-error

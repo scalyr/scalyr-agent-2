@@ -22,6 +22,11 @@ disable=C0103,C0111,I0011,I0012,W0704,W0142,W0212,W0232,W0613,W0702,R0201,W0614,
 
 [MASTER]
 ignore = third_party,third_party_python2,third_party_tls
+load-plugins=pylint_plugins.bundled_imports_checker,pylint_plugins.py2exe_checker
+# In order to load the plugins, PYTHONPATH must contain the root of the Scalyr Agent source directory.  Here's
+# a hook to make sure it is there.  NOTE: This assumes pylint is always run from the top of the source directory,
+# which is pretty much always the case.
+init-hook="import os, sys; sys.path.insert(0, os.getcwd())"
 
 [TYPECHECK]
 # Note: This modules are manipulated during the runtime so we can't detect all the properties during

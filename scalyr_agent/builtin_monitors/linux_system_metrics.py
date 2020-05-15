@@ -21,6 +21,8 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+# pylint: disable=six-moves-import-not-included-for-win32
+
 import os
 import re
 
@@ -660,7 +662,9 @@ class WriterThread(StoppableThread):
         StoppableThread.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
 
 
-class SystemMetricsMonitor(ScalyrMonitor):
+class SystemMetricsMonitor(
+    ScalyrMonitor
+):  # pylint: disable=monitor-not-included-for-win32
     """
 # Linux System Metrics
 

@@ -97,6 +97,7 @@ from scalyr_agent.platform_controller import (
     CannotExecuteAsUser,
 )
 from scalyr_agent.platform_controller import AgentNotRunning
+from scalyr_agent.build_info import get_build_revision
 
 
 STATUS_FILE = "last_status"
@@ -907,18 +908,22 @@ class ScalyrAgent(object):
                     logs_initial_positions = None
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
-
                 python_version_str = sys.version.replace("\n", "")
+                build_revision = get_build_revision()
 
-                log.info(
-                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str)
+                # TODO: Why do we log the same line under info and debug? Intentional?
+                msg = (
+                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s)"
+                    % (
+                        SCALYR_VERSION,
+                        build_revision,
+                        scalyr_util.get_pid_tid(),
+                        python_version_str,
+                    )
                 )
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
-                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
-                )
+
+                log.info(msg)
+                log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
@@ -927,6 +932,8 @@ class ScalyrAgent(object):
                 scalyr_server = self.__config.scalyr_server
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
+
+                self.__config.print_useful_settings()
 
                 self.__scalyr_client = self.__create_client()
 
@@ -948,7 +955,13 @@ class ScalyrAgent(object):
                 # JSON library setting is applied as part of __create_worker_thread method
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "JSON library is %s" % (scalyr_util.get_json_lib()),
+                    'Using JSON library "%s"' % (scalyr_util.get_json_lib()),
+                )
+
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    'Using "%s" compression algorithm with level "%s"'
+                    % (self.__config.compression_type, self.__config.compression_level),
                 )
 
                 current_time = time.time()
@@ -1169,6 +1182,8 @@ class ScalyrAgent(object):
                     worker_thread.stop()
 
                     worker_thread = None
+
+                    new_config.print_useful_settings(self.__config)
 
                     self.__config = new_config
                     self.__controller.consume_config(new_config, new_config.file_path)
@@ -1421,6 +1436,7 @@ class ScalyrAgent(object):
         result = AgentStatus()
         result.launch_time = self.__start_time
         result.user = self.__controller.get_current_user()
+        result.revision = get_build_revision()
         result.version = SCALYR_VERSION
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server

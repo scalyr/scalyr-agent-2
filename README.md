@@ -86,15 +86,16 @@ from a specific tox virtual environment as shown below:
 For example:
 
 ```bash
-# This will run all the tests in scalyr_agent/tests/url_monitor_test.py file
-.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py"
+# This will run all the tests in tests/unit/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "tests/unit/url_monitor_test.py"
 
 # This will run all the test methods on the ``UrlMonitorTestRequest`` class in the
-# scalyr_agent/tests/url_monitor_test.py file
+# tests/unit/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "tests/unit/url_monitor_test.py::UrlMonitorTestRequest"
 
 # This will run ``UrlMonitorTestRequest.test_get_request_no_headers`` test method from the
-# scalyr_agent/tests/url_monitor_test.py file
-.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "scalyr_agent/tests/url_monitor_test.py::UrlMonitorTestRequest" -k test_get_request_no_headers
+# tests/unit/url_monitor_test.py file
+.tox/py2.7-unit-tests/bin/py.test -vv --durations=5 "tests/unit/url_monitor_test.py::UrlMonitorTestRequest" -k test_get_request_no_headers
 ```
 
 ### Continuous Integration

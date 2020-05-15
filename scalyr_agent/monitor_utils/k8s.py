@@ -5,6 +5,7 @@ import hashlib
 import os
 import random
 import re
+import warnings
 from string import Template
 import sys
 import threading
@@ -29,6 +30,7 @@ from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as util
 from scalyr_agent.compat import os_environ_unicode
+from scalyr_agent.configuration import Configuration
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -109,11 +111,6 @@ def cache(global_config):
         @param config: The configuration
         @type config: A Scalyr Configuration object
     """
-    # split comma delimited string of namespaces to ignore in to a list of strings
-    namespaces_to_ignore = []
-    for x in global_config.k8s_ignore_namespaces:
-        namespaces_to_ignore.append(x.strip())
-
     cache_config = _CacheConfig(
         api_url=global_config.k8s_api_url,
         verify_api_queries=global_config.k8s_verify_api_queries,
@@ -207,6 +204,159 @@ class KubeletApiException(Exception):
     """
 
     pass
+
+
+class K8sNamespaceFilter(object):
+    """
+    Represents a filter on Kubernetes namespaces.  This filter can be be created via both whitelists and
+    blacklists.  This abstraction will then return True or False given a namespace to indicate if it
+    passes the filter (i.e., is included in the whitelist and not included in the blacklist).
+
+    For legacy reasons, it also has logic in it to differiente between global and local blacklist.  This
+    is to provide backward compatibility for when the blacklist was just an option on the Kubernetes monitor
+    (local) and not an option on the global configuration file (global).
+    """
+
+    def __init__(self, global_include, global_ignore, local_ignore=None):
+        """Constructs a filter given the different whitelist (include list) and blacklists (exclude lists).
+        Note, for convenience, all namespaces are stripped of trailing and leading whitespace.  (Whitespace
+        could be introduced via customers putting spaces between commas in the comma separate list.)
+
+        :param global_include: The list of namespaces to include.  If the list is empty or a single element of "*",
+            then all namespaces will pass the filter except for those in the blacklist (if any).
+        :param global_ignore: The list of namespaces to exclude, as specified at the global level.  If this
+            list is the same as the default list and `local_ignore` is not None, then the local_ignore list will
+            be used.
+        :param local_ignore: The list of namespaces to exclude, as specified at the local level.  This list is only
+            used if the `global_ignore` list is not the same as the default.
+        :type global_include: [six.text_type]
+        :type global_ignore: [six.text_type]
+        :type local_ignore: [six.text_type]
+        """
+
+        default_blacklist = self.__namespace_set(
+            Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
+        )
+        blacklist = self.__namespace_set(global_ignore)
+        # If the global list is the same as the default one, it probably means the customer has not changed
+        # this value at the global level.  In that case, we defer to the local one if it exits.
+        if blacklist == default_blacklist and local_ignore is not None:
+            blacklist = self.__namespace_set(local_ignore)
+
+        # Only one of __whitelist or __blacklist will be None.  If __whitelist is not None, then that means
+        # we are filtering from a whitelist and only the specified namespaces should be allowed.  Otherwise, by
+        # default, we allow all namespaces except those specifically blacklisted.
+        whitelist = self.__namespace_set(global_include)
+        if not whitelist or whitelist == set("*"):
+            self.__whitelist = None
+            self.__blacklist = blacklist
+        else:
+            self.__whitelist = whitelist - blacklist
+            self.__blacklist = None
+
+    def passes(self, namespace):
+        """Returns true if the given namespace passes the filter.  This means the namespace is in the whitelist
+        (or the whitelist is *) and does not appear in the blacklist.
+        :param namespace: The namespace to test
+        :type namespace: six.text_type
+        :return: True if the namespace passes the filter.
+        :rtype: bool
+        """
+        return namespace in self
+
+    @staticmethod
+    def include_all():
+        """
+        :return: A filter that will pass all namespaces.
+        :rtype: K8sNamespaceFilter
+        """
+        return K8sNamespaceFilter(global_include=["*"], global_ignore=[])
+
+    @staticmethod
+    def default_value():
+        """Returns the filter created by the configuration when all the defaults are used.
+        :return: The default filter.
+        :rtype: K8sNamespaceFilter
+        """
+        return K8sNamespaceFilter(
+            global_include=Configuration.DEFAULT_K8S_INCLUDE_NAMESPACES,
+            global_ignore=Configuration.DEFAULT_K8S_IGNORE_NAMESPACES,
+        )
+
+    @staticmethod
+    def from_config(global_config=None, local_config=None):
+        """Convenience method for created a filter object based on the global configuration file and
+        a monitor's configuration.
+
+        :param global_config: The global configuraiton object.  This is used to retrieve the global include and ignore
+            list.
+        :param local_config: The local configuration object, if any.  If not None, this is used to retrieve the
+            local ignore list.
+        :type global_config: Configuration
+        :type local_config: MonitorConfiguration
+        :return: The filter.
+        :rtype: K8sNamespaceFilter
+        """
+        global_ignore = global_config.k8s_ignore_namespaces
+        global_include = global_config.k8s_include_namespaces
+
+        if local_config is not None:
+            local_ignore = local_config.get("k8s_ignore_namespaces")
+        else:
+            local_ignore = None
+        return K8sNamespaceFilter(
+            global_include=global_include,
+            global_ignore=global_ignore,
+            local_ignore=local_ignore,
+        )
+
+    @staticmethod
+    def __namespace_set(namespace_list):
+        """Creates a set containing the names in the specified list.  This also (for convenience) strips out
+        leading and trailing whitespace.
+
+        :param namespace_list: The list of namespaces
+        :type namespace_list: [six.text_type]
+        :return: The set
+        :rtype: set
+        """
+        result = set()
+        if namespace_list is None:
+            return result
+
+        for x in namespace_list:
+            result.add(x.strip())
+
+        return result
+
+    def __contains__(self, key):
+        """Returns true if the given namespace passes the filter.  This means the namespace is in the whitelist
+        (or the whitelist is *) and does not appear in the blacklist.
+
+        :param key: The namespace to test
+        :type key: six.text_type
+        :return: True if the namespace passes the filter.
+        :rtype: bool
+        """
+        if self.__whitelist is not None:
+            return key in self.__whitelist
+        else:
+            return key not in self.__blacklist
+
+    def __str__(self):
+        if self.__whitelist is not None:
+            return "include_only=%s" % ",".join(sorted(self.__whitelist))
+        else:
+            return "exclude=%s" % ",".join(sorted(self.__blacklist))
+
+    def __eq__(self, other):
+        if self.__whitelist is not None:
+            return self.__whitelist == other.__whitelist
+        else:
+            return self.__blacklist == other.__blacklist
+
+    def __ne__(self, other):
+        return not self == other
 
 
 class QualifiedName(object):
@@ -2132,12 +2282,17 @@ class KubeletApi(object):
         self,
         k8s,
         host_ip=None,
+        node_name=None,
+        verify_https=True,
         kubelet_url_template=Template("https://${host_ip}:10250"),
+        ca_file="/run/secrets/kubernetes.io/serviceaccount/ca.crt",
     ):
         """
         @param k8s - a KubernetesApi object
         """
+        self._ca_file = ca_file
         self._host_ip = host_ip
+        self._verify_https = verify_https
         if self._host_ip is None:
             try:
                 pod_name = k8s.get_pod_name()
@@ -2159,34 +2314,64 @@ class KubeletApi(object):
         self._session.headers.update(headers)
 
         global_log.info("KubeletApi host ip = %s" % self._host_ip)
-        self._kubelet_url = self._build_kubelet_url(kubelet_url_template, host_ip)
+        self._kubelet_url = self._build_kubelet_url(
+            kubelet_url_template, host_ip, node_name
+        )
         self._fallback_kubelet_url = self._build_kubelet_url(
-            FALLBACK_KUBELET_URL_TEMPLATE, host_ip
+            FALLBACK_KUBELET_URL_TEMPLATE, host_ip, node_name
         )
         self._timeout = 20.0
 
     @staticmethod
-    def _build_kubelet_url(kubelet_url, host_ip):
-        if host_ip:
-            return kubelet_url.substitute(host_ip=host_ip)
+    def _build_kubelet_url(kubelet_url, host_ip, node_name):
+        if node_name and host_ip:
+            return kubelet_url.substitute(node_name=node_name, host_ip=host_ip)
         return None
 
     def _switch_to_fallback(self):
         self._kubelet_url = self._fallback_kubelet_url
+
+    def _verify_connection(self):
+        """ Return whether or not to use SSL verification
+        """
+        if self._verify_https and self._ca_file:
+            return self._ca_file
+        return False
+
+    def _get(self, url, verify):
+        return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
         while True:
             url = self._kubelet_url + path
-            response = self._session.get(url, timeout=self._timeout, verify=False)
+            # We suppress warnings here to avoid spam about an unverified connection going to stderr.
+            # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
+            # other threads if they are emitted while this request is going.
+            verify_connection = self._verify_connection()
+            if not verify_connection:
+                with warnings.catch_warnings():
+                    warnings.simplefilter(
+                        "ignore",
+                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
+                    )
+                    response = self._get(url, False)
+                if self._kubelet_url.startswith("https://"):
+                    global_log.warn(
+                        "Accessing Kubelet with an unverified HTTPS request.",
+                        limit_once_per_x_secs=3600,
+                        limit_key="unverified-kubelet-request",
+                    )
+            else:
+                response = self._get(url, verify_connection)
             response.encoding = "utf-8"
             if response.status_code != 200:
                 if (
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
-                    global_log.warning(
+                    global_log.log(
                         scalyr_logging.DEBUG_LEVEL_3,
                         "Invalid response while querying the Kubelet API: %d. Falling back to older endpoint."
                         % response.status_code,
@@ -2194,7 +2379,7 @@ class KubeletApi(object):
                     self._switch_to_fallback()
                     continue
                 else:
-                    global_log.warning(
+                    global_log.log(
                         scalyr_logging.DEBUG_LEVEL_3,
                         "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                         % (url, response.status_code, len(response.text)),
