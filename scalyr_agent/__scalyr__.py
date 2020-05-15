@@ -52,28 +52,28 @@ from io import open
 # Example layouts for different install types:
 #
 # Running from source:
-#     ~/scalyr-agent-2/VERSION
+#     ~/scalyr-agent-2/VERSION.txt
 #     ~/scalyr-agent-2/scalyr-agent/__scalyr__.py
 #     ~/scalyr-agent-2/scalyr-agent/third_party
 #
 #   Here the install root is ~/scalyr-agent-2 and the package root is ~/scalyr-agent-2/scalyr-agent
 #
 # Install using tarball:
-#     ~/scalyr-agent-2/py/scalyr_agent/VERSION
+#     ~/scalyr-agent-2/py/scalyr_agent/VERSION.txt
 #     ~/scalyr-agent-2/py/scalyr_agent/__scalyr__py
 #     ~/scalyr-agent-2/py/scalyr_agent/third_party
 #
 #   Here the install root is ~/scalyr-agent-2 and the package root is ~/scalyr-agent-2/py/scalyr-agent
 #
 # Install using rpm/deb package:
-#     /usr/share/scalyr-agent-2/py/scalyr_agent/VERSION
+#     /usr/share/scalyr-agent-2/py/scalyr_agent/VERSION.txt
 #     /usr/share/scalyr-agent-2/py/scalyr_agent/__scalyr__py
 #     /usr/share/scalyr-agent-2/py/scalyr_agent/third_party
 #
 #   Here the install root is /usr/share/scalyr-agent-2 and the package root is /usr/share/scalyr-agent-2/py/scalyr-agent
 #
 # Install using win32 exe:
-#     C:\Program Files (x86)\Scalyr\program_files\VERSION
+#     C:\Program Files (x86)\Scalyr\program_files\VERSION.txt
 #     C:\Program Files (x86)\Scalyr\program_files\__scalyr__.py
 #     (There is no third party directory... its contents gets added directly to program_files
 #
@@ -178,19 +178,19 @@ def __add_scalyr_package_to_path():
 
 
 def __determine_version():
-    """Returns the agent version number, read from the VERSION file.
+    """Returns the agent version number, read from the VERSION.txt file.
     """
     # This file can be either in the package root or the install root (if you examine the cases
     # from above).  So, just check both locations.
-    in_install = os.path.join(get_install_root(), "VERSION")
-    in_package = os.path.join(get_package_root(), "VERSION")
+    in_install = os.path.join(get_install_root(), "VERSION.txt")
+    in_package = os.path.join(get_package_root(), "VERSION.txt")
 
     if os.path.isfile(in_package):
         version_path = in_package
     elif os.path.isfile(in_install):
         version_path = in_install
     else:
-        raise Exception("Could not locate VERSION file!")
+        raise Exception("Could not locate VERSION.txt file!")
 
     version_fp = open(version_path, "r")
     try:
