@@ -2144,3 +2144,36 @@ class HistogramTracker(object):
             self.max(),
             self.estimate_median(),
         )
+
+
+class LeakyBucketMeter(object):
+    """Implements a leaky bucket meter to track log bytes sent from this Agent.
+    """
+
+    def __init__(self, leak_rate_per_second, bucket_size):
+        """
+        :param leak_rate_per_second: How many bytes per second this bucket allows through.
+        :param bucket_size: Maximum bytes we can add before an overflow is detected.
+        """
+        self.leak_rate_per_second = leak_rate_per_second
+        self.bucket_size = bucket_size
+        self.bytes_added = 0
+        self.start_time = time.time()
+
+    def sleep_and_add(self, amount):
+        """Add some amount of bytes to this bucket. If there is not sufficient room this method will sleep until there
+        is.
+
+        :param amount: Amount of bytes to add to this bucket.
+        :return:
+        """
+        leaked_bytes = (time.time() - self.start_time) * self.leak_rate_per_second
+        # Add fake bytes so we simulate an empty bucket and not a negatively full one
+        self.bytes_added = max(leaked_bytes, self.bytes_added)
+
+        if self.bytes_added + amount > leaked_bytes + self.bucket_size:
+            time.sleep(
+                (self.bytes_added + amount - leaked_bytes) / self.leak_rate_per_second
+            )
+
+        self.bytes_added += amount
