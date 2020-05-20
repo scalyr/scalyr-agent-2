@@ -1218,7 +1218,9 @@ class StoppableThread(threading.Thread):
 
 class RateLimiter(object):
     """An abstraction that can be used to enforce some sort of rate limit, expressed as a maximum number
-    of bytes to be consumed over a period of time. This abstraction is not thread-safe.
+    of bytes to be consumed over a period of time.
+
+    This abstraction is not thread-safe.
 
     It uses a leaky-bucket implementation.  In this approach, the rate limit is modeled as a bucket
     with a hole in it.  The bucket has a maximum size (expressed in bytes) and a fill rate (expressed in bytes
