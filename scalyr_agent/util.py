@@ -1257,6 +1257,25 @@ class RateLimiter(object):
 
         @return: True if there are enough room in the rate limit to allow the operation.
         """
+        if self._get_time_to_sleep(num_bytes, current_time) > 0.0:
+            return False
+        else:
+            self.__bucket_contents -= num_bytes
+            return True
+
+    def sleep_and_charge(self, num_bytes, current_time=None):
+        """Sleeps until there are enough bytes available for an operation costing num_bytes, then charges that amount.
+
+        @param num_bytes: The number of bytes to consume from the rate limit.
+        @param current_time: If not none, the value to use as the current time, expressed in seconds past epoch. This
+            is used in testing.
+        """
+        time_to_sleep = self._get_time_to_sleep(num_bytes, current_time)
+        if time_to_sleep > 0.0:
+            time.sleep(time_to_sleep)
+        self.__bucket_contents -= num_bytes
+
+    def _get_time_to_sleep(self, num_bytes, current_time=None):
         if current_time is None:
             current_time = time.time()
 
@@ -1270,10 +1289,11 @@ class RateLimiter(object):
         self.__last_bucket_fill_time = current_time
 
         if num_bytes <= self.__bucket_contents:
-            self.__bucket_contents -= num_bytes
-            return True
-
-        return False
+            return 0.0
+        elif self.__bucket_fill_rate == 0:
+            return float("inf")
+        else:
+            return (num_bytes - self.__bucket_contents) / self.__bucket_fill_rate
 
 
 class ScriptEscalator(object):
