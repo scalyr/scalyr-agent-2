@@ -514,11 +514,6 @@ class TestRateLimiter(ScalyrTestCase):
         try:
             self.__last_sleep_amount = -1
             self.__test_rate = RateLimiter(10, 1, current_time=0)
-            self.sleep_and_charge(10)
-            self.assertEqual(self.__last_sleep_amount, -1)
-            self.sleep_and_charge(10)
-            self.assertEqual(self.__last_sleep_amount, 10)
-            self.advance_time(15)
             self.sleep_and_charge(20)
             self.assertEqual(self.__last_sleep_amount, 10)
         finally:
