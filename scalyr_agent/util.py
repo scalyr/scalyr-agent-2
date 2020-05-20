@@ -1218,7 +1218,7 @@ class StoppableThread(threading.Thread):
 
 class RateLimiter(object):
     """An abstraction that can be used to enforce some sort of rate limit, expressed as a maximum number
-    of bytes to be consumed over a period of time.
+    of bytes to be consumed over a period of time. This abstraction is not thread-safe.
 
     It uses a leaky-bucket implementation.  In this approach, the rate limit is modeled as a bucket
     with a hole in it.  The bucket has a maximum size (expressed in bytes) and a fill rate (expressed in bytes
@@ -1263,19 +1263,36 @@ class RateLimiter(object):
             self.__bucket_contents -= num_bytes
             return True
 
-    def sleep_and_charge(self, num_bytes, current_time=None):
-        """Sleeps until there are enough bytes available for an operation costing num_bytes, then charges that amount.
+    def block_until_charge_succeeds(self, num_bytes, current_time=None):
+        """Blocks until there are enough bytes available for an operation costing num_bytes, then charges that amount.
+        As a reminder, this abstraction is not thread-safe so no other method should be invoked on this instance while
+        it is blocking.
 
         @param num_bytes: The number of bytes to consume from the rate limit.
         @param current_time: If not none, the value to use as the current time, expressed in seconds past epoch. This
             is used in testing.
         """
+        if self.__bucket_fill_rate <= 0.0:
+            raise ValueError(
+                "bucket_fill_rate must be greater than 0 to use block_until_charge_succeeds"
+            )
         time_to_sleep = self._get_time_to_sleep(num_bytes, current_time)
         if time_to_sleep > 0.0:
             time.sleep(time_to_sleep)
         self.__bucket_contents -= num_bytes
 
     def _get_time_to_sleep(self, num_bytes, current_time=None):
+        """Returns the amount of time in seconds we would need to sleep to have enough capacity to charge num_bytes
+        without overflowing. num_bytes values greater than the bucket size are allowed and will simulate overfilling
+        of the bucket. bucket_fill_rates values less than or equal to zero will not return values that should actually
+        be slept on, but they are valid enough for checking if there is sufficient space to charge num_bytes
+        immediately.
+
+        @param num_bytes: The number of bytes to consume from the rate limit.
+        @param current_time: If not none, the value to use as the current time, expressed in seconds past epoch. This
+            is used in testing.
+        :return: Time in seconds to sleep to create enough capacity for num_bytes, assuming valid bucket_fill_rate.
+        """
         if current_time is None:
             current_time = time.time()
 
