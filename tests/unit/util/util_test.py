@@ -1158,3 +1158,98 @@ class TestHistogramTracker(ScalyrTestCase):
         for count, lower, upper in self._testing.buckets():
             result.append((count, lower, upper))
         return result
+
+
+class TestParseValueWithRate(ScalyrTestCase):
+    def test_numerators(self):
+        self.assertEqual(100, scalyr_util.parse_data_rate_string("100 B/s"))
+        self.assertEqual(100 * 1000, scalyr_util.parse_data_rate_string("100 kB/s"))
+        self.assertEqual(
+            100 * 1000 * 1000, scalyr_util.parse_data_rate_string("100 mB/s")
+        )
+        self.assertEqual(
+            100 * 1000 * 1000 * 1000, scalyr_util.parse_data_rate_string("100 gB/s")
+        )
+        self.assertEqual(
+            100 * 1000 * 1000 * 1000 * 1000,
+            scalyr_util.parse_data_rate_string("100 tB/s"),
+        )
+        self.assertEqual(100 * 1024, scalyr_util.parse_data_rate_string("100 kiB/s"))
+        self.assertEqual(
+            100 * 1024 * 1024, scalyr_util.parse_data_rate_string("100 miB/s")
+        )
+        self.assertEqual(
+            100 * 1024 * 1024 * 1024, scalyr_util.parse_data_rate_string("100 giB/s")
+        )
+        self.assertEqual(
+            100 * 1024 * 1024 * 1024 * 1024,
+            scalyr_util.parse_data_rate_string("100 tiB/s"),
+        )
+
+    def test_denominators(self):
+        self.assertEqual(100000, scalyr_util.parse_data_rate_string("100000 B/s"))
+        self.assertEqual(
+            100000 / 60.0, scalyr_util.parse_data_rate_string("100000 B/m")
+        )
+        self.assertEqual(
+            100000 / 60.0 / 60.0, scalyr_util.parse_data_rate_string("100000 B/h")
+        )
+        self.assertEqual(
+            100000 / 60.0 / 60.0 / 24.0,
+            scalyr_util.parse_data_rate_string("100000 B/d"),
+        )
+        self.assertEqual(
+            100000 / 60.0 / 60.0 / 24.0 / 7.0,
+            scalyr_util.parse_data_rate_string("100000 B/w"),
+        )
+
+    def test_spacing(self):
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1kiB/s"))
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1 kiB/s"))
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1\tkiB/s"))
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1   \t   \t  kiB/s"))
+
+    def test_capitalization(self):
+        self.assertEqual(100, scalyr_util.parse_data_rate_string("100 B/S"))
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 b/S")
+        self.assertEqual(100, scalyr_util.parse_data_rate_string("100 B/s"))
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 b/s")
+
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1KiB/S"))
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1kIB/S"))
+        self.assertEqual(1000, scalyr_util.parse_data_rate_string("1KB/S"))
+        self.assertEqual(1000, scalyr_util.parse_data_rate_string("1kB/S"))
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "1Kb/S")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "1kib/S")
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1KiB/s"))
+        self.assertEqual(1024, scalyr_util.parse_data_rate_string("1kIB/s"))
+        self.assertEqual(1000, scalyr_util.parse_data_rate_string("1KB/s"))
+        self.assertEqual(1000, scalyr_util.parse_data_rate_string("1kB/s"))
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "1Kb/s")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "1kb/s")
+
+    def test_values(self):
+        self.assertEqual(100, scalyr_util.parse_data_rate_string("100 B/s"))
+        self.assertEqual(-100, scalyr_util.parse_data_rate_string("-100 B/s"))
+        self.assertEqual(0, scalyr_util.parse_data_rate_string("0 B/s"))
+        self.assertEqual(0, scalyr_util.parse_data_rate_string("0 gB/s"))
+        self.assertEqual(0, scalyr_util.parse_data_rate_string("-0 gB/s"))
+        self.assertEqual(-100.2456, scalyr_util.parse_data_rate_string("-100.2456 B/s"))
+        self.assertEqual(
+            199.000001, scalyr_util.parse_data_rate_string("199.000001 B/s")
+        )
+
+        self.assertEqual(
+            1024 * 1024 * 1024 * 1024 / 60.0 / 60.0 / 24.0 / 7.0,
+            scalyr_util.parse_data_rate_string("1 tiB/w"),
+        )
+
+    def test_invalid_inputs(self):
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "B/s")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 /")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "- B/s")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 YB/s")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 B/C")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 D/s")
+        self.assertRaises(ValueError, scalyr_util.parse_data_rate_string, "100 g1/s")
