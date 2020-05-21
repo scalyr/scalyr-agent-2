@@ -17,6 +17,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
@@ -374,12 +375,18 @@ class TestRateLimiter(ScalyrTestCase):
         super(TestRateLimiter, self).setUp()
         self.__test_rate = RateLimiter(100, 10, current_time=0)
         self.__current_time = 0
+        self.__last_sleep_amount = -1
 
     def advance_time(self, delta):
         self.__current_time += delta
 
     def charge_if_available(self, num_bytes):
         return self.__test_rate.charge_if_available(
+            num_bytes, current_time=self.__current_time
+        )
+
+    def block_until_charge_succeeds(self, num_bytes):
+        return self.__test_rate.block_until_charge_succeeds(
             num_bytes, current_time=self.__current_time
         )
 
@@ -414,6 +421,54 @@ class TestRateLimiter(ScalyrTestCase):
         self.assertFalse(self.charge_if_available(60))
         self.advance_time(1)
         self.assertTrue(self.charge_if_available(60))
+
+    def fake_sleep(self, seconds):
+        self.__last_sleep_amount = seconds
+        self.advance_time(seconds)
+
+    def test_basic_use_sleep(self):
+        with mock.patch("scalyr_agent.util.time.sleep", self.fake_sleep):
+            self.__last_sleep_amount = -1
+            self.block_until_charge_succeeds(20)
+            self.assertEqual(self.__last_sleep_amount, -1)
+            self.block_until_charge_succeeds(80)
+            self.assertEqual(self.__last_sleep_amount, -1)
+            self.block_until_charge_succeeds(1)
+            self.assertEqual(self.__last_sleep_amount, 0.1)
+
+    def test_custom_bucket_size_and_rate_sleep(self):
+        with mock.patch("scalyr_agent.util.time.sleep", self.fake_sleep):
+            self.__last_sleep_amount = -1
+            self.__test_rate = RateLimiter(10, 1, current_time=0)
+            self.block_until_charge_succeeds(10)
+            self.assertEqual(self.__last_sleep_amount, -1)
+            self.block_until_charge_succeeds(10)
+            self.assertEqual(self.__last_sleep_amount, 10)
+            self.advance_time(15)
+            self.block_until_charge_succeeds(20)
+            self.assertEqual(self.__last_sleep_amount, 10)
+
+    def test_zero_bucket_fill_rate_sleep(self):
+        self.__test_rate = RateLimiter(100, 0, current_time=0)
+        self.assertRaises(ValueError, self.block_until_charge_succeeds, 20)
+
+    def test_refill_sleep(self):
+        with mock.patch("scalyr_agent.util.time.sleep", self.fake_sleep):
+            self.__last_sleep_amount = -1
+            self.block_until_charge_succeeds(60)
+            self.assertEqual(self.__last_sleep_amount, -1)
+            self.block_until_charge_succeeds(60)
+            self.assertEqual(self.__last_sleep_amount, 2)
+            self.advance_time(1)
+            self.block_until_charge_succeeds(60)
+            self.assertEqual(self.__last_sleep_amount, 5)
+
+    def test_charge_greater_than_bucket_size_sleep(self):
+        with mock.patch("scalyr_agent.util.time.sleep", self.fake_sleep):
+            self.__last_sleep_amount = -1
+            self.__test_rate = RateLimiter(10, 1, current_time=0)
+            self.block_until_charge_succeeds(20)
+            self.assertEqual(self.__last_sleep_amount, 10)
 
 
 class TestRunState(ScalyrTestCase):
