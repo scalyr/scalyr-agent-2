@@ -23,6 +23,11 @@ __author__ = "saurabh@scalyr.com"
 
 import os
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent.builtin_monitors.linux_process_metrics import (
     ProcessMonitor,
@@ -33,6 +38,7 @@ from scalyr_agent.builtin_monitors.linux_process_metrics import (
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import MonitorInformation
+from scalyr_agent.test_base import skipIf
 
 from six.moves import range
 
@@ -217,10 +223,18 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
 
 
 class TestProcessListUtility(ScalyrTestCase):
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def setUp(self):
         super(TestProcessListUtility, self).setUp()
         self.ps = ProcessList()
 
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_no_process(self):
         # override
         self.ps.parent_to_children_map = defaultdict(list)
@@ -230,6 +244,10 @@ class TestProcessListUtility(ScalyrTestCase):
         self.assertEqual(self.ps.get_matches_commandline(".*"), [])
         self.assertEqual(self.ps.get_matches_commandline_with_children(".*"), [])
 
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_single_process_no_children(self):
         # override
         # process id 0 is basically no process. PID 1 is the main process of a terminal
@@ -251,6 +269,10 @@ class TestProcessListUtility(ScalyrTestCase):
             set(self.ps.get_matches_commandline_with_children(".*")), set([1, 2])
         )
 
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_single_process_with_children(self):
         # override
         # process id 0 is basically no process. PID 1 is the main process of a terminal
@@ -275,6 +297,10 @@ class TestProcessListUtility(ScalyrTestCase):
             set(self.ps.get_matches_commandline_with_children(".*")), set([1, 2, 3])
         )
 
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_multiple_processes_with_children(self):
         # override
         # process id 0 is basically no process. PID 1 is the main process of a terminal
