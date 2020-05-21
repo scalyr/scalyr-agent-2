@@ -14,7 +14,7 @@ docker==3.6.0
 requests==2.18.0
 pathlib2==2.3.5
 PyYAML==4.2b4
-# Depends on build-essential and procps which we have trouble installing on
+# Depends on build-essential which we have trouble installing on
 # Docker image we use
 #psutil==5.7.0
 # Needed by MockHTTPServer class and related tests
