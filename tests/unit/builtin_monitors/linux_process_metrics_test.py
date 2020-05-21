@@ -21,6 +21,11 @@ import platform
 
 import mock
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
 from scalyr_agent.scalyr_monitor import load_monitor_class
 from scalyr_agent.test_base import ScalyrTestCase
@@ -31,6 +36,10 @@ __all__ = ["LinuxProcessMetricsMonitorTest"]
 
 class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 3.6 on Circle CI)",
+    )
     def test_gather_sample_by_pid_success(self):
         monitor_config = {
             "module": "linux_process_metrics",
@@ -49,6 +58,10 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_gather_sample_by_commandline_success(self):
         monitor_config = {
             "module": "linux_process_metrics",
@@ -67,6 +80,10 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(
+        not psutil,
+        "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
+    )
     def test_gather_sample_by_pid_failure_pid_doesnt_exist(self):
         monitor_config = {
             "module": "linux_process_metrics",
