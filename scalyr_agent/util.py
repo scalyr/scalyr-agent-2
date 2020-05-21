@@ -681,30 +681,39 @@ def get_web_url_from_upload_url(server):
 
 def parse_data_rate_string(value):
     """Return a rate in bytes per second parsed from a string of a float or int followed by a unit.
-    Takes into account bit (`b`) vs byte (`B`), ignores capitalization of things like `k` vs `K` and the time unit
-    denominator. Allowed numerators go up to terabytes, and allowed denominators go up to weeks.
+    Takes into account bit (`b`) vs byte (`B`) but bit will throw an error to make sure no one gets tripped up, ignores
+    capitalization of things like `k` vs `K` and the time unit denominator. Allowed numerators go up to terabytes, and
+    allowed denominators go up to weeks.
 
     :param value: String with value and unit
     :return: The parsed rate in bytes per second, or raise ValueError if it could not be parsed
     """
-    m = re.search(r"(-?\d+\.?\d*)\s*([kKmMgGtT]?)([bB])/([sSmMhHdDwW])", value)
+    m = re.search(r"(-?\d+\.?\d*)\s*([kKmMgGtT]?)([iI]?)([bB])/([sSmMhHdDwW])", value)
     if m:
         value = float(m.group(1))
         numerator = m.group(2).upper()
-        bit_or_byte = m.group(3)
-        denominator = m.group(4).upper()
+        base_string = m.group(3).upper()
+        bit_or_byte = m.group(4)
+        denominator = m.group(5).upper()
+
+        base = 1000
+        if base_string == "I":
+            base = 1024
 
         if numerator == "K":
-            value = value * 1024
+            value = value * base
         elif numerator == "M":
-            value = value * 1024 * 1024
+            value = value * base ** 2
         elif numerator == "G":
-            value = value * 1024 * 1024 * 1024
+            value = value * base ** 3
         elif numerator == "T":
-            value = value * 1024 * 1024 * 1024 * 1024
+            value = value * base ** 4
 
         if bit_or_byte == "b":
-            value = value / 8
+            raise ValueError(
+                "Could not parse data rate string '%s', rates defined in bits (lowercase 'b') are not allowed."
+                % value
+            )
 
         if denominator == "M":
             value = value / 60
@@ -716,7 +725,7 @@ def parse_data_rate_string(value):
             value = value / 60 / 60 / 24 / 7
 
         return value
-    raise ValueError("Could not parse data rate string")
+    raise ValueError("Could not parse data rate string '%s'" % value)
 
 
 class JsonReadFileException(Exception):
