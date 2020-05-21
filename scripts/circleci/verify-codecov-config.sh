@@ -14,22 +14,28 @@
 # limitations under the License.
 
 # Script which verifies codecov.yml config syntax with codecov.io.
-# It takes occasional codecov API failures into account and tries to retry
-# upload.
-
+# It takes occasional codecov API failures (timeouts) into account and tries to
+# retry on failure.
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
 RETRY_DELAY=${RETRY_DELAY:-5}
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
-    curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
+    OUTPUT=$(curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
+    $(echo "${OUTPUT}" | grep -i "Valid!" > /dev/null)
     EXIT_CODE=$?
 
     if [ "${EXIT_CODE}" -eq 0 ]; then
+        echo ""
+        echo "codecov.yml config is valid."
         break
     fi
 
+    echo ""
     echo "Command exited with non-zero, retrying in ${RETRY_DELAY} seconds..."
+    echo ""
+    echo "curl output: ${OUTPUT}"
+    echo ""
     sleep "${RETRY_DELAY}"
 done
 
