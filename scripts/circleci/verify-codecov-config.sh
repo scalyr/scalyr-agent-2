@@ -24,9 +24,9 @@ for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     OUTPUT=$(curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
     CURL_EXIT_CODE=$?
     echo "${OUTPUT}" | grep -i "Valid!" > /dev/null
-    EXIT_CODE=$?
+    GREP_EXIT_CODE=$?
 
-    if [ "${EXIT_CODE}" -eq 0 ]; then
+    if [ "${GREP_EXIT_CODE}" -eq 0 ]; then
         echo ""
         echo "codecov.yml config is valid."
         break
@@ -47,7 +47,7 @@ for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     fi
 done
 
-if [ "${EXIT_CODE}" -ne 0 ]; then
+if [ "${GREP_EXIT_CODE}" -ne 0 ]; then
     echo "Verifying codecov.yml failed after ${MAX_ATTEMPTS} attempts"
     exit 1
 fi
