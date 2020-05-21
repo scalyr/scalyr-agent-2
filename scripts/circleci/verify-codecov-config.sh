@@ -22,7 +22,8 @@ RETRY_DELAY=${RETRY_DELAY:-5}
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     OUTPUT=$(curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
-    $(echo "${OUTPUT}" | grep -i "Valid!" > /dev/null)
+    CURL_EXIT_CODE=$?
+    echo "${OUTPUT}" | grep -i "Valid!" > /dev/null
     EXIT_CODE=$?
 
     if [ "${EXIT_CODE}" -eq 0 ]; then
@@ -32,11 +33,18 @@ for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     fi
 
     echo ""
-    echo "Command exited with non-zero, retrying in ${RETRY_DELAY} seconds..."
-    echo ""
     echo "curl output: ${OUTPUT}"
     echo ""
-    sleep "${RETRY_DELAY}"
+
+    if [ "${CURL_EXIT_CODE}" -eq 28 ]; then
+        # curl exists with 28 on timeout
+        echo "Command exited with non-zero (timeout), retrying in ${RETRY_DELAY} seconds..."
+        sleep "${RETRY_DELAY}"
+    else
+        # fatal error - we should abort immediately instead of retrying
+        echo "codecov.yml config validation failed"
+        exit 1
+    fi
 done
 
 if [ "${EXIT_CODE}" -ne 0 ]; then
