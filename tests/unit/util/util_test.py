@@ -450,8 +450,7 @@ class TestRateLimiter(ScalyrTestCase):
 
     def test_zero_bucket_fill_rate_sleep(self):
         self.__test_rate = RateLimiter(100, 0, current_time=0)
-        with self.assertRaises(ValueError):
-            self.block_until_charge_succeeds(20)
+        self.assertRaises(ValueError, self.block_until_charge_succeeds, 20)
 
     def test_refill_sleep(self):
         with mock.patch("scalyr_agent.util.time.sleep", self.fake_sleep):
