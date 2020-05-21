@@ -20,6 +20,8 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
+import re
+
 if False:
     from typing import Union
     from typing import Tuple
@@ -675,6 +677,46 @@ def get_web_url_from_upload_url(server):
     server = server.replace("https://upload.", "https://www.")
     server = server.replace("https://app.", "https://www.")
     return server
+
+
+def parse_data_rate_string(value):
+    """Return a rate in bytes per second parsed from a string of a float or int followed by a unit.
+    Takes into account bit (`b`) vs byte (`B`), ignores capitalization of things like `k` vs `K` and the time unit
+    denominator. Allowed numerators go up to terabytes, and allowed denominators go up to weeks.
+
+    :param value: String with value and unit
+    :return: The parsed rate in bytes per second, or raise ValueError if it could not be parsed
+    """
+    m = re.search(r"(-?\d+\.?\d*)\s*([kKmMgGtT]?)([bB])/([sSmMhHdDwW])", value)
+    if m:
+        value = float(m.group(1))
+        numerator = m.group(2).upper()
+        bit_or_byte = m.group(3)
+        denominator = m.group(4).upper()
+
+        if numerator == "K":
+            value = value * 1024
+        elif numerator == "M":
+            value = value * 1024 * 1024
+        elif numerator == "G":
+            value = value * 1024 * 1024 * 1024
+        elif numerator == "T":
+            value = value * 1024 * 1024 * 1024 * 1024
+
+        if bit_or_byte == "b":
+            value = value / 8
+
+        if denominator == "M":
+            value = value / 60
+        elif denominator == "H":
+            value = value / 60 / 60
+        elif denominator == "D":
+            value = value / 60 / 60 / 24
+        elif denominator == "W":
+            value = value / 60 / 60 / 24 / 7
+
+        return value
+    raise ValueError("Could not parse data rate string")
 
 
 class JsonReadFileException(Exception):
