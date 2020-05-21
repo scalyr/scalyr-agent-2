@@ -11,12 +11,11 @@ coverage:
 
   status:
     project:
-      default:
-        default: false
-        # TODO: Define threshold once we agree on them
-        #target: auto
-        #threshold: 2%
-        #patch: yes
+      default: false
+      # TODO: Define threshold once we agree on them
+      #target: auto
+      #threshold: 2%
+      #patch: yes
 
 # Code coverage data needs to be relative to the repo root, but in out reports it's
 # relative to /home/circleci/scalyr-agent-2/ so we need to fix the paths so it works
