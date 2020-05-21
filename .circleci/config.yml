@@ -716,7 +716,9 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
-          apt_dependencies: "procps build-essential"
+          # NOTE: We simply skip tests which depend on those dependencies since
+          # there appear to be broken upstream since May 20th,2020
+          #apt_dependencies: "procps build-essential"
 
   smoke-standalone-27-tls12:
     docker:
