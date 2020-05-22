@@ -1,7 +1,7 @@
 
 function Expand-ZIPFile($file, $destination) {
 	$shell = new-object -com shell.application
-	$zip = $shell.NameSpace($file)
+	$zip = $shell.NameSpace((Resolve-Path $file).Path)
 	foreach($item in $zip.items())
 		{
 			$shell.Namespace($destination).copyhere($item)
