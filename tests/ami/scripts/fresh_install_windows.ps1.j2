@@ -32,8 +32,6 @@ try {
 }
 
 
-#Invoke-WebRequest "{{ package_to_version }}" -OutFile .\package.msi
-#$scripts_path=split-path -parent $MyInvocation.MyCommand.Definition
 $msi_version=GetMSIVersion -MSI .\ScalyrAgentInstaller.msi
 echo $msi_version
 
@@ -55,6 +53,13 @@ $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
 [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
 
 $Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
+
+# enable disk performance counters
+if ($major -lt 10) {
+    Write-Output "Enable disk performance counters because it is required in Windows Server < 2019."
+    diskperf -y;
+
+}
 
 scalyr-agent-2 start;
 
