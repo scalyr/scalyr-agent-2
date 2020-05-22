@@ -1,3 +1,5 @@
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 wget https://github.com/PowerShell/Win32-OpenSSH/releases/download/v8.1.0.0p1-Beta/OpenSSH-Win64.zip -OutFile OpenSSH-Win64.zip;
 Expand-Archive -LiteralPath OpenSSH-Win64.zip -DestinationPath "C:\Program Files" -Force;
 mv "C:\Program Files\OpenSSH-Win64" "C:\Program Files\openssh";
