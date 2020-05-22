@@ -13,7 +13,7 @@ function Expand-ZIPFile($file, $destination) {
 
 wget https://github.com/PowerShell/Win32-OpenSSH/releases/download/v8.1.0.0p1-Beta/OpenSSH-Win64.zip -OutFile OpenSSH-Win64.zip;
 #Expand-Archive -LiteralPath OpenSSH-Win64.zip -DestinationPath "C:\Program Files" -Force;
-Expand-ZIPFile –File  OpenSSH-Win64.zip –Destination "C:\Program Files"
+Expand-ZIPFile –File  "~\OpenSSH-Win64.zip" –Destination "C:\Program Files"
 
 rm OpenSSH-Win64.zip -Force
 
