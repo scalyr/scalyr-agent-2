@@ -978,6 +978,8 @@ def export_config(config_dest, config_file_path, configuration):
         # raw value for this configuration to avoid it making the path absolute when we want the relative.
         fragment_dir = configuration.config_directory_raw
 
+        # TODO - AGENT-400, should add support for the extra-config-dir here
+
         # If it was absolute, try to make it relative.
         if os.path.isabs(fragment_dir):
             fragment_dir = relative_path(
