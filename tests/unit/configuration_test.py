@@ -64,6 +64,8 @@ class TestConfigurationBase(ScalyrTestCase):
         self._config_file = os.path.join(self._config_dir, "agent.json")
         self._config_fragments_dir = os.path.join(self._config_dir, "agent.d")
         os.makedirs(self._config_fragments_dir)
+        self._extra_config_fragments_dir = tempfile.mkdtemp() + "extra"
+        os.makedirs(self._extra_config_fragments_dir)
         for key in os_environ_unicode.keys():
             if "scalyr" in key.lower():
                 del os.environ[key]
@@ -106,15 +108,18 @@ class TestConfigurationBase(ScalyrTestCase):
         fp.close()
 
     def _write_config_fragment_file_with_separator_conversion(
-        self, file_path, contents
+        self, file_path, contents, config_dir=None
     ):
+        if config_dir is None:
+            config_dir = self._config_fragments_dir
+
         contents = scalyr_util.json_encode(
             self.__convert_separators(
                 scalyr_util.json_scalyr_config_decode(contents)
             ).to_dict()
         )
 
-        full_path = os.path.join(self._config_fragments_dir, file_path)
+        full_path = os.path.join(config_dir, file_path)
         fp = open(full_path, "w")
         fp.write(contents)
         fp.close()
@@ -130,7 +135,7 @@ class TestConfigurationBase(ScalyrTestCase):
             self.config = config
             self.log_config = {"path": self.module_name.split(".")[-1] + ".log"}
 
-    def _create_test_configuration_instance(self, logger=None):
+    def _create_test_configuration_instance(self, logger=None, extra_config_dir=None):
         """Creates an instance of a Configuration file for testing.
 
         @return:  The test instance
@@ -144,7 +149,9 @@ class TestConfigurationBase(ScalyrTestCase):
             self.convert_path("/var/lib/scalyr-agent-2"),
         )
 
-        return Configuration(self._config_file, default_paths, logger)
+        return Configuration(
+            self._config_file, default_paths, logger, extra_config_dir=extra_config_dir
+        )
 
     # noinspection PyPep8Naming
     def assertPathEquals(self, actual_path, expected_path):
@@ -945,6 +952,64 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(len(config.log_configs), 2)
+
+    def test_extra_config_dir_absolute(self):
+
+        self._write_file_with_separator_conversion(""" { api_key: "main-api-key" } """)
+        self._write_config_fragment_file_with_separator_conversion(
+            "extra.json",
+            """ {
+           max_line_size: 10,
+          }
+        """,
+            config_dir=self._extra_config_fragments_dir,
+        )
+        config = self._create_test_configuration_instance(
+            extra_config_dir=self._extra_config_fragments_dir
+        )
+        config.parse()
+        self.assertEquals(config.api_key, "main-api-key")
+        self.assertEquals(config.max_line_size, 10)
+
+    def test_extra_config_dir_relative(self):
+        self._write_file_with_separator_conversion(""" { api_key: "main-api-key" } """)
+        extra_dir = os.path.join(self._config_dir, "extra")
+        os.makedirs(extra_dir)
+        self._write_config_fragment_file_with_separator_conversion(
+            "extra.json",
+            """ {
+           max_line_size: 10,
+          }
+        """,
+            config_dir=extra_dir,
+        )
+        config = self._create_test_configuration_instance(extra_config_dir="extra")
+        config.parse()
+        self.assertEquals(config.api_key, "main-api-key")
+        self.assertEquals(config.max_line_size, 10)
+
+    def test_raw_extra_config(self):
+        self._write_file_with_separator_conversion(""" { api_key: "main-api-key" } """)
+        extra_dir = os.path.join(self._config_dir, "extra")
+        os.makedirs(extra_dir)
+        self._write_config_fragment_file_with_separator_conversion(
+            "extra.json",
+            """ {
+           max_line_size: 10,
+          }
+        """,
+            config_dir=extra_dir,
+        )
+        config = self._create_test_configuration_instance(extra_config_dir="extra")
+        config.parse()
+        self.assertEquals(config.extra_config_directory, extra_dir)
+        self.assertEquals(config.extra_config_directory_raw, "extra")
+
+    def test_no_raw_extra_config(self):
+        self._write_file_with_separator_conversion(""" { api_key: "main-api-key" } """)
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertTrue(config.extra_config_directory_raw is None)
 
     def test_parser_specification(self):
         self._write_file_with_separator_conversion(

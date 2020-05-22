@@ -1000,6 +1000,7 @@ class ControlledCacheWarmer(StoppableThread):
         # The list of containers whose pods are eligible to be warmed in the cache.  Essentially, the active_pods
         # minus those already warmed or blacklisted.
         self.__containers_to_warm = []
+
         self.__max_failure_count = max_failure_count
         self.__blacklist_time_secs = blacklist_time_secs
         self.__max_query_retries = max_query_retries
@@ -1053,6 +1054,49 @@ class ControlledCacheWarmer(StoppableThread):
             self.__condition_var.notify_all()
         finally:
             self.__condition_var.release()
+
+    def mark_has_been_used(self, container_id, unmark_to_warm=False):
+        """
+        Marks a WarmingEntry as having been used.  This typically means that
+        the container id has been returned as a container that should be
+        watched by the agent.
+        @param container_id: the container id of the warming entry to mark as used
+        @param unmark_to_warm: whether or not to unmark the WarmingEntry as something to warm
+        """
+        self.__lock.acquire()
+        try:
+            entry = self.__active_pods.get(container_id, None)
+            if entry:
+                entry.has_been_used = True
+
+                if unmark_to_warm:
+                    entry.is_recently_marked = False
+
+        finally:
+            self.__lock.release()
+
+    def pending_first_use(self, container_id):
+        """
+        Returns whether a WarmingEntry for a container_id is awaiting its first use
+
+        @param container_id: the container id to check
+
+        @return: Whether or not the entry has been marked as used. If this is
+        False, it typically means this container's log has not yet been
+        included in the list of logs to copy. If this container is not part of
+        the active set, always returns False.
+        """
+        self.__lock.acquire()
+        try:
+            entry = self.__active_pods.get(container_id, None)
+            if entry:
+                return not entry.has_been_used
+
+        finally:
+            self.__lock.release()
+
+        # if we are here, then the container id didn't have a warming entry.
+        return False
 
     def begin_marking(self):
         """Must be invoked before any container is marked as being active, by invoking `mark_to_warm`.
@@ -1569,9 +1613,11 @@ class ControlledCacheWarmer(StoppableThread):
             self.pod_namespace = pod_namespace
             # The associated pod's name.
             self.pod_name = pod_name
-            # The time when this pod was first requested to be warmed
+            # Whether or not this is a new warming entry that has never been used
+            self.has_been_used = False
+            # The most recent time when this pod was requested to be warmed - gets updated after cache expiry
             self.start_time = None
-            # Whether or not it has been successfully warmed.
+            # Whether or not it is currently warmed.
             self.is_warm = False
             # Used to indicate if it is been marked in the most recent marking run started by `begin_marking`.
             self.is_recently_marked = False
@@ -1673,9 +1719,18 @@ def _get_containers(
                 # Note we need to *include* results that were created after the 'running_or_created_after' time.
                 # that means we need to *ignore* any containers created before that
                 # hence the reason 'create_before' is assigned to a value named '...created_after'
-                if _ignore_old_dead_container(
+                is_old_dead_container = _ignore_old_dead_container(
                     container, created_before=running_or_created_after
-                ):
+                )
+
+                # AGENT-373/270 - we don't want to ignore containers that are still
+                # pending first use, otherwise we will miss out on short-lived logs
+                pending_first_use = False
+                if controlled_warmer is not None:
+                    pending_first_use = controlled_warmer.pending_first_use(cid)
+
+                # ignore containers that are old and dead and whose logs are already being copied
+                if is_old_dead_container and not pending_first_use:
                     continue
 
                 if len(container["Names"]) > 0:
@@ -1814,6 +1869,15 @@ def _get_containers(
                                             ignore_k8s_api_exception=True,
                                         )
                                         if pod:
+                                            # We've read the pod from the cache, so any WarmingEntry associated
+                                            # with this has now been used.  This ensures we pick up short lived
+                                            # logs that finished before they had a warm entry in the k8s_cache
+                                            if controlled_warmer is not None:
+                                                controlled_warmer.mark_has_been_used(
+                                                    cid,
+                                                    unmark_to_warm=is_old_dead_container,
+                                                )
+
                                             k8s_info["pod_info"] = pod
 
                                             k8s_container = k8s_info.get(

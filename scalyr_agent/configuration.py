@@ -46,6 +46,7 @@ from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
+from scalyr_agent import compat
 
 
 class Configuration(object):
@@ -75,7 +76,7 @@ class Configuration(object):
     DEFAULT_K8S_IGNORE_NAMESPACES = ["kube-system"]
     DEFAULT_K8S_INCLUDE_NAMESPACES = ["*"]
 
-    def __init__(self, file_path, default_paths, logger):
+    def __init__(self, file_path, default_paths, logger, extra_config_dir=None):
         # Captures all environment aware variables for testing purposes
         self._environment_aware_map = {}
         self.__file_path = os.path.abspath(file_path)
@@ -105,6 +106,9 @@ class Configuration(object):
         # Add documentation, verify, etc.
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
+
+        # An additional directory to look for config snippets
+        self.__extra_config_directory = extra_config_dir
 
         self.__logger = logger
 
@@ -151,8 +155,14 @@ class Configuration(object):
                 "server_attributes",
             )
 
+            # Get any configuration snippets in the config directory
+            extra_config = self.__list_files(self.config_directory)
+
+            # Plus any configuration snippets in the additional config directory
+            extra_config.extend(self.__list_files(self.extra_config_directory))
+
             # Now, look for any additional configuration in the config fragment directory.
-            for fp in self.__list_files(self.config_directory):
+            for fp in extra_config:
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
                 for k in content.keys():
@@ -933,6 +943,26 @@ class Configuration(object):
         )
 
     @property
+    def extra_config_directory(self):
+        """Returns the configuration value for `extra_config_directory`, resolved to full path if
+        necessary.  """
+
+        # If `extra_config_directory` is a relative path, then it will be relative
+        # to the directory containing the main config file
+        if self.__extra_config_directory is None:
+            return None
+
+        return self.__resolve_absolute_path(
+            self.__extra_config_directory,
+            self.__get_parent_directory(self.__file_path),
+        )
+
+    @property
+    def extra_config_directory_raw(self):
+        """Returns the configuration value for 'extra_config_directory'."""
+        return self.__extra_config_directory
+
+    @property
     def max_allowed_request_size(self):
         """Returns the configuration value for 'max_allowed_request_size'."""
         return self.__get_config().get_int("max_allowed_request_size")
@@ -1190,6 +1220,20 @@ class Configuration(object):
                 other.__config.put("debug_level", original_debug_level)
 
     @staticmethod
+    def get_extra_config_dir(extra_config_dir):
+        """
+        Returns the value for the additional config directory - either from the value passed
+        in, or from the environment variable `SCALYR_EXTRA_CONFIG_DIR`.
+
+        @param extra_config_dir: the additinal configuration directory.  If this value is
+            None, then the environment variable `SCALYR_EXTRA_CONFIG_DIR` is read for the result
+        """
+        result = extra_config_dir
+        if extra_config_dir is None:
+            result = compat.os_getenv_unicode("SCALYR_EXTRA_CONFIG_DIR")
+        return result
+
+    @staticmethod
     def default_ca_cert_path():
         """Returns the default configuration file path for the agent."""
         # TODO:  Support more platforms.
@@ -1250,6 +1294,8 @@ class Configuration(object):
         @return: If the directory exists and can be read, the list of files ending in .json (not directories).
         """
         result = []
+        if directory_path is None:
+            return result
         if not os.path.isdir(directory_path):
             return result
         if not os.access(directory_path, os.R_OK):
