@@ -1,5 +1,3 @@
-$public_key=$args[0]
-
 wget https://github.com/PowerShell/Win32-OpenSSH/releases/download/v8.1.0.0p1-Beta/OpenSSH-Win64.zip -OutFile OpenSSH-Win64.zip;
 Expand-Archive -LiteralPath OpenSSH-Win64.zip -DestinationPath "C:\Program Files" -Force;
 mv "C:\Program Files\OpenSSH-Win64" "C:\Program Files\openssh";
@@ -17,7 +15,7 @@ New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Wi
 New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShellCommandOption -Value "/c" -PropertyType String -Force;
 
 mkdir ~\.ssh -Force;
-Add-Content ~\.ssh\authorized_keys $public_key;
+Add-Content ~\.ssh\authorized_keys $Env:PUBLIC_KEY;
 
 (Get-Content "C:\ProgramData\ssh\sshd_config") `
    -replace 'Match Group administrators', '#Match Group administrators' `
