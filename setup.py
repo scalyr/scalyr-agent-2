@@ -181,7 +181,7 @@ def perform_setup():
     # Determine which of the two uses cases we are executing.. either we are on Windows building the
     # Windows installer using py2exe, or we are uploading the module to pypi.
     if "win32" == sys.platform:
-        my_data_files = [("", [path.join("source_root", "VERSION.txt")])]
+        my_data_files = [("", [path.join("source_root", "VERSION")])]
         for my_license in os.listdir(path.join("data_files", "licenses")):
             license_file = path.join("data_files", "licenses", my_license)
             if os.path.isfile(license_file):
@@ -190,10 +190,10 @@ def perform_setup():
         my_package_data = None
     else:
         my_data_files = []
-        my_package_data = {"scalyr_agent": ["VERSION.txt"]}
-        # Copy VERSION.txt to the source directory to make it easier to include it as package data.  There's
+        my_package_data = {"scalyr_agent": ["VERSION"]}
+        # Copy VERSION to the source directory to make it easier to include it as package data.  There's
         # is surely a better way here, but my setup.py fu is very weak.
-        shutil.copy("VERSION.txt", "scalyr_agent")
+        shutil.copy("VERSION", "scalyr_agent")
 
     # Compute the set of modules to manually include.
     modules_to_include = set()
@@ -292,8 +292,8 @@ def perform_setup():
     )
 
     if "win32" != sys.platform:
-        # Delete the temporary copy of VERSION.txt that we created above.
-        tmp_path = os.path.join("scalyr_agent", "VERSION.txt")
+        # Delete the temporary copy of VERSION that we created above.
+        tmp_path = os.path.join("scalyr_agent", "VERSION")
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)
 

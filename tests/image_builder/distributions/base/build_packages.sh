@@ -15,7 +15,7 @@
 
 PACKAGE_TYPE=${1}
 
-echo "$(cat /agent_source/VERSION.txt)-$(git --git-dir /agent_source/.git rev-parse --short HEAD)" >/agent_source/VERSION.txt
+echo "$(cat /agent_source/VERSION)-$(git --git-dir /agent_source/.git rev-parse --short HEAD)" >/agent_source/VERSION
 
 mkdir -p /package
 cd /package || exit 1
@@ -23,7 +23,7 @@ echo "${PACKAGE_TYPE}"
 python /agent_source/build_package.py "${PACKAGE_TYPE}"
 
 # change version and build new package for agent upgrade test.
-echo "$(cat /agent_source/VERSION.txt)-2" >/agent_source/VERSION.txt
+echo "$(cat /agent_source/VERSION)-2" >/agent_source/VERSION
 mkdir -p /second_package
 cd /second_package || exit 1
 

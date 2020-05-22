@@ -3,7 +3,7 @@
 #----------------------------------------------------------------------------------------
 # Runs agent smoketest for k8s in Minikube:
 #    - Assumes that the current scalyr-agent-2 root directory contains the test branch and that
-#       the VERSION.txt file can be overwritten (ie. the scalyr-agent-2 directory is a "throwaway" copy.
+#       the VERSION file can be overwritten (ie. the scalyr-agent-2 directory is a "throwaway" copy.
 #    - Launch agent k8s pod
 #    - Launch uploader pod (writes lines to stdout)
 #    - Launch verifier pod (polls for liveness of agent and uploader as well as verifies expected uploaded lines)
@@ -84,7 +84,7 @@ echo "=================================================="
 echo "Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
-perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION.txt
+perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 python build_package.py k8s_builder --coverage
 TARBALL=$(ls scalyr-k8s-agent-*)
 

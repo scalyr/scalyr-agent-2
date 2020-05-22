@@ -14,7 +14,7 @@ main_a = Analysis(['source_root\\scalyr_agent\\agent_main.py'],
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
 			 hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
-             datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses')],
+             datas=[('data_files\\VERSION', '.'), ('data_files\\licenses', 'third_party_licenses')],
 )
 
 config_a = Analysis(['source_root\\scalyr_agent\\config_main.py'],
@@ -24,7 +24,7 @@ config_a = Analysis(['source_root\\scalyr_agent\\config_main.py'],
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
              hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
-             datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses')],
+             datas=[('data_files\\VERSION', '.'), ('data_files\\licenses', 'third_party_licenses')],
              )
 
 service_a = Analysis(['source_root\\scalyr_agent\\platform_windows.py'],
@@ -34,7 +34,7 @@ service_a = Analysis(['source_root\\scalyr_agent\\platform_windows.py'],
 				'source_root\\scalyr_agent\\third_party_python2',
 				],
              hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
-             datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses')],
+             datas=[('data_files\\VERSION', '.'), ('data_files\\licenses', 'third_party_licenses')],
              )
 
 

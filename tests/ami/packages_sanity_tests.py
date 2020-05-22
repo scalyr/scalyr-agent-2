@@ -68,13 +68,10 @@ combination of both.
 from __future__ import absolute_import
 from __future__ import print_function
 
-if False:
-    from typing import List
-    from typing import Optional
-
 import os
 import sys
 import time
+import re
 
 import random
 import argparse
@@ -94,27 +91,33 @@ from libcloud.compute.deployment import (
     FileDeployment,
     MultiStepDeployment,
 )
-
 import libcloud.compute.base
+from tests.ami.utils import get_env_throw_if_not_set
+
+if False:
+    from typing import List
+    from typing import Optional
 
 
+# if we try to run deployment script on windows machine with openssh,
+# ParamikoSSHClient does not return valid remote path after "put" operation.
+# For example if we put script file by path 'C:\users\admin' it adds slash at the beginning - '/C:\users\admin'.
+# When it is time to execute this script on the remote machine,
+# it ends with error because '/C:\users\admin' is invalid path.
 class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
     def put(self, path, contents=None, chmod=None, mode="w"):
         result = super(ParamikoSSHClient, self).put(
             path, contents=contents, chmod=chmod, mode=mode
         )
-        import re
-
+        # just remove first slash.
         if re.match(r"^\/\w\:.*$", result):
             return result[1:]
 
         return result
 
 
+# monkeypatch original ParamikoSSHClient
 libcloud.compute.base.SSHClient = ParamikoSSHClient
-
-
-from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")

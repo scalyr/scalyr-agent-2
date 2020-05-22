@@ -2,7 +2,7 @@
 #----------------------------------------------------------------------------------------
 # Runs agent smoketest for docker:
 #    - Assumes that the current scalyr-agent-2 root directory contains the test branch and that
-#       the VERSION.txt file can be overwritten (ie. the scalyr-agent-2 directory is a "throwaway" copy.
+#       the VERSION file can be overwritten (ie. the scalyr-agent-2 directory is a "throwaway" copy.
 #    - Launch agent docker image
 #    - Launch uploader docker image (writes lines to stdout)
 #    - Launch verifier docker image (polls for liveness of agent and
@@ -76,9 +76,9 @@ kill_and_delete_docker_test_containers
 echo `pwd`
 
 # Build agent docker image packager with fake version
-fakeversion=`cat VERSION.txt`
+fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
-echo $fakeversion > ./VERSION.txt
+echo $fakeversion > ./VERSION
 echo "Building docker image"
 python build_package.py docker_${syslog_or_json}_builder --coverage
 
