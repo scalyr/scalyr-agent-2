@@ -227,6 +227,57 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
+    def test_has_been_used(self):
+        warmer = self.__warmer_test_instance
+        fake_cache = self.__fake_cache
+
+        # containers that haven't been added should never be pending_first_use
+        self.assertFalse(warmer.pending_first_use(self.CONTAINER_1))
+
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        # warming entry is pending first use as soon as it has been created (happens in mark to warm if not exists)
+        self.assertTrue(warmer.pending_first_use(self.CONTAINER_1))
+        warmer.end_marking()
+
+        fake_cache.wait_until_request_pending()
+        fake_cache.set_response(self.NAMESPACE_1, self.POD_1, success=True)
+
+        warmer.block_until_idle(self.timeout)
+        # pod is warm, but warming entry is still pending first use until marked
+        self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
+        self.assertTrue(warmer.pending_first_use(self.CONTAINER_1))
+
+        warmer.mark_has_been_used(self.CONTAINER_1)
+        self.assertFalse(warmer.pending_first_use(self.CONTAINER_1))
+        self.assertTrue(self.CONTAINER_1 in warmer.active_containers())
+
+    def test_has_been_used_unmark_to_warm(self):
+        warmer = self.__warmer_test_instance
+        fake_cache = self.__fake_cache
+
+        # containers that haven't been added should never be pending_first_use
+        self.assertFalse(warmer.pending_first_use(self.CONTAINER_1))
+
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        # warming entry is pending first use as soon as it has been created (happens in mark to warm if not exists)
+        self.assertTrue(warmer.pending_first_use(self.CONTAINER_1))
+        warmer.end_marking()
+
+        fake_cache.wait_until_request_pending()
+        fake_cache.set_response(self.NAMESPACE_1, self.POD_1, success=True)
+
+        warmer.block_until_idle(self.timeout)
+
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        self.assertTrue(warmer.pending_first_use(self.CONTAINER_1))
+        warmer.mark_has_been_used(self.CONTAINER_1, unmark_to_warm=True)
+        warmer.end_marking()
+
+        self.assertFalse(warmer.pending_first_use(self.CONTAINER_1))
+        self.assertFalse(self.CONTAINER_1 in warmer.active_containers())
+
     def test_already_warm(self):
         # Test case where a pod was put into the warming list, but when it is returned by `pick_next_pod`, it is
         # already warmed in the cache.
