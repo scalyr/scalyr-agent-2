@@ -227,11 +227,15 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.global_monitor_sample_interval, 30.0)
 
-        self.assertEquals(config.max_allowed_request_size, 1 * 1024 * 1024)
+        self.assertEquals(config.max_send_rate_enforcement, "unlimited")
+        self.assertIsNone(config.parsed_max_send_rate_enforcement)
+        self.assertEquals(config.disable_max_send_rate_enforcement_overrides, False)
+
+        self.assertEquals(config.max_allowed_request_size, 5900000)
         self.assertEquals(config.min_allowed_request_size, 100 * 1024)
 
-        self.assertEquals(config.min_request_spacing_interval, 1.0)
-        self.assertEquals(config.max_request_spacing_interval, 5.0)
+        self.assertEquals(config.min_request_spacing_interval, 0.1)
+        self.assertEquals(config.max_request_spacing_interval, 1.0)
 
         self.assertEquals(config.high_water_bytes_sent, 100 * 1024)
         self.assertEquals(config.high_water_request_spacing_adjustment, 0.6)
@@ -247,8 +251,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.enable_gc_stats, False)
 
         self.assertEquals(config.max_line_size, 9900)
-        self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
-        self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
+        self.assertEquals(config.max_log_offset_size, 200000000)
+        self.assertEquals(config.max_existing_log_offset_size, 200000000)
         self.assertEquals(config.max_sequence_number, 1024 ** 4)
         self.assertEquals(config.line_completion_wait_time, 5)
         self.assertEquals(config.read_page_size, 64 * 1024)
@@ -269,7 +273,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertFalse(config.pidfile_advanced_reuse_guard)
         self.assertFalse(config.strip_domain_from_default_server_host)
 
-        self.assertEquals(config.pipeline_threshold, 1.1)
+        self.assertEquals(config.pipeline_threshold, 0)
 
         self.assertEquals(
             config.k8s_service_account_cert,
@@ -348,6 +352,8 @@ class TestConfiguration(TestConfigurationBase):
             allow_http: true,
             scalyr_server: "noland.scalyr.com",
             global_monitor_sample_interval: 60.0,
+            max_send_rate_enforcement: "2 MB/s",
+            disable_max_send_rate_enforcement_overrides: true,
             max_allowed_request_size: 2000000,
             min_allowed_request_size: 7000,
             min_request_spacing_interval: 2.0,
@@ -417,6 +423,11 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["region"], "us-east")
 
         self.assertEquals(config.global_monitor_sample_interval, 60.0)
+
+        self.assertEquals(config.max_send_rate_enforcement, "2 MB/s")
+        self.assertEquals(config.parsed_max_send_rate_enforcement, 2000000)
+
+        self.assertEquals(config.disable_max_send_rate_enforcement_overrides, True)
 
         self.assertEquals(config.max_allowed_request_size, 2000000)
         self.assertEquals(config.min_allowed_request_size, 7000)
@@ -1396,6 +1407,8 @@ class TestConfiguration(TestConfigurationBase):
                         fake_env[field] = "WARN"
                     elif field == "compression_type":
                         fake_env[field] = "deflate"
+                    elif field == "max_send_rate_enforcement":
+                        fake_env[field] = "legacy"
                     else:
                         self.assertNotEquals(
                             FAKE_STRING,
@@ -2311,3 +2324,45 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
             config_description=None,
             valid_values=["bar", "baz"],
         )
+
+    def test_max_send_rate_enforcement_legacy_defaults(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                max_send_rate_enforcement: "legacy"
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        self.assertEquals(config.max_send_rate_enforcement, "legacy")
+        self.assertIsNone(config.parsed_max_send_rate_enforcement)
+
+        self.assertEquals(config.max_allowed_request_size, 1048576)
+        self.assertEquals(config.pipeline_threshold, 1.1)
+        self.assertEquals(config.min_request_spacing_interval, 1.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
+        self.assertEquals(config.max_log_offset_size, 5242880)
+        self.assertEquals(config.max_existing_log_offset_size, 104857600)
+
+    def test_disable_max_send_rate_enforcement_overrides(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                disable_max_send_rate_enforcement_overrides: true
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        self.assertEquals(config.max_send_rate_enforcement, "unlimited")
+        self.assertIsNone(config.parsed_max_send_rate_enforcement)
+
+        self.assertEquals(config.max_allowed_request_size, 1048576)
+        self.assertEquals(config.pipeline_threshold, 1.1)
+        self.assertEquals(config.min_request_spacing_interval, 1.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
+        self.assertEquals(config.max_log_offset_size, 5242880)
+        self.assertEquals(config.max_existing_log_offset_size, 104857600)

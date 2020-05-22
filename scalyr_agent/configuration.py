@@ -213,6 +213,53 @@ class Configuration(object):
                 if https_server != server:
                     self.__config["scalyr_server"] = https_server
 
+            # Set defaults based on `max_send_rate_enforcement` value
+            if (
+                self.__config["max_send_rate_enforcement"] == "legacy"
+                or self.__config["disable_max_send_rate_enforcement_overrides"]
+            ):
+                if "max_allowed_request_size" not in self.__config:
+                    self.__config["max_allowed_request_size"] = 1048576
+                if "pipeline_threshold" not in self.__config:
+                    self.__config["pipeline_threshold"] = 1.1
+                if "min_request_spacing_interval" not in self.__config:
+                    self.__config["min_request_spacing_interval"] = 1.0
+                if "max_request_spacing_interval" not in self.__config:
+                    self.__config["max_request_spacing_interval"] = 5.0
+                if "max_log_offset_size" not in self.__config:
+                    self.__config["max_log_offset_size"] = 5242880
+                if "max_existing_log_offset_size" not in self.__config:
+                    self.__config["max_existing_log_offset_size"] = 104857600
+            else:
+                if "max_allowed_request_size" not in self.__config:
+                    self.__config["max_allowed_request_size"] = 5900000
+                if "pipeline_threshold" not in self.__config:
+                    self.__config["pipeline_threshold"] = 0
+                if "min_request_spacing_interval" not in self.__config:
+                    self.__config["min_request_spacing_interval"] = 0.1
+                if "max_request_spacing_interval" not in self.__config:
+                    self.__config["max_request_spacing_interval"] = 1.0
+                if "max_log_offset_size" not in self.__config:
+                    self.__config["max_log_offset_size"] = 200000000
+                if "max_existing_log_offset_size" not in self.__config:
+                    self.__config["max_existing_log_offset_size"] = 200000000
+
+            # Parse `max_send_rate_enforcement`
+            if (
+                self.__config["max_send_rate_enforcement"] != "unlimited"
+                and self.__config["max_send_rate_enforcement"] != "legacy"
+            ):
+                try:
+                    self.__config[
+                        "parsed_max_send_rate_enforcement"
+                    ] = scalyr_util.parse_data_rate_string(
+                        self.__config["max_send_rate_enforcement"]
+                    )
+                except ValueError as e:
+                    raise BadConfiguration(
+                        six.text_type(e), "max_send_rate_enforcement", "notDataRate"
+                    )
+
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
             if "serverHost" not in self.server_attributes:
@@ -291,6 +338,8 @@ class Configuration(object):
             "compression_type",
             "compression_level",
             "pipeline_threshold",
+            "max_send_rate_enforcement",
+            "disable_max_send_rate_enforcement_overrides",
             "min_allowed_request_size",
             "max_allowed_request_size",
             "min_request_spacing_interval",
@@ -863,6 +912,25 @@ class Configuration(object):
     def config_directory_raw(self):
         """Returns the configuration value for 'config_directory', as recorded in the configuration file."""
         return self.__get_config().get_string("config_directory")
+
+    @property
+    def parsed_max_send_rate_enforcement(self):
+        """Returns the configuration value for 'max_send_rate_enforcement' in bytes per second if not `unlimited` or `legacy`."""
+        return self.__get_config().get_float(
+            "parsed_max_send_rate_enforcement", none_if_missing=True
+        )
+
+    @property
+    def max_send_rate_enforcement(self):
+        """Returns the raw value for 'max_send_rate_enforcement'."""
+        return self.__get_config().get_string("max_send_rate_enforcement")
+
+    @property
+    def disable_max_send_rate_enforcement_overrides(self):
+        """Returns the configuration value for 'disable_max_send_rate_enforcement_overrides'."""
+        return self.__get_config().get_bool(
+            "disable_max_send_rate_enforcement_overrides"
+        )
 
     @property
     def max_allowed_request_size(self):
@@ -1454,10 +1522,27 @@ class Configuration(object):
             env_aware=True,
         )
 
+        self.__verify_or_set_optional_string(
+            config,
+            "max_send_rate_enforcement",
+            "unlimited",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "disable_max_send_rate_enforcement_overrides",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
         self.__verify_or_set_optional_int(
             config,
             "max_allowed_request_size",
-            1 * 1024 * 1024,
+            None,
             description,
             apply_defaults,
             env_aware=True,
@@ -1473,7 +1558,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "min_request_spacing_interval",
-            1.0,
+            None,
             description,
             apply_defaults,
             env_aware=True,
@@ -1481,7 +1566,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "max_request_spacing_interval",
-            5.0,
+            None,
             description,
             apply_defaults,
             env_aware=True,
@@ -1592,7 +1677,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_log_offset_size",
-            5 * 1024 * 1024,
+            None,
             description,
             apply_defaults,
             env_aware=True,
@@ -1606,7 +1691,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_existing_log_offset_size",
-            100 * 1024 * 1024,
+            None,
             description,
             apply_defaults,
             env_aware=True,
@@ -1683,7 +1768,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "pipeline_threshold",
-            1.1,
+            None,
             description,
             apply_defaults,
             env_aware=True,
