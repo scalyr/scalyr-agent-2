@@ -1452,6 +1452,14 @@ jobs:
           command: |
             cat outputs/WindowsServer2012.log
 
+      - run:
+          command: |
+            cat outputs/WindowsServer2016.log
+
+      - run:
+          command: |
+            cat outputs/WindowsServer2019.log
+
 workflows:
   version: 2
   unit-tests:
