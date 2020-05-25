@@ -1446,7 +1446,18 @@ jobs:
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &
 
-            wait -n
+            for job in `jobs -p`
+            do
+                echo $job
+                wait $job || let "FAIL+=1"
+            done
+
+            echo $FAIL
+
+            if [ "$FAIL" -ne "0" ];
+            then
+                echo "FAIL"
+            fi
 
       - run:
           command: |
