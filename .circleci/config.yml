@@ -1422,7 +1422,7 @@ jobs:
       - store_artifacts:
           path: package
 
-  windows2012-ami-test:
+  windows-ami-test:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
@@ -1434,6 +1434,7 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run:
+          name: run package tests in EC2 instances.
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
@@ -1442,17 +1443,20 @@ jobs:
             python -m pip install --user -r tests/ami/requirements.txt
             export PYTHONPATH="."
             mkdir -p outputs
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2013 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
+
+            # run sanity test for each platform in backgroung.
+            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &
 
+
+            # Wait for every job.
             for job in `jobs -p`
             do
-                echo $job
                 wait $job || let "FAIL+=1"
             done
 
-
+            # Exit with error if some of the jobs failed.
             if [ "$FAIL" -ne "0" ];
             then
                 echo "FAIL"
@@ -1466,13 +1470,13 @@ jobs:
             cat outputs/WindowsServer2012.log
 
       - run:
-          name: WindowsServer2012 result.
+          name: WindowsServer2016 result.
           when: always
           command: |
             cat outputs/WindowsServer2016.log
 
       - run:
-          name: WindowsServer2012 result.
+          name: WindowsServer2019 result.
           when: always
           command: |
             cat outputs/WindowsServer2019.log
@@ -1484,7 +1488,7 @@ workflows:
     # Python 3 versions
     jobs:
       - build-windows-package
-      - windows2012-ami-test:
+      - windows-ami-test:
           requires:
             - build-windows-package
 #      - lint-checks
