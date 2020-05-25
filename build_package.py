@@ -300,7 +300,7 @@ def build_win32_installer_package(variant, version):
     )
 
     run_command(
-        "{0} pyinstaller scalyr-agent.spec".format(sys.executable),
+        "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
         exit_on_fail=True,
         command_name="pyinstaller",
     )
@@ -323,13 +323,6 @@ def build_win32_installer_package(variant, version):
         convert_newlines=True,
     )
 
-    # Generate the file used by WIX's candle program.
-    # create_wxs_file(
-    #     make_path(agent_source_root, "win32/scalyr_agent.wxs"),
-    #     convert_path("Scalyr/bin"),
-    #     "scalyr_agent.wxs",
-    # )
-
     # Get ready to run wix.  Add in WIX to the PATH variable.
     os.environ["PATH"] = "%s;%s\\bin" % (os.getenv("PATH"), os.getenv("WIX"))
 
@@ -349,6 +342,7 @@ def build_win32_installer_package(variant, version):
         del parts[3]
         version = ".".join(parts)
 
+    # Gather files by 'heat' tool from WIX and generate .wxs file for 'bin' folder.
     run_command(
         "heat dir Scalyr/bin -sreg -ag -cg BIN -dr APPLICATIONROOTDIRECTORY -var var.BinFolderSource -t wix-heat-bin-transform.xsl -o bin.wxs",
         exit_on_fail=True,
@@ -369,6 +363,7 @@ def build_win32_installer_package(variant, version):
     )
 
     installer_name = "ScalyrAgentInstaller-%s.msi" % version
+
     run_command(
         "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj bin.wixobj -v"
         % installer_name,
