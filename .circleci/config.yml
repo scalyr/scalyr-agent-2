@@ -1452,11 +1452,11 @@ jobs:
                 wait $job || let "FAIL+=1"
             done
 
-            echo $FAIL
 
             if [ "$FAIL" -ne "0" ];
             then
                 echo "FAIL"
+                exit 1
             fi
 
       - run:
