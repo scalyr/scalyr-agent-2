@@ -139,14 +139,33 @@ class AgentLogVerifier(AgentVerifier):
             )
         )
 
-    def _verify(self):
+    def verify(self, timeout=2 * 60):
+        # Give agent some time to start up before checking for version string.
+        # This version check is done against a local agent.log file and status -v --format=json
+        # output and not Scalyr API so we don't need to retry it and wait for logs to be shipped to
+        # Scalyr API.
+        time.sleep(5)
+        self._verify_agent_version_string()
+
+        # Now call the parent verify method which calls _verify()
+        return super(AgentLogVerifier, self).verify(timeout=timeout)
+
+    def _verify_agent_version_string(self):
+        """
+        Check that the local agent.log file and status output contains the correct version string.
+
+        This method is different from main _verify() method in a sense that we only run it once and
+        don't retry it since this data should be immediately available so there is no need to retry
+        and wait on the Scalyr API since we query the local file and not the Scalyr API.
+        """
         local_agent_log_data = self._runner.read_file_content(
             self._runner.agent_log_file_path
         )
 
         if not local_agent_log_data:
-            print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
-            return
+            raise ValueError(
+                ("No data in '{0}' file.".format(self._runner.agent_log_file_path))
+            )
 
         print("Check start line contains correct version and revision string")
         match = re.search(
@@ -155,8 +174,9 @@ class AgentLogVerifier(AgentVerifier):
         )
 
         if not match:
-            print("Unable to retrieve package version and revision from agent.log file")
-            return False
+            raise ValueError(
+                "Unable to retrieve package version and revision from agent.log file"
+            )
 
         expected_package_version, expected_package_revision = match.groups()
 
@@ -168,18 +188,33 @@ class AgentLogVerifier(AgentVerifier):
         # NOTE: Ideally we would also pass in expected version and revision to make this more robust
         # and correct
         if expected_package_version != actual_package_version:
-            print(
+            raise ValueError(
                 "Expected package version %s, got %s"
                 % (expected_package_version, actual_package_version)
             )
-            return False
 
         if expected_package_revision != actual_package_revision:
-            print(
+            raise ValueError(
                 "Expected package revision %s, got %s"
                 % (expected_package_revision, actual_package_revision)
             )
-            return False
+
+        print("Correct agent version and revision string found.")
+
+    def _verify(self):
+        """
+        Verify that the agent has successfuly started.
+
+        Right now we do that by ensuring has produced 5 "spawned collector" log messages which have
+        also been shipped to the Scalyr API.
+        """
+        local_agent_log_data = self._runner.read_file_content(
+            self._runner.agent_log_file_path
+        )
+
+        if not local_agent_log_data:
+            print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
+            return
 
         print("Check that all collectors were found.")
         collector_line_pattern_str = _make_agent_log_line_pattern(
@@ -238,6 +273,7 @@ class AgentLogVerifier(AgentVerifier):
             print("Data received: %s" % (response_log))
             return
 
+        print("Local agent logs and Scalyr API returned correct data.")
         return True
 
 
