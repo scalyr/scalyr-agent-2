@@ -311,9 +311,11 @@ class DataJsonVerifier(AgentVerifier):
         )
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
+        self._lines_count = 100  # TODO: change back to 1000
+
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
-        for i in range(1000):
+        for i in range(self._lines_count):
             json_data = json.dumps({"count": i, "stream_id": self._timestamp})
             self._runner.write_line(self._data_json_log_path, json_data)
         return
@@ -326,16 +328,16 @@ class DataJsonVerifier(AgentVerifier):
             return
 
         matches = response["matches"]
-        if len(matches) < 1000:
+        if len(matches) < self._lines_count:
             print(
-                "Less than all log lines were found (found %s, expected 1000)."
-                % (len(matches))
+                "Less than all log lines were found (found %s, expected %s)."
+                % (len(matches), self._lines_count)
             )
             return
-        if len(matches) > 1000:
+        if len(matches) > self._lines_count:
             print(
-                "Too many log lines were found (found %s, expected 1000)."
-                % (len(matches))
+                "Too many log lines were found (found %s, expected %s)."
+                % (len(matches), self._lines_count)
             )
             return
 
@@ -345,8 +347,8 @@ class DataJsonVerifier(AgentVerifier):
             print("Some of the fetched lines have wrong 'stream_id'")
             return
 
-        # response matches must contain count values from 0 to 999
-        if set(m["count"] for m in matches) != set(range(1000)):
+        # response matches must contain count values from 0 to self._lines_count
+        if set(m["count"] for m in matches) != set(range(self._lines_count)):
             return
 
         return True
