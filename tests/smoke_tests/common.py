@@ -33,6 +33,24 @@ from tests.smoke_tests.verifier import (
 from tests.utils.agent_runner import AgentRunner
 
 
+def _create_data_json_file(runner, data_json_verifier):
+    # NOTE: It's important that the file exists before starting the agent otherwise it won't be
+    # consumed by the agent and the tests will fail.
+    agent_logs_dir_path = six.text_type(runner.agent_logs_dir_path)
+    data_log_path = six.text_type(data_json_verifier._data_json_log_path)
+
+    if os.path.exists(data_log_path):
+        os.remove(data_log_path)
+    else:
+        try:
+            os.makedirs(agent_logs_dir_path)
+        except OSError:
+            pass
+
+    with open(data_log_path, "a") as _:
+        pass
+
+
 def _test_standalone_smoke(agent_installation_type, python_version=None):
     """
     Agent standalone test to run within the same machine.
@@ -59,22 +77,6 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
     process_metrics_verifier = ProcessMetricsVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
-
-    # NOTE: It's important that the file exists before starting the agent otherwise it won't be
-    # consumed by the agent and the tests will fail.
-    agent_logs_dir_path = six.text_type(runner.agent_logs_dir_path)
-    data_log_path = six.text_type(data_json_verifier._data_json_log_path)
-
-    if os.path.exists(data_log_path):
-        os.remove(data_log_path)
-    else:
-        try:
-            os.makedirs(agent_logs_dir_path)
-        except OSError:
-            pass
-
-    with open(data_log_path, "a") as _:
-        pass
 
     runner.start()
 
