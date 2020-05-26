@@ -20,6 +20,8 @@ import json
 import re
 import time
 
+from pprint import pprint
+
 import six
 
 from scalyr_agent import compat
@@ -113,6 +115,16 @@ class AgentVerifier(object):
                 return True
 
             if time.time() >= timeout_time:
+                # If we reach a timeout, also print agent status output since this may help us with
+                # troubleshooting a failure / timeout
+                try:
+                    status = json.loads(self._runner.status_json())
+                except Exception:
+                    status = None
+                else:
+                    print("Agent status:")
+                    pprint(status)
+
                 raise ValueError(
                     "Received no successful response in %s seconds. Timeout reached"
                     % (timeout)
