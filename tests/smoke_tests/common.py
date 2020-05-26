@@ -41,11 +41,11 @@ def _create_data_json_file(runner, data_json_verifier):
 
     if os.path.exists(data_log_path):
         os.remove(data_log_path)
-    else:
-        try:
-            os.makedirs(agent_logs_dir_path)
-        except OSError:
-            pass
+
+    try:
+        os.makedirs(agent_logs_dir_path)
+    except OSError:
+        pass
 
     with open(data_log_path, "a") as _:
         pass
@@ -77,6 +77,8 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
     process_metrics_verifier = ProcessMetricsVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
+
+    _create_data_json_file(runner=runner, data_json_verifier=data_json_verifier)
 
     runner.start()
 
