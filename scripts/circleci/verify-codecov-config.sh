@@ -14,26 +14,40 @@
 # limitations under the License.
 
 # Script which verifies codecov.yml config syntax with codecov.io.
-# It takes occasional codecov API failures into account and tries to retry
-# upload.
-
+# It takes occasional codecov API failures (timeouts) into account and tries to
+# retry on failure.
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
 RETRY_DELAY=${RETRY_DELAY:-5}
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
-    curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
-    EXIT_CODE=$?
+    OUTPUT=$(curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
+    CURL_EXIT_CODE=$?
+    echo "${OUTPUT}" | grep -i "Valid!" > /dev/null
+    GREP_EXIT_CODE=$?
 
-    if [ "${EXIT_CODE}" -eq 0 ]; then
+    if [ "${GREP_EXIT_CODE}" -eq 0 ]; then
+        echo ""
+        echo "codecov.yml config is valid."
         break
     fi
 
-    echo "Command exited with non-zero, retrying in ${RETRY_DELAY} seconds..."
-    sleep "${RETRY_DELAY}"
+    echo ""
+    echo "curl output: ${OUTPUT}"
+    echo ""
+
+    if [ "${CURL_EXIT_CODE}" -eq 28 ]; then
+        # curl exists with 28 on timeout
+        echo "Command exited with non-zero (timeout), retrying in ${RETRY_DELAY} seconds..."
+        sleep "${RETRY_DELAY}"
+    else
+        # fatal error - we should abort immediately instead of retrying
+        echo "codecov.yml config validation failed"
+        exit 1
+    fi
 done
 
-if [ "${EXIT_CODE}" -ne 0 ]; then
+if [ "${GREP_EXIT_CODE}" -ne 0 ]; then
     echo "Verifying codecov.yml failed after ${MAX_ATTEMPTS} attempts"
     exit 1
 fi
