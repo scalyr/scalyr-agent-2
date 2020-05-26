@@ -189,12 +189,10 @@ class AgentRunner(object):
             # if agent is started differently.
             service_executable = find_executable("service")
             if service_executable:
-                cmd = "%s scalyr-agent-2 --no-fork --no-change-user start" % (
-                    service_executable
-                )
+                cmd = "%s scalyr-agent-2 --no-change-user start" % (service_executable)
             else:
                 # Special case for CentOS 6 where we need to use absolute path to service command
-                cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
+                cmd = "/sbin/service scalyr-agent-2 --no-change-user start"
 
             self._agent_process = subprocess.Popen(
                 cmd, shell=True, env=compat.os_environ_unicode.copy()
@@ -202,7 +200,7 @@ class AgentRunner(object):
         else:
             base_args = [
                 str(_AGENT_MAIN_PATH),
-                "--no-fork",
+                # "--no-fork",
                 "--no-change-user",
                 "start",
             ]
