@@ -1579,7 +1579,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "disable_max_send_rate_enforcement_overrides",
-            False,
+            True,
             description,
             apply_defaults,
             env_aware=True,
