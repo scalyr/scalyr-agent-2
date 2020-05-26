@@ -200,8 +200,8 @@ class AgentLogVerifier(AgentVerifier):
         if len(found_collectors) != 5:
             print(
                 (
-                    "Not all collectors were found. Expected '{0}', got '{1}'.".format(
-                        5, len(found_collectors)
+                    "Not all collectors were found. Expected '{0}', got '{1}'. Found collectors: {2}".format(
+                        5, len(found_collectors), ", ".join(found_collectors)
                     )
                 )
             )
@@ -228,8 +228,10 @@ class AgentLogVerifier(AgentVerifier):
         if len(found_collectors_remote) != 5:
             print(
                 (
-                    "Not all remote collectors were found. Expected '{0}', got '{1}'.".format(
-                        5, len(found_collectors_remote)
+                    "Not all remote collectors were found. Expected '{0}', got '{1}'. Found collectors: {2}".format(
+                        5,
+                        len(found_collectors_remote),
+                        ", ".join(found_collectors_remote),
                     )
                 )
             )
