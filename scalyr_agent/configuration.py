@@ -229,7 +229,7 @@ class Configuration(object):
                 or self.__config["disable_max_send_rate_enforcement_overrides"]
             ):
                 if "max_allowed_request_size" not in self.__config:
-                    self.__config["max_allowed_request_size"] = 1048576
+                    self.__config["max_allowed_request_size"] = 1024 * 1024
                 if "pipeline_threshold" not in self.__config:
                     self.__config["pipeline_threshold"] = 1.1
                 if "min_request_spacing_interval" not in self.__config:
@@ -237,9 +237,9 @@ class Configuration(object):
                 if "max_request_spacing_interval" not in self.__config:
                     self.__config["max_request_spacing_interval"] = 5.0
                 if "max_log_offset_size" not in self.__config:
-                    self.__config["max_log_offset_size"] = 5242880
+                    self.__config["max_log_offset_size"] = 5 * 1024 * 1024
                 if "max_existing_log_offset_size" not in self.__config:
-                    self.__config["max_existing_log_offset_size"] = 104857600
+                    self.__config["max_existing_log_offset_size"] = 100 * 1024 * 1024
             else:
                 if "max_allowed_request_size" not in self.__config:
                     self.__config["max_allowed_request_size"] = 5900000
