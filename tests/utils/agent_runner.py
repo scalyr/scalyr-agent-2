@@ -350,7 +350,7 @@ class AgentRunner(object):
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
             "monitors": [],
-            "max_allowed_request_size": 1048576,
+            "pipeline_threshold": 1.1,
         }
 
         if self._enable_debug_log:
