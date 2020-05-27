@@ -350,7 +350,7 @@ class AgentRunner(object):
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
             "monitors": [],
-            "max_request_spacing_interval": 5.0,
+            "max_log_offset_size": 5242880,
         }
 
         if self._enable_debug_log:
