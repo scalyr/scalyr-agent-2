@@ -227,7 +227,7 @@ class AgentRunner(object):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=True,
-                close_fds=True,
+                close_fds=False,
             )
 
         print("Agent started.")
@@ -358,7 +358,7 @@ class AgentRunner(object):
             # NOTE: We also enable copy_from_start if debug_level is enabled to we ship whole debug
             # log to scalyr
             config["debug_level"] = 5
-            # config["logs"].append({"path": "agent_debug.log"})  # type: ignore
+            config["logs"].append({"path": "agent_debug.log"})  # type: ignore
 
         if not self._send_to_server:
             # do not send requests to server.
