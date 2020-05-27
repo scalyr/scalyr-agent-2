@@ -223,7 +223,7 @@ class AgentRunner(object):
             cmd = " ".join(args)
             self._agent_process = subprocess.Popen(
                 cmd,
-                stdin=None,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=True,
@@ -350,8 +350,7 @@ class AgentRunner(object):
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),
             "monitors": [],
-            "max_log_offset_size": 5242880,
-            "max_existing_log_offset_size": 104857600,
+            "max_send_rate_enforcement": "legacy",
         }
 
         if self._enable_debug_log:
