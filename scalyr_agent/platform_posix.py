@@ -673,7 +673,8 @@ class PosixPlatformController(PlatformController):
                 # si.close()
                 # so.close()
                 # se.close()
-                sys.stdin.close()
+                sys.stdout.close()
+                sys.stderr.close()
             except Exception:
                 sys.exit(1)
             # we are not a fork, so write the pid to a file
