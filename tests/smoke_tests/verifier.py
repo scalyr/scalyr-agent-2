@@ -22,6 +22,8 @@ import time
 
 import six
 
+from pprint import pprint
+
 from scalyr_agent import compat
 from tests.utils.agent_runner import AgentRunner
 from tests.smoke_tests.request import ScalyrRequest
@@ -181,6 +183,8 @@ class AgentLogVerifier(AgentVerifier):
         expected_package_version, expected_package_revision = match.groups()
 
         status = json.loads(self._runner.status_json())
+        print("Agent status:\n")
+        pprint(status)
 
         actual_package_version = status["version"]
         actual_package_revision = status["revision"]
@@ -208,6 +212,10 @@ class AgentLogVerifier(AgentVerifier):
         Right now we do that by ensuring has produced 5 "spawned collector" log messages which have
         also been shipped to the Scalyr API.
         """
+        status = json.loads(self._runner.status_json())
+        print("Agent status:\n")
+        pprint(status)
+
         local_agent_log_data = self._runner.read_file_content(
             self._runner.agent_log_file_path
         )
