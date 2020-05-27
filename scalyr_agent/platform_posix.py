@@ -658,6 +658,8 @@ class PosixPlatformController(PlatformController):
         if fork:
             if not self.__daemonize():
                 return
+            else:
+                time.sleep(3)
         else:
             # we are not a fork, so write the pid to a file
             if not self.__write_pidfile():
