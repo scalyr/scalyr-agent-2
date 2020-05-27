@@ -481,7 +481,7 @@ class ScalyrAgent(object):
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
         scalyr_logging.set_log_destination(
             use_disk=True,
-            no_fork=self.__no_fork,
+            no_fork=False,  # self.__no_fork,
             stdout_severity=self.__config.stdout_severity,
             max_bytes=self.__config.log_rotation_max_bytes,
             backup_count=self.__config.log_rotation_backup_count,
