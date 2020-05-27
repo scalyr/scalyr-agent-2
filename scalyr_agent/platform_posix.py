@@ -655,10 +655,26 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
-        if True:  # fork:
+        if fork:
             if not self.__daemonize():
                 return
         else:
+            try:
+                # redirect standard file descriptors
+                sys.stdout.flush()
+                sys.stderr.flush()
+                si = open(self.__stdin, "r")
+                so = open(self.__stdout, "a+")
+                # 2->TODO io.open does not allow buffering disabling on text files. So open it as binary.
+                se = open(self.__stderr, "ba+", 0)
+                os.dup2(si.fileno(), sys.stdin.fileno())
+                os.dup2(so.fileno(), sys.stdout.fileno())
+                os.dup2(se.fileno(), sys.stderr.fileno())
+                si.close()
+                so.close()
+                se.close()
+            except Exception:
+                sys.exit(1)
             # we are not a fork, so write the pid to a file
             if not self.__write_pidfile():
                 raise AgentAlreadyRunning(
