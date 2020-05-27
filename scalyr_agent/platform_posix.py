@@ -663,6 +663,7 @@ class PosixPlatformController(PlatformController):
                 # redirect standard file descriptors
                 sys.stdout.flush()
                 sys.stderr.flush()
+                time.sleep(1)
             except Exception:
                 sys.exit(1)
             # we are not a fork, so write the pid to a file
