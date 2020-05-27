@@ -357,7 +357,7 @@ class AgentRunner(object):
         if self._enable_debug_log:
             # NOTE: We also enable copy_from_start if debug_level is enabled to we ship whole debug
             # log to scalyr
-            # config["debug_level"] = 5
+            config["debug_level"] = 1
             config["logs"].append({"path": "agent_debug.log"})  # type: ignore
 
         if not self._send_to_server:
