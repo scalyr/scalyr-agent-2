@@ -1388,27 +1388,27 @@ jobs:
 
 workflows:
   version: 2
-  unit-tests:
+  #unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
-    jobs:
-      - lint-checks
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
+    #jobs:
+      #- lint-checks
+      #- unittest-26
+      #- unittest-27
+      #- unittest-35
+      #- unittest-35-osx
   smoke-tests:
     jobs:
       - smoke-standalone-26
       - smoke-standalone-27
       - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
+      #- smoke-standalone-26-tls12
+      #- smoke-standalone-27-tls12
        # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
+      #- smoke-docker-json
+      #- smoke-docker-syslog
+      #- smoke-k8s
+      #- smoke-monitors-tests
   package-tests:
     jobs:
       # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
@@ -1444,8 +1444,8 @@ workflows:
           <<: *master_and_release_only
   benchmarks:
     jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
+      #- benchmarks-micro-py-27
+      #- benchmarks-micro-py-35
       - benchmarks-idle-agent-py-27:
           <<: *benchmarks_master_and_release_only
       - benchmarks-idle-agent-py-35:
