@@ -1712,6 +1712,12 @@ class ScalyrAgent(object):
             if tmp_file is not None:
                 tmp_file.close()
 
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_4,
+            'Wrote agent status data in "%s" format to %s'
+            % (status_format, final_file_path),
+        )
+
         return final_file_path
 
 
