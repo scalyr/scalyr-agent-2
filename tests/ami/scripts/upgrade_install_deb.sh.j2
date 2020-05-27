@@ -25,20 +25,20 @@ sleep 10
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
-{% if not package_from_version_is_url -%}
+{% if package_from_version_source_type == "install_script" -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
-{% endif -%}
+{% elif package_from_version_source_type in ("file", "url") -%}
+    {% if package_from_version_source_type == "url" -%}
+    wget -O from_package.deb "{{ package_from_version }}"
+    {% endif -%}
 
-# Install old version
-{% if package_from_version_is_url -%}
-wget -O package-from.deb "{{ package_from_version }}"
-sudo DEBIAN_FRONTEND=noninteractive dpkg -i package-from.deb
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i from_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
-export PACKAGE_FROM_VERSION=$(dpkg-deb -f "package-from.deb" Version)
+export PACKAGE_TO_VERSION=$(dpkg-deb -f "from_package.deb" Version)
 {% else -%}
-sudo apt-get install -y --allow-downgrades "scalyr-agent-2={{package_from_version}}"
-export PACKAGE_FROM_VERSION="{{package_from_version}}"
+sudo apt-get install -y "scalyr-agent-2={{package_from_version}}"
+export PACKAGE_TO_VERSION="{{package_from_version}}"
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart
@@ -61,10 +61,14 @@ echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
 # Upgrade to new version
-{% if package_to_version_is_url -%}
-wget -O package-to.deb "{{ package_from_version }}"
-sudo DEBIAN_FRONTEND=noninteractive dpkg -i package-to.deb
-export PACKAGE_TO_VERSION=$(dpkg-deb -f "package-to.deb" Version)
+{% if package_to_version_source_type in ("file", "url") -%}
+    {% if package_to_version_source_type == "url" -%}
+    wget -O to_package.deb "{{ package_to_version }}"
+    {% endif -%}
+
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i to_package.deb
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export PACKAGE_TO_VERSION=$(dpkg-deb -f "to_package.deb" Version)
 {% else -%}
 sudo apt-get install -y "scalyr-agent-2={{package_to_version}}"
 export PACKAGE_TO_VERSION="{{package_to_version}}"

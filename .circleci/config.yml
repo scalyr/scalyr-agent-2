@@ -1389,7 +1389,6 @@ jobs:
       size: "medium"
       shell: powershell.exe
     steps:
-      # Commands are run in a Windows virtual machine environment
       - checkout
       - restore_cache:
           key: windows_python_installer-python-3.7.7-{{ .Branch }}
@@ -1422,7 +1421,7 @@ jobs:
       - store_artifacts:
           path: package
 
-  windows-ami-test:
+  ami-tests:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
@@ -1444,7 +1443,7 @@ jobs:
             export PYTHONPATH="."
             mkdir -p outputs
 
-            # run sanity test for each platform in backgroung.
+            # run sanity test for each image concurrently in backgroung.
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &

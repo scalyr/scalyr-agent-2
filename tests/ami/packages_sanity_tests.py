@@ -229,12 +229,14 @@ def main(
         script_filename = "upgrade_install_%s.%s.j2"
 
     if distro.lower().startswith("windows"):
-        script_filename = script_filename % ("windows", "ps1")
+        package_type = "windows"
+        script_extension = "ps1"
     else:
-        script_filename = script_filename % (
-            "deb" if distro.startswith("ubuntu") else "rpm",
-            "sh",
-        )
+        package_type = "deb" if distro.startswith("ubuntu") else "rpm"
+        script_extension = "sh"
+
+    script_filename = script_filename % (package_type, script_extension)
+
     script_file_path = os.path.join(SCRIPTS_DIR, script_filename)
 
     with open(script_file_path, "r") as fp:
@@ -264,13 +266,34 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
+    remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name="deploy.ps1", timeout=120
+        rendered_template, name=remote_script_name, timeout=120
     )
 
+    steps = []
+
     if os.path.exists(to_version) and os.path.isfile(to_version):
-        put_file_step = FileDeployment(to_version, "./ScalyrAgentInstaller.msi")
-        deployment = MultiStepDeployment(add=[put_file_step, test_package_step])
+        file_name = os.path.basename(to_version)
+        extension = os.path.splitext(file_name)[1]
+
+        target_path = "./to_package{0}".format(extension)
+
+        to_package_put_file_step = FileDeployment(to_version, target_path)
+        steps.append(to_package_put_file_step)
+
+    if os.path.exists(from_version) and os.path.isfile(from_version):
+        file_name = os.path.basename(from_version)
+        extension = os.path.splitext(file_name)[1]
+
+        target_path = "./from_package{0}".format(extension)
+
+        from_package_put_file_step = FileDeployment(from_version, target_path)
+        steps.append(from_package_put_file_step)
+
+    if steps:
+        steps.append(test_package_step)  # type: ignore
+        deployment = MultiStepDeployment(add=steps)  # type: ignore
     else:
         deployment = test_package_step  # type: ignore
 
@@ -288,7 +311,7 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=10,
-            timeout=180,
+            timeout=1800,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
@@ -351,13 +374,19 @@ def render_script_template(
         python_package or distro_details["default_python_package_name"]
     )
     template_context["package_from_version"] = from_version
-    template_context["package_from_version_is_url"] = (
-        "http://" in from_version or "https://" in from_version
-    )
     template_context["package_to_version"] = to_version
-    template_context["package_to_version_is_url"] = (
-        "http://" in to_version or "https://" in to_version
-    )
+
+    def get_source_type(version_string):
+        if "http://" in version_string or "https://" in version_string:
+            return "url"
+        elif os.path.exists(version_string) and os.path.isfile(version_string):
+            return "file"
+        else:
+            return "install_script"
+
+    template_context["package_to_version_source_type"] = get_source_type(to_version)
+    template_context["package_from_version_source_type"] = get_source_type(from_version)
+
     template_context["verbose"] = verbose
 
     template = Template(script_template)
