@@ -944,7 +944,7 @@ class AgentLogFilter(object):
     and greater than logging.DEBUG if it is.
     """
 
-    def __init__(self, is_debug, force_stdout, force_stderr):
+    def __init__(self, is_debug):
         """Initializes the filter.
 
         @param is_debug: If True, then will only pass records that have a level of logging.DEBUG or lower.  If False,
@@ -953,8 +953,6 @@ class AgentLogFilter(object):
         @type is_debug: bool
         """
         self.__is_debug = is_debug
-        self.__stdout = force_stdout
-        self.__stderr = force_stderr
 
     def filter(self, record):
         """Performs the filtering.
@@ -965,9 +963,6 @@ class AgentLogFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
-        if self.__stdout or self.__stderr:
-            return True
-
         if self.__is_debug and record.levelno > logging.DEBUG:
             return False
         elif not self.__is_debug and record.levelno <= logging.DEBUG:
@@ -1659,7 +1654,7 @@ class AgentLogManager(object):
                 backupCount=self.__rotation_backup_count,
             )
 
-        handler.addFilter(AgentLogFilter(is_debug, is_force_stdout, is_force_stderr))
+        handler.addFilter(AgentLogFilter(is_debug))
 
         formatter = AgentLogFormatter()
         # Rate limit the log if this is the main log since we are copying it up to Scalyr as well.
