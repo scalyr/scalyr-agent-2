@@ -655,11 +655,9 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
-        if fork:
+        if True:  # fork:
             if not self.__daemonize():
                 return
-            else:
-                time.sleep(3)
         else:
             # we are not a fork, so write the pid to a file
             if not self.__write_pidfile():
