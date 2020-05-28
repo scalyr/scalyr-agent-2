@@ -183,8 +183,6 @@ class AgentLogVerifier(AgentVerifier):
         expected_package_version, expected_package_revision = match.groups()
 
         status = json.loads(self._runner.status_json())
-        print("Agent status:\n")
-        pprint(status)
 
         actual_package_version = status["version"]
         actual_package_revision = status["revision"]
