@@ -1052,6 +1052,9 @@ class StdoutFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
+        # TODO: We don't handle our custom debug log levels correctly.
+        # If DEBUG level is specified we should use level number 5 since that
+        # represents the lowest number for the custom debug log level we define
         return getattr(record, "force_stdout", False) or (
             self.__no_fork
             and record.levelno >= self.__stdout_severity
