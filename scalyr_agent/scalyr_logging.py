@@ -217,11 +217,26 @@ def alternateCurrentFrame():
     return sys._getframe(3)
 
 
+# We set this variable to True after close_handlers() has been called (this happens when termination
+# handler function is called when shutting down the agent.
+# This way we can avoid "IOError: [Errno 0] Error" errors which may appear in stdout on agent
+# shutdown when using agent_main.py stop command which sends SIGTERM signal multiple times.
+# Those logs appeared if we try to log a message inside SIGTERM handler after all the log
+# handlers have already been closed.
+HANDLERS_CLOSED = False
+
+
 def close_handlers():
+    global HANDLERS_CLOSED
+
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
         root_logger.removeHandler(handler)
-        handler.close()
+
+        if handler is not None:
+            handler.close()
+
+    HANDLERS_CLOSED = True
 
 
 if hasattr(sys, "_getframe"):

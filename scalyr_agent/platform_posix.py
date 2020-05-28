@@ -634,10 +634,14 @@ class PosixPlatformController(PlatformController):
 
             It takes care of invoking the agent termination handler function.
             """
-            logger.debug("Received SIGTERM signal")
+            # Termination handler will cause log handlers to be closed so we need to check if they
+            # are still opened before trying to log a message.
+            if not scalyr_logging.HANDLERS_CLOSED:
+                logger.debug("Received SIGTERM signal")
 
             if self.__termination_handler is not None:
-                logger.debug("Invoking termination handler...")
+                if not scalyr_logging.HANDLERS_CLOSED:
+                    logger.debug("Invoking termination handler...")
                 self.__termination_handler()
 
         # noinspection PyUnusedLocal
