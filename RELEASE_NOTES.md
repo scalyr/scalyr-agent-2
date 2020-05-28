@@ -1,5 +1,18 @@
 # Release Notes
 
+## 2.1.5 TBD - June 4, 2020
+
+* Defaults relating to Agent upload limits and speed have been changed. If you were hitting the limits of the Agent
+  this release may result in a higher volume of uploaded logs.
+
+  If you wish to revert the settings to their pre-2.1.5 state you should add the following to your configuration file:
+
+  ```
+  max_send_rate_enforcement: "legacy"
+  ```
+
+## 2.1.4 TBD - ???
+
 ## 2.1.3 "Orion" - May 1, 2020
 
 * You may now restrict which namespaces for which logs and events are collected
