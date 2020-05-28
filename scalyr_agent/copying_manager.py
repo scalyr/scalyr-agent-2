@@ -857,9 +857,10 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 last_success = current_time
 
                             # Rate limit based on amount of copied log bytes in a successful request
-                            self.__rate_limiter.block_until_charge_succeeds(
-                                log_bytes_sent
-                            )
+                            if self.__rate_limiter:
+                                self.__rate_limiter.block_until_charge_succeeds(
+                                    log_bytes_sent
+                                )
 
                         else:
                             result = "failedReadingLogs"
