@@ -1032,7 +1032,13 @@ class StdoutFilter(object):
         """Initializes the filter.
         """
         self.__no_fork = no_fork
-        self.__stdout_severity = getattr(logging, stdout_severity, 0)
+
+        self.__stdout_severity = logging.getLevelName(stdout_severity.upper())
+
+        if not isinstance(self.__stdout_severity, int):
+            # If getLevelName() returns a string this means a level with the provided name doesn't
+            # exist so we fall back to notset
+            self.__stdout_severity = 0
 
     def filter(self, record):
         """Performs the filtering.
@@ -1046,6 +1052,9 @@ class StdoutFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
+        # TODO: We don't handle our custom debug log levels correctly.
+        # If DEBUG level is specified we should use level number 5 since that
+        # represents the lowest number for the custom debug log level we define
         return getattr(record, "force_stdout", False) or (
             self.__no_fork
             and record.levelno >= self.__stdout_severity
