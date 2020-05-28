@@ -9,6 +9,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 5, 2020 08:30 -0800
 
 Features
 * Add support for ``zstandard`` and ``lz4`` compression of outgoing requests to the Scalyr API. For backward compatibility reasons, the default value for ``compression_type`` configuration option still is ``deflate``.
+* Fix a bug and make sure ``stdout_severity`` config option is handled correctly.
 
 ## 2.1.3 "Orion" - May 1, 2020
 
