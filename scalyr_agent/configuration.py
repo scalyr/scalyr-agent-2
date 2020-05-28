@@ -1037,7 +1037,7 @@ class Configuration(object):
         """Returns the configuration value for 'stdout_severity'.
         Only used when running in no-fork mode.
         """
-        return self.__get_config().get_string("stdout_severity")
+        return self.__get_config().get_string("stdout_severity").upper()
 
     @property
     def ca_cert_path(self):
@@ -1874,7 +1874,7 @@ class Configuration(object):
             env_aware=True,
         )
         stdout_severity = config.get_string("stdout_severity", default_value="NOTSET")
-        if not hasattr(logging, stdout_severity):
+        if not hasattr(logging, stdout_severity.upper()):
             raise BadConfiguration(
                 "The stdout severity must be a valid logging level name",
                 "stdout_severity",
