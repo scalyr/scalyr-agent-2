@@ -1691,7 +1691,8 @@ class AgentLogManager(object):
         # We remove all other handlers on the root.  We are forcing the system to only use what we want.
         for handler in list(root_logger.handlers):
             root_logger.removeHandler(handler)
-            handler.close()
+            if handler:
+                handler.close()
 
         root_logger.addHandler(self.__main_log_handler)
         if self.__force_stdout_handler:
