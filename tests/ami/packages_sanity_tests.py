@@ -484,7 +484,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--from-version",
         help=("Package version or URL to the package to use for upgrade tests."),
-        default=None,
+        default="current",
         required=False,
     )
     parser.add_argument(
