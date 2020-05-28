@@ -1615,7 +1615,7 @@ class Configuration(object):
         # We do not strictly enforce this -- some lines returned by LogFileIterator may be
         # longer than this due to some edge cases.
         self.__verify_or_set_optional_int(
-            config, "max_line_size", 9900, description, apply_defaults, env_aware=True
+            config, "max_line_size", 49900, description, apply_defaults, env_aware=True
         )
 
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
