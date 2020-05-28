@@ -1032,7 +1032,13 @@ class StdoutFilter(object):
         """Initializes the filter.
         """
         self.__no_fork = no_fork
-        self.__stdout_severity = getattr(logging, stdout_severity, 0)
+
+        self.__stdout_severity = logging.getLevelName(stdout_severity.upper())
+
+        if not isinstance(self.__stdout_severity, int):
+            # If getLevelName() returns a string this means a level with the provided name doesn't
+            # exist so we fall back to notset
+            self.__stdout_severity = 0
 
     def filter(self, record):
         """Performs the filtering.
