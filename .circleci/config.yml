@@ -1535,10 +1535,11 @@ workflows:
     # Python 3 versions
     jobs:
       - build-linux-packages
-      - build-windows-package
+      #- build-windows-package
       - ami-tests:
           requires:
-            - build-windows-package
+            #- build-windows-package
+            - build-linux-packages
 #      - lint-checks
 #      - unittest-26
 #      - unittest-27
