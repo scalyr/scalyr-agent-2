@@ -28,9 +28,12 @@ cat /etc/*-release
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
+# Install provided version
 {% if package_to_version_source_type == "install_script" -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+sudo apt-get install -y "scalyr-agent-2={{package_to_version}}"
+export PACKAGE_TO_VERSION="{{package_to_version}}"
 {% elif package_to_version_source_type in ("file", "url") -%}
     {% if package_to_version_source_type == "url" -%}
     wget -O package.deb "{{ package_to_version }}"
@@ -39,9 +42,6 @@ sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export PACKAGE_TO_VERSION=$(dpkg-deb -f "package.deb" Version)
-{% else -%}
-sudo apt-get install -y "scalyr-agent-2={{package_to_version}}"
-export PACKAGE_TO_VERSION="{{package_to_version}}"
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart

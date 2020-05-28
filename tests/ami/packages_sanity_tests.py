@@ -533,11 +533,6 @@ if __name__ == "__main__":
     if args.type == "install" and not args.to_version:
         raise ValueError("--to-version needs to be provided for install test")
 
-    if args.type == "upgrade" and (not args.from_version or not args.to_version):
-        raise ValueError(
-            "--from-version and to --to-version needs to be provided for upgrade test"
-        )
-
     main(
         distro=args.distro,
         test_type=args.type,

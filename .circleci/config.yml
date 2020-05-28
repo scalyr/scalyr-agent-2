@@ -1421,6 +1421,48 @@ jobs:
       - store_artifacts:
           path: package
 
+  build-linux-packages:
+    working_directory: ~/scalyr-agent-2
+    docker:
+        - image: circleci/python:3.6-jessie
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          command: |
+            sudo apt-key update
+            sudo apt update
+            sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+            sudo gem install --no-document fpm
+
+      - run:
+          command: |
+            mkdir artifacts
+            mkdir package
+
+            ls
+            pushd artifacts
+
+            python ../build_package.py deb
+            python ../build_package.py rpm
+
+            popd
+
+            cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
+            cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
+
+
+
+      - persist_to_workspace:
+          root: package
+          paths:
+            - scalyr-agent-2.deb
+            - scalyr-agent-2.rpm
+
+
+
   ami-tests:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -1444,10 +1486,11 @@ jobs:
             mkdir -p outputs
 
             # run sanity test for each image concurrently in backgroung.
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &
+            #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
+            #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
+            #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &
 
+            python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804 &
 
             # Wait for every job.
             for job in `jobs -p`
@@ -1461,6 +1504,11 @@ jobs:
                 echo "FAIL"
                 exit 1
             fi
+      - run:
+          name: ubuntu1804 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1804.log
 
       - run:
           name: WindowsServer2012 result.
@@ -1486,8 +1534,9 @@ workflows:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
+      - build-linux-packages
       - build-windows-package
-      - windows-ami-test:
+      - ami-tests:
           requires:
             - build-windows-package
 #      - lint-checks

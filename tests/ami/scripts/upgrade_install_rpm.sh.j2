@@ -30,8 +30,6 @@ sudo yum install -y "{{python_package}}"
 
 # Install latest version
 {% if package_from_version_source_type == "install_script" -%}
-wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
-sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
 {% elif package_from_version_source_type in ("file", "url") -%}
     {% if package_from_version_source_type == "url" -%}
     wget -O from_package.rpm "{{ package_from_version }}"
@@ -41,8 +39,10 @@ sudo rpm -iv from_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export PACKAGE_TO_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "from_package.rpm" | sed "s/_.*//g")
 {% else -%}
-sudo apt-get install -y "scalyr-agent-2={{package_from_version}}"
-export PACKAGE_TO_VERSION="{{package_from_version}}"
+wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+sudo yum downgrade -y "scalyr-agent-2-{{package_from_version}}"
+export PACKAGE_FROM_VERSION="{{package_from_version}}"
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart
@@ -70,7 +70,7 @@ ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
     wget -O to_package.rpm "{{ package_to_version }}"
     {% endif -%}
 
-sudo rpm -Fiv to_package.rpm
+sudo rpm -Uv package-to.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export PACKAGE_TO_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "to_package.rpm" | sed "s/_.*//g")
 {% else -%}
