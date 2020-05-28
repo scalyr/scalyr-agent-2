@@ -2454,8 +2454,8 @@ class LogFileProcessor(object):
 
                 @param result: Must be one of SUCCESS, FAIL_AND_DROP, FAIL_AND_RETRY.
                 @type result: int
-                @return: True if the processor has been closed because it is finished and the caller should no longer
-                    use it.
+                @return: A tuple of (bool, int), first value is True if the processor has been closed because it is
+                finished and the caller should no longer use it, second is the amount of log bytes copied.
                 @rtype: bool
                 """
                 try:
@@ -2513,7 +2513,7 @@ class LogFileProcessor(object):
                             self.__log_file_iterator.close()
                             self.__is_closed = True
 
-                        return self.__is_closed
+                        return self.__is_closed, bytes_copied
 
                     elif result == LogFileProcessor.FAIL_AND_DROP:
                         self.__log_file_iterator.mark(
@@ -2525,12 +2525,12 @@ class LogFileProcessor(object):
                             "Request failed. Dropping %d bytes of logs as per server request."
                             % bytes_read
                         )
-                        return False
+                        return False, bytes_copied
                     elif result == LogFileProcessor.FAIL_AND_RETRY:
                         self.__log_file_iterator.seek(original_position)
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         log.info("Request failed. Retrying")
-                        return False
+                        return False, bytes_copied
                     else:
                         # [start of 2->TODO]
                         #  As in other similar places, it can be OK to leave literals here as str.
