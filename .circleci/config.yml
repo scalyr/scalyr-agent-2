@@ -1490,7 +1490,10 @@ jobs:
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
             python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log & \
             python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804.log & \
-            python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
+            python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604.log & \
+            python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404.log & \
+            python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log & \
+            python tests/ami/packages_sanity_tests.py --distro=centos8 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos8.log &
 
             # Wait for every job.
             for job in `jobs -p`
@@ -1511,10 +1514,28 @@ jobs:
             cat outputs/ubuntu1804.log
 
       - run:
+          name: ubuntu1604 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1604.log
+
+      - run:
+          name: ubuntu1404 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1404.log
+
+      - run:
           name: centos7 result.
           when: always
           command: |
             cat outputs/centos7.log
+
+      - run:
+          name: centos8 result.
+          when: always
+          command: |
+            cat outputs/centos8.log
 
       - run:
           name: WindowsServer2012 result.
