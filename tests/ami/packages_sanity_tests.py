@@ -311,7 +311,7 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=10,
-            timeout=1800,
+            timeout=240,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
