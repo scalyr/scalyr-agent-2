@@ -38,11 +38,11 @@ export PACKAGE_TO_VERSION=$(dpkg-deb -f "from_package.deb" Version)
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
     {% if package_from_version == "current" -%}
-sudo apt-get install -y "scalyr-agent-2"
+export PACKAGE_FROM_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{print $3}')
     {% else -%}
 sudo apt-get install -y "scalyr-agent-2={{package_from_version}}" --allow-downgrades
-    {% endif -%}
 export PACKAGE_TO_VERSION="{{package_from_version}}"
+    {% endif -%}
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart
