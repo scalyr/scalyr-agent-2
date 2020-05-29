@@ -25,6 +25,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 __author__ = "czerwin@scalyr.com"
 
@@ -1187,7 +1188,7 @@ def write_to_file(string_value, file_path):
     """
     dest_fp = open(file_path, "w")
     dest_fp.write(string_value.rstrip())
-    dest_fp.write(os.linesep)
+    dest_fp.write(six.ensure_text(os.linesep))
     dest_fp.close()
 
 
@@ -1352,7 +1353,7 @@ def create_change_logs():
                 # If a sublist, then recursively call this function, increasing the level.
                 print_release_notes(output_fp, note, level_prefixes, level + 1)
                 if level == 0:
-                    print(file=output_fp)
+                    print("", file=output_fp)
             else:
                 # Otherwise emit the note with the prefix for this level.
                 print("%s%s" % (prefix, note), file=output_fp)
@@ -1375,13 +1376,13 @@ def create_change_logs():
                 ),
                 file=fp,
             )
-            print(file=fp)
+            print("", file=fp)
             print("Release: %s (%s)" % (release["version"], release["name"]), file=fp)
-            print(file=fp)
+            print("", file=fp)
             # Include the release notes, with the first level with no indent, an asterisk for the second level
             # and a dash for the third.
             print_release_notes(fp, release["notes"], ["", " * ", "   - "])
-            print(file=fp)
+            print("", file=fp)
     finally:
         fp.close()
 
@@ -1632,7 +1633,7 @@ def get_build_info():
             "git config user.email", fail_quietly=True, command_name="git"
         )
         if rc != 0:
-            packager_email = u"unknown"
+            packager_email = "unknown"
 
         print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
