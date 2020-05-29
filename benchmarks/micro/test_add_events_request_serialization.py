@@ -105,3 +105,57 @@ def test_serialize_large_add_events_request(benchmark):
     assert b"attrs" in output_bytes
     assert b"events" in output_bytes
     assert b"message" in output_bytes
+
+
+@pytest.mark.submit_result_to_codespeed
+def test_serialize_add_events_50_large_events_total_400kb_payload(benchmark):
+    """
+    AddEvents request with 100 4k events for a total of 400 kb  payload size for the log lines
+    """
+    num_events = 100
+    line_length = 4000
+    attributes_count = 0
+
+    add_events_request = generate_add_events_request(
+        num_events=num_events,
+        line_length=line_length,
+        attributes_count=attributes_count,
+    )
+
+    def run_benchmark():
+        current_time = time.time()
+        add_events_request.set_client_time(current_time)
+        return add_events_request.get_payload()
+
+    output_bytes = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    assert b"thread" in output_bytes
+    assert b"attrs" in output_bytes
+    assert b"events" in output_bytes
+    assert b"message" in output_bytes
+
+
+@pytest.mark.submit_result_to_codespeed
+def test_serialize_add_events_6250_small_events_total_400kb_payload(benchmark):
+    """
+    AddEvents request with 6250 64 byte events for a total of 400 kb payload size for the log lines
+    """
+    num_events = 6250
+    line_length = 64
+    attributes_count = 0
+
+    add_events_request = generate_add_events_request(
+        num_events=num_events,
+        line_length=line_length,
+        attributes_count=attributes_count,
+    )
+
+    def run_benchmark():
+        current_time = time.time()
+        add_events_request.set_client_time(current_time)
+        return add_events_request.get_payload()
+
+    output_bytes = benchmark.pedantic(run_benchmark, iterations=500, rounds=100)
+    assert b"thread" in output_bytes
+    assert b"attrs" in output_bytes
+    assert b"events" in output_bytes
+    assert b"message" in output_bytes
