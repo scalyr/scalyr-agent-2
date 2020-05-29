@@ -617,8 +617,6 @@ commands:
           fail_only: true
           only_for_branches: master
 
-
-
 jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
@@ -1384,8 +1382,9 @@ jobs:
                 --email=cloudtech-builds@scalyr.com
 
   build-windows-package:
+    description: "Build windows MSI installer."
     executor:
-      name: win/default # executor type
+      name: win/default
       size: "medium"
       shell: powershell.exe
     steps:
@@ -1394,6 +1393,7 @@ jobs:
           key: windows_python_installer-python-3.7.7-{{ .Branch }}
 
       - run:
+          name: Install python.
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
@@ -1408,11 +1408,11 @@ jobs:
             - "python_installer"
 
       - run:
+          name: build MSI package.
           command: |
              .\win32\build.ps1 c:\Python37
               mkdir package
               mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
-              #cp .\ScalyrAgentInstaller-*.msi package
 
       - persist_to_workspace:
           root: package
@@ -1422,6 +1422,7 @@ jobs:
           path: package
 
   build-linux-packages:
+    description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
         - image: circleci/python:3.6-jessie
@@ -1464,6 +1465,7 @@ jobs:
 
 
   ami-tests:
+    description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
@@ -1554,84 +1556,87 @@ workflows:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      - build-linux-packages
-      - build-windows-package
+      - lint-checks
+      - unittest-26
+      - unittest-27
+      - unittest-35
+      - unittest-35-osx
+  smoke-tests:
+    jobs:
+      - smoke-standalone-26
+      - smoke-standalone-27
+      - smoke-standalone-35
+      - smoke-standalone-26-tls12
+      - smoke-standalone-27-tls12
+       # NOTE: smoke test jobs below still use old smoke tests framework
+      - smoke-docker-json
+      - smoke-docker-syslog
+      - smoke-k8s
+      - smoke-monitors-tests
+  package-tests:
+    jobs:
+      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
+      # product deb and rpm packages which can be used for testing.
+      # On master build, we run package-test-* jobs which also produce packages which
+      # can be used for testing. This means it's redundant to run both jobs at the same
+      # time since as long as one set of those jobs runs, packages will be produced.
+      # The reason why we run package-build-*, but not package-test-* jobs for each PR
+      # is that those jobs are much faster.
+      - package-build-rpm:
+          <<: *non_master_and_release
+      - package-build-deb:
+          <<: *non_master_and_release
+      - package-test-rpm:
+          <<: *master_and_release_only
+      - package-test-deb:
+          <<: *master_and_release_only
+      - smoke-rpm-package-py2:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
+          <<: *master_and_release_only
+      - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
+      - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
+          <<: *master_and_release_only
+      - build-linux-packages:
+          <<: *master_and_release_only
+      - build-windows-package:
+          <<: *master_and_release_only
       - ami-tests:
           requires:
             - build-windows-package
             - build-linux-packages
-#      - lint-checks
-#      - unittest-26
-#      - unittest-27
-#      - unittest-35
-#      - unittest-35-osx
-#  smoke-tests:
-#    jobs:
-#      - smoke-standalone-26
-#      - smoke-standalone-27
-#      - smoke-standalone-35
-#      - smoke-standalone-26-tls12
-#      - smoke-standalone-27-tls12
-#       # NOTE: smoke test jobs below still use old smoke tests framework
-#      - smoke-docker-json
-#      - smoke-docker-syslog
-#      - smoke-k8s
-#      - smoke-monitors-tests
-#  package-tests:
-#    jobs:
-#      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
-#      # product deb and rpm packages which can be used for testing.
-#      # On master build, we run package-test-* jobs which also produce packages which
-#      # can be used for testing. This means it's redundant to run both jobs at the same
-#      # time since as long as one set of those jobs runs, packages will be produced.
-#      # The reason why we run package-build-*, but not package-test-* jobs for each PR
-#      # is that those jobs are much faster.
-#      - package-build-rpm:
-#          <<: *non_master_and_release
-#      - package-build-deb:
-#          <<: *non_master_and_release
-#      - package-test-rpm:
-#          <<: *master_and_release_only
-#      - package-test-deb:
-#          <<: *master_and_release_only
-#      - smoke-rpm-package-py2:
-#          requires:
-#            - package-test-rpm
-#          <<: *master_and_release_only
-#      - smoke-rpm-package-py3:
-#          requires:
-#            - package-test-rpm
-#          <<: *master_and_release_only
-#      - smoke-deb-package-py2:
-#          requires:
-#            - package-test-deb
-#          <<: *master_and_release_only
-#      - smoke-deb-package-py3:
-#          requires:
-#            - package-test-deb
-#          <<: *master_and_release_only
-#  benchmarks:
-#    jobs:
-#      - benchmarks-micro-py-27
-#      - benchmarks-micro-py-35
-#      - benchmarks-idle-agent-py-27:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-idle-agent-py-35:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-idle-agent-no-monitors-py-27:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-idle-agent-no-monitors-py-35:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-#          <<: *benchmarks_master_and_release_only
-#      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-#          <<: *benchmarks_master_and_release_only
+          <<: *master_and_release_only
+  benchmarks:
+    jobs:
+      - benchmarks-micro-py-27
+      - benchmarks-micro-py-35
+      - benchmarks-idle-agent-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *benchmarks_master_and_release_only
+      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+          <<: *benchmarks_master_and_release_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

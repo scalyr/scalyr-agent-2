@@ -41,7 +41,7 @@ export PACKAGE_TO_VERSION="{{package_to_version}}"
 
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
-export PACKAGE_TO_VERSION=$(dpkg-deb -f "package.deb" Version)
+export PACKAGE_TO_VERSION=$(dpkg-deb -f "to_package.deb" Version)
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart
