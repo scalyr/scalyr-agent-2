@@ -2137,7 +2137,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
             self.convert_path("/var/lib/scalyr-agent-2"),
         )
         return Configuration(
-            self._config_file, default_paths, scalyr_logging.getLogger("scalyr_agent")
+            self._config_file, default_paths, scalyr_logging.AgentLogger("config_test")
         )
 
     def test_default_config(self):
