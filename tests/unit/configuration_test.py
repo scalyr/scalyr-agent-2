@@ -2469,3 +2469,30 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.max_request_spacing_interval, 1.0)
         self.assertEquals(config.max_log_offset_size, 200000000)
         self.assertEquals(config.max_existing_log_offset_size, 200000000)
+
+    def test_max_send_rate_enforcement_legacy_overrides(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                max_send_rate_enforcement: "legacy",
+                max_allowed_request_size: 1234,
+                pipeline_threshold: 0.3,
+                min_request_spacing_interval: 3.0,
+                max_request_spacing_interval: 4.0,
+                max_log_offset_size: 1234,
+                max_existing_log_offset_size: 1234
+            }
+            """
+        )
+        config = self.get_configuration_with_logger()
+        config.parse()
+
+        self.assertEquals(config.max_send_rate_enforcement, "legacy")
+        self.assertIsNone(config.parsed_max_send_rate_enforcement)
+
+        self.assertEquals(config.max_allowed_request_size, 1048576)
+        self.assertEquals(config.pipeline_threshold, 1.1)
+        self.assertEquals(config.min_request_spacing_interval, 1.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
+        self.assertEquals(config.max_log_offset_size, 5242880)
+        self.assertEquals(config.max_existing_log_offset_size, 104857600)
