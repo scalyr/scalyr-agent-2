@@ -29,8 +29,7 @@ sudo yum install -y wget
 sudo yum install -y "{{python_package}}"
 
 # Install latest version
-{% if package_from_version_source_type == "install_script" -%}
-{% elif package_from_version_source_type in ("file", "url") -%}
+{% if package_from_version_source_type in ("file", "url") -%}
     {% if package_from_version_source_type == "url" -%}
     wget -O from_package.rpm "{{ package_from_version }}"
     {% endif -%}
