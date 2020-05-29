@@ -17,6 +17,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from scalyr_agent import scalyr_logging
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -2128,6 +2130,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         )
         return Configuration(self._config_file, default_paths, None)
 
+    def get_configuration_with_logger(self):
+        default_paths = DefaultPaths(
+            self.convert_path(self._log_dir),
+            self.convert_path("/etc/scalyr-agent-2/agent.json"),
+            self.convert_path("/var/lib/scalyr-agent-2"),
+        )
+        return Configuration(
+            self._config_file, default_paths, scalyr_logging.getLogger("scalyr_agent")
+        )
+
     def test_default_config(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2431,3 +2443,29 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.max_request_spacing_interval, 5.0)
         self.assertEquals(config.max_log_offset_size, 5242880)
         self.assertEquals(config.max_existing_log_offset_size, 104857600)
+
+    def test_max_send_rate_enforcement_overrides(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                max_allowed_request_size: 1234,
+                pipeline_threshold: 0.3,
+                min_request_spacing_interval: 3.0,
+                max_request_spacing_interval: 4.0,
+                max_log_offset_size: 1234,
+                max_existing_log_offset_size: 1234
+            }
+            """
+        )
+        config = self.get_configuration_with_logger()
+        config.parse()
+
+        self.assertEquals(config.max_send_rate_enforcement, "unlimited")
+        self.assertIsNone(config.parsed_max_send_rate_enforcement)
+
+        self.assertEquals(config.max_allowed_request_size, 5900000)
+        self.assertEquals(config.pipeline_threshold, 0)
+        self.assertEquals(config.min_request_spacing_interval, 0.1)
+        self.assertEquals(config.max_request_spacing_interval, 1.0)
+        self.assertEquals(config.max_log_offset_size, 200000000)
+        self.assertEquals(config.max_existing_log_offset_size, 200000000)

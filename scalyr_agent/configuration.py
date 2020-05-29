@@ -224,34 +224,39 @@ class Configuration(object):
                     self.__config["scalyr_server"] = https_server
 
             # Set defaults based on `max_send_rate_enforcement` value
-            if (
-                self.__config["max_send_rate_enforcement"] == "legacy"
-                or self.__config["disable_max_send_rate_enforcement_overrides"]
-            ):
-                if "max_allowed_request_size" not in self.__config:
+            if not self.__config["disable_max_send_rate_enforcement_overrides"]:
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_allowed_request_size", 1024 * 1024
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "pipeline_threshold", 1.1
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "min_request_spacing_interval", 1.0
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_request_spacing_interval", 5.0
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_log_offset_size", 5 * 1024 * 1024
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_existing_log_offset_size", 100 * 1024 * 1024
+                )
+
+                if self.__config["max_send_rate_enforcement"] == "legacy":
                     self.__config["max_allowed_request_size"] = 1024 * 1024
-                if "pipeline_threshold" not in self.__config:
                     self.__config["pipeline_threshold"] = 1.1
-                if "min_request_spacing_interval" not in self.__config:
                     self.__config["min_request_spacing_interval"] = 1.0
-                if "max_request_spacing_interval" not in self.__config:
                     self.__config["max_request_spacing_interval"] = 5.0
-                if "max_log_offset_size" not in self.__config:
                     self.__config["max_log_offset_size"] = 5 * 1024 * 1024
-                if "max_existing_log_offset_size" not in self.__config:
                     self.__config["max_existing_log_offset_size"] = 100 * 1024 * 1024
-            else:
-                if "max_allowed_request_size" not in self.__config:
+                else:
                     self.__config["max_allowed_request_size"] = 5900000
-                if "pipeline_threshold" not in self.__config:
                     self.__config["pipeline_threshold"] = 0
-                if "min_request_spacing_interval" not in self.__config:
                     self.__config["min_request_spacing_interval"] = 0.1
-                if "max_request_spacing_interval" not in self.__config:
                     self.__config["max_request_spacing_interval"] = 1.0
-                if "max_log_offset_size" not in self.__config:
                     self.__config["max_log_offset_size"] = 200000000
-                if "max_existing_log_offset_size" not in self.__config:
                     self.__config["max_existing_log_offset_size"] = 200000000
 
             # Parse `max_send_rate_enforcement`
@@ -311,6 +316,13 @@ class Configuration(object):
         except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
+        if self.__config[config_option] != default:
+            self.__logger.warn(
+                "Configured option %s is being overridden due to max_send_rate_enforcement setting."
+                % config_option
+            )
 
     def apply_config(self):
         """
@@ -1588,7 +1600,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_allowed_request_size",
-            None,
+            1 * 1024 * 1024,
             description,
             apply_defaults,
             env_aware=True,
@@ -1604,7 +1616,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "min_request_spacing_interval",
-            None,
+            1.0,
             description,
             apply_defaults,
             env_aware=True,
@@ -1612,7 +1624,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "max_request_spacing_interval",
-            None,
+            5.0,
             description,
             apply_defaults,
             env_aware=True,
@@ -1723,7 +1735,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_log_offset_size",
-            None,
+            5 * 1024 * 1024,
             description,
             apply_defaults,
             env_aware=True,
@@ -1737,7 +1749,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_existing_log_offset_size",
-            None,
+            100 * 1024 * 1024,
             description,
             apply_defaults,
             env_aware=True,
@@ -1814,7 +1826,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(
             config,
             "pipeline_threshold",
-            None,
+            1.1,
             description,
             apply_defaults,
             env_aware=True,
