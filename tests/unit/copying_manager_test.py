@@ -1423,6 +1423,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             fp.write(
                 scalyr_util.json_encode(
                     {
+                        "disable_max_send_rate_enforcement_overrides": True,
                         "api_key": "fake",
                         "logs": [{"path": self.__test_log_file}],
                         "pipeline_threshold": pipeline_threshold,
