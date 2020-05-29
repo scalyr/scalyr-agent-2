@@ -224,7 +224,10 @@ class Configuration(object):
                     self.__config["scalyr_server"] = https_server
 
             # Set defaults based on `max_send_rate_enforcement` value
-            if not self.__config["disable_max_send_rate_enforcement_overrides"]:
+            if (
+                not self.__config["disable_max_send_rate_enforcement_overrides"]
+                and not self.__config["max_send_rate_enforcement"] == "legacy"
+            ):
                 self._warn_of_override_due_to_rate_enforcement(
                     "max_allowed_request_size", 1024 * 1024
                 )
@@ -244,20 +247,12 @@ class Configuration(object):
                     "max_existing_log_offset_size", 100 * 1024 * 1024
                 )
 
-                if self.__config["max_send_rate_enforcement"] == "legacy":
-                    self.__config["max_allowed_request_size"] = 1024 * 1024
-                    self.__config["pipeline_threshold"] = 1.1
-                    self.__config["min_request_spacing_interval"] = 1.0
-                    self.__config["max_request_spacing_interval"] = 5.0
-                    self.__config["max_log_offset_size"] = 5 * 1024 * 1024
-                    self.__config["max_existing_log_offset_size"] = 100 * 1024 * 1024
-                else:
-                    self.__config["max_allowed_request_size"] = 5900000
-                    self.__config["pipeline_threshold"] = 0
-                    self.__config["min_request_spacing_interval"] = 0.1
-                    self.__config["max_request_spacing_interval"] = 1.0
-                    self.__config["max_log_offset_size"] = 200000000
-                    self.__config["max_existing_log_offset_size"] = 200000000
+                self.__config["max_allowed_request_size"] = 5900000
+                self.__config["pipeline_threshold"] = 0
+                self.__config["min_request_spacing_interval"] = 0.1
+                self.__config["max_request_spacing_interval"] = 1.0
+                self.__config["max_log_offset_size"] = 200000000
+                self.__config["max_existing_log_offset_size"] = 200000000
 
             # Parse `max_send_rate_enforcement`
             if (
