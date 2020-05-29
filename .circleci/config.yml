@@ -1531,12 +1531,6 @@ jobs:
             cat outputs/centos7.log
 
       - run:
-          name: centos8 result.
-          when: always
-          command: |
-            cat outputs/centos8.log
-
-      - run:
           name: WindowsServer2012 result.
           when: always
           command: |
