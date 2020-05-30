@@ -1628,7 +1628,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 10}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 10,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 
@@ -1651,7 +1655,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance. This test checks we skip to the end of
         # the file if the max_log_offset_size is exceeded
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
         config = _create_configuration(extra)
 
         log_config = {"path": self.__path}
@@ -1673,7 +1681,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 10}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 10,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 
@@ -1700,7 +1712,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we skip to the end
         # of the file if max_log_offset_size is exceeded
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
         config = _create_configuration(extra)
 
         log_config = {"path": self.__path}
@@ -1757,6 +1773,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         extra = {
             "max_log_offset_size": 10,  # set to low value so test will fail if this is used
             "max_existing_log_offset_size": 20,
+            "disable_max_send_rate_enforcement_overrides": True,
         }
         config = _create_configuration(extra)
 
@@ -1794,6 +1811,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         extra = {
             "max_log_offset_size": 100,  # set to high value to test will fail if this is used
             "max_existing_log_offset_size": 20,
+            "disable_max_send_rate_enforcement_overrides": True,
         }
         config = _create_configuration(extra)
 
@@ -1815,7 +1833,11 @@ class TestLogFileProcessor(ScalyrTestCase):
     def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing(
         self,
     ):
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 

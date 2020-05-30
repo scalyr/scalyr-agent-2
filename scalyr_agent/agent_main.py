@@ -892,9 +892,6 @@ class ScalyrAgent(object):
             # noinspection PyBroadException
             try:
                 self.__run_state = RunState()
-                self.__run_state.register_on_stop_callback(
-                    scalyr_logging.close_handlers
-                )
                 self.__log_file_path = os.path.join(
                     self.__config.agent_log_path, "agent.log"
                 )
@@ -1268,6 +1265,13 @@ class ScalyrAgent(object):
         finally:
             if worker_thread is not None:
                 worker_thread.stop()
+
+            # NOTE: We manually call close_handlers() here instead of registering it to call it as
+            # part of run state stop routine.
+            # The reason for that is that run state stop callbacks are called before we get here
+            # which means that some messages which are produced after that and before fully shutting
+            # down are lost and not logged.
+            scalyr_logging.close_handlers()
 
     def __fail_if_already_running(self):
         """If the agent is already running, prints an appropriate error message and exits the process.
@@ -1711,6 +1715,12 @@ class ScalyrAgent(object):
             )
             if tmp_file is not None:
                 tmp_file.close()
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_4,
+            'Wrote agent status data in "%s" format to %s'
+            % (status_format, final_file_path),
+        )
 
         return final_file_path
 
