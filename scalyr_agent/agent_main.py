@@ -219,6 +219,7 @@ class ScalyrAgent(object):
         my_options.no_fork = True
         my_options.no_change_user = True
         my_options.no_check_remote = False
+        my_options.extra_config_dir = None
 
         if perform_config_check:
             command = "inner_run_with_checks"
@@ -246,12 +247,11 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         status_format = command_options.status_format
+        extra_config_dir = command_options.extra_config_dir
         self.__no_fork = command_options.no_fork
         no_check_remote = False
 
-        self.__extra_config_dir = Configuration.get_extra_config_dir(
-            command_options.extra_config_dir
-        )
+        self.__extra_config_dir = Configuration.get_extra_config_dir(extra_config_dir)
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == "version":
