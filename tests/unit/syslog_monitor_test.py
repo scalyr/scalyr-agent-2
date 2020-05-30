@@ -325,8 +325,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.old = sys.stdout
 
         # Replace sys.stdout with 'dummy' StringIO.
-        # We need to have one more variable  which points to our 'dummy' stream because
-        # Pytest can replace 'sys.stdout' with its own stream so, we will not be able to access 'dummy' stream after it.
+        # We must have one more variable which points to our 'dummy' stream because
+        # Pytest can replace 'sys.stdout' with its own stream,
+        # so we will not be able to access 'dummy' stream after that.
         self.dummy_stream = StringIO()
         sys.stdout = self.dummy_stream
 
