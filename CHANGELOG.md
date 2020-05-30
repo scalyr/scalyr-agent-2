@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.5 "Prime" - May 30, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 13:30 -0800
+--->
+
+Bug fix
+* Fixed issue causing the Windows version of the Scalyr Agent to not start when starting in forked mode.
+
 ## 2.1.4 "Prime" - May 30, 2020
 
 <!---
