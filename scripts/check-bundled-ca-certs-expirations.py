@@ -41,21 +41,21 @@ def main():
 
         cert = x509.load_pem_x509_certificate(content, default_backend())
 
-        if (
-            datetime.datetime.utcnow() + datetime.timedelta(days=30 * 6)
-            >= cert.not_valid_after
-        ):
+        now_dt = datetime.datetime.utcnow()
+        expire_in_days = (cert.not_valid_after - now_dt).days
+
+        if now_dt + datetime.timedelta(days=30 * 6) >= cert.not_valid_after:
             print(
                 (
-                    "Certificate %s will expire in 6 months or sooner (%s), please update!"
-                    % (file_path, cert.not_valid_after)
+                    "Certificate %s will expire in 6 months or sooner (expires in %s days - %s), please update!"
+                    % (file_path, expire_in_days, cert.not_valid_after)
                 )
             )
             sys.exit(1)
         else:
             print(
-                "OK - certificate %s will expire in %s"
-                % (file_path, cert.not_valid_after)
+                "OK - certificate %s will expire in %s days (%s)"
+                % (file_path, expire_in_days, cert.not_valid_after)
             )
 
 
