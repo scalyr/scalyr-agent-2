@@ -227,10 +227,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # Rate limiter
         self.__rate_limiter = None
-        if False:  # self.__config.parsed_max_rate_enforcement isnt None
+        if self.__config.parsed_max_send_rate_enforcement:
             self.__rate_limiter = RateLimiter(
-                100, 100
-            )  # parsed_max_rate_enforcement * 4, parsed_max_rate_enforcement
+                self.__config.parsed_max_send_rate_enforcement * 4.0,
+                self.__config.parsed_max_send_rate_enforcement,
+            )
 
         # Keep track of monitors
         self.__monitors = monitors
