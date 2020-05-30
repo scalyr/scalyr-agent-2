@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.5 "Prime" - May 30, 2020
+## 2.1.5 "Quantum Leap" - May 30, 2020
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 13:30 -0800
