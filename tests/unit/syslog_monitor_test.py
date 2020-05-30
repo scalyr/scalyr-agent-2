@@ -323,7 +323,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         # hide stdout
         self.old = sys.stdout
-        sys.stdout = StringIO()
+
+        # Replace sys.stdout with 'dummy' StringIO.
+        # We need to have one more variable  which points to our 'dummy' stream because
+        # Pytest can replace 'sys.stdout' with its own stream so, we will not be able to access 'dummy' stream after it.
+        self.dummy_stream = StringIO()
+        sys.stdout = self.dummy_stream
 
     def tearDown(self):
         # close any open sockets
@@ -338,7 +343,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.handler.close()
 
         # restore stdout
-        sys.stdout.close()
+        self.dummy_stream.close()
         sys.stdout = self.old
 
     def connect(self, socket, addr, max_tries=3):

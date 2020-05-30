@@ -16,6 +16,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
@@ -1119,12 +1120,13 @@ class SyslogHandler(object):
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
     def handle(self, data):
+        data = six.ensure_text(data)
         if self.__docker_logging:
             self.__handle_docker_logs(data)
         else:
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        self.__line_reporter(data.count(b"\n") + 1)
+        self.__line_reporter(data.count("\n") + 1)
 
 
 class RequestVerifier(object):
