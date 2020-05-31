@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Script which errors out if any of the bundled certs will expire in 6 months or sooner.
+Script which errors out if any of the bundled certs will expire in 24 months or sooner.
 """
 
 from __future__ import absolute_import
