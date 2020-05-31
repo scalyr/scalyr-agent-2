@@ -20,8 +20,10 @@ Script which errors out if any of the bundled certs will expire in 6 months or s
 from __future__ import absolute_import
 from __future__ import print_function
 
+if False:
+    from typing import List
+
 import os
-import sys
 import glob
 import datetime
 from io import open
@@ -29,34 +31,60 @@ from io import open
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
+# By default we fail if any of the bundled cert expires in 2 years or sooner
+DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA = datetime.timedelta(days=(12 * 30 * 2))
 
-def main():
+
+def fail_if_cert_expires_in_timedelta(cert_path, expire_in_threshold_timedelta):
+    # type: (str, datetime.timedelta) -> None
+    """
+    Fail and throw an exception if the provided certificate expires in the provided timedelta period
+    or sooner.
+    """
+    with open(cert_path, "rb") as fp:
+        content = fp.read()
+
+    cert = x509.load_pem_x509_certificate(content, default_backend())
+
+    now_dt = datetime.datetime.utcnow()
+    expire_in_days = (cert.not_valid_after - now_dt).days
+
+    if now_dt + expire_in_threshold_timedelta >= cert.not_valid_after:
+        raise Exception(
+            (
+                "Certificate %s will expire in %s days (%s), please update!"
+                % (cert_path, expire_in_days, cert.not_valid_after)
+            )
+        )
+    else:
+        print(
+            "OK - certificate %s will expire in %s days (%s)"
+            % (cert_path, expire_in_days, cert.not_valid_after)
+        )
+
+
+def get_bundled_cert_paths():
+    # type: () -> List[str]
+    """
+    Return full absolute paths for all the bundled certs.
+    """
     cwd = os.path.abspath(os.getcwd())
 
+    result = []
     for file_name in glob.glob("certs/*"):
         file_path = os.path.join(cwd, file_name)
+        result.append(file_path)
 
-        with open(file_path, "rb") as fp:
-            content = fp.read()
+    return result
 
-        cert = x509.load_pem_x509_certificate(content, default_backend())
 
-        now_dt = datetime.datetime.utcnow()
-        expire_in_days = (cert.not_valid_after - now_dt).days
+def main():
+    cert_paths = get_bundled_cert_paths()
 
-        if now_dt + datetime.timedelta(days=30 * 6) >= cert.not_valid_after:
-            print(
-                (
-                    "Certificate %s will expire in 6 months or sooner (expires in %s days - %s), please update!"
-                    % (file_path, expire_in_days, cert.not_valid_after)
-                )
-            )
-            sys.exit(1)
-        else:
-            print(
-                "OK - certificate %s will expire in %s days (%s)"
-                % (file_path, expire_in_days, cert.not_valid_after)
-            )
+    for cert_path in cert_paths:
+        fail_if_cert_expires_in_timedelta(
+            cert_path, expire_in_threshold_timedelta=DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA
+        )
 
 
 if __name__ == "__main__":
