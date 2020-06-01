@@ -1,15 +1,29 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.4 "TBD" - May 5, 2020
+## 2.1.5 "Quantum Leap" - May 30, 2020
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 5, 2020 08:30 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 13:30 -0800
 --->
 
+Bug fix
+* Fixed issue causing the Windows version of the Scalyr Agent to not start when starting in forked mode.
+
+## 2.1.4 "Prime" - May 30, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 09:30 -0800
+--->
+
+Critical bug fix
+* Updated bundled certificates used to verify Scalyr TLS certificate.  Existing bundled certificates had expired causing some customers to not be able to verify the TLS connection.
+
 Features
-* Add support for ``zstandard`` and ``lz4`` compression of outgoing requests to the Scalyr API. For backward compatibility reasons, the default value for ``compression_type`` configuration option still is ``deflate``.
-* Fix a bug and make sure ``stdout_severity`` config option is handled correctly.
+* Added ability to specify an extra configuration snippet directory (in addition to `agent.d`).  You may specify the extra directory by setting the SCALYR_EXTRA_CONFIG_DIR environment variable to the path of your desired directory.  This has been added mainly to help mounting additional configuration in Kubernetes.
+
+Bug fix
+* Fix timing issue in `kubernetes_monitor` that could result in not collecting logs from very short lived containers.
 
 ## 2.1.3 "Orion" - May 1, 2020
 
