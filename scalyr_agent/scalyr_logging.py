@@ -217,11 +217,26 @@ def alternateCurrentFrame():
     return sys._getframe(3)
 
 
+# We set this variable to True after close_handlers() has been called (this happens when termination
+# handler function is called when shutting down the agent.
+# This way we can avoid "IOError: [Errno 0] Error" errors which may appear in stdout on agent
+# shutdown when using agent_main.py stop command which sends SIGTERM signal multiple times.
+# Those logs appeared if we try to log a message inside SIGTERM handler after all the log
+# handlers have already been closed.
+HANDLERS_CLOSED = False
+
+
 def close_handlers():
+    global HANDLERS_CLOSED
+
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
         root_logger.removeHandler(handler)
-        handler.close()
+
+        if handler is not None:
+            handler.close()
+
+    HANDLERS_CLOSED = True
 
 
 if hasattr(sys, "_getframe"):
@@ -1032,7 +1047,13 @@ class StdoutFilter(object):
         """Initializes the filter.
         """
         self.__no_fork = no_fork
-        self.__stdout_severity = getattr(logging, stdout_severity, 0)
+
+        self.__stdout_severity = logging.getLevelName(stdout_severity.upper())
+
+        if not isinstance(self.__stdout_severity, int):
+            # If getLevelName() returns a string this means a level with the provided name doesn't
+            # exist so we fall back to notset
+            self.__stdout_severity = 0
 
     def filter(self, record):
         """Performs the filtering.
@@ -1046,6 +1067,9 @@ class StdoutFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
+        # TODO: We don't handle our custom debug log levels correctly.
+        # If DEBUG level is specified we should use level number 5 since that
+        # represents the lowest number for the custom debug log level we define
         return getattr(record, "force_stdout", False) or (
             self.__no_fork
             and record.levelno >= self.__stdout_severity
@@ -1647,14 +1671,14 @@ class AgentLogManager(object):
             handler.addFilter(StderrFilter())
         elif self.__use_stdout:
             handler = logging.StreamHandler(sys.stdout)
-            handler.addFilter(AgentLogFilter(is_debug))
         else:
             handler = logging.handlers.RotatingFileHandler(
                 file_path,
                 maxBytes=self.__rotation_max_bytes,
                 backupCount=self.__rotation_backup_count,
             )
-            handler.addFilter(AgentLogFilter(is_debug))
+
+        handler.addFilter(AgentLogFilter(is_debug))
 
         formatter = AgentLogFormatter()
         # Rate limit the log if this is the main log since we are copying it up to Scalyr as well.
@@ -1682,7 +1706,9 @@ class AgentLogManager(object):
         # We remove all other handlers on the root.  We are forcing the system to only use what we want.
         for handler in list(root_logger.handlers):
             root_logger.removeHandler(handler)
-            handler.close()
+            if handler:
+                # Don't call close on None in case __recreate_handler returns None
+                handler.close()
 
         root_logger.addHandler(self.__main_log_handler)
         if self.__force_stdout_handler:
