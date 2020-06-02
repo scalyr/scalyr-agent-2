@@ -1,6 +1,12 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+
+## 2.1.6 TBD - June 4, 2020
+
+Minor updates
+* Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.
+
 ## 2.1.5 "Quantum Leap" - May 30, 2020
 
 <!---
