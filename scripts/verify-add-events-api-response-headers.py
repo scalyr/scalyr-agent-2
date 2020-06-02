@@ -14,7 +14,8 @@
 # limitations under the License.
 
 """
-Script which verifies that /addEvents API endpoint returns correctly response headers.
+Script which verifies that /addEvents API endpoint returns correct response headers in different
+scenarios.
 """
 
 from __future__ import absolute_import
@@ -29,8 +30,8 @@ import requests
 
 from scalyr_agent import compat
 
-# A list of headers which should be present in the response for a specific response status code.
-# If either more or less headers are returned, the script will fail.
+# A list of headers names which should be present in the response for a specific response status
+# code. If either more or less headers are returned, the script will fail.
 EXPECTED_HEADER_NAMES_401 = [
     "Server",
     "Date",
@@ -80,12 +81,12 @@ def verify_api_response_headers_and_status_code(
 ):
     # type: (str, str, int, List[str]) -> None
     """
-    Verify that the POST request to the provided URL and data returns expected status code and headers.
+    Verify that the POST request to the provided URL with the provided data returns expected status
+    code and response headers.
     """
     resp = requests.post(url=url, headers=BASE_HEADERS, data=data)
 
     if resp.status_code != expected_status_code:
-        print(resp.text)
         raise ValueError(
             "Expected %s status code, got %s" % (expected_status_code, resp.status_code)
         )
@@ -120,7 +121,7 @@ def main():
             expected_headers=EXPECTED_HEADER_NAMES_401,
         )
 
-        # 2. Test authenticated scenario with valid API key and invalid payload
+        # 2. Test authenticated scenario with a valid API key and invalid payload
         print("Authenticated checks (expecting status code 400)")
         print("")
         data = BASE_BODY.copy()
@@ -134,7 +135,7 @@ def main():
             expected_headers=EXPECTED_HEADER_NAMES_401,
         )
 
-        # 2. Test authenticated scenario with valid API key and valid payload
+        # 2. Test authenticated scenario with a valid API key and valid payload
         print("Authenticated checks (expecting status code 200)")
         print("")
         data = BASE_BODY.copy()
