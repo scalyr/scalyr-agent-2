@@ -316,7 +316,9 @@ class Configuration(object):
         if self.__config[config_option] != default:
             self.__logger.warn(
                 "Configured option %s is being overridden due to max_send_rate_enforcement setting."
-                % config_option
+                % config_option,
+                limit_once_per_x_secs=86400,
+                limit_key="max_send_rate_enforcement_override",
             )
 
     def apply_config(self):
