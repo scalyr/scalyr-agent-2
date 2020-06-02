@@ -7,8 +7,11 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 4, 2020 13:30 -0800
 --->
 
-Minor updates
+Minor updates:
 * Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.
+
+Bug fixes:
+* Fixed Syslog monitor issue causing monitor to write binary strings to the log file.
 
 ## 2.1.5 "Quantum Leap" - May 30, 2020
 
