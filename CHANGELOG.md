@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.1.6 "Rama" - June 4, 2020
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on June 4, 2020 13:30 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 4, 2020 13:30 -0800
 --->
 
 Minor updates
