@@ -229,8 +229,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__rate_limiter = None
         if self.__config.parsed_max_send_rate_enforcement:
             self.__rate_limiter = RateLimiter(
-                self.__config.parsed_max_send_rate_enforcement
-                * 4.0,  # Making the bucket size 4 times the bytes per second, it shouldn't affect the rate over a long time meaningfully but we dont have a rationalle for this value. TODO: Make this configurable as part of the `max_send_rate_enforcement` configuration option
+                # Making the bucket size 4 times the bytes per second, it shouldn't affect the rate over a long time
+                # meaningfully but we dont have a rationalle for this value.
+                # TODO: Make this configurable as part of the `max_send_rate_enforcement` configuration option
+                self.__config.parsed_max_send_rate_enforcement * 4.0,
                 self.__config.parsed_max_send_rate_enforcement,
             )
 
