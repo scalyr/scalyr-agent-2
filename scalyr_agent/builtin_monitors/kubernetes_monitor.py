@@ -57,6 +57,7 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
     K8sApiTemporaryError,
+    K8sConfigBuilder,
     K8sNamespaceFilter,
 )
 from scalyr_agent.monitor_utils.k8s import (
@@ -2487,6 +2488,8 @@ class ContainerChecker(object):
         self.__cri_query_filesystem = self._config.get("k8s_cri_query_filesystem")
         self.__sidecar_mode = self._config.get("k8s_sidecar_mode")
 
+        self.__k8s_log_configs = self._global_config.k8s_log_configs
+
         self.__agent_pod = agent_pod
 
         self.__log_path = log_path
@@ -2514,6 +2517,7 @@ class ContainerChecker(object):
         )
 
         self.k8s_cache = None
+        self.__k8s_config_builder = None
 
         self.__node_name = None
 
@@ -2685,6 +2689,18 @@ class ContainerChecker(object):
                 k8s_cache=self.k8s_cache,
                 k8s_include_by_default=self.__include_all,
                 k8s_namespaces_to_include=self.__namespaces_to_include,
+            )
+
+            # Create the k8s config builder
+            rename_no_original = False
+            # This is for a hack to prevent the original log file name from being added to the attributes.
+            if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
+                rename_no_original = True
+            self.__k8s_config_builder = K8sConfigBuilder(
+                self._global_config.k8s_log_configs,
+                self._logger,
+                rename_no_original,
+                parse_format=self.__parse_format,
             )
 
             # if querying the docker api fails, set the container list to empty
@@ -2974,16 +2990,6 @@ class ContainerChecker(object):
 
         return scalyr_util.seconds_since_epoch(result)
 
-    def __create_log_config(self, parser, path, attributes, parse_format="raw"):
-        """Convenience function to create a log_config dict from the parameters"""
-
-        return {
-            "parser": parser,
-            "path": path,
-            "parse_format": parse_format,
-            "attributes": attributes,
-        }
-
     def __get_base_attributes(self):
         attributes = None
         try:
@@ -3022,9 +3028,8 @@ class ContainerChecker(object):
             "short_id": short_cid,
             "container_id": cid,
             "container_name": info["name"],
+            "container_runtime": self._container_runtime,
         }
-
-        rename_logfile = "/%s/%s.log" % (self._container_runtime, info["name"])
 
         k8s_info = info.get("k8s_info", {})
 
@@ -3039,6 +3044,7 @@ class ContainerChecker(object):
 
             rename_vars["pod_name"] = pod_name
             rename_vars["namespace"] = pod_namespace
+            rename_vars["pod_namespace"] = pod_namespace
             container_attributes["pod_name"] = pod_name
             container_attributes["pod_namespace"] = pod_namespace
 
@@ -3132,18 +3138,11 @@ class ContainerChecker(object):
                 scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % short_cid
             )
 
-        if "log_path" in info and info["log_path"]:
-            result = self.__create_log_config(
-                parser=parser,
-                path=info["log_path"],
-                attributes=container_attributes,
-                parse_format=self.__parse_format,
-            )
-            result["rename_logfile"] = rename_logfile
-            # This is for a hack to prevent the original log file name from being added to the attributes.
-            if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
-                result["rename_no_original"] = True
-        else:
+        result = self.__k8s_config_builder.get_log_config(
+            info=info, k8s_info=k8s_info, parser=parser,
+        )
+
+        if result is None:
             # without a log_path there is no log config that can be created.  Log a warning and return
             # See ticket: #AGENT-88
             self._logger.warning(
@@ -3162,25 +3161,10 @@ class ContainerChecker(object):
 
             return None
 
-        if result is None:
-            # This should never be true because either we have created a result based on the log path
-            # or we have returned early, however it is here to protect against processing annotations
-            # on an empty result.  See ticket: #AGENT-88
-            self._logger.warning(
-                "Empty result for container '%s' of %s/%s"
-                % (short_cid, pod_namespace, pod_name),
-                limit_once_per_x_secs=3600,
-                limit_key="k8s-empty-result-%s" % short_cid,
-            )
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_1,
-                "Info is: %s\nCommon annotations: %s\nContainer annotations: %s"
-                % (info, common_annotations, container_annotations),
-                limit_once_per_x_secs=3600,
-                limit_key="k8s-empty-result-info-%s" % short_cid,
-            )
-            return None
+        if "k8s_container_name" in k8s_info:
+            rename_vars["k8s_container_name"] = k8s_info["k8s_container_name"]
 
+        # Annotation override all other configs:
         # apply common annotations first
         annotations = common_annotations
         # set/override any container specific annotations
@@ -3193,8 +3177,7 @@ class ContainerChecker(object):
         # list of config items that cannot be updated via annotations
         invalid_keys = ["path", "lineGroupers"]
 
-        # set config items, ignoring invalid options and taking care to
-        # handle attributes
+        # set config items, ignoring invalid options
         for key, value in six.iteritems(annotations):
             if key in skip_keys:
                 continue
@@ -3208,26 +3191,30 @@ class ContainerChecker(object):
                 )
                 continue
 
-            # we need to make sure we update attributes rather
-            # than overriding the entire dict, otherwise we'll override pod_name, namespace etc
-            if key == "attributes":
-                if "attributes" not in result:
-                    result["attributes"] = {}
-                attrs = result["attributes"]
-                attrs.update(value)
-
-                # we also need to override the top level parser value if attributes['parser'] is set
-                if "parser" in attrs:
-                    result["parser"] = attrs["parser"]
-                continue
-            elif key == "rename_logfile":
-                # rename logfile supports string substitions
-                # so update value if necessary
-                template = Template(value)
-                value = template.safe_substitute(rename_vars)
-
             # everything else is added to the log_config result as is
             result[key] = value
+
+        # Perform variable substitution for rename_logfile
+        if "rename_logfile" in result:
+            template = Template(result["rename_logfile"])
+            result["rename_logfile"] = template.safe_substitute(rename_vars)
+
+        # Update result["attributes"] with list of attributes generated by the agent
+        # Make sure to use a copy because it could be pointing to objects in the original attributes
+        # or log configs, and we don't want to modify those
+        attrs = result.get("attributes", {}).copy()
+        for key, value in six.iteritems(container_attributes):
+            # Only set values that haven't been explicity set
+            # by an annotation or k8s_logs config option
+            if key not in attrs:
+                attrs[key] = value
+
+        # use our new copy instead
+        result["attributes"] = attrs
+
+        # Update root level parser if attributes["parser"] is set
+        if "parser" in attrs:
+            result["parser"] = attrs["parser"]
 
         return result
 

@@ -94,6 +94,8 @@ class Configuration(object):
         self.__log_configs = []
         # Optional configuration for journald monitor logging
         self.__journald_log_configs = []
+        # Optional configuration for k8s monitor logging
+        self.__k8s_log_configs = []
         # The monitor configuration objects from the configuration file.  This does not include monitors that
         # are created by default by the platform.
         self.__monitor_configs = []
@@ -151,6 +153,7 @@ class Configuration(object):
                 "import_vars",
                 "logs",
                 "journald_logs",
+                "k8s_logs",
                 "monitors",
                 "server_attributes",
             )
@@ -189,6 +192,7 @@ class Configuration(object):
 
                 self.__add_elements_from_array("logs", content, self.__config)
                 self.__add_elements_from_array("journald_logs", content, self.__config)
+                self.__add_elements_from_array("k8s_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
@@ -293,6 +297,8 @@ class Configuration(object):
             self.__journald_log_configs = list(
                 self.__config.get_json_array("journald_logs")
             )
+
+            self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
             # add in the profile log if we have enabled profiling
             if self.enable_profiling:
@@ -834,6 +840,13 @@ class Configuration(object):
 
         @rtype list<JsonObject>"""
         return self.__journald_log_configs
+
+    @property
+    def k8s_log_configs(self):
+        """Returns the list of configuration entries for all the k8s loggers specified in the configuration file.
+
+        @rtype list<JsonObject>"""
+        return self.__k8s_log_configs
 
     @property
     def monitor_configs(self):
@@ -2578,6 +2591,7 @@ class Configuration(object):
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, "logs", description)
         self.__verify_or_set_optional_array(config, "journald_logs", description)
+        self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
 
         i = 0
@@ -2598,11 +2612,67 @@ class Configuration(object):
             i += 1
 
         i = 0
+        for log_entry in config.get_json_array("k8s_logs"):
+            self.__verify_k8s_log_entry_and_set_defaults(
+                log_entry, config_file_path=file_path, entry_index=i,
+            )
+            i += 1
+
+        i = 0
         for monitor_entry in config.get_json_array("monitors"):
             self.__verify_monitor_entry_and_set_defaults(
                 monitor_entry, file_path=file_path, entry_index=i
             )
             i += 1
+
+    def __verify_k8s_log_entry_and_set_defaults(
+        self, log_entry, description=None, config_file_path=None, entry_index=None,
+    ):
+        """Verifies that the configuration for the specified k8s log entry.
+
+        A "k8s_log" entry can have one of multiple keys defined `k8s_pod_glob`, `k8s_namespace_glob`,
+        or `k8s_container_glob` which is a string containing a glob pattern to match against.
+
+        By default each of these values is `*` which matches against everything.  Users can
+        set these fields to limit the log configuration to specific pods, namespaces and containers.
+
+        Only the first matching config will be applied to any give log.  Users should make sure to
+        place more specific matching rules before more general ones.
+
+        Also verify the rest of the log config meets the required log config criteria and sets any defaults.
+
+        Raises an exception if it does not.
+
+        @param log_entry: The JsonObject holding the configuration for a log.
+        @param description: A human-readable description of where the log entry came from to use in error messages. If
+            none is given, then both file_path and entry_index must be set.
+        @param config_file_path: The path for the file from where the configuration was read. Used to generate the
+            description if none was given.
+        @param entry_index: The index of the entry in the 'logs' json array. Used to generate the description if none
+            was given.
+        """
+
+        self.__verify_or_set_optional_string(
+            log_entry, "k8s_pod_glob", "*", description
+        )
+        self.__verify_or_set_optional_string(
+            log_entry, "k8s_namespace_glob", "*", description
+        )
+        self.__verify_or_set_optional_string(
+            log_entry, "k8s_container_glob", "*", description
+        )
+
+        self.__verify_log_entry_with_key_and_set_defaults(
+            log_entry,
+            None,
+            description=description,
+            config_file_path=config_file_path,
+            entry_index=entry_index,
+            # k8s log config defaults are applied later when adding containers to the copying manager
+            # so don't set them here
+            apply_defaults=False,
+            logs_field="k8s_logs",
+        )
 
     def __verify_log_entry_and_set_defaults(
         self, log_entry, description=None, config_file_path=None, entry_index=None
@@ -2639,6 +2709,8 @@ class Configuration(object):
         description=None,
         config_file_path=None,
         entry_index=None,
+        apply_defaults=True,
+        logs_field="logs",
     ):
         """Verifies that the configuration for the specified log meets all the required criteria and sets any defaults.
 
@@ -2653,12 +2725,15 @@ class Configuration(object):
             description if none was given.
         @param entry_index: The index of the entry in the 'logs' json array. Used to generate the description if none
             was given.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
+        @param logs_field: The name of the field used for log configs
         """
         no_description_given = description is None
         if no_description_given:
             description = (
-                'the entry with index=%i in the "logs" array in configuration file "%s"'
-                % (entry_index, config_file_path)
+                'the entry with index=%i in the "%s" array in configuration file "%s"'
+                % (entry_index, logs_field, config_file_path)
             )
         log = None
         if key is not None:
@@ -2668,18 +2743,22 @@ class Configuration(object):
 
         if log is not None and no_description_given:
             description = (
-                'the entry for "%s" in the "logs" array in configuration file "%s"'
-                % (log, config_file_path)
+                'the entry for "%s" in the "%s" array in configuration file "%s"'
+                % (log, logs_field, config_file_path)
             )
 
         self.__verify_or_set_optional_array_of_strings(
-            log_entry, "exclude", [], description
+            log_entry, "exclude", [], description, apply_defaults=apply_defaults,
         )
 
         # If a parser was specified, make sure it is a string.
         if "parser" in log_entry:
             self.__verify_or_set_optional_string(
-                log_entry, "parser", "ignored", description
+                log_entry,
+                "parser",
+                "ignored",
+                description,
+                apply_defaults=apply_defaults,
             )
 
         self.__verify_or_set_optional_attributes(log_entry, "attributes", description)
@@ -2701,30 +2780,58 @@ class Configuration(object):
             i += 1
 
         self.__verify_or_set_optional_bool(
-            log_entry, "copy_from_start", False, description
+            log_entry,
+            "copy_from_start",
+            False,
+            description,
+            apply_defaults=apply_defaults,
         )
         self.__verify_or_set_optional_bool(
             log_entry, "parse_lines_as_json", None, description, apply_defaults=False
         )
         self.__verify_or_set_optional_string(
-            log_entry, "parse_format", "raw", description
+            log_entry,
+            "parse_format",
+            "raw",
+            description,
+            apply_defaults=apply_defaults,
         )
         self.__verify_or_set_optional_string(
-            log_entry, "json_message_field", "log", description
+            log_entry,
+            "json_message_field",
+            "log",
+            description,
+            apply_defaults=apply_defaults,
         )
         self.__verify_or_set_optional_string(
-            log_entry, "json_timestamp_field", "time", description
+            log_entry,
+            "json_timestamp_field",
+            "time",
+            description,
+            apply_defaults=apply_defaults,
         )
 
         self.__verify_or_set_optional_bool(
-            log_entry, "ignore_stale_files", False, description
+            log_entry,
+            "ignore_stale_files",
+            False,
+            description,
+            apply_defaults=apply_defaults,
         )
         self.__verify_or_set_optional_float(
-            log_entry, "staleness_threshold_secs", 5 * 60, description
+            log_entry,
+            "staleness_threshold_secs",
+            5 * 60,
+            description,
+            apply_defaults=apply_defaults,
         )
 
         self.__verify_or_set_optional_int(
-            log_entry, "minimum_scan_interval", None, description
+            log_entry,
+            "minimum_scan_interval",
+            None,
+            description,
+            apply_defaults=apply_defaults,
         )
 
         # Verify that if it has a sampling_rules array, then it is an array of json objects.
@@ -2859,12 +2966,15 @@ class Configuration(object):
         @param fields: A list of field names to check in the config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @return: The name of the found key, or None
         """
         count = 0
+        result = None
         for field in fields:
             try:
                 value = config_object.get_string(field, none_if_missing=True)
                 if value is not None:
+                    result = field
                     count += 1
             except JsonConversionException:
                 raise BadConfiguration(
@@ -2887,6 +2997,7 @@ class Configuration(object):
                 field,
                 "missingRequired",
             )
+        return result
 
     def __verify_or_set_optional_string(
         self,
