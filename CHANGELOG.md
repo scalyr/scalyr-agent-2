@@ -19,7 +19,6 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 09:30 -0800
 Critical bug fix
 * Updated bundled certificates used to verify Scalyr TLS certificate.  Existing bundled certificates had expired causing some customers to not be able to verify the TLS connection.
 
-Features
 * Added ability to specify an extra configuration snippet directory (in addition to `agent.d`).  You may specify the extra directory by setting the SCALYR_EXTRA_CONFIG_DIR environment variable to the path of your desired directory.  This has been added mainly to help mounting additional configuration in Kubernetes.
 
 Bug fix
