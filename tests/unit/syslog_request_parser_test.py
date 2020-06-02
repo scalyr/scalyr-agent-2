@@ -44,8 +44,8 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b"5 hello5 world", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual(b"hello", handler.values[0])
-        self.assertEqual(b"world", handler.values[1])
+        self.assertEqual("hello", handler.values[0])
+        self.assertEqual("world", handler.values[1])
 
     def test_framed_message_incomplete(self):
         parser = SyslogRequestParser(None, 32)
@@ -58,7 +58,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b" world", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual(b"hello world", handler.values[0])
+        self.assertEqual("hello world", handler.values[0])
 
     def test_framed_message_multiple_incomplete(self):
         parser = SyslogRequestParser(None, 32)
@@ -76,7 +76,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b"ld", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual(b"hello world", handler.values[0])
+        self.assertEqual("hello world", handler.values[0])
 
     def test_framed_message_invalid_frame_size(self):
         parser = SyslogRequestParser(None, 32)
@@ -92,8 +92,8 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b"10 lo world .", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual(b"23 hello world h", handler.values[0])
-        self.assertEqual(b" 10 lo world .", handler.values[1])
+        self.assertEqual("23 hello world h", handler.values[0])
+        self.assertEqual(" 10 lo world .", handler.values[1])
 
     def test_unframed_messages(self):
         parser = SyslogRequestParser(None, 32)
@@ -101,8 +101,8 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b"hello\nworld\n", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual(b"hello", handler.values[0])
-        self.assertEqual(b"world", handler.values[1])
+        self.assertEqual("hello", handler.values[0])
+        self.assertEqual("world", handler.values[1])
 
     def test_unframed_messages_incomplete(self):
         parser = SyslogRequestParser(None, 32)
@@ -114,7 +114,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser.process(b" world\n", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual(b"hello world", handler.values[0])
+        self.assertEqual("hello world", handler.values[0])
 
     def test_unframed_message_exceeds_max_size(self):
         parser = SyslogRequestParser(None, 13)
@@ -122,10 +122,10 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
 
         parser.process(b"in my hand i have ", handler.handle)
         self.assertEqual(1, len(handler.values))
-        self.assertEqual(b"in my hand i have ", handler.values[0])
+        self.assertEqual("in my hand i have ", handler.values[0])
         parser.process(b"100 dollars\n", handler.handle)
         self.assertEqual(2, len(handler.values))
-        self.assertEqual(b"100 dollars", handler.values[1])
+        self.assertEqual("100 dollars", handler.values[1])
 
 
 if __name__ == "__main__":
