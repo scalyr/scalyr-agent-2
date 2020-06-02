@@ -243,8 +243,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.max_allowed_request_size, 5900000)
         self.assertEquals(config.min_allowed_request_size, 100 * 1024)
 
-        self.assertEquals(config.min_request_spacing_interval, 0.1)
-        self.assertEquals(config.max_request_spacing_interval, 1.0)
+        self.assertEquals(config.min_request_spacing_interval, 0.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
 
         self.assertEquals(config.high_water_bytes_sent, 100 * 1024)
         self.assertEquals(config.high_water_request_spacing_adjustment, 0.6)
@@ -2465,8 +2465,8 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         self.assertEquals(config.max_allowed_request_size, 5900000)
         self.assertEquals(config.pipeline_threshold, 0)
-        self.assertEquals(config.min_request_spacing_interval, 0.1)
-        self.assertEquals(config.max_request_spacing_interval, 1.0)
+        self.assertEquals(config.min_request_spacing_interval, 0.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
         self.assertEquals(config.max_log_offset_size, 200000000)
         self.assertEquals(config.max_existing_log_offset_size, 200000000)
 
