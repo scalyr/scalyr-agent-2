@@ -56,7 +56,8 @@ from scalyr_agent import scalyr_init
 
 scalyr_init()
 
-ONE_MB = 1024 * 1024
+ONE_MIB = 1024 * 1024
+ALMOST_SIX_MB = 5900000
 
 
 def _create_test_copying_manager(configuration, monitors, auto_start=True):
@@ -434,16 +435,16 @@ class DynamicLogPathTest(ScalyrTestCase):
         fp.close()
 
 
-class CopyingParamsTest(ScalyrTestCase):
+class CopyingParamsLegacyTest(ScalyrTestCase):
     def setUp(self):
-        super(CopyingParamsTest, self).setUp()
+        super(CopyingParamsLegacyTest, self).setUp()
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, "agentConfig.json")
         self.__config_fragments_dir = os.path.join(self.__config_dir, "configs.d")
         os.makedirs(self.__config_fragments_dir)
 
         fp = open(self.__config_file, "w")
-        fp.write('{api_key: "fake"}')
+        fp.write('{api_key: "fake", max_send_rate_enforcement: "legacy"}')
         fp.close()
 
         config = self.__create_test_configuration_instance()
@@ -451,13 +452,13 @@ class CopyingParamsTest(ScalyrTestCase):
         self.test_params = CopyingParameters(config)
 
     def test_initial_settings(self):
-        self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MB)
+        self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MIB)
         self.assertEquals(self.test_params.current_sleep_interval, 5.0)
 
     def test_no_events_being_sent(self):
         for i in range(0, 5):
             self.test_params.update_params("success", 0)
-            self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MB)
+            self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MIB)
             self.assertEquals(self.test_params.current_sleep_interval, 5.0)
 
     def test_small_events_being_sent(self):
@@ -465,10 +466,10 @@ class CopyingParamsTest(ScalyrTestCase):
         self._run(
             "success",
             10 * 1024,
-            [1.5, ONE_MB],
-            [2.25, ONE_MB],
-            [3.375, ONE_MB],
-            [5, ONE_MB],
+            [1.5, ONE_MIB],
+            [2.25, ONE_MIB],
+            [3.375, ONE_MIB],
+            [5, ONE_MIB],
         )
 
     def test_too_many_events_being_sent(self):
@@ -477,10 +478,10 @@ class CopyingParamsTest(ScalyrTestCase):
         self._run(
             "success",
             200 * 1024,
-            [3.0, ONE_MB],
-            [1.8, ONE_MB],
-            [1.08, ONE_MB],
-            [1, ONE_MB],
+            [3.0, ONE_MIB],
+            [1.8, ONE_MIB],
+            [1.08, ONE_MIB],
+            [1, ONE_MIB],
         )
 
     def test_request_too_big(self):
@@ -501,12 +502,134 @@ class CopyingParamsTest(ScalyrTestCase):
         self._run(
             "error",
             200 * 1024,
-            [4.5, ONE_MB],
-            [6.75, ONE_MB],
-            [10.125, ONE_MB],
-            [15.1875, ONE_MB],
-            [22.78125, ONE_MB],
-            [30, ONE_MB],
+            [4.5, ONE_MIB],
+            [6.75, ONE_MIB],
+            [10.125, ONE_MIB],
+            [15.1875, ONE_MIB],
+            [22.78125, ONE_MIB],
+            [30, ONE_MIB],
+        )
+
+    def _run(self, status, bytes_sent, *expected_sleep_interval_allowed_bytes):
+        """Verifies that when test_params is updated with the specified status and bytes sent the current sleep
+        interval and allowed bytes is updated to the given values.
+
+        This will call test_params.update_params N times where N is the number of additional arguments supplied.
+        After the ith invocation of test_params.update_params, the values for the current_sleep_interval and
+        current_bytes_allowed_to_send will be checked against the ith additional parameter.
+
+        @param status: The status to use when invoking test_params.update_params.
+        @param bytes_sent: The number of bytes sent to use when invoking test_params.update_params.
+        @param expected_sleep_interval_allowed_bytes: A variable number of two element arrays where the first element
+            is the expected value for current_sleep_interval and the second is the expected value of
+            current_bytes_allowed_to_send. Each subsequent array represents what those values should be after invoking
+            test_params.update_param again.
+        """
+        for expected_result in expected_sleep_interval_allowed_bytes:
+            self.test_params.update_params(status, bytes_sent)
+            self.assertAlmostEquals(
+                self.test_params.current_sleep_interval, expected_result[0]
+            )
+            self.assertAlmostEquals(
+                self.test_params.current_bytes_allowed_to_send, expected_result[1]
+            )
+
+    class LogObject(object):
+        def __init__(self, config):
+            self.config = config
+            self.log_path = config["path"]
+
+    class MonitorObject(object):
+        def __init__(self, config):
+            self.module_name = config["module"]
+            self.config = config
+            self.log_config = {"path": self.module_name.split(".")[-1] + ".log"}
+
+    def __create_test_configuration_instance(self):
+
+        default_paths = DefaultPaths(
+            "/var/log/scalyr-agent-2",
+            "/etc/scalyr-agent-2/agent.json",
+            "/var/lib/scalyr-agent-2",
+        )
+        return Configuration(self.__config_file, default_paths, None)
+
+
+class CopyingParamsTest(ScalyrTestCase):
+    def setUp(self):
+        super(CopyingParamsTest, self).setUp()
+        self.__config_dir = tempfile.mkdtemp()
+        self.__config_file = os.path.join(self.__config_dir, "agentConfig.json")
+        self.__config_fragments_dir = os.path.join(self.__config_dir, "configs.d")
+        os.makedirs(self.__config_fragments_dir)
+
+        fp = open(self.__config_file, "w")
+        fp.write('{api_key: "fake"}')
+        fp.close()
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.test_params = CopyingParameters(config)
+
+    def test_initial_settings(self):
+        self.assertEquals(self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB)
+        self.assertEquals(self.test_params.current_sleep_interval, 1.0)
+
+    def test_no_events_being_sent(self):
+        for i in range(0, 5):
+            self.test_params.update_params("success", 0)
+            self.assertEquals(
+                self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB
+            )
+            self.assertEquals(self.test_params.current_sleep_interval, 1.0)
+
+    def test_small_events_being_sent(self):
+        self.test_params.current_sleep_interval = 0.1
+        self._run(
+            "success",
+            10 * 1024,
+            [0.15, ALMOST_SIX_MB],
+            [0.225, ALMOST_SIX_MB],
+            [0.3375, ALMOST_SIX_MB],
+            [0.50625, ALMOST_SIX_MB],
+        )
+
+    def test_too_many_events_being_sent(self):
+        self.test_params.current_sleep_interval = 1
+
+        self._run(
+            "success",
+            200 * 1024,
+            [0.6, ALMOST_SIX_MB],
+            [0.36, ALMOST_SIX_MB],
+            [0.216, ALMOST_SIX_MB],
+            [0.1296, ALMOST_SIX_MB],
+        )
+
+    def test_request_too_big(self):
+        self.test_params.current_sleep_interval = 1
+
+        self.test_params.update_params("requestTooLarge", 300 * 1024)
+        self.assertAlmostEquals(
+            self.test_params.current_bytes_allowed_to_send, 150 * 1024
+        )
+
+        self.test_params.update_params("requestTooLarge", 150 * 1024)
+        self.assertAlmostEquals(
+            self.test_params.current_bytes_allowed_to_send, 100 * 1024
+        )
+
+    def test_error_back_off(self):
+        self.test_params.current_sleep_interval = 3
+        self._run(
+            "error",
+            200 * 1024,
+            [4.5, ALMOST_SIX_MB],
+            [6.75, ALMOST_SIX_MB],
+            [10.125, ALMOST_SIX_MB],
+            [15.1875, ALMOST_SIX_MB],
+            [22.78125, ALMOST_SIX_MB],
+            [30, ALMOST_SIX_MB],
         )
 
     def _run(self, status, bytes_sent, *expected_sleep_interval_allowed_bytes):
@@ -1300,6 +1423,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             fp.write(
                 scalyr_util.json_encode(
                     {
+                        "disable_max_send_rate_enforcement_overrides": True,
                         "api_key": "fake",
                         "logs": [{"path": self.__test_log_file}],
                         "pipeline_threshold": pipeline_threshold,

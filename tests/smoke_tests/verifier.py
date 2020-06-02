@@ -22,6 +22,8 @@ import time
 
 import six
 
+from pprint import pprint
+
 from scalyr_agent import compat
 from tests.utils.agent_runner import AgentRunner
 from tests.smoke_tests.request import ScalyrRequest
@@ -139,14 +141,33 @@ class AgentLogVerifier(AgentVerifier):
             )
         )
 
-    def _verify(self):
+    def verify(self, timeout=2 * 60):
+        # Give agent some time to start up before checking for version string.
+        # This version check is done against a local agent.log file and status -v --format=json
+        # output and not Scalyr API so we don't need to retry it and wait for logs to be shipped to
+        # Scalyr API.
+        time.sleep(2)
+        self._verify_agent_version_string()
+
+        # Now call the parent verify method which calls _verify()
+        return super(AgentLogVerifier, self).verify(timeout=timeout)
+
+    def _verify_agent_version_string(self):
+        """
+        Check that the local agent.log file and status output contains the correct version string.
+
+        This method is different from main _verify() method in a sense that we only run it once and
+        don't retry it since this data should be immediately available so there is no need to retry
+        and wait on the Scalyr API since we query the local file and not the Scalyr API.
+        """
         local_agent_log_data = self._runner.read_file_content(
             self._runner.agent_log_file_path
         )
 
         if not local_agent_log_data:
-            print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
-            return
+            raise ValueError(
+                ("No data in '{0}' file.".format(self._runner.agent_log_file_path))
+            )
 
         print("Check start line contains correct version and revision string")
         match = re.search(
@@ -155,8 +176,9 @@ class AgentLogVerifier(AgentVerifier):
         )
 
         if not match:
-            print("Unable to retrieve package version and revision from agent.log file")
-            return False
+            raise ValueError(
+                "Unable to retrieve package version and revision from agent.log file"
+            )
 
         expected_package_version, expected_package_revision = match.groups()
 
@@ -168,18 +190,37 @@ class AgentLogVerifier(AgentVerifier):
         # NOTE: Ideally we would also pass in expected version and revision to make this more robust
         # and correct
         if expected_package_version != actual_package_version:
-            print(
+            raise ValueError(
                 "Expected package version %s, got %s"
                 % (expected_package_version, actual_package_version)
             )
-            return False
 
         if expected_package_revision != actual_package_revision:
-            print(
+            raise ValueError(
                 "Expected package revision %s, got %s"
                 % (expected_package_revision, actual_package_revision)
             )
-            return False
+
+        print("Correct agent version and revision string found.")
+
+    def _verify(self):
+        """
+        Verify that the agent has successfuly started.
+
+        Right now we do that by ensuring has produced 5 "spawned collector" log messages which have
+        also been shipped to the Scalyr API.
+        """
+        status = json.loads(self._runner.status_json())
+        print("Agent status:\n")
+        pprint(status)
+
+        local_agent_log_data = self._runner.read_file_content(
+            self._runner.agent_log_file_path
+        )
+
+        if not local_agent_log_data:
+            print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
+            return
 
         print("Check that all collectors were found.")
         collector_line_pattern_str = _make_agent_log_line_pattern(
@@ -200,8 +241,8 @@ class AgentLogVerifier(AgentVerifier):
         if len(found_collectors) != 5:
             print(
                 (
-                    "Not all collectors were found. Expected '{0}', got '{1}'.".format(
-                        5, len(found_collectors)
+                    "Not all collectors were found. Expected '{0}', got '{1}'. Found collectors: {2}".format(
+                        5, len(found_collectors), ", ".join(found_collectors)
                     )
                 )
             )
@@ -228,14 +269,17 @@ class AgentLogVerifier(AgentVerifier):
         if len(found_collectors_remote) != 5:
             print(
                 (
-                    "Not all remote collectors were found. Expected '{0}', got '{1}'.".format(
-                        5, len(found_collectors_remote)
+                    "Not all remote collectors were found. Expected '{0}', got '{1}'. Found collectors: {2}".format(
+                        5,
+                        len(found_collectors_remote),
+                        ", ".join(found_collectors_remote),
                     )
                 )
             )
             print("Data received: %s" % (response_log))
             return
 
+        print("Local agent logs and Scalyr API returned correct data.")
         return True
 
 
@@ -261,9 +305,11 @@ class DataJsonVerifier(AgentVerifier):
         )
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
+        self._lines_count = 1000
+
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
-        for i in range(1000):
+        for i in range(self._lines_count):
             json_data = json.dumps({"count": i, "stream_id": self._timestamp})
             self._runner.write_line(self._data_json_log_path, json_data)
         return
@@ -276,11 +322,17 @@ class DataJsonVerifier(AgentVerifier):
             return
 
         matches = response["matches"]
-        if len(matches) < 1000:
-            print("Less than all log lines were found.")
+        if len(matches) < self._lines_count:
+            print(
+                "Less than all log lines were found (found %s, expected %s)."
+                % (len(matches), self._lines_count)
+            )
             return
-        if len(matches) > 1000:
-            print("Too many log lines were found.")
+        if len(matches) > self._lines_count:
+            print(
+                "Too many log lines were found (found %s, expected %s)."
+                % (len(matches), self._lines_count)
+            )
             return
 
         matches = [json.loads(m["message"]) for m in matches]
@@ -289,8 +341,8 @@ class DataJsonVerifier(AgentVerifier):
             print("Some of the fetched lines have wrong 'stream_id'")
             return
 
-        # response matches must contain count values from 0 to 999
-        if set(m["count"] for m in matches) != set(range(1000)):
+        # response matches must contain count values from 0 to self._lines_count
+        if set(m["count"] for m in matches) != set(range(self._lines_count)):
             return
 
         return True

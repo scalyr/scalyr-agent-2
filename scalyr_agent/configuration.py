@@ -223,6 +223,53 @@ class Configuration(object):
                 if https_server != server:
                     self.__config["scalyr_server"] = https_server
 
+            # Set defaults based on `max_send_rate_enforcement` value
+            if (
+                not self.__config["disable_max_send_rate_enforcement_overrides"]
+                and not self.__config["max_send_rate_enforcement"] == "legacy"
+            ):
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_allowed_request_size", 1024 * 1024
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "pipeline_threshold", 1.1
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "min_request_spacing_interval", 1.0
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_request_spacing_interval", 5.0
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_log_offset_size", 5 * 1024 * 1024
+                )
+                self._warn_of_override_due_to_rate_enforcement(
+                    "max_existing_log_offset_size", 100 * 1024 * 1024
+                )
+
+                self.__config["max_allowed_request_size"] = 5900000
+                self.__config["pipeline_threshold"] = 0
+                self.__config["min_request_spacing_interval"] = 0.1
+                self.__config["max_request_spacing_interval"] = 1.0
+                self.__config["max_log_offset_size"] = 200000000
+                self.__config["max_existing_log_offset_size"] = 200000000
+
+            # Parse `max_send_rate_enforcement`
+            if (
+                self.__config["max_send_rate_enforcement"] != "unlimited"
+                and self.__config["max_send_rate_enforcement"] != "legacy"
+            ):
+                try:
+                    self.__config[
+                        "parsed_max_send_rate_enforcement"
+                    ] = scalyr_util.parse_data_rate_string(
+                        self.__config["max_send_rate_enforcement"]
+                    )
+                except ValueError as e:
+                    raise BadConfiguration(
+                        six.text_type(e), "max_send_rate_enforcement", "notDataRate"
+                    )
+
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
             if "serverHost" not in self.server_attributes:
@@ -265,6 +312,13 @@ class Configuration(object):
             self.__last_error = e
             raise e
 
+    def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
+        if self.__config[config_option] != default:
+            self.__logger.warn(
+                "Configured option %s is being overridden due to max_send_rate_enforcement setting."
+                % config_option
+            )
+
     def apply_config(self):
         """
         Apply global configuration object based on the configuration values.
@@ -301,6 +355,8 @@ class Configuration(object):
             "compression_type",
             "compression_level",
             "pipeline_threshold",
+            "max_send_rate_enforcement",
+            "disable_max_send_rate_enforcement_overrides",
             "min_allowed_request_size",
             "max_allowed_request_size",
             "min_request_spacing_interval",
@@ -875,6 +931,25 @@ class Configuration(object):
         return self.__get_config().get_string("config_directory")
 
     @property
+    def parsed_max_send_rate_enforcement(self):
+        """Returns the configuration value for 'max_send_rate_enforcement' in bytes per second if not `unlimited` or `legacy`."""
+        return self.__get_config().get_float(
+            "parsed_max_send_rate_enforcement", none_if_missing=True
+        )
+
+    @property
+    def max_send_rate_enforcement(self):
+        """Returns the raw value for 'max_send_rate_enforcement'."""
+        return self.__get_config().get_string("max_send_rate_enforcement")
+
+    @property
+    def disable_max_send_rate_enforcement_overrides(self):
+        """Returns the configuration value for 'disable_max_send_rate_enforcement_overrides'."""
+        return self.__get_config().get_bool(
+            "disable_max_send_rate_enforcement_overrides"
+        )
+
+    @property
     def extra_config_directory(self):
         """Returns the configuration value for `extra_config_directory`, resolved to full path if
         necessary.  """
@@ -969,7 +1044,7 @@ class Configuration(object):
         """Returns the configuration value for 'stdout_severity'.
         Only used when running in no-fork mode.
         """
-        return self.__get_config().get_string("stdout_severity")
+        return self.__get_config().get_string("stdout_severity").upper()
 
     @property
     def ca_cert_path(self):
@@ -1500,6 +1575,23 @@ class Configuration(object):
             env_aware=True,
         )
 
+        self.__verify_or_set_optional_string(
+            config,
+            "max_send_rate_enforcement",
+            "unlimited",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "disable_max_send_rate_enforcement_overrides",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
         self.__verify_or_set_optional_int(
             config,
             "max_allowed_request_size",
@@ -1615,7 +1707,7 @@ class Configuration(object):
         # We do not strictly enforce this -- some lines returned by LogFileIterator may be
         # longer than this due to some edge cases.
         self.__verify_or_set_optional_int(
-            config, "max_line_size", 9900, description, apply_defaults, env_aware=True
+            config, "max_line_size", 49900, description, apply_defaults, env_aware=True
         )
 
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
@@ -1789,7 +1881,7 @@ class Configuration(object):
             env_aware=True,
         )
         stdout_severity = config.get_string("stdout_severity", default_value="NOTSET")
-        if not hasattr(logging, stdout_severity):
+        if not hasattr(logging, stdout_severity.upper()):
             raise BadConfiguration(
                 "The stdout severity must be a valid logging level name",
                 "stdout_severity",

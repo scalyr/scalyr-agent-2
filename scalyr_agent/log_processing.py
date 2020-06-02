@@ -262,7 +262,7 @@ class LogFileIterator(object):
         # written to it if not.
         self.at_end = False
 
-        self.__max_line_length = config.max_line_size  # Defaults to 5 * 1024
+        self.__max_line_length = config.max_line_size  # Defaults to 49900
         self.__line_completion_wait_time = (
             config.line_completion_wait_time
         )  # Defaults to 5 * 60
