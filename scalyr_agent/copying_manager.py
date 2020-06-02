@@ -1225,6 +1225,9 @@ class CopyingManager(StoppableThread, LogWatcher):
             @param result: The type of result of sending the AddEventRequest, one of LogFileProcessor.SUCCESS,
                 LogFileProcessor.FAIL_AND_RETRY, LogFileProcessor.FAIL_AND_DROP.
             @type result: int
+
+            @return: Return the log bytes copied in this request, the sum of all bytes copied as reported by individual
+                processors.
             """
             # TODO:  This might not be bullet proof here.  We copy __log_processors and then update it at the end
             # We could be susceptible to exceptions thrown in the middle of this method, though now should.
