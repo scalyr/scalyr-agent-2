@@ -31,12 +31,14 @@ from io import open
 from io import StringIO
 import threading
 
+from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
+import mock
 
 
 class SyslogFrameParserTestCase(unittest.TestCase):
@@ -296,6 +298,16 @@ class TestSyslogMonitor(SyslogMonitor):
             self._reported_lines_count = 0
 
 
+class TestSyslogHandler(syslog_monitor.SyslogHandler):
+    """Subclass of the SyslogHandler. It does not affect any internal logic, it just only make some check assertions."""
+
+    def handle(self, data):
+        assert (
+            type(data) == six.text_type
+        ), "SyslogHandler.handle function accepts only unicode strings."
+        return super(TestSyslogHandler, self).handle(data)
+
+
 class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @classmethod
     def setUpClass(cls):
@@ -378,7 +390,11 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             sock.sendto(data, dest_addr)
         self.monitor.wait_for_new_lines(expected_line_number=expected_line_count)
 
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
     def test_run_tcp_server(self):
+
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
@@ -427,6 +443,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             "Unable to find '%s' in output:\n\t %s" % (expected_line2, actual),
         )
 
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
     def test_run_udp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -459,6 +478,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             "Unable to find '%s' in output:\n\t %s" % (expected, actual),
         )
 
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
     def test_run_multiple_servers(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
