@@ -249,8 +249,8 @@ class Configuration(object):
 
                 self.__config["max_allowed_request_size"] = 5900000
                 self.__config["pipeline_threshold"] = 0
-                self.__config["min_request_spacing_interval"] = 0.1
-                self.__config["max_request_spacing_interval"] = 1.0
+                self.__config["min_request_spacing_interval"] = 0.0
+                self.__config["max_request_spacing_interval"] = 5.0
                 self.__config["max_log_offset_size"] = 200000000
                 self.__config["max_existing_log_offset_size"] = 200000000
 
@@ -316,7 +316,9 @@ class Configuration(object):
         if self.__config[config_option] != default:
             self.__logger.warn(
                 "Configured option %s is being overridden due to max_send_rate_enforcement setting."
-                % config_option
+                % config_option,
+                limit_once_per_x_secs=86400,
+                limit_key="max_send_rate_enforcement_override",
             )
 
     def apply_config(self):
