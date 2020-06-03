@@ -1,7 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.5 "Prime" - May 30, 2020
+## 2.1.6 "Rama" - June 4, 2020
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 4, 2020 13:30 -0800
+--->
+
+Minor updates:
+* Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.
+
+Bug fixes:
+* Fixed Syslog monitor issue causing monitor to write binary strings to the log file.
+
+## 2.1.5 "Quantum Leap" - May 30, 2020
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 13:30 -0800
@@ -19,7 +31,6 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 30, 2020 09:30 -0800
 Critical bug fix
 * Updated bundled certificates used to verify Scalyr TLS certificate.  Existing bundled certificates had expired causing some customers to not be able to verify the TLS connection.
 
-Features
 * Added ability to specify an extra configuration snippet directory (in addition to `agent.d`).  You may specify the extra directory by setting the SCALYR_EXTRA_CONFIG_DIR environment variable to the path of your desired directory.  This has been added mainly to help mounting additional configuration in Kubernetes.
 
 Bug fix

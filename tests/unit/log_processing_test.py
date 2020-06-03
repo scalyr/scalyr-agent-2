@@ -1536,7 +1536,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time
         )
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
         return log_processor
 
     def test_basic_usage(self):
@@ -1554,7 +1554,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(23, status.total_bytes_pending)
         self.assertEqual(0, status.total_bytes_copied)
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 23)
         self.assertEqual(2, events.total_events())
         self.assertEqual(events.get_message(0), b"First line\n")
         self.assertEqual(events.get_message(1), b"Second line\n")
@@ -1577,7 +1579,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(11, status.total_bytes_pending)
         self.assertEqual(23, status.total_bytes_copied)
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 11)
         self.assertEqual(events.get_message(0), b"Third line\n")
 
         status = log_processor.generate_status()
@@ -1624,7 +1628,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 10}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 10,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 
@@ -1647,7 +1655,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance. This test checks we skip to the end of
         # the file if the max_log_offset_size is exceeded
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
         config = _create_configuration(extra)
 
         log_config = {"path": self.__path}
@@ -1669,7 +1681,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 10}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 10,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 
@@ -1696,7 +1712,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we skip to the end
         # of the file if max_log_offset_size is exceeded
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
         config = _create_configuration(extra)
 
         log_config = {"path": self.__path}
@@ -1753,6 +1773,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         extra = {
             "max_log_offset_size": 10,  # set to low value so test will fail if this is used
             "max_existing_log_offset_size": 20,
+            "disable_max_send_rate_enforcement_overrides": True,
         }
         config = _create_configuration(extra)
 
@@ -1790,6 +1811,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         extra = {
             "max_log_offset_size": 100,  # set to high value to test will fail if this is used
             "max_existing_log_offset_size": 20,
+            "disable_max_send_rate_enforcement_overrides": True,
         }
         config = _create_configuration(extra)
 
@@ -1811,7 +1833,11 @@ class TestLogFileProcessor(ScalyrTestCase):
     def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing(
         self,
     ):
-        extra = {"max_log_offset_size": 20, "max_existing_log_offset_size": 30}
+        extra = {
+            "max_log_offset_size": 20,
+            "max_existing_log_offset_size": 30,
+            "disable_max_send_rate_enforcement_overrides": True,
+        }
 
         config = _create_configuration(extra)
 
@@ -1856,14 +1882,16 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(events.get_message(0), b"First line\n")
         self.assertEqual(events.get_message(1), b"Second line\n")
 
-        self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_RETRY))
+        self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_RETRY)[0])
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 23)
         self.assertEqual(2, events.total_events())
         self.assertEqual(events.get_message(0), b"First line\n")
         self.assertEqual(events.get_message(1), b"Second line\n")
@@ -1881,7 +1909,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(events.get_message(0), b"First line\n")
         self.assertEqual(events.get_message(1), b"Second line\n")
 
-        self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_DROP))
+        self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_DROP)[0])
 
         # Add some more text to make sure it appears.
         self.append_file(self.__path, b"Third line\n")
@@ -1891,7 +1919,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 11)
         self.assertEqual(1, events.total_events())
         self.assertEqual(events.get_message(0), b"Third line\n")
 
@@ -1914,7 +1944,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time
         )
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
 
     def test_grouping_rules(self):
         log_config = {
@@ -1932,7 +1962,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 39)
         self.assertEqual(expected, events.get_message(0))
 
     def test_random_coin_flip_sampling_rules(self):
@@ -1953,7 +1985,8 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
 
         self.assertEqual(10, len(events.events))
 
@@ -1982,7 +2015,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 31)
         self.assertEqual(expected, events.get_message(0))
 
     def test_sampling_rule(self):
@@ -1997,7 +2032,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 18)
         self.assertEqual(events.get_message(0), b"ERROR Second line\n")
 
     def test_redaction_rule(self):
@@ -2011,7 +2048,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 33)
         self.assertEqual(events.get_message(0), b"GET /foo&password=foo&start=true\n")
 
     def test_hashed_redaction_in_middle_of_line(self):
@@ -2104,7 +2143,9 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         # make sure everything is good
         expected = ("bb" + unichr(8230) + "bb\n").encode("utf-8")
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 8)
         self.assertEqual(events.get_message(0), expected)
 
         # close file_iterator to prevent unclosed file warnings.
@@ -2122,7 +2163,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
         self.assertEqual(0, events.total_events())
 
         self.__fake_time += 9 * 60
@@ -2130,14 +2171,14 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
 
         self.__fake_time += 62
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time
         )
 
-        self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertTrue(completion_callback(LogFileProcessor.SUCCESS)[0])
 
     def test_signals_deletion_due_to_staleness(self):
         log_processor = self._create_processor(close_when_staleness_exceeds=300)
@@ -2151,7 +2192,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 0)
         self.assertEqual(0, events.total_events())
 
         self.__fake_time += 4 * 60
@@ -2159,14 +2202,14 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
 
         self.__fake_time += 62
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time
         )
 
-        self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertTrue(completion_callback(LogFileProcessor.SUCCESS)[0])
 
     def test_log_attributes(self):
         attribs = {"host": "scalyr-1"}
@@ -2190,7 +2233,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 23)
         self.assertEqual(events.total_events(), 2)
         self.assertEqual("scalyr-1", events.events[0].attrs["host"])
         self.assertEqual("scalyr-1", events.events[1].attrs["host"])
@@ -2219,7 +2264,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 0)
         self.assertEqual(0, events.total_events())
         self.assertEqual(len(events.threads), 0)
 
@@ -2229,7 +2276,9 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
 
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 23)
         self.assertEqual(2, events.total_events())
         self.assertEqual(events.get_message(0), b"First line\n")
         self.assertEqual(events.get_message(1), b"Second line\n")
@@ -2290,7 +2339,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time
         )
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS)[0])
 
         first_line = b"the first line\n"
         second_line = b"second line\n"
@@ -2301,7 +2350,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time
         )
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 27)
 
         self.assertEqual(2, events.total_events())
 
@@ -2316,7 +2367,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time
         )
-        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        close, bytes_copied = completion_callback(LogFileProcessor.SUCCESS)
+        self.assertFalse(close)
+        self.assertEqual(bytes_copied, 11)
 
         self.assertEqual(1, events.total_events())
 

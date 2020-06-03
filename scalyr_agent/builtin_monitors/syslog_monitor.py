@@ -16,6 +16,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
@@ -437,7 +438,8 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     """
 
     def handle(self):
-        self.server.syslog_handler.handle(self.request[0].strip())
+        data = six.ensure_text(self.request[0].strip())
+        self.server.syslog_handler.handle(data)
 
 
 class SyslogRequestParser(object):
@@ -535,7 +537,10 @@ class SyslogRequestParser(object):
                         limit_once_per_x_secs=300,
                         limit_key="syslog-max-buffer-exceeded",
                     )
-                    handle_frame(self._remaining)
+                    # skip invalid bytes which can appear because of the buffer overflow.
+                    frame_data = six.ensure_text(self._remaining, errors="ignore")
+
+                    handle_frame(frame_data)
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
@@ -546,7 +551,11 @@ class SyslogRequestParser(object):
 
             # output the frame
             frame_length = frame_end - self._offset
-            handle_frame(self._remaining[self._offset : frame_end].strip())
+
+            frame_data = six.ensure_text(
+                self._remaining[self._offset : frame_end].strip()
+            )
+            handle_frame(frame_data)
             frames_handled += 1
 
             self._offset += frame_length + skip
@@ -1118,13 +1127,20 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
-    def handle(self, data):
+    def handle(self, data):  # type: (six.text_type) -> None
+        """
+        Feed syslog messages to the appropriate loggers.
+        """
+
+        # one more time ensure that we don't have binary string.
+        data = six.ensure_text(data)
+
         if self.__docker_logging:
             self.__handle_docker_logs(data)
         else:
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        self.__line_reporter(data.count(b"\n") + 1)
+        self.__line_reporter(data.count("\n") + 1)
 
 
 class RequestVerifier(object):
