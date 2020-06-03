@@ -2607,16 +2607,16 @@ class LogFileProcessor(object):
 
         self.__lock.acquire()
         self.__total_bytes_skipped += skipped_bytes
-        message = "Skipped copying %ld existing bytes in '%s' due to: %s"
+        msg = "Skipped copying %ld existing bytes in '%s' due to: %s"
         if self.__new_file:
             self.__skipped_new_bytes += skipped_bytes
-            message = "Skipped copying %ld new bytes in '%s' due to: %s"
+            msg = "Skipped copying %ld new bytes in '%s' due to: %s"
         else:
             self.__skipped_preexisting_bytes += skipped_bytes
         self.__lock.release()
 
         log.warning(
-            message, skipped_bytes, self.__path, message, error_code=error_code,
+            msg, skipped_bytes, self.__path, message, error_code=error_code,
         )
 
     def add_sampler(self, match_expression, sampling_rate):
