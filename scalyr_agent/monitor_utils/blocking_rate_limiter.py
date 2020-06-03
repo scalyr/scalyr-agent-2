@@ -20,7 +20,7 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-if False:
+if False:  # NOSONAR
     from typing import Dict
 
 import random

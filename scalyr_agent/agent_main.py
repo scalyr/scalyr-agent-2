@@ -105,6 +105,10 @@ STATUS_FORMAT_FILE = "status_format"
 
 VALID_STATUS_FORMATS = ["text", "json"]
 
+AGENT_LOG_FILENAME = "agent.log"
+
+AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
+
 
 def _update_disabled_until(config_value, current_time):
     if config_value is not None:
@@ -231,7 +235,7 @@ class ScalyrAgent(object):
             command = "inner_run"
         try:
             return ScalyrAgent(controller).main(config_file_path, command, my_options)
-        except:
+        except Exception:
             log.exception("Agent failed while running.  Will be shutting down.")
             raise
 
@@ -490,7 +494,7 @@ class ScalyrAgent(object):
             max_bytes=self.__config.log_rotation_max_bytes,
             backup_count=self.__config.log_rotation_backup_count,
             logs_directory=self.__config.agent_log_path,
-            agent_log_file_path="agent.log",
+            agent_log_file_path=AGENT_LOG_FILENAME,
         )
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
@@ -647,7 +651,7 @@ class ScalyrAgent(object):
         try:
             self.__controller.is_agent_running(fail_if_not_running=True)
         except AgentNotRunning as e:
-            print("The agent does not appear to be running.")
+            print(AGENT_NOT_RUNNING_MESSAGE)
             print("%s" % six.text_type(e))
             return 1
 
@@ -689,7 +693,7 @@ class ScalyrAgent(object):
         result = self.__controller.request_agent_status()
         if result is not None:
             if result == errno.ESRCH:
-                print("The agent does not appear to be running.", file=sys.stderr)
+                print(AGENT_NOT_RUNNING_MESSAGE, file=sys.stderr)
                 return 1
             elif result == errno.EPERM:
                 # TODO:  We probably should just get the name of the user running the agent and output it
@@ -711,10 +715,12 @@ class ScalyrAgent(object):
 
             if time.time() > deadline:
                 if self.__config is not None:
-                    agent_log = os.path.join(self.__config.agent_log_path, "agent.log")
+                    agent_log = os.path.join(
+                        self.__config.agent_log_path, AGENT_LOG_FILENAME
+                    )
                 else:
                     agent_log = os.path.join(
-                        self.__default_paths.agent_log_path, "agent.log"
+                        self.__default_paths.agent_log_path, AGENT_LOG_FILENAME
                     )
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
@@ -777,7 +783,7 @@ class ScalyrAgent(object):
             print('The agent is running. For details, use "scalyr-agent-2 status -v".')
             return 0
         else:
-            print("The agent does not appear to be running.")
+            print(AGENT_NOT_RUNNING_MESSAGE)
             return 4
 
     def __condrestart(self, quiet, no_check_remote):
@@ -900,7 +906,7 @@ class ScalyrAgent(object):
             try:
                 self.__run_state = RunState()
                 self.__log_file_path = os.path.join(
-                    self.__config.agent_log_path, "agent.log"
+                    self.__config.agent_log_path, AGENT_LOG_FILENAME
                 )
                 scalyr_logging.set_log_destination(
                     use_disk=True,
@@ -909,7 +915,7 @@ class ScalyrAgent(object):
                     max_bytes=self.__config.log_rotation_max_bytes,
                     backup_count=self.__config.log_rotation_backup_count,
                     logs_directory=self.__config.agent_log_path,
-                    agent_log_file_path="agent.log",
+                    agent_log_file_path=AGENT_LOG_FILENAME,
                 )
 
                 self.__update_debug_log_level(self.__config.debug_level)
@@ -1049,7 +1055,7 @@ class ScalyrAgent(object):
                         # Log the bandwidth-related stats once every minute:
                         log_stats_delta = self.__config.bandwidth_stats_log_interval
                         if current_time > last_bw_stats_report_time + log_stats_delta:
-                            self.___overall_stats = self.__calculate_overall_stats(
+                            self.__overall_stats = self.__calculate_overall_stats(
                                 base_overall_stats
                             )
 

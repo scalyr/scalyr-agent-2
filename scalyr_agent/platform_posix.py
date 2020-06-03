@@ -410,7 +410,7 @@ class PosixPlatformController(PlatformController):
                         return None
                     else:
                         return ppid
-                except:
+                except Exception:
                     return None
             finally:
                 if pf is not None:

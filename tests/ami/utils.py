@@ -14,7 +14,7 @@
 
 from __future__ import absolute_import
 
-if False:
+if False:  # NOSONAR
     from typing import Optional
 
 from scalyr_agent import compat
