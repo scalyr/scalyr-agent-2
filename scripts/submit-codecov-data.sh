@@ -22,7 +22,8 @@ RETRY_DELAY=${RETRY_DELAY:-5}
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
-    # NOTE: We pass --required flag to the binary since we also want it to rAeturn non-zero if upload fails
+    # NOTE: We pass --required flag to the binary since we also want it to return non-zero (and fail
+    # the build) if upload fails
     codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml --required
     EXIT_CODE=$?
 
