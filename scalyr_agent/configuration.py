@@ -716,7 +716,7 @@ class Configuration(object):
 
     @property
     def disable_copy_manager_stats(self):
-        return self.__get_config().get_bool("disable_leak_copy_manager_stats")
+        return self.__get_config().get_bool("disable_copy_manager_stats")
 
     @property
     def disable_update_debug_log_level(self):
@@ -2339,11 +2339,7 @@ class Configuration(object):
             config, "disable_leak_bandwidth_stats", False, description, apply_defaults
         )
         self.__verify_or_set_optional_bool(
-            config,
-            "disable_leak_copy_manager_stats",
-            False,
-            description,
-            apply_defaults,
+            config, "disable_copy_manager_stats", False, description, apply_defaults,
         )
         self.__verify_or_set_optional_bool(
             config,

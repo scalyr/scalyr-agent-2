@@ -884,12 +884,13 @@ class ScalyrAgent(object):
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
         base_overall_stats = OverallStats()
+
         # We only emit the overall stats once ever ten minutes.  Track when we last reported it.
-        last_overall_stats_report_time = time.time()
+        last_overall_stats_report_time = self.__start_time
         # We only emit the bandwidth stats once every minute.  Track when we last reported it.
-        last_bw_stats_report_time = last_overall_stats_report_time
+        last_bw_stats_report_time = self.__start_time
         # We only emit the copying_manager stats once every 5 minutes.  Track when we last reported it.
-        last_copy_manager_stats_report_time = last_overall_stats_report_time
+        last_copy_manager_stats_report_time = self.__start_time
 
         # The thread that runs the monitors and and the log copier.
         worker_thread = None
@@ -1598,7 +1599,7 @@ class ScalyrAgent(object):
         """Logs the copy_manager_status message that we periodically write to the agent log to give copying manager
         stats.
 
-        This includes such metrics as the amount of times through the main look and time spent in various sections.
+        This includes such metrics as the amount of times through the main loop and time spent in various sections.
 
         @param overall_stats: The overall stats for the agent.
         @type overall_stats: OverallStats
@@ -1756,17 +1757,19 @@ class ScalyrAgent(object):
             result.avg_bytes_copied_rate = (
                 result.total_bytes_copied - self.__last_total_bytes_copied
             ) / self.__config.copying_manager_stats_log_interval
+
+            total_bytes_produced = (
+                result.total_bytes_skipped
+                + result.total_bytes_copied
+                + result.total_bytes_pending
+            )
+            last_total_bytes_produced = (
+                self.__last_total_bytes_skipped
+                + self.__last_total_bytes_copied
+                + self.__last_total_bytes_pending
+            )
             result.avg_bytes_produced_rate = (
-                (
-                    result.total_bytes_skipped
-                    + result.total_bytes_copied
-                    + result.total_bytes_pending
-                )
-                - (
-                    self.__last_total_bytes_skipped
-                    + self.__last_total_bytes_copied
-                    + self.__last_total_bytes_pending
-                )
+                total_bytes_produced - last_total_bytes_produced
             ) / self.__config.copying_manager_stats_log_interval
             if result.total_bytes_skipped > self.__last_total_bytes_skipped:
                 if self.__config.parsed_max_send_rate_enforcement:
