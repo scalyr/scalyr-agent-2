@@ -79,7 +79,7 @@ def _link_to_default_python(command):
 
     try:
         os.remove(python_path)
-    except:
+    except Exception:
         pass
 
     os.symlink(six.text_type(BINARY_DIR_PATH / real_executable_path), python_path)

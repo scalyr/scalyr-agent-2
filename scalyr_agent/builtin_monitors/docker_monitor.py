@@ -1148,7 +1148,7 @@ class ContainerChecker(StoppableThread):
             checkpoints = scalyr_util.read_file_as_json(
                 self.__checkpoint_file, strict_utf8=True
             )
-        except:
+        except Exception:
             self._logger.info(
                 "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.",
                 self.__checkpoint_file,
@@ -2084,7 +2084,7 @@ TODO:  Back fill the instructions here.
             st = os.stat(api_socket)
             if not stat.S_ISSOCK(st.st_mode):
                 raise Exception()
-        except:
+        except Exception:
             raise Exception(
                 "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
                 % api_socket
