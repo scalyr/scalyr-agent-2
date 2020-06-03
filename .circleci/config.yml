@@ -1026,12 +1026,21 @@ jobs:
             sudo pip install "tox==3.14.3"
       - run:
           name: Run Python Lint Checks
-        # Small safety check to make sure the build fails if codecov.yml file is invalid.
-        # By default codecov doesn't fail on invalid config and simply falls back to
-        # system wide default config in case repo local config is invalid. This usually results
-        # in confused and undesired behavior.
           command: |
+            export PYTHONPATH=.
+
+            # Small safety check to make sure the build fails if codecov.yml file is invalid.
+            # By default codecov doesn't fail on invalid config and simply falls back to
+            # system wide default config in case repo local config is invalid. This usually results
+            # in confused and undesired behavior.
             ./scripts/circleci/verify-codecov-config.sh
+
+            # Runs script which verifies /addEvents API returns correct response headers. In ideal
+            # world, this script would live somewhere else (perhaps as part of monitoring tooling,
+            # but for now it will live here.
+            ./scripts/verify-add-events-api-response-headers.py
+
+            # Run tox ling target
             tox -e lint
       - run:
           name: Run Shell Scripts Lint Checks
