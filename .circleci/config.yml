@@ -119,7 +119,7 @@ commands:
                 command: |
                   ls -la .coverage* || true
 
-                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  pip install "coverage==4.5.4" "codecov==2.1.3"
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Print the report
@@ -436,7 +436,7 @@ commands:
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
-                  pip install "coverage==4.5.4" "codecov==2.0.15"
+                  pip install "coverage==4.5.4" "codecov==2.1.3"
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
@@ -1026,12 +1026,21 @@ jobs:
             sudo pip install "tox==3.14.3"
       - run:
           name: Run Python Lint Checks
-        # Small safety check to make sure the build fails if codecov.yml file is invalid.
-        # By default codecov doesn't fail on invalid config and simply falls back to
-        # system wide default config in case repo local config is invalid. This usually results
-        # in confused and undesired behavior.
           command: |
+            export PYTHONPATH=.
+
+            # Small safety check to make sure the build fails if codecov.yml file is invalid.
+            # By default codecov doesn't fail on invalid config and simply falls back to
+            # system wide default config in case repo local config is invalid. This usually results
+            # in confused and undesired behavior.
             ./scripts/circleci/verify-codecov-config.sh
+
+            # Runs script which verifies /addEvents API returns correct response headers. In ideal
+            # world, this script would live somewhere else (perhaps as part of monitoring tooling,
+            # but for now it will live here.
+            ./scripts/verify-add-events-api-response-headers.py
+
+            # Run tox ling target
             tox -e lint
       - run:
           name: Run Shell Scripts Lint Checks
