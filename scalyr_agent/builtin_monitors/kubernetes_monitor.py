@@ -1601,7 +1601,7 @@ class ControlledCacheWarmer(StoppableThread):
                     if consecutive_warm_pods == 10:
                         # TODO-163: Get rid of circuit breaker.
                         self._run_state.sleep_but_awaken_if_stopped(0.1)
-            except:
+            except Exception:
                 global_log.exception("cacher warmer uncaught exception")
 
     class WarmingEntry(object):
@@ -2459,7 +2459,6 @@ class ContainerChecker(object):
         self._logger = logger
 
         self.__delay = self._config.get("container_check_interval")
-        self.__log_prefix = self._config.get("docker_log_prefix")
         self.__name = self._config.get("container_name")
 
         self.__use_v2_attributes = self._config.get("k8s_use_v2_attributes")
@@ -3410,7 +3409,7 @@ cluster.
             st = os.stat(api_socket)
             if not stat.S_ISSOCK(st.st_mode):
                 raise Exception()
-        except:
+        except Exception:
             raise Exception(
                 "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
                 % api_socket

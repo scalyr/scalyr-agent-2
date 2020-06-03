@@ -252,7 +252,7 @@ class AgentLogVerifier(AgentVerifier):
         print("Send query to Scalyr server.")
         try:
             response_data = self._request.send()
-        except:
+        except Exception:
             print("Query failed.")
             return
 
@@ -317,7 +317,7 @@ class DataJsonVerifier(AgentVerifier):
     def _verify(self):
         try:
             response = self._request.send()
-        except:
+        except Exception:
             print("Query failed.")
             return
 
@@ -370,7 +370,7 @@ class SystemMetricsVerifier(AgentVerifier):
     def _verify(self):
         try:
             response = self._request.send()
-        except:
+        except Exception:
             print("Query failed.")
             return
 
@@ -403,7 +403,7 @@ class ProcessMetricsVerifier(AgentVerifier):
     def _verify(self):
         try:
             response = self._request.send()
-        except:
+        except Exception:
             print("Query failed.")
             return
 

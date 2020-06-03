@@ -3237,7 +3237,7 @@ class Configuration(object):
             if value is not None:
                 re.compile(value)
                 return
-        except:
+        except Exception:
             raise BadConfiguration(
                 'The value for required field "%s" has a value that cannot be parsed as '
                 "string regular expression (using python syntax).  "
