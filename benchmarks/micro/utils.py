@@ -14,7 +14,7 @@
 
 from __future__ import absolute_import
 
-if False:
+if False:  # NOSONAR
     from typing import Dict
     from typing import Callable
     from typing import Optional

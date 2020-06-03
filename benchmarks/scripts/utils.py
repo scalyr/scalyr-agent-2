@@ -23,7 +23,7 @@ import pprint
 from datetime import datetime
 from argparse import ArgumentParser  # NOQA
 
-if False:
+if False:  # NOSONAR
     from typing import List
     from typing import Dict
     from typing import Tuple
