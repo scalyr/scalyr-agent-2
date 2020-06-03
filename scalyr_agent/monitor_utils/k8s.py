@@ -1970,7 +1970,7 @@ class KubernetesApi(object):
             if rate_limited:
                 kapi = os.path.join(kapi, "limited")
             else:
-                kapi = os.path.join(kapi, "limited")
+                kapi = os.path.join(kapi, "not_limited")
             if not os.path.exists(kapi):
                 os.mkdir(kapi, 0o755)
             fname = "%s_%.20f_%s_%s" % (

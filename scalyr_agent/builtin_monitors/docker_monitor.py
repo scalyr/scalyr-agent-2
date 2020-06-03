@@ -606,7 +606,7 @@ class WrappedStreamResponse(object):
     def __init__(self, client, response, decode):
         self.client = client
         self.response = response
-        self.decode = self.decode
+        self.decode = decode
 
     def __iter__(self):
         # pylint: disable=bad-super-call
