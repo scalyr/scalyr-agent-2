@@ -190,6 +190,10 @@ class ScalyrAgent(object):
         self.__last_verify_config = None
 
         self.__no_fork = False
+        self.__last_total_bytes_skipped = 0
+        self.__last_total_bytes_copied = 0
+        self.__last_total_bytes_pending = 0
+        self.__last_total_rate_limited_time = 0
 
     @staticmethod
     def agent_run_method(controller, config_file_path, perform_config_check=False):
@@ -886,10 +890,13 @@ class ScalyrAgent(object):
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
         base_overall_stats = OverallStats()
+
         # We only emit the overall stats once ever ten minutes.  Track when we last reported it.
-        last_overall_stats_report_time = time.time()
+        last_overall_stats_report_time = self.__start_time
         # We only emit the bandwidth stats once every minute.  Track when we last reported it.
-        last_bw_stats_report_time = last_overall_stats_report_time
+        last_bw_stats_report_time = self.__start_time
+        # We only emit the copying_manager stats once every 5 minutes.  Track when we last reported it.
+        last_copy_manager_stats_report_time = self.__start_time
 
         # The thread that runs the monitors and and the log copier.
         worker_thread = None
@@ -1035,7 +1042,7 @@ class ScalyrAgent(object):
                             > last_overall_stats_report_time + log_stats_delta
                         ):
                             self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats
+                                base_overall_stats,
                             )
                             self.__log_overall_stats(self.__overall_stats)
                             last_overall_stats_report_time = current_time
@@ -1056,6 +1063,25 @@ class ScalyrAgent(object):
                                 self.__calculate_overall_stats(self.__overall_stats)
                             )
                             last_bw_stats_report_time = current_time
+
+                    if self.__config.disable_copy_manager_stats:
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_0, "copy manager stats disabled"
+                        )
+                    else:
+                        # Log the copy manager stats once every 5 mins (by default)
+                        log_stats_delta = (
+                            self.__config.copying_manager_stats_log_interval
+                        )
+                        if (
+                            current_time
+                            > last_copy_manager_stats_report_time + log_stats_delta
+                        ):
+                            self.__overall_stats = self.__calculate_overall_stats(
+                                base_overall_stats, copy_manager_warnings=True,
+                            )
+                            self.__log_copy_manager_stats(self.__overall_stats)
+                            last_copy_manager_stats_report_time = current_time
 
                     log.log(
                         scalyr_logging.DEBUG_LEVEL_1,
@@ -1447,7 +1473,7 @@ class ScalyrAgent(object):
                 self.__debug_server = None
             self.__unsafe_debugging_running = False
 
-    def __generate_status(self):
+    def __generate_status(self, warn_on_rate_limit=False):
         """Generates the server status object and returns it.
 
         The returned status object is used to create the detailed status page.
@@ -1491,7 +1517,9 @@ class ScalyrAgent(object):
 
         # Include the copying and monitors status.
         if self.__copying_manager is not None:
-            result.copying_manager_status = self.__copying_manager.generate_status()
+            result.copying_manager_status = self.__copying_manager.generate_status(
+                warn_on_rate_limit=warn_on_rate_limit
+            )
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
 
@@ -1514,10 +1542,11 @@ class ScalyrAgent(object):
         """
         stats = overall_stats
         log.info(
-            'agent_status launch_time="%s" version="%s" watched_paths=%ld copying_paths=%ld total_bytes_copied=%ld'
-            " total_bytes_skipped=%ld total_bytes_subsampled=%ld total_redactions=%ld total_bytes_failed=%ld "
-            "total_copy_request_errors=%ld total_monitor_reported_lines=%ld running_monitors=%ld dead_monitors=%ld"
-            " user_cpu_=%f system_cpu=%f ram_usage=%ld"
+            'agent_status launch_time="%s" version="%s" watched_paths=%ld copying_paths=%ld total_bytes_copied=%ld '
+            "total_bytes_skipped=%ld total_bytes_subsampled=%ld total_redactions=%ld total_bytes_failed=%ld "
+            "total_copy_request_errors=%ld total_monitor_reported_lines=%ld running_monitors=%ld dead_monitors=%ld "
+            "user_cpu_=%f system_cpu=%f ram_usage=%ld skipped_new_bytes=%ld skipped_preexisting_bytes=%ld "
+            "total_bytes_pending=%ld"
             % (
                 scalyr_util.format_time(stats.launch_time),
                 stats.version,
@@ -1535,6 +1564,9 @@ class ScalyrAgent(object):
                 stats.user_cpu,
                 stats.system_cpu,
                 stats.rss_size,
+                stats.skipped_new_bytes,
+                stats.skipped_preexisting_bytes,
+                stats.total_bytes_pending,
             )
         )
 
@@ -1569,7 +1601,36 @@ class ScalyrAgent(object):
             )
         )
 
-    def __calculate_overall_stats(self, base_overall_stats):
+    def __log_copy_manager_stats(self, overall_stats):
+        """Logs the copy_manager_status message that we periodically write to the agent log to give copying manager
+        stats.
+
+        This includes such metrics as the amount of times through the main loop and time spent in various sections.
+
+        @param overall_stats: The overall stats for the agent.
+        @type overall_stats: OverallStats
+        """
+        stats = overall_stats
+
+        log.info(
+            "copy_manager_status total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
+            "total_request_time=%lf total_pipelined_requests=%ld avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
+            % (
+                stats.total_copy_iterations,
+                stats.total_read_time,
+                stats.total_compression_time,
+                stats.total_waiting_time,
+                stats.total_blocking_response_time,
+                stats.total_request_time,
+                stats.total_pipelined_requests,
+                stats.avg_bytes_produced_rate,
+                stats.avg_bytes_copied_rate,
+            )
+        )
+
+    def __calculate_overall_stats(
+        self, base_overall_stats, copy_manager_warnings=False
+    ):
         """Return a newly calculated overall stats for the agent.
 
         This will calculate the latest stats based on the running agent.  Since most stats only can be
@@ -1582,7 +1643,9 @@ class ScalyrAgent(object):
         @return:  The combined stats
         @rtype: OverallStats
         """
-        current_status = self.__generate_status()
+        current_status = self.__generate_status(
+            warn_on_rate_limit=copy_manager_warnings
+        )
 
         delta_stats = OverallStats()
 
@@ -1594,6 +1657,30 @@ class ScalyrAgent(object):
             delta_stats.total_copy_requests_errors = (
                 current_status.copying_manager_status.total_errors
             )
+            delta_stats.total_rate_limited_time = (
+                current_status.copying_manager_status.total_rate_limited_time
+            )
+            delta_stats.total_copy_iterations = (
+                current_status.copying_manager_status.total_copy_iterations
+            )
+            delta_stats.total_read_time = (
+                current_status.copying_manager_status.total_read_time
+            )
+            delta_stats.total_waiting_time = (
+                current_status.copying_manager_status.total_waiting_time
+            )
+            delta_stats.total_blocking_response_time = (
+                current_status.copying_manager_status.total_blocking_response_time
+            )
+            delta_stats.total_request_time = (
+                current_status.copying_manager_status.total_request_time
+            )
+            delta_stats.total_pipelined_requests = (
+                current_status.copying_manager_status.total_pipelined_requests
+            )
+            delta_stats.rate_limited_time_since_last_status = (
+                current_status.copying_manager_status.rate_limited_time_since_last_status
+            )
             watched_paths = len(current_status.copying_manager_status.log_matchers)
             for matcher in current_status.copying_manager_status.log_matchers:
                 copying_paths += len(matcher.log_processors_status)
@@ -1601,8 +1688,15 @@ class ScalyrAgent(object):
                     delta_stats.total_bytes_copied += (
                         processor_status.total_bytes_copied
                     )
+                    delta_stats.total_bytes_pending += (
+                        processor_status.total_bytes_pending
+                    )
                     delta_stats.total_bytes_skipped += (
                         processor_status.total_bytes_skipped
+                    )
+                    delta_stats.skipped_new_bytes += processor_status.skipped_new_bytes
+                    delta_stats.skipped_preexisting_bytes += (
+                        processor_status.skipped_preexisting_bytes
                     )
                     delta_stats.total_bytes_subsampled += (
                         processor_status.total_bytes_dropped_by_sampling
@@ -1646,6 +1740,7 @@ class ScalyrAgent(object):
         delta_stats.total_connections_created = (
             self.__scalyr_client.total_connections_created
         )
+        delta_stats.total_compression_time = self.__scalyr_client.total_compression_time
 
         # Add in the latest stats to the stats before the last restart.
         result = delta_stats + base_overall_stats
@@ -1663,6 +1758,57 @@ class ScalyrAgent(object):
             result.system_cpu,
             result.rss_size,
         ) = self.__controller.get_usage_info()
+
+        if copy_manager_warnings:
+            result.avg_bytes_copied_rate = (
+                result.total_bytes_copied - self.__last_total_bytes_copied
+            ) / self.__config.copying_manager_stats_log_interval
+
+            total_bytes_produced = (
+                result.total_bytes_skipped
+                + result.total_bytes_copied
+                + result.total_bytes_pending
+            )
+            last_total_bytes_produced = (
+                self.__last_total_bytes_skipped
+                + self.__last_total_bytes_copied
+                + self.__last_total_bytes_pending
+            )
+            result.avg_bytes_produced_rate = (
+                total_bytes_produced - last_total_bytes_produced
+            ) / self.__config.copying_manager_stats_log_interval
+            if result.total_bytes_skipped > self.__last_total_bytes_skipped:
+                if self.__config.parsed_max_send_rate_enforcement:
+                    log.warning(
+                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "were generated over the last %.1f minutes. This may be due to "
+                        "max_send_rate_enforcement. Log upload has been delayed %.1f seconds in the last "
+                        "%.1f minutes  This may be desired (due to excessive "
+                        "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
+                        "help."
+                        % (
+                            result.avg_bytes_copied_rate / 1000000,
+                            result.avg_bytes_produced_rate / 1000000,
+                            self.__config.copying_manager_stats_log_interval / 60.0,
+                            result.rate_limited_time_since_last_status,
+                            self.__config.copying_manager_stats_log_interval / 60.0,
+                        )
+                    )
+                else:
+                    log.warning(
+                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "were generated over the last %.1f minutes.  This may be desired (due to excessive "
+                        "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
+                        "help."
+                        % (
+                            result.avg_bytes_copied_rate / 1000000,
+                            result.avg_bytes_produced_rate / 1000000,
+                            self.__config.copying_manager_stats_log_interval / 60.0,
+                        )
+                    )
+            self.__last_total_bytes_skipped = result.total_bytes_skipped
+            self.__last_total_bytes_copied = result.total_bytes_copied
+            self.__last_total_bytes_pending = result.total_bytes_pending
 
         return result
 

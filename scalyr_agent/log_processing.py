@@ -2083,6 +2083,8 @@ class LogFileProcessor(object):
         self.__total_bytes_skipped = (
             0  # Bytes that had to be skipped due to falling too far behind in the log.
         )
+        self.__skipped_new_bytes = 0
+        self.__skipped_preexisting_bytes = 0
         self.__total_bytes_failed = 0  # Bytes that could not be sent up to server.
         self.__total_bytes_dropped_by_sampling = 0
         self.__total_bytes_pending = (
@@ -2113,6 +2115,7 @@ class LogFileProcessor(object):
 
         # if we don't have a checkpoint or if the checkpoint doesn't contain pending files
         # then we assume this is a new file and we only go back at most max_log_offset_size bytes
+        self.__new_file = True
         if checkpoint is None or "pending_files" not in checkpoint:
             self.__max_log_offset_size = (
                 config.max_log_offset_size
@@ -2121,6 +2124,7 @@ class LogFileProcessor(object):
             # otherwise this is an existing file so we can go back at most
             # max_existing_log_offset_size bytes
             self.__max_log_offset_size = self.__max_existing_log_offset_size
+            self.__new_file = False
 
         self.__last_success = None
 
@@ -2170,6 +2174,8 @@ class LogFileProcessor(object):
             )
 
             result.total_bytes_skipped = self.__total_bytes_skipped
+            result.skipped_new_bytes = self.__skipped_new_bytes
+            result.skipped_preexisting_bytes = self.__skipped_preexisting_bytes
             result.total_bytes_failed = self.__total_bytes_failed
             result.total_bytes_dropped_by_sampling = (
                 self.__total_bytes_dropped_by_sampling
@@ -2179,7 +2185,6 @@ class LogFileProcessor(object):
                 self.__total_lines_dropped_by_sampling
             )
             result.total_redactions = self.__total_redactions
-            result.total_bytes_skipped = self.__total_bytes_skipped
 
             return result
         finally:
@@ -2446,6 +2451,7 @@ class LogFileProcessor(object):
             # If we get here on what was a new file, then the file is now an existing file, so set the maximum log
             # offset size to use the size for existing files
             self.__max_log_offset_size = self.__max_existing_log_offset_size
+            self.__new_file = False
 
             # Define the callback to return.
             def completion_callback(result):
@@ -2473,6 +2479,7 @@ class LogFileProcessor(object):
                         self.__total_bytes_skipped += (
                             bytes_between_positions - bytes_read
                         )
+                        self.__skipped_new_bytes += bytes_between_positions - bytes_read
 
                         self.__total_bytes_dropped_by_sampling += (
                             bytes_dropped_by_sampling
@@ -2600,14 +2607,16 @@ class LogFileProcessor(object):
 
         self.__lock.acquire()
         self.__total_bytes_skipped += skipped_bytes
+        msg = "Skipped copying %ld existing bytes in '%s' due to: %s"
+        if self.__new_file:
+            self.__skipped_new_bytes += skipped_bytes
+            msg = "Skipped copying %ld new bytes in '%s' due to: %s"
+        else:
+            self.__skipped_preexisting_bytes += skipped_bytes
         self.__lock.release()
 
         log.warning(
-            "Skipped copying %ld bytes in '%s' due to: %s",
-            skipped_bytes,
-            self.__path,
-            message,
-            error_code=error_code,
+            msg, skipped_bytes, self.__path, message, error_code=error_code,
         )
 
     def add_sampler(self, match_expression, sampling_rate):
