@@ -14,7 +14,7 @@
 
 from __future__ import absolute_import
 
-if False:
+if False:  # NOSONAR
     from typing import Union, Tuple, Any, Generator, Iterable, Optional
 
 import sys

@@ -21,7 +21,7 @@ Keep in mind that that file is only available for package and not for dev instal
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-if False:
+if False:  # NOSONAR
     from typing import Dict
 
 import os
