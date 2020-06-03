@@ -58,16 +58,22 @@ API_URLS = [
     # Prod EU
     "https://eu.scalyr.com/addEvents",
     "https://upload.eu.scalyr.com/addEvents",
+    # Staging EU
+    "https://logstaging.eu.scalyr.com/addEvents",
 ]
 
 SCALYR_TOKEN_PROD_US = compat.os_getenv_unicode("SCALYR_TOKEN_PROD_US")
 SCALYR_TOKEN_PROD_EU = compat.os_getenv_unicode("SCALYR_TOKEN_PROD_EU")
+SCALYR_TOKEN_STAGING_EU = compat.os_getenv_unicode("SCALYR_TOKEN_STAGING_EU")
 
 if not SCALYR_TOKEN_PROD_US:
     raise ValueError("SCALYR_TOKEN_PROD_US environment variable not set")
 
 if not SCALYR_TOKEN_PROD_EU:
     raise ValueError("SCALYR_TOKEN_PROD_EU environment variable not set")
+
+if not SCALYR_TOKEN_STAGING_EU:
+    raise ValueError("SCALYR_TOKEN_STAGING_EU environment variable not set")
 
 
 BASE_HEADERS = {
@@ -104,12 +110,15 @@ def verify_api_response_headers_and_status_code(
 
 def main():
     for url in API_URLS:
-        if "eu" in url:
+        if "staging.eu" in url:
+            # staging eu
+            token = SCALYR_TOKEN_STAGING_EU
+        elif "eu" in url:
             # prod eu
-            token = compat.os_getenv_unicode("SCALYR_TOKEN_PROD_EU")
+            token = SCALYR_TOKEN_PROD_EU
         else:
             # prod us
-            token = compat.os_getenv_unicode("SCALYR_TOKEN_PROD_US")
+            token = SCALYR_TOKEN_PROD_US
 
         # 1. Test unauthenticated scenario (aka invalid / missing API key)
         print("Unauthenticated checks (expecting status code 401)")
