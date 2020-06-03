@@ -71,7 +71,7 @@ def generate_add_events_request(
 
     add_events_request = AddEventsRequest(base_body=base_body)
 
-    for index in range(0, num_events):
+    for _ in range(0, num_events):
         line = generate_random_line(length=line_length)
         attributes = generate_random_dict(keys_count=attributes_count)
 
