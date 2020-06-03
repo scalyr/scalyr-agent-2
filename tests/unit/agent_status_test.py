@@ -75,6 +75,21 @@ class TestOverallStats(ScalyrTestCase):
         a.total_request_latency_secs = 5
         a.total_connections_created = 6
 
+        a.total_bytes_pending = 1
+        a.skipped_new_bytes = 2
+        a.skipped_preexisting_bytes = 3
+
+        a.total_copy_iterations = 1
+        a.total_read_time = 2
+        a.total_compression_time = 3
+        a.total_waiting_time = 4
+        a.total_blocking_response_time = 5
+        a.total_request_time = 6
+        a.total_pipelined_requests = 7
+        a.avg_bytes_produced_rate = 8
+        a.avg_bytes_copied_rate = 9
+        a.rate_limited_time_since_last_status = 10
+
         b.total_bytes_copied = 9
         b.total_bytes_skipped = 10
         b.total_bytes_subsampled = 11
@@ -91,6 +106,21 @@ class TestOverallStats(ScalyrTestCase):
         b.total_response_bytes_received = 10
         b.total_request_latency_secs = 11
         b.total_connections_created = 12
+
+        b.total_bytes_pending = 1
+        b.skipped_new_bytes = 2
+        b.skipped_preexisting_bytes = 3
+
+        b.total_copy_iterations = 1
+        b.total_read_time = 2
+        b.total_compression_time = 3
+        b.total_waiting_time = 4
+        b.total_blocking_response_time = 5
+        b.total_request_time = 6
+        b.total_pipelined_requests = 7
+        b.avg_bytes_produced_rate = 8
+        b.avg_bytes_copied_rate = 9
+        b.rate_limited_time_since_last_status = 10
 
         c = a + b
 
@@ -110,6 +140,21 @@ class TestOverallStats(ScalyrTestCase):
         self.assertEquals(c.total_response_bytes_received, 14)
         self.assertEquals(c.total_request_latency_secs, 16)
         self.assertEquals(c.total_connections_created, 18)
+
+        self.assertEquals(c.total_bytes_pending, 2)
+        self.assertEquals(c.skipped_new_bytes, 4)
+        self.assertEquals(c.skipped_preexisting_bytes, 6)
+
+        self.assertEquals(c.total_copy_iterations, 2)
+        self.assertEquals(c.total_read_time, 4)
+        self.assertEquals(c.total_compression_time, 6)
+        self.assertEquals(c.total_waiting_time, 8)
+        self.assertEquals(c.total_blocking_response_time, 10)
+        self.assertEquals(c.total_request_time, 12)
+        self.assertEquals(c.total_pipelined_requests, 14)
+        self.assertEquals(c.avg_bytes_produced_rate, 16)
+        self.assertEquals(c.avg_bytes_copied_rate, 18)
+        self.assertEquals(c.rate_limited_time_since_last_status, 20)
 
 
 class TestReportStatus(ScalyrTestCase):
