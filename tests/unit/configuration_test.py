@@ -243,8 +243,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.max_allowed_request_size, 5900000)
         self.assertEquals(config.min_allowed_request_size, 100 * 1024)
 
-        self.assertEquals(config.min_request_spacing_interval, 0.1)
-        self.assertEquals(config.max_request_spacing_interval, 1.0)
+        self.assertEquals(config.min_request_spacing_interval, 0.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
 
         self.assertEquals(config.high_water_bytes_sent, 100 * 1024)
         self.assertEquals(config.high_water_request_spacing_adjustment, 0.6)
@@ -259,7 +259,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.enable_gc_stats, False)
 
-        self.assertEquals(config.max_line_size, 9900)
+        self.assertEquals(config.max_line_size, 49900)
         self.assertEquals(config.max_log_offset_size, 200000000)
         self.assertEquals(config.max_existing_log_offset_size, 200000000)
         self.assertEquals(config.max_sequence_number, 1024 ** 4)
@@ -1664,7 +1664,7 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
         config.print_useful_settings()
         mock_logger.info.assert_any_call("Configuration settings")
-        mock_logger.info.assert_any_call("\tmax_line_size: 9900")
+        mock_logger.info.assert_any_call("\tmax_line_size: 49900")
 
     def test_print_config_when_changed(self):
         """
@@ -1684,7 +1684,7 @@ class TestConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """{
             api_key: "hi there"
-            max_line_size: 49900,
+            max_line_size: 9900,
             }
         """
         )
@@ -1695,7 +1695,7 @@ class TestConfiguration(TestConfigurationBase):
 
         calls = [
             call("Configuration settings"),
-            call("\tmax_line_size: 49900"),
+            call("\tmax_line_size: 9900"),
         ]
         mock_logger.info.assert_has_calls(calls)
 
@@ -2465,8 +2465,8 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         self.assertEquals(config.max_allowed_request_size, 5900000)
         self.assertEquals(config.pipeline_threshold, 0)
-        self.assertEquals(config.min_request_spacing_interval, 0.1)
-        self.assertEquals(config.max_request_spacing_interval, 1.0)
+        self.assertEquals(config.min_request_spacing_interval, 0.0)
+        self.assertEquals(config.max_request_spacing_interval, 5.0)
         self.assertEquals(config.max_log_offset_size, 200000000)
         self.assertEquals(config.max_existing_log_offset_size, 200000000)
 

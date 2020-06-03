@@ -573,7 +573,7 @@ class CopyingParamsTest(ScalyrTestCase):
 
     def test_initial_settings(self):
         self.assertEquals(self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB)
-        self.assertEquals(self.test_params.current_sleep_interval, 1.0)
+        self.assertEquals(self.test_params.current_sleep_interval, 5.0)
 
     def test_no_events_being_sent(self):
         for i in range(0, 5):
@@ -581,7 +581,7 @@ class CopyingParamsTest(ScalyrTestCase):
             self.assertEquals(
                 self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB
             )
-            self.assertEquals(self.test_params.current_sleep_interval, 1.0)
+            self.assertEquals(self.test_params.current_sleep_interval, 5.0)
 
     def test_small_events_being_sent(self):
         self.test_params.current_sleep_interval = 0.1

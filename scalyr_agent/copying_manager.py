@@ -35,7 +35,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.log_watcher import LogWatcher
 
-from scalyr_agent.util import StoppableThread
+from scalyr_agent.util import StoppableThread, RateLimiter
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
 
@@ -224,6 +224,18 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
+
+        # Rate limiter
+        self.__rate_limiter = None
+        if self.__config.parsed_max_send_rate_enforcement:
+            self.__rate_limiter = RateLimiter(
+                # Making the bucket size 4 times the bytes per second, it shouldn't affect the rate over a long time
+                # meaningfully but we don't have a rationale for this value.
+                # TODO: Make this configurable as part of the `max_send_rate_enforcement` configuration option
+                self.__config.parsed_max_send_rate_enforcement * 4.0,
+                self.__config.parsed_max_send_rate_enforcement,
+            )
+
         # Keep track of monitors
         self.__monitors = monitors
 
@@ -813,6 +825,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                     full_response,
                                 )
 
+                            log_bytes_sent = 0
                             if (
                                 result == "success"
                                 or "discardBuffer" in result
@@ -821,7 +834,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 next_add_events_task = None
                                 try:
                                     if result == "success":
-                                        self.__pending_add_events_task.completion_callback(
+                                        log_bytes_sent = self.__pending_add_events_task.completion_callback(
                                             LogFileProcessor.SUCCESS
                                         )
                                         next_add_events_task = (
@@ -846,6 +859,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             if result == "success":
                                 last_success = current_time
+
+                            # Rate limit based on amount of copied log bytes in a successful request
+                            if self.__rate_limiter:
+                                self.__rate_limiter.block_until_charge_succeeds(
+                                    log_bytes_sent
+                                )
+
                         else:
                             result = "failedReadingLogs"
                             bytes_sent = 0
@@ -1205,6 +1225,9 @@ class CopyingManager(StoppableThread, LogWatcher):
             @param result: The type of result of sending the AddEventRequest, one of LogFileProcessor.SUCCESS,
                 LogFileProcessor.FAIL_AND_RETRY, LogFileProcessor.FAIL_AND_DROP.
             @type result: int
+
+            @return: Return the log bytes copied in this request, the sum of all bytes copied as reported by individual
+                processors.
             """
             # TODO:  This might not be bullet proof here.  We copy __log_processors and then update it at the end
             # We could be susceptible to exceptions thrown in the middle of this method, though now should.
@@ -1217,13 +1240,17 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__log_paths_being_processed = {}
             add_events_request.close()
 
+            total_bytes_copied = 0
+
             for i in range(0, len(processor_list)):
                 # Iterate over all the processors, seeing if we had a callback for that particular processor.
                 processor = processor_list[i]
                 if i in all_callbacks:
                     # noinspection PyCallingNonCallable
                     # If we did have a callback for that processor, report the status and see if we callback is done.
-                    keep_it = not all_callbacks[i](result)
+                    (closed_processor, bytes_copied) = all_callbacks[i](result)
+                    keep_it = not closed_processor
+                    total_bytes_copied += bytes_copied
                 else:
                     keep_it = True
                 if keep_it:
@@ -1231,6 +1258,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                     self.__log_paths_being_processed[processor.log_path] = processor
                 else:
                     processor.close()
+
+            return total_bytes_copied
 
         if for_pipelining and add_events_request.num_events == 0:
             handle_completed_callback(LogFileProcessor.SUCCESS)
