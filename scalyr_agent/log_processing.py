@@ -2929,7 +2929,6 @@ class LogLineRedacter(object):
                     replacement_matches += 1
                     if group_hash_indicator in replacement_ex:
                         # the group needs to be hashed
-                        replaced_group = replaced_group
                         replaced_group = replaced_group.replace(
                             group_hash_indicator,
                             scalyr_util.md5_hexdigest(

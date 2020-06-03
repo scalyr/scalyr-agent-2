@@ -1242,7 +1242,7 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
     @return: The exist status and output string of the command.
     """
     # We have to use a temporary file to hold the output to stdout and stderr.
-    output_file = tempfile.mktemp()
+    _, output_file = tempfile.mkstemp()
     output_fp = open(output_file, "w")
 
     try:
