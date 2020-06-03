@@ -1030,7 +1030,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     "the allowed send rate."
                     % (
                         self.__rate_limited_time_since_last_status,
-                        self.__config.config_monitor_stats_log_interval / 60.0,
+                        self.__config.copying_manager_stats_log_interval / 60.0,
                     )
                 )
             self.__rate_limited_time_since_last_status = 0
