@@ -154,8 +154,16 @@ class OverallStats(AgentStatus):
 
         # The total number of log bytes copied to the Scalyr servers.
         self.total_bytes_copied = 0
+        # The number of bytes that still need to be sent to the Scalyr servers.
+        self.total_bytes_pending = 0
         # The total number of log bytes that were skipped and were not considered to be sent to the Scalyr servers.
         self.total_bytes_skipped = 0
+        # The total number of log bytes that were skipped from files just picked up by a processor.
+        self.skipped_new_bytes = 0
+        # The total number of log bytes that were skipped from already tracked files.
+        self.skipped_preexisting_bytes = 0
+        # The total time in seconds we were blocked by the rate limiter
+        self.total_rate_limited_time = 0
         # The total number of log bytes that were not sent to the Scalyr servers due to subsampling rules.
         self.total_bytes_subsampled = 0
         # The total number of log bytes that were not sent to Scalyr due to errors on either the client or server side.
@@ -185,14 +193,32 @@ class OverallStats(AgentStatus):
         # The total number of HTTP connections successfully created.
         self.total_connections_created = 0
 
+        # Fields needed for copying manager status
+        self.total_copy_iterations = 0
+        self.total_read_time = 0
+        self.total_compression_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.avg_bytes_produced_rate = 0
+        self.avg_bytes_copied_rate = 0
+
     def __add__(self, other):
         """Adds all of the 'total_' fields of this instance and other together and returns a new OverallStats containing
         the result.
         """
         result = OverallStats()
         result.total_bytes_copied = self.total_bytes_copied + other.total_bytes_copied
+        result.total_bytes_pending = (
+            self.total_bytes_pending + other.total_bytes_pending
+        )
         result.total_bytes_skipped = (
             self.total_bytes_skipped + other.total_bytes_skipped
+        )
+        result.skipped_new_bytes = self.skipped_new_bytes + other.skipped_new_bytes
+        result.skipped_preexisting_bytes = (
+            self.skipped_preexisting_bytes + other.skipped_preexisting_bytes
         )
         result.total_bytes_subsampled = (
             self.total_bytes_subsampled + other.total_bytes_subsampled
@@ -230,6 +256,27 @@ class OverallStats(AgentStatus):
         )
         result.total_connections_created = (
             self.total_connections_created + other.total_connections_created
+        )
+        result.total_copy_iterations = (
+            self.total_copy_iterations + other.total_copy_iterations
+        )
+        result.total_read_time = self.total_read_time + other.total_read_time
+        result.total_compression_time = (
+            self.total_compression_time + other.total_compression_time
+        )
+        result.total_waiting_time = self.total_waiting_time + other.total_waiting_time
+        result.total_blocking_response_time = (
+            self.total_blocking_response_time + other.total_blocking_response_time
+        )
+        result.total_request_time = self.total_request_time + other.total_request_time
+        result.total_pipelined_requests = (
+            self.total_pipelined_requests + other.total_pipelined_requests
+        )
+        result.avg_bytes_produced_rate = (
+            self.avg_bytes_produced_rate + other.avg_bytes_produced_rate
+        )
+        result.avg_bytes_copied_rate = (
+            self.avg_bytes_copied_rate + other.avg_bytes_copied_rate
         )
 
         return result
@@ -276,6 +323,19 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.last_response_status = None
         # The total number of failed copy requests.
         self.total_errors = None
+        # The total time in seconds we were blocked by the rate limiter
+        self.total_rate_limited_time = 0
+        # The time in seconds we were blocked by the rate limiter since the last status
+        self.rate_limited_time_since_last_status = 0
+
+        self.total_copy_iterations = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.avg_bytes_produced_rate = 0
+        self.avg_bytes_copied_rate = 0
 
         # LogMatcherStatus objects for each of the log paths being watched for copying.
         self.log_matchers = []
@@ -311,6 +371,10 @@ class LogProcessorStatus(BaseAgentStatus):
         self.total_bytes_pending = 0
         # The total bytes that were skipped (due to the log lines being too old, or the agent falling behind).
         self.total_bytes_skipped = 0
+        # The total number of log bytes that were skipped from files just picked up by a processor.
+        self.skipped_new_bytes = 0
+        # The total number of log bytes that were skipped from already tracked files.
+        self.skipped_preexisting_bytes = 0
         # The total bytes that failed due to errors at either the server or client.
         self.total_bytes_failed = 0
         # The total bytes that were not sent to the server due to subsampling rules.

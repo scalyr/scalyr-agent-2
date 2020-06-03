@@ -1324,6 +1324,8 @@ class RateLimiter(object):
         @param num_bytes: The number of bytes to consume from the rate limit.
         @param current_time: If not none, the value to use as the current time, expressed in seconds past epoch. This
             is used in testing.
+
+        @return: Returns the amount of time this method slept.
         """
         if self.__bucket_fill_rate <= 0.0:
             raise ValueError(
@@ -1333,6 +1335,8 @@ class RateLimiter(object):
         if time_to_sleep > 0.0:
             time.sleep(time_to_sleep)
         self.__bucket_contents -= num_bytes
+
+        return time_to_sleep
 
     def _get_time_to_sleep(self, num_bytes, current_time=None):
         """Returns the amount of time in seconds we would need to sleep to have enough capacity to charge num_bytes

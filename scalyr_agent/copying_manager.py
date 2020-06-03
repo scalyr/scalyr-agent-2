@@ -316,6 +316,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__last_response_status = None
         self.__total_bytes_uploaded = 0
         self.__total_errors = 0
+        self.__total_rate_limited_time = 0
+        self.__rate_limited_time_since_last_status = 0
 
         # The positions to use for a given file if there is not already a checkpoint for that file.
         # Set in the start_manager call.
@@ -333,6 +335,14 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__disable_new_file_matches = configuration.disable_new_file_matches
         self.__disable_scan_for_new_bytes = configuration.disable_scan_for_new_bytes
         self.__disable_copying_thread = configuration.disable_copying_thread
+
+        # Statistics for copying_manager_status messages
+        self.total_copy_iterations = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
 
     @property
     def expanded_server_attributes(self):
@@ -771,6 +781,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 "Sending an add event request",
                             )
                             # Send the request, but don't block for the response yet.
+                            send_request_time_start = time.time()
                             get_response = self._send_events(
                                 self.__pending_add_events_task
                             )
@@ -792,6 +803,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 # Time how long it takes us to build it because we will subtract it from how long we
                                 # have to wait before we send the next request.
                                 pipeline_time = time.time()
+                                self.total_pipelined_requests += 1
                                 self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
                                     copying_params.current_bytes_allowed_to_send,
                                     for_pipelining=True,
@@ -800,7 +812,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 pipeline_time = 0.0
 
                             # Now block for the response.
+                            blocking_response_time_start = time.time()
                             (result, bytes_sent, full_response) = get_response()
+                            blocking_response_time_end = time.time()
+                            self.total_blocking_response_time += (
+                                blocking_response_time_end
+                                - blocking_response_time_start
+                            )
+                            self.total_request_time += (
+                                blocking_response_time_end - send_request_time_start
+                            )
 
                             if pipeline_time > 0:
                                 pipeline_time = time.time() - pipeline_time
@@ -862,9 +883,12 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
-                                self.__rate_limiter.block_until_charge_succeeds(
+                                time_slept = self.__rate_limiter.block_until_charge_succeeds(
                                     log_bytes_sent
                                 )
+                                self.__total_rate_limited_time += time_slept
+                                self.__rate_limited_time_since_last_status += time_slept
+                                self.total_waiting_time += time_slept
 
                         else:
                             result = "failedReadingLogs"
@@ -928,6 +952,12 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self._sleep_but_awaken_if_stopped(
                             copying_params.current_sleep_interval - pipeline_time
                         )
+                        self.total_waiting_time += (
+                            copying_params.current_sleep_interval - pipeline_time
+                        )
+
+                    # End of the copy loop
+                    self.total_copy_iterations += 1
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
@@ -952,7 +982,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         self.__copying_semaphore.acquire(True)
 
-    def generate_status(self):
+    def generate_status(self, warn_on_rate_limit=False):
         """Generate the status for the copying manager to be reported.
 
         This is used in such features as 'scalyr-agent-2 status -v'.
@@ -974,12 +1004,36 @@ class CopyingManager(StoppableThread, LogWatcher):
             result.last_response = self.__last_response
             result.last_response_status = self.__last_response_status
             result.total_errors = self.__total_errors
+            result.total_rate_limited_time = self.__total_rate_limited_time
+            result.rate_limited_time_since_last_status = (
+                self.__rate_limited_time_since_last_status
+            )
+            result.total_copy_iterations = self.total_copy_iterations
+            result.total_read_time = self.total_read_time
+            result.total_waiting_time = self.total_waiting_time
+            result.total_blocking_response_time = self.total_blocking_response_time
+            result.total_request_time = self.total_request_time
+            result.total_pipelined_requests = self.total_pipelined_requests
 
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
         finally:
             self.__lock.release()
+        if warn_on_rate_limit:
+            if self.__rate_limited_time_since_last_status > 0:
+                log.warning(
+                    "Warning, the maximum send rate has been exceeded (configured through "
+                    "'max_send_rate_enforcement').  Log upload is being delayed and may result in skipped log "
+                    "lines.  Copying has been delayed %.1f seconds in the last %.1f minutes. This may be "
+                    "desired (due to excessive bytes from a problematic log file) or you may wish to adjust "
+                    "the allowed send rate."
+                    % (
+                        self.__rate_limited_time_since_last_status,
+                        self.__config.config_monitor_stats_log_interval / 60.0,
+                    )
+                )
+            self.__rate_limited_time_since_last_status = 0
 
         return result
 
@@ -1164,6 +1218,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             "Getting batch of events to send. (pipelining=%s)"
             % six.text_type(for_pipelining),
         )
+        start_time = time.time()
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
         # collect all of the callback that they give us and wrap it into one massive one.
@@ -1202,6 +1257,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # We have to make sure we rollback any LogFileProcessors we touched by invoking their callbacks.
                 for cb in six.itervalues(all_callbacks):
                     cb(LogFileProcessor.FAIL_AND_RETRY)
+                end_time = time.time()
+                self.total_read_time += end_time - start_time
                 return None
 
             all_callbacks[current_processor] = callback
@@ -1217,6 +1274,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 current_processor = self.__current_processor
             else:
                 break
+        end_time = time.time()
+        self.total_read_time += end_time - start_time
 
         # Define the single callback we will return to wrap all of the callbacks we have collected.
         def handle_completed_callback(result):

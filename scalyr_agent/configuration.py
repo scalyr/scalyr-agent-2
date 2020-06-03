@@ -715,6 +715,10 @@ class Configuration(object):
         return self.__get_config().get_bool("disable_leak_bandwidth_stats")
 
     @property
+    def disable_copy_manager_stats(self):
+        return self.__get_config().get_bool("disable_leak_copy_manager_stats")
+
+    @property
     def disable_update_debug_log_level(self):
         return self.__get_config().get_bool("disable_leak_update_debug_log_level")
 
@@ -759,6 +763,10 @@ class Configuration(object):
     @property
     def overall_stats_log_interval(self):
         return self.__get_config().get_float("overall_stats_log_interval")
+
+    @property
+    def copying_manager_stats_log_interval(self):
+        return self.__get_config().get_float("copying_manager_stats_log_interval")
 
     @property
     def bandwidth_stats_log_interval(self):
@@ -2332,6 +2340,13 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_bool(
             config,
+            "disable_leak_copy_manager_stats",
+            False,
+            description,
+            apply_defaults,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
             "disable_leak_update_debug_log_level",
             False,
             description,
@@ -2378,6 +2393,16 @@ class Configuration(object):
             config,
             "overall_stats_log_interval",
             600,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # How often to capture and log copying manager agent stats (in seconds).
+        # NOTE: This values must be >= config_change_check_interval.
+        self.__verify_or_set_optional_float(
+            config,
+            "copying_manager_stats_log_interval",
+            300,
             description,
             apply_defaults,
             env_aware=True,
