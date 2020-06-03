@@ -1671,6 +1671,9 @@ class ScalyrAgent(object):
             delta_stats.total_pipelined_requests = (
                 current_status.copying_manager_status.total_pipelined_requests
             )
+            delta_stats.rate_limited_time_since_last_status = (
+                current_status.copying_manager_status.rate_limited_time_since_last_status
+            )
             watched_paths = len(current_status.copying_manager_status.log_matchers)
             for matcher in current_status.copying_manager_status.log_matchers:
                 copying_paths += len(matcher.log_processors_status)
@@ -1766,9 +1769,6 @@ class ScalyrAgent(object):
                 )
             ) / self.__config.copying_manager_stats_log_interval
             if result.total_bytes_skipped > self.__last_total_bytes_skipped:
-                rate_limited_time = (
-                    result.total_rate_limited_time - self.__last_total_rate_limited_time
-                ) / self.__config.copying_manager_stats_log_interval
                 if self.__config.parsed_max_send_rate_enforcement:
                     log.warning(
                         "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
@@ -1781,7 +1781,7 @@ class ScalyrAgent(object):
                             result.avg_bytes_copied_rate / 1000000,
                             result.avg_bytes_produced_rate / 1000000,
                             self.__config.copying_manager_stats_log_interval / 60.0,
-                            rate_limited_time,
+                            result.rate_limited_time_since_last_status,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                         )
                     )
@@ -1800,7 +1800,6 @@ class ScalyrAgent(object):
             self.__last_total_bytes_skipped = result.total_bytes_skipped
             self.__last_total_bytes_copied = result.total_bytes_copied
             self.__last_total_bytes_pending = result.total_bytes_pending
-            self.__last_total_rate_limited_time = result.total_rate_limited_time
 
         return result
 

@@ -203,6 +203,7 @@ class OverallStats(AgentStatus):
         self.total_pipelined_requests = 0
         self.avg_bytes_produced_rate = 0
         self.avg_bytes_copied_rate = 0
+        self.rate_limited_time_since_last_status = 0
 
     def __add__(self, other):
         """Adds all of the 'total_' fields of this instance and other together and returns a new OverallStats containing
@@ -277,6 +278,10 @@ class OverallStats(AgentStatus):
         )
         result.avg_bytes_copied_rate = (
             self.avg_bytes_copied_rate + other.avg_bytes_copied_rate
+        )
+        result.rate_limited_time_since_last_status = (
+            self.rate_limited_time_since_last_status
+            + other.rate_limited_time_since_last_status
         )
 
         return result
