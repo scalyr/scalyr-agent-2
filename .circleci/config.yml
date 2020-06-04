@@ -745,6 +745,25 @@ jobs:
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
+
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            # Print the report
+            coverage.exe report -i
+
+            # Submit it to codecov.io
+            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
+
       # NOTE: sadly slack/status orb doesn't work on windows
       #- slack/status:
       #    fail_only: true
