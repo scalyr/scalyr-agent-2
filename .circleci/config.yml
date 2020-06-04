@@ -764,10 +764,8 @@ jobs:
             coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
-      # NOTE: sadly slack/status orb doesn't work on windows
-      #- slack/status:
-      #    fail_only: true
-      #    only_for_branches: master
+      # NOTE: sadly slack/status orb doesn't work on windows so we can't notify
+      # on master failure
 
   unittest-27:
     working_directory: ~/scalyr-agent-2
