@@ -709,10 +709,7 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Chocolatey Cache
-          key: deps-v2-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
-      - restore_cache:
-          name: Restore Python Dependencies Cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -725,23 +722,29 @@ jobs:
             echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
-          key: deps-v2-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
           paths:
             - ~/choco-cache
+            # Actual package files are stored in NuGet cache
+            - C:\Users\circleci\AppData\Local\NuGet\Cache
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python Dependencies
           command: |
             python.exe --version
             python.exe -m pip install --user --upgrade "tox==3.14.3"
+            python.exe -m pip install --user --upgrade "pip==20.0.1"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
             tox.exe -epy3.5-windows-unit-tests
       - save_cache:
           name: Save Python Dependencies Cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
           paths:
-            - ~/.cache/pip
+            - C:\Users\circleci\AppData\Local\pip\Cache
       # NOTE: sadly slack/status orb doesn't work on windows
       #- slack/status:
       #    fail_only: true
