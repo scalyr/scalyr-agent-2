@@ -1,5 +1,40 @@
 # Release Notes
 
+## 2.1.6 "Rama" - June 4, 2020
+
+* There are a number of new default overrides to increase Agent throughput:
+
+  ```
+  "max_allowed_request_size": 5900000
+  "pipeline_threshold": 0
+  "min_request_spacing_interval": 0.0
+  "max_request_spacing_interval": 5.0
+  "max_log_offset_size": 200000000
+  "max_existing_log_offset_size": 200000000
+  ```
+
+  Increased throughput may result in a larger amount of logs uploaded to Scalyr if the Agent has been skipping logs
+  before this upgrade, and as a result a larger bill.
+
+  If you are interested in relying on the legacy behavior, you may set the `max_send_rate_enforcement` option to
+  `legacy` either by setting it in your `agent.json` configuration file, or by setting the
+  `SCALYR_MAX_SEND_RATE_ENFORCEMENT` environment variable to `legacy`.
+
+* The `max_send_rate_enforcement` option defaults to `"unlimited"`, which will not rate limit at all and have the above
+  overrides in effect. This option accepts a rate value of a format `"<rate><unit_numerator>/<unit_denominator>""`.
+
+  `<rate>` Accepts an integer or float value.
+
+  `<unit_numerator>` Accepts one of bytes (`B`), kilobytes(`KB`), megabytes (`MB`), gigabytes (`GB`), and terabytes
+  (`TB`). It also takes into account kibibytes(`KiB`), mebibytes (`MiB`), gibibytes (`GiB`), and tebibytes
+  (`TiB`). To avoid confusion it only accepts units in bytes with a capital `B`, and not bits with a lowercase `b`.
+
+  `<unit_denominator>` Accepts a unit of time, one of seconds (`s`), minutes (`m`), hours (`h`), days (`d`), and weeks
+  (`w`).
+
+  Note, this will rate limit in terms of raw log bytes uploaded to Scalyr which may not be same as charged log volume
+  if you have additional fields and other enrichments turned on.
+
 ## 2.1.3 "Orion" - May 1, 2020
 
 * You may now restrict which namespaces for which logs and events are collected
