@@ -96,7 +96,11 @@ class CPUProfilerTestCase(unittest.TestCase):
 
     @mock.patch("scalyr_agent.profiler.yappi", MOCK_YAPPI)
     def test_profiling_data_is_written_on_stop(self):
-        _, data_file_path = tempfile.mkstemp()
+        data_file_fd, data_file_path = tempfile.mkstemp()
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(data_file_fd)
 
         MOCK_CONFIG.enable_profiling = True
         MOCK_CONFIG.profile_log_name = data_file_path
@@ -145,7 +149,11 @@ class MemoryProfilerTestCase(unittest.TestCase):
     @mock.patch("scalyr_agent.profiler.pympler", MOCK_PYMPLER)
     def test_profiling_data_is_written_on_stop(self):
         # Verify data is written on _stop method call
-        _, data_file_path = tempfile.mkstemp()
+        data_file_fd, data_file_path = tempfile.mkstemp()
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(data_file_fd)
 
         MOCK_CONFIG.enable_profiling = True
         MOCK_CONFIG.memory_profile_log_name = data_file_path
