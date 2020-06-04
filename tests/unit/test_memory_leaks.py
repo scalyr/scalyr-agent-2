@@ -20,7 +20,7 @@ are not present anymore.
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import Any
     from typing import Set
 

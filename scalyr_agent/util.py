@@ -22,7 +22,7 @@ from __future__ import print_function
 
 import re
 
-if False:  # NOSONAR
+if False:
     from typing import Union
     from typing import Tuple
     from typing import Callable

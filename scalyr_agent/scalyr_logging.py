@@ -28,7 +28,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-if False:  # NOSONAR
+if False:
     from typing import Dict
 
     # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa

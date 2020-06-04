@@ -40,7 +40,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from io import open
 
-if False:  # NOSONAR
+if False:
     # NOTE: This is a workaround for old Python versions where typing module is not available
     # We should eventually improve that once we start producing distributions with Python
     # interpreter and dependencies bundled in.

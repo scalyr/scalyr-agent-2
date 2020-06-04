@@ -16,7 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-if False:  # NOSONAR
+if False:
     from typing import Optional
     from typing import Union
     from typing import Tuple

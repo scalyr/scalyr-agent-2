@@ -26,7 +26,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from scalyr_agent import compat
 
-if False:  # NOSONAR
+if False:
     from typing import Optional
     from typing import List
 

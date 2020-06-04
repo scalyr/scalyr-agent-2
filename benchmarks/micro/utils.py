@@ -14,7 +14,7 @@
 
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import Dict
     from typing import Callable
     from typing import Optional
@@ -71,7 +71,7 @@ def generate_add_events_request(
 
     add_events_request = AddEventsRequest(base_body=base_body)
 
-    for _ in range(0, num_events):
+    for index in range(0, num_events):
         line = generate_random_line(length=line_length)
         attributes = generate_random_dict(keys_count=attributes_count)
 

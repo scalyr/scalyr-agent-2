@@ -18,7 +18,7 @@ Module containing various date parsing related utility functions.
 
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import Optional
 
 import re

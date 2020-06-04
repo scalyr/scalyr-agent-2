@@ -21,7 +21,7 @@ more specifics about the checker and the invariants it enforces.
 
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import Any
     from typing import Union
 
