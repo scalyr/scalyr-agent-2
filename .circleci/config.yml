@@ -46,6 +46,7 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
+  win: circleci/windows@2.2.0
 
 # Global workflow level parameters
 parameters:
@@ -668,7 +669,7 @@ jobs:
           command: |
             brew install pyenv
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -681,18 +682,66 @@ jobs:
             python -m pip install virtualenv
             python -m virtualenv venv
             ./venv/bin/pip install "tox==3.14.3"
-      - save_cache:
-          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - ~/.cache/pip
-            - ~/.pyenv
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
             tox -epy3.5-unit-tests
+      - save_cache:
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+            - ~/.pyenv
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
+  unittest-35-windows:
+    working_directory: ~/scalyr-agent-2
+    executor:
+      name: win/default
+      size: medium
+      shell: bash
+    environment:
+      PYTHON: 3.5.4
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Chocolatey Cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: Install Python
+          command: |
+            # Install Python using chocolatey and set custom cache location so we preserve package cache over builds
+            mkdir -p /c/choco-cache
+            choco config set cacheLocation /c/choco-cache
+            choco install python --version "${PYTHON}" --yes --limit-output --no-progress
+
+            # Add Python we installed to PATH and make sure it has precedence over system Python
+            echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
+      - save_cache:
+          name: Save Chocolatey Cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - /c/choco-cache
+      - run:
+          name: Install Python Dependencies
+          command: |
+            python.exe --version
+            python.exe -m pip install --user --upgrade "tox==3.14.3"
+      - run:
+          name: Run Unit Tests under Python 3.5
+          command: |
+            tox.exe -epy3.5-windows-unit-tests
+      - save_cache:
+          name: Save Python Dependencies Cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ~/.cache/pip
       - slack/status:
           fail_only: true
           only_for_branches: master
@@ -1401,85 +1450,9 @@ workflows:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      - lint-checks
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
-  smoke-tests:
-    jobs:
-      - smoke-standalone-26
-      - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
-  package-tests:
-    jobs:
-      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
-      # product deb and rpm packages which can be used for testing.
-      # On master build, we run package-test-* jobs which also produce packages which
-      # can be used for testing. This means it's redundant to run both jobs at the same
-      # time since as long as one set of those jobs runs, packages will be produced.
-      # The reason why we run package-build-*, but not package-test-* jobs for each PR
-      # is that those jobs are much faster.
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-  benchmarks:
-    jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
-      - benchmarks-idle-agent-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *benchmarks_master_and_release_only
-  weekly-circle-ci-usage-report:
-    triggers:
-      - schedule:
-          cron: "0 0 * * 0"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - send-circle-ci-usage-report
+    #  - lint-checks
+    #  - unittest-26
+    #  - unittest-27
+    #  - unittest-35
+    #  - unittest-35-osx
+      - unittest-35-windows
