@@ -21,7 +21,10 @@
   `SCALYR_MAX_SEND_RATE_ENFORCEMENT` environment variable to `legacy`.
 
 * The `max_send_rate_enforcement` option defaults to `"unlimited"`, which will not rate limit at all and have the above
-  overrides in effect. This option accepts a rate value of a format `"<rate><unit_numerator>/<unit_denominator>""`.
+  overrides in effect. You may also set it to a specific maximum upload rate, such as `2MB/s`.  The Agent will attempt
+  to not exceed this rate by artificially delaying its upload requests.
+
+  The format for specifying a maximum upload rate is: `"<rate><unit_numerator>/<unit_denominator>""`, where
 
   `<rate>` Accepts an integer or float value.
 
@@ -32,6 +35,8 @@
   `<unit_denominator>` Accepts a unit of time, one of seconds (`s`), minutes (`m`), hours (`h`), days (`d`), and weeks
   (`w`).
 
+  Other examples include: `1.5MB/s`, `5GB/d`, `200KiB/s`.
+  
   Note, this will rate limit in terms of raw log bytes uploaded to Scalyr which may not be same as charged log volume
   if you have additional fields and other enrichments turned on.
 
