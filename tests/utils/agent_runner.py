@@ -20,7 +20,7 @@ import shutil
 import os
 import atexit
 
-if False:  # NOSONAR
+if False:
     from typing import Dict, Optional, Any
 
 import copy

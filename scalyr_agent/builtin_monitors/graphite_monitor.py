@@ -387,7 +387,7 @@ class GraphitePickleServer(ServerProcessor):
         try:
             # Use pickle to read the binary data.
             data_object = pickle.loads(request)
-        except Exception:  # pickle.loads is document as raising any type of exception, so have to catch them all.
+        except:  # pickle.loads is document as raising any type of exception, so have to catch them all.
             self.__logger.warn(
                 "Could not parse incoming metric line from graphite pickle server, ignoring",
                 error_code="graphite_monitor/badUnpickle",

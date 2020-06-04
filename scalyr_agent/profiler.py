@@ -23,7 +23,7 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
-if False:  # NOSONAR
+if False:
     from typing import Optional
     from typing import Dict
     from typing import List

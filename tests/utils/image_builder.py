@@ -21,7 +21,7 @@ import docker
 import argparse
 import hashlib
 
-if False:  # NOSONAR
+if False:
     from typing import Optional
     from typing import List
     from typing import Type

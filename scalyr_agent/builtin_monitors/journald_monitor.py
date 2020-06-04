@@ -19,7 +19,7 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
-if False:  # NOSONAR
+if False:
     from typing import Dict
 
 import datetime
@@ -180,7 +180,7 @@ def load_checkpoints(filename):
     checkpoints = {}
     try:
         checkpoints = scalyr_util.read_file_as_json(filename, strict_utf8=True)
-    except Exception:
+    except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "No checkpoint file '%s' exists.\n\tAll journald logs will be read starting from their current end.",

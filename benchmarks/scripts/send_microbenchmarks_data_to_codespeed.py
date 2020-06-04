@@ -19,7 +19,7 @@ CodeSpeed instance.
 
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import List
 
 import glob

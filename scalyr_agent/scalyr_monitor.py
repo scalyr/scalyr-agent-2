@@ -25,7 +25,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-if False:  # NOSONAR
+if False:
     from typing import Dict
     from types import ModuleType
 

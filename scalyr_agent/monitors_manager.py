@@ -17,7 +17,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-if False:  # NOSONAR
+if False:
     from typing import List
 
 __author__ = "czerwin@scalyr.com"
@@ -166,7 +166,7 @@ class MonitorsManager(StoppableThread):
                     scalyr_logging.DEBUG_LEVEL_0,
                     "Scalyr Monitors disabled.  Skipping monitor manager thread",
                 )
-        except Exception:
+        except:
             log.exception("Failed to start the monitors due to an exception")
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
@@ -186,7 +186,7 @@ class MonitorsManager(StoppableThread):
             try:
                 log.info("Stopping monitor %s", monitor.monitor_name)
                 monitor.stop(wait_on_join=False)
-            except Exception:
+            except:
                 log.exception(
                     "Failed to stop the metric log without join due to an exception"
                 )
@@ -199,14 +199,14 @@ class MonitorsManager(StoppableThread):
                 # noinspection PyBroadException
                 try:
                     monitor.stop(join_timeout=max_wait)
-                except Exception:
+                except:
                     log.exception("Failed to stop the metric log due to an exception")
 
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
                 monitor.close_metric_log()
-            except Exception:
+            except:
                 log.exception("Failed to close the metric log due to an exception")
 
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
