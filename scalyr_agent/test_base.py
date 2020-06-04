@@ -360,7 +360,11 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             )
 
         if not self.__assertion_failed:
-            shutil.rmtree(self.logs_directory)
+            try:
+                shutil.rmtree(self.logs_directory)
+            except PermissionError:
+                # Workaround for Windows when sometimes deleting fails because file is still in use
+                pass
 
     def assertLogFileContainsLineRegex(self, expression, file_path=None):
         """
