@@ -623,7 +623,7 @@ def get_pid_tid():
             six.text_type(os.getpid()),
             six.text_type(six.moves._thread.get_ident()),
         )
-    except Exception:
+    except:
         return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
 
 
@@ -634,7 +634,7 @@ def is_list_of_strings(vals):
         for val in vals:
             if not isinstance(val, six.string_types):
                 return False
-    except Exception:
+    except:
         # vals is not enumerable
         return False
 

@@ -139,7 +139,7 @@ class SyslogMonitorTestCase(unittest.TestCase):
             func()
         except Exception as e:
             self.fail("Unexpected Exception: %s" % six.text_type(e))
-        except Exception:
+        except:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
 
 
@@ -366,7 +366,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             try:
                 socket.connect(addr)
                 connected = True
-            except Exception:
+            except:
                 time.sleep(0.1)
             tries += 1
 

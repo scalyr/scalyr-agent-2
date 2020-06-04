@@ -207,7 +207,7 @@ def currentframe():
     # noinspection PyBroadException
     try:
         raise Exception
-    except Exception:
+    except:
         return sys.exc_info()[2].tb_frame.f_back
 
 

@@ -22,6 +22,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import sys
+import string
 from datetime import datetime
 
 import pg8000  # pylint: disable=import-error
@@ -314,9 +315,9 @@ class PostgreSQLDb(object):
             self._cursor.execute("select version();")
             r = self._cursor.fetchone()
             # assumes version is in the form of 'PostgreSQL x.y.z on ...'
-            s = r[0].split(" ")
+            s = string.split(r[0])
             version = s[1]
-        except Exception:
+        except:
             ex = sys.exc_info()[0]
             self._logger.error("Exception getting database version: %s" % ex)
         return version
@@ -333,7 +334,7 @@ class PostgreSQLDb(object):
         except (ValueError, IndexError):
             self._major = self._medium = 0
             self._version = "unknown"
-        except Exception:
+        except:
             ex = sys.exc_info()[0]
             self._logger.error("Exception getting database version: %s" % ex)
             self._version = "unknown"

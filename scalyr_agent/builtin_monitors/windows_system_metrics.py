@@ -596,5 +596,5 @@ class SystemMonitor(ScalyrMonitor):
                         self._logger.emit_value(
                             metric_name, metric_value, extra_fields=extra_fields
                         )
-        except Exception:
+        except:
             self._logger.exception("Failed to gather sample due to exception")
