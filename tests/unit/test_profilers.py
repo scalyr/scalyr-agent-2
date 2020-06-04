@@ -98,8 +98,8 @@ class CPUProfilerTestCase(unittest.TestCase):
     def test_profiling_data_is_written_on_stop(self):
         data_file_fd, data_file_path = tempfile.mkstemp()
 
-        # We close fd here since it's re-opened later by the profiler. This way tests pass on
-        # Windows.
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
         os.close(data_file_fd)
 
         MOCK_CONFIG.enable_profiling = True
@@ -151,8 +151,8 @@ class MemoryProfilerTestCase(unittest.TestCase):
         # Verify data is written on _stop method call
         data_file_fd, data_file_path = tempfile.mkstemp()
 
-        # We close fd here since it's re-opened later by the profiler. This way tests pass on
-        # Windows.
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
         os.close(data_file_fd)
 
         MOCK_CONFIG.enable_profiling = True

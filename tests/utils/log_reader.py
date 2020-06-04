@@ -16,7 +16,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-if False:
+if False:  # NOSONAR
     from typing import Optional
 
 import re
