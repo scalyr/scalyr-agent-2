@@ -14,14 +14,16 @@
 
 from __future__ import absolute_import
 
+from __future__ import print_function
+import re
 from io import open
 
 import mock
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.__scalyr__ import MSI_INSTALL
-from scalyr_agent.test_base import ScalyrTestCase
-from scalyr_agent import agent_main
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+from scalyr_agent import agent_main, agent_status
 
 __all__ = ["AgentMainTestCase"]
 
@@ -38,7 +40,7 @@ CORRECT_INIT_PRAGMA = """
 """
 
 
-class AgentMainTestCase(ScalyrTestCase):
+class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     @mock.patch("scalyr_agent.agent_main.INSTALL_TYPE", 1)
     def test_create_client_ca_file_and_intermediate_certs_file_doesnt_exist(self):
         from scalyr_agent.agent_main import ScalyrAgent
@@ -170,3 +172,76 @@ class AgentMainTestCase(ScalyrTestCase):
             " is correct and contains thre leading ### on BEGIN and END lines."
         )
         self.assertTrue(CORRECT_INIT_PRAGMA in content, msg)
+
+    def test_skipped_bytes_warnings(self):
+        import scalyr_agent.agent_main
+
+        from scalyr_agent.agent_main import ScalyrAgent
+        from scalyr_agent.platform_controller import PlatformController
+
+        scalyr_agent.agent_main.INSTALL_TYPE = DEV_INSTALL
+
+        config = mock.Mock()
+        config.scalyr_server = "foo.bar.com"
+        config.server_attributes = {"serverHost": "test"}
+        config.additional_file_paths = []
+        config.compression_level = 1
+        config.copying_manager_stats_log_interval = 60
+        config.parsed_max_send_rate_enforcement = 12345
+
+        config.verify_server_certificate = True
+        config.ca_cert_path = "/tmp/doesnt.exist"
+
+        platform_controller = PlatformController()
+        platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = config
+        agent._ScalyrAgent__scalyr_client = agent._ScalyrAgent__create_client()
+
+        base_stats = agent_status.OverallStats()
+        base_stats.total_bytes_skipped = 500
+        test = agent._ScalyrAgent__calculate_overall_stats(
+            base_stats, copy_manager_warnings=True
+        )
+        self.assertIsNotNone(test)
+        self.assertLogFileContainsLineRegex(
+            ".*"
+            + re.escape(
+                "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes. This may be due to max_send_rate_enforcement. Log upload has been delayed 0.0 seconds in the last 1.0 minutes  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+            )
+        )
+
+        config = mock.Mock()
+        config.scalyr_server = "foo.bar.com"
+        config.server_attributes = {"serverHost": "test"}
+        config.additional_file_paths = []
+        config.compression_level = 1
+        config.copying_manager_stats_log_interval = 60
+        config.parsed_max_send_rate_enforcement = None
+
+        config.verify_server_certificate = True
+        config.ca_cert_path = "/tmp/doesnt.exist"
+
+        platform_controller = PlatformController()
+        platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = config
+        agent._ScalyrAgent__scalyr_client = agent._ScalyrAgent__create_client()
+
+        base_stats.total_bytes_skipped = 1000
+        test = agent._ScalyrAgent__calculate_overall_stats(
+            base_stats, copy_manager_warnings=True
+        )
+        self.assertIsNotNone(test)
+        with open(self.agent_log_path, "r") as f:
+            print((f.read()))
+        self.assertLogFileContainsLineRegex(
+            ".*"
+            + re.escape(
+                "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+            )
+        )
+
+    @staticmethod
+    def fake_get_useage_info():
+        return 0, 0, 0

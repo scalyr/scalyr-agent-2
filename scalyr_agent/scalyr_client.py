@@ -221,6 +221,8 @@ class ScalyrClientSession(object):
         self.total_request_latency_secs = 0
         # The total number of HTTP connections successfully created.
         self.total_connections_created = 0
+        # The total time spent compressing messages
+        self.total_compression_time = 0
         # The path the file containing the certs for the root certificate authority to use for verifying the SSL
         # connection to Scalyr.  If this is None, then server certificate verification is disabled, and we are
         # susceptible to man-in-the-middle attacks.
@@ -352,6 +354,7 @@ class ScalyrClientSession(object):
                     (float(size_before_compress) / size_after_compress), 2
                 )
                 duration = round((end_time - start_time), 4)
+                self.total_compression_time += duration
 
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,

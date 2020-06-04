@@ -757,8 +757,8 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
     @return: The exist status of the command.
     """
     # We have to use a temporary file to hold the output to stdout and stderr.
-    _, output_file = tempfile.mkstemp()
-    output_fp = open(output_file, "w")
+    output_file_fd, output_file = tempfile.mkstemp()
+    output_fp = os.fdopen(output_file_fd, "w")
 
     try:
         # NOTE: To avoid shell injection we need to be careful that each comamnd_str which is passed

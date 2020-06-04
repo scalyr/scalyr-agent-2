@@ -7,6 +7,10 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 4, 2020 13:30 -0800
 --->
 
+Features:
+* New configuration option `max_send_rate_enforcement` allows setting a limit on the rate at which the Agent will upload log bytes to Scalyr. You may wish to set this if you are worried about bursts of log data from problematic files and want to avoid getting charged for these bursts.
+* New default overrides for a number of configuration parameters that will result in a higher throughput for the Agent. If you were relying on the lower throughput as a makeshift rate limiter we recommend setting the new `max_send_rate_enforcement` configuration option to an acceptable rate or "legacy" to maintain the current behavior. See the [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#216-rama---june-4-2020) for more details.
+
 Minor updates:
 * Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.
 
