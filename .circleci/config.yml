@@ -742,9 +742,10 @@ jobs:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
           paths:
             - ~/.cache/pip
-      - slack/status:
-          fail_only: true
-          only_for_branches: master
+      # NOTE: sadly slack/status orb doesn't work on windows
+      #- slack/status:
+      #    fail_only: true
+      #    only_for_branches: master
 
   unittest-27:
     working_directory: ~/scalyr-agent-2
