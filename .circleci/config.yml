@@ -119,7 +119,7 @@ commands:
                 command: |
                   ls -la .coverage* || true
 
-                  pip install "coverage==4.5.4" "codecov==2.1.3"
+                  pip install -r coverage-requirements.txt
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Print the report
@@ -436,7 +436,7 @@ commands:
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
-                  pip install "coverage==4.5.4" "codecov==2.1.3"
+                  pip install -r coverage-requirements.txt
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions

@@ -1,0 +1,3 @@
+# Python requirements used by the code coverage tox targets
+coverage==5.1
+codecov==2.1.3
