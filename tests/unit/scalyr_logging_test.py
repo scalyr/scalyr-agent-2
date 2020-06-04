@@ -91,7 +91,11 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_metric_logging(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        metric_file_path = tempfile.mktemp(".log")
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
@@ -115,7 +119,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     def test_metric_logging_metric_name_blacklist(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         monitor_instance._metric_name_blacklist = ["name1", "name3"]
-        metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
@@ -160,7 +169,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_1 = ScalyrMonitor(
             monitor_config=monitor_1_config, logger=monitor_1_logger
         )
-        monitor_1_metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, monitor_1_metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_2_config = {"module": "foo2", "metric_name_blacklist": ["c", "d"]}
         monitor_2_logger = scalyr_logging.getLogger(
@@ -169,7 +183,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_2 = ScalyrMonitor(
             monitor_config=monitor_2_config, logger=monitor_1_logger
         )
-        monitor_2_metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, monitor_2_metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_1_logger.openMetricLogForMonitor(monitor_1_metric_file_path, monitor_1)
 
@@ -217,7 +236,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_logging_to_metric_log(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
@@ -238,7 +262,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_metric_logging_with_bad_name(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
@@ -264,7 +293,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_errors_for_monitor(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
@@ -280,8 +314,13 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_one = ScalyrLoggingTest.FakeMonitor("testing one")
         monitor_two = ScalyrLoggingTest.FakeMonitor("testing two")
 
-        metric_file_one = tempfile.mktemp(".log")
-        metric_file_two = tempfile.mktemp(".log")
+        metric_file_one_fd, metric_file_one = tempfile.mkstemp(".log")
+        metric_file_two_fd, metric_file_two = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_one_fd)
+        os.close(metric_file_two_fd)
 
         logger_one = scalyr_logging.getLogger("scalyr_agent.builtin_monitors.foo(1)")
         logger_two = scalyr_logging.getLogger("scalyr_agent.builtin_monitors.foo(2)")
@@ -311,7 +350,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_pass_in_module_with_metric(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        metric_file_path = tempfile.mktemp(".log")
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"

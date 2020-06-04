@@ -448,7 +448,7 @@ class MysqlDB(object):
         except (ValueError, IndexError):
             self._major = self._medium = 0
             self._version = "unknown"
-        except:
+        except Exception:
             ex = sys.exc_info()[0]
             self._logger.error("Exception getting database version: %s" % ex)
             self._version = "unknown"
@@ -1058,7 +1058,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     elif len(hostPortParts) == 2:
                         try:
                             self._database_port = int(hostPortParts[1])
-                        except:
+                        except Exception:
                             raise Exception(
                                 "database_hostport specified is incorrect.  The format show be host:port, where port is an integer."
                             )

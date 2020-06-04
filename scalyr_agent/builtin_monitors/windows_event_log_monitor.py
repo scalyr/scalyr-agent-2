@@ -452,7 +452,7 @@ class NewApi(Api):
         result = value
         try:
             result = win32evtlog.EvtFormatMessage(metadata, event, field)
-        except:
+        except Exception:
             pass
 
         return result
@@ -490,7 +490,7 @@ class NewApi(Api):
             metadata = win32evtlog.EvtOpenPublisherMetadata(
                 vals[win32evtlog.EvtSystemProviderName][0]
             )
-        except:
+        except Exception:
             pass
 
         result["Message"] = self._FormattedMessage(
@@ -572,7 +572,7 @@ class NewApi(Api):
         except Exception as e:
             try:
                 self._logger.info("%s", six.text_type(e))
-            except:
+            except Exception:
                 self._logger.info("Error printing exception information")
 
     def log_event(self, event):
@@ -718,7 +718,7 @@ and System sources:
             checkpoints = scalyr_util.read_file_as_json(
                 self.__checkpoint_file, strict_utf8=True
             )
-        except:
+        except Exception:
             self._logger.info(
                 "No checkpoint file '%s' exists.\nAll logs will be read starting from their current end.",
                 self.__checkpoint_file,
@@ -744,7 +744,7 @@ and System sources:
             try:
                 if windll.wevtapi:
                     evtapi = True
-            except:
+            except Exception:
                 pass
 
         result = None

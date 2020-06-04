@@ -306,10 +306,13 @@ class ScalyrHttpConnection(Connection):
         # fetch end-entity certificate and write to tempfile
         end_entity_pem = ssl.get_server_certificate((self._host, self._port))
         try:
-            _, end_entity_pem_tempfile_path = mkstemp()
-            fh = open(end_entity_pem_tempfile_path, "w")
-            fh.write(end_entity_pem)
-            fh.close()
+            end_entity_pem_tempfile_fd, end_entity_pem_tempfile_path = mkstemp()
+            # NOTE: We close the fd here because we open it again below. This way file deletion at
+            # the end works correctly on Windows.
+            os.close(end_entity_pem_tempfile_fd)
+
+            with os.fdopen(end_entity_pem_tempfile_fd, "w") as fp:
+                fp.write(end_entity_pem)
 
             # invoke openssl
             # root_certs = '/usr/share/scalyr-agent-2/certs/ca_certs.crt'
