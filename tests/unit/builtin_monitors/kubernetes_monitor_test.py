@@ -21,6 +21,7 @@ from __future__ import absolute_import
 import re
 import time
 import warnings
+import platform
 from string import Template
 
 import sys
@@ -50,6 +51,7 @@ from scalyr_agent.test_util import ScalyrTestUtils
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
 from tests.unit.copying_manager_test import FakeMonitor
+from scalyr_agent.test_base import skipIf
 
 import mock
 from mock import patch
@@ -655,6 +657,7 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
             result = api.query_stats()
             self.assertEqual(result, {})
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_unverified_https(self):
         def fake_get(self, url, verify):
             resp = FakeResponse()

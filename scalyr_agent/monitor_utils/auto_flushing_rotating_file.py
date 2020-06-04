@@ -40,8 +40,13 @@ class AutoFlushingRotatingFile(object):
         self._totalSize = self._file.tell()
 
     def write(self, message):
+        raw_message = message
         message = "%s\n" % message
-        size = len(message)
+
+        # NOTE: When opening file in text only mode, on Windows \n will automatically be converted
+        # to \r\n on write, which means that the actual file will be larger if we don't take this
+        # into account here
+        size = len(raw_message + os.linesep)
 
         self._lock.acquire()
         try:
