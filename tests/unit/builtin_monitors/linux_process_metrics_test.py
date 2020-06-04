@@ -26,7 +26,11 @@ try:
 except ImportError:
     psutil = None
 
-from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
+if platform.system() != "Windows":
+    from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
+else:
+    ProcessMonitor = None  # type: ignore
+
 from scalyr_agent.scalyr_monitor import load_monitor_class
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
@@ -36,6 +40,7 @@ __all__ = ["LinuxProcessMetricsMonitorTest"]
 
 class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(
         not psutil,
         "Skipping tests because psutil is not available (likely running under Python 3.6 on Circle CI)",
@@ -58,6 +63,7 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(
         not psutil,
         "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
@@ -80,6 +86,7 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, len(monitor_info.metrics))
 
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(
         not psutil,
         "Skipping tests because psutil is not available (likely running under Python 2.6 on Circle CI)",
