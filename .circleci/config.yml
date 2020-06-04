@@ -709,7 +709,7 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Chocolatey Cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v2-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
       - restore_cache:
           name: Restore Python Dependencies Cache
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
@@ -717,17 +717,17 @@ jobs:
           name: Install Python
           command: |
             # Install Python using chocolatey and set custom cache location so we preserve package cache over builds
-            mkdir -p /c/choco-cache
-            choco config set cacheLocation /c/choco-cache
+            mkdir -p ~/choco-cache
+            choco config set cacheLocation ~/choco-cache
             choco install python --version "${PYTHON}" --yes --limit-output --no-progress
 
             # Add Python we installed to PATH and make sure it has precedence over system Python
             echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v2-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
           paths:
-            - /c/choco-cache
+            - ~/choco-cache
       - run:
           name: Install Python Dependencies
           command: |
