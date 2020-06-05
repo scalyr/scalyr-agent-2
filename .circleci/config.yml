@@ -1072,6 +1072,8 @@ jobs:
       - image: circleci/python:3.6-jessie
     steps:
       - checkout
+      # TODO: Download and combine all the coverage data so we can use it with
+      # sonar cloud.
       - sonarcloud/scan
 
   benchmarks-idle-agent-py-27:
