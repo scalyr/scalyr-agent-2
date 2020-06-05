@@ -60,9 +60,10 @@ def download_coverage_files(destination_path):
 
     cls = get_driver(Provider.S3)
     driver = cls(ACCESS_KEY_ID, ACCESS_KEY_SECRET, region="us-east-1")
-
     container = driver.get_container(container_name=BUCKET_NAME)
-    for index, obj in enumerate(container.list_objects()):
+
+    prefix = "%s/%s" % (CIRCLE_CI_BRANCH, CIRCLE_CI_COMMIT)
+    for index, obj in enumerate(container.list_objects(prefix=prefix)):
         print(("Downloading object %s" % (obj.name)))
 
         obj_time = obj.name.split("/")[-1].rsplit(".")[-1]
