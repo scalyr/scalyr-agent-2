@@ -46,7 +46,6 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
-  sonarcloud: sonarsource/sonarcloud@1.0.0
 
 # Global workflow level parameters
 parameters:
@@ -1086,14 +1085,37 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
+    environment:
+      VERSION: "4.1.0.1829"
+      SCANNER_DIRECTORY: "/tmp/cache/scanner"
+      SONAR_USER_HOME: "/tmp/cache/scanner/.sonar"
+      OS: "linux"
     steps:
       - checkout
+      # NOTE: Those steps are based on sonarcloud orb. We can't use the orb
+      # directly since it doesn't allow us to specify us a custom path to the
+      # config
       - run:
-          name: Copy over sonar config
+          name: Create cache directory if it doesn't exist
+          command: mkdir -p /tmp/cache/scanner
+      - restore_cache:
+          key: v2-sonarcloud-scanner-4.1.0.1829
+      - run:
+          name: Download Sonar Scanner
           command: |
-            # NOTE: This is needed because sonar orb doesn't support specifying
-            # a path to a custom config file
-            sudo cp ~/scalyr-agent-2/.sonarcloud.properties /tmp/cache/scanner/sonar-scanner-4.1.0.1829-linux/conf/sonar-scanner.properties
+            set -e
+
+            if [[ ! -x "$SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/bin/sonar-scanner" ]]; then
+              curl -Ol https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$VERSION-$OS.zip
+              unzip -qq -o sonar-scanner-cli-$VERSION-$OS.zip -d $SCANNER_DIRECTORY
+            fi
+
+            chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/bin/sonar-scanner
+            chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/jre/bin/java
+      - save_cache:
+          key: v2sonarcloud-scanner-4.1.0.1829
+          paths:
+            - /tmp/cache/scanner
       - run:
           # NOTE: Sadly there isn't a better way for us to achieve that. We generate coverage
           # data as part of multiple independent workflow jobs so we uploaded
@@ -1106,12 +1128,11 @@ jobs:
           # build.
           name: Download Coverage Data files
           command: |
-            export PYTHONPATH=.
-
-            pip install "coverage==4.5.4" "apache-libcloud==2.8.2"
+            sudo pip install "coverage==4.5.4" "apache-libcloud==2.8.2"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Download Coverage Data
+            export PYTHONPATH=.
             ./scripts/circleci/download-coverage-data-from-s3.py "."
             ls -la .coverage*
 
@@ -1123,7 +1144,10 @@ jobs:
 
             # Print it
             coverage report
-      - sonarcloud/scan
+      - run:
+          name: Run Sonar Scanner
+          command:
+            ${SCANNER_DIRECTORY}/sonar-scanner-${VERSION}-${OS}/bin/sonar-scanner -Dproject.settings=.sonarcloud.properties
 
   benchmarks-idle-agent-py-27:
     working_directory: ~/scalyr-agent-2
