@@ -46,6 +46,7 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
+  win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
 # Global workflow level parameters
 parameters:
@@ -1395,91 +1396,276 @@ jobs:
                 --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
+  build-windows-package:
+    description: "Build windows MSI installer."
+    executor:
+      name: win/default
+      size: "medium"
+      shell: powershell.exe
+    steps:
+      - checkout
+      - restore_cache:
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}
+
+      - run:
+          name: Install python.
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir python_installer -Force
+            if (!(Test-Path .\python_installer\python-3.7.7-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.7.7-amd64.exe https://www.python.org/ftp/python/3.7.7/python-3.7.7-amd64.exe
+            }
+            .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
+
+      - save_cache:
+          key: windows_python_installer-{{ .Branch }}
+          paths:
+            - "python_installer"
+
+      - run:
+          name: build MSI package.
+          command: |
+             .\win32\build.ps1 c:\Python37
+              mkdir package
+              mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+      - persist_to_workspace:
+          root: package
+          paths: ScalyrAgentInstaller.msi
+
+      - store_artifacts:
+          path: package
+
+  build-linux-packages:
+    description: "Build deb and rpm packages."
+    working_directory: ~/scalyr-agent-2
+    docker:
+        - image: circleci/python:3.6-jessie
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          command: |
+            sudo apt-key update
+            sudo apt update
+            sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+
+            # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
+            # as a temporaty solution explicitly specify ffi version.
+            sudo gem install --no-document ffi:1.12.2 fpm
+
+      - run:
+          command: |
+            mkdir artifacts
+            mkdir package
+
+            ls
+            pushd artifacts
+
+            # update agent version.
+            echo "$(cat VERSION).1" > VERSION
+
+            python ../build_package.py deb
+            python ../build_package.py rpm
+
+            popd
+
+            cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
+            cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
+
+
+
+      - persist_to_workspace:
+          root: package
+          paths:
+            - scalyr-agent-2.deb
+            - scalyr-agent-2.rpm
+
+      - store_artifacts:
+          path: package
+
+
+
+  ami-tests:
+    description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie
+    steps:
+      - add_ssh_keys:
+            fingerprints:
+              - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: run package tests in EC2 instances.
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+            export KEY_NAME=circleci
+            export PRIVATE_KEY_PATH="~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            python -m pip install --user -r tests/ami/requirements.txt
+            export PYTHONPATH="."
+            mkdir -p outputs
+
+            # run AMI package sanity tests concurrently.
+            ./scripts/circleci/wait-for-running-bg-jobs.sh
+
+
+      - run:
+          name: ubuntu1804 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1804.log
+
+      - run:
+          name: ubuntu1604 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1604.log
+
+      - run:
+          name: ubuntu1404 result.
+          when: always
+          command: |
+            cat outputs/ubuntu1404.log
+
+      - run:
+          name: centos7 result.
+          when: always
+          command: |
+            cat outputs/centos7.log
+
+      - run:
+          name: WindowsServer2012 result.
+          when: always
+          command: |
+            cat outputs/WindowsServer2012.log
+
+      - run:
+          name: WindowsServer2016 result.
+          when: always
+          command: |
+            cat outputs/WindowsServer2016.log
+
+      - run:
+          name: WindowsServer2019 result.
+          when: always
+          command: |
+            cat outputs/WindowsServer2019.log
+
+      - store_artifacts:
+          path: outputs
+
 workflows:
   version: 2
-  unit-tests:
-    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-    # Python 3 versions
-    jobs:
-      - lint-checks
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
-  smoke-tests:
-    jobs:
-      - smoke-standalone-26
-      - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
   package-tests:
     jobs:
-      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
-      # product deb and rpm packages which can be used for testing.
-      # On master build, we run package-test-* jobs which also produce packages which
-      # can be used for testing. This means it's redundant to run both jobs at the same
-      # time since as long as one set of those jobs runs, packages will be produced.
-      # The reason why we run package-build-*, but not package-test-* jobs for each PR
-      # is that those jobs are much faster.
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
+      - build-linux-packages
+      - build-windows-package
+      - ami-tests:
           requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-  benchmarks:
-    jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
-      - benchmarks-idle-agent-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *benchmarks_master_and_release_only
-  weekly-circle-ci-usage-report:
-    triggers:
-      - schedule:
-          cron: "0 0 * * 0"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - send-circle-ci-usage-report
+            - build-windows-package
+            - build-linux-packages
+
+
+#workflows:
+#  version: 2
+#  unit-tests:
+#    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+#    # Python 3 versions
+#    jobs:
+#      - lint-checks
+#      - unittest-26
+#      - unittest-27
+#      - unittest-35
+#      - unittest-35-osx
+#  smoke-tests:
+#    jobs:
+#      - smoke-standalone-26
+#      - smoke-standalone-27
+#      - smoke-standalone-35
+#      - smoke-standalone-26-tls12
+#      - smoke-standalone-27-tls12
+#       # NOTE: smoke test jobs below still use old smoke tests framework
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - smoke-monitors-tests
+#  package-tests:
+#    jobs:
+#      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
+#      # product deb and rpm packages which can be used for testing.
+#      # On master build, we run package-test-* jobs which also produce packages which
+#      # can be used for testing. This means it's redundant to run both jobs at the same
+#      # time since as long as one set of those jobs runs, packages will be produced.
+#      # The reason why we run package-build-*, but not package-test-* jobs for each PR
+#      # is that those jobs are much faster.
+#      - package-build-rpm:
+#          <<: *non_master_and_release
+#      - package-build-deb:
+#          <<: *non_master_and_release
+#      - package-test-rpm:
+#          <<: *master_and_release_only
+#      - package-test-deb:
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py2:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py3:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py2:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py3:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - build-linux-packages:
+#          <<: *master_and_release_only
+#      - build-windows-package:
+#          <<: *master_and_release_only
+#      - ami-tests:
+#          requires:
+#            - build-windows-package
+#            - build-linux-packages
+#          <<: *master_and_release_only
+#  benchmarks:
+#    jobs:
+#      - benchmarks-micro-py-27
+#      - benchmarks-micro-py-35
+#      - benchmarks-idle-agent-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-no-monitors-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-no-monitors-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+#          <<: *benchmarks_master_and_release_only
+#  weekly-circle-ci-usage-report:
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * 0"
+#          filters:
+#            branches:
+#              only:
+#                - master
+#    jobs:
+#      - send-circle-ci-usage-report

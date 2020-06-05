@@ -117,7 +117,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(text_type(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(text_type(sys.executable))
 
     return file_path
 

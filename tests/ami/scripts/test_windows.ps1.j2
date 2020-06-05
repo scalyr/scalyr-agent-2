@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This script installs Scalyr agent MSI package for windows.
+
+
+$ProgressPreference = "SilentlyContinue"
+
+
+function GetMSIVersion {
+    param (
+    [IO.FileInfo] $MSI
+)
+# this function gets version string from .msi package.
+if (!(Test-Path $MSI.FullName)) {
+    throw "File '{0}' does not exist" -f $MSI.FullName
+}
+
+try {
+    $windowsInstaller = New-Object -com WindowsInstaller.Installer
+    $database = $windowsInstaller.GetType().InvokeMember(
+        "OpenDatabase", "InvokeMethod", $Null,
+        $windowsInstaller, @($MSI.FullName, 0)
+    )
+
+    $q = "SELECT Value FROM Property WHERE Property = 'ProductVersion'"
+    $View = $database.GetType().InvokeMember(
+        "OpenView", "InvokeMethod", $Null, $database, ($q)
+    )
+
+    $View.GetType().InvokeMember("Execute", "InvokeMethod", $Null, $View, $Null)
+    $record = $View.GetType().InvokeMember( "Fetch", "InvokeMethod", $Null, $View, $Null )
+    $version = $record.GetType().InvokeMember( "StringData", "GetProperty", $Null, $record, 1 )
+
+    return $version
+} catch {
+    throw "Failed to get MSI file version: {0}." -f $_
+}
+}
+
+
+$msi_version=GetMSIVersion -MSI .\install_package.msi
+echo $msi_version
+
+# install scalyr agent and wait until it is done.
+Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
+
+# replace api_key and serverHost
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+# After string replacement we need to reencode config file without BOM.
+$ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
+[System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
+
+$Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
+
+# enable disk performance counters
+if ($major -lt 10) {
+    Write-Output "Enable disk performance counters because it is required in Windows Server < 2019."
+    diskperf -y;
+
+}
+
+scalyr-agent-2 start;
+
+Start-Sleep 5
+
+$status_output=scalyr-agent-2 status -v;
+
+echo $status_output
+
+if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
+
+Write-Output $status_output
+
+if ("$status_output" -notmatch "$msi_version")   { Throw "Can not find version." };
+if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
+if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
+if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };

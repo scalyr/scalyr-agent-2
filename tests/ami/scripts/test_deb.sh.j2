@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+set -e
+
+{% if verbose -%}
+set -x
+{% endif -%}
+
+# Give it some time to finish provisioning process. It's possible that we can SSH in before
+# cloud-init fully finished
+sleep 20
+
+uname -a
+cat /etc/*-release
+
+sudo apt-get update -y
+sudo apt-get install -y "{{python_package}}"
+
+# Install Sclayr agent.
+{% if install_package["type"] in ("file", "url") -%}
+{# type of the package is 'file' or 'url', that means that file
+should be uploaded by script or already uploaded by Libloud. #}
+    {% if install_package["type"] == "url" -%}
+    wget -O install_package.deb "{{ install_package["source"] }}"
+    {% elif upgrade_package["type"] == "file" -%}
+    {# file should be already uploaded by Libcloud, so just pass this. #}
+    {% endif -%}
+
+# install Scalyr agent from package file.
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i install_package.deb
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export INSTALL_PACKAGE_VERSION=$(dpkg-deb -f "install_package.deb" Version)
+{% else -%}
+# install Scalyr agent by downloading convenience script.
+wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
+    {% if install_package["source"] == "current" -%}
+    {# Install the latest agent version in repo. #}
+# Get version of the current package
+export INSTALL_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
+    {% else -%}
+    {# Install particular agent version from repo. #}
+# Install older package.
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{install_package["source"]}}" --allow-downgrades
+export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
+    {% endif -%}
+{% endif -%}
+
+sudo /etc/init.d/scalyr-agent-2 restart
+
+sleep 5
+
+# Run some basic sanity checks
+sudo scalyr-agent-2 status -v
+echo ""
+
+sudo scalyr-agent-2 status -v | grep "${INSTALL_PACKAGE_VERSION}"
+sudo scalyr-agent-2 status -v | grep agent.log
+sudo scalyr-agent-2 status -v | grep linux_system_metrics
+sudo scalyr-agent-2 status -v | grep linux_process_metrics
+
+# Verify rc*.d symlinks are in place
+ls -la /etc/rc*.d/ | grep scalyr-agent
+echo ""
+ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+
+{% if test_type == "upgrade" -%}
+
+# Upgrade to new version
+
+{% if upgrade_package["type"] in ("file", "url") -%}
+{# type of the package is 'file' or 'url', that means that file
+should be uploaded by script or already uploaded by Libloud. #}
+    {% if upgrade_package["type"] == "url" -%}
+wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
+    {% elif upgrade_package["type"] == "file" -%}
+    {# file should be already uploaded by Libcloud, so just pass this. #}
+    {% endif -%}
+
+echo "Upgrade Scalyr agent from file."
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i upgrade_package.deb
+sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
+export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "upgrade_package.deb" Version)
+{% else -%}
+    {% if upgrade_package["source"] == "current" -%}
+    {# Upgrade agent to the latest verson in repo. #}
+sudo DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y scalyr-agent-2
+export UPGRADE_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
+    {% else -%}
+    {# Upgrade agent to the particular version #}
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{upgrade_package["source"]}}"
+export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
+    {% endif -%}
+{% endif -%}
+
+sudo /etc/init.d/scalyr-agent-2 restart
+
+sleep 5
+
+# Verify status works and symlinks are in place
+sudo scalyr-agent-2 status -v
+echo ""
+
+sudo scalyr-agent-2 status -v | grep "${UPGRADE_PACKAGE_VERSION}"
+sudo scalyr-agent-2 status -v | grep agent.log
+sudo scalyr-agent-2 status -v | grep linux_system_metrics
+sudo scalyr-agent-2 status -v | grep linux_process_metrics
+
+# Verify rc*.d symlinks are in place
+ls -la /etc/rc*.d/ | grep scalyr-agent
+echo ""
+ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+{% endif -%}

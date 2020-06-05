@@ -25,6 +25,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 __author__ = "czerwin@scalyr.com"
 
@@ -43,6 +44,7 @@ import uuid
 
 from io import StringIO
 from io import BytesIO
+from io import open
 
 from optparse import OptionParser
 from time import gmtime, strftime
@@ -234,7 +236,7 @@ def build_win32_installer_package(variant, version):
     shutil.copy(convert_path("scalyr_agent/__scalyr__.py"), "__scalyr__.py")
     shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION")
     shutil.copy(
-        make_path(agent_source_root, "VERSION"), convert_path("scalyr_agent/VERSION")
+        make_path(agent_source_root, "VERSION"), convert_path("scalyr_agent/VERSION"),
     )
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
@@ -284,14 +286,31 @@ def build_win32_installer_package(variant, version):
         make_path(agent_source_root, "DESCRIPTION.rst"),
         convert_path("source_root/DESCRIPTION.rst"),
     )
+    pyinstaller_spec_path = os.path.join(
+        agent_source_root, "win32", "scalyr-agent.spec"
+    )
 
-    run_command("python.exe setup.py py2exe", exit_on_fail=True, command_name="py2exe")
+    shutil.copy(pyinstaller_spec_path, "scalyr-agent.spec")
+    shutil.copy(
+        os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
+        "wix-heat-bin-transform.xsl",
+    )
+
+    shutil.copy(
+        os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
+    )
+
+    run_command(
+        "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
+        exit_on_fail=True,
+        command_name="pyinstaller",
+    )
 
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
-    os.rename("dist", convert_path("Scalyr/bin"))
+    os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
         "Scalyr/bin/ScalyrShell.cmd",
@@ -308,13 +327,6 @@ def build_win32_installer_package(variant, version):
     # TODO: Check certificate expiration same as we do as part of tox lint target
     # NOTE: This requires us to update Jenkins pipeline and other places where this script is called
     # to install cryptography library
-
-    # Generate the file used by WIX's candle program.
-    create_wxs_file(
-        make_path(agent_source_root, "win32/scalyr_agent.wxs"),
-        convert_path("Scalyr/bin"),
-        "scalyr_agent.wxs",
-    )
 
     # Get ready to run wix.  Add in WIX to the PATH variable.
     os.environ["PATH"] = "%s;%s\\bin" % (os.getenv("PATH"), os.getenv("WIX"))
@@ -335,6 +347,19 @@ def build_win32_installer_package(variant, version):
         del parts[3]
         version = ".".join(parts)
 
+    # Gather files by 'heat' tool from WIX and generate .wxs file for 'bin' folder.
+    run_command(
+        "heat dir Scalyr/bin -sreg -ag -cg BIN -dr APPLICATIONROOTDIRECTORY -var var.BinFolderSource -t wix-heat-bin-transform.xsl -o bin.wxs",
+        exit_on_fail=True,
+        command_name="heat",
+    )
+
+    run_command(
+        'candle -nologo -out bin.wixobj bin.wxs -dBinFolderSource="Scalyr/bin"',
+        exit_on_fail=True,
+        command_name="candle",
+    )
+
     run_command(
         'candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
         '-dPRODUCTCODE="%s" scalyr_agent.wxs' % (version, upgrade_code, product_code),
@@ -343,8 +368,9 @@ def build_win32_installer_package(variant, version):
     )
 
     installer_name = "ScalyrAgentInstaller-%s.msi" % version
+
     run_command(
-        "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj"
+        "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj bin.wixobj -v"
         % installer_name,
         exit_on_fail=True,
         command_name="light",
@@ -416,7 +442,7 @@ def create_wxs_file(template_path, dist_path, destination_path):
             result.append(line)
 
     # Write the resulting lines out.
-    f = open(destination_path, "wb")
+    f = open(destination_path, "w")
     try:
         for line in result:
             f.write(line)
@@ -903,7 +929,8 @@ def build_base_files(base_configs="config"):
     recursively_delete_files_by_name("README.md")
     os.chdir("..")
     shutil.copy(
-        make_path(agent_source_root, "VERSION"), os.path.join("scalyr_agent", "VERSION")
+        make_path(agent_source_root, "VERSION"),
+        os.path.join("scalyr_agent", "VERSION"),
     )
 
     # create copies of the agent_main.py with python2 and python3 shebang.
@@ -1168,7 +1195,7 @@ def write_to_file(string_value, file_path):
     """
     dest_fp = open(file_path, "w")
     dest_fp.write(string_value.rstrip())
-    dest_fp.write(os.linesep)
+    dest_fp.write(six.ensure_text(os.linesep))
     dest_fp.close()
 
 
@@ -1334,7 +1361,7 @@ def create_change_logs():
                 # If a sublist, then recursively call this function, increasing the level.
                 print_release_notes(output_fp, note, level_prefixes, level + 1)
                 if level == 0:
-                    print(file=output_fp)
+                    print("", file=output_fp)
             else:
                 # Otherwise emit the note with the prefix for this level.
                 print("%s%s" % (prefix, note), file=output_fp)
@@ -1357,13 +1384,13 @@ def create_change_logs():
                 ),
                 file=fp,
             )
-            print(file=fp)
+            print("", file=fp)
             print("Release: %s (%s)" % (release["version"], release["name"]), file=fp)
-            print(file=fp)
+            print("", file=fp)
             # Include the release notes, with the first level with no indent, an asterisk for the second level
             # and a dash for the third.
             print_release_notes(fp, release["notes"], ["", " * ", "   - "])
-            print(file=fp)
+            print("", file=fp)
     finally:
         fp.close()
 
@@ -1614,7 +1641,7 @@ def get_build_info():
             "git config user.email", fail_quietly=True, command_name="git"
         )
         if rc != 0:
-            packager_email = u"unknown"
+            packager_email = "unknown"
 
         print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
