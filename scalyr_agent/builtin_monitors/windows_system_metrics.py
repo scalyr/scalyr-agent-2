@@ -104,7 +104,6 @@ def _gather_metric(method, attribute=None, transform=None):
     def gather_metric():
         """Dynamically Generated """
         try:
-            print(attribute)
             metric = methodcaller(method)  # pylint: disable=redefined-outer-name
             value = metric(psutil)
 

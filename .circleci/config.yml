@@ -1564,14 +1564,11 @@ workflows:
   package-tests:
     jobs:
       - build-linux-packages:
-          <<: *master_and_release_only
       - build-windows-package:
-          <<: *master_and_release_only
       - ami-tests:
           requires:
             - build-windows-package
             - build-linux-packages
-          <<: *master_and_release_only
 
 
 #workflows:
