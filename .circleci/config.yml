@@ -700,6 +700,8 @@ jobs:
           only_for_branches: master
 
   unittest-35-windows:
+    # TODO: That's a temporary in-line definition from slack orb. We can remove it once
+    # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
     parameters:
       webhook:
         type: string
@@ -834,8 +836,34 @@ jobs:
             coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
 
-      # NOTE: sadly slack/status orb doesn't work on windows so we can't notify
-      # on master failure
+      # TODO: That's a temporary in-line definition from slack orb. We can remove it once
+      # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
+      - run:
+          name: Provide error if curl is not installed.
+          command: |
+            which curl > curl_exists; echo $? | grep -q '1' && echo curl not installed && rm curl_exists && exit 1
+            rm curl_exists
+
+      - run:
+          name: Slack - Setting Failure Condition
+          command: |
+            echo 'export SLACK_BUILD_STATUS="fail"' >> $BASH_ENV
+          when: on_fail
+
+      - run:
+          name: Slack - Setting Success Condition
+          command: |
+            echo 'export SLACK_BUILD_STATUS="success"' >> $BASH_ENV
+          when: on_success
+
+      - run:
+          name: Provide error if non-bash shell
+          command: |
+            if [ ! -x /bin/bash ]; then
+              echo Bash not installed.
+              exit 1
+            fi
+
       - run:
           name: Slack - Sending Status Alert
           shell: bash
