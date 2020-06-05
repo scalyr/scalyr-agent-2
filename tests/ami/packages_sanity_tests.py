@@ -97,6 +97,7 @@ from tests.ami.utils import get_env_throw_if_not_set
 if False:
     from typing import List
     from typing import Optional
+    from typing import Dict
 
 
 # if we try to run deployment script on windows machine with openssh,
@@ -210,6 +211,35 @@ SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
 
+def _get_source_type(version_string):
+    # type: (str) -> str
+    """
+    Get agent installation package source type according to data in the version string.
+    """
+    if "http://" in version_string or "https://" in version_string:
+        return "url"
+    elif os.path.exists(version_string) and os.path.isfile(version_string):
+        return "file"
+    else:
+        return "install_script"
+
+
+def _create_file_deployment_step(file_path, remote_file_name):
+    # type: (str, str) -> FileDeployment
+    """
+    Create Libcloud file deployment step object.
+
+    """
+    file_name = os.path.basename(file_path)
+    extension = os.path.splitext(file_name)[1]
+
+    target_path = "./{0}{1}".format(remote_file_name, extension)
+
+    step = FileDeployment(file_path, target_path)
+
+    return step
+
+
 def main(
     distro,
     test_type,
@@ -221,12 +251,49 @@ def main(
     verbose=False,
 ):
     # type: (str, str, str, str, str, str, bool, bool) -> None
-    distro_details = EC2_DISTRO_DETAILS_MAP[distro]
+
+    # deployment objects for package files will be stored here.
+    file_upload_steps = []
 
     if test_type == "install":
-        script_filename = "fresh_install_%s.%s.j2"
+        install_package_source = to_version
     else:
-        script_filename = "upgrade_install_%s.%s.j2"
+        # install package is specified in from-version in case of upgrade
+        install_package_source = from_version
+
+    # prepare data for install_package
+    install_package_source_type = _get_source_type(install_package_source)
+
+    if install_package_source_type == "file":
+        # create install package file deployment object.
+        file_upload_steps.append(
+            _create_file_deployment_step(install_package_source, "install_package")
+        )
+
+    install_package_info = {
+        "type": install_package_source_type,
+        "source": install_package_source,
+    }
+
+    upgrade_package_info = None
+
+    # prepare data for upgrade_package if it is specified.
+    if test_type == "upgrade":
+        upgrade_package_source = to_version
+        upgrade_package_source_type = _get_source_type(upgrade_package_source)
+
+        if upgrade_package_source_type == "file":
+            # create install package file deployment object.
+            file_upload_steps.append(
+                _create_file_deployment_step(to_version, "upgrade_package")
+            )
+
+        upgrade_package_info = {
+            "type": upgrade_package_source_type,
+            "source": upgrade_package_source,
+        }
+
+    distro_details = EC2_DISTRO_DETAILS_MAP[distro]
 
     if distro.lower().startswith("windows"):
         package_type = "windows"
@@ -235,7 +302,7 @@ def main(
         package_type = "deb" if distro.startswith("ubuntu") else "rpm"
         script_extension = "sh"
 
-    script_filename = script_filename % (package_type, script_extension)
+    script_filename = "test_%s.%s.j2" % (package_type, script_extension)
 
     script_file_path = os.path.join(SCRIPTS_DIR, script_filename)
 
@@ -246,8 +313,9 @@ def main(
         script_template=script_content,
         distro_details=distro_details,
         python_package=python_package,
-        from_version=from_version,
-        to_version=to_version,
+        test_type=test_type,
+        install_package=install_package_info,
+        upgrade_package=upgrade_package_info,
         installer_script_url=installer_script_url,
         verbose=verbose,
     )
@@ -271,29 +339,10 @@ def main(
         rendered_template, name=remote_script_name, timeout=120
     )
 
-    steps = []
-
-    if os.path.exists(to_version) and os.path.isfile(to_version):
-        file_name = os.path.basename(to_version)
-        extension = os.path.splitext(file_name)[1]
-
-        target_path = "./to_package{0}".format(extension)
-
-        to_package_put_file_step = FileDeployment(to_version, target_path)
-        steps.append(to_package_put_file_step)
-
-    if os.path.exists(from_version) and os.path.isfile(from_version):
-        file_name = os.path.basename(from_version)
-        extension = os.path.splitext(file_name)[1]
-
-        target_path = "./from_package{0}".format(extension)
-
-        from_package_put_file_step = FileDeployment(from_version, target_path)
-        steps.append(from_package_put_file_step)
-
-    if steps:
-        steps.append(test_package_step)  # type: ignore
-        deployment = MultiStepDeployment(add=steps)  # type: ignore
+    if file_upload_steps:
+        # Package files must be uploaded to the instance directly.
+        file_upload_steps.append(test_package_step)  # type: ignore
+        deployment = MultiStepDeployment(add=file_upload_steps)  # type: ignore
     else:
         deployment = test_package_step  # type: ignore
 
@@ -353,19 +402,23 @@ def render_script_template(
     script_template,
     distro_details,
     python_package,
-    from_version=None,
-    to_version=None,
+    test_type,
+    install_package=None,
+    upgrade_package=None,
     installer_script_url=None,
     verbose=False,
 ):
-    # type: (str, dict, str, Optional[str], Optional[str], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
-    from_version = from_version or ""
-    to_version = to_version or ""
+    # from_version = from_version or ""
+    # to_version = to_version or ""
 
     template_context = distro_details.copy()
+
+    template_context["test_type"] = test_type
+
     template_context["installer_script_url"] = (
         installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
     )
@@ -373,19 +426,9 @@ def render_script_template(
     template_context["python_package"] = (
         python_package or distro_details["default_python_package_name"]
     )
-    template_context["package_from_version"] = from_version
-    template_context["package_to_version"] = to_version
 
-    def get_source_type(version_string):
-        if "http://" in version_string or "https://" in version_string:
-            return "url"
-        elif os.path.exists(version_string) and os.path.isfile(version_string):
-            return "file"
-        else:
-            return "install_script"
-
-    template_context["package_to_version_source_type"] = get_source_type(to_version)
-    template_context["package_from_version_source_type"] = get_source_type(from_version)
+    template_context["install_package"] = install_package
+    template_context["upgrade_package"] = upgrade_package
 
     template_context["verbose"] = verbose
 
@@ -532,6 +575,19 @@ if __name__ == "__main__":
 
     if args.type == "install" and not args.to_version:
         raise ValueError("--to-version needs to be provided for install test")
+
+    if args.type == "upgrade" and (not args.from_version or not args.to_version):
+        raise ValueError(
+            "--from-version and to --to-version needs to be provided for upgrade test"
+        )
+
+    if args.type == "upgrade" and (
+        args.from_version == "current" and args.to_version == "current"
+    ):
+        raise ValueError(
+            "--from-version and --to-version options "
+            'can not have the same "current" value.'
+        )
 
     main(
         distro=args.distro,

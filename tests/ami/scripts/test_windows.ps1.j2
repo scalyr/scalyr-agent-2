@@ -51,11 +51,11 @@ try {
 }
 
 
-$msi_version=GetMSIVersion -MSI .\to_package.msi
+$msi_version=GetMSIVersion -MSI .\install_package.msi
 echo $msi_version
 
 # install scalyr agent and wait until it is done.
-Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i to_package.msi /quiet /qn" -wait
+Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
 # replace api_key and serverHost
 (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `

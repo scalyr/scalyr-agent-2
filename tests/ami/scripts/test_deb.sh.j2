@@ -25,26 +25,32 @@ sleep 10
 uname -a
 cat /etc/*-release
 
-sudo yum install -y wget
-sudo yum install -y "{{python_package}}"
+sudo apt-get update -y
+sudo apt-get install -y "{{python_package}}"
 
-# Install latest version
-{% if package_from_version_source_type in ("file", "url") -%}
-    {% if package_from_version_source_type == "url" -%}
-    wget -O from_package.rpm "{{ package_from_version }}"
+# Install Sclayr agent.
+{% if install_package["type"] in ("file", "url") -%}
+    {% if install_package["type"] == "url" -%}
+    # Download package.
+    wget -O install_package.deb "{{ install_package["source"] }}"
     {% endif -%}
 
-sudo rpm -iv from_package.rpm
+# install Scalyr agent from package file.
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i install_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
-export PACKAGE_TO_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "from_package.rpm" | sed "s/_.*//g")
+export INSTALL_PACKAGE_VERSION=$(dpkg-deb -f "install_package.deb" Version)
 {% else -%}
+# install Scalyr agent by downloading convenience script.
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
-    {% if package_from_version == "current" -%}
-export PACKAGE_FROM_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{print $3}')
+    {% if install_package["source"] == "current" -%}
+    {# in case of the 'current' version we just keep version which is installed by convenience script. #}
+# Get version of the current package
+export INSTALL_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
     {% else -%}
-sudo yum downgrade -y "scalyr-agent-2-{{package_from_version}}"
-export PACKAGE_TO_VERSION="{{package_to_version}}"
+# Install older package.
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{install_package["source"]}}" --allow-downgrades
+export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
@@ -56,7 +62,7 @@ sleep 5
 sudo scalyr-agent-2 status -v
 echo ""
 
-sudo scalyr-agent-2 status -v | grep "${PACKAGE_FROM_VERSION}"
+sudo scalyr-agent-2 status -v | grep "${INSTALL_PACKAGE_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
@@ -64,26 +70,29 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 # Verify rc*.d symlinks are in place
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
-
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
+
+{% if test_type == "upgrade" -%}
+
 # Upgrade to new version
-{% if package_to_version_source_type in ("file", "url") -%}
-    {% if package_to_version_source_type == "url" -%}
-    wget -O to_package.rpm "{{ package_to_version }}"
+{% if upgrade_package["type"] in ("file", "url") -%}
+    {% if upgrade_package["type"] == "url" -%}
+    wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% endif -%}
 
-
-echo "1"
-sudo rpm -Uv to_package.rpm
-echo "2"
+echo "Upgrade Scalyr agent from file."
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i to_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
-echo "3"
-export PACKAGE_TO_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "to_package.rpm" | sed "s/_.*//g")
-echo "4"
+export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "to_package.deb" Version)
 {% else -%}
-sudo yum install -y "scalyr-agent-2-{{package_to_version}}"
-export PACKAGE_TO_VERSION="{{package_to_version}}"
+    {% if upgrade_package["source"] == "current" -%}
+sudo DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y scalyr-agent-2
+export UPGRADE_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
+    {% else -%}
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{upgrade_package["source"]}}"
+export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
+    {% endif -%}
 {% endif -%}
 
 sudo /etc/init.d/scalyr-agent-2 restart
@@ -94,7 +103,7 @@ sleep 5
 sudo scalyr-agent-2 status -v
 echo ""
 
-sudo scalyr-agent-2 status -v | grep "${PACKAGE_TO_VERSION}"
+sudo scalyr-agent-2 status -v | grep "${UPGRADE_PACKAGE_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
@@ -103,3 +112,5 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+{% endif -%}
