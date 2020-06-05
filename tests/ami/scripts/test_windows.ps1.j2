@@ -82,6 +82,8 @@ Start-Sleep 5
 
 $status_output=scalyr-agent-2 status -v;
 
+echo $status_output
+
 if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
 Write-Output $status_output
