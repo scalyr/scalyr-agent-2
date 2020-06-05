@@ -1072,6 +1072,12 @@ jobs:
       - image: circleci/python:3.6-jessie
     steps:
       - checkout
+      - run:
+          name: Copy over sonar config
+          command: |
+            # NOTE: This is needed because sonar orb doesn't support specifying
+            # a path to a custom config file
+            sudo ~/scalyr-agent-2/.sonarcloud.properties /tmp/cache/scanner/sonar-scanner-4.1.0.1829-linux/conf/sonar-scanner.properties
       # TODO: Download and combine all the coverage data so we can use it with
       # sonar cloud.
       - sonarcloud/scan
