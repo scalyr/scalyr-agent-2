@@ -50,7 +50,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: scalyr/scalyr-k8s-agent:2.1.5
+        image: scalyr/scalyr-k8s-agent:2.1.6
         imagePullPolicy: Always
         name: scalyr-agent
         resources:
