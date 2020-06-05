@@ -94,7 +94,7 @@ sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "upgrade_package.rpm" | sed "s/_.*//g")
 {% else -%}
      {% if upgrade_package["source"] == "current" -%}
-     {# Upgrade agent to the latest verson in repo. #}
+     {# Upgrade agent to the latest version in repo. #}
 sudo yum upgrade -y scalyr-agent-2
 export UPGRADE_PACKAGE_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{print $3}')
       {% else -%}

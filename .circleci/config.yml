@@ -1455,6 +1455,9 @@ jobs:
             ls
             pushd artifacts
 
+            # update agent version.
+            echo "$(cat VERSION).1" > VERSION
+
             python ../build_package.py deb
             python ../build_package.py rpm
 
@@ -1470,6 +1473,9 @@ jobs:
           paths:
             - scalyr-agent-2.deb
             - scalyr-agent-2.rpm
+
+      - store_artifacts:
+          path: package
 
 
 
@@ -1496,6 +1502,7 @@ jobs:
             export PYTHONPATH="."
             mkdir -p outputs
 
+            # run AMI package sanity tests concurrently.
             ./scripts/circleci/wait-for-running-bg-jobs.sh
 
 

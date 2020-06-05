@@ -91,9 +91,9 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% endif -%}
 
 echo "Upgrade Scalyr agent from file."
-sudo DEBIAN_FRONTEND=noninteractive dpkg -i to_package.deb
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i upgrade_package
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
-export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "to_package.deb" Version)
+export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "upgrade_package.deb" Version)
 {% else -%}
     {% if upgrade_package["source"] == "current" -%}
     {# Upgrade agent to the latest verson in repo. #}
