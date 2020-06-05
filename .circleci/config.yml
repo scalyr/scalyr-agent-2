@@ -1442,7 +1442,10 @@ jobs:
             sudo apt-key update
             sudo apt update
             sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
-            sudo gem install --no-document fpm
+
+            # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
+            # as a temporaty solution explicitly specify ffi version.
+            sudo gem install --no-document ffi:1.12.2 fpm
 
       - run:
           command: |
@@ -1493,27 +1496,9 @@ jobs:
             export PYTHONPATH="."
             mkdir -p outputs
 
-            # run sanity test for each image concurrently in backgroung.
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log & \
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log & \
-            python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log & \
-            python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804.log & \
-            python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604.log & \
-            python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404.log & \
-            python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
+            ./scripts/circleci/wait-for-running-bg-jobs.sh
 
-            # Wait for every job.
-            for job in `jobs -p`
-            do
-                wait $job || let "FAIL+=1"
-            done
 
-            # Exit with error if some of the jobs failed.
-            if [ "$FAIL" -ne "0" ];
-            then
-                echo "FAIL"
-                exit 1
-            fi
       - run:
           name: ubuntu1804 result.
           when: always
