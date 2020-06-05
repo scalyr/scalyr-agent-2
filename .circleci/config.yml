@@ -506,6 +506,7 @@ commands:
 
       - run:
           name: Install Dependencies
+          shell: bash
           command: |
             pip install "tox==<< pipeline.parameters.default_tox_version >>"
 
@@ -666,6 +667,7 @@ jobs:
       - checkout
       - run:
           name: install pyenv
+          shell: bash
           command: |
             brew install pyenv
       - restore_cache:
