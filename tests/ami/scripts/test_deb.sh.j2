@@ -30,9 +30,12 @@ sudo apt-get install -y "{{python_package}}"
 
 # Install Sclayr agent.
 {% if install_package["type"] in ("file", "url") -%}
+{# type of the package is 'file' or 'url', that means that file
+should be uploaded by script or already uploaded by Libloud. #}
     {% if install_package["type"] == "url" -%}
-    # Download package.
     wget -O install_package.deb "{{ install_package["source"] }}"
+    {% elif upgrade_package["type"] == "file" -%}
+    {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
 # install Scalyr agent from package file.
@@ -44,10 +47,11 @@ export INSTALL_PACKAGE_VERSION=$(dpkg-deb -f "install_package.deb" Version)
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
     {% if install_package["source"] == "current" -%}
-    {# in case of the 'current' version we just keep version which is installed by convenience script. #}
+    {# Install the latest agent version in repo. #}
 # Get version of the current package
 export INSTALL_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
     {% else -%}
+    {# Install particular agent version from repo. #}
 # Install older package.
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{install_package["source"]}}" --allow-downgrades
 export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
@@ -76,9 +80,14 @@ ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 {% if test_type == "upgrade" -%}
 
 # Upgrade to new version
+
 {% if upgrade_package["type"] in ("file", "url") -%}
+{# type of the package is 'file' or 'url', that means that file
+should be uploaded by script or already uploaded by Libloud. #}
     {% if upgrade_package["type"] == "url" -%}
-    wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
+wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
+    {% elif upgrade_package["type"] == "file" -%}
+    {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
 echo "Upgrade Scalyr agent from file."
@@ -87,9 +96,11 @@ sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "to_package.deb" Version)
 {% else -%}
     {% if upgrade_package["source"] == "current" -%}
+    {# Upgrade agent to the latest verson in repo. #}
 sudo DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y scalyr-agent-2
 export UPGRADE_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installed | awk '{print $2}')
     {% else -%}
+    {# Upgrade agent to the particular version #}
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
     {% endif -%}
