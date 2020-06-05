@@ -25,14 +25,15 @@ python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --f
 python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
 
 # Wait for every job.
+FAIL=0
 for job in `jobs -p`
 do
-    wait $job || let "FAIL+=1"
+    wait $job || let "FAIL=FAIL+1"
 done
 
 # Exit with error if some of the jobs failed.
-if [ "$FAIL" -ne "0" ];
+if [ "${FAIL}" -ne 0 ];
 then
-    echo "FAIL"
+    echo "One of the end to end tests failed. Please check the log output."
     exit 1
 fi
