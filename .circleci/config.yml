@@ -1507,7 +1507,13 @@ jobs:
             export SECRET_KEY=${AWS_SECRET_KEY}
             export KEY_NAME=circleci
             export PRIVATE_KEY_PATH="~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+
+            # NOTE: We need to upgrade pip otherwise installation from git fails
+            python -m pip install --user --upgrade pip
+
+            # Install dependencies
             python -m pip install --user -r tests/ami/requirements.txt
+
             export PYTHONPATH="."
             mkdir -p outputs
 
