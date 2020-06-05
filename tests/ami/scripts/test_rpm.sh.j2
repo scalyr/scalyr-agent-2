@@ -89,7 +89,7 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-sudo rpm -Uv upgrade_package.rpm
+sudo rpm -FUv upgrade_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "upgrade_package.rpm" | sed "s/_.*//g")
 {% else -%}

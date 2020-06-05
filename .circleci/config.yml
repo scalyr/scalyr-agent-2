@@ -1464,9 +1464,8 @@ jobs:
             ls
             pushd artifacts
 
-            # update agent version.
+            # update agent version to avoid version conflict with current scalyr repository package.
             #echo "$(cat VERSION).1" > VERSION
-            echo 2.1.7 > VERSION
 
             python ../build_package.py deb
             python ../build_package.py rpm
