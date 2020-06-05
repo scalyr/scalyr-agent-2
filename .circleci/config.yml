@@ -1556,7 +1556,11 @@ jobs:
           command: |
             cat outputs/WindowsServer2019.log
 
+      - store_artifacts:
+          path: outputs
+
 workflows:
+  version: 2
   package-tests:
     jobs:
       - build-linux-packages:
