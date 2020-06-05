@@ -728,7 +728,7 @@ jobs:
 
       fail_only:
         type: boolean
-        default: false
+        default: true
         description: >
           If `true`, notifications of successful jobs will not be sent.
 
@@ -740,7 +740,7 @@ jobs:
 
       only_for_branches:
         type: string
-        default: ""
+        default: "master"
         description: >
           If set, a comma-separated list of branches for which to send
           notifications. No spaces.
@@ -768,8 +768,6 @@ jobs:
         default: ""
         description: >
           ID of channel if set, overrides webhook's default channel setting
-
-
     working_directory: ~/scalyr-agent-2
     executor:
       name: win/default
