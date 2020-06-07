@@ -1516,7 +1516,6 @@ jobs:
             # run AMI package sanity tests concurrently.
             ./scripts/circleci/wait-for-running-bg-jobs.sh
 
-
       - run:
           name: ubuntu1804 result.
           when: always
