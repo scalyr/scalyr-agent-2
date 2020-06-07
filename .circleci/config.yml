@@ -1405,6 +1405,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
+          name: Restore Pyinstaller Cache
           key: windows_python_installer-python-3.7.7-{{ .Branch }}
 
       - run:
@@ -1418,16 +1419,27 @@ jobs:
             .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
 
       - save_cache:
-          key: windows_python_installer-{{ .Branch }}
+          name: Save Pyinstaller Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}
           paths:
             - "python_installer"
 
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+
       - run:
-          name: build MSI package.
+          name: Build MSI package
           command: |
              .\win32\build.ps1 c:\Python37
               mkdir package
               mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+      - save_cache:
+          name: Save Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          paths:
+            - C:\Users\circleci\AppData\Local\pip\Cache
 
       - persist_to_workspace:
           root: package
@@ -1447,6 +1459,7 @@ jobs:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
       - run:
+          name: Install System Dependencies
           command: |
             sudo apt-key update
             sudo apt update
@@ -1457,6 +1470,7 @@ jobs:
             sudo gem install --no-document ffi:1.12.2 fpm
 
       - run:
+          name: Build deb and rpm packages
           command: |
             mkdir artifacts
             mkdir package
@@ -1475,8 +1489,6 @@ jobs:
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
-
-
       - persist_to_workspace:
           root: package
           paths:
@@ -1485,8 +1497,6 @@ jobs:
 
       - store_artifacts:
           path: package
-
-
 
   ami-tests:
     description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
@@ -1500,69 +1510,33 @@ jobs:
       - checkout
       - attach_workspace:
           at: /tmp/workspace
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
       - run:
-          name: run package tests in EC2 instances.
+          name: Install Python Dependencies
           command: |
-            export ACCESS_KEY=${AWS_ACCESS_KEY}
-            export SECRET_KEY=${AWS_SECRET_KEY}
-            export KEY_NAME=circleci
-            export PRIVATE_KEY_PATH="~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
-
             # NOTE: We need to upgrade pip otherwise installation from git fails
             python -m pip install --user --upgrade pip
 
             # Install dependencies
             python -m pip install --user -r tests/ami/requirements.txt
-
-            export PYTHONPATH="."
-            mkdir -p outputs
-
-            # run AMI package sanity tests concurrently.
-            ./scripts/circleci/wait-for-running-bg-jobs.sh
-
-
+      - save_cache:
+          name: "Save Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
       - run:
-          name: ubuntu1804 result.
-          when: always
+          name: Run package tests on EC2 instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
           command: |
-            cat outputs/ubuntu1804.log
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
 
-      - run:
-          name: ubuntu1604 result.
-          when: always
-          command: |
-            cat outputs/ubuntu1604.log
-
-      - run:
-          name: ubuntu1404 result.
-          when: always
-          command: |
-            cat outputs/ubuntu1404.log
-
-      - run:
-          name: centos7 result.
-          when: always
-          command: |
-            cat outputs/centos7.log
-
-      - run:
-          name: WindowsServer2012 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2012.log
-
-      - run:
-          name: WindowsServer2016 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2016.log
-
-      - run:
-          name: WindowsServer2019 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2019.log
-
+            ./scripts/circleci/run-ami-tests-in-bg.sh
       - store_artifacts:
           path: outputs
 
