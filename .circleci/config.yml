@@ -1405,6 +1405,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
+          name: Restore Pyinstaller Cache
           key: windows_python_installer-python-3.7.7-{{ .Branch }}
 
       - run:
@@ -1418,16 +1419,27 @@ jobs:
             .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
 
       - save_cache:
+          name: Save Pyinstaller Cache
           key: windows_python_installer-python-3.7.7-{{ .Branch }}
           paths:
             - "python_installer"
 
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+
       - run:
-          name: build MSI package.
+          name: Build MSI package
           command: |
              .\win32\build.ps1 c:\Python37
               mkdir package
               mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+      - save_cache:
+          name: Save Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          paths:
+            - C:\Users\circleci\AppData\Local\pip\Cache
 
       - persist_to_workspace:
           root: package
@@ -1521,6 +1533,9 @@ jobs:
             PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
             PYTHONPATH: "."
           command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
             echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
             ./scripts/circleci/run-ami-tests-in-bg.sh
       - store_artifacts:
