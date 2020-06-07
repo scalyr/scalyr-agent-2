@@ -1418,7 +1418,7 @@ jobs:
             .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
 
       - save_cache:
-          key: windows_python_installer-{{ .Branch }}
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}
           paths:
             - "python_installer"
 
