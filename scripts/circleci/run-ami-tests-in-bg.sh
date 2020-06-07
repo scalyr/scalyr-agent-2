@@ -30,13 +30,15 @@ python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --f
 python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404.log &
 python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
 
-# Store command line args and log paths for all the jobs for a friendlier output
+# Store command line args and log paths for all the jobs for a friendlier output on failure
 JOBS_COMMAND_LINE_ARGS=()
 JOBS_LOG_FILE_PATHS=()
+
 for job_pid in $(jobs -p)
 do
     JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n")
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
+
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
     JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}.log"
 done
@@ -58,12 +60,13 @@ do
     fi
 done
 
-echo "AMI sanity tests jobs have completed."
+echo "All the AMI sanity tests jobs have completed."
 
 # Exit with error if some of the jobs failed.
 if [ "${FAIL_COUNTER}" -ne 0 ];
 then
-    echo "One of the end to end tests failed. Please check the output logs."
+    echo "One of the AMI tests failed. Please check the output logs above."
+    echo "NOTE: Output for all the jobs are also available as job build artifacts."
     exit 1
 else
     echo "All the AMI tests have completed successfuly."

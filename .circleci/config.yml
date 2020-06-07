@@ -1447,6 +1447,7 @@ jobs:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
       - run:
+          name: Install System Dependencies
           command: |
             sudo apt-key update
             sudo apt update
@@ -1457,6 +1458,7 @@ jobs:
             sudo gem install --no-document ffi:1.12.2 fpm
 
       - run:
+          name: Build deb and rpm packages
           command: |
             mkdir artifacts
             mkdir package
