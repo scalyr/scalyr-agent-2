@@ -1475,8 +1475,6 @@ jobs:
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
-
-
       - persist_to_workspace:
           root: package
           paths:
@@ -1485,8 +1483,6 @@ jobs:
 
       - store_artifacts:
           path: package
-
-
 
   ami-tests:
     description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
