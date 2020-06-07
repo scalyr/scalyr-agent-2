@@ -36,7 +36,7 @@ JOBS_LOG_FILE_PATHS=()
 
 for job_pid in $(jobs -p)
 do
-    JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n")
+    JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n" | awk '{for(i=9;i<=NF;++i)printf $i""FS}')
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
 
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
@@ -58,12 +58,12 @@ do
     echo ""
 
     if wait "${job_pid}"; then
-        echo "Job \"${JOB_COMMAND_LINE_ARGS}\" finished successfuly."
+        echo "Job finished successfuly: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 
-        echo "Job \"${JOB_COMMAND_LINE_ARGS}\" failed."
-        echo "Showing output of ${JOB_LOG_FILE_PATH}:"
+        echo "Job failed: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Showing output from ${JOB_LOG_FILE_PATH}:"
         echo "--------------------------------------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
         echo "--------------------------------------------------------------------------------------"
@@ -71,10 +71,11 @@ do
 
     echo ""
     echo "============================================================================================"
-    echo ""
 done
 
+echo ""
 echo "All the AMI sanity tests jobs have completed."
+echo ""
 
 # Exit with error if some of the jobs failed.
 if [ "${FAIL_COUNTER}" -ne 0 ];
