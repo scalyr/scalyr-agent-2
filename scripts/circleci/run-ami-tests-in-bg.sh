@@ -45,6 +45,8 @@ done
 
 echo ""
 
+FAIL_COUNTER=0
+
 # Wait for all the jobs to finish
 for job_pid in $(jobs -p)
 do
