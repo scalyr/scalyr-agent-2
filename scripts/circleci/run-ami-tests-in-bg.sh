@@ -27,23 +27,29 @@ python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --f
 python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404.log &
 python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
 
-# Store command line args for all the jobs for a friendlier output on failure
+# Store command line args and log paths for all the jobs for a friendlier output
 JOBS_COMMAND_LINE_ARGS=()
+JOBS_LOG_FILE_PATHS=()
 for job_pid in $(jobs -p)
 do
     JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n")
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
+    DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
+    JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}.log"
 done
 
 # Wait for all the jobs to finish
 for job_pid in $(jobs -p)
 do
     JOB_COMMAND_LINE_ARGS=${JOBS_COMMAND_LINE_ARGS[${job_pid}]}
+    JOB_LOG_FILE_PATH=${JOBS_LOG_FILE_PATHS[${job_pid}]}
+
     if wait "${job_pid}"; then
         echo "Job \"${JOB_COMMAND_LINE_ARGS}\" finished successfuly."
     else
-        echo "Job \"${JOB_COMMAND_LINE_ARGS}\" failed."
         ((FAIL_COUNTER=FAIL_COUNTER+1))
+        echo "Job \"${JOB_COMMAND_LINE_ARGS}\" failed."
+        cat "${JOB_LOG_FILE_PATH}" || true
     fi
 done
 

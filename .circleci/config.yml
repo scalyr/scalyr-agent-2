@@ -1514,7 +1514,7 @@ jobs:
             mkdir -p outputs
 
             # run AMI package sanity tests concurrently.
-            ./scripts/circleci/wait-for-running-bg-jobs.sh
+            ./scripts/circleci/run-ami-tests-in-bg.sh
 
       - run:
           name: ubuntu1804 result.
