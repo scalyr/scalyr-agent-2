@@ -18,6 +18,9 @@
 
 echo "Runing AMI sanity tests in the background..."
 
+# Create directory which output log files will be saved
+mkdir -p outputs
+
 # run sanity test for each image concurrently in backgroung.
 python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log &
 python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log &
@@ -49,7 +52,9 @@ do
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
         echo "Job \"${JOB_COMMAND_LINE_ARGS}\" failed."
+        echo "-----------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
+        echo "-----------------------------------------------------------"
     fi
 done
 

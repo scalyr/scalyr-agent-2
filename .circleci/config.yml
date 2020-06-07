@@ -1496,68 +1496,31 @@ jobs:
       - checkout
       - attach_workspace:
           at: /tmp/workspace
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
       - run:
-          name: run package tests in EC2 instances.
+          name: Install Python Dependencies
           command: |
-            export ACCESS_KEY=${AWS_ACCESS_KEY}
-            export SECRET_KEY=${AWS_SECRET_KEY}
-            export KEY_NAME=circleci
-            export PRIVATE_KEY_PATH="~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
-
             # NOTE: We need to upgrade pip otherwise installation from git fails
             python -m pip install --user --upgrade pip
 
             # Install dependencies
             python -m pip install --user -r tests/ami/requirements.txt
-
-            export PYTHONPATH="."
-            mkdir -p outputs
-
-            # run AMI package sanity tests concurrently.
+      - save_cache:
+          name: "Save Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      - run:
+          name: Run package tests on EC2 instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
             ./scripts/circleci/run-ami-tests-in-bg.sh
-
-      - run:
-          name: ubuntu1804 result.
-          when: always
-          command: |
-            cat outputs/ubuntu1804.log
-
-      - run:
-          name: ubuntu1604 result.
-          when: always
-          command: |
-            cat outputs/ubuntu1604.log
-
-      - run:
-          name: ubuntu1404 result.
-          when: always
-          command: |
-            cat outputs/ubuntu1404.log
-
-      - run:
-          name: centos7 result.
-          when: always
-          command: |
-            cat outputs/centos7.log
-
-      - run:
-          name: WindowsServer2012 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2012.log
-
-      - run:
-          name: WindowsServer2016 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2016.log
-
-      - run:
-          name: WindowsServer2019 result.
-          when: always
-          command: |
-            cat outputs/WindowsServer2019.log
-
       - store_artifacts:
           path: outputs
 
