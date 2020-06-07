@@ -16,7 +16,7 @@
 # Script which runs AMI based install and upgrade tests for various distros in
 # parallel.
 
-echo "Runing AMI sanity tests in the background..."
+echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
 
 # Create directory which output log files will be saved
 mkdir -p outputs
@@ -43,21 +43,33 @@ do
     JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}.log"
 done
 
+echo ""
+
 # Wait for all the jobs to finish
 for job_pid in $(jobs -p)
 do
     JOB_COMMAND_LINE_ARGS=${JOBS_COMMAND_LINE_ARGS[${job_pid}]}
     JOB_LOG_FILE_PATH=${JOBS_LOG_FILE_PATHS[${job_pid}]}
 
+    echo ""
+    echo "============================================================================================"
+    echo ""
+
     if wait "${job_pid}"; then
         echo "Job \"${JOB_COMMAND_LINE_ARGS}\" finished successfuly."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
+
         echo "Job \"${JOB_COMMAND_LINE_ARGS}\" failed."
-        echo "-----------------------------------------------------------"
+        echo "Showing output of ${JOB_LOG_FILE_PATH}:"
+        echo "--------------------------------------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
-        echo "-----------------------------------------------------------"
+        echo "--------------------------------------------------------------------------------------"
     fi
+
+    echo ""
+    echo "============================================================================================"
+    echo ""
 done
 
 echo "All the AMI sanity tests jobs have completed."

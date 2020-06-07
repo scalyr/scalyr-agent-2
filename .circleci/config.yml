@@ -1536,7 +1536,6 @@ jobs:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
 
-            echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
             ./scripts/circleci/run-ami-tests-in-bg.sh
       - store_artifacts:
           path: outputs
