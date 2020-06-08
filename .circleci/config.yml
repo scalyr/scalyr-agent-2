@@ -1406,7 +1406,7 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
 
       - run:
           name: Install python.
@@ -1420,7 +1420,7 @@ jobs:
 
       - save_cache:
           name: Save Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
           paths:
             - "python_installer"
 
