@@ -97,6 +97,9 @@ from libcloud.compute.deployment import (
     MultiStepDeployment,
 )
 import libcloud.compute.base
+
+from scalyr_agent import compat
+
 from tests.ami.utils import get_env_throw_if_not_set
 
 
@@ -353,10 +356,18 @@ def main(
     image = NodeImage(
         distro_details["image_id"], distro_details["image_name"], driver, None
     )
-    name = "%s-automated-agent-tests-%s-%s" % (
+
+    circle_branch_name = compat.os_environ_unicode.get("CIRCLE_BRANCH", "unknown")
+    circle_branch_name = circle_branch_name.replace("/", "_").replace("-", "_")
+    circle_build_num = compat.os_environ_unicode.get(
+        "CIRCLE_BUILD_NUM", random.randint(0, 1000)
+    )
+
+    name = "%s-automated-agent-tests-%s-branch-%s-build-%s" % (
         distro,
         test_type,
-        random.randint(0, 1000),
+        circle_branch_name,
+        circle_build_num,
     )
 
     print("Starting node provisioning and tests...")
