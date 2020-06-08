@@ -20,6 +20,8 @@ set -x
 
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
+# TODO: A more robust and correct way would be to poll cloud-init status file until it indicates
+# provisioning has finished.
 sleep 20
 
 uname -a
