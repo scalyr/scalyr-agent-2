@@ -94,4 +94,6 @@ if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
 
 # Verify build_info file exists
+echo""
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
+echo ""
