@@ -210,6 +210,9 @@ SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
+# All the instances created by this script will create this string in the name.
+INSTANCE_NAME_STRING = "-automated-agent-tests-"
+
 
 def _get_source_type(version_string):
     # type: (str) -> str
@@ -342,8 +345,7 @@ def main(
     cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
     deployment.add(cat_logs_step)
 
-    cls = get_driver(Provider.EC2)
-    driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
+    driver = get_libcloud_driver()
 
     size = NodeSize(
         distro_details["size_id"], distro_details["size_id"], 0, 0, 0, 0, driver,
@@ -351,7 +353,7 @@ def main(
     image = NodeImage(
         distro_details["image_id"], distro_details["image_name"], driver, None
     )
-    name = "%s-automated-agent-%s-test-%s" % (
+    name = "%s-automated-agent-tests-%s-%s" % (
         distro,
         test_type,
         random.randint(0, 1000),
@@ -461,6 +463,10 @@ def destroy_node_and_cleanup(driver, node):
     """
     volumes = driver.list_volumes(node=node)
 
+    assert (
+        INSTANCE_NAME_STRING in node.name
+    ), "Refusing to delete node without %s in the name" % (INSTANCE_NAME_STRING)
+
     print("")
     print(('Destroying node "%s"...' % (node.name)))
     node.destroy()
@@ -523,6 +529,15 @@ def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=
         )
 
     return True
+
+
+def get_libcloud_driver():
+    """
+    Return Libcloud driver instance.
+    """
+    cls = get_driver(Provider.EC2)
+    driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
+    return driver
 
 
 if __name__ == "__main__":
