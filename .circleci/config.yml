@@ -1429,11 +1429,39 @@ jobs:
           key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
 
       - run:
+          name: Bump Version
+          shell: bash
+          command: |
+            # Update agent version to avoid version conflict with current scalyr repository package.
+            # This way we can also correctly assert that the upgrade has worked - if we didn't do
+            # that, from and to version would be the same
+            # NOTE: We can't include git revision as part of the version since it's not a valid
+            # version on Windows.
+            echo "$(cat VERSION).1" > VERSION
+            cat VERSION
+
+      - run:
           name: Build MSI package
           command: |
              .\win32\build.ps1 c:\Python37
+
               mkdir package
+              mkdir artifacts
+
+              cp .\ScalyrAgentInstaller-*.msi artifacts/
               mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+      - run:
+          name: Copy Package With Version in Name
+          shell: bash
+          command: |
+            # NOTE: We preserve two versions of the package as the build artifact. One with the
+            # version in the name and one without.
+            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
+            # if someone wgets a dev package or similar) they immediately know it's a dev version
+            # from the name itself.
+            export PACKAGE_VERSION="$(cat VERSION)"
+            cp package/ScalyrAgentInstaller.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
 
       - save_cache:
           name: Save Python Dependencies Cache
@@ -1446,7 +1474,7 @@ jobs:
           paths: ScalyrAgentInstaller.msi
 
       - store_artifacts:
-          path: package
+          path: artifacts
 
   build-linux-packages:
     description: "Build deb and rpm packages."
@@ -1470,22 +1498,31 @@ jobs:
             sudo gem install --no-document ffi:1.12.2 fpm
 
       - run:
+          name: Bump Agent Version
+          command: |
+            # Update agent version to avoid version conflict with current scalyr repository package.
+            # This way we can also correctly assert that the upgrade has worked - if we didn't do
+            # that, from and to version would be the same
+            echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
+            cat VERSION
+      - run:
           name: Build deb and rpm packages
           command: |
             mkdir artifacts
             mkdir package
 
-            ls
             pushd artifacts
-
-            # update agent version to avoid version conflict with current scalyr repository package.
-            #echo "$(cat VERSION).1" > VERSION
 
             python ../build_package.py deb
             python ../build_package.py rpm
 
             popd
 
+            # NOTE: We preserve two versions of the package as the build artifact. One with the
+            # version in the name and one without.
+            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
+            # if someone wgets a dev package or similar) they immediately know it's a dev version
+            # from the name itself.
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
@@ -1496,7 +1533,7 @@ jobs:
             - scalyr-agent-2.rpm
 
       - store_artifacts:
-          path: package
+          path: artifacts
 
   ami-tests:
     description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
