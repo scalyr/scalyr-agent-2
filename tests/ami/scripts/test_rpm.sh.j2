@@ -34,7 +34,7 @@ sudo yum install -y "{{python_package}}"
 should be uploaded by script or already uploaded by Libloud. #}
     {% if install_package["type"] == "url" -%}
     wget -O install_package.deb "{{ install_package["source"] }}"
-    {% elif upgrade_package["type"] == "file" -%}
+    {% elif install_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
