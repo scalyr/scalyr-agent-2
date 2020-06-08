@@ -494,8 +494,9 @@ def destroy_node_and_cleanup(driver, node):
         if volume.extra.get("instance_id", None) != node.id:
             continue
 
-        if volume.size != 8:
+        if volume.size not in [8, 30]:
             # All the volumes we use are 8 GB EBS volumes
+            # Special case is Windows 2019 with 30 GB volume
             continue
 
         destroy_volume_with_retry(driver=driver, volume=volume)
