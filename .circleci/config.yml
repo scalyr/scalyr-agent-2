@@ -1564,6 +1564,19 @@ jobs:
           paths:
             - "~/.cache/pip"
       - run:
+          # Step which cleans up any old nodes which might have been left running because a
+          # previous build was canceled half way through or similar
+          name: Clean Up Old Stray EC2 Instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
+            ./tests/ami/cleanup_old_test_instances.py
+      - run:
           name: Run package tests on EC2 instances
           environment:
             KEY_NAME: "circleci"

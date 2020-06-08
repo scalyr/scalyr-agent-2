@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +29,8 @@ from libcloud.utils.iso8601 import parse_date
 
 from packages_sanity_tests import INSTANCE_NAME_STRING
 from packages_sanity_tests import get_libcloud_driver
-from packages_sanity_tests import destroy_node_and_cleanup
+
+#  from packages_sanity_tests import destroy_node_and_cleanup
 
 # We delete any old automated test nodes which are older than 4 hours
 DELETE_OLD_NODES_TIMEDELTA = datetime.timedelta(hours=4)
@@ -62,8 +64,11 @@ def main():
 
     nodes = []
 
+    # TODO: For now we only print the node names to ensure script doesn't incorrectly delete
+    # wrong nodes. We should uncomment out deletion once we are sure the script is correct.
     for node in nodes_to_delete:
-        destroy_node_and_cleanup(driver=driver, node=node)
+        # destroy_node_and_cleanup(driver=driver, node=node)
+        pass
 
     print("Destroyed %s old nodes" % (len(nodes_to_delete)))
 
