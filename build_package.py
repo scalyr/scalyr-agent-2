@@ -266,6 +266,14 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION")
     shutil.copy(make_path(agent_source_root, "LICENSE.txt"), "LICENSE.txt")
 
+    # Also add in build_info file
+    try:
+        write_to_file(get_build_info(), "build_info")
+    except Exception as e:
+        # NOTE: For now this error is not fatal in case git is not present on the system where
+        # we are building a package
+        print("Failed to retrieve / write build info fail: %s" % (str(e)))
+
     # Copy the third party licenses
     shutil.copytree(
         make_path(agent_source_root, "scalyr_agent/third_party/licenses"), "licenses"
