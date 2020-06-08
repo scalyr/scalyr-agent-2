@@ -18,6 +18,9 @@
 # Errors shouldn't be considered as fatal
 set +e
 
+echo "--------------------------------------------------------------------"
+echo ""
 echo "Catting agent.log file"
+echo ""
 
 cat /var/log/scalyr-agent-2/agent.log

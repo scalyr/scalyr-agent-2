@@ -326,6 +326,22 @@ def main(
         verbose=verbose,
     )
 
+    remote_script_name = "deploy.{0}".format(script_extension)
+    test_package_step = ScriptDeployment(
+        rendered_template, name=remote_script_name, timeout=120
+    )
+
+    if file_upload_steps:
+        # Package files must be uploaded to the instance directly.
+        file_upload_steps.append(test_package_step)  # type: ignore
+        deployment = MultiStepDeployment(add=file_upload_steps)  # type: ignore
+    else:
+        deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
+
+    # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
+    deployment.add(cat_logs_step)
+
     cls = get_driver(Provider.EC2)
     driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
 
@@ -340,22 +356,8 @@ def main(
         test_type,
         random.randint(0, 1000),
     )
-    remote_script_name = "deploy.{0}".format(script_extension)
-    test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=120
-    )
 
-    if file_upload_steps:
-        # Package files must be uploaded to the instance directly.
-        file_upload_steps.append(test_package_step)  # type: ignore
-        deployment = MultiStepDeployment(add=file_upload_steps)  # type: ignore
-    else:
-        deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
-
-    # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
     print("Starting node provisioning and tests...")
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
-    deployment.add(cat_logs_step)
 
     start_time = int(time.time())
 

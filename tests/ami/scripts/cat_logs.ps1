@@ -15,6 +15,9 @@
 
 # Script which cats agent log file and runs if sanity tests have failed.
 
+echo "--------------------------------------------------------------------"
+echo ""
 echo "Catting agent.log file"
+echo ""
 
 type "C:\Program Files (x86)\Scalyr\log\agent.log"
