@@ -20,4 +20,4 @@ set +e
 
 echo "Catting agent.log file"
 
-cat /var/log/scalyr/agent.log
+cat /var/log/scalyr-agent-2/agent.log

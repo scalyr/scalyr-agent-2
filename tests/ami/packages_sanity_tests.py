@@ -353,7 +353,6 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-
     print("Starting node provisioning and tests...")
     cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
     deployment.add(cat_logs_step)

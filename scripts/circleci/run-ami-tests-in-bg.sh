@@ -73,17 +73,17 @@ do
     echo "============================================================================================"
 done
 
-echo ""
-echo "All the AMI sanity tests jobs have completed."
-echo ""
-
 # Exit with error if some of the jobs failed.
 if [ "${FAIL_COUNTER}" -ne 0 ];
 then
-    echo "One of the AMI tests failed. Please check the output logs above."
+    echo ""
+    echo "${FAIL_COUNTER} of the the AMI tests failed. Please check the output logs above."
     echo "NOTE: Output for all the jobs are also available as job build artifacts."
+    echo ""
     exit 1
 else
+    echo ""
     echo "All the AMI tests have completed successfuly."
+    echo ""
     exit 0
 fi
