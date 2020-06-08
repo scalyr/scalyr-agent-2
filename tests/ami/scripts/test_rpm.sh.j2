@@ -71,6 +71,9 @@ sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
+# Verify build_info file with build metadata is present
+cat /usr/share/scalyr-agent-2/build_info || (echo "build_info file is missing" ; exit 1)
+
 # Verify rc*.d symlinks are in place
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
