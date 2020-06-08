@@ -29,6 +29,11 @@ sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
 # Install Sclayr agent.
+echo ""
+echo "Installing Scalyr agent"
+echo "Using package: {{ install_package["source"] }}"
+echo ""
+
 {% if install_package["type"] in ("file", "url") -%}
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
@@ -58,11 +63,15 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
+echo "Restarting agent"
+echo ""
 sudo /etc/init.d/scalyr-agent-2 restart
 
 sleep 5
 
 # Run some basic sanity checks
+echo "Verifying agent status output"
+echo ""
 sudo scalyr-agent-2 status -v
 echo ""
 
@@ -73,19 +82,25 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify build_info file with build metadata is present
 echo ""
+echo "Verifying build_info file exists"
 cat /usr/share/scalyr-agent-2/build_info || (echo "build_info file is missing" ; exit 1)
 echo ""
 
 # Verify rc*.d symlinks are in place
+echo ""
+echo "Verifying rc.d symlinks exist"
+echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
 
 {% if test_type == "upgrade" -%}
-
 # Upgrade to new version
-
+echo ""
+echo "Upgrading Scalyr agent"
+echo "Using version: {{ upgrade_package["source"] }}"
+echo ""
 {% if upgrade_package["type"] in ("file", "url") -%}
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
@@ -111,11 +126,17 @@ export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
+echo ""
+echo "Restarting agent"
+echo ""
 sudo /etc/init.d/scalyr-agent-2 restart
 
 sleep 5
 
 # Verify status works and symlinks are in place
+echo ""
+echo "Verifying agent status output"
+echo ""
 sudo scalyr-agent-2 status -v
 echo ""
 
@@ -125,8 +146,10 @@ sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify rc*.d symlinks are in place
+echo ""
+echo "Verifying rc.d symlinks exist"
+echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
-
 {% endif -%}
