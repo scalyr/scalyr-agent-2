@@ -303,11 +303,17 @@ def main(
         script_extension = "sh"
 
     script_filename = "test_%s.%s.j2" % (package_type, script_extension)
-
     script_file_path = os.path.join(SCRIPTS_DIR, script_filename)
 
     with open(script_file_path, "r") as fp:
         script_content = fp.read()
+
+    cat_logs_script_file_path = os.path.join(
+        SCRIPTS_DIR, "cat_logs.%s" % (script_extension)
+    )
+
+    with open(cat_logs_script_file_path, "r") as fp:
+        cat_logs_script_content = fp.read()
 
     rendered_template = render_script_template(
         script_template=script_content,
@@ -344,9 +350,13 @@ def main(
         file_upload_steps.append(test_package_step)  # type: ignore
         deployment = MultiStepDeployment(add=file_upload_steps)  # type: ignore
     else:
-        deployment = test_package_step  # type: ignore
+        deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
+
+    # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
 
     print("Starting node provisioning and tests...")
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
+    deployment.add(cat_logs_step)
 
     start_time = int(time.time())
 
@@ -375,6 +385,12 @@ def main(
         success = test_package_step.exit_status == 0
         stdout = test_package_step.stdout
         stderr = test_package_step.stderr
+
+        if cat_logs_step.stdout:
+            stdout += "\n" + cat_logs_step.stdout
+
+        if cat_logs_step.stderr:
+            stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
 
