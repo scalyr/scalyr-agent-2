@@ -819,20 +819,21 @@ jobs:
           path: test-results
       - store_artifacts:
           path: test-results
-      - run:
-          name: Submit Coverage Data to codecov.io
-          command: |
-            ls -la .coverage* || true
+      # NOTE: coverage.py seems to be broken on Circle CI on Windows
+      # - run:
+      #     name: Submit Coverage Data to codecov.io
+      #     command: |
+      #       ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
-            cp .circleci/.coveragerc_ci .coveragerc
+      #       python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+      #       cp .circleci/.coveragerc_ci .coveragerc
 
-            # Print the report
-            coverage.exe report -i
+      #       # Print the report
+      #       coverage.exe report -i
 
-            # Submit it to codecov.io
-            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
-            ./scripts/submit-codecov-data.sh
+      #       # Submit it to codecov.io
+      #       coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+      #       ./scripts/submit-codecov-data.sh
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
