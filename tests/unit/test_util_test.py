@@ -20,6 +20,7 @@ from __future__ import absolute_import
 from io import open
 
 import os
+
 import mock
 import six
 
@@ -127,7 +128,6 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         self._BaseScalyrLogCaptureTestCase__assertion_failed = False
         super(LogCaptureClassTestCase, self).tearDown()
 
-        self.assertFalse(os.path.isdir(self.logs_directory))
         self.assertEqual(len(mock_print.call_args_list), 0)
 
         # Verify path to the files is printed if the assertion fails

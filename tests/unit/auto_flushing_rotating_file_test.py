@@ -30,6 +30,14 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
 
 from six.moves import range
 
+LINE_STR = "abcdefghi"
+
+# Actual line which is written to the file when file is opened in text mode
+LINE_STR_FULL = LINE_STR + os.linesep
+
+# Size of the actual line which is written to a file
+LINE_STR_FULL_SIZE = len(LINE_STR_FULL)
+
 
 class AutoFlushingRotatingFileTestCase(unittest.TestCase):
     def setUp(self):
@@ -43,52 +51,60 @@ class AutoFlushingRotatingFileTestCase(unittest.TestCase):
 
     def dump_bytes(self, amount=100):
         for i in range(0, amount, 1):
-            self._file.write("abcdefghi")
+            self._file.write(LINE_STR)
 
     def test_no_rotation(self):
         self._file = AutoFlushingRotatingFile(self._path)
 
-        self.dump_bytes()
+        self.dump_bytes(100)
 
         file_size = os.path.getsize(self._path)
-        self.assertEqual(1000, file_size)
+        self.assertEqual(LINE_STR_FULL_SIZE * 100, file_size)
 
     def test_no_rotation_but_max_bytes(self):
         self._file = AutoFlushingRotatingFile(self._path, max_bytes=500)
-        self.dump_bytes()
+        self.dump_bytes(100)
         file_size = os.path.getsize(self._path)
-        self.assertEqual(1000, file_size)
+
+        self.assertEqual(LINE_STR_FULL_SIZE * 100, file_size)
 
     def test_append_existing(self):
         self._file = AutoFlushingRotatingFile(self._path)
-        self.dump_bytes()
+        self.dump_bytes(100)
         self._file.close()
 
         self._file = AutoFlushingRotatingFile(self._path)
-        self.dump_bytes()
+        self.dump_bytes(100)
 
         file_size = os.path.getsize(self._path)
-        self.assertEqual(2000, file_size)
+        self.assertEqual(LINE_STR_FULL_SIZE * 200, file_size)
 
     def test_single_rotation(self):
-        self._file = AutoFlushingRotatingFile(self._path, max_bytes=200, backup_count=1)
-        self.dump_bytes()
+        max_bytes = LINE_STR_FULL_SIZE * 10
+        self._file = AutoFlushingRotatingFile(
+            self._path, max_bytes=max_bytes, backup_count=1
+        )
+        self.dump_bytes(100)
         file_size = os.path.getsize(self._path)
-        self.assertEqual(200, file_size)
+
+        self.assertEqual(LINE_STR_FULL_SIZE * 10, file_size)
 
         file_size = os.path.getsize("%s.1" % self._path)
-        self.assertEqual(200, file_size)
+        self.assertEqual(max_bytes, file_size)
 
         self.assertEqual(False, os.path.exists("%s.2" % self._path))
 
     def test_multi_rotation(self):
-        self._file = AutoFlushingRotatingFile(self._path, max_bytes=200, backup_count=3)
-        self.dump_bytes()
+        max_bytes = LINE_STR_FULL_SIZE * 10
+        self._file = AutoFlushingRotatingFile(
+            self._path, max_bytes=max_bytes, backup_count=3
+        )
+        self.dump_bytes(100)
         file_size = os.path.getsize(self._path)
-        self.assertEqual(200, file_size)
+        self.assertEqual(LINE_STR_FULL_SIZE * 10, file_size)
 
         for i in range(1, 4, 1):
             file_size = os.path.getsize("%s.%d" % (self._path, i))
-            self.assertEqual(200, file_size)
+            self.assertEqual(max_bytes, file_size)
 
         self.assertEqual(False, os.path.exists("%s.4" % self._path))

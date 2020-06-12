@@ -198,4 +198,8 @@ def parse_scalyr_request(payload):
     #  and convert it to
     #      "foo":
     rewritten_payload = re.sub(b"([\\w\\-]+):", b'"\\1":', rewritten_payload)
+
+    # NOTE: Special case for Windows where path is C:\ which we don't want to convert
+    rewritten_payload = rewritten_payload.replace(b'"C":\\', b"C:\\")
+
     return scalyr_util.json_decode(rewritten_payload.decode("utf-8"))

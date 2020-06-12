@@ -1,7 +1,4 @@
-# This is only meant for Scalyr's internal development and dev environment.
-# These dependencies are not needed to run the Scalyr Agent, but mainly used for
-# running test suites, and mocking Python Objects for the Scalyr Agent.
-
+# Python requirements file which is used for running unit Tests on Windows
 # Testing tools and libraries
 tox==3.14.3
 mock==3.0.5
@@ -28,6 +25,3 @@ orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1
 pathlib2==2.3.5; python_version <= '2.7'
-# Used for performanice optimized versions of rfc3339_to_* functions
-# NOTE: Not supported on windows
-udatetime==0.0.16

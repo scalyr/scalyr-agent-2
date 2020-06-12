@@ -30,6 +30,7 @@ import os
 from io import open
 from io import StringIO
 import threading
+import platform
 
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
@@ -39,6 +40,8 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
 import mock
+
+from scalyr_agent.test_base import skipIf
 
 
 class SyslogFrameParserTestCase(unittest.TestCase):
@@ -344,6 +347,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         sys.stdout = self.dummy_stream
 
     def tearDown(self):
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
         # close any open sockets
         for s in self.sockets:
             s.close()
@@ -393,6 +400,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_tcp_server(self):
 
         config = {
@@ -446,6 +454,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_udp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -481,6 +490,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_multiple_servers(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
