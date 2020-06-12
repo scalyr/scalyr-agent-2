@@ -18,14 +18,18 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import platform
+
+import mock
 
 from scalyr_agent.builtin_monitors.shell_monitor import ShellMonitor
 from scalyr_agent.test_base import ScalyrTestCase
 
-import mock
+from scalyr_agent.test_base import skipIf
 
 
 class ShellMonitorTest(ScalyrTestCase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample(self):
         monitor_config = {
             "module": "shell_monitor",
@@ -44,6 +48,7 @@ class ShellMonitorTest(ScalyrTestCase):
         self.assertEqual(call_kwargs["extra_fields"]["command"], 'echo "foo bar!"')
         self.assertEqual(call_kwargs["extra_fields"]["length"], 9)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_max_characters_output_trimming(self):
         monitor_config = {
             "module": "shell_monitor",
@@ -62,6 +67,7 @@ class ShellMonitorTest(ScalyrTestCase):
         self.assertEqual(call_kwargs["extra_fields"]["command"], 'echo "foo bar!"')
         self.assertEqual(call_kwargs["extra_fields"]["length"], 9)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_log_all_lines(self):
         monitor_config = {
             "module": "shell_monitor",
@@ -83,6 +89,7 @@ class ShellMonitorTest(ScalyrTestCase):
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 21)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_extract_expression(self):
         monitor_config = {
             "module": "shell_monitor",
@@ -105,6 +112,7 @@ class ShellMonitorTest(ScalyrTestCase):
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 3)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_stdout_and_stderr_is_combined(self):
         monitor_config = {
             "module": "shell_monitor",

@@ -684,7 +684,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(test_manager.log_matchers[0].config["path"], "/tmp/hi.log")
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
         )
 
     def test_from_monitors(self):
@@ -692,7 +692,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
@@ -713,7 +713,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 3)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
@@ -733,17 +733,17 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],
-            "/var/log/scalyr-agent-2/hi_monitor.log",
+            "/var/log/scalyr-agent-2" + os.sep + "hi_monitor.log",
         )
 
         # We also verify the monitor instance itself's log config object was updated to have the full path.
         self.assertEquals(
             self.__monitor_fake_instances[0].log_config["path"],
-            "/var/log/scalyr-agent-2/hi_monitor.log",
+            "/var/log/scalyr-agent-2" + os.sep + "hi_monitor.log",
         )
 
     def test_remove_log_path_with_non_existing_path(self):
@@ -1444,10 +1444,11 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         return self._controller
 
     def __append_log_lines(self, *args):
-        fp = open(self.__test_log_file, "a")
+        # NOTE: We open file in binary mode, otherwise \n gets converted to \r\n on Windows on write
+        fp = open(self.__test_log_file, "ab")
         for l in args:
-            fp.write(l)
-            fp.write("\n")
+            fp.write(l.encode("utf-8"))
+            fp.write(b"\n")
         fp.close()
 
 

@@ -24,6 +24,7 @@ __author__ = "czerwin@scalyr.com"
 import io
 import os
 import json
+import platform
 import tempfile
 
 import mock
@@ -291,14 +292,20 @@ class TestReportStatus(ScalyrTestCase):
         # Environment variables
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
         # intentionally leave out required scalyr_server
-        os.environ["scalyr_K8S_CLUSTER_NAME"] = "test_cluster"
+        os.environ["SCALYR_K8S_CLUSTER_NAME"] = "test_cluster"
         os.environ[
             "K8S_EVENT_DISABLE"
         ] = "Special-case-included despite missing prefix.  Appears at end of main keys."
         os.environ["SCALYR_K8S_EVENT_DISABLE"] = "true"
         os.environ["SCALYR_AAA"] = "Should appear just after main keys"
         os.environ["SCALYR_XXX_A"] = "A before b (ignores case)"
-        os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
+
+        # On Windows keys are not case sensitive and get upper cased
+        if platform.system() == "Windows":
+            os.environ["SCALYR_XXX_B"] = "b after A (ignores case)"
+        else:
+            os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
+
         os.environ["SCALYR_ZZZ"] = "Should appear at the end"
         report_status(output, self.status, self.time)
 
@@ -329,7 +336,7 @@ Environment variables: SCALYR_API_KEY = <Redacted>
                        SCALYR_SERVER = <Missing>
                        K8S_EVENT_DISABLE = Special-case-included despite missing prefix.  Appears at end of main keys.
                        SCALYR_AAA = Should appear just after main keys
-                       scalyr_K8S_CLUSTER_NAME = test_cluster
+                       SCALYR_K8S_CLUSTER_NAME = test_cluster
                        SCALYR_K8S_EVENT_DISABLE = true
                        SCALYR_XXX_A = A before b (ignores case)
                        sCaLyR_XXX_b = b after A (ignores case)
@@ -367,6 +374,13 @@ Running monitors:
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
+
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_config(self):

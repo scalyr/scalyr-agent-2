@@ -196,8 +196,9 @@ class TestConfigurationBase(ScalyrTestCase):
             if len(path_part) > 0:
                 result = os.path.join(result, path_part)
 
-        if os.path.sep == "\\":
+        if os.path.sep == "\\" and not result.startswith("C:\\"):
             result = "C:\\%s" % result
+
         return result
 
     def convert_path(self, path):
@@ -418,8 +419,8 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertPathEquals(config.agent_log_path, "/var/silly1")
-        self.assertPathEquals(config.agent_data_path, "/var/silly2")
+        self.assertPathEquals(config.agent_log_path, os.path.join("/var/", "silly1"))
+        self.assertPathEquals(config.agent_data_path, os.path.join("/var/", "silly2"))
         self.assertEquals(config.additional_monitor_module_paths, "silly3")
         self.assertEquals(
             config.config_directory, os.path.join(self._config_dir, "silly4")
@@ -463,7 +464,8 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.copying_thread_profile_interval, 2)
         self.assertEquals(
-            config.copying_thread_profile_output_path, "/tmp/some_profiles"
+            config.copying_thread_profile_output_path,
+            self.convert_path("/tmp/some_profiles"),
         )
 
         self.assertEquals(config.max_new_log_detection_time, 2 * 60)
@@ -1063,10 +1065,12 @@ class TestConfiguration(TestConfigurationBase):
 
         parsed_log_config = config.parse_log_config({"path": "hi.log"})
 
-        self.assertEquals(parsed_log_config["path"], "/var/log/scalyr-agent-2/hi.log")
+        # TODO: Existing code doesn't correctly handle paths when mixing separators
+        expected_path = self.convert_path("/var/log/scalyr-agent-2/hi.log")
+        self.assertEquals(parsed_log_config["path"], expected_path)
 
         parsed_log_config = config.parse_log_config(
-            {"path": "/var/log/scalyr-agent-2/hi.log"}, default_parser="foo"
+            {"path": expected_path}, default_parser="foo"
         )
 
         self.assertEquals(parsed_log_config["attributes"]["parser"], "foo")
@@ -1590,7 +1594,7 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(config.api_key, "abcdefg")
-        self.assertEquals(config.agent_log_path, "/var/silly1")
+        self.assertEquals(config.agent_log_path, self.convert_path("/var/silly1"))
         self.assertEqual(
             config.network_proxies,
             {"http": "http://foo.com", "https": "https://bar.com"},

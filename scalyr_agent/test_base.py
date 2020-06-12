@@ -176,6 +176,10 @@ class BaseScalyrTestCase(unittest.TestCase):
     def tearDown(self):
         scalyr_util.SORT_KEYS = False
 
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
         StoppableThread.set_name_prefix("TestCase %s: " % six.text_type(self))
@@ -346,6 +350,10 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def tearDown(self):
         super(BaseScalyrLogCaptureTestCase, self).tearDown()
 
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
         if self.__assertion_failed:
             # Print the paths to which we store the output to so they can be introspected by the
             # developer
@@ -378,10 +386,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         if not self._file_contains_line_regex(
             file_path=file_path, expression=expression
         ):
+            with open(file_path, "r") as fp:
+                content = fp.read()
+
             self.__assertion_failed = True
             self.fail(
-                'File "%s" doesn\'t contain "%s" line expression'
-                % (file_path, expression)
+                'File "%s" doesn\'t contain "%s" line expression.\n\nActual file content: %s'
+                % (file_path, expression, content)
             )
 
     def assertLogFileDoesntContainsLineRegex(self, expression, file_path=None):
@@ -398,10 +409,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if self._file_contains_line_regex(file_path=file_path, expression=expression):
+            with open(file_path, "r") as fp:
+                content = fp.read()
+
             self.__assertion_failed = True
             self.fail(
-                'File "%s" contain "%s" line expression, but it shouldn\'t'
-                % (file_path, expression)
+                'File "%s" contain "%s" line expression, but it shouldn\'t.\n\nActual file content: %s'
+                % (file_path, expression, content)
             )
 
     def assertLogFileContainsRegex(self, expression, file_path=None):
@@ -418,9 +432,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if not self._file_contains_regex(file_path=file_path, expression=expression):
+            with open(file_path, "r") as fp:
+                content = fp.read()
+
             self.__assertion_failed = True
             self.fail(
-                'File "%s" doesn\'t contain "%s" expression' % (file_path, expression)
+                'File "%s" doesn\'t contain "%s" expression.\n\nActual file content: %s'
+                % (file_path, expression, content)
             )
 
     def assertLogFileDoesntContainsRegex(self, expression, file_path=None):
@@ -437,10 +455,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if self._file_contains_regex(file_path=file_path, expression=expression):
+            with open(file_path, "r") as fp:
+                content = fp.read()
+
             self.__assertion_failed = True
             self.fail(
-                'File "%s" contain "%s" expression, but it shouldn\'t'
-                % (file_path, expression)
+                'File "%s" contain "%s" expression, but it shouldn\'t.\n\nActual file content: %s'
+                % (file_path, expression, content)
             )
 
     def _file_contains_line_regex(self, file_path, expression):

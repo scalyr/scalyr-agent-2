@@ -17,8 +17,13 @@ from __future__ import absolute_import
 
 import sys
 import time
+import platform
 
-from scalyr_agent.builtin_monitors.linux_system_metrics import SystemMetricsMonitor
+if platform.system() != "Windows":
+    from scalyr_agent.builtin_monitors.linux_system_metrics import SystemMetricsMonitor
+else:
+    SystemMetricsMonitor = None  # type: ignore
+
 from scalyr_agent.scalyr_monitor import load_monitor_class
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
@@ -32,6 +37,7 @@ __all__ = ["LinuxSystemMetricsMonitorTest"]
 class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_success(self):
         monitor_config = {
             "module": "linux_system_metrics",
