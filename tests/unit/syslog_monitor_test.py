@@ -347,6 +347,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         sys.stdout = self.dummy_stream
 
     def tearDown(self):
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
         # close any open sockets
         for s in self.sockets:
             s.close()

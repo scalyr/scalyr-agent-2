@@ -176,6 +176,10 @@ class BaseScalyrTestCase(unittest.TestCase):
     def tearDown(self):
         scalyr_util.SORT_KEYS = False
 
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
         StoppableThread.set_name_prefix("TestCase %s: " % six.text_type(self))
@@ -346,7 +350,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def tearDown(self):
         super(BaseScalyrLogCaptureTestCase, self).tearDown()
 
-        # It's important we close all the open FDs used by logger otherwise tests will fail on
+        # It's important we close all the open FDs used by loggers otherwise tests will fail on
         # Windows because the file will still be opened
         scalyr_logging.close_handlers()
 
