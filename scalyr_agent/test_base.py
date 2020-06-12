@@ -346,6 +346,10 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def tearDown(self):
         super(BaseScalyrLogCaptureTestCase, self).tearDown()
 
+        # It's important we close all the open FDs used by logger otherwise tests will fail on
+        # Windows because the file will still be opened
+        scalyr_logging.close_handlers()
+
         if self.__assertion_failed:
             # Print the paths to which we store the output to so they can be introspected by the
             # developer
@@ -360,11 +364,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             )
 
         if not self.__assertion_failed:
-            try:
-                shutil.rmtree(self.logs_directory)
-            except PermissionError:
-                # Workaround for Windows when sometimes deleting fails because file is still in use
-                pass
+            shutil.rmtree(self.logs_directory)
 
     def assertLogFileContainsLineRegex(self, expression, file_path=None):
         """

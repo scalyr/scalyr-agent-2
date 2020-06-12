@@ -20,7 +20,6 @@ from __future__ import absolute_import
 from io import open
 
 import os
-import platform
 
 import mock
 import six
@@ -128,11 +127,6 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
 
         self._BaseScalyrLogCaptureTestCase__assertion_failed = False
         super(LogCaptureClassTestCase, self).tearDown()
-
-        # On Windows sometimes the folder won't be deleted because a process is still holding an
-        # open file handle to it and we can't delete it
-        if platform.system() != "Windows":
-            self.assertFalse(os.path.isdir(self.logs_directory))
 
         self.assertEqual(len(mock_print.call_args_list), 0)
 
