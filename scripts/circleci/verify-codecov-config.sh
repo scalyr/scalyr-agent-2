@@ -21,7 +21,7 @@ RETRY_DELAY=${RETRY_DELAY:-5}
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
-    OUTPUT=$(curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
+    OUTPUT=$(curl -k --max-time 10 --data-binary @codecov.yml https://codecov.io/validate)
     CURL_EXIT_CODE=$?
     echo "${OUTPUT}" | grep -i "Valid!" > /dev/null
     GREP_EXIT_CODE=$?

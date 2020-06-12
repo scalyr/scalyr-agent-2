@@ -305,6 +305,10 @@ def build_win32_installer_package(variant, version):
         convert_newlines=True,
     )
 
+    # TODO: Check certificate expiration same as we do as part of tox lint target
+    # NOTE: This requires us to update Jenkins pipeline and other places where this script is called
+    # to install cryptography library
+
     # Generate the file used by WIX's candle program.
     create_wxs_file(
         make_path(agent_source_root, "win32/scalyr_agent.wxs"),
@@ -952,6 +956,9 @@ def build_base_files(base_configs="config"):
     for cert_file in glob_files(make_path(agent_source_root, "certs/*.pem")):
         shutil.copy(cert_file, cert_file.split("/")[-1])
 
+    # TODO: Check certificate expiration same as we do as part of tox lint target
+    # NOTE: This requires us to update Jenkins pipeline and other places where this script is called
+    # to install cryptography library
     os.chdir("..")
 
     # Misc extra files needed for some features.
