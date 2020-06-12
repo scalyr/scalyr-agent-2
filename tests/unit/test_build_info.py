@@ -53,14 +53,14 @@ class BuildInfoUtilTestCase(unittest.TestCase):
 
     @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", MOCK_BUILD_INFO_PATH)
     @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", MOCK_BUILD_INFO_PATH)
-    @mock.patch("scalyr_agent.build_info.INSTALL_TYPE", DEV_INSTALL)
+    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", DEV_INSTALL)
     def test_get_build_revision_from_build_info_success(self):
         build_revision = get_build_revision()
         self.assertEqual(build_revision, "7d4c4e2e94242ee25320a75c510d52967cfe50eb")
 
     @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", "/tmp/doesnt.exist")
     @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", "/tmp/doesnt.exist")
-    @mock.patch("scalyr_agent.build_info.INSTALL_TYPE", DEV_INSTALL)
+    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", DEV_INSTALL)
     @mock.patch("scalyr_agent.build_info.GIT_GET_HEAD_REVISION_CMD", "echo 'revision'")
     def test_get_build_revision_from_git_success(self):
         build_revision = get_build_revision()

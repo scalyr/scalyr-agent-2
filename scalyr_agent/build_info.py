@@ -30,17 +30,11 @@ from io import open
 
 import six
 
-try:
-    from __scalyr__ import DEV_INSTALL, INSTALL_TYPE
-except ImportError:
-    from scalyr_agent.__scalyr__ import DEV_INSTALL, INSTALL_TYPE
-
 from scalyr_agent.compat import subprocess_check_output
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 IS_WINDOWS = platform.system() == "Windows"
-IS_DEV_INSTALL = INSTALL_TYPE == DEV_INSTALL
 
 # Directory structure for packages looks like this:
 # /usr/share/scalyr-agent-2/py/scalyr_agent/build_info.py
@@ -133,7 +127,13 @@ def get_build_revision():
     If we are running on a dev install, it retrieves the commit revision by querying git reflog
     instead.
     """
-    if IS_DEV_INSTALL:
+    # NOTE: We use lazy import to avoid import time side affects
+    try:
+        from __scalyr__ import DEV_INSTALL, INSTALL_TYPE
+    except ImportError:
+        from scalyr_agent.__scalyr__ import DEV_INSTALL, INSTALL_TYPE  # type: ignore
+
+    if INSTALL_TYPE == DEV_INSTALL:
         if IS_WINDOWS and not os.path.isfile(BUILD_INFO_PATH_WINDOWS):
             return get_build_revision_from_git()
         elif not os.path.isfile(BUILD_INFO_PATH_LINUX):
