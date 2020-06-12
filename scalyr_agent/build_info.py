@@ -25,7 +25,6 @@ if False:  # NOSONAR
     from typing import Dict
 
 import os
-import subprocess
 import platform
 from io import open
 
@@ -118,7 +117,7 @@ def get_build_revision_from_git():
     cmd = GIT_GET_HEAD_REVISION_CMD
 
     try:
-        output = subprocess_check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        output = subprocess_check_output(cmd, shell=True)
     except Exception:
         return "unknown"
 
