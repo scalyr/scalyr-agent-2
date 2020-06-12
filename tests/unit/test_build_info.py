@@ -19,13 +19,11 @@ import unittest
 
 import mock
 
+from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.build_info import get_build_info
 from scalyr_agent.build_info import get_build_revision
 
-try:
-    from __scalyr__ import DEV_INSTALL
-except ImportError:
-    from scalyr_agent.__scalyr__ import DEV_INSTALL
+__all__ = ["BuildInfoUtilTestCase"]
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MOCK_BUILD_INFO_PATH = os.path.abspath(
