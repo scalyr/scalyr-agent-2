@@ -29,6 +29,7 @@ from libcloud.utils.iso8601 import parse_date
 
 from packages_sanity_tests import INSTANCE_NAME_STRING
 from packages_sanity_tests import get_libcloud_driver
+from packages_sanity_tests import destroy_node_and_cleanup
 
 #  from packages_sanity_tests import destroy_node_and_cleanup
 
@@ -67,8 +68,8 @@ def main():
     # TODO: For now we only print the node names to ensure script doesn't incorrectly delete
     # wrong nodes. We should uncomment out deletion once we are sure the script is correct.
     for node in nodes_to_delete:
-        # destroy_node_and_cleanup(driver=driver, node=node)
-        pass
+        assert INSTANCE_NAME_STRING in node.name
+        destroy_node_and_cleanup(driver=driver, node=node)
 
     print("Destroyed %s old nodes" % (len(nodes_to_delete)))
 

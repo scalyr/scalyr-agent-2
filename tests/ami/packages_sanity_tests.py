@@ -215,8 +215,9 @@ SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
-# All the instances created by this script will create this string in the name.
+# All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "-automated-agent-tests-"
+assert "-tests-" in INSTANCE_NAME_STRING
 
 
 def _get_source_type(version_string):
