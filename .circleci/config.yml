@@ -819,20 +819,21 @@ jobs:
           path: test-results
       - store_artifacts:
           path: test-results
-      - run:
-          name: Submit Coverage Data to codecov.io
-          command: |
-            ls -la .coverage* || true
+      # NOTE: coverage.py seems to be broken on Circle CI on Windows
+      # - run:
+      #     name: Submit Coverage Data to codecov.io
+      #     command: |
+      #       ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
-            cp .circleci/.coveragerc_ci .coveragerc
+      #       python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+      #       cp .circleci/.coveragerc_ci .coveragerc
 
-            # Print the report
-            coverage.exe report -i
+      #       # Print the report
+      #       coverage.exe report -i
 
-            # Submit it to codecov.io
-            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
-            ./scripts/submit-codecov-data.sh
+      #       # Submit it to codecov.io
+      #       coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+      #       ./scripts/submit-codecov-data.sh
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
@@ -1696,6 +1697,201 @@ jobs:
                 --branch=all --branch-limit=5 --limit=2 \
                 --email=cloudtech-builds@scalyr.com
 
+  build-windows-package:
+    description: "Build windows MSI installer."
+    executor:
+      name: win/default
+      size: "medium"
+      shell: powershell.exe
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Pyinstaller Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+
+      - run:
+          name: Install python.
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir python_installer -Force
+            if (!(Test-Path .\python_installer\python-3.7.7-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.7.7-amd64.exe https://www.python.org/ftp/python/3.7.7/python-3.7.7-amd64.exe
+            }
+            .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
+
+      - save_cache:
+          name: Save Pyinstaller Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+          paths:
+            - "python_installer"
+
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+
+      - run:
+          name: Bump Version
+          shell: bash
+          command: |
+            # Update agent version to avoid version conflict with current scalyr repository package.
+            # This way we can also correctly assert that the upgrade has worked - if we didn't do
+            # that, from and to version would be the same
+            # NOTE: We can't include git revision as part of the version since it's not a valid
+            # version on Windows.
+            echo "$(cat VERSION).1" > VERSION
+            cat VERSION
+
+      - run:
+          name: Build MSI package
+          command: |
+             .\win32\build.ps1 c:\Python37
+
+              mkdir package
+              mkdir artifacts
+
+              cp .\ScalyrAgentInstaller-*.msi artifacts/
+              mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+      - run:
+          name: Copy Package With Version in Name
+          shell: bash
+          command: |
+            # NOTE: We preserve two versions of the package as the build artifact. One with the
+            # version in the name and one without.
+            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
+            # if someone wgets a dev package or similar) they immediately know it's a dev version
+            # from the name itself.
+            export PACKAGE_VERSION="$(cat VERSION)"
+            cp package/ScalyrAgentInstaller.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+
+      - save_cache:
+          name: Save Python Dependencies Cache
+          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          paths:
+            - C:\Users\circleci\AppData\Local\pip\Cache
+
+      - persist_to_workspace:
+          root: package
+          paths: ScalyrAgentInstaller.msi
+
+      - store_artifacts:
+          path: artifacts
+
+  build-linux-packages:
+    description: "Build deb and rpm packages."
+    working_directory: ~/scalyr-agent-2
+    docker:
+        - image: circleci/python:3.6-jessie
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install System Dependencies
+          command: |
+            sudo apt-key update
+            sudo apt update
+            sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+
+            # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
+            # as a temporaty solution explicitly specify ffi version.
+            sudo gem install --no-document ffi:1.12.2 fpm
+
+      - run:
+          name: Bump Agent Version
+          command: |
+            # Update agent version to avoid version conflict with current scalyr repository package.
+            # This way we can also correctly assert that the upgrade has worked - if we didn't do
+            # that, from and to version would be the same
+            echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
+            cat VERSION
+      - run:
+          name: Build deb and rpm packages
+          command: |
+            mkdir artifacts
+            mkdir package
+
+            pushd artifacts
+
+            python ../build_package.py deb
+            python ../build_package.py rpm
+
+            popd
+
+            # NOTE: We preserve two versions of the package as the build artifact. One with the
+            # version in the name and one without.
+            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
+            # if someone wgets a dev package or similar) they immediately know it's a dev version
+            # from the name itself.
+            cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
+            cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
+
+      - persist_to_workspace:
+          root: package
+          paths:
+            - scalyr-agent-2.deb
+            - scalyr-agent-2.rpm
+
+      - store_artifacts:
+          path: artifacts
+
+  ami-tests:
+    description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie
+    steps:
+      - add_ssh_keys:
+            fingerprints:
+              - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+      - run:
+          name: Install Python Dependencies
+          command: |
+            # NOTE: We need to upgrade pip otherwise installation from git fails
+            python -m pip install --user --upgrade pip
+
+            # Install dependencies
+            python -m pip install --user "requests"
+            python -m pip install --user -r tests/ami/requirements.txt
+      - save_cache:
+          name: "Save Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      - run:
+          # Step which cleans up any old nodes which might have been left running because a
+          # previous build was canceled half way through or similar
+          name: Clean Up Old Stray EC2 Instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
+            ./tests/ami/cleanup_old_test_instances.py
+      - run:
+          name: Run package tests on EC2 instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
+            ./scripts/circleci/run-ami-tests-in-bg.sh
+      - store_artifacts:
+          path: outputs
+
 workflows:
   version: 2
   unit-tests:
@@ -1722,17 +1918,8 @@ workflows:
       - smoke-monitors-tests
   package-tests:
     jobs:
-      # NOTE: package-build-* jobs only run for PR / non-master builds. Those jobs
-      # product deb and rpm packages which can be used for testing.
-      # On master build, we run package-test-* jobs which also produce packages which
-      # can be used for testing. This means it's redundant to run both jobs at the same
-      # time since as long as one set of those jobs runs, packages will be produced.
-      # The reason why we run package-build-*, but not package-test-* jobs for each PR
-      # is that those jobs are much faster.
-      - package-build-rpm:
-          <<: *non_master_and_release
-      - package-build-deb:
-          <<: *non_master_and_release
+      - build-linux-packages
+      - build-windows-package
       - package-test-rpm:
           <<: *master_and_release_only
       - package-test-deb:
@@ -1752,6 +1939,11 @@ workflows:
       - smoke-deb-package-py3:
           requires:
             - package-test-deb
+          <<: *master_and_release_only
+      - ami-tests:
+          requires:
+            - build-windows-package
+            - build-linux-packages
           <<: *master_and_release_only
   benchmarks:
     jobs:

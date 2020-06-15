@@ -117,7 +117,11 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(text_type(sys.executable, sys.getfilesystemencoding()))
+        # encode python executable path for python 2.
+        executable_path = sys.executable
+        if type(executable_path) != text_type:
+            executable_path = text_type(executable_path, sys.getfilesystemencoding())
+        return os.path.dirname(executable_path)
 
     return file_path
 

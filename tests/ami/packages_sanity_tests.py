@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,16 +72,19 @@ from __future__ import print_function
 if False:  # NOSONAR
     from typing import List
     from typing import Optional
+    from typing import Dict
 
 import os
 import sys
 import time
+import re
 
 import random
 import argparse
 from io import open
 
 from jinja2 import Template
+import requests
 
 from libcloud.compute.types import Provider
 from libcloud.compute.base import NodeDriver
@@ -89,9 +93,37 @@ from libcloud.compute.base import NodeSize
 from libcloud.compute.base import StorageVolume
 from libcloud.compute.base import DeploymentError
 from libcloud.compute.providers import get_driver
-from libcloud.compute.deployment import ScriptDeployment
+from libcloud.compute.deployment import (
+    ScriptDeployment,
+    FileDeployment,
+    MultiStepDeployment,
+)
+import libcloud.compute.base
+
+from scalyr_agent import compat
 
 from tests.ami.utils import get_env_throw_if_not_set
+
+
+# if we try to run deployment script on windows machine with openssh,
+# ParamikoSSHClient does not return valid remote path after "put" operation.
+# For example if we put script file by path 'C:\users\admin' it adds slash at the beginning - '/C:\users\admin'.
+# When it is time to execute this script on the remote machine,
+# it ends with error because '/C:\users\admin' is invalid path.
+class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
+    def put(self, path, contents=None, chmod=None, mode="w"):
+        result = super(ParamikoSSHClient, self).put(
+            path, contents=contents, chmod=chmod, mode=mode
+        )
+        # just remove first slash.
+        if re.match(r"^\/\w\:.*$", result):
+            return result[1:]
+
+        return result
+
+
+# monkeypatch original ParamikoSSHClient
+libcloud.compute.base.SSHClient = ParamikoSSHClient
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
@@ -141,6 +173,27 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
+    "WindowsServer2019": {
+        "image_id": "ami-0f9790554e2b6bc8d",
+        "image_name": "WindowsServer2019-SSH",
+        "size_id": "t2.micro",
+        "ssh_username": "Administrator",
+        "default_python_package_name": "python2",
+    },
+    "WindowsServer2016": {
+        "image_id": "ami-06e455febb7d693eb",
+        "image_name": "WindowsServer2016-SSH",
+        "size_id": "t2.micro",
+        "ssh_username": "Administrator",
+        "default_python_package_name": "python2",
+    },
+    "WindowsServer2012": {
+        "image_id": "ami-033513be5c11f0e67",
+        "image_name": "WindowsServer2012R2-SSH",
+        "size_id": "t2.micro",
+        "ssh_username": "Administrator",
+        "default_python_package_name": "python2",
+    },
 }
 
 DEFAULT_INSTALLER_SCRIPT_URL = (
@@ -156,11 +209,63 @@ PRIVATE_KEY_PATH = get_env_throw_if_not_set("PRIVATE_KEY_PATH")
 PRIVATE_KEY_PATH = os.path.expanduser(PRIVATE_KEY_PATH)
 
 SECURITY_GROUPS_STR = get_env_throw_if_not_set(
-    "SECURITY_GROUPS", "allow-ssh"
+    "SECURITY_GROUPS", "allow-ssh-rdp"
 )  # sg-02efe05c115d41622
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
+
+# All the instances created by this script will use this string in the name.
+INSTANCE_NAME_STRING = "-automated-agent-tests-"
+assert "-tests-" in INSTANCE_NAME_STRING
+
+
+def _get_source_type(version_string):
+    # type: (str) -> Optional[str]
+    """
+    Get agent installation package source type according to data in the version string.
+    """
+    if not version_string:
+        return None
+
+    if "http://" in version_string or "https://" in version_string:
+        return "url"
+    elif os.path.exists(version_string) and os.path.isfile(version_string):
+        return "file"
+    else:
+        return "install_script"
+
+
+def _create_file_deployment_step(file_path, remote_file_name):
+    # type: (str, str) -> FileDeployment
+    """
+    Create Libcloud file deployment step object.
+
+    """
+    file_name = os.path.basename(file_path)
+    extension = os.path.splitext(file_name)[1]
+
+    target_path = "./{0}{1}".format(remote_file_name, extension)
+
+    step = FileDeployment(file_path, target_path)
+
+    return step
+
+
+def _verify_url_exists(url, use_head=False):
+    # (str, bool) -> bool
+    """
+    Verify that the provided URL exists (aka doesn't return 404).
+    """
+    try:
+        if use_head:
+            resp = requests.head(url)
+        else:
+            resp = requests.get(url)
+    except requests.exceptions.ConnectionError:
+        return False
+
+    return resp.status_code in [200, 302]
 
 
 def main(
@@ -174,33 +279,98 @@ def main(
     verbose=False,
 ):
     # type: (str, str, str, str, str, str, bool, bool) -> None
-    distro_details = EC2_DISTRO_DETAILS_MAP[distro]
+
+    # deployment objects for package files will be stored here.
+    file_upload_steps = []
 
     if test_type == "install":
-        script_filename = "fresh_install_%s.sh.j2"
+        install_package_source = to_version
     else:
-        script_filename = "upgrade_install_%s.sh.j2"
+        # install package is specified in from-version in case of upgrade
+        install_package_source = from_version
 
-    script_filename = script_filename % (
-        "deb" if distro.startswith("ubuntu") else "rpm"
-    )
+    # prepare data for install_package
+    install_package_source_type = _get_source_type(install_package_source)
+
+    if install_package_source_type == "file":
+        # create install package file deployment object.
+        file_upload_steps.append(
+            _create_file_deployment_step(install_package_source, "install_package")
+        )
+
+    install_package_info = {
+        "type": install_package_source_type,
+        "source": install_package_source,
+    }
+
+    upgrade_package_info = None
+
+    # prepare data for upgrade_package if it is specified.
+    if test_type == "upgrade":
+        upgrade_package_source = to_version
+        upgrade_package_source_type = _get_source_type(upgrade_package_source)
+
+        if upgrade_package_source_type == "file":
+            # create install package file deployment object.
+            file_upload_steps.append(
+                _create_file_deployment_step(to_version, "upgrade_package")
+            )
+
+        upgrade_package_info = {
+            "type": upgrade_package_source_type,
+            "source": upgrade_package_source,
+        }
+
+    distro_details = EC2_DISTRO_DETAILS_MAP[distro]
+
+    if distro.lower().startswith("windows"):
+        package_type = "windows"
+        script_extension = "ps1"
+    else:
+        package_type = "deb" if distro.startswith("ubuntu") else "rpm"
+        script_extension = "sh"
+
+    script_filename = "test_%s.%s.j2" % (package_type, script_extension)
     script_file_path = os.path.join(SCRIPTS_DIR, script_filename)
 
     with open(script_file_path, "r") as fp:
         script_content = fp.read()
 
+    cat_logs_script_file_path = os.path.join(
+        SCRIPTS_DIR, "cat_logs.%s" % (script_extension)
+    )
+
+    with open(cat_logs_script_file_path, "r") as fp:
+        cat_logs_script_content = fp.read()
+
     rendered_template = render_script_template(
         script_template=script_content,
         distro_details=distro_details,
         python_package=python_package,
-        from_version=from_version,
-        to_version=to_version,
+        test_type=test_type,
+        install_package=install_package_info,
+        upgrade_package=upgrade_package_info,
         installer_script_url=installer_script_url,
         verbose=verbose,
     )
 
-    cls = get_driver(Provider.EC2)
-    driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
+    remote_script_name = "deploy.{0}".format(script_extension)
+    test_package_step = ScriptDeployment(
+        rendered_template, name=remote_script_name, timeout=120
+    )
+
+    if file_upload_steps:
+        # Package files must be uploaded to the instance directly.
+        file_upload_steps.append(test_package_step)  # type: ignore
+        deployment = MultiStepDeployment(add=file_upload_steps)  # type: ignore
+    else:
+        deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
+
+    # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
+    deployment.add(cat_logs_step)
+
+    driver = get_libcloud_driver()
 
     size = NodeSize(
         distro_details["size_id"], distro_details["size_id"], 0, 0, 0, 0, driver,
@@ -208,12 +378,19 @@ def main(
     image = NodeImage(
         distro_details["image_id"], distro_details["image_name"], driver, None
     )
-    name = "%s-automated-agent-%s-test-%s" % (
+
+    circle_branch_name = compat.os_environ_unicode.get("CIRCLE_BRANCH", "unknown")
+    circle_branch_name = circle_branch_name.replace("/", "_").replace("-", "_")
+    circle_build_num = compat.os_environ_unicode.get(
+        "CIRCLE_BUILD_NUM", random.randint(0, 1000)
+    )
+
+    name = "%s-automated-agent-tests-%s-branch-%s-build-%s" % (
         distro,
         test_type,
-        random.randint(0, 1000),
+        circle_branch_name,
+        circle_build_num,
     )
-    step = ScriptDeployment(rendered_template, timeout=120)
 
     print("Starting node provisioning and tests...")
 
@@ -229,21 +406,27 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=10,
-            timeout=140,
-            deploy=step,
+            timeout=260,
+            deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
     except DeploymentError as e:
         print("Deployment failed: %s" % (str(e)))
         node = e.node
         success = False
-        step.exit_status = 1
+        test_package_step.exit_status = 1
         stdout = getattr(e.original_error, "stdout", None)
         stderr = getattr(e.original_error, "stderr", None)
     else:
-        success = step.exit_status == 0
-        stdout = step.stdout
-        stderr = step.stderr
+        success = test_package_step.exit_status == 0
+        stdout = test_package_step.stdout
+        stderr = test_package_step.stderr
+
+        if cat_logs_step.stdout:
+            stdout += "\n" + cat_logs_step.stdout
+
+        if cat_logs_step.stderr:
+            stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
 
@@ -254,7 +437,7 @@ def main(
 
     print(("stdout: %s" % (stdout)))
     print(("stderr: %s" % (stderr)))
-    print(("exit_code: %s" % (step.exit_status)))
+    print(("exit_code: %s" % (test_package_step.exit_status)))
     print(("succeeded: %s" % (str(success))))
     print(("duration: %s seconds" % (duration)))
 
@@ -271,19 +454,23 @@ def render_script_template(
     script_template,
     distro_details,
     python_package,
-    from_version=None,
-    to_version=None,
+    test_type,
+    install_package=None,
+    upgrade_package=None,
     installer_script_url=None,
     verbose=False,
 ):
-    # type: (str, dict, str, Optional[str], Optional[str], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
-    from_version = from_version or ""
-    to_version = to_version or ""
+    # from_version = from_version or ""
+    # to_version = to_version or ""
 
     template_context = distro_details.copy()
+
+    template_context["test_type"] = test_type
+
     template_context["installer_script_url"] = (
         installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
     )
@@ -291,14 +478,10 @@ def render_script_template(
     template_context["python_package"] = (
         python_package or distro_details["default_python_package_name"]
     )
-    template_context["package_from_version"] = from_version
-    template_context["package_from_version_is_url"] = (
-        "http://" in from_version or "https://" in from_version
-    )
-    template_context["package_to_version"] = to_version
-    template_context["package_to_version_is_url"] = (
-        "http://" in to_version or "https://" in to_version
-    )
+
+    template_context["install_package"] = install_package
+    template_context["upgrade_package"] = upgrade_package
+
     template_context["verbose"] = verbose
 
     template = Template(script_template)
@@ -312,6 +495,10 @@ def destroy_node_and_cleanup(driver, node):
     Destroy the provided node and cleanup any left over EBS volumes.
     """
     volumes = driver.list_volumes(node=node)
+
+    assert (
+        INSTANCE_NAME_STRING in node.name
+    ), "Refusing to delete node without %s in the name" % (INSTANCE_NAME_STRING)
 
     print("")
     print(('Destroying node "%s"...' % (node.name)))
@@ -328,8 +515,9 @@ def destroy_node_and_cleanup(driver, node):
         if volume.extra.get("instance_id", None) != node.id:
             continue
 
-        if volume.size != 8:
+        if volume.size not in [8, 30]:
             # All the volumes we use are 8 GB EBS volumes
+            # Special case is Windows 2019 with 30 GB volume
             continue
 
         destroy_volume_with_retry(driver=driver, volume=volume)
@@ -377,6 +565,15 @@ def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=
     return True
 
 
+def get_libcloud_driver():
+    """
+    Return Libcloud driver instance.
+    """
+    cls = get_driver(Provider.EC2)
+    driver = cls(ACCESS_KEY, SECRET_KEY, region=REGION)
+    return driver
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=("Run basic agent installer sanity tests on EC2 instance")
@@ -396,7 +593,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--from-version",
         help=("Package version or URL to the package to use for upgrade tests."),
-        default=None,
+        default="current",
         required=False,
     )
     parser.add_argument(
@@ -448,6 +645,37 @@ if __name__ == "__main__":
     if args.type == "upgrade" and (not args.from_version or not args.to_version):
         raise ValueError(
             "--from-version and to --to-version needs to be provided for upgrade test"
+        )
+
+    if args.type == "upgrade" and (
+        args.from_version == "current" and args.to_version == "current"
+    ):
+        raise ValueError(
+            "--from-version and --to-version options "
+            'can not have the same "current" value.'
+        )
+
+    # Fail early if any of the provided URLs doesn't exist
+    if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
+        raise ValueError(
+            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+            % (args.installer_script_url)
+        )
+
+    if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
+        args.from_version, True
+    ):
+        raise ValueError(
+            'Failed to retrieve package from "%s". Ensure that the URL is correct.'
+            % (args.from_version)
+        )
+
+    if _get_source_type(args.to_version) == "url" and not _verify_url_exists(
+        args.to_version, True
+    ):
+        raise ValueError(
+            'Failed to retrieve package from "%s". Ensure that the URL is correct.'
+            % (args.to_version)
         )
 
     main(
