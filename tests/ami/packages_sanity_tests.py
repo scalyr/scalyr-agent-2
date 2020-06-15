@@ -84,6 +84,7 @@ import argparse
 from io import open
 
 from jinja2 import Template
+import requests
 
 from libcloud.compute.types import Provider
 from libcloud.compute.base import NodeDriver
@@ -219,10 +220,13 @@ INSTANCE_NAME_STRING = "-automated-agent-tests-"
 
 
 def _get_source_type(version_string):
-    # type: (str) -> str
+    # type: (str) -> Optional[str]
     """
     Get agent installation package source type according to data in the version string.
     """
+    if not version_string:
+        return None
+
     if "http://" in version_string or "https://" in version_string:
         return "url"
     elif os.path.exists(version_string) and os.path.isfile(version_string):
@@ -245,6 +249,22 @@ def _create_file_deployment_step(file_path, remote_file_name):
     step = FileDeployment(file_path, target_path)
 
     return step
+
+
+def _verify_url_exists(url, use_head=False):
+    # (str, bool) -> bool
+    """
+    Verify that the provided URL exists (aka doesn't return 404).
+    """
+    try:
+        if use_head:
+            resp = requests.head(url)
+        else:
+            resp = requests.get(url)
+    except requests.exceptions.ConnectionError:
+        return False
+
+    return resp.status_code in [200, 302]
 
 
 def main(
@@ -632,6 +652,29 @@ if __name__ == "__main__":
         raise ValueError(
             "--from-version and --to-version options "
             'can not have the same "current" value.'
+        )
+
+    # Fail early if any of the provided URLs doesn't exist
+    if not _verify_url_exists(args.installer_script_url):
+        raise ValueError(
+            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+            % (args.installer_script_url)
+        )
+
+    if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
+        args.from_version
+    ):
+        raise ValueError(
+            'Failed to retrieve package from "%s". Ensure that the URL is correct.'
+            % (args.from_version)
+        )
+
+    if _get_source_type(args.to_version) == "url" and not _verify_url_exists(
+        args.to_version
+    ):
+        raise ValueError(
+            'Failed to retrieve package from "%s". Ensure that the URL is correct.'
+            % (args.to_version)
         )
 
     main(
