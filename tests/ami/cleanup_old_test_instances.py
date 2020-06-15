@@ -69,8 +69,10 @@ def main():
     # wrong nodes. We should uncomment out deletion once we are sure the script is correct.
     for node in nodes_to_delete:
         assert INSTANCE_NAME_STRING in node.name
+        print("")
         destroy_node_and_cleanup(driver=driver, node=node)
 
+    print("")
     print("Destroyed %s old nodes" % (len(nodes_to_delete)))
 
 
