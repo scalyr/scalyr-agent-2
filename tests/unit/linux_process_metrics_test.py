@@ -22,6 +22,7 @@ from io import open
 __author__ = "saurabh@scalyr.com"
 
 import os
+import platform
 
 try:
     import psutil
@@ -610,6 +611,7 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
 
 
 class StatReaderTestCase(ScalyrTestCase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_gather_sample(self):
         stat_reader = StatReader(pid=1, monitor_id=1, logger=None)
         stat_reader._StatReader__get_uptime_ms = lambda: 5 * 60 * 60 * 1000

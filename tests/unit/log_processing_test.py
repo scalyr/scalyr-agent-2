@@ -26,6 +26,7 @@ import tempfile
 import unittest
 import sys
 import time
+import platform
 from io import open
 
 import scalyr_agent.util as scalyr_util
@@ -48,6 +49,7 @@ from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 import six
 from six import unichr
@@ -2671,6 +2673,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEqual(self.__path_one, attrs["logfile"])
         self.assertFalse("original_file" in attrs)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_rename_regex(self):
         config = self._create_log_config(self.__path_one)
         config["rename_logfile"] = JsonObject(
@@ -2686,10 +2689,10 @@ class TestLogMatcher(ScalyrTestCase):
 
         # the temp directory is auto-generated, so it's not possible to
         # assert the actual path, we can however match the pre-folder and file name
-
-        self.assertEqual("text.txt", attrs["logfile"].split("/")[-1])
-
-        self.assertEqual(["scalyr", "test"], attrs["logfile"].split("/")[1:3])
+        self.assertEqual("text.txt", attrs["logfile"].split(os.sep)[-1])
+        if platform.system() != "Windows":
+            # NOTE: On windows path will Contains C:\Users prefix...
+            self.assertEqual(["scalyr", "test"], attrs["logfile"].split(os.sep)[1:3])
 
         self.assertEqual(self.__path_one, attrs["original_file"])
 

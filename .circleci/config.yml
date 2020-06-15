@@ -46,6 +46,7 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
+  win: circleci/windows@2.2.0
 
 # Global workflow level parameters
 parameters:
@@ -515,6 +516,7 @@ commands:
 
       - run:
           name: Install Dependencies
+          shell: bash
           command: |
             pip install "tox==<< pipeline.parameters.default_tox_version >>"
 
@@ -675,10 +677,11 @@ jobs:
       - checkout
       - run:
           name: install pyenv
+          shell: bash
           command: |
             brew install pyenv
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -691,21 +694,319 @@ jobs:
             python -m pip install virtualenv
             python -m virtualenv venv
             ./venv/bin/pip install "tox==3.14.3"
-      - save_cache:
-          key: deps2-tox-{{ .Branch }}-2.5-osx-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - ~/.cache/pip
-            - ~/.pyenv
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
             tox -epy3.5-unit-tests
-
+      - save_cache:
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+            - ~/.pyenv
       - slack/status:
           fail_only: true
           only_for_branches: master
+
+  unittest-35-windows:
+    # TODO: That's a temporary in-line definition from slack orb. We can remove it once
+    # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
+    parameters:
+      webhook:
+        type: string
+        default: ${SLACK_WEBHOOK}
+        description: >
+          Enter either your Webhook value or use the CircleCI UI to add your
+          token under the 'SLACK_WEBHOOK' env var
+
+      success_message:
+        type: string
+        default: ":tada: A $CIRCLE_JOB job has succeeded!"
+        description: Enter custom message.
+
+      failure_message:
+        type: string
+        default: ":red_circle: A $CIRCLE_JOB job has failed!"
+        description: Enter custom message.
+
+      success_only:
+        type: boolean
+        default: false
+        description: >
+          If `true`, notifications of failed jobs will not be sent.
+
+      fail_only:
+        type: boolean
+        default: true
+        description: >
+          If `true`, notifications of successful jobs will not be sent.
+
+      mentions:
+        type: string
+        default: ""
+        description: >
+          A comma separated list of user IDs. No spaces.
+
+      only_for_branches:
+        type: string
+        default: "master"
+        description: >
+          If set, a comma-separated list of branches for which to send
+          notifications. No spaces.
+
+      include_project_field:
+        type: boolean
+        default: true
+        description: >
+          Whether or not to include the Project field in the message
+
+      include_job_number_field:
+        type: boolean
+        default: true
+        description: >
+          Whether or not to include the Job Number field in the message
+
+      include_visit_job_action:
+        type: boolean
+        default: true
+        description: >
+          Whether or not to include the Visit Job action in the message
+
+      channel:
+        type: string
+        default: ""
+        description: >
+          ID of channel if set, overrides webhook's default channel setting
+    working_directory: ~/scalyr-agent-2
+    executor:
+      name: win/default
+      size: medium
+      shell: bash
+    environment:
+      PYTHON: 3.5.4
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Chocolatey Cache
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: Install Python
+          command: |
+            # Install Python using chocolatey and set custom cache location so we preserve package cache over builds
+            mkdir -p ~/choco-cache
+            choco config set cacheLocation ~/choco-cache
+            choco install python --version "${PYTHON}" --yes --limit-output --no-progress
+
+            # Add Python we installed to PATH and make sure it has precedence over system Python
+            echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
+      - save_cache:
+          name: Save Chocolatey Cache
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ~/choco-cache
+            # Actual package files are stored in NuGet cache
+            - C:\Users\circleci\AppData\Local\NuGet\Cache
+      - restore_cache:
+          name: Restore Python Dependencies Cache
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: Install Python Dependencies
+          command: |
+            python.exe --version
+            python.exe -m pip install --user --upgrade "tox==3.14.3"
+            python.exe -m pip install --user --upgrade "pip==20.0.1"
+      - run:
+          name: Run Unit Tests under Python 3.5
+          command: |
+            tox.exe -epy3.5-windows-unit-tests
+      - save_cache:
+          name: Save Python Dependencies Cache
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - C:\Users\circleci\AppData\Local\pip\Cache
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
+
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            # Print the report
+            coverage.exe report -i
+
+            # Submit it to codecov.io
+            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
+
+      # TODO: That's a temporary in-line definition from slack orb. We can remove it once
+      # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
+      - run:
+          name: Provide error if curl is not installed.
+          command: |
+            which curl > curl_exists; echo $? | grep -q '1' && echo curl not installed && rm curl_exists && exit 1
+            rm curl_exists
+
+      - run:
+          name: Slack - Setting Failure Condition
+          command: |
+            echo 'export SLACK_BUILD_STATUS="fail"' >> $BASH_ENV
+          when: on_fail
+
+      - run:
+          name: Slack - Setting Success Condition
+          command: |
+            echo 'export SLACK_BUILD_STATUS="success"' >> $BASH_ENV
+          when: on_success
+
+      - run:
+          name: Provide error if non-bash shell
+          command: |
+            if [ ! -x /bin/bash ]; then
+              echo Bash not installed.
+              exit 1
+            fi
+
+      - run:
+          name: Slack - Sending Status Alert
+          shell: bash
+          when: always
+          command: |
+            current_branch_in_filter=false
+
+            IFS="," read -ra BRANCH_FILTERS \<<< "<< parameters.only_for_branches >>"
+
+            for i in "${BRANCH_FILTERS[@]}"; do
+              if [ "${i}" == "${CIRCLE_BRANCH}" ]; then
+                current_branch_in_filter=true
+              fi
+            done
+
+            if [ "x" == "x<< parameters.only_for_branches>>" ] || [ "$current_branch_in_filter" = true ]; then
+              # Provide error if no webhook is set and error. Otherwise continue
+              if [ -z "<< parameters.webhook >>" ]; then
+                echo "NO SLACK WEBHOOK SET"
+                echo "Please input your SLACK_WEBHOOK value either in the settings for this project, or as a parameter for this orb."
+                exit 1
+              else
+                #Create Members string
+                if [ -n "<< parameters.mentions >>" ]; then
+                  IFS="," read -ra SLACK_MEMBERS \<<< "<< parameters.mentions >>"
+                  for i in "${SLACK_MEMBERS[@]}"; do
+                    if [ $(echo ${i} | head -c 1) == "S" ]; then
+                      SLACK_MENTIONS="${SLACK_MENTIONS}<!subteam^${i}> "
+                    elif echo ${i} | grep -E "^(here|channel|everyone)$" > /dev/null; then
+                      SLACK_MENTIONS="${SLACK_MENTIONS}<!${i}> "
+                    else
+                      SLACK_MENTIONS="${SLACK_MENTIONS}<@${i}> "
+                    fi
+                  done
+                fi
+                #If successful
+                if [ "$SLACK_BUILD_STATUS" = "success" ]; then
+                  #Skip if fail_only
+                  if [ << parameters.fail_only >> = true ]; then
+                    echo "The job completed successfully"
+                    echo '"fail_only" is set to "true". No Slack notification sent.'
+                  else
+                    curl -X POST -H 'Content-type: application/json' \
+                      --data "{ \
+                                <<# parameters.channel >>
+                                \"channel\": \"<< parameters.channel >>\", \
+                                <</ parameters.channel >>
+                                \"attachments\": [ \
+                                  { \
+                                    \"fallback\": \"<< parameters.success_message >>\", \
+                                    \"text\": \"<< parameters.success_message >> $SLACK_MENTIONS\", \
+                                    \"fields\": [ \
+                                      <<# parameters.include_project_field >>
+                                      { \
+                                        \"title\": \"Project\", \
+                                        \"value\": \"$CIRCLE_PROJECT_REPONAME\", \
+                                        \"short\": true \
+                                      }, \
+                                      <</ parameters.include_project_field >>
+                                      <<# parameters.include_job_number_field >>
+                                      { \
+                                        \"title\": \"Job Number\", \
+                                        \"value\": \"$CIRCLE_BUILD_NUM\", \
+                                        \"short\": true \
+                                      } \
+                                      <</ parameters.include_job_number_field >>
+                                    ], \
+                                    \"actions\": [ \
+                                      <<# parameters.include_visit_job_action >>
+                                      { \
+                                        \"type\": \"button\", \
+                                        \"text\": \"Visit Job\", \
+                                        \"url\": \"$CIRCLE_BUILD_URL\" \
+                                      } \
+                                      <</ parameters.include_visit_job_action >>
+                                    ], \
+                                    \"color\": \"#1CBF43\" \
+                                  } \
+                                ] \
+                              } " << parameters.webhook >>
+                    echo "Job completed successfully. Alert sent."
+                  fi
+                else
+                  #If Failed
+
+                  #Skip if success_only
+                  if [ << parameters.success_only >> = true ]; then
+                    echo "The job failed"
+                    echo '"success_only" is set to "true". No Slack notification sent.'
+                  else
+                    curl -X POST -H 'Content-type: application/json' \
+                      --data "{ \
+                        <<# parameters.channel >>
+                        \"channel\": \"<< parameters.channel >>\", \
+                        <</ parameters.channel >>
+                        \"attachments\": [ \
+                          { \
+                            \"fallback\": \"<< parameters.failure_message >>\", \
+                            \"text\": \"<< parameters.failure_message >> $SLACK_MENTIONS\", \
+                            \"fields\": [ \
+                              <<# parameters.include_project_field >>
+                              { \
+                                \"title\": \"Project\", \
+                                \"value\": \"$CIRCLE_PROJECT_REPONAME\", \
+                                \"short\": true \
+                              }, \
+                              <</ parameters.include_project_field >>
+                              <<# parameters.include_job_number_field >>
+                              { \
+                                \"title\": \"Job Number\", \
+                                \"value\": \"$CIRCLE_BUILD_NUM\", \
+                                \"short\": true \
+                              } \
+                              <</ parameters.include_job_number_field >>
+                            ], \
+                            \"actions\": [ \
+                              <<# parameters.include_visit_job_action >>
+                              { \
+                                \"type\": \"button\", \
+                                \"text\": \"Visit Job\", \
+                                \"url\": \"$CIRCLE_BUILD_URL\" \
+                              } \
+                              <</ parameters.include_visit_job_action >>
+                            ], \
+                            \"color\": \"#ed5c5c\" \
+                          } \
+                        ] \
+                      } " << parameters.webhook >>
+                    echo "Job failed. Alert sent."
+                  fi
+                fi
+              fi
+            else
+              echo "Current branch is not included in only_for_branches filter; no status alert will be sent"
+            fi
 
   unittest-27:
     working_directory: ~/scalyr-agent-2
@@ -1492,6 +1793,7 @@ workflows:
       - unittest-27
       - unittest-35
       - unittest-35-osx
+      - unittest-35-windows
   smoke-tests:
     jobs:
       - smoke-standalone-26

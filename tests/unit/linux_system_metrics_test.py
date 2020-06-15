@@ -20,13 +20,21 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-from scalyr_agent.monitors_manager import MonitorsManager
+import platform
+
+if platform.system() != "Windows":
+    from scalyr_agent.monitors_manager import MonitorsManager
+else:
+    MonitorsManager = None  # type: ignore
+
 from scalyr_agent.test_util import FakePlatform
+from scalyr_agent.test_base import skipIf
 
 from tests.unit.configuration_test import TestConfigurationBase
 
 
 class TestSystemMetricConfiguration(TestConfigurationBase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_log_write_rate(self):
         self._write_file_with_separator_conversion(
             """ {
