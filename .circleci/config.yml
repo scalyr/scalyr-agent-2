@@ -1944,7 +1944,7 @@ workflows:
           requires:
             - build-windows-package
             - build-linux-packages
-          #<<: *master_and_release_only
+          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-micro-py-27
