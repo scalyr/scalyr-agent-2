@@ -1858,6 +1858,7 @@ jobs:
             python -m pip install --user --upgrade pip
 
             # Install dependencies
+            python -m pip install --user "requests"
             python -m pip install --user -r tests/ami/requirements.txt
       - save_cache:
           name: "Save Python Dependencies cache"
@@ -1943,7 +1944,7 @@ workflows:
           requires:
             - build-windows-package
             - build-linux-packages
-          <<: *master_and_release_only
+          #<<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-micro-py-27

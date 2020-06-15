@@ -655,14 +655,14 @@ if __name__ == "__main__":
         )
 
     # Fail early if any of the provided URLs doesn't exist
-    if not _verify_url_exists(args.installer_script_url):
+    if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
         raise ValueError(
             'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
             % (args.installer_script_url)
         )
 
     if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
-        args.from_version
+        args.from_version, True
     ):
         raise ValueError(
             'Failed to retrieve package from "%s". Ensure that the URL is correct.'
@@ -670,7 +670,7 @@ if __name__ == "__main__":
         )
 
     if _get_source_type(args.to_version) == "url" and not _verify_url_exists(
-        args.to_version
+        args.to_version, True
     ):
         raise ValueError(
             'Failed to retrieve package from "%s". Ensure that the URL is correct.'
