@@ -897,4 +897,9 @@ class PipeRedirectorClient(RedirectorClient):
 
 
 if __name__ == "__main__":
-    sys.exit(win32serviceutil.HandleCommandLine(ScalyrAgentService))
+    if len(sys.argv) == 1:
+        servicemanager.Initialize()
+        servicemanager.PrepareToHostSingle(ScalyrAgentService)
+        servicemanager.StartServiceCtrlDispatcher()
+    else:
+        win32serviceutil.HandleCommandLine(ScalyrAgentService)
