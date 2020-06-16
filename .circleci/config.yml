@@ -1892,88 +1892,105 @@ jobs:
       - store_artifacts:
           path: outputs
 
+
 workflows:
   version: 2
   unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
     jobs:
-      - lint-checks
-      - unittest-26
       - unittest-27
-      - unittest-35
-      - unittest-35-osx
-      - unittest-35-windows
   smoke-tests:
     jobs:
-      - smoke-standalone-26
       - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
+
   package-tests:
     jobs:
       - build-linux-packages
       - build-windows-package
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - ami-tests:
-          requires:
-            - build-windows-package
-            - build-linux-packages
-          <<: *master_and_release_only
-  benchmarks:
-    jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
-      - benchmarks-idle-agent-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *benchmarks_master_and_release_only
-  weekly-circle-ci-usage-report:
-    triggers:
-      - schedule:
-          cron: "0 0 * * 0"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - send-circle-ci-usage-report
+
+#workflows:
+#  version: 2
+#  unit-tests:
+#    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+#    # Python 3 versions
+#    jobs:
+#      - lint-checks
+#      - unittest-26
+#      - unittest-27
+#      - unittest-35
+#      - unittest-35-osx
+#      - unittest-35-windows
+#  smoke-tests:
+#    jobs:
+#      - smoke-standalone-26
+#      - smoke-standalone-27
+#      - smoke-standalone-35
+#      - smoke-standalone-26-tls12
+#      - smoke-standalone-27-tls12
+#       # NOTE: smoke test jobs below still use old smoke tests framework
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - smoke-monitors-tests
+#  package-tests:
+#    jobs:
+#      - build-linux-packages
+#      - build-windows-package
+#      - package-test-rpm:
+#          <<: *master_and_release_only
+#      - package-test-deb:
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py2:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-rpm-package-py3:
+#          requires:
+#            - package-test-rpm
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py2:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - smoke-deb-package-py3:
+#          requires:
+#            - package-test-deb
+#          <<: *master_and_release_only
+#      - ami-tests:
+#          requires:
+#            - build-windows-package
+#            - build-linux-packages
+#          <<: *master_and_release_only
+#  benchmarks:
+#    jobs:
+#      - benchmarks-micro-py-27
+#      - benchmarks-micro-py-35
+#      - benchmarks-idle-agent-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-no-monitors-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-idle-agent-no-monitors-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+#          <<: *benchmarks_master_and_release_only
+#      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+#          <<: *benchmarks_master_and_release_only
+#  weekly-circle-ci-usage-report:
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * 0"
+#          filters:
+#            branches:
+#              only:
+#                - master
+#    jobs:
+#      - send-circle-ci-usage-report
