@@ -39,7 +39,7 @@ if [ "${TEST_TYPE}" == "stable" ]; then
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1804-install.log &
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1604-install.log &
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1404-install.log &
-  python tests/ami/packages_sanity_tests.py --distro=ubuntu1003 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/debian1003-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/debian1003-install.log &
   python tests/ami/packages_sanity_tests.py --distro=centos7 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/centos7-install.log &
   python tests/ami/packages_sanity_tests.py --distro=centos8 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/centos8-install.log &
 else
