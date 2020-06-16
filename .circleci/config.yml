@@ -116,7 +116,7 @@ commands:
           condition: << parameters.upload_coverage >>
           steps:
             - run:
-                name: Submit Coverage Data to codecov.io
+                name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
                 command: |
                   ls -la .coverage* || true
 
@@ -437,7 +437,7 @@ commands:
           condition: << parameters.upload_coverage >>
           steps:
             - run:
-                name: Combine and Submit Coverage Data to codecov.io
+                name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
                 command: |
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
@@ -1155,7 +1155,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
