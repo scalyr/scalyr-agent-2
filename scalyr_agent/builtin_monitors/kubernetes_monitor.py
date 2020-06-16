@@ -2725,14 +2725,6 @@ class ContainerChecker(object):
 
         self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-        # stop the DockerLoggers
-
-        for logger in self.raw_logs:
-            path = logger["log_config"]["path"]
-            if self.__log_watcher:
-                self.__log_watcher.remove_log_path(self.__module.module_name, path)
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path))
-
         self.raw_logs = []
 
     def get_k8s_data(self):

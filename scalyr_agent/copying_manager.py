@@ -909,9 +909,17 @@ class CopyingManager(StoppableThread, LogWatcher):
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
 
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Start removing finished log matchers",
+                        )
                         self.__scan_for_pending_log_files()
                         self.__remove_logs_scheduled_for_deletion()
                         self.__purge_finished_log_matchers()
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Done removing finished log matchers",
+                        )
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
