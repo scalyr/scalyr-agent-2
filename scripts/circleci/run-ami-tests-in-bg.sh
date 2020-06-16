@@ -42,6 +42,7 @@ if [ "${TEST_TYPE}" == "stable" ]; then
   python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/debian1003-install.log &
   python tests/ami/packages_sanity_tests.py --distro=centos7 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/centos7-install.log &
   python tests/ami/packages_sanity_tests.py --distro=centos8 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/centos8-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/amazonlinux2-install.log &
 else
   echo "Run sanity tests for the new packages from the current revision."
 
@@ -58,6 +59,7 @@ else
   python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/debian1003-upgrade.log &
   python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7-upgrade.log &
   python tests/ami/packages_sanity_tests.py --distro=centos8 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos8-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/amazonlinux2-upgrade.log &
 fi
 
 # Store command line args and log paths for all the jobs for a friendlier output on failure

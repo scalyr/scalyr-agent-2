@@ -129,6 +129,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
 
 EC2_DISTRO_DETAILS_MAP = {
+    # Debian based distros
     "ubuntu1404": {
         "image_id": "ami-07957d39ebba800d5",
         "image_name": "Ubuntu Server 14.04 LTS (HVM)",
@@ -157,6 +158,7 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "admin",
         "default_python_package_name": "python",
     },
+    # RHEL based distros
     # NOTE: Currently doesn't work with 4096 RSA keys due to paramiko issues
     # Need to use 2048 bit key to test this one
     "centos6": {
@@ -180,6 +182,14 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
+    "amazonlinux2": {
+        "image_id": "ami-09d95fab7fff3776c",
+        "image_name": "Amazon Linux 2 AMI (HVM), SSD Volume Type",
+        "size_id": "t2.micro",
+        "ssh_username": "ec2-user",
+        "default_python_package_name": "python",
+    },
+    # Windows
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
