@@ -15,29 +15,42 @@
 
 # Script which runs AMI based install and upgrade tests for various distros in
 # parallel.
+#
+#
+#
+
 
 echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
 
 # Create directory which output log files will be saved
 mkdir -p outputs
 
-# Run sanity test for each image concurrently in background
-# Tests below utilize installer script to test installing latest stable version of the package
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1804-install.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1604-install.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1404-install.log &
+TEST_TYPE="$1"
 
-# Tests below install package which is built as part of a Circle CI job
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+if [ "$TEST_TYPE" != "stable" ] && [ "$TEST_TYPE" != "development" ]; then
+    echo "Test type: 'stable' or 'development' must be specified."
+    exit 1
+fi
 
-# Tests below install latest stable version using an installer script and then upgrade to a
-# version which was built as part of a Circle CI job
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804-upgrade.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604-upgrade.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404-upgrade.log &
-python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7-upgrade.log &
+if [ "$TEST_TYPE" != "stable" ]; then
+  # Run sanity test for each image concurrently in background
+  # Tests below utilize installer script to test installing latest stable version of the package
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1804-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1604-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1404-install.log &
+else
+  # Tests below install package which is built as part of a Circle CI job
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+
+  # Tests below install latest stable version using an installer script and then upgrade to a
+  # version which was built as part of a Circle CI job
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7-upgrade.log &
+fi
 
 # Store command line args and log paths for all the jobs for a friendlier output on failure
 JOBS_COMMAND_LINE_ARGS=()
