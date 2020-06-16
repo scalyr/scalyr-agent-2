@@ -58,6 +58,8 @@ def download_coverage_files(destination_path):
             "%s path doesn't exist or it's not a directory" % (destination_path)
         )
 
+    print("Downloading coverage files from S3")
+
     cls = get_driver(Provider.S3)
     driver = cls(ACCESS_KEY_ID, ACCESS_KEY_SECRET, region="us-east-1")
     container = driver.get_container(container_name=BUCKET_NAME)

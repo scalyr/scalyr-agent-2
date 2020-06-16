@@ -59,6 +59,8 @@ def upload_file(file_path):
     if not os.path.isfile(file_path):
         raise ValueError("File %s doesn't exist" % (file_path))
 
+    print("Uploading coverage file to S3")
+
     cls = get_driver(Provider.S3)
     driver = cls(ACCESS_KEY_ID, ACCESS_KEY_SECRET, region="us-east-1")
 
