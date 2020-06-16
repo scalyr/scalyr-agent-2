@@ -16,7 +16,7 @@
 # Script which runs AMI based install and upgrade tests for various distros in
 # parallel.
 #
-#
+# Usage: run-ami-tests-in-bg-sh [stabel|development
 #
 
 
@@ -32,13 +32,19 @@ if [ "$TEST_TYPE" != "stable" ] && [ "$TEST_TYPE" != "development" ]; then
     exit 1
 fi
 
-if [ "$TEST_TYPE" != "stable" ]; then
+if [ "$TEST_TYPE" == "stable" ]; then
+
+  echo "Run sanity tests for the stable package versions."
+
   # Run sanity test for each image concurrently in background
   # Tests below utilize installer script to test installing latest stable version of the package
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1804-install.log &
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1604-install.log &
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" &> outputs/ubuntu1404-install.log &
 else
+
+  echo "Run sanity tests for the bew packages from the current revision."
+
   # Tests below install package which is built as part of a Circle CI job
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
