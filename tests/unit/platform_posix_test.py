@@ -22,20 +22,25 @@ __author__ = "czerwin@scalyr.com"
 import os
 import tempfile
 import errno
-import fcntl
 import signal
+import platform
 from io import open
 
 import mock
 
-
-from scalyr_agent.platform_posix import StatusReporter, PidfileManager
-from scalyr_agent.platform_posix import PosixPlatformController
+if platform.system() != "Windows":
+    from scalyr_agent.platform_posix import StatusReporter, PidfileManager
+    from scalyr_agent.platform_posix import PosixPlatformController
+else:
+    StatusReporter, PidfileManager = None, None  # type: ignore
+    PosixPlatformController = None  # type: ignore
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 
 class PosixPlatformControllerTestCase(ScalyrTestCase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     @mock.patch("signal.signal")
     @mock.patch("scalyr_agent.platform_posix.sys.exit", mock.Mock())
     def test_signal_handlers(self, mock_signal):
@@ -75,21 +80,25 @@ class TestStatusReporter(ScalyrTestCase):
         self.receiver.close()
         self.sender.close()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_basic_status(self):
         self.sender.report_status("My status")
         self.assertEquals(self.receiver.read_status(timeout=5.0), "My status")
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_status_with_newlines(self):
         self.sender.report_status("My status\nAnother one\n")
         self.assertEquals(
             self.receiver.read_status(timeout=5.0), "My status\nAnother one\n"
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_timeout_exceeded(self):
         self.assertEquals(
             self.receiver.read_status(timeout=0.0, timeout_status="timeout"), "timeout"
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_no_timeout(self):
         self.sender.report_status("My status")
         self.assertEquals(self.receiver.read_status(), "My status")
@@ -116,17 +125,21 @@ class TestPidfileManager(ScalyrTestCase):
     # try to write pid with someone holding lock
     # try to write pid with someone with the legacy format with active pid
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_no_existing_pidfile(self):
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_write_not_finished(self):
         self._write_pidfile_contents("12345")
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_pidfile_empty(self):
         self._write_pidfile_contents("")
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_locked_format_with_agent_running(self):
         release_lock = self._write_pidfile_contents(
             "%s locked\n" % os.getpid(), hold_lock=True
@@ -134,6 +147,7 @@ class TestPidfileManager(ScalyrTestCase):
         self.assertEquals(os.getpid(), self.__test_manager.read_pid())
         release_lock()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_with_agent_running(self):
         release_lock = self._write_pidfile_contents(
             "%s\n" % os.getpid(), hold_lock=True
@@ -141,38 +155,46 @@ class TestPidfileManager(ScalyrTestCase):
         self.assertEquals(os.getpid(), self.__test_manager.read_pid())
         release_lock()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_locked_format_with_agent_gone_without_delete(self):
         self._write_pidfile_contents("%s locked\n" % os.getpid(), hold_lock=False)
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_with_agent_gone_without_delete(self):
         self._write_pidfile_contents("%s\n" % os.getpid(), hold_lock=False)
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_old_format_pid_not_running(self):
         self._write_pidfile_contents(
             "%s command\n" % self._find_unused_pid(), hold_lock=False
         )
         self.assertIsNone(self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_read_pid_old_format_pid_running(self):
         self._write_pidfile_contents("%s command\n" % os.getpid(), hold_lock=False)
         self.assertEquals(os.getpid(), self.__test_manager.read_pid())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_no_existing(self):
         self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
         self.assertEquals("1234\n", self._read_pidfile_contents())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_lock_format_with_existing_but_not_running(self):
         self._write_pidfile_contents("%s locked\n" % os.getpid(), hold_lock=False)
         self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
         self.assertEquals("1234\n", self._read_pidfile_contents())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_with_existing_but_not_running(self):
         self._write_pidfile_contents("%s\n" % os.getpid(), hold_lock=False)
         self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
         self.assertEquals("1234\n", self._read_pidfile_contents())
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_lock_format_while_already_running(self):
         releaser = self._write_pidfile_contents(
             "%s locked\n" % os.getpid(), hold_lock=True
@@ -180,15 +202,18 @@ class TestPidfileManager(ScalyrTestCase):
         self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
         releaser()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_while_already_running(self):
         releaser = self._write_pidfile_contents("%s\n" % os.getpid(), hold_lock=True)
         self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
         releaser()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_write_pid_while_legacy_agent_running(self):
         self._write_pidfile_contents("%s command\n" % os.getpid(), hold_lock=False)
         self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_release_after_write_pid(self):
         release_lock = self.__test_manager.create_writer().write_pid(pid=1234)
         release_lock()
@@ -199,6 +224,7 @@ class TestPidfileManager(ScalyrTestCase):
         self.assertIsNotNone(release_lock)
         release_lock()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_acquire_then_write_pid(self):
         writer = self.__test_manager.create_writer()
         release_lock = writer.acquire_pid_lock()
@@ -210,6 +236,7 @@ class TestPidfileManager(ScalyrTestCase):
         self.assertEquals("1234\n", self._read_pidfile_contents())
         release_lock()
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_logger(self):
         def log_it(message):
             self.__logged_messages.append(message)
@@ -218,6 +245,7 @@ class TestPidfileManager(ScalyrTestCase):
         self.__test_manager.read_pid()
         self.assertGreater(len(self.__logged_messages), 0)
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
     def test_debug_logger(self):
         def log_it(message):
             self.__logged_messages.append(message)
@@ -243,10 +271,14 @@ class TestPidfileManager(ScalyrTestCase):
             fp.flush()
 
         def release_it():
+            import fcntl
+
             fcntl.flock(fp, fcntl.LOCK_UN)
             fp.close()
 
         if hold_lock:
+            import fcntl
+
             fcntl.flock(fp, fcntl.LOCK_EX)
             return release_it
         else:

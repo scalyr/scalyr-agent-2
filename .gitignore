@@ -70,3 +70,6 @@ test-results/
 microbenchmark_histograms/
 benchmark_histograms/
 benchmark_results/
+
+# sonarqube / sonarcloud
+.scannerwork/

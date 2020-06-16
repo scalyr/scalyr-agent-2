@@ -257,6 +257,12 @@ class AgentLogVerifier(AgentVerifier):
             return
 
         print("Query response received.")
+
+        if "matches" not in response_data:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response_data)))
+            return
+
         response_log = "\n".join([msg["message"] for msg in response_data["matches"]])
 
         found_collectors_remote = set(

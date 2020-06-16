@@ -525,7 +525,7 @@ def md5_hexdigest(data):
     encoded_data = data.encode("utf-8")
 
     if not new_md5:
-        m = md5.new()
+        m = md5.new()  # nosec
     else:
         m = md5()
     m.update(encoded_data)
