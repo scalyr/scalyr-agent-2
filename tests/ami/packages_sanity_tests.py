@@ -150,6 +150,13 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
+    "debian1003": {
+        "image_id": "ami-0b9a611a02047d3b1",
+        "image_name": "Debian 10 Buster",
+        "size_id": "t2.micro",
+        "ssh_username": "admin",
+        "default_python_package_name": "python",
+    },
     # NOTE: Currently doesn't work with 4096 RSA keys due to paramiko issues
     # Need to use 2048 bit key to test this one
     "centos6": {
@@ -328,7 +335,11 @@ def main(
         package_type = "windows"
         script_extension = "ps1"
     else:
-        package_type = "deb" if distro.startswith("ubuntu") else "rpm"
+        package_type = (
+            "deb"
+            if distro.startswith("ubuntu") or distro.startswith("debian")
+            else "rpm"
+        )
         script_extension = "sh"
 
     script_filename = "test_%s.%s.j2" % (package_type, script_extension)
