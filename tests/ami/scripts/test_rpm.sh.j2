@@ -47,6 +47,11 @@ cat /etc/*-release
 sudo yum install -y wget
 sudo yum install -y "{{python_package}}"
 
+# Install any optional additional packages
+{% if additional_packages -%}
+sudo yum install -y {{additional_packages}}
+{% endif -%}
+
 # Install Sclayr agent.
 echo ""
 echo "Installing Scalyr agent"

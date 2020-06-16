@@ -275,10 +275,11 @@ def main(
     to_version,
     python_package,
     installer_script_url,
+    additional_packages=None,
     destroy_node=False,
     verbose=False,
 ):
-    # type: (str, str, str, str, str, str, bool, bool) -> None
+    # type: (str, str, str, str, str, str, str, bool, bool) -> None
 
     # deployment objects for package files will be stored here.
     file_upload_steps = []
@@ -351,6 +352,7 @@ def main(
         install_package=install_package_info,
         upgrade_package=upgrade_package_info,
         installer_script_url=installer_script_url,
+        additional_packages=additional_packages,
         verbose=verbose,
     )
 
@@ -458,9 +460,10 @@ def render_script_template(
     install_package=None,
     upgrade_package=None,
     installer_script_url=None,
+    additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -481,6 +484,7 @@ def render_script_template(
 
     template_context["install_package"] = install_package
     template_context["upgrade_package"] = upgrade_package
+    template_context["additional_packages"] = additional_packages
 
     template_context["verbose"] = verbose
 
@@ -611,6 +615,12 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--additional-packages",
+        help=("Optional string of additional system level packages to install."),
+        required=False,
+    )
+
+    parser.add_argument(
         "--installer-script-url",
         help=("URL to the installer script to use."),
         default=DEFAULT_INSTALLER_SCRIPT_URL,
@@ -631,13 +641,6 @@ if __name__ == "__main__":
         default=False,
     )
     args = parser.parse_args(sys.argv[1:])
-
-    if args.distro == "centos8" and args.type == "upgrade":
-        raise ValueError(
-            "upgrade test is not supported on CentOS 8, because scalyr-agent-2 "
-            '2.0.x package depends on "python" package which is not available on '
-            "CentOS 8."
-        )
 
     if args.type == "install" and not args.to_version:
         raise ValueError("--to-version needs to be provided for install test")
@@ -685,6 +688,7 @@ if __name__ == "__main__":
         to_version=args.to_version,
         python_package=args.python_package,
         installer_script_url=args.installer_script_url,
+        additional_packages=args.additional_packages,
         destroy_node=not args.no_destroy_node,
         verbose=args.verbose,
     )

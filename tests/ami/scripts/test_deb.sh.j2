@@ -45,6 +45,10 @@ cat /etc/*-release
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
+{% if additional_packages -%}
+sudo apt-get install -y {{additional_packages}}
+{% endif -%}
+
 # Install Sclayr agent.
 echo ""
 echo "Installing Scalyr agent"

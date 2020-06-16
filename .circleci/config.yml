@@ -618,6 +618,64 @@ commands:
           fail_only: true
           only_for_branches: master
 
+  ami-tests:
+    description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
+    parameters:
+      test_type:
+        description: "Type of tests to run."
+        type: enum
+        enum: ["development", "stable"]
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - restore_cache:
+          name: "Restore Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+      - run:
+          name: Install Python Dependencies
+          command: |
+            # NOTE: We need to upgrade pip otherwise installation from git fails
+            python -m pip install --user --upgrade pip
+
+            # Install dependencies
+            python -m pip install --user "requests"
+            python -m pip install --user -r tests/ami/requirements.txt
+      - save_cache:
+          name: "Save Python Dependencies cache"
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      - run:
+          # Step which cleans up any old nodes which might have been left running because a
+          # previous build was canceled half way through or similar
+          name: Clean Up Old Stray EC2 Instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
+            ./tests/ami/cleanup_old_test_instances.py
+      - run:
+          name: Run package tests on EC2 instances
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+
+            ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
+      - store_artifacts:
+          path: outputs
+
 jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
@@ -1836,61 +1894,23 @@ jobs:
       - store_artifacts:
           path: artifacts
 
-  ami-tests:
-    description: "Run scalyr agent packages sanity tests based on EC2/Libcloud."
+  ami-tests-stable:
+    description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
     steps:
-      - add_ssh_keys:
-            fingerprints:
-              - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
-      - checkout
-      - attach_workspace:
-          at: /tmp/workspace
-      - restore_cache:
-          name: "Restore Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
-      - run:
-          name: Install Python Dependencies
-          command: |
-            # NOTE: We need to upgrade pip otherwise installation from git fails
-            python -m pip install --user --upgrade pip
+      - ami-tests:
+          test_type: "stable"
 
-            # Install dependencies
-            python -m pip install --user "requests"
-            python -m pip install --user -r tests/ami/requirements.txt
-      - save_cache:
-          name: "Save Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
-          paths:
-            - "~/.cache/pip"
-      - run:
-          # Step which cleans up any old nodes which might have been left running because a
-          # previous build was canceled half way through or similar
-          name: Clean Up Old Stray EC2 Instances
-          environment:
-            KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
-            PYTHONPATH: "."
-          command: |
-            export ACCESS_KEY=${AWS_ACCESS_KEY}
-            export SECRET_KEY=${AWS_SECRET_KEY}
-
-            ./tests/ami/cleanup_old_test_instances.py
-      - run:
-          name: Run package tests on EC2 instances
-          environment:
-            KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
-            PYTHONPATH: "."
-          command: |
-            export ACCESS_KEY=${AWS_ACCESS_KEY}
-            export SECRET_KEY=${AWS_SECRET_KEY}
-
-            ./scripts/circleci/run-ami-tests-in-bg.sh
-      - store_artifacts:
-          path: outputs
+  ami-tests-development:
+    description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie
+    steps:
+      - ami-tests:
+          test_type: "development"
 
 workflows:
   version: 2
@@ -1940,10 +1960,12 @@ workflows:
           requires:
             - package-test-deb
           <<: *master_and_release_only
-      - ami-tests:
+      - ami-tests-development:
           requires:
             - build-windows-package
             - build-linux-packages
+          <<: *master_and_release_only
+      - ami-tests-stable:
           <<: *master_and_release_only
   benchmarks:
     jobs:
@@ -1967,6 +1989,7 @@ workflows:
           <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *benchmarks_master_and_release_only
+
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
@@ -1977,3 +2000,18 @@ workflows:
                 - master
     jobs:
       - send-circle-ci-usage-report
+
+  # We run AMI based package install tests which utilize installer script on
+  # daily basis.
+  # This helps us detect various installer script and other potential upstream
+  # issues.
+  daily-stable-ami-package-install-tests:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - ami-tests-stable
