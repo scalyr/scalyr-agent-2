@@ -642,13 +642,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args(sys.argv[1:])
 
-    if args.distro == "centos8" and args.type == "upgrade":
-        raise ValueError(
-            "upgrade test is not supported on CentOS 8, because scalyr-agent-2 "
-            '2.0.x package depends on "python" package which is not available on '
-            "CentOS 8."
-        )
-
     if args.type == "install" and not args.to_version:
         raise ValueError("--to-version needs to be provided for install test")
 
