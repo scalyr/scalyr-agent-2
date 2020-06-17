@@ -9,8 +9,23 @@ and run basic installer fresh install and upgrade sanity checks.
 For example usage and which variables need to be set, please refer to the
 script file module level docstring.
 
+## Supported Distros
 
-## Using Windows images.
+Right now tests run on the following distros and operating systems on each merge to master and
+also daily as part of our Circle CI job:
+
+* Ubunut 14.04
+* Ubunut 16.04
+* Ubunut 18.04
+* Debian 10
+* CentOS 7
+* CentOS 8
+* Amazon Linux 2
+* Windows Sever 2012
+* Windows Sever 2016
+* Windows Sever 2019
+
+## Using Windows images
 
 Apache Libcloud operates EC2 instances by ssh, so we need to install OpenSSH server on windows images
 before we can use them.

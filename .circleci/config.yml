@@ -634,7 +634,16 @@ commands:
       test_type:
         description: "Type of tests to run."
         type: enum
-        enum: ["development", "stable"]
+        enum:
+          - "development"
+          - "stable"
+        # URL to the installer script to use with the tests. We default to stable version, but
+        # you can change that value if you made changes to the installer script and you want
+        # to easily test them against all the distrod we run AMI tests on
+      installer_script_url:
+        description: "URL to the installer script which to use for the install and upgrade tests."
+        type: string
+        default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
     steps:
       - add_ssh_keys:
           fingerprints:
@@ -681,6 +690,7 @@ commands:
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
+            export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:

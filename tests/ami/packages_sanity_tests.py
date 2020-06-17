@@ -129,6 +129,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
 
 EC2_DISTRO_DETAILS_MAP = {
+    # Debian based distros
     "ubuntu1404": {
         "image_id": "ami-07957d39ebba800d5",
         "image_name": "Ubuntu Server 14.04 LTS (HVM)",
@@ -150,6 +151,14 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
+    "debian1003": {
+        "image_id": "ami-0b9a611a02047d3b1",
+        "image_name": "Debian 10 Buster",
+        "size_id": "t2.micro",
+        "ssh_username": "admin",
+        "default_python_package_name": "python",
+    },
+    # RHEL based distros
     # NOTE: Currently doesn't work with 4096 RSA keys due to paramiko issues
     # Need to use 2048 bit key to test this one
     "centos6": {
@@ -173,6 +182,14 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
+    "amazonlinux2": {
+        "image_id": "ami-09d95fab7fff3776c",
+        "image_name": "Amazon Linux 2 AMI (HVM), SSD Volume Type",
+        "size_id": "t2.micro",
+        "ssh_username": "ec2-user",
+        "default_python_package_name": "python",
+    },
+    # Windows
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
@@ -328,7 +345,11 @@ def main(
         package_type = "windows"
         script_extension = "ps1"
     else:
-        package_type = "deb" if distro.startswith("ubuntu") else "rpm"
+        package_type = (
+            "deb"
+            if distro.startswith("ubuntu") or distro.startswith("debian")
+            else "rpm"
+        )
         script_extension = "sh"
 
     script_filename = "test_%s.%s.j2" % (package_type, script_extension)
@@ -527,7 +548,7 @@ def destroy_node_and_cleanup(driver, node):
         destroy_volume_with_retry(driver=driver, volume=volume)
 
 
-def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=5):
+def destroy_volume_with_retry(driver, volume, max_retries=12, retry_sleep_delay=5):
     # type: (NodeDriver, StorageVolume, int, int) -> bool
     """
     Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
