@@ -38,8 +38,8 @@ Use the following commands to build the respective images:
 
     cd scalyr-agent-2/docker
     python ../build_package.py --no-versioned-file-name k8s_builder
-    ./scalyr-docker-agent-syslog --extract-packages
-    docker build -t scalyr/scalyr-k8s-agent .
+    ./scalyr-k8s-agent --extract-packages
+    docker build -t scalyr/scalyr-k8s-agent -f Dockerfile.k8s .
 
 ## Running the Scalyr Agent in Docker
 
