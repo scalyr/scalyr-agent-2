@@ -548,7 +548,7 @@ def destroy_node_and_cleanup(driver, node):
         destroy_volume_with_retry(driver=driver, volume=volume)
 
 
-def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=5):
+def destroy_volume_with_retry(driver, volume, max_retries=12, retry_sleep_delay=5):
     # type: (NodeDriver, StorageVolume, int, int) -> bool
     """
     Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
