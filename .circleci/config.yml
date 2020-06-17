@@ -1996,6 +1996,7 @@ jobs:
     steps:
       - ami-tests:
           test_type: "stable"
+          installer_script_url: "https://www.scalyr.com/scalyr-repo/4adfas/internal/latest/install-scalyr-agent-2-internal.sh"
 
   ami-tests-development:
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
@@ -2005,6 +2006,7 @@ jobs:
     steps:
       - ami-tests:
           test_type: "development"
+          installer_script_url: "https://www.scalyr.com/scalyr-repo/4adfas/internal/latest/install-scalyr-agent-2-internal.sh"
 
 workflows:
   version: 2
@@ -2069,9 +2071,7 @@ workflows:
           requires:
             - build-windows-package
             - build-linux-packages
-          <<: *master_and_release_only
-      - ami-tests-stable:
-          <<: *master_and_release_only
+      - ami-tests-stable
   benchmarks:
     jobs:
       - benchmarks-micro-py-27
