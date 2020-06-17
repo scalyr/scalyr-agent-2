@@ -18,9 +18,6 @@
 #
 # Usage: run-ami-tests-in-bg-sh [stable|development]
 #
-
-echo "Running AMI sanity tests concurrently in the background (this may take up to 5 minutes and no output may be produced by this script for up to 3 minutes)..."
-
 # Create directory which output log files will be saved
 mkdir -p outputs
 
@@ -35,6 +32,9 @@ if [ "${TEST_TYPE}" != "stable" ] && [ "${TEST_TYPE}" != "development" ]; then
     echo "Test type: 'stable' or 'development' must be specified."
     exit 1
 fi
+
+echo "Running AMI sanity tests concurrently in the background (this may take up to 5 minutes and no output may be produced by this script for up to 3 minutes)..."
+echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
 
 if [ "${TEST_TYPE}" == "stable" ]; then
   echo "Run sanity tests for the stable package versions."
