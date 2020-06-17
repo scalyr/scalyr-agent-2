@@ -35,6 +35,7 @@ fi
 
 echo "Running AMI sanity tests concurrently in the background (this may take up to 5 minutes and no output may be produced by this script for up to 3 minutes)..."
 echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
+echo ""
 
 if [ "${TEST_TYPE}" == "stable" ]; then
   echo "Run sanity tests for the stable package versions."
