@@ -34,6 +34,13 @@ Use the following commands to build the respective images:
     ./scalyr-docker-agent-syslog --extract-packages
     docker build -t scalyr/scalyr-docker-agent-syslog .
 
+#### scalyr-k8s-agent
+
+    cd scalyr-agent-2/docker
+    python ../build_package.py --no-versioned-file-name k8s_builder
+    ./scalyr-k8s-agent --extract-packages
+    docker build -t scalyr/scalyr-k8s-agent -f Dockerfile.k8s .
+
 ## Running the Scalyr Agent in Docker
 
 To run a Scalyr Agent container, you must do the following 3 things:
