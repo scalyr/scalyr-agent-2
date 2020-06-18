@@ -1908,6 +1908,10 @@ workflows:
     jobs:
       - build-linux-packages
       - build-windows-package
+      - ami-tests:
+          requires:
+            - build-windows-package
+            - build-linux-packages
 
 #workflows:
 #  version: 2
