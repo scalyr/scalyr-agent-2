@@ -82,7 +82,7 @@ from io import open
 
 # Indicates if this code was compiled into a single Windows executable via Py2exe.  If that's the case,
 # then we cannot rely on __file__ and the source is kind of through into the same directory.
-__is_py2exe__ = hasattr(sys, "frozen")
+__is_frozen__ = hasattr(sys, "frozen")
 
 
 def scalyr_init():
@@ -95,7 +95,7 @@ def scalyr_init():
     """
     # If this is a win32 executable, then all the packages have already been bundled in the exec and there is no
     # need to change the PYTHONPATH
-    if not __is_py2exe__:
+    if not __is_frozen__:
         __add_scalyr_package_to_path()
 
 
@@ -110,7 +110,7 @@ def __determine_package_root():
     # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
     # We could just return the parent of __file__, however, this apparently is not portable on all version of
     # Windows.  Moreover, when running as a win32 exe, __file__ is not set.
-    if not __is_py2exe__:
+    if not __is_frozen__:
         base = os.getcwd()
         file_path = inspect.stack()[1][1]
         if not os.path.isabs(file_path):
@@ -151,7 +151,7 @@ def get_install_root():
     """
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
     parent_of_package_install = os.path.dirname(get_package_root())
-    if __is_py2exe__:  # win32 install
+    if __is_frozen__:  # win32 install
         return parent_of_package_install
     elif os.path.basename(parent_of_package_install) != "py":  # Running from Source
         return parent_of_package_install
@@ -175,7 +175,7 @@ def __add_scalyr_package_to_path():
         sys.path.insert(0, os.path.join(get_package_root(), "third_party_python3"))
 
     # if we are not on windows, prepend the third party tls directory first so it appears after the package root
-    if not __is_py2exe__:
+    if not __is_frozen__:
         sys.path.insert(0, os.path.join(get_package_root(), "third_party_tls"))
 
     sys.path.insert(0, os.path.dirname(get_package_root()))
@@ -184,17 +184,24 @@ def __add_scalyr_package_to_path():
 def __determine_version():
     """Returns the agent version number, read from the VERSION file.
     """
-    # This file can be either in the package root or the install root (if you examine the cases
-    # from above).  So, just check both locations.
-    in_install = os.path.join(get_install_root(), "VERSION")
-    in_package = os.path.join(get_package_root(), "VERSION")
 
-    if os.path.isfile(in_package):
-        version_path = in_package
-    elif os.path.isfile(in_install):
-        version_path = in_install
-    else:
+    file_names = ["VERSION"]
+
+    if __is_frozen__:
+        file_names.append("VERSION.txt")
+
+    def find_path():
+        # This file can be either in the package root or the install root (if you examine the cases
+        # from above).  So, just check both locations.
+        for root in [get_install_root(), get_package_root()]:
+            for file_name in file_names:
+                path = os.path.join(root, file_name)
+                if os.path.isfile(path):
+                    return path
+
         raise Exception("Could not locate VERSION file!")
+
+    version_path = find_path()
 
     version_fp = open(version_path, "r")
     try:
