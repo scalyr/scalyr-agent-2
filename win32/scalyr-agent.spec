@@ -51,7 +51,7 @@ service_a = Analysis(['source_root\\scalyr_agent\\platform_windows.py'],
                 'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2',
 				],
-             hiddenimports = monitors
+             hiddenimports = monitors,
              datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses'), ('data_files\\build_info', '.')],
              )
 
