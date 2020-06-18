@@ -20,14 +20,16 @@ from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
+windows_monitors = ['windows_process_metrics', 'windows_system_metrics', 'windows_event_log_monitor']
+
 if sys.platform == "win32":
-    monitors = ['windows_process_metrics', 'windows_system_metrics', 'windows_event_log_monitor']
+    monitors = ["scalyr_agent.builtin_monitors." + m for m in windows_monitors]
 else:
     monitors = []
 
+
 main_a = Analysis(['source_root\\scalyr_agent\\agent_main.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
 				'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
@@ -37,7 +39,6 @@ main_a = Analysis(['source_root\\scalyr_agent\\agent_main.py'],
 
 config_a = Analysis(['source_root\\scalyr_agent\\config_main.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
                 'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
@@ -47,7 +48,6 @@ config_a = Analysis(['source_root\\scalyr_agent\\config_main.py'],
 
 service_a = Analysis(['source_root\\scalyr_agent\\platform_windows.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
                 'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2',
 				],
