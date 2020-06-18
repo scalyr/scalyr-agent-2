@@ -24,40 +24,39 @@ var CODESPEED_AUTH = system.env['CODESPEED_AUTH'];
 // How much time to wait for chart XHR data to load
 var CHART_LOAD_TIMEOUT = 5000;
 
-var TIMELIME_CHARTS_TO_CAPTURE_URLS = [
-  'https://' + CODESPEED_AUTH + '@scalyr-agent-codespeed.herokuapp.com/timeline/?exe=2%2C6%2C3%2C7%2C10%2C1%2C5%2C4%2C8&base=1%2B95&ben=memory_usage_rss&env=1&revs=30&equid=off&quarts=on&extr=on',
-  'https://' + CODESPEED_AUTH + '@scalyr-agent-codespeed.herokuapp.com/timeline/?exe=2%2C6%2C3%2C7%2C10%2C1%2C5%2C4%2C8&base=1%2B95&ben=log_lines_error&env=1&revs=30&equid=off&quarts=on&extr=on',
-  'https://' + CODESPEED_AUTH + '@scalyr-agent-codespeed.herokuapp.com/timeline/?exe=2%2C6%2C3%2C7%2C10%2C1%2C5%2C4%2C8&base=1%2B95&ben=log_lines_info&env=1&revs=30&equid=off&quarts=on&extr=on',
-  'https://' + CODESPEED_AUTH + '@scalyr-agent-codespeed.herokuapp.com/timeline/?exe=2%2C6%2C3%2C7%2C10%2C1%2C5%2C4%2C8&base=1%2B95&ben=log_lines_debug&env=1&revs=30&equid=off&quarts=on&extr=on',
+var BASE_TIMELINE_CHART_URL = 'https://' + CODESPEED_AUTH + '@scalyr-agent-codespeed.herokuapp.com/timeline/?exe=2%2C6%2C3%2C7%2C10%2C1%2C5%2C4%2C8&base=1%2B95&env=1&revs=30&equid=off&quarts=on&extr=on'
 
+// A list of benchmark names we capture screenshots for
+var BENCHMARK_NAMES = [
+  'memory_usage_rss',
+  'log_lines_error',
+  'log_lines_info',
+  'log_lines_debug',
 ]
 
-var DESTINATION_PATHS = [
-  '/tmp/codespeed-memory_usage_rss.png',
-  '/tmp/codespeed-log_lines_error.png',
-  '/tmp/codespeed-log_lines_info.png',
-  '/tmp/codespeed-log_lines_debug.png',
-]
+var DESTINATION_PATH = "/tmp/codespeed-screenshots/";
 
-function capture_screenshot(url, destination_path) {
-  console.log("Capturing screenshot for " + url);
+function capture_screenshot(url, destination_filename) {
+  console.log("Capturing screenshot for " + url.replace(CODESPEED_AUTH, "***"));
 
   var page = webpage.create();
   page.viewportSize = { width: 1680, height: 768 };
   page.clipRect = { top: 0, left: 0, width: 1680, height: 768 };
   page.open(url, function() {
     setTimeout(function() {
+      var destination_path = DESTINATION_PATH + destination_filename;
       page.render(destination_path);
       console.log('Screenshot saved to ' + destination_path);
     }, CHART_LOAD_TIMEOUT);
   });
 }
 
-for (var i = 0; i < TIMELIME_CHARTS_TO_CAPTURE_URLS.length; i++) {
-  var url = TIMELIME_CHARTS_TO_CAPTURE_URLS[i];
-  var destination_path = DESTINATION_PATHS[i];
+for (var i = 0; i < BENCHMARK_NAMES.length; i++) {
+  var benchmark_name = BENCHMARK_NAMES[i];
+  var url = BASE_TIMELINE_CHART_URL + '&ben=' + benchmark_name;
+  var destination_filename = benchmark_name + ".png";
 
-  capture_screenshot(url, destination_path);
+  capture_screenshot(url, destination_filename);
 }
 
 setTimeout(phantom.exit, 10 * 1000);
