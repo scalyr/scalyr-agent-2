@@ -2070,7 +2070,8 @@ workflows:
             - build-windows-package
             - build-linux-packages
           <<: *master_and_release_only
-      - ami-tests-stable
+      - ami-tests-stable:
+          <<: *master_and_release_only
   benchmarks:
     jobs:
       - benchmarks-micro-py-27
