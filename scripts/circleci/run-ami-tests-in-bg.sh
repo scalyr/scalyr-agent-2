@@ -43,7 +43,9 @@ if [ "${TEST_TYPE}" == "stable" ]; then
   # Run sanity test for each image concurrently in background
   # Tests below utilize installer script to test installing latest stable version of the package
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1804-install.log &
-  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1604-install.log &
+  # NOTE: Here we also install "yum-utils" package so we test a regression where our installer
+  # would incorrectly detect yum as a package manager on Ubuntu system with yum-utils installed
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --additional-packages=yum-utils --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1604-install.log &
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1404-install.log &
   python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/debian1003-install.log &
   python tests/ami/packages_sanity_tests.py --distro=centos7 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos7-install.log &
