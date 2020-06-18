@@ -184,10 +184,17 @@ def __add_scalyr_package_to_path():
 def __determine_version():
     """Returns the agent version number, read from the VERSION file.
     """
+
+    if sys.platform == "win32":
+        version_file_name = "VERSION.txt"
+    else:
+        version_file_name = "VERSION"
+
     # This file can be either in the package root or the install root (if you examine the cases
     # from above).  So, just check both locations.
-    in_install = os.path.join(get_install_root(), "VERSION")
-    in_package = os.path.join(get_package_root(), "VERSION")
+
+    in_install = os.path.join(get_install_root(), version_file_name)
+    in_package = os.path.join(get_package_root(), version_file_name)
 
     if os.path.isfile(in_package):
         version_path = in_package
