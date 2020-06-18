@@ -188,6 +188,8 @@ def __determine_version():
     file_names = ["VERSION"]
 
     if __is_frozen__:
+        # also check for VERSION.txt file because there is a reserved filename - "VERSION" in Pyinstaller,
+        # and it expects that this file is a DLL.
         file_names.append("VERSION.txt")
 
     def find_path():
