@@ -1710,7 +1710,7 @@ jobs:
       - run:
           name: Capture CodeSpeed Graphs Screenshots and Post Notification to Slack
           environment:
-            SLACK_CHANNEL: "#bot-testing"
+            SLACK_CHANNEL: "#cloud-tech"
           command: |
             export OPENSSL_CONF=/etc/ssl/
             mkdir -p /tmp/codespeed-screenshots/
@@ -2138,7 +2138,6 @@ workflows:
           <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *benchmarks_master_and_release_only
-      - send-benchmark-results-and-graphs-to-slack
       - send-benchmark-results-and-graphs-to-slack:
           requires:
             - benchmarks-idle-agent-py-27
