@@ -263,7 +263,10 @@ def build_win32_installer_package(variant, version):
     os.chdir("data_files")
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
-    shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION")
+
+    # make it VERSION.txt because PyInstaller on python 2 expects dll file named VERSION,
+    # and then fails with an error because of the invalid DLL loading.
+    shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION.txt")
     shutil.copy(make_path(agent_source_root, "LICENSE.txt"), "LICENSE.txt")
 
     # Also add in build_info file
