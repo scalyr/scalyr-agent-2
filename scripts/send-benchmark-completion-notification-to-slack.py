@@ -75,7 +75,7 @@ IMAGE_SERVICE_URL = "https://0x0.st"
 def upload_files(file_paths):
     # type: (List[str]) -> List[Tuple[str, str]]
     """
-    Uploaded provided files and return list of (url, filename) tuples.
+    Upload provided files and return list of (url, filename) tuples.
     """
     result = []
     for file_path in sorted(file_paths):
