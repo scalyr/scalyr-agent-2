@@ -1898,11 +1898,6 @@ workflows:
   unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
-    jobs:
-      - unittest-27
-  smoke-tests:
-    jobs:
-      - smoke-standalone-27
 
   package-tests:
     jobs:
