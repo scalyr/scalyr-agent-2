@@ -69,10 +69,12 @@ except KeyError:
 def _do_request(method, url, **kwargs):
     # type: (str, str, **Any) -> requests.Response
 
-    kwargs["headers"] = {
-        "Circle-Token": CIRCLE_API_TOKEN,
-        **kwargs.get("headers", dict()),
-    }
+    headers = kwargs.get("headers", dict())
+
+    headers["Circle-Token"] = CIRCLE_API_TOKEN
+
+    kwargs["headers"] = headers
+
     with requests.Session() as session:
         resp = session.request(method=method, url=url, **kwargs)
     resp.raise_for_status()
