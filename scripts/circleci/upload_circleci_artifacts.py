@@ -263,7 +263,7 @@ def download_artifacts(artifacts_to_fetch, workflow_infos, output_path):
 
     cached_job_infos = dict()  # type: Dict[str, Any]
     cached_artifact_infos = dict()  # type: Dict[Tuple, Any]
-
+    raise Exception(str(workflow_infos))
     for workflow_name, job_name, artifact_pattern in artifacts_to_fetch:
         workflow_info = workflow_infos.get(workflow_name)
         if workflow_info is None:
