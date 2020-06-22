@@ -180,6 +180,8 @@ def wait_for_workflow(workflow_id, timeout_time):
         workflow_status = workflow_info["status"]
         workflow_name = workflow_info["name"]
 
+        print("Status: ", workflow_name)
+
         if workflow_status == "success":
             print("Workflow '{0}' finished successfully.".format(workflow_name))
             return workflow_info
