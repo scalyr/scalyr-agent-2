@@ -1895,9 +1895,6 @@ jobs:
 
 workflows:
   version: 2
-  unit-tests:
-    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-    # Python 3 versions
 
   package-tests:
     jobs:
