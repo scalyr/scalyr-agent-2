@@ -318,6 +318,7 @@ def main(
     # wait for whole pipeline is finished and get all workflows.
     workflow_infos = wait_for_pipeline(pipeline_number=pipeline_number)
 
+    time.sleep(20)
     # download artifacts.
     download_artifacts(artifacts_to_fetch, workflow_infos, output_path)
 
