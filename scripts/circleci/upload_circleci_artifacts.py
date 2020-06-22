@@ -72,7 +72,6 @@ def _do_request(method, url, **kwargs):
     headers = kwargs.get("headers", dict())
 
     headers["Circle-Token"] = CIRCLE_API_TOKEN
-    headers["Accept"] = "application/json"
 
     kwargs["headers"] = headers
 
