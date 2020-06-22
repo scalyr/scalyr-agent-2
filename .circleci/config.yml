@@ -1678,6 +1678,50 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           cache_key_name: "benchmarks-micro-py27"
 
+  # Job which sends notification to Slack after benchmark run has completed
+  # on master merge / push.
+  send-benchmark-results-and-graphs-to-slack:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - checkout
+      - run:
+          name: Set Permissions
+          command: |
+            # Set permissions so we can directly restore into /usr/local/bin
+            sudo chmod 777 /usr/local/bin
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.5-capture-screenshot
+      - run:
+          name: Download and install Phantom JS
+          command: |
+            if [ ! -e "/usr/local/bin/phantomjs" ]; then
+              echo "Downloading and installing PhantomJS"
+              wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2
+              tar -xf phantomjs-2.1.1-linux-x86_64.tar.bz2
+              sudo cp phantomjs-2.1.1-linux-x86_64/bin/phantomjs /usr/local/bin
+            fi
+      - save_cache:
+          name: Save PhantomJS Cache
+          key: deps2-tox-{{ .Branch }}-3.5-capture-screenshot
+          paths:
+            - /usr/local/bin/phantomjs
+      - run:
+          name: Capture CodeSpeed Graphs Screenshots and Post Notification to Slack
+          environment:
+            SLACK_CHANNEL: "#cloud-tech"
+          command: |
+            export OPENSSL_CONF=/etc/ssl/
+            mkdir -p /tmp/codespeed-screenshots/
+
+            # Capture the graph screenshots
+            phantomjs scripts/phantomjs/capture_codespeed_graphs_screenshots.js
+
+            # Send notication to Slack
+            export PYTHONPATH=.
+            ./scripts/send-benchmark-completion-notification-to-slack.py /tmp/codespeed-screenshots/
+
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2093,6 +2137,18 @@ workflows:
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
           <<: *benchmarks_master_and_release_only
       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+          <<: *benchmarks_master_and_release_only
+      - send-benchmark-results-and-graphs-to-slack:
+          requires:
+            - benchmarks-idle-agent-py-27
+            - benchmarks-idle-agent-py-35
+            - benchmarks-idle-agent-no-monitors-py-27
+            - benchmarks-idle-agent-no-monitors-py-35
+            - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+            - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+            - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
           <<: *benchmarks_master_and_release_only
 
   weekly-circle-ci-usage-report:
