@@ -100,10 +100,11 @@ def get_paginated_collection(url):
     :param url: Url to the collection.
     :return: Yields next element in the collection.
     """
-    next_page_token = None
+    # next_page_token = None
     while True:
 
-        resp = get_request(url=url, params={"page-token": next_page_token})
+        # resp = get_request(url=url, params={"page-token": next_page_token})
+        resp = get_request(url=url)
 
         for item in resp["items"]:
             yield item
@@ -235,8 +236,6 @@ def wait_for_pipeline(pipeline_number,):
     )
 
     pipeline_id = pipeline_info["id"]
-
-    raise Exception(pipeline_id)
 
     # get pipeline workflows
     pipeline_workflows = get_paginated_list(
