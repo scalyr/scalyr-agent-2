@@ -231,11 +231,15 @@ def wait_for_pipeline(pipeline_number,):
     :return: General information about all workflows from CircleCI.
     """
     # get information about the pipeline.
+
     pipeline_info = get_request(
         url=CIRCLE_API_PROJECT_URL + "/pipeline/" + str(pipeline_number)
     )
 
     pipeline_id = pipeline_info["id"]
+
+    r = get_request(url=CIRCLE_API_URL + "/pipeline/" + str(pipeline_id) + "/workflow")
+    raise Exception(r)
 
     # get pipeline workflows
     pipeline_workflows = get_paginated_list(
