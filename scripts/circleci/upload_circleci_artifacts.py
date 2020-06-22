@@ -237,6 +237,7 @@ def wait_for_pipeline(pipeline_number,):
     )
 
     pipeline_id = pipeline_info["id"]
+    raise Exception(pipeline_id)
 
     r = get_request(url=CIRCLE_API_URL + "/pipeline/" + str(pipeline_id) + "/workflow")
     raise Exception(r)
