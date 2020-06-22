@@ -236,11 +236,12 @@ def wait_for_pipeline(pipeline_number,):
 
     pipeline_id = pipeline_info["id"]
 
+    raise Exception(pipeline_id)
+
     # get pipeline workflows
     pipeline_workflows = get_paginated_list(
         url=CIRCLE_API_URL + "/pipeline/" + str(pipeline_id) + "/workflow",
     )
-    raise Exception(pipeline_workflows)
     # remove duplicated workflows and keep latest ones.
     latest_workflows = discard_outdated_workflows(pipeline_workflows)
 
