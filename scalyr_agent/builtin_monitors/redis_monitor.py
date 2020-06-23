@@ -27,7 +27,7 @@ import time
 
 from six.moves import range
 
-from scalyr_agent import ScalyrMonitor
+from scalyr_agent import ScalyrMonitor, define_config_option
 
 from redis.client import Redis, parse_info  # pylint: disable=import-error
 from redis.exceptions import (  # pylint: disable=import-error
@@ -37,6 +37,15 @@ from redis.exceptions import (  # pylint: disable=import-error
 
 MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")  # NOQA
 
+__monitor__ = __name__
+
+define_config_option(
+    __monitor__,
+    "log_cluster_replication_info",
+    "Optional (defaults to false). If true, the monitor will record redis cluster's replication "
+    "offsets, difference between master and replica, and how many seconds the replica is falling behind",
+    default=False,
+)
 
 class RedisHost(object):
     """Class that holds various information about a specific redis connection
@@ -215,7 +224,7 @@ class RedisHost(object):
         max_replica_offset = 0
         for n in range(connected_replicas):
             max_replica_offset = max(
-                max_replica_offset, replication_info["slave{}".format(n)]["offset"]
+                max_replica_offset, replication_info["slave%d" % n]["offset"]
             )
 
         offset_difference = int(master_repl_offset - max_replica_offset)
@@ -438,6 +447,9 @@ Here is an example with two hosts with passwords:
             max_value=6000,
         )
 
+        # Whether to record cluster replication information
+        self.log_cluster_replication_info = self._config.get("log_cluster_replication_info")
+
         # Redis-py requires None rather than 0 if no timeout
         if self.__connection_timeout == 0:
             self.__connection_timeout = None
@@ -473,7 +485,10 @@ Here is an example with two hosts with passwords:
             new_connection = not host.valid()
             try:
                 host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
-                host.log_cluster_replication_info(self._logger)
+
+                if self.log_cluster_replication_info:
+                    host.log_cluster_replication_info(self._logger)
+
             except ConnectionError:
                 if new_connection:
                     self._logger.error(
