@@ -312,16 +312,15 @@ def download_artifacts(artifacts_to_fetch, workflow_infos, output_path):
 def main(
     branch_name, artifacts_to_fetch, output_path,
 ):
-    # pipeline_trigger_info = trigger_pipeline(branch_name=branch_name)
+    pipeline_trigger_info = trigger_pipeline(branch_name=branch_name)
 
-    # pipeline_number = pipeline_trigger_info["number"]
+    pipeline_number = pipeline_trigger_info["number"]
 
-    pipeline_number = 3292
+    # pipeline_number = 3292
 
     # wait for whole pipeline is finished and get all workflows.
     workflow_infos = wait_for_pipeline(pipeline_number=pipeline_number)
 
-    time.sleep(20)
     # download artifacts.
     download_artifacts(artifacts_to_fetch, workflow_infos, output_path)
 
