@@ -25,9 +25,11 @@ import binascii
 import re
 import time
 
+from six.moves import range
+
 from scalyr_agent import ScalyrMonitor
 
-from redis.client import Redis  # pylint: disable=import-error
+from redis.client import Redis, parse_info  # pylint: disable=import-error
 from redis.exceptions import (  # pylint: disable=import-error
     ConnectionError,
     TimeoutError,
@@ -56,6 +58,12 @@ class RedisHost(object):
 
         # Timestamp of the last slowlog entry
         self.last_timestamp = 0
+
+        # master offset of the last replication entry
+        self.last_master_offset = 0
+
+        # Timestamp of the last replication entry
+        self.last_replication_sample_timestamp = 0
 
         # Redis object
         self.__redis = None
@@ -186,6 +194,65 @@ class RedisHost(object):
         # print it out in reverse because redis sends entries in reverse order
         for entry in reversed(unseen_entries):
             self.log_entry(logger, entry)
+
+    def log_cluster_replication_info(self, logger):
+        # Gather replication information from Redis
+        replication_info = parse_info(self.redis.execute_command("INFO REPLICATION"))
+
+        # We only care about information from Redis master, which contains offsets from both master and replica
+        if replication_info["role"] != "master":
+            return
+
+        master_repl_offset = replication_info["master_repl_offset"]
+
+        if master_repl_offset == 0:
+            return
+
+        master_replid = replication_info["master_replid"]
+        connected_replicas = replication_info["connected_slaves"]
+
+        # If there are more than one replicas, log the most up-to-date
+        max_replica_offset = 0
+        for n in range(connected_replicas):
+            max_replica_offset = max(
+                max_replica_offset, replication_info["slave{}".format(n)]["offset"]
+            )
+
+        offset_difference = int(master_repl_offset - max_replica_offset)
+
+        now = time.time()
+
+        # Offset difference between master and replica doesn't indicate how far behind the slave is, in wall clock time
+        #
+        # we calculate how many seconds the replica is falling behind, by comparing
+        # a. offset difference between master and replica
+        # and
+        # b. master offset's change rate (per second)
+        master_offset_change_per_sec = int(
+            (master_repl_offset - self.last_master_offset)
+            / (now - self.last_replication_sample_timestamp)
+        )
+        replica_lag_secs = int(offset_difference / master_offset_change_per_sec)
+
+        time_format = "%Y-%m-%d %H:%M:%SZ"
+        logger.emit_value(
+            "redis",
+            "replication",
+            extra_fields={
+                "host": self.display_string,
+                "ts": time.strftime(time_format, time.gmtime(now)),
+                "masterId": master_replid,
+                "masterOffset": master_repl_offset,
+                "connectedReplicas": connected_replicas,
+                "maxReplicaOffset": max_replica_offset,
+                "offsetDiff": offset_difference,
+                "masterOffsetDiffPerSec": master_offset_change_per_sec,
+                "replicaLagSecs": replica_lag_secs,
+            },
+        )
+
+        self.last_master_offset = master_repl_offset
+        self.last_replication_sample_timestamp = now
 
     def log_entry(self, logger, entry):
         # check to see if redis truncated the command
@@ -402,11 +469,11 @@ Here is an example with two hosts with passwords:
             self.__redis_hosts.append(redis_host)
 
     def gather_sample(self):
-
         for host in self.__redis_hosts:
             new_connection = not host.valid()
             try:
                 host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
+                host.log_cluster_replication_info(self._logger)
             except ConnectionError:
                 if new_connection:
                     self._logger.error(
