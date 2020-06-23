@@ -236,6 +236,8 @@ def wait_for_pipeline(pipeline_number,):
         url=CIRCLE_API_PROJECT_URL + "/pipeline/" + str(pipeline_number)
     )
 
+    raise Exception(str(pipeline_info))
+
     pipeline_id = pipeline_info["id"]
 
     # get pipeline workflows
@@ -318,7 +320,7 @@ def main(
 
     # pipeline_number = 3292
 
-    time.sleep(20)
+    # time.sleep(20)
     # wait for whole pipeline is finished and get all workflows.
     workflow_infos = wait_for_pipeline(pipeline_number=pipeline_number)
 
