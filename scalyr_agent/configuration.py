@@ -225,7 +225,8 @@ class Configuration(object):
 
             # Set defaults based on `max_send_rate_enforcement` value
             if (
-                not self.__config["disable_max_send_rate_enforcement_overrides"]
+                False
+                and not self.__config["disable_max_send_rate_enforcement_overrides"]
                 and not self.__config["max_send_rate_enforcement"] == "legacy"
             ):
                 self._warn_of_override_due_to_rate_enforcement(
