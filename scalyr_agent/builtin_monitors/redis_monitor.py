@@ -47,6 +47,7 @@ define_config_option(
     default=False,
 )
 
+
 class RedisHost(object):
     """Class that holds various information about a specific redis connection
     """
@@ -448,7 +449,9 @@ Here is an example with two hosts with passwords:
         )
 
         # Whether to record cluster replication information
-        self.log_cluster_replication_info = self._config.get("log_cluster_replication_info")
+        self.log_cluster_replication_info = self._config.get(
+            "log_cluster_replication_info"
+        )
 
         # Redis-py requires None rather than 0 if no timeout
         if self.__connection_timeout == 0:
