@@ -100,11 +100,10 @@ def get_paginated_collection(url):
     :param url: Url to the collection.
     :return: Yields next element in the collection.
     """
-    # next_page_token = None
+    next_page_token = None
     while True:
 
-        # resp = get_request(url=url, params={"page-token": next_page_token})
-        resp = get_request(url=url)
+        resp = get_request(url=url, params={"page-token": next_page_token})
 
         for item in resp["items"]:
             yield item
@@ -196,8 +195,8 @@ def wait_for_workflow(workflow_id, timeout_time):
             )
 
         if datetime.datetime.now() >= timeout_time:
-            raise TimeoutError(
-                "Can not wait more for workflow '{0}'.".format(workflow_name)
+            raise RuntimeError(
+                "Timeout. Can not wait more for workflow '{0}'.".format(workflow_name)
             )
 
         print("Wait for workflow '{0}'.".format(workflow_name))
@@ -230,13 +229,32 @@ def wait_for_pipeline(pipeline_number,):
     Wait for all workflows are finishedin the pipeline specified by 'pipeline number'.
     :return: General information about all workflows from CircleCI.
     """
-    # get information about the pipeline.
 
-    pipeline_info = get_request(
-        url=CIRCLE_API_PROJECT_URL + "/pipeline/" + str(pipeline_number)
+    # wait until the 'state' field of the pipeline is 'created'.
+    timeout_time = datetime.datetime.now() + datetime.timedelta(
+        seconds=CIRCLE_WAIT_TIMEOUT
     )
+    while True:
+        # get information about the pipeline.
+        pipeline_info = get_request(
+            url=CIRCLE_API_PROJECT_URL + "/pipeline/" + str(pipeline_number)
+        )
+        pipeline_state = pipeline_info["state"]
 
-    raise Exception(str(pipeline_info))
+        if pipeline_state == "created":
+            break
+
+        if pipeline_state != "pending":
+            raise RuntimeError(
+                "Pipeline has a wrong state: {0}.".format(pipeline_state)
+            )
+
+        if datetime.datetime.now() >= timeout_time:
+            raise RuntimeError(
+                "Timeout. Can not wait more for pipeline: '{0}'".format(pipeline_number)
+            )
+
+        time.sleep(10)
 
     pipeline_id = pipeline_info["id"]
 
