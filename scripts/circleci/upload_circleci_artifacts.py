@@ -316,6 +316,8 @@ def main(
 
     # pipeline_number = pipeline_trigger_info["number"]
 
+    raise Exception(requests.__version__)
+
     pipeline_number = 3292
 
     # wait for whole pipeline is finished and get all workflows.
