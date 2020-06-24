@@ -1,7 +1,6 @@
 # Release Notes
 
-## 2.1.7
-
+## 2.1.7 "Serenity" - June 24, 2020
 
 * Agent configuration files now support a top level json array called `k8s_logs` which lets you specify log
   configuration for Kubernetes logs.
