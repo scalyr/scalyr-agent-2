@@ -8,7 +8,7 @@ Packaged by Yan Shnayder <yan@scalyr.com> on Jun 24, 2020 16:30 -0800
 --->
 
 Features:
-* New configuration option `k8s_logs` allows configuring of Kubernetes logs similarly to the `logs` configuration option. Please see the [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
+* New configuration feature `k8s_logs` allows configuring of Kubernetes logs similarly to the `logs` configuration but matches based on Kubernetes pod, namespace, and container name. Please see the [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#217-serenity---june-24-2020) for more details.
 
 Buf fixes:
 * Fixed race condition that sometimes resulted in duplicated K8s logs being uploaded on agent restart or configuration update.
