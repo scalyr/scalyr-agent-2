@@ -151,14 +151,15 @@ def download_artifact_file(artifact_info, output_path):
             file.write(chunk)
 
 
-def trigger_pipeline(branch_name,):
-    # type: (str) -> Dict
+def trigger_pipeline(branch_name, agent_version):
+    # type: (str, str) -> Dict
     """
     Trigger new CircleCI pipeline for the specified branch.
     :return: General information about started pipeline from CircleCI.
     """
     resp = post_request(
-        url=CIRCLE_API_PROJECT_URL + "/pipeline", json={"branch": branch_name}
+        url=CIRCLE_API_PROJECT_URL + "/pipeline",
+        json={"branch": branch_name, "parameters": {"agent-version": agent_version}},
     )
 
     resp.raise_for_status()
@@ -329,10 +330,10 @@ def download_artifacts(artifacts_to_fetch, workflow_infos, output_path):
             )
 
 
-def main(
-    branch_name, artifacts_to_fetch, output_path,
-):
-    pipeline_trigger_info = trigger_pipeline(branch_name=branch_name)
+def main(branch_name, artifacts_to_fetch, output_path, agent_version):
+    pipeline_trigger_info = trigger_pipeline(
+        branch_name=branch_name, agent_version=agent_version
+    )
 
     pipeline_number = pipeline_trigger_info["number"]
 
@@ -379,6 +380,13 @@ if __name__ == "__main__":
         help="Output path for all uploaded artifacts.",
     )
 
+    parser.add_argument(
+        "--agent-version",
+        required=True,
+        type=str,
+        help="The version of the agent package.",
+    )
+
     args = parser.parse_args()
 
     if [len(args.workflow), len(args.job), len(args.artifact_path)].count(
@@ -392,4 +400,5 @@ if __name__ == "__main__":
         branch_name=args.branch,
         artifacts_to_fetch=list(zip(args.workflow, args.job, args.artifact_path)),
         output_path=args.output_path,
+        agent_version=args.agent_version,
     )

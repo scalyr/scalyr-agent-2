@@ -61,6 +61,10 @@ parameters:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
+  agent-version:
+    description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
+    type: string
+    default: ""
 
 commands:
   unittest_tox:
@@ -1729,17 +1733,30 @@ jobs:
           name: Restore Python Dependencies Cache
           key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
 
-      - run:
-          name: Bump Version
-          shell: bash
-          command: |
-            # Update agent version to avoid version conflict with current scalyr repository package.
-            # This way we can also correctly assert that the upgrade has worked - if we didn't do
-            # that, from and to version would be the same
-            # NOTE: We can't include git revision as part of the version since it's not a valid
-            # version on Windows.
-            echo "$(cat VERSION).1" > VERSION
-            cat VERSION
+      - when:
+          condition: << pipeline.parameters.agent-version >>
+          steps:
+            - run:
+                name: Change package version to << pipeline.parameters.agent-version >>.
+                shell: bash
+                command: |
+                  echo << pipeline.parameters.agent-version >> > VERSION
+      - unless:
+          condition: << pipeline.parameters.agent-version >>
+          steps:
+            - run:
+                name: Bump Version
+                shell: bash
+                command: |
+                  # Update agent version to avoid version conflict with current scalyr repository package.
+                  # This way we can also correctly assert that the upgrade has worked - if we didn't do
+                  # that, from and to version would be the same
+                  # NOTE: We can't include git revision as part of the version since it's not a valid
+                  # version on Windows.
+
+                  echo "$(cat VERSION).1" > VERSION
+                  cat VERSION
+
 
       - run:
           name: Build MSI package
