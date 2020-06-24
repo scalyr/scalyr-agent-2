@@ -88,7 +88,20 @@ if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
 Write-Output $status_output
 
-if ("$status_output" -notmatch "$msi_version")   { Throw "Can not find version." };
+
+
+if ("$status_output" -notmatch "$msi_version")   {
+
+    $version_numbers=$msi_version.Split(".");
+    $version_first_part=$version_numbers[0..2] -join ".";
+    $version_second_part=$version_numbers[-1];
+    $pattern=$version_first_part + ".[a-zA-Z]+[0-9]+." + $version_second_part;
+
+    if ("$status_output" -notmatch "$pattern")
+    {
+        Throw "Can not find version.";
+    }
+};
 if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
 if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
