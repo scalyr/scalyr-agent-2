@@ -52,7 +52,7 @@ orbs:
 parameters:
   default_tox_version:
     type: string
-    default: "3.14.3"
+    default: "3.15.2"
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
@@ -72,7 +72,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       apt_dependencies:
         description: "Any optional apt dependencies which should be installed."
         type: string
@@ -272,7 +272,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       codespeed_executable:
         description: "CodeSpeed executable name."
         type: string
@@ -342,7 +342,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       pre_checkout_apt_dependencies:
         description: "Any optional apt dependencies which are installed before checkout step."
         type: string

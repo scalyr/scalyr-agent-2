@@ -3,7 +3,7 @@
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 
 # Testing tools and libraries
-tox==3.14.3
+tox==3.15.2
 mock==3.0.5
 psutil==5.7.0
 pytest==4.6.9; python_version < '3.0'
