@@ -46,13 +46,13 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
-  win: circleci/windows@2.2.0
+  win: circleci/windows@2.4.0
 
 # Global workflow level parameters
 parameters:
   default_tox_version:
     type: string
-    default: "3.14.3"
+    default: "3.15.2"
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
@@ -72,7 +72,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       apt_dependencies:
         description: "Any optional apt dependencies which should be installed."
         type: string
@@ -272,7 +272,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       codespeed_executable:
         description: "CodeSpeed executable name."
         type: string
@@ -342,7 +342,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.14.3"
+        default: "3.15.2"
       pre_checkout_apt_dependencies:
         description: "Any optional apt dependencies which are installed before checkout step."
         type: string
@@ -882,12 +882,20 @@ jobs:
           name: Install Python Dependencies
           command: |
             python.exe --version
-            python.exe -m pip install --user --upgrade "tox==3.14.3"
-            python.exe -m pip install --user --upgrade "pip==20.0.1"
+            python.exe -m pip install --user --upgrade "tox==3.15.2"
+            python.exe -m pip install --user --upgrade "pip==20.1.1"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
-            tox.exe -epy3.5-windows-unit-tests
+            # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
+            # after the tox commands finishes. That's why we use the redirect workaround. Sadly
+            # this means we don't see output immediately as it produced (using redirect + tee also
+            # results in the job not exiting when tox command finishes).
+            tox.exe -epy3.5-windows-unit-tests > output 2>&1
+            EXIT_CODE=$?
+            cat output
+            exit ${EXIT_CODE}
+          no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
@@ -897,21 +905,20 @@ jobs:
           path: test-results
       - store_artifacts:
           path: test-results
-      # NOTE: coverage.py seems to be broken on Circle CI on Windows
-      # - run:
-      #     name: Submit Coverage Data to codecov.io
-      #     command: |
-      #       ls -la .coverage* || true
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
 
-      #       python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
-      #       cp .circleci/.coveragerc_ci .coveragerc
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            cp .circleci/.coveragerc_ci .coveragerc
 
-      #       # Print the report
-      #       coverage.exe report -i
+            # Print the report
+            coverage.exe report -i
 
-      #       # Submit it to codecov.io
-      #       coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
-      #       ./scripts/submit-codecov-data.sh
+            # Submit it to codecov.io
+            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
