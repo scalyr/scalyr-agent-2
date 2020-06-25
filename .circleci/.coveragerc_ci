@@ -15,9 +15,12 @@ omit =
     tests/ami/*
     tests/distribution/*
     tests/distribution_builders/*
+    tests/image_builder/*
     tests\ami/*
     tests\distribution\*
     tests\distribution_builders\*
+    tests\image_builder\*
     /home/circleci/scalyr-agent-2/tests/ami/*
     /home/circleci/scalyr-agent-2/tests/distribution/*
     /home/circleci/scalyr-agent-2/tests/distribution_builders/*
+    /home/circleci/scalyr-agent-2/tests/image_builder/*
