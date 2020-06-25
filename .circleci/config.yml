@@ -887,16 +887,16 @@ jobs:
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
-            echo "pre1"
+            # NOTE: If we don't redirect the output, Windows this step / job
+            # doesn't correctly exit even after the tox commands finishes.
+            # That's why we use redirect workaround. Sadly this means we don't
+            # see output immediately as it produced (using redirect + tee also
+            # results in the job not exiting when tox command finishes).
             tox.exe -epy3.5-windows-unit-tests > output 2>&1
-            echo $?
+            EXIT_CODE=$?
             cat output
-            echo "post2"
-            ps aux
-            #killall5 -9
-            #exit 0
-            ps aux
-          no_output_timeout: 1m
+            exit ${EXIT_CODE}
+          no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
@@ -906,21 +906,20 @@ jobs:
           path: test-results
       - store_artifacts:
           path: test-results
-      # NOTE: coverage.py seems to be broken on Circle CI on Windows
-      # - run:
-      #     name: Submit Coverage Data to codecov.io
-      #     command: |
-      #       ls -la .coverage* || true
+      - run:
+          name: Submit Coverage Data to codecov.io
+          command: |
+            ls -la .coverage* || true
 
-      #       python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
-      #       cp .circleci/.coveragerc_ci .coveragerc
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            cp .circleci/.coveragerc_ci .coveragerc
 
-      #       # Print the report
-      #       coverage.exe report -i
+            # Print the report
+            coverage.exe report -i
 
-      #       # Submit it to codecov.io
-      #       coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
-      #       ./scripts/submit-codecov-data.sh
+            # Submit it to codecov.io
+            coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
