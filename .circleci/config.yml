@@ -1711,27 +1711,28 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
 
       - run:
           name: Install python.
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.7.7-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.7.7-amd64.exe https://www.python.org/ftp/python/3.7.7/python-3.7.7-amd64.exe
+            if (!(Test-Path .\python_installer\python-2.7.18.amd64.msi -PathType Leaf)) {
+                wget -O .\python_installer\python-2.7.18.amd64.msi https://www.python.org/ftp/python/2.7.18/python-2.7.18.amd64.msi
             }
-            .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
+            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
+            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
 
       - save_cache:
           name: Save Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
           paths:
             - "python_installer"
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent-version >>
@@ -1761,7 +1762,7 @@ jobs:
       - run:
           name: Build MSI package
           command: |
-             .\win32\build.ps1 c:\Python37
+             .\win32\build.ps1 c:\Python27
 
               mkdir package
               mkdir artifacts
@@ -1783,7 +1784,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
