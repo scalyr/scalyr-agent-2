@@ -2,6 +2,10 @@
 
 ## 2.1.7 "Serenity" - June 24, 2020
 
+* Windows 32-bit systems are no longer supported.
+
+  If you still need support, you should not upgrade beyond version 2.1.6.
+
 * Agent configuration files now support a top level json array called `k8s_logs` which lets you specify log
   configuration for Kubernetes logs.
 
