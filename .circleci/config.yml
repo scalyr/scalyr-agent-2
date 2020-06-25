@@ -46,7 +46,7 @@ version: 2.1
 
 orbs:
   slack: circleci/slack@3.4.2
-  win: circleci/windows@2.2.0
+  win: circleci/windows@2.4.0
 
 # Global workflow level parameters
 parameters:
@@ -883,15 +883,20 @@ jobs:
           command: |
             python.exe --version
             python.exe -m pip install --user --upgrade "tox==3.15.2"
-            python.exe -m pip install --user --upgrade "pip==20.0.1"
+            python.exe -m pip install --user --upgrade "pip==20.1.1"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
             echo "pre1"
-            #tox.exe -epy3.5-windows-unit-tests
-            echo "post2"
+            tox.exe -epy3.5-windows-unit-tests > output 2>&1
             echo $?
-            exit 0
+            cat output
+            echo "post2"
+            ps aux
+            #killall5 -9
+            #exit 0
+            ps aux
+          no_output_timeout: 1m
       - save_cache:
           name: Save Python Dependencies Cache
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
@@ -2056,9 +2061,9 @@ jobs:
 
 workflows:
   version: 2
-  static-analysis:
-    jobs:
-      - lint-checks
+  # static-analysis:
+  #   jobs:
+  #     - lint-checks
   unit-tests:
     # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
     # Python 3 versions
@@ -2122,8 +2127,8 @@ workflows:
       #         <<: *master_and_release_only
   benchmarks:
     jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
+      #- benchmarks-micro-py-27
+      #- benchmarks-micro-py-35
       - benchmarks-idle-agent-py-27:
           <<: *benchmarks_master_and_release_only
       - benchmarks-idle-agent-py-35:
