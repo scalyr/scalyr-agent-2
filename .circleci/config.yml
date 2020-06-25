@@ -882,7 +882,7 @@ jobs:
           name: Install Python Dependencies
           command: |
             python.exe --version
-            python.exe -m pip install --user --upgrade "tox==3.14.3"
+            python.exe -m pip install --user --upgrade "tox==3.15.2"
             python.exe -m pip install --user --upgrade "pip==20.0.1"
       - run:
           name: Run Unit Tests under Python 3.5
