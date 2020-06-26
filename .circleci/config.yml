@@ -1729,15 +1729,15 @@ jobs:
             export PYTHONPATH=.
             ./scripts/send-benchmark-completion-notification-to-slack.py /tmp/codespeed-screenshots/
 
-  smoke-standalone-38-rate-limit:
+  smoke-standalone-35-rate-limit:
     working_directory: ~/scalyr-agent-2
     environment:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.5
     steps:
       - smoke-standalone-tox:
-          python_version: "3.8"
-          tox_target: "py3.8-smoke-tests-rate-limit"
+          python_version: "3.5"
+          tox_target: "py3.5-smoke-tests-rate-limit"
 
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
@@ -2086,6 +2086,7 @@ workflows:
       - smoke-standalone-26
       - smoke-standalone-27
       - smoke-standalone-35
+      - smoke-standalone-35-rate-limit
       - smoke-standalone-26-tls12
       - smoke-standalone-27-tls12
        # NOTE: smoke test jobs below still use old smoke tests framework
