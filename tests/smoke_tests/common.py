@@ -72,11 +72,11 @@ def _test_standalone_smoke(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
     if rate_limited:
-        data_json_verifier = DataJsonVerifier(
+        data_json_verifier = DataJsonVerifierRateLimited(
             runner, compat.os_environ_unicode["SCALYR_SERVER"]
         )
     else:
-        data_json_verifier = DataJsonVerifierRateLimited(
+        data_json_verifier = DataJsonVerifier(
             runner, compat.os_environ_unicode["SCALYR_SERVER"]
         )
     system_metrics_verifier = SystemMetricsVerifier(
