@@ -396,7 +396,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         """
         self.prepare()
 
-        time.sleep(4.5)  # Give some time for the lines to be uploaded
+        time.sleep(14.5)  # Give some time for the lines to be uploaded
 
         # We shouldnrt need to call this, but testing things currently
         return super(DataJsonVerifierRateLimited, self).verify(timeout=timeout)
