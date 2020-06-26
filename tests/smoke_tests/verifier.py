@@ -359,6 +359,83 @@ class DataJsonVerifier(AgentVerifier):
         return True
 
 
+class DataJsonVerifierRateLimited(AgentVerifier):
+    """
+    """
+
+    def __init__(self, runner, server_address):
+        super(DataJsonVerifierRateLimited, self).__init__(runner, server_address)
+
+        self._data_json_log_path = self._runner.add_log_file(
+            self._runner.agent_logs_dir_path / "data.log"
+        )
+        self._timestamp = datetime.datetime.now().isoformat()
+
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
+            "$logfile=='{0}'".format(
+                self._runner.get_file_path_text(self._data_json_log_path)
+            )
+        )
+        self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
+
+        self._lines_count = 1000
+        self._expected_lines_uploaded = 200
+
+    def prepare(self):
+        print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
+        for i in range(self._lines_count):
+            json_data = json.dumps({"count": i, "stream_id": self._timestamp})
+            self._runner.write_line(self._data_json_log_path, json_data)
+        return
+
+    def verify(self, timeout=2 * 60):
+        """
+        We only need to check at one point in time and confirm that the amount of lines uploaded is roughly equal to
+        what we expect to be uploaded with the given rate.
+        """
+        time.sleep(2)  # Give some time for the lines to be uploaded
+        return self._verify()
+
+    def _verify(self):
+        try:
+            response = self._request.send()
+        except Exception:
+            print("Query failed.")
+            return False
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
+        matches = response["matches"]
+        if len(matches) < self._expected_lines_uploaded - (
+            self._expected_lines_uploaded * 0.1
+        ):
+            print(
+                "Not enough log lines were found (found %s, expected %s +- 10%%)."
+                % (len(matches), self._lines_count)
+            )
+            return False
+        if len(matches) > self._expected_lines_uploaded - (
+            self._expected_lines_uploaded * 0.1
+        ):
+            print(
+                "Too many log lines were found (found %s, expected %s +- 10%%)."
+                % (len(matches), self._lines_count)
+            )
+            return False
+
+        matches = [json.loads(m["message"]) for m in matches]
+
+        if not all([m["stream_id"] == self._timestamp for m in matches]):
+            print("Some of the fetched lines have wrong 'stream_id'")
+            return False
+
+        return True
+
+
 class SystemMetricsVerifier(AgentVerifier):
     """
     Verifier that checks that linux_system_metrics.log file was uploaded to the Scalyr server.

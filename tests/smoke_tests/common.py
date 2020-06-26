@@ -27,6 +27,7 @@ from scalyr_agent.__scalyr__ import DEV_INSTALL, get_package_root
 from tests.smoke_tests.verifier import (
     AgentLogVerifier,
     DataJsonVerifier,
+    DataJsonVerifierRateLimited,
     SystemMetricsVerifier,
     ProcessMetricsVerifier,
 )
@@ -51,7 +52,9 @@ def _create_data_json_file(runner, data_json_verifier):
         pass
 
 
-def _test_standalone_smoke(agent_installation_type, python_version=None):
+def _test_standalone_smoke(
+    agent_installation_type, python_version=None, rate_limited=False
+):
     """
     Agent standalone test to run within the same machine.
     """
@@ -68,9 +71,14 @@ def _test_standalone_smoke(agent_installation_type, python_version=None):
     agent_log_verifier = AgentLogVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
-    data_json_verifier = DataJsonVerifier(
-        runner, compat.os_environ_unicode["SCALYR_SERVER"]
-    )
+    if rate_limited:
+        data_json_verifier = DataJsonVerifier(
+            runner, compat.os_environ_unicode["SCALYR_SERVER"]
+        )
+    else:
+        data_json_verifier = DataJsonVerifierRateLimited(
+            runner, compat.os_environ_unicode["SCALYR_SERVER"]
+        )
     system_metrics_verifier = SystemMetricsVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
