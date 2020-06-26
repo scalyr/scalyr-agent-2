@@ -396,7 +396,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         """
         self.prepare()
 
-        time.sleep(2)  # Give some time for the lines to be uploaded
+        time.sleep(4.5)  # Give some time for the lines to be uploaded
         return self._verify()
 
     def _verify(self):
