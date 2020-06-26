@@ -394,6 +394,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         We only need to check at one point in time and confirm that the amount of lines uploaded is roughly equal to
         what we expect to be uploaded with the given rate.
         """
+        self.prepare()
+
         time.sleep(2)  # Give some time for the lines to be uploaded
         return self._verify()
 
