@@ -1710,8 +1710,22 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          name: Restore Pyinstaller Cache
-          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
+          name: Restore Python installer Cache
+          key: windows-python-installer-python-{{ .Branch }}-python-installer-cache
+
+      - restore_cache:
+          name: Restore Wix cache
+          key: windows-wix-cache-{{ .Branch }}
+
+      - run:
+          name: Install python.
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir wix311_binaries -Force
+            if (!(Test-Path .\wix\wix311-binaries.zip -PathType Leaf)) {
+              wget https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -OutFile wix311_binaries\wix311-binaries.zip
+            }
+            Expand-Archive -LiteralPath wix311_binaries\wix311-binaries.zip -DestinationPath C:\wix311
 
       - run:
           name: Install python.
@@ -1723,6 +1737,12 @@ jobs:
             }
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+
+      - save_cache:
+          name: Save Wix Cache
+          key: windows-wix-cache-{{ .Branch }}
+          paths:
+            - "wix311_binaries"
 
       - save_cache:
           name: Save Pyinstaller Cache
@@ -1762,7 +1782,9 @@ jobs:
       - run:
           name: Build MSI package
           command: |
-             .\win32\build.ps1 c:\Python27
+              $Env:WIX = "C:\wix311"
+              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              c:\Python27\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
