@@ -1722,7 +1722,7 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir wix311_binaries -Force
-            if (!(Test-Path .\wix\wix311-binaries.zip -PathType Leaf)) {
+            if (!(Test-Path .\wix311_binaries\wix311-binaries.zip -PathType Leaf)) {
               wget https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -OutFile wix311_binaries\wix311-binaries.zip
             }
             Expand-Archive -LiteralPath wix311_binaries\wix311-binaries.zip -DestinationPath C:\wix311
