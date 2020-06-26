@@ -327,6 +327,11 @@ class DataJsonVerifier(AgentVerifier):
             print("Query failed.")
             return
 
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return
+
         matches = response["matches"]
         if len(matches) < self._lines_count:
             print(

@@ -1,5 +1,87 @@
 # Release Notes
 
+## 2.1.7 "Serenity" - June 24, 2020
+
+* Windows 32-bit systems are no longer supported.
+
+  If you still need support, you should not upgrade beyond version 2.1.6.
+
+* Agent configuration files now support a top level json array called `k8s_logs` which lets you specify log
+  configuration for Kubernetes logs.
+
+  For example, you could create a new config snippet containing the following values:
+
+  ```
+  {
+    "k8s_logs": [
+      {
+        "k8s_pod_glob": "*nginx*",
+        "attributes": {
+          "parser": "nginxParser"
+        }
+      }
+    ]
+  }
+  ```
+
+  and any pod whose name matches the glob `*nginx*` will be configured to use the parser `nginxParser`.
+
+  The log configuration snippet can contain the same configuration options as those from  [`logs`
+  section](https://app.scalyr.com/help/scalyr-agent?#logUpload), with the exception that you don't need to specify a log
+  path because the configuration will be applied based on whether pod metadata matches various glob patterns.
+
+  You can currently specify glob patterns for the pod name, the pod namespace, and the name of the container specified
+  in the k8s pod yaml using the fields `k8s_pod_glob`, `k8s_namespace_glob` and `k8s_container_glob` respectively.
+
+  Each of these globs default to `*` (match everything), and a log config will only be applied if all three of these
+  globs match for a specific container's logs.
+
+  Only a single log config will be applied for any given container, and logs are matched on a "first come, first served"
+  basis determined by the order in which they appear in the config file.  This means that you should define more
+  specific config rules before more general ones.
+
+  Here is a more complex log configuration that modifies the name of the logfile shown in the Scalyr UI, to include pod
+  namespace and pod name, and that then also samples only 10% of any log messages that contain DEBUG:
+
+  ```
+  {
+    "k8s_logs": [
+      {
+        // configure rename rule and sampling for myApp
+        "k8s_pod_glob": "myApp*",
+        "k8s_namespace_glob": "backend",
+        "sampling_rules": [
+          { match_expression: "DEBUG", sampling_rate: 0.1 }
+        ],
+        // also specify a rename rule
+        "rename_logfile": "/k8s/${pod_namespace}/${pod_name}/${k8s_container_name}.log"
+      },
+      {
+        // this configuration will match every other container because
+        // k8s_pod_glob, k8s_namespace_glob and k8s_container_glob all default to `*`
+        "rename_logfile": "/k8s/${pod_namespace}/${pod_name}/${k8s_container_name}.log"
+      }
+    ]
+  }
+  ```
+
+  Note that for [`rename_logfile`](https://app.scalyr.com/help/scalyr-agent?#logFileRenaming) the field can contain one
+  or more predefined variables which will be replaced at runtime with the appropriate values.  The variables currently
+  allowed include:
+
+  * `${pod_name}` - the name of the pod
+  * `${pod_namespace}` - the namespace of the pod
+  * `${k8s_container_name}` - the name of the container in the k8s pod spec
+  * `${node_name}` - the name of the node
+  * `${controller_name}` - the name of the controller running the pod (e.g. the deployment name, or the cronjob name and so on).
+  * `${short_id}` the first 8 characters of the container's ID
+  * `${container_id}` the full container ID
+  * `${container_name}` the container name used by the container runtime
+  * `${container_runtime}` the runtime used for this container (e.g. `docker`, `containerd` etc)
+
+  If [pod annotations](https://app.scalyr.com/help/scalyr-agent-k8s?#annotations-config) are used to configure a pod,
+  then any config option defined in the annotations will override the values specified in the `k8s_log` snippets.
+
 ## 2.1.6 "Rama" - June 4, 2020
 
 * There are a number of new default overrides to increase Agent throughput:
@@ -36,7 +118,7 @@
   (`w`).
 
   Other examples include: `1.5MB/s`, `5GB/d`, `200KiB/s`.
-  
+
   Note, this will rate limit in terms of raw log bytes uploaded to Scalyr which may not be same as charged log volume
   if you have additional fields and other enrichments turned on.
 

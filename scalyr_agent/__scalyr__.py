@@ -185,23 +185,25 @@ def __determine_version():
     """Returns the agent version number, read from the VERSION file.
     """
 
+    file_names = ["VERSION"]
+
     if __is_frozen__:
-        version_file_name = "VERSION.txt"
-    else:
-        version_file_name = "VERSION"
+        # also check for VERSION.txt file because there is a reserved filename - "VERSION" in Pyinstaller,
+        # and it expects that this file is a DLL.
+        file_names.append("VERSION.txt")
 
-    # This file can be either in the package root or the install root (if you examine the cases
-    # from above).  So, just check both locations.
+    def find_path():
+        # This file can be either in the package root or the install root (if you examine the cases
+        # from above).  So, just check both locations.
+        for root in [get_install_root(), get_package_root()]:
+            for file_name in file_names:
+                path = os.path.join(root, file_name)
+                if os.path.isfile(path):
+                    return path
 
-    in_install = os.path.join(get_install_root(), version_file_name)
-    in_package = os.path.join(get_package_root(), version_file_name)
-
-    if os.path.isfile(in_package):
-        version_path = in_package
-    elif os.path.isfile(in_install):
-        version_path = in_install
-    else:
         raise Exception("Could not locate VERSION file!")
+
+    version_path = find_path()
 
     version_fp = open(version_path, "r")
     try:

@@ -129,6 +129,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
 
 EC2_DISTRO_DETAILS_MAP = {
+    # Debian based distros
     "ubuntu1404": {
         "image_id": "ami-07957d39ebba800d5",
         "image_name": "Ubuntu Server 14.04 LTS (HVM)",
@@ -150,6 +151,14 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
+    "debian1003": {
+        "image_id": "ami-0b9a611a02047d3b1",
+        "image_name": "Debian 10 Buster",
+        "size_id": "t2.micro",
+        "ssh_username": "admin",
+        "default_python_package_name": "python",
+    },
+    # RHEL based distros
     # NOTE: Currently doesn't work with 4096 RSA keys due to paramiko issues
     # Need to use 2048 bit key to test this one
     "centos6": {
@@ -173,6 +182,14 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
+    "amazonlinux2": {
+        "image_id": "ami-09d95fab7fff3776c",
+        "image_name": "Amazon Linux 2 AMI (HVM), SSD Volume Type",
+        "size_id": "t2.micro",
+        "ssh_username": "ec2-user",
+        "default_python_package_name": "python",
+    },
+    # Windows
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
@@ -275,10 +292,11 @@ def main(
     to_version,
     python_package,
     installer_script_url,
+    additional_packages=None,
     destroy_node=False,
     verbose=False,
 ):
-    # type: (str, str, str, str, str, str, bool, bool) -> None
+    # type: (str, str, str, str, str, str, str, bool, bool) -> None
 
     # deployment objects for package files will be stored here.
     file_upload_steps = []
@@ -327,7 +345,11 @@ def main(
         package_type = "windows"
         script_extension = "ps1"
     else:
-        package_type = "deb" if distro.startswith("ubuntu") else "rpm"
+        package_type = (
+            "deb"
+            if distro.startswith("ubuntu") or distro.startswith("debian")
+            else "rpm"
+        )
         script_extension = "sh"
 
     script_filename = "test_%s.%s.j2" % (package_type, script_extension)
@@ -351,6 +373,7 @@ def main(
         install_package=install_package_info,
         upgrade_package=upgrade_package_info,
         installer_script_url=installer_script_url,
+        additional_packages=additional_packages,
         verbose=verbose,
     )
 
@@ -458,9 +481,10 @@ def render_script_template(
     install_package=None,
     upgrade_package=None,
     installer_script_url=None,
+    additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -481,6 +505,7 @@ def render_script_template(
 
     template_context["install_package"] = install_package
     template_context["upgrade_package"] = upgrade_package
+    template_context["additional_packages"] = additional_packages
 
     template_context["verbose"] = verbose
 
@@ -523,7 +548,7 @@ def destroy_node_and_cleanup(driver, node):
         destroy_volume_with_retry(driver=driver, volume=volume)
 
 
-def destroy_volume_with_retry(driver, volume, max_retries=10, retry_sleep_delay=5):
+def destroy_volume_with_retry(driver, volume, max_retries=12, retry_sleep_delay=5):
     # type: (NodeDriver, StorageVolume, int, int) -> bool
     """
     Destroy the provided volume retrying up to max_retries time if destroy fails because the volume
@@ -611,6 +636,12 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--additional-packages",
+        help=("Optional string of additional system level packages to install."),
+        required=False,
+    )
+
+    parser.add_argument(
         "--installer-script-url",
         help=("URL to the installer script to use."),
         default=DEFAULT_INSTALLER_SCRIPT_URL,
@@ -631,13 +662,6 @@ if __name__ == "__main__":
         default=False,
     )
     args = parser.parse_args(sys.argv[1:])
-
-    if args.distro == "centos8" and args.type == "upgrade":
-        raise ValueError(
-            "upgrade test is not supported on CentOS 8, because scalyr-agent-2 "
-            '2.0.x package depends on "python" package which is not available on '
-            "CentOS 8."
-        )
 
     if args.type == "install" and not args.to_version:
         raise ValueError("--to-version needs to be provided for install test")
@@ -685,6 +709,7 @@ if __name__ == "__main__":
         to_version=args.to_version,
         python_package=args.python_package,
         installer_script_url=args.installer_script_url,
+        additional_packages=args.additional_packages,
         destroy_node=not args.no_destroy_node,
         verbose=args.verbose,
     )

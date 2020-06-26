@@ -212,6 +212,7 @@ class AgentRunner(object):
                 args = [
                     "coverage",
                     "run",
+                    "--branch",
                     "--concurrency=thread",
                     "--parallel-mode",
                     " ".join(base_args),

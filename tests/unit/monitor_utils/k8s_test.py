@@ -29,14 +29,18 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sApiNotFoundException,
     K8sApiTemporaryError,
     K8sApiPermanentError,
+    K8sConfigBuilder,
     ApiQueryOptions,
     K8sNamespaceFilter,
 )
+from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.configuration import Configuration
+
+from tests.unit.configuration_test import TestConfigurationBase
 
 import time
 
@@ -164,6 +168,290 @@ class Test_K8sCache(ScalyrTestCase):
             ignore_k8s_api_exception=True,
         )
         self.assertIsNone(obj)
+
+
+class TestK8sConfigBuilder(TestConfigurationBase):
+    """
+    Tests the Kubernetes Log Config builder
+    """
+
+    def setUp(self):
+        super(TestK8sConfigBuilder, self).setUp()
+
+        self.info = {
+            "log_path": "/var/log/test.log",
+        }
+
+        self.k8s_info = {
+            "pod_name": "test_pod",
+            "pod_namespace": "test_namespace",
+            "k8s_container_name": "test_container",
+        }
+
+        self.parser = "defaultTestParser"
+
+        self.logger = mock.Mock()
+
+    def test_no_log_path(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        info = {}
+        config = builder.get_log_config(info, self.k8s_info, self.parser)
+
+        self.assertTrue(config is None)
+
+    def test_no_k8s_info(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        info = {}
+        config = builder.get_log_config(info, None, self.parser)
+
+        self.assertTrue(config is None)
+
+    def test_cant_change_path(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "path": "/no/change/allowed.log",
+                "test": "testy"
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser)
+
+        self.assertEqual("testy", config["test"])
+        self.assertEqual("/var/log/test.log", config["path"])
+
+    def test_default_rename_logfile(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "test": "test"
+              },
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual(
+            "/${container_runtime}/${container_name}.log", config["rename_logfile"]
+        )
+
+    def test_pod_glob(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_pod_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "k8s_pod_glob": "test*",
+                "test": "match_pod",
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual("match_pod", config["test"])
+
+    def test_namespace_glob(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_namespace_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "k8s_namespace_glob": "test*",
+                "test": "match_namespace",
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual("match_namespace", config["test"])
+
+    def test_k8s_container_glob(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_container_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "k8s_container_glob": "test*",
+                "test": "match_container",
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual("match_container", config["test"])
+
+    def test_multi_match(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_pod_glob": "no_match",
+                "k8s_namespace_glob": "no_match",
+                "k8s_container_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "k8s_pod_glob": "*pod*",
+                "k8s_namespace_glob": "*namespace*",
+                "k8s_container_glob": "*container*",
+                "test": "multi match",
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual("multi match", config["test"])
+
+    def test_no_glob_match(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_pod_glob": "no_match",
+                "test": "no_match",
+              },
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertFalse("test" in config)
+
+    def test_default_match(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                attributes: {
+                  "foo": "bar",
+                  "baz": "boo",
+                },
+                testTest: "test",
+
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        builder = K8sConfigBuilder(
+            config.k8s_log_configs, self.logger, rename_no_original=True
+        )
+
+        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+
+        self.assertEqual(self.parser, config["parser"])
+        self.assertEqual(self.info["log_path"], config["path"])
+        self.assertEqual("json", config["parse_format"])
+        expected = JsonObject({"baz": "boo", "foo": "bar"})
+        self.assertEqual(expected, config["attributes"])
+        self.assertEqual("test", config["testTest"])
 
 
 class TestKubernetesApi(ScalyrTestCase):

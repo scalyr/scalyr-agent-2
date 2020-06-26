@@ -15,20 +15,60 @@
 
 # Script which runs AMI based install and upgrade tests for various distros in
 # parallel.
-
-echo "Runing AMI sanity tests concurrently in the background (this may take up to 5 minutes)..."
-
+#
+# Usage: run-ami-tests-in-bg-sh [stable|development]
+#
 # Create directory which output log files will be saved
 mkdir -p outputs
 
-# run sanity test for each image concurrently in backgroung.
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012.log &
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016.log &
-python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604.log &
-python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404.log &
-python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm &> outputs/centos7.log &
+TEST_TYPE="$1"
+
+if [ -z "${INSTALLER_SCRIPT_URL}" ]; then
+    echo "INSTALLER_SCRIPT_URL environment variable not set"
+    exit 1
+fi
+
+if [ "${TEST_TYPE}" != "stable" ] && [ "${TEST_TYPE}" != "development" ]; then
+    echo "Test type: 'stable' or 'development' must be specified."
+    exit 1
+fi
+
+echo "Running AMI sanity tests concurrently in the background (this may take up to 5 minutes and no output may be produced by this script for up to 3 minutes)..."
+echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
+echo ""
+
+if [ "${TEST_TYPE}" == "stable" ]; then
+  echo "Run sanity tests for the stable package versions."
+
+  # Run sanity test for each image concurrently in background
+  # Tests below utilize installer script to test installing latest stable version of the package
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1804-install.log &
+  # NOTE: Here we also install "yum-utils" package so we test a regression where our installer
+  # would incorrectly detect yum as a package manager on Ubuntu system with yum-utils installed
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=install --to-version=current --additional-packages=yum-utils --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1604-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1404-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/debian1003-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos7 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos7-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos8 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos8-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/amazonlinux2-install.log &
+else
+  echo "Run sanity tests for the new packages from the current revision."
+
+  # Tests below install package which is built as part of a Circle CI job
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+
+  # Tests below install latest stable version using an installer script and then upgrade to a
+  # version which was built as part of a Circle CI job
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/debian1003-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos7-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos8 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos8-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/amazonlinux2-upgrade.log &
+fi
 
 # Store command line args and log paths for all the jobs for a friendlier output on failure
 JOBS_COMMAND_LINE_ARGS=()
@@ -40,7 +80,9 @@ do
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
 
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
-    JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}.log"
+    TEST_TYPE=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "type=" '{print $2}' | awk '{print $1}')
+
+    JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
 done
 
 echo ""

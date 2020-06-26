@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import fnmatch
 import hashlib
 import os
 import random
@@ -2398,6 +2399,137 @@ class KubeletApi(object):
 
     def query_stats(self):
         return self.query_api("/stats/summary")
+
+
+class K8sConfigBuilder(object):
+    """Builds log configs for containers based on config snippets found in the `k8s_logs` field of
+    the config file.
+    """
+
+    def __init__(
+        self,
+        k8s_log_configs,
+        logger,
+        rename_no_original,
+        rename_logfile=None,
+        parse_format="json",
+    ):
+        """
+        @param k8s_log_configs: The config snippets from the configuration
+        @param logger: A scalyr logger
+        @param rename_no_original: A bool, used to prevent the original log file name from being added to the attributes.
+        @param rename_logfile: A value for renaming a logfile - can contain variable substitutions
+        @param parse_format: The parse format of this log config
+        """
+
+        if rename_logfile is None:
+            rename_logfile = "/${container_runtime}/${container_name}.log"
+
+        self.__k8s_log_configs = k8s_log_configs
+        self._logger = logger
+        self.__rename_logfile = rename_logfile
+        self.__rename_no_original = rename_no_original
+        self.__parse_format = parse_format
+
+    def _check_match(self, element, name, value, glob):
+        """
+        Checks to see if we have a match against the glob for a certain value
+        @param element: The index number of the element in the k8s_config list
+        @param name: A string containing the name of the field we are evaluating (used for debug log purposes)
+        @param value: The value of the field to evaluate the glob against
+        @param glob: A string containing a glob to evaluate
+        """
+        result = False
+        if glob is not None and value is not None:
+            # ignore this config if value doesn't match the glob
+            if fnmatch.fnmatch(value, glob):
+                result = True
+            else:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Ignoring k8s_log item %d because %s '%s' doesn't match '%s'"
+                    % (element, name, value, glob,),
+                )
+        return result
+
+    def get_log_config(self, info, k8s_info, parser):
+        """
+        Creates a log_config from various attributes and then applies any `k8s_logs` configs that
+        might apply to this log
+        @param info: A dict containing docker information about the container we are creating a config for
+        @param k8s_info: A dict containing k8s information about the container we are creating a config for
+        @param parser: A string containing the name of the parser to use for this log config
+        @return: A dict containing a log_config, or None if we couldn't create a valid config (i.e. log_path was empty)
+        """
+
+        # Make sure we have a log_path for the log config
+        path = info.get("log_path", None)
+        if not path:
+            return None
+
+        # Build up the default config that we will use
+        result = {
+            "parser": parser,
+            "path": path,
+            "parse_format": self.__parse_format,
+            "rename_logfile": self.__rename_logfile,
+            "rename_no_original": self.__rename_no_original,
+        }
+
+        # If we don't have any k8s information then we don't match against k8s_log_configs
+        if k8s_info is None:
+            return result
+
+        # Now apply log configs
+        for i, config in enumerate(self.__k8s_log_configs):
+            # We check for glob matches against `k8s_pod_glob`, `k8s_namespace_glob` and `k8s_container_glob`
+
+            # Check for the pod glob
+            pod_glob = config.get("k8s_pod_glob", None)
+            pod_name = k8s_info.get("pod_name", None)
+            if not self._check_match(i, "pod_name", pod_name, pod_glob):
+                continue
+
+            # Check for the namespace glob
+            namespace_glob = config.get("k8s_namespace_glob", None)
+            pod_namespace = k8s_info.get("pod_namespace", None)
+            if not self._check_match(i, "pod_namespace", pod_namespace, namespace_glob):
+                continue
+
+            # Check for the k8s container name glob
+            container_glob = config.get("k8s_container_glob", None)
+            k8s_container = k8s_info.get("k8s_container_name", None)
+            if not self._check_match(
+                i, "k8s_container_name", k8s_container, container_glob
+            ):
+                continue
+
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_2,
+                "Applying k8s_log config item %d.  Matched pod_name ('%s', '%s'), pod_namespace ('%s', '%s'),  k8s_container_name ('%s', '%s')"
+                % (
+                    i,
+                    pod_name,
+                    pod_glob,
+                    pod_namespace,
+                    namespace_glob,
+                    k8s_container,
+                    container_glob,
+                ),
+            )
+            # We have the first matching config.  Apply the log config and break
+            # Note, we can't just .update() because we may need to exclude `path`
+            for key, value in six.iteritems(config):
+                # Ignore `path` so people can't override it
+                if key == "path":
+                    continue
+                else:
+                    result[key] = value
+
+            # Done
+            break
+
+        return result
 
 
 class DockerMetricFetcher(object):

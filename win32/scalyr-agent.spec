@@ -14,39 +14,44 @@
 # limitations under the License.
 
 
+import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 
 block_cipher = None
 
+windows_monitors = ['windows_process_metrics', 'windows_system_metrics', 'windows_event_log_monitor']
+
+if sys.platform == "win32":
+    monitors = ["scalyr_agent.builtin_monitors." + m for m in windows_monitors]
+else:
+    monitors = []
+
 
 main_a = Analysis(['source_root\\scalyr_agent\\agent_main.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
 				'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
-			 hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
+			 hiddenimports = monitors,
              datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses'), ('data_files\\build_info', '.')],
 )
 
 config_a = Analysis(['source_root\\scalyr_agent\\config_main.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
                 'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2'
 				],
-             hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
+             hiddenimports = monitors,
              datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses'), ('data_files\\build_info', '.')],
              )
 
 service_a = Analysis(['source_root\\scalyr_agent\\platform_windows.py'],
              pathex=[
-                'source_root\\scalyr_agent\\builtin_monitors',
                 'source_root\\scalyr_agent\\third_party',
 				'source_root\\scalyr_agent\\third_party_python2',
 				],
-             hiddenimports = collect_submodules('scalyr_agent.builtin_monitors') + ['pkg_resources.py2_warn'],
+             hiddenimports = monitors,
              datas=[('data_files\\VERSION.txt', '.'), ('data_files\\licenses', 'third_party_licenses'), ('data_files\\build_info', '.')],
              )
 

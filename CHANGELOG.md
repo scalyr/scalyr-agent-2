@@ -1,6 +1,21 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.7 "Serenity" - June 24, 2020
+
+<!---
+Packaged by Yan Shnayder <yan@scalyr.com> on Jun 24, 2020 16:30 -0800
+--->
+
+Features:
+* New configuration feature `k8s_logs` allows configuring of Kubernetes logs similarly to the `logs` configuration but matches based on Kubernetes pod, namespace, and container name. Please see the [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#217-serenity---june-24-2020) for more details.
+
+Bug fixes:
+* Fixed race condition that sometimes resulted in duplicated K8s logs being uploaded on agent restart or configuration update.
+
+Misc:
+* The Windows package is now built using `pyInstaller` instead of `py2exe`.  As part of the change, we are no longer supporting 32-bit Windows systems.  Nothing else should change due move to `py2Installer`.
+
 ## 2.1.6 "Rama" - June 4, 2020
 
 <!---

@@ -234,10 +234,9 @@ def build_win32_installer_package(variant, version):
     # entry in it, and it does not have '.' in it.  We leave a copy of __scalyr__.py in the original scalyr_agent
     # directory because we need it there when we execute setup.py.  For the same reason, we put a copy of VERSION.
     shutil.copy(convert_path("scalyr_agent/__scalyr__.py"), "__scalyr__.py")
-    shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION.txt")
+    shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION")
     shutil.copy(
-        make_path(agent_source_root, "VERSION"),
-        convert_path("scalyr_agent/VERSION.txt"),
+        make_path(agent_source_root, "VERSION"), convert_path("scalyr_agent/VERSION"),
     )
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
@@ -264,6 +263,9 @@ def build_win32_installer_package(variant, version):
     os.chdir("data_files")
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
+
+    # make it VERSION.txt because PyInstaller on python 2 expects dll file named VERSION,
+    # and then fails with an error because of the invalid DLL loading.
     shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION.txt")
     shutil.copy(make_path(agent_source_root, "LICENSE.txt"), "LICENSE.txt")
 
