@@ -380,7 +380,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
         self._lines_count = 1000
-        self._expected_lines_uploaded = 200  # TODO: (rate * 10 seconds) / message size
+        self._expected_lines_uploaded = (
+            200  # TODO: ((rate * 10 seconds) + (rate * 4)) / message_size
+        )
 
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
@@ -412,6 +414,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
                     "Received no successful response in %s seconds. Timeout reached"
                     % (timeout)
                 )
+            print(
+                "No matching logs found yet, will retry in %s second(s)" % retry_delay
+            )
             time.sleep(retry_delay)
 
         # Give more time for upload and ingestion
@@ -451,7 +456,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         ):
             print(
                 "Not enough log lines were found (found %s, expected %s +- 10%%)."
-                % (len(matches), self._lines_count)
+                % (len(matches), self._expected_lines_uploaded)
             )
             return False
         if len(matches) > self._expected_lines_uploaded - (
@@ -459,7 +464,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         ):
             print(
                 "Too many log lines were found (found %s, expected %s +- 10%%)."
-                % (len(matches), self._lines_count)
+                % (len(matches), self._expected_lines_uploaded)
             )
             return False
 

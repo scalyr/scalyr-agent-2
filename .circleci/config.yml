@@ -1732,6 +1732,7 @@ jobs:
   smoke-standalone-35-rate-limit:
     working_directory: ~/scalyr-agent-2
     environment:
+      SCALYR_MAX_SEND_RATE_ENFORCEMENT: "4KB/s"
     docker:
       - image: circleci/python:3.5
     steps:
