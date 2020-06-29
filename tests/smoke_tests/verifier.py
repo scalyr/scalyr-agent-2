@@ -380,7 +380,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
         self._lines_count = 1000
-        self._expected_lines_uploaded = 200
+        self._expected_lines_uploaded = 200  # TODO: (rate * 10 seconds) / message size
 
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
@@ -396,10 +396,42 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         """
         self.prepare()
 
-        time.sleep(14.5)  # Give some time for the lines to be uploaded
+        # This retry delay is not between attempts to verify the payload but to get the first uploaded logs
+        retry_delay = 1
 
-        # We shouldnrt need to call this, but testing things currently
-        return super(DataJsonVerifierRateLimited, self).verify(timeout=timeout)
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
+        while True:
+            print("Verifying start of ingestion...")
+            if self._verify_ingest_began():
+                break
+
+            if time.time() >= timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+            time.sleep(retry_delay)
+
+        # Give more time for upload and ingestion
+        time.sleep(10)
+
+        return self._verify()
+
+    def _verify_ingest_began(self):
+        try:
+            response = self._request.send()
+        except Exception:
+            print("Query failed.")
+            return False
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
+        return len(response["matches"]) > 0
 
     def _verify(self):
         try:
