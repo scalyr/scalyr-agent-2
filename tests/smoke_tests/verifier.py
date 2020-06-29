@@ -379,7 +379,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         )
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
-        self._lines_count = 8000
+        self._lines_count = 5000
         # Estimate of line size
         self._line_size = len(json.dumps({"count": 0, "stream_id": self._timestamp}))
         self._expected_lines_uploaded = (1000 * (10 + 4)) / self._line_size
@@ -387,7 +387,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
         for i in range(self._lines_count):
-            json_data = json.dumps({"count": i, "stream_id": self._timestamp})
+            json_data = json.dumps(
+                {"count": i, "stream_id": datetime.datetime.now().isoformat()}
+            )
             self._runner.write_line(self._data_json_log_path, json_data)
         return
 
@@ -459,7 +461,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
                 % (len(matches), self._expected_lines_uploaded)
             )
             return False
-        if len(matches) > self._expected_lines_uploaded - (
+        if len(matches) > self._expected_lines_uploaded + (
             self._expected_lines_uploaded * 0.1
         ):
             print(
