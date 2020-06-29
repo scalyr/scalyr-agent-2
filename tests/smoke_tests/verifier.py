@@ -387,9 +387,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
         for i in range(self._lines_count):
-            json_data = json.dumps(
-                {"count": i, "stream_id": datetime.datetime.now().isoformat()}
-            )
+            json_data = json.dumps({"count": i, "stream_id": self._timestamp})
             self._runner.write_line(self._data_json_log_path, json_data)
         return
 
