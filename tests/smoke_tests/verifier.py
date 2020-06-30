@@ -407,7 +407,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._lines_count = 5000
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
-        self._expected_lines_uploaded = (200000 * (10 + 4)) / self._line_size
+        self._expected_lines_uploaded = (200000 * 10) / self._line_size
 
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
