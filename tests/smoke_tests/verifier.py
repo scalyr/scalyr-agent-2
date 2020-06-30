@@ -494,6 +494,11 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             )
             return False
 
+        print(
+            "Enough log lines found (found %s, expected %s +- 10%%)."
+            % (len(matches), self._expected_lines_uploaded)
+        )
+
         matches = [json.loads(m["message"]) for m in matches]
 
         if not all([m["stream_id"] == self._timestamp for m in matches]):
