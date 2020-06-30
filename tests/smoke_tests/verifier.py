@@ -382,13 +382,32 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._message = {
             "count": 0,
             "stream_id": self._timestamp,
-            "randomFiller": "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb",
+            "randomFiller": "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb",
         }
 
         self._lines_count = 5000
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
-        self._expected_lines_uploaded = (1000 * (10 + 4)) / self._line_size
+        self._expected_lines_uploaded = (10000 * (10 + 4)) / self._line_size
 
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
