@@ -366,13 +366,6 @@ class DataJsonVerifierRateLimited(AgentVerifier):
     def __init__(self, runner, server_address):
         super(DataJsonVerifierRateLimited, self).__init__(runner, server_address)
 
-        self._request = ScalyrRequest(
-            server_address=self._server_address,
-            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
-            max_count=10000,
-            start_time=self._start_time,
-        )
-
         self._data_json_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "data.log"
         )
@@ -440,7 +433,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb",
         }
 
-        self._lines_count = 10000
+        self._lines_count = 5000
         self._upload_wait_time = 120
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
