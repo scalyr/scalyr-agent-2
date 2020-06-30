@@ -440,8 +440,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._expected_lines_uploaded = (
             400000
             * (
-                self._upload_wait_time + 4
-            )  # 200000 is the rate in bytes we configured in the config, +4 to account for the leaky buckets max size
+                self._upload_wait_time
+            )  # 200000 is the rate in bytes we configured in the config
         ) / self._line_size
 
     def prepare(self):
