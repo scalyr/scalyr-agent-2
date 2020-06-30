@@ -409,7 +409,10 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
         self._expected_lines_uploaded = (
-            200000 * self._upload_wait_time
+            200000
+            * (
+                self._upload_wait_time + 4
+            )  # 200000 is the rate in bytes we configured in the config, +4 to account for the leaky buckets max size
         ) / self._line_size
 
     def prepare(self):
