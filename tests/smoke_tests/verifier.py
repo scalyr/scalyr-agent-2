@@ -401,11 +401,40 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
             "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
             "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
+            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
             "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb",
         }
 
         self._lines_count = 5000
-        self._upload_wait_time = 30
+        self._upload_wait_time = 60
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
         self._expected_lines_uploaded = (
