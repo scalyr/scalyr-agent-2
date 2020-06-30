@@ -1732,7 +1732,7 @@ jobs:
   smoke-standalone-35-rate-limit:
     working_directory: ~/scalyr-agent-2
     environment:
-      SCALYR_MAX_SEND_RATE_ENFORCEMENT: "10KB/s"
+      SCALYR_MAX_SEND_RATE_ENFORCEMENT: "200KB/s"
       SCALYR_MIN_ALLOWED_REQUEST_SIZE: "100"
       SCALYR_MAX_ALLOWED_REQUEST_SIZE: "20000"
       SCALYR_DISABLE_MAX_SEND_RATE_ENFORCEMENT_OVERRIDES: "true"
