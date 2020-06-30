@@ -98,6 +98,9 @@
   Increased throughput may result in a larger amount of logs uploaded to Scalyr if the Agent has been skipping logs
   before this upgrade, and as a result a larger bill.
 
+  Increase to `max_allowed_request_size` may result in increased memory usage by the Agent, if this is an issue you may
+  wish to revert to the legacy behavior as described below.
+
   If you are interested in relying on the legacy behavior, you may set the `max_send_rate_enforcement` option to
   `legacy` either by setting it in your `agent.json` configuration file, or by setting the
   `SCALYR_MAX_SEND_RATE_ENFORCEMENT` environment variable to `legacy`.
