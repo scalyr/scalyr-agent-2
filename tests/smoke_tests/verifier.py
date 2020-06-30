@@ -405,9 +405,12 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         }
 
         self._lines_count = 5000
+        self._upload_wait_time = 30
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
-        self._expected_lines_uploaded = (200000 * 10) / self._line_size
+        self._expected_lines_uploaded = (
+            200000 * self._upload_wait_time
+        ) / self._line_size
 
     def prepare(self):
         print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
@@ -446,7 +449,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             time.sleep(retry_delay)
 
         # Give more time for upload and ingestion
-        time.sleep(10)
+        time.sleep(self._upload_wait_time)
 
         return self._verify()
 
