@@ -2144,9 +2144,7 @@ jobs:
 
             mkdir artifacts
 
-            mkdir -p ~/artifacts
-
-            pushd ~/artifacts
+            pushd artifacts
 
             bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$PUBLIC_KEY" internal
 
