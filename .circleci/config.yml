@@ -65,6 +65,10 @@ parameters:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
     default: ""
+  repo-public-key:
+    description: ""
+    type: string
+    default: ""
 
 commands:
   unittest_tox:
@@ -2079,6 +2083,86 @@ jobs:
       - store_artifacts:
           path: artifacts
 
+  build-linux2-packages:
+    description: "Build deb and rpm packages."
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie
+    environment:
+      PUBLIC_KEY: << pipeline.parameters.repo-public-key >>
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install System Dependencies
+          command: |
+            sudo apt-key update
+            sudo apt update
+            sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+
+
+            # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
+            # as a temporaty solution explicitly specify ffi version.
+            sudo gem install --no-document ffi:1.12.2 fpm
+
+      - run:
+          name: Bump Agent Version
+          command: |
+            # Update agent version to avoid version conflict with current scalyr repository package.
+            # This way we can also correctly assert that the upgrade has worked - if we didn't do
+            # that, from and to version would be the same
+            echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
+            cat VERSION
+
+      - run:
+          name: Build deb and rpm packages
+          command: |
+
+            gpg --update-trustdb
+            cat > gen-key-script \<<EOF
+            Key-Type: 1
+            Key-Length: 2048
+            Subkey-Type: 1
+            Subkey-Length: 2048
+            Name-Real: Scalyr test
+            Name-Email: Scalyr@Test.com
+            Expire-Date: 0
+            EOF
+
+
+            if [ -z "$PUBLIC_KEY" ]; then
+              sudo apt install --force-yes rng-tools
+              sudo rngd -r /dev/urandom
+              gpg --batch --gen-key gen-key-script
+
+            fi
+
+
+            echo $PUBLIC_KEY
+
+            mkdir artifacts
+
+            mkdir -p ~/artifacts
+
+            pushd ~/artifacts
+
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$PUBLIC_KEY" internal
+
+            ls
+
+
+
+#      - persist_to_workspace:
+#          root: package
+#          paths:
+#            - scalyr-agent-2.deb
+#            - scalyr-agent-2.rpm
+
+      - store_artifacts:
+          path: artifacts
+
   ami-tests-stable:
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
@@ -2102,6 +2186,7 @@ workflows:
   version: 2
   package-tests:
     jobs:
+      - build-linux2-packages
       - build-linux-packages
       - build-windows-package
       - ami-tests-development:
