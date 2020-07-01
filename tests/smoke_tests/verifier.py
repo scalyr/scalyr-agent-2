@@ -382,7 +382,10 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._message = {
             "count": 0,
             "stream_id": self._timestamp,
-            "wawawa": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fg8f8f",
+            "wawawa": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f"
+            "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f gfyfgufyu"
+            "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f gfyfgufyu"
+            "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f gfyfgufyu",
         }
 
         self._lines_count = 5000
