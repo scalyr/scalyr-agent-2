@@ -382,10 +382,6 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._message = {
             "count": 0,
             "stream_id": self._timestamp,
-            "randomFiller": "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
-            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
-            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb"
-            "bfhubevhjhgfdsdfghbnbhvgfdghjvcfgdfghghfrtyhgftryhbvftryhjbnvgftryuhfevbhfuvbefhuvbefhuvbefhvuebfhvefubvehfvbefhvucbnvhcivbhecvubhvnejdcibudehvdvb",
         }
 
         self._lines_count = 5000
@@ -393,9 +389,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
         self._expected_lines_uploaded = (
-            400000
+            1000
             * (
-                self._upload_wait_time
+                self._upload_wait_time + 4
             )  # 200000 is the rate in bytes we configured in the config
         ) / self._line_size
 
