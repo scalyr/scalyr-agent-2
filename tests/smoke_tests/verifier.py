@@ -382,6 +382,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._message = {
             "count": 0,
             "stream_id": self._timestamp,
+            "wawawa": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fg8f8f",
         }
 
         self._lines_count = 5000
