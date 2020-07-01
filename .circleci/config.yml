@@ -2149,6 +2149,8 @@ jobs:
 
             bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$PUBLIC_KEY" internal
 
+            popd
+
             mv output/build_output.tar artifacts
 
 
