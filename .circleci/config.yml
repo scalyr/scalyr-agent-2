@@ -2143,12 +2143,13 @@ jobs:
             echo $PUBLIC_KEY
 
             mkdir artifacts
+            mkdir output
 
-            pushd artifacts
+            pushd output
 
             bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$PUBLIC_KEY" internal
 
-            ls
+            mv output/build_output.tar artifacts
 
 
 
