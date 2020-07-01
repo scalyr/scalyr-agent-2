@@ -389,11 +389,11 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         }
 
         self._lines_count = 5000
-        self._upload_wait_time = 120
+        self._upload_wait_time = 20
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
         self._expected_lines_uploaded = (
-            1000
+            1000000
             * (
                 self._upload_wait_time + 4
             )  # 200000 is the rate in bytes we configured in the config
