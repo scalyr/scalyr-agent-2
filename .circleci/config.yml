@@ -2121,37 +2121,23 @@ jobs:
           command: |
 
             gpg --update-trustdb
-            cat > gen-key-script \<<EOF
-            Key-Type: 1
-            Key-Length: 2048
-            Subkey-Type: 1
-            Subkey-Length: 2048
-            Name-Real: Scalyr test
-            Name-Email: Scalyr@Test.com
-            Expire-Date: 0
-            EOF
 
+            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
 
-            if [ -z "$PUBLIC_KEY" ]; then
-              sudo apt install --force-yes rng-tools
-              sudo rngd -r /dev/urandom
-              gpg --batch --gen-key gen-key-script
-
-            fi
-
-
-            echo $PUBLIC_KEY
+            gpg --import scripts/circleci/release/public_keys/main.asc
+            gpg --import scripts/circleci/release/public_keys/alt.asc
 
             mkdir artifacts
             mkdir output
 
             pushd output
 
-            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$PUBLIC_KEY" internal
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" internal
 
             popd
 
-            mv output/build_output.tar artifacts
+            ls output
 
 
 

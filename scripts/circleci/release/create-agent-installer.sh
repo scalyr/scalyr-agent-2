@@ -1,10 +1,15 @@
 REPO_PACKAGE_VERSION="1.2.2"
 
+function die() {
+  echo "$1";
+  exit 1;
+}
+
 function create_pubkey_file() {
   if [[ $2 == "main" ]]; then
-    echo "${PUBLIC_KEY}" > $1;
+    gpg --armor --export $GPG_SIGNING_KEYID > $1;
   else
-    echo "${PUBLIC_KEY}" > $1;
+    gpg --armor --export $GPG_ALT_SIGNING_KEYID > $1;
   fi
 }
 
@@ -274,7 +279,8 @@ function create_apt_repo_packages() {
   # Apt uses a different keyid format than the RPMs or GPG, so we have to
   # construct it here.  Their keyid is the last four hexadecimal groups in
   # the fingerprint.
-  FINGERPRINT_KEYID=`gpg --with-fingerprint etc/apt/trusted.gpg.d/scalyr.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+  #FINGERPRINT_KEYID=`gpg --with-fingerprint etc/apt/trusted.gpg.d/scalyr.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+  FINGERPRINT_KEYID=GPG_SIGNING_KEYID
 
 
   create_apt_postinstall_script;
@@ -292,12 +298,12 @@ function create_apt_repo_packages() {
   create_package "deb" "main" "bootstrap";
 }
 
-PUBLIC_KEY=$1
-REPO_BASE_URL=$2
-GPG_SIGNING_KEYID="4AD7B6C6"
-REPO_INSTALLER_V2_BASE_NAME="install-scalyr-agent-2.sh"
 
-gpg --import <<< echo "$PUBLIC_KEY"
+GPG_SIGNING_KEYID=$1
+GPG_ALT_SIGNING_KEYID=$2
+REPO_BASE_URL=$3
+
+REPO_INSTALLER_V2_BASE_NAME="install-scalyr-agent-2.sh"
 
 
 create_apt_repo_packages;
