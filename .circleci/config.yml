@@ -2092,8 +2092,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
-    environment:
-      PUBLIC_KEY: << pipeline.parameters.repo-public-key >>
     steps:
       - checkout
       - restore_cache:
