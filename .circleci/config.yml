@@ -2092,6 +2092,10 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
+    environment:
+      REPO_BRANCH: "<< pipeline.parameters.repo_branch >>"
+      REPO_BASE_URL=: "<< pipeline.parameters.repo_base_url >>"
+
     steps:
       - checkout
       - restore_cache:
@@ -2136,15 +2140,11 @@ jobs:
             mkdir output
             pushd output
 
-            if [-z "<< pipeline.parameters.repo_branch >>" ]; then
-              REPO_BRANCH="<< pipeline.parameters.repo_branch >>"
-            else
+            if [-z "$REPO_BRANCH" ]; then
               REPO_BRANCH="stable"
             fi
 
-            if [-z "<< pipeline.parameters.repo_base_url >>" ]; then
-              REPO_BASE_URL="<< pipeline.parameters.repo_base_url >>"
-            else
+            if [-z "$REPO_BASE_URL" ]; then
               REPO_BASE_URL="stable"
             fi
 
