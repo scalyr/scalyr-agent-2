@@ -2125,12 +2125,13 @@ jobs:
             GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
             GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
 
+            # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
             gpg --import scripts/circleci/release/public_keys/alt.asc
 
             mkdir artifacts
-            mkdir output
 
+            mkdir output
             pushd output
 
             bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" internal
@@ -2138,8 +2139,6 @@ jobs:
             popd
 
             cp output/*.rpm output/*.deb output/install-scalyr-agent-2.sh artifacts
-
-            ls output
 
 
 
