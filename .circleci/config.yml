@@ -2140,11 +2140,11 @@ jobs:
             mkdir output
             pushd output
 
-            if [-z "$REPO_BRANCH" ]; then
+            if [ -z "$REPO_BRANCH" ]; then
               REPO_BRANCH="stable"
             fi
 
-            if [-z "$REPO_BASE_URL" ]; then
+            if [ -z "$REPO_BASE_URL" ]; then
               REPO_BASE_URL="stable"
             fi
 
