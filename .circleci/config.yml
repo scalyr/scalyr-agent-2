@@ -61,7 +61,7 @@ parameters:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
-  agent-version:
+  agent_version:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
     default: ""
@@ -1966,15 +1966,15 @@ jobs:
           key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
 
       - when:
-          condition: << pipeline.parameters.agent-version >>
+          condition: << pipeline.parameters.agent_version >>
           steps:
             - run:
-                name: Change package version to << pipeline.parameters.agent-version >>.
+                name: Change package version to << pipeline.parameters.agent_version >>.
                 shell: bash
                 command: |
-                  echo << pipeline.parameters.agent-version >> > VERSION
+                  echo << pipeline.parameters.agent_version >> > VERSION
       - unless:
-          condition: << pipeline.parameters.agent-version >>
+          condition: << pipeline.parameters.agent_version >>
           steps:
             - run:
                 name: Bump Version
