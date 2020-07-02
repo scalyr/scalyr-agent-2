@@ -361,6 +361,10 @@ class DataJsonVerifier(AgentVerifier):
 
 class DataJsonVerifierRateLimited(AgentVerifier):
     """
+    A verifier that writes 5000 large lines to data.log, then waits until it detects at least one such message in
+    Scalyr, then waits a set time before checking how many lines have been uploaded. The intent of this is to test
+    rate limiting, and as such the agent must be configured with a rate limit that is reflected in
+    `self._rate_limit_bytes_per_second`.
     """
 
     def __init__(self, runner, server_address):
@@ -457,11 +461,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._upload_wait_time = 30
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
+        self._rate_limit_bytes_per_second = 500000
         self._expected_lines_uploaded = (
-            500000
-            * (
-                self._upload_wait_time + 4
-            )  # 200000 is the rate in bytes we configured in the config
+            self._rate_limit_bytes_per_second * (self._upload_wait_time + 4)
         ) / self._line_size
 
     def prepare(self):
@@ -506,6 +508,9 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         return self._verify()
 
     def _verify_ingest_began(self):
+        """
+        Check that any lines have been uploaded, this helps keep the test consistent by working around ingest time.
+        """
         try:
             response = self._request.send()
         except Exception:
