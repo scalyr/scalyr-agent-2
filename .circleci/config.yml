@@ -2089,26 +2089,26 @@ workflows:
       - unittest-35-windows
   smoke-tests:
     jobs:
-      #- smoke-standalone-26
-      #- smoke-standalone-27
-      #- smoke-standalone-35
+      - smoke-standalone-26
+      - smoke-standalone-27
+      - smoke-standalone-35
       - smoke-standalone-35-rate-limit
-      #- smoke-standalone-26-tls12
-      #- smoke-standalone-27-tls12
+      - smoke-standalone-26-tls12
+      - smoke-standalone-27-tls12
        # NOTE: smoke test jobs below still use old smoke tests framework
-      #- smoke-docker-json
-      #- smoke-docker-syslog
-      #- smoke-k8s
-      #- smoke-monitors-tests
-      #- sonarcloud-scan:
-      #    requires:
+      - smoke-docker-json
+      - smoke-docker-syslog
+      - smoke-k8s
+      - smoke-monitors-tests
+      - sonarcloud-scan:
+          requires:
             # NOTE: This is not ideal, but Circle CI doesn't support cross
             # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
             # slowest jobs
-      #      - smoke-docker-json
-      #      - smoke-docker-syslog
-      #      - smoke-k8s
-      #      - smoke-monitors-tests
+            - smoke-docker-json
+            - smoke-docker-syslog
+            - smoke-k8s
+            - smoke-monitors-tests
   package-tests:
     jobs:
       - build-linux-packages
