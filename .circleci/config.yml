@@ -2137,6 +2137,8 @@ jobs:
 
             popd
 
+            cp output/*.rpm output/*.deb output/install-scalyr-agent-2.sh artifacts
+
             ls output
 
 
