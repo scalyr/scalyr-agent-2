@@ -1,4 +1,6 @@
-REPO_PACKAGE_VERSION="1.2.2"
+#!/bin/bash
+
+set -e;
 
 function die() {
   echo "$1";
@@ -21,9 +23,6 @@ function create_apt_postinstall_script() {
     die "You must first define fingerprint keyid.";
   fi
   cat > postinstall.sh <<EOF
-#!/bin/bash
-
-set -e;
 
 # If we are installing or updating, be sure to add the key to the rpm's
 # key ring.
@@ -302,8 +301,10 @@ function create_apt_repo_packages() {
 GPG_SIGNING_KEYID=$1
 GPG_ALT_SIGNING_KEYID=$2
 REPO_BASE_URL=$3
+REPO_BRANCH=$4
 
 REPO_INSTALLER_V2_BASE_NAME="install-scalyr-agent-2.sh"
+REPO_PACKAGE_VERSION="1.2.2"
 
 
 create_apt_repo_packages;

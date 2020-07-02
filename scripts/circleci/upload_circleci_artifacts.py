@@ -49,6 +49,7 @@ import operator
 import datetime
 import time
 import re
+import json
 
 import requests
 
@@ -151,7 +152,7 @@ def download_artifact_file(artifact_info, output_path):
             file.write(chunk)
 
 
-def trigger_pipeline(branch_name, agent_version):
+def trigger_pipeline(branch_name, pipeline_parameters):
     # type: (str, str) -> Dict
     """
     Trigger new CircleCI pipeline for the specified branch.
@@ -159,7 +160,7 @@ def trigger_pipeline(branch_name, agent_version):
     """
     resp = post_request(
         url=CIRCLE_API_PROJECT_URL + "/pipeline",
-        json={"branch": branch_name, "parameters": {"agent-version": agent_version}},
+        json={"branch": branch_name, "parameters": pipeline_parameters},
     )
 
     resp.raise_for_status()
@@ -330,9 +331,9 @@ def download_artifacts(artifacts_to_fetch, workflow_infos, output_path):
             )
 
 
-def main(branch_name, artifacts_to_fetch, output_path, agent_version):
+def main(branch_name, artifacts_to_fetch, output_path, pipeline_parameters):
     pipeline_trigger_info = trigger_pipeline(
-        branch_name=branch_name, agent_version=agent_version
+        branch_name=branch_name, pipeline_parameters=pipeline_parameters
     )
 
     pipeline_number = pipeline_trigger_info["number"]
@@ -381,10 +382,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--agent-version",
-        required=True,
+        "--pipeline-parameters",
         type=str,
-        help="The version of the agent package.",
+        help="Text string with an encoded json with CircleCI pipeline parameters.",
     )
 
     args = parser.parse_args()
@@ -400,5 +400,5 @@ if __name__ == "__main__":
         branch_name=args.branch,
         artifacts_to_fetch=list(zip(args.workflow, args.job, args.artifact_path)),
         output_path=args.output_path,
-        agent_version=args.agent_version,
+        pipeline_parameters=json.loads(args.pipeline_parameters),
     )

@@ -65,7 +65,11 @@ parameters:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
     default: ""
-  repo-public-key:
+  repo-branch:
+    description: ""
+    type: string
+    default: ""
+  repo-base-url:
     description: ""
     type: string
     default: ""
@@ -2134,7 +2138,19 @@ jobs:
             mkdir output
             pushd output
 
-            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" internal
+            if [-z "<< pipeline.parameters.repo-branch >>" ]; then
+              REPO_BRANCH="<< pipeline.parameters.repo-branch >>"
+            else
+              REPO_BRANCH="stable"
+            fi
+
+            if [-z "<< pipeline.parameters.repo-base-url >>" ]; then
+              REPO_BASE_URL="<< pipeline.parameters.repo-base-url >>"
+            else
+              REPO_BASE_URL="stable"
+            fi
+
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$REPO_BRANCH"
 
             popd
 
