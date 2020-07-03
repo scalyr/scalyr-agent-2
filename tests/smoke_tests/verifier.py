@@ -387,8 +387,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             "count": 0,
             "stream_id": self._timestamp,
             "filler": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f"
-            + "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f gfyfgufyu"
-            * 67,
+            * 69,
         }
 
         self._lines_count = 5000
