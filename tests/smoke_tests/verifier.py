@@ -594,9 +594,16 @@ class SystemMetricsVerifier(AgentVerifier):
             print("Query failed.")
             return
 
+        print("Query response received.")
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
         if len(response["matches"]) < 220:
             print("Not enough system metrics were loaded to Scalyr.")
-            return
+            return False
 
         return True
 
@@ -627,8 +634,15 @@ class ProcessMetricsVerifier(AgentVerifier):
             print("Query failed.")
             return
 
+        print("Query response received.")
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
         if len(response["matches"]) < 14:
             print("Not enough process metrics were loaded to Scalyr.")
-            return
+            return False
 
         return True
