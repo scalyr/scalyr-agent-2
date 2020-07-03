@@ -2094,7 +2094,7 @@ jobs:
       - image: circleci/python:3.6-jessie
     environment:
       REPO_BRANCH: "<< pipeline.parameters.repo_branch >>"
-      REPO_BASE_URL=: "<< pipeline.parameters.repo_base_url >>"
+      REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
 
     steps:
       - checkout
