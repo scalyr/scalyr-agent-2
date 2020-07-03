@@ -485,11 +485,34 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         retry_delay = 1
 
         start_time = time.time()
+        ingestion_start_timeout_time = start_time() + 20
+
+        print("Verifying start of ingestion...")
+        while True:
+            if self._verify_ingest_began():
+                break
+
+            if time.time() >= ingestion_start_timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+            print(
+                "No matching logs found yet, will retry in %s second(s)" % retry_delay
+            )
+            time.sleep(retry_delay)
+
+        print("Successfully verified ingestion has begun.")
+
+        # Give more time for upload and ingestion
+        time.sleep(self._upload_wait_time)
+
+        start_time = time.time()
         timeout_time = start_time + timeout
 
+        print("Verifying data has been ingested")
         while True:
-            print("Verifying start of ingestion...")
-            if self._verify_ingest_began():
+            if self._verify():
                 break
 
             if time.time() >= timeout_time:
@@ -502,10 +525,11 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             )
             time.sleep(retry_delay)
 
-        # Give more time for upload and ingestion
-        time.sleep(self._upload_wait_time)
-
-        return self._verify()
+        end_time = time.time()
+        print("Successfully verified all data has been correctly ingested.")
+        print("Success.")
+        print("Duration: %s" % (int(end_time - start_time)))
+        return True
 
     def _verify_ingest_began(self):
         """
