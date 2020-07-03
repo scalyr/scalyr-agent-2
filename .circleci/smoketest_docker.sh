@@ -35,6 +35,16 @@ syslog_or_json=$2
 # Max seconds before the test hard fails
 max_wait=$3
 
+# We don't have an easy way to update base test docker images which come bundled
+# with the smoketest.py file
+# (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
+# /tmp/smoketest.py) so we simply download this file from the github before running the tests.
+# That's not great, but it works.
+SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
+
+SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/scalyr-agent-2/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o /tmp/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
+
 #----------------------------------------------------------------------------------------
 # Everything below this script should be fully controlled by above variables
 #----------------------------------------------------------------------------------------
@@ -112,11 +122,12 @@ bash -c "${smoketest_script} ${contname_uploader} ${max_wait} \
 # Capture uploader short container ID
 uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
 echo "Uploader container ID == ${uploader_hostname}"
+echo "Using smoketest.py script from ${SMOKE_TESTS_SCRIPT_BRANCH} branch and URL ${SMOKE_TESTS_SCRIPT_URL}"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
-bash -c "sudo curl -o /tmp/smoketest.py https://raw.githubusercontent.com/scalyr/scalyr-agent-2/e2e_rate_limit_test/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ; ${smoketest_script} ${contname_verifier} ${max_wait} \
+bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
