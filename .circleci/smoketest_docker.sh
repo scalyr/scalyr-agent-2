@@ -116,7 +116,7 @@ echo "Uploader container ID == ${uploader_hostname}"
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
-bash -c "${smoketest_script} ${contname_verifier} ${max_wait} \
+bash -c "sudo curl -o /tmp/smoketest.py https://raw.githubusercontent.com/scalyr/scalyr-agent-2/e2e_rate_limit_test/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ; ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \

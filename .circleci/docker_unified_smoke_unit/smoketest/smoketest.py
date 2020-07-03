@@ -761,8 +761,10 @@ class DockerSyslogActor(DockerSmokeTestActor):
             [actual_monitor == expected_monitor, actual_parser == expected_parser]
         ):
             print('"monitor" or "parser" attribute value doesn\'t match')
-            print("Expected(monitor): '%s', got '%s'", expected_monitor, actual_monitor)
-            print("Expected(parser): '%s', got '%s'", expected_parser, actual_parser)
+            print(
+                "Expected(monitor): '%s', got '%s'" % (expected_monitor, actual_monitor)
+            )
+            print("Expected(parser): '%s', got '%s'" % (expected_parser, actual_parser))
             return False
         return True
 
