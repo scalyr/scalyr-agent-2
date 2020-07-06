@@ -297,13 +297,13 @@ function create_apt_repo_packages() {
   create_package "deb" "main" "bootstrap";
 }
 
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 GPG_SIGNING_KEYID=$1
 GPG_ALT_SIGNING_KEYID=$2
 REPO_BASE_URL=$3
 REPO_BRANCH=$4
 
-REPO_INSTALLER_V2_BASE_NAME="install-scalyr-agent-2.sh"
 REPO_PACKAGE_VERSION="1.2.2"
 
 
@@ -314,6 +314,8 @@ clean_package_files;
 create_alt_yum_repo_packages;
 
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb;
+
+cp $SCRIPTPATH/installScalyrAgentV2.sh installScalyrAgentV2.sh
 cat installScalyrAgentV2.sh
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
