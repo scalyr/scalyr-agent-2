@@ -752,20 +752,19 @@ class DockerSyslogActor(DockerSmokeTestActor):
             return False
 
         expected_monitor = "agentSyslog"
-        expected_parser = "agentSyslogDocker"
+        # expected_parser = "agentSyslogDocker"
 
         actual_monitor = att.get("monitor")
-        actual_parser = att.get("parser")
+        # actual_parser = att.get("parser")
 
-        if not all(
-            [actual_monitor == expected_monitor, actual_parser == expected_parser]
-        ):
-            print('"monitor" or "parser" attribute value doesn\'t match')
+        # NOTE: "parser" attribute is not returned by the API anymore since early July 2020 so we
+        # only assert on the monitor name
+        if actual_monitor != expected_monitor:
             print(
                 "Expected(monitor): '%s', got '%s'" % (expected_monitor, actual_monitor)
             )
-            print("Expected(parser): '%s', got '%s'" % (expected_parser, actual_parser))
             return False
+
         return True
 
 
