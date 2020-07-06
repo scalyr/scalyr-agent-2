@@ -392,9 +392,13 @@ class DataJsonVerifierRateLimited(AgentVerifier):
 
         self._lines_count = 5000
         self._upload_wait_time = 30
+
         # Estimate of line size
         self._line_size = len(json.dumps(self._message))
+
+        # This value should match the rate limit configured for the agent when running this test
         self._rate_limit_bytes_per_second = 500000
+
         self._expected_lines_uploaded = (
             self._rate_limit_bytes_per_second * (self._upload_wait_time + 4)
         ) / self._line_size
@@ -472,8 +476,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         """
         try:
             response = self._request.send()
-        except Exception:
-            print("Query failed.")
+        except Exception as e:
+            print("Query failed: %s" % str(e))
             return False
 
         if "matches" not in response:
@@ -486,8 +490,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
     def _verify(self):
         try:
             response = self._request.send()
-        except Exception:
-            print("Query failed.")
+        except Exception as e:
+            print("Query failed: %s" % str(e))
             return False
 
         if "matches" not in response:
