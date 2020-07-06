@@ -314,6 +314,7 @@ clean_package_files;
 create_alt_yum_repo_packages;
 
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb;
+cat installScalyrAgentV2.sh
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
