@@ -303,6 +303,7 @@ GPG_ALT_SIGNING_KEYID=$2
 REPO_BASE_URL=$3
 REPO_BRANCH=$4
 
+if [ -n "" ]
 REPO_INSTALLER_V2_BASE_NAME="install-scalyr-agent-2.sh"
 REPO_PACKAGE_VERSION="1.2.2"
 
@@ -318,6 +319,6 @@ cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
 
-mv installScalyrAgentV2.sh "$REPO_INSTALLER_V2_BASE_NAME";
+#mv installScalyrAgentV2.sh "$REPO_INSTALLER_V2_BASE_NAME";
 #tar -cf build_output.tar "$REPO_INSTALLER_V2_BASE_NAME" *.rpm *.deb;
 
