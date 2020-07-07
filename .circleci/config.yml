@@ -703,6 +703,13 @@ commands:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+            if [ "<< parameters.test_type >>" = "development" ]; then
+              pushd /tmp/workspace
+              python -m SimpleHTTPServer &
+              popd
+              export INSTALLER_SCRIPT_URL="http://0.0.0.0:8000"
+            fi
+
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:
@@ -2087,7 +2094,7 @@ jobs:
       - store_artifacts:
           path: artifacts
 
-  build-linux2-packages:
+  build-linux-install-script:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2136,6 +2143,7 @@ jobs:
             gpg --import scripts/circleci/release/public_keys/alt.asc
 
             mkdir artifacts
+            mkdir package
 
             mkdir output
             pushd output
@@ -2153,14 +2161,14 @@ jobs:
             popd
 
             cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
+            cp output/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
 
 
 
-#      - persist_to_workspace:
-#          root: package
-#          paths:
-#            - scalyr-agent-2.deb
-#            - scalyr-agent-2.rpm
+      - persist_to_workspace:
+          root: package
+          paths:
+            - installScalyrAgentV2.sh
 
       - store_artifacts:
           path: artifacts
@@ -2188,13 +2196,15 @@ workflows:
   version: 2
   package-tests:
     jobs:
-      - build-linux2-packages
+      - build-linux-install-script
       - build-linux-packages
       - build-windows-package
       - ami-tests-development:
           requires:
             - build-windows-package
             - build-linux-packages
+            - build-linux-install-script
+            - build-linux-install-script
 
 #workflows:
 #  version: 2

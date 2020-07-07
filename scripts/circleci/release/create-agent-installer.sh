@@ -321,6 +321,3 @@ cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
 
-#mv installScalyrAgentV2.sh "$REPO_INSTALLER_V2_BASE_NAME";
-#tar -cf build_output.tar "$REPO_INSTALLER_V2_BASE_NAME" *.rpm *.deb;
-
