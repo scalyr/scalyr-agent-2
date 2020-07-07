@@ -371,9 +371,7 @@ def main(
     if os.path.exists(installer_script_url):
         installer_script_info["type"] = "file"
         file_upload_steps.append(
-            _create_file_deployment_step(
-                installer_script_url, "install-scalyr-agent-2.sh"
-            )
+            _create_file_deployment_step(installer_script_url, "install-scalyr-agent-2")
         )
     else:
         installer_script_info["type"] = "url"
@@ -693,11 +691,11 @@ if __name__ == "__main__":
         )
 
     # Fail early if any of the provided URLs doesn't exist
-    if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
-        raise ValueError(
-            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
-            % (args.installer_script_url)
-        )
+    # if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
+    #     raise ValueError(
+    #         'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+    #         % (args.installer_script_url)
+    #     )
 
     if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
         args.from_version, True
