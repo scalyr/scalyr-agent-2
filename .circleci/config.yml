@@ -704,10 +704,7 @@ commands:
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
             if [ "<< parameters.test_type >>" = "development" ]; then
-              pushd /tmp/workspace
-              python -m http.server &
-              popd
-              export INSTALLER_SCRIPT_URL="http://0.0.0.0:8000/installScalyrAgentV2.sh"
+              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
 
 

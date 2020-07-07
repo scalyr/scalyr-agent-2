@@ -365,6 +365,19 @@ def main(
     with open(cat_logs_script_file_path, "r") as fp:
         cat_logs_script_content = fp.read()
 
+    installer_script_info = {
+        "source": installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
+    }
+    if os.path.exists(installer_script_url):
+        installer_script_info["type"] = "file"
+        file_upload_steps.append(
+            _create_file_deployment_step(
+                installer_script_url, "install-scalyr-agent-2.sh"
+            )
+        )
+    else:
+        installer_script_info["type"] = "url"
+
     rendered_template = render_script_template(
         script_template=script_content,
         distro_details=distro_details,
@@ -372,7 +385,7 @@ def main(
         test_type=test_type,
         install_package=install_package_info,
         upgrade_package=upgrade_package_info,
-        installer_script_url=installer_script_url,
+        installer_script_url=installer_script_info,
         additional_packages=additional_packages,
         verbose=verbose,
     )
@@ -484,7 +497,7 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -495,7 +508,7 @@ def render_script_template(
 
     template_context["test_type"] = test_type
 
-    template_context["installer_script_url"] = (
+    template_context["installer_script_info"] = (
         installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
     )
     template_context["scalyr_api_key"] = SCALYR_API_KEY

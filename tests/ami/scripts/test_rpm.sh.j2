@@ -73,7 +73,9 @@ sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export INSTALL_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "install_package.rpm" | sed "s/_.*//g")
 {% else -%}
 # install Scalyr agent by downloading convenience script.
-wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_url}}"
+    {% if installer_script_info["type"] == "url" -%}
+wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_info["source"]}}"
+    {% endif -%}
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
     {% if install_package["source"] == "current" -%}
     {# Install the latest agent version in repo. #}
