@@ -46,8 +46,8 @@ def test_default_compression_algorithm(request):
     time.sleep(1)
 
     agent_status = runner.status_json(True)
-    compression_algorithm = agent_status["compression_algorithm"]
-    compression_level = agent_status["compression_algorithm"]
+    compression_algorithm = agent_status["compression_type"]
+    compression_level = agent_status["compression_level"]
 
     assert compression_algorithm == "deflate", "expected deflate, got %s" % (
         compression_algorithm
