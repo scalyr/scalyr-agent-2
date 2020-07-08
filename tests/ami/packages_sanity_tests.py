@@ -690,13 +690,6 @@ if __name__ == "__main__":
             'can not have the same "current" value.'
         )
 
-    # Fail early if any of the provided URLs doesn't exist
-    # if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
-    #     raise ValueError(
-    #         'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
-    #         % (args.installer_script_url)
-    #     )
-
     if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
         args.from_version, True
     ):

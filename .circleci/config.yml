@@ -2201,7 +2201,6 @@ workflows:
             - build-windows-package
             - build-linux-packages
             - build-linux-install-script
-            - build-linux-install-script
 
 #workflows:
 #  version: 2
