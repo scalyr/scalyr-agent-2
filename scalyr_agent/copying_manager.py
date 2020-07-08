@@ -1026,6 +1026,18 @@ class CopyingManager(StoppableThread, LogWatcher):
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
+            if self.__config.enable_health_check:
+                result.health_check_result = "Good"
+                if (
+                    time.time()
+                    > self.__last_attempt_time
+                    + self.__config.healthy_max_time_since_last_copy_attempt
+                ):
+                    result.health_check_result = (
+                        "Failed, max time since last copy attempt (%s seconds) exceeded"
+                        % self.__config.healthy_max_time_since_last_copy_attempt
+                    )
+
         finally:
             self.__lock.release()
         if warn_on_rate_limit:

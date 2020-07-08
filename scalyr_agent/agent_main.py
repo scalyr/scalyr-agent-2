@@ -739,10 +739,17 @@ class ScalyrAgent(object):
             )
             return 1
 
+        health_check_error = None
         fp = open(status_file)
         for line in fp:
             print(line.rstrip())
+            if "Health check:" in line and line.rstrip() != "Health check: Good":
+                health_check_error = line.rstrip()
         fp.close()
+
+        if health_check_error:
+            print(health_check_error, file=sys.stderr)
+            return 1
 
         return 0
 

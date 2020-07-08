@@ -1221,6 +1221,23 @@ class Configuration(object):
         """
         return self.__get_config().get_bool("strip_domain_from_default_server_host")
 
+    @property
+    def enable_health_check(self):
+        """If we should have a health check in the agent `status -v` command, which will include a 'Health check' line
+        and change the command's return code if the health check does not pass.
+        """
+        return self.__get_config().get_bool("enable_health_check")
+
+    @property
+    def healthy_max_time_since_last_copy_attempt(self):
+        """Returns the max amount of time since the last copy attempt to consider the agent 'healthy' for
+        the purpose of a health check using `status -v`. This copy attempt need not be successful, since this is just
+        to check that the agent is healthy and should not reflect server side errors.
+
+        Only relevant if `enable_health_check` is True.
+        """
+        return self.__get_config().get_float("healthy_max_time_since_last_copy_attempt")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -1879,6 +1896,24 @@ class Configuration(object):
             config,
             "strip_domain_from_default_server_host",
             False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_health_check",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_float(
+            config,
+            "healthy_max_time_since_last_copy_attempt",
+            60.0,
             description,
             apply_defaults,
             env_aware=True,

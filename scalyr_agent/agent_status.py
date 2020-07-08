@@ -345,6 +345,8 @@ class CopyingManagerStatus(BaseAgentStatus):
         # LogMatcherStatus objects for each of the log paths being watched for copying.
         self.log_matchers = []
 
+        self.health_check_result = None
+
 
 class LogMatcherStatus(BaseAgentStatus):
     """The status object containing information about all of the copying being performed for a particular
@@ -594,6 +596,10 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
             "Total responses with errors:               %d (see '%s' for details)"
             % (manager_status.total_errors, agent_log_file_path,),
             file=output,
+        )
+    if manager_status.health_check_result:
+        print(
+            "Health check: %s" % manager_status.health_check_result, file=output,
         )
     print("", file=output)
 
