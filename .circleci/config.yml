@@ -2097,8 +2097,7 @@ workflows:
       - build-linux-packages
       - build-windows-package
       - package-test-rpm
-      - package-test-deb:
-          <<: *master_and_release_only
+      - package-test-deb
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
