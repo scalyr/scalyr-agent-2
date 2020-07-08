@@ -62,7 +62,7 @@ EOF
 
 function create_apt_policy_file() {
   cat > $1 <<EOF
-<?xml version="1.0"?>1111
+<?xml version="1.0"?>
 <!DOCTYPE Policy SYSTEM "http://www.debian.org/debsig/1.0/policy.dtd">
 <Policy xmlns="http://www.debian.org/debsig/1.0/">
 <Origin Name="Scalyr Inc" id="$FINGERPRINT_KEYID"
