@@ -1,6 +1,5 @@
 #!/bin/bash
 #
-# test!!!!!!!!!!!!!!!!!6
 # Installs necessary packages to run the Scalyr Agent 2 on the host.
 # To perform this task, the script  Analyzes the system and attempts to
 # install the correct repository configuration files to enable installing
