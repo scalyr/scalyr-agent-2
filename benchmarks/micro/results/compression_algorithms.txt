@@ -1,0 +1,965 @@
+====================================================================================================
+Compression
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 3072 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                name                               | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_3k]    |      0.0026979600001197923       |               2.428                |
+|           test_compress_bytes[snappy-agent_debug_log_3k]          |       0.003167050000030258       |               2.319                |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_3k] |       0.009665169999912848       |                3.25                |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_3k]        |       0.01544403499995184        |               2.482                |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_3k]     |       0.01870540500007678        |               3.289                |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_3k]      |       0.01950281500000095        |               3.246                |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_3k]  |       0.02618038499999864        |               3.314                |
+|      test_compress_bytes[brotli_quality_3-agent_debug_log_3k]     |       0.027135240000077943       |               3.188                |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_3k]      |       0.028846849999997204       |               3.333                |
+|     test_compress_bytes[zstandard_level_10-agent_debug_log_3k]    |       0.03855059999999355        |               3.289                |
+|        test_compress_bytes[lz4_level_16-agent_debug_log_3k]       |       0.04369180999997724        |               2.484                |
+|      test_compress_bytes[brotli_quality_5-agent_debug_log_3k]     |       0.07380771499995831        |               3.557                |
+|      test_compress_bytes[brotli_quality_8-agent_debug_log_3k]     |        0.0917083649999384        |               3.557                |
+|     test_compress_bytes[zstandard_level_12-agent_debug_log_3k]    |       0.12867372000005872        |                3.3                 |
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_3k]    |       0.45162542000000805        |               2.743                |
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                name                               | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+|      test_compress_bytes[brotli_quality_5-agent_debug_log_3k]     |       0.07380771499995831        |               3.557                |
+|      test_compress_bytes[brotli_quality_8-agent_debug_log_3k]     |        0.0917083649999384        |               3.557                |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_3k]      |       0.028846849999997204       |               3.333                |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_3k]  |       0.02618038499999864        |               3.314                |
+|     test_compress_bytes[zstandard_level_12-agent_debug_log_3k]    |       0.12867372000005872        |                3.3                 |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_3k]     |       0.01870540500007678        |               3.289                |
+|     test_compress_bytes[zstandard_level_10-agent_debug_log_3k]    |       0.03855059999999355        |               3.289                |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_3k] |       0.009665169999912848       |                3.25                |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_3k]      |       0.01950281500000095        |               3.246                |
+|      test_compress_bytes[brotli_quality_3-agent_debug_log_3k]     |       0.027135240000077943       |               3.188                |
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_3k]    |       0.45162542000000805        |               2.743                |
+|        test_compress_bytes[lz4_level_16-agent_debug_log_3k]       |       0.04369180999997724        |               2.484                |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_3k]        |       0.01544403499995184        |               2.482                |
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_3k]    |      0.0026979600001197923       |               2.428                |
+|           test_compress_bytes[snappy-agent_debug_log_3k]          |       0.003167050000030258       |               2.319                |
++-------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 10240 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                name                                | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_10k]    |       0.004301224999956332       |               5.478                |
+|          test_compress_bytes[snappy-agent_debug_log_10k]           |       0.006052144999983966       |               5.088                |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_10k] |       0.013828730000007283       |               8.002                |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_10k]     |       0.03213637500000033        |               8.091                |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_10k]      |       0.03459224499999913        |               7.336                |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_10k]        |       0.035234509999959585       |               5.929                |
+|     test_compress_bytes[brotli_quality_3-agent_debug_log_10k]      |       0.045816529999989086       |               7.707                |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_10k]  |       0.059352154999998685       |               7.621                |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_10k]      |       0.07554702000001967        |               7.873                |
+|    test_compress_bytes[zstandard_level_10-agent_debug_log_10k]     |       0.09103889999995118        |               8.136                |
+|     test_compress_bytes[brotli_quality_5-agent_debug_log_10k]      |       0.13218314000006615        |                8.87                |
+|     test_compress_bytes[brotli_quality_8-agent_debug_log_10k]      |        0.1552243150000976        |               8.862                |
+|       test_compress_bytes[lz4_level_16-agent_debug_log_10k]        |       0.18609456000007185        |               5.932                |
+|    test_compress_bytes[zstandard_level_12-agent_debug_log_10k]     |        0.535901570000128         |               8.136                |
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_10k]    |        1.3288420299999881        |               6.202                |
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                name                                | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+|     test_compress_bytes[brotli_quality_5-agent_debug_log_10k]      |       0.13218314000006615        |                8.87                |
+|     test_compress_bytes[brotli_quality_8-agent_debug_log_10k]      |        0.1552243150000976        |               8.862                |
+|    test_compress_bytes[zstandard_level_10-agent_debug_log_10k]     |       0.09103889999995118        |               8.136                |
+|    test_compress_bytes[zstandard_level_12-agent_debug_log_10k]     |        0.535901570000128         |               8.136                |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_10k]     |       0.03213637500000033        |               8.091                |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_10k] |       0.013828730000007283       |               8.002                |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_10k]      |       0.07554702000001967        |               7.873                |
+|     test_compress_bytes[brotli_quality_3-agent_debug_log_10k]      |       0.045816529999989086       |               7.707                |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_10k]  |       0.059352154999998685       |               7.621                |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_10k]      |       0.03459224499999913        |               7.336                |
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_10k]    |        1.3288420299999881        |               6.202                |
+|       test_compress_bytes[lz4_level_16-agent_debug_log_10k]        |       0.18609456000007185        |               5.932                |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_10k]        |       0.035234509999959585       |               5.929                |
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_10k]    |       0.004301224999956332       |               5.478                |
+|          test_compress_bytes[snappy-agent_debug_log_10k]           |       0.006052144999983966       |               5.088                |
++--------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 512000 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                | mean time in ms (less is better) | compression ratio (more is better) |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_500k]    |       0.26090956000000887        |               11.007               |
+|           test_compress_bytes[snappy-agent_debug_log_500k]          |        0.2956046050000083        |               8.604                |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_500k] |        0.4596823200000344        |               20.515               |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_500k]     |        1.4067701149999934        |               21.221               |
+|      test_compress_bytes[brotli_quality_3-agent_debug_log_500k]     |        1.4913758249999631        |               19.831               |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_500k]        |        1.7575014750001117        |               14.206               |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_500k]      |        1.8409839399999992        |               13.869               |
+|     test_compress_bytes[zstandard_level_10-agent_debug_log_500k]    |        2.677342094999986         |               23.897               |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_500k]  |        3.5809744150000027        |               17.038               |
+|      test_compress_bytes[brotli_quality_5-agent_debug_log_500k]     |           4.210760295            |               24.943               |
+|     test_compress_bytes[zstandard_level_12-agent_debug_log_500k]    |        4.304134475000012         |               23.91                |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_500k]      |        5.353478480000007         |               18.527               |
+|      test_compress_bytes[brotli_quality_8-agent_debug_log_500k]     |        7.3425520699999325        |               24.966               |
+|        test_compress_bytes[lz4_level_16-agent_debug_log_500k]       |        12.248530069999967        |               14.544               |
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_500k]    |        60.844145220000016        |               28.245               |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                | mean time in ms (less is better) | compression ratio (more is better) |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-agent_debug_log_500k]    |        60.844145220000016        |               28.245               |
+|      test_compress_bytes[brotli_quality_8-agent_debug_log_500k]     |        7.3425520699999325        |               24.966               |
+|      test_compress_bytes[brotli_quality_5-agent_debug_log_500k]     |           4.210760295            |               24.943               |
+|     test_compress_bytes[zstandard_level_12-agent_debug_log_500k]    |        4.304134475000012         |               23.91                |
+|     test_compress_bytes[zstandard_level_10-agent_debug_log_500k]    |        2.677342094999986         |               23.897               |
+|     test_compress_bytes[zstandard_level_5-agent_debug_log_500k]     |        1.4067701149999934        |               21.221               |
+| test_compress_bytes[zstandard_level_3_default-agent_debug_log_500k] |        0.4596823200000344        |               20.515               |
+|      test_compress_bytes[brotli_quality_3-agent_debug_log_500k]     |        1.4913758249999631        |               19.831               |
+|      test_compress_bytes[deflate_level_9-agent_debug_log_500k]      |        5.353478480000007         |               18.527               |
+|  test_compress_bytes[deflate_level_6_default-agent_debug_log_500k]  |        3.5809744150000027        |               17.038               |
+|        test_compress_bytes[lz4_level_16-agent_debug_log_500k]       |        12.248530069999967        |               14.544               |
+|        test_compress_bytes[lz4_level_3-agent_debug_log_500k]        |        1.7575014750001117        |               14.206               |
+|      test_compress_bytes[deflate_level_3-agent_debug_log_500k]      |        1.8409839399999992        |               13.869               |
+|    test_compress_bytes[lz4_level_0_default-agent_debug_log_500k]    |       0.26090956000000887        |               11.007               |
+|           test_compress_bytes[snappy-agent_debug_log_500k]          |        0.2956046050000083        |               8.604                |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 3072 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++------------------------------------------------------------+----------------------------------+------------------------------------+
+|                            name                            | mean time in ms (less is better) | compression ratio (more is better) |
++------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-json_log_3k]    |       0.003060789999942415       |               2.168                |
+|          test_compress_bytes[snappy-json_log_3k]           |      0.0041140200000100435       |               2.211                |
+| test_compress_bytes[zstandard_level_3_default-json_log_3k] |       0.010387095000048419       |               3.119                |
+|        test_compress_bytes[lz4_level_3-json_log_3k]        |       0.01687312499999649        |               2.374                |
+|     test_compress_bytes[zstandard_level_5-json_log_3k]     |       0.018534765000062237       |               3.212                |
+|      test_compress_bytes[deflate_level_3-json_log_3k]      |       0.018897570000002695       |               3.149                |
+|     test_compress_bytes[brotli_quality_3-json_log_3k]      |       0.027554674999947792       |               3.158                |
+|  test_compress_bytes[deflate_level_6_default-json_log_3k]  |       0.027888329999994355       |               3.278                |
+|      test_compress_bytes[deflate_level_9-json_log_3k]      |       0.032464804999987606       |                3.3                 |
+|    test_compress_bytes[zstandard_level_10-json_log_3k]     |       0.04080471500010674        |               3.257                |
+|       test_compress_bytes[lz4_level_16-json_log_3k]        |       0.053831640000154835       |               2.383                |
+|     test_compress_bytes[brotli_quality_5-json_log_3k]      |       0.07041919999995372        |               3.589                |
+|     test_compress_bytes[brotli_quality_8-json_log_3k]      |       0.09614078999998554        |               3.606                |
+|    test_compress_bytes[zstandard_level_12-json_log_3k]     |       0.16498445999996392        |               3.236                |
+|    test_compress_bytes[bz2_level_6_default-json_log_3k]    |       0.39439112999996695        |               3.091                |
++------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++------------------------------------------------------------+----------------------------------+------------------------------------+
+|                            name                            | mean time in ms (less is better) | compression ratio (more is better) |
++------------------------------------------------------------+----------------------------------+------------------------------------+
+|     test_compress_bytes[brotli_quality_8-json_log_3k]      |       0.09614078999998554        |               3.606                |
+|     test_compress_bytes[brotli_quality_5-json_log_3k]      |       0.07041919999995372        |               3.589                |
+|      test_compress_bytes[deflate_level_9-json_log_3k]      |       0.032464804999987606       |                3.3                 |
+|  test_compress_bytes[deflate_level_6_default-json_log_3k]  |       0.027888329999994355       |               3.278                |
+|    test_compress_bytes[zstandard_level_10-json_log_3k]     |       0.04080471500010674        |               3.257                |
+|    test_compress_bytes[zstandard_level_12-json_log_3k]     |       0.16498445999996392        |               3.236                |
+|     test_compress_bytes[zstandard_level_5-json_log_3k]     |       0.018534765000062237       |               3.212                |
+|     test_compress_bytes[brotli_quality_3-json_log_3k]      |       0.027554674999947792       |               3.158                |
+|      test_compress_bytes[deflate_level_3-json_log_3k]      |       0.018897570000002695       |               3.149                |
+| test_compress_bytes[zstandard_level_3_default-json_log_3k] |       0.010387095000048419       |               3.119                |
+|    test_compress_bytes[bz2_level_6_default-json_log_3k]    |       0.39439112999996695        |               3.091                |
+|       test_compress_bytes[lz4_level_16-json_log_3k]        |       0.053831640000154835       |               2.383                |
+|        test_compress_bytes[lz4_level_3-json_log_3k]        |       0.01687312499999649        |               2.374                |
+|          test_compress_bytes[snappy-json_log_3k]           |      0.0041140200000100435       |               2.211                |
+|    test_compress_bytes[lz4_level_0_default-json_log_3k]    |       0.003060789999942415       |               2.168                |
++------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 10240 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+|                             name                            | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-json_log_10k]    |      0.0074887650000832195       |               2.738                |
+|           test_compress_bytes[snappy-json_log_10k]          |       0.010824014999890608       |                2.79                |
+| test_compress_bytes[zstandard_level_3_default-json_log_10k] |       0.02363305500004742        |                4.05                |
+|        test_compress_bytes[lz4_level_3-json_log_10k]        |       0.05321050499990321        |               3.207                |
+|      test_compress_bytes[deflate_level_3-json_log_10k]      |       0.06393754499999683        |               3.978                |
+|     test_compress_bytes[zstandard_level_5-json_log_10k]     |       0.06578487499986352        |                4.24                |
+|      test_compress_bytes[brotli_quality_3-json_log_10k]     |       0.07856811500001724        |               4.124                |
+|  test_compress_bytes[deflate_level_6_default-json_log_10k]  |       0.12548622999999814        |               4.258                |
+|      test_compress_bytes[deflate_level_9-json_log_10k]      |       0.16505473499999201        |               4.335                |
+|      test_compress_bytes[brotli_quality_5-json_log_10k]     |        0.2038441299999505        |               4.589                |
+|     test_compress_bytes[zstandard_level_10-json_log_10k]    |       0.23631754499998436        |               4.363                |
+|        test_compress_bytes[lz4_level_16-json_log_10k]       |        0.2598477349999584        |               3.237                |
+|      test_compress_bytes[brotli_quality_8-json_log_10k]     |       0.27066402499993814        |               4.678                |
+|     test_compress_bytes[zstandard_level_12-json_log_10k]    |        0.6929174049998821        |               4.294                |
+|    test_compress_bytes[bz2_level_6_default-json_log_10k]    |        1.2167525349999764        |               4.655                |
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+|                             name                            | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+|      test_compress_bytes[brotli_quality_8-json_log_10k]     |       0.27066402499993814        |               4.678                |
+|    test_compress_bytes[bz2_level_6_default-json_log_10k]    |        1.2167525349999764        |               4.655                |
+|      test_compress_bytes[brotli_quality_5-json_log_10k]     |        0.2038441299999505        |               4.589                |
+|     test_compress_bytes[zstandard_level_10-json_log_10k]    |       0.23631754499998436        |               4.363                |
+|      test_compress_bytes[deflate_level_9-json_log_10k]      |       0.16505473499999201        |               4.335                |
+|     test_compress_bytes[zstandard_level_12-json_log_10k]    |        0.6929174049998821        |               4.294                |
+|  test_compress_bytes[deflate_level_6_default-json_log_10k]  |       0.12548622999999814        |               4.258                |
+|     test_compress_bytes[zstandard_level_5-json_log_10k]     |       0.06578487499986352        |                4.24                |
+|      test_compress_bytes[brotli_quality_3-json_log_10k]     |       0.07856811500001724        |               4.124                |
+| test_compress_bytes[zstandard_level_3_default-json_log_10k] |       0.02363305500004742        |                4.05                |
+|      test_compress_bytes[deflate_level_3-json_log_10k]      |       0.06393754499999683        |               3.978                |
+|        test_compress_bytes[lz4_level_16-json_log_10k]       |        0.2598477349999584        |               3.237                |
+|        test_compress_bytes[lz4_level_3-json_log_10k]        |       0.05321050499990321        |               3.207                |
+|           test_compress_bytes[snappy-json_log_10k]          |       0.010824014999890608       |                2.79                |
+|    test_compress_bytes[lz4_level_0_default-json_log_10k]    |      0.0074887650000832195       |               2.738                |
++-------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 512000 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+|                             name                             | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-json_log_500k]    |        0.7596351350000319        |               3.801                |
+|          test_compress_bytes[snappy-json_log_500k]           |        0.8447895650000348        |               3.666                |
+| test_compress_bytes[zstandard_level_3_default-json_log_500k] |        1.3951452849999768        |               5.783                |
+|     test_compress_bytes[zstandard_level_5-json_log_500k]     |        3.107478769999865         |               6.025                |
+|     test_compress_bytes[brotli_quality_3-json_log_500k]      |        3.217646570000028         |               5.814                |
+|      test_compress_bytes[deflate_level_3-json_log_500k]      |        3.9092197150000083        |               5.411                |
+|        test_compress_bytes[lz4_level_3-json_log_500k]        |        3.992696769999995         |               5.234                |
+|  test_compress_bytes[deflate_level_6_default-json_log_500k]  |        8.182464140000002         |               6.211                |
+|     test_compress_bytes[brotli_quality_5-json_log_500k]      |        8.605314529999895         |               6.581                |
+|    test_compress_bytes[zstandard_level_10-json_log_500k]     |        11.70249462999994         |               6.804                |
+|    test_compress_bytes[zstandard_level_12-json_log_500k]     |        13.991503784999999        |               6.955                |
+|     test_compress_bytes[brotli_quality_8-json_log_500k]      |        16.206194830000094        |               7.066                |
+|       test_compress_bytes[lz4_level_16-json_log_500k]        |        24.606915594999883        |               5.575                |
+|      test_compress_bytes[deflate_level_9-json_log_500k]      |        25.854472495000017        |               6.528                |
+|    test_compress_bytes[bz2_level_6_default-json_log_500k]    |        53.733330794999965        |               11.747               |
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+|                             name                             | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-json_log_500k]    |        53.733330794999965        |               11.747               |
+|     test_compress_bytes[brotli_quality_8-json_log_500k]      |        16.206194830000094        |               7.066                |
+|    test_compress_bytes[zstandard_level_12-json_log_500k]     |        13.991503784999999        |               6.955                |
+|    test_compress_bytes[zstandard_level_10-json_log_500k]     |        11.70249462999994         |               6.804                |
+|     test_compress_bytes[brotli_quality_5-json_log_500k]      |        8.605314529999895         |               6.581                |
+|      test_compress_bytes[deflate_level_9-json_log_500k]      |        25.854472495000017        |               6.528                |
+|  test_compress_bytes[deflate_level_6_default-json_log_500k]  |        8.182464140000002         |               6.211                |
+|     test_compress_bytes[zstandard_level_5-json_log_500k]     |        3.107478769999865         |               6.025                |
+|     test_compress_bytes[brotli_quality_3-json_log_500k]      |        3.217646570000028         |               5.814                |
+| test_compress_bytes[zstandard_level_3_default-json_log_500k] |        1.3951452849999768        |               5.783                |
+|       test_compress_bytes[lz4_level_16-json_log_500k]        |        24.606915594999883        |               5.575                |
+|      test_compress_bytes[deflate_level_3-json_log_500k]      |        3.9092197150000083        |               5.411                |
+|        test_compress_bytes[lz4_level_3-json_log_500k]        |        3.992696769999995         |               5.234                |
+|    test_compress_bytes[lz4_level_0_default-json_log_500k]    |        0.7596351350000319        |               3.801                |
+|          test_compress_bytes[snappy-json_log_500k]           |        0.8447895650000348        |               3.666                |
++--------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_10_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                | mean time in ms (less is better) | compression ratio (more is better) |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_10_events]    |      0.0020500850001070603       |               1.933                |
+|           test_compress_bytes[snappy-add_events_10_events]          |       0.002649475000069401       |                1.99                |
+| test_compress_bytes[zstandard_level_3_default-add_events_10_events] |       0.007052069999957666       |               2.557                |
+|        test_compress_bytes[lz4_level_3-add_events_10_events]        |       0.01121374000003783        |               1.965                |
+|     test_compress_bytes[zstandard_level_5-add_events_10_events]     |       0.012525479999965226       |               2.591                |
+|      test_compress_bytes[deflate_level_3-add_events_10_events]      |        0.012894414999991         |               2.626                |
+|  test_compress_bytes[deflate_level_6_default-add_events_10_events]  |       0.016316915000000876       |               2.644                |
+|      test_compress_bytes[deflate_level_9-add_events_10_events]      |       0.01746993000000252        |               2.644                |
+|      test_compress_bytes[brotli_quality_3-add_events_10_events]     |        0.0225438749999185        |                2.64                |
+|        test_compress_bytes[lz4_level_16-add_events_10_events]       |       0.026178849999922704       |               1.967                |
+|     test_compress_bytes[zstandard_level_10-add_events_10_events]    |       0.029054294999966146       |               2.596                |
+|      test_compress_bytes[brotli_quality_5-add_events_10_events]     |       0.04391618999996184        |               2.905                |
+|      test_compress_bytes[brotli_quality_8-add_events_10_events]     |       0.05211961000000542        |               2.916                |
+|     test_compress_bytes[zstandard_level_12-add_events_10_events]    |       0.055703190000038205       |               2.587                |
+|    test_compress_bytes[bz2_level_6_default-add_events_10_events]    |       0.22303954000001625        |               2.325                |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                | mean time in ms (less is better) | compression ratio (more is better) |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+|      test_compress_bytes[brotli_quality_8-add_events_10_events]     |       0.05211961000000542        |               2.916                |
+|      test_compress_bytes[brotli_quality_5-add_events_10_events]     |       0.04391618999996184        |               2.905                |
+|  test_compress_bytes[deflate_level_6_default-add_events_10_events]  |       0.016316915000000876       |               2.644                |
+|      test_compress_bytes[deflate_level_9-add_events_10_events]      |       0.01746993000000252        |               2.644                |
+|      test_compress_bytes[brotli_quality_3-add_events_10_events]     |        0.0225438749999185        |                2.64                |
+|      test_compress_bytes[deflate_level_3-add_events_10_events]      |        0.012894414999991         |               2.626                |
+|     test_compress_bytes[zstandard_level_10-add_events_10_events]    |       0.029054294999966146       |               2.596                |
+|     test_compress_bytes[zstandard_level_5-add_events_10_events]     |       0.012525479999965226       |               2.591                |
+|     test_compress_bytes[zstandard_level_12-add_events_10_events]    |       0.055703190000038205       |               2.587                |
+| test_compress_bytes[zstandard_level_3_default-add_events_10_events] |       0.007052069999957666       |               2.557                |
+|    test_compress_bytes[bz2_level_6_default-add_events_10_events]    |       0.22303954000001625        |               2.325                |
+|           test_compress_bytes[snappy-add_events_10_events]          |       0.002649475000069401       |                1.99                |
+|        test_compress_bytes[lz4_level_16-add_events_10_events]       |       0.026178849999922704       |               1.967                |
+|        test_compress_bytes[lz4_level_3-add_events_10_events]        |       0.01121374000003783        |               1.965                |
+|    test_compress_bytes[lz4_level_0_default-add_events_10_events]    |      0.0020500850001070603       |               1.933                |
++---------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_100_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                 | mean time in ms (less is better) | compression ratio (more is better) |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_100_events]    |       0.010081940000006284       |               3.481                |
+|          test_compress_bytes[snappy-add_events_100_events]           |       0.013218694999963532       |               3.777                |
+| test_compress_bytes[zstandard_level_3_default-add_events_100_events] |       0.029723255000071447       |               4.925                |
+|      test_compress_bytes[deflate_level_3-add_events_100_events]      |       0.07960381999999822        |               4.873                |
+|        test_compress_bytes[lz4_level_3-add_events_100_events]        |       0.08374673500004093        |               3.867                |
+|     test_compress_bytes[zstandard_level_5-add_events_100_events]     |       0.09984450500006403        |                5.14                |
+|     test_compress_bytes[brotli_quality_3-add_events_100_events]      |        0.1101343550000422        |                4.89                |
+|  test_compress_bytes[deflate_level_6_default-add_events_100_events]  |       0.15172111999999238        |                5.11                |
+|      test_compress_bytes[deflate_level_9-add_events_100_events]      |        0.1888432400000184        |               5.119                |
+|     test_compress_bytes[brotli_quality_5-add_events_100_events]      |       0.24779322999997078        |               5.436                |
+|     test_compress_bytes[brotli_quality_8-add_events_100_events]      |        0.289327844999967         |               5.446                |
+|       test_compress_bytes[lz4_level_16-add_events_100_events]        |        0.4259762849997628        |               3.905                |
+|    test_compress_bytes[zstandard_level_10-add_events_100_events]     |        0.4374649400000763        |               5.167                |
+|    test_compress_bytes[zstandard_level_12-add_events_100_events]     |        0.9361972449999811        |               5.225                |
+|    test_compress_bytes[bz2_level_6_default-add_events_100_events]    |         1.41142209500007         |               6.214                |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                 | mean time in ms (less is better) | compression ratio (more is better) |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-add_events_100_events]    |         1.41142209500007         |               6.214                |
+|     test_compress_bytes[brotli_quality_8-add_events_100_events]      |        0.289327844999967         |               5.446                |
+|     test_compress_bytes[brotli_quality_5-add_events_100_events]      |       0.24779322999997078        |               5.436                |
+|    test_compress_bytes[zstandard_level_12-add_events_100_events]     |        0.9361972449999811        |               5.225                |
+|    test_compress_bytes[zstandard_level_10-add_events_100_events]     |        0.4374649400000763        |               5.167                |
+|     test_compress_bytes[zstandard_level_5-add_events_100_events]     |       0.09984450500006403        |                5.14                |
+|      test_compress_bytes[deflate_level_9-add_events_100_events]      |        0.1888432400000184        |               5.119                |
+|  test_compress_bytes[deflate_level_6_default-add_events_100_events]  |       0.15172111999999238        |                5.11                |
+| test_compress_bytes[zstandard_level_3_default-add_events_100_events] |       0.029723255000071447       |               4.925                |
+|     test_compress_bytes[brotli_quality_3-add_events_100_events]      |        0.1101343550000422        |                4.89                |
+|      test_compress_bytes[deflate_level_3-add_events_100_events]      |       0.07960381999999822        |               4.873                |
+|       test_compress_bytes[lz4_level_16-add_events_100_events]        |        0.4259762849997628        |               3.905                |
+|        test_compress_bytes[lz4_level_3-add_events_100_events]        |       0.08374673500004093        |               3.867                |
+|          test_compress_bytes[snappy-add_events_100_events]           |       0.013218694999963532       |               3.777                |
+|    test_compress_bytes[lz4_level_0_default-add_events_100_events]    |       0.010081940000006284       |               3.481                |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_200_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                 | mean time in ms (less is better) | compression ratio (more is better) |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_200_events]    |       0.020560800000026802       |                3.75                |
+|          test_compress_bytes[snappy-add_events_200_events]           |       0.029847370000020135       |               4.139                |
+| test_compress_bytes[zstandard_level_3_default-add_events_200_events] |       0.06024563499998691        |                5.38                |
+|     test_compress_bytes[zstandard_level_5-add_events_200_events]     |       0.14283835499991682        |               5.692                |
+|      test_compress_bytes[deflate_level_3-add_events_200_events]      |       0.17638988500000563        |                5.33                |
+|        test_compress_bytes[lz4_level_3-add_events_200_events]        |       0.18579250000001934        |               4.363                |
+|     test_compress_bytes[brotli_quality_3-add_events_200_events]      |        0.1965064899999902        |               5.415                |
+|  test_compress_bytes[deflate_level_6_default-add_events_200_events]  |       0.31638317500000124        |               5.756                |
+|    test_compress_bytes[zstandard_level_10-add_events_200_events]     |       0.42733432500007495        |               5.821                |
+|     test_compress_bytes[brotli_quality_5-add_events_200_events]      |       0.44927827999998726        |               6.042                |
+|      test_compress_bytes[deflate_level_9-add_events_200_events]      |       0.45051042500000804        |               5.777                |
+|     test_compress_bytes[brotli_quality_8-add_events_200_events]      |        0.5276025499999548        |               6.082                |
+|    test_compress_bytes[zstandard_level_12-add_events_200_events]     |        0.8444769149999942        |               5.836                |
+|       test_compress_bytes[lz4_level_16-add_events_200_events]        |        0.9878797049999832        |               4.491                |
+|    test_compress_bytes[bz2_level_6_default-add_events_200_events]    |        2.278067304999958         |               8.098                |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                 name                                 | mean time in ms (less is better) | compression ratio (more is better) |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-add_events_200_events]    |        2.278067304999958         |               8.098                |
+|     test_compress_bytes[brotli_quality_8-add_events_200_events]      |        0.5276025499999548        |               6.082                |
+|     test_compress_bytes[brotli_quality_5-add_events_200_events]      |       0.44927827999998726        |               6.042                |
+|    test_compress_bytes[zstandard_level_12-add_events_200_events]     |        0.8444769149999942        |               5.836                |
+|    test_compress_bytes[zstandard_level_10-add_events_200_events]     |       0.42733432500007495        |               5.821                |
+|      test_compress_bytes[deflate_level_9-add_events_200_events]      |       0.45051042500000804        |               5.777                |
+|  test_compress_bytes[deflate_level_6_default-add_events_200_events]  |       0.31638317500000124        |               5.756                |
+|     test_compress_bytes[zstandard_level_5-add_events_200_events]     |       0.14283835499991682        |               5.692                |
+|     test_compress_bytes[brotli_quality_3-add_events_200_events]      |        0.1965064899999902        |               5.415                |
+| test_compress_bytes[zstandard_level_3_default-add_events_200_events] |       0.06024563499998691        |                5.38                |
+|      test_compress_bytes[deflate_level_3-add_events_200_events]      |       0.17638988500000563        |                5.33                |
+|       test_compress_bytes[lz4_level_16-add_events_200_events]        |        0.9878797049999832        |               4.491                |
+|        test_compress_bytes[lz4_level_3-add_events_200_events]        |       0.18579250000001934        |               4.363                |
+|          test_compress_bytes[snappy-add_events_200_events]           |       0.029847370000020135       |               4.139                |
+|    test_compress_bytes[lz4_level_0_default-add_events_200_events]    |       0.020560800000026802       |                3.75                |
++----------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_10_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                        | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_10_events_with_attributes]    |      0.0034255799999272085       |               1.833                |
+|           test_compress_bytes[snappy-add_events_10_events_with_attributes]          |       0.004219890000101145       |               1.795                |
+| test_compress_bytes[zstandard_level_3_default-add_events_10_events_with_attributes] |       0.012458675000068808       |               2.515                |
+|        test_compress_bytes[lz4_level_3-add_events_10_events_with_attributes]        |       0.018327694999946686       |               1.899                |
+|     test_compress_bytes[zstandard_level_5-add_events_10_events_with_attributes]     |       0.02083997999992704        |               2.551                |
+|      test_compress_bytes[deflate_level_3-add_events_10_events_with_attributes]      |       0.025982349999997822       |               2.511                |
+|      test_compress_bytes[deflate_level_9-add_events_10_events_with_attributes]      |       0.03571746999996961        |               2.585                |
+|      test_compress_bytes[brotli_quality_3-add_events_10_events_with_attributes]     |       0.03586888499995666        |               2.521                |
+|  test_compress_bytes[deflate_level_6_default-add_events_10_events_with_attributes]  |       0.03610418499999213        |               2.577                |
+|        test_compress_bytes[lz4_level_16-add_events_10_events_with_attributes]       |       0.05281019499982165        |               1.902                |
+|     test_compress_bytes[zstandard_level_10-add_events_10_events_with_attributes]    |       0.05341416500005636        |               2.555                |
+|      test_compress_bytes[brotli_quality_5-add_events_10_events_with_attributes]     |       0.09283280999987653        |               2.847                |
+|      test_compress_bytes[brotli_quality_8-add_events_10_events_with_attributes]     |        0.1107962249999872        |               2.855                |
+|     test_compress_bytes[zstandard_level_12-add_events_10_events_with_attributes]    |       0.13871370500009306        |               2.542                |
+|    test_compress_bytes[bz2_level_6_default-add_events_10_events_with_attributes]    |        0.4285313849999639        |               2.405                |
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                        | mean time in ms (less is better) | compression ratio (more is better) |
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|      test_compress_bytes[brotli_quality_8-add_events_10_events_with_attributes]     |        0.1107962249999872        |               2.855                |
+|      test_compress_bytes[brotli_quality_5-add_events_10_events_with_attributes]     |       0.09283280999987653        |               2.847                |
+|      test_compress_bytes[deflate_level_9-add_events_10_events_with_attributes]      |       0.03571746999996961        |               2.585                |
+|  test_compress_bytes[deflate_level_6_default-add_events_10_events_with_attributes]  |       0.03610418499999213        |               2.577                |
+|     test_compress_bytes[zstandard_level_10-add_events_10_events_with_attributes]    |       0.05341416500005636        |               2.555                |
+|     test_compress_bytes[zstandard_level_5-add_events_10_events_with_attributes]     |       0.02083997999992704        |               2.551                |
+|     test_compress_bytes[zstandard_level_12-add_events_10_events_with_attributes]    |       0.13871370500009306        |               2.542                |
+|      test_compress_bytes[brotli_quality_3-add_events_10_events_with_attributes]     |       0.03586888499995666        |               2.521                |
+| test_compress_bytes[zstandard_level_3_default-add_events_10_events_with_attributes] |       0.012458675000068808       |               2.515                |
+|      test_compress_bytes[deflate_level_3-add_events_10_events_with_attributes]      |       0.025982349999997822       |               2.511                |
+|    test_compress_bytes[bz2_level_6_default-add_events_10_events_with_attributes]    |        0.4285313849999639        |               2.405                |
+|        test_compress_bytes[lz4_level_16-add_events_10_events_with_attributes]       |       0.05281019499982165        |               1.902                |
+|        test_compress_bytes[lz4_level_3-add_events_10_events_with_attributes]        |       0.018327694999946686       |               1.899                |
+|    test_compress_bytes[lz4_level_0_default-add_events_10_events_with_attributes]    |      0.0034255799999272085       |               1.833                |
+|           test_compress_bytes[snappy-add_events_10_events_with_attributes]          |       0.004219890000101145       |               1.795                |
++-------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_100_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                         | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_100_events_with_attributes]    |       0.028537925000087228       |               2.986                |
+|          test_compress_bytes[snappy-add_events_100_events_with_attributes]           |       0.05007635500000163        |                3.02                |
+| test_compress_bytes[zstandard_level_3_default-add_events_100_events_with_attributes] |       0.07843957500000442        |               4.181                |
+|     test_compress_bytes[zstandard_level_5-add_events_100_events_with_attributes]     |       0.16532415999996886        |               4.375                |
+|        test_compress_bytes[lz4_level_3-add_events_100_events_with_attributes]        |        0.2102642199999849        |               3.476                |
+|      test_compress_bytes[deflate_level_3-add_events_100_events_with_attributes]      |       0.21210758500000315        |               4.094                |
+|     test_compress_bytes[brotli_quality_3-add_events_100_events_with_attributes]      |        0.2326352099998985        |               4.211                |
+|  test_compress_bytes[deflate_level_6_default-add_events_100_events_with_attributes]  |       0.38883048000001086        |                4.44                |
+|    test_compress_bytes[zstandard_level_10-add_events_100_events_with_attributes]     |        0.4578043699999057        |               4.546                |
+|      test_compress_bytes[deflate_level_9-add_events_100_events_with_attributes]      |        0.5013399299999843        |               4.484                |
+|     test_compress_bytes[brotli_quality_5-add_events_100_events_with_attributes]      |        0.5505492650000221        |               4.694                |
+|     test_compress_bytes[brotli_quality_8-add_events_100_events_with_attributes]      |        0.6522020899999958        |               4.747                |
+|       test_compress_bytes[lz4_level_16-add_events_100_events_with_attributes]        |        0.897956399999984         |               3.538                |
+|    test_compress_bytes[zstandard_level_12-add_events_100_events_with_attributes]     |        0.9160256649999354        |                4.55                |
+|    test_compress_bytes[bz2_level_6_default-add_events_100_events_with_attributes]    |        2.2188018849999835        |               5.545                |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                         | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-add_events_100_events_with_attributes]    |        2.2188018849999835        |               5.545                |
+|     test_compress_bytes[brotli_quality_8-add_events_100_events_with_attributes]      |        0.6522020899999958        |               4.747                |
+|     test_compress_bytes[brotli_quality_5-add_events_100_events_with_attributes]      |        0.5505492650000221        |               4.694                |
+|    test_compress_bytes[zstandard_level_12-add_events_100_events_with_attributes]     |        0.9160256649999354        |                4.55                |
+|    test_compress_bytes[zstandard_level_10-add_events_100_events_with_attributes]     |        0.4578043699999057        |               4.546                |
+|      test_compress_bytes[deflate_level_9-add_events_100_events_with_attributes]      |        0.5013399299999843        |               4.484                |
+|  test_compress_bytes[deflate_level_6_default-add_events_100_events_with_attributes]  |       0.38883048000001086        |                4.44                |
+|     test_compress_bytes[zstandard_level_5-add_events_100_events_with_attributes]     |       0.16532415999996886        |               4.375                |
+|     test_compress_bytes[brotli_quality_3-add_events_100_events_with_attributes]      |        0.2326352099998985        |               4.211                |
+| test_compress_bytes[zstandard_level_3_default-add_events_100_events_with_attributes] |       0.07843957500000442        |               4.181                |
+|      test_compress_bytes[deflate_level_3-add_events_100_events_with_attributes]      |       0.21210758500000315        |               4.094                |
+|       test_compress_bytes[lz4_level_16-add_events_100_events_with_attributes]        |        0.897956399999984         |               3.538                |
+|        test_compress_bytes[lz4_level_3-add_events_100_events_with_attributes]        |        0.2102642199999849        |               3.476                |
+|          test_compress_bytes[snappy-add_events_100_events_with_attributes]           |       0.05007635500000163        |                3.02                |
+|    test_compress_bytes[lz4_level_0_default-add_events_100_events_with_attributes]    |       0.028537925000087228       |               2.986                |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_200_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                         | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[lz4_level_0_default-add_events_200_events_with_attributes]    |       0.07252949999994485        |               3.219                |
+|          test_compress_bytes[snappy-add_events_200_events_with_attributes]           |       0.10666201500001193        |               3.301                |
+| test_compress_bytes[zstandard_level_3_default-add_events_200_events_with_attributes] |       0.16611296500006034        |               4.545                |
+|     test_compress_bytes[zstandard_level_5-add_events_200_events_with_attributes]     |       0.36207363500000866        |               4.808                |
+|      test_compress_bytes[deflate_level_3-add_events_200_events_with_attributes]      |        0.4121936100000001        |               4.424                |
+|     test_compress_bytes[brotli_quality_3-add_events_200_events_with_attributes]      |        0.4199114400000071        |               4.608                |
+|        test_compress_bytes[lz4_level_3-add_events_200_events_with_attributes]        |       0.43098973500001136        |               3.935                |
+|  test_compress_bytes[deflate_level_6_default-add_events_200_events_with_attributes]  |        0.8752040300000008        |               4.939                |
+|     test_compress_bytes[brotli_quality_5-add_events_200_events_with_attributes]      |        0.9709321300000084        |               5.184                |
+|    test_compress_bytes[zstandard_level_10-add_events_200_events_with_attributes]     |        1.1272458800000607        |               5.114                |
+|      test_compress_bytes[deflate_level_9-add_events_200_events_with_attributes]      |        1.2236854299999944        |               4.998                |
+|     test_compress_bytes[brotli_quality_8-add_events_200_events_with_attributes]      |        1.3219424250000245        |               5.305                |
+|       test_compress_bytes[lz4_level_16-add_events_200_events_with_attributes]        |        2.1397617049997564        |                4.09                |
+|    test_compress_bytes[zstandard_level_12-add_events_200_events_with_attributes]     |        2.144282300000029         |               5.126                |
+|    test_compress_bytes[bz2_level_6_default-add_events_200_events_with_attributes]    |        4.027038369999829         |               6.807                |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+Best by compression ratio (more is better)
+
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|                                         name                                         | mean time in ms (less is better) | compression ratio (more is better) |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+|    test_compress_bytes[bz2_level_6_default-add_events_200_events_with_attributes]    |        4.027038369999829         |               6.807                |
+|     test_compress_bytes[brotli_quality_8-add_events_200_events_with_attributes]      |        1.3219424250000245        |               5.305                |
+|     test_compress_bytes[brotli_quality_5-add_events_200_events_with_attributes]      |        0.9709321300000084        |               5.184                |
+|    test_compress_bytes[zstandard_level_12-add_events_200_events_with_attributes]     |        2.144282300000029         |               5.126                |
+|    test_compress_bytes[zstandard_level_10-add_events_200_events_with_attributes]     |        1.1272458800000607        |               5.114                |
+|      test_compress_bytes[deflate_level_9-add_events_200_events_with_attributes]      |        1.2236854299999944        |               4.998                |
+|  test_compress_bytes[deflate_level_6_default-add_events_200_events_with_attributes]  |        0.8752040300000008        |               4.939                |
+|     test_compress_bytes[zstandard_level_5-add_events_200_events_with_attributes]     |       0.36207363500000866        |               4.808                |
+|     test_compress_bytes[brotli_quality_3-add_events_200_events_with_attributes]      |        0.4199114400000071        |               4.608                |
+| test_compress_bytes[zstandard_level_3_default-add_events_200_events_with_attributes] |       0.16611296500006034        |               4.545                |
+|      test_compress_bytes[deflate_level_3-add_events_200_events_with_attributes]      |        0.4121936100000001        |               4.424                |
+|       test_compress_bytes[lz4_level_16-add_events_200_events_with_attributes]        |        2.1397617049997564        |                4.09                |
+|        test_compress_bytes[lz4_level_3-add_events_200_events_with_attributes]        |       0.43098973500001136        |               3.935                |
+|          test_compress_bytes[snappy-add_events_200_events_with_attributes]           |       0.10666201500001193        |               3.301                |
+|    test_compress_bytes[lz4_level_0_default-add_events_200_events_with_attributes]    |       0.07252949999994485        |               3.219                |
++--------------------------------------------------------------------------------------+----------------------------------+------------------------------------+
+
+====================================================================================================
+
+====================================================================================================
+Decompression
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 3072 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++---------------------------------------------------------------------+----------------------------------+
+|                                 name                                | mean time in ms (less is better) |
++---------------------------------------------------------------------+----------------------------------+
+|           test_decompress_bytes[snappy-agent_debug_log_3k]          |       0.000955669999740394       |
+|        test_decompress_bytes[lz4_level_3-agent_debug_log_3k]        |       0.001177384999948572       |
+|    test_decompress_bytes[lz4_level_0_default-agent_debug_log_3k]    |      0.0014314299998119395       |
+|        test_decompress_bytes[lz4_level_16-agent_debug_log_3k]       |      0.0015948650001007536       |
+|     test_decompress_bytes[zstandard_level_5-agent_debug_log_3k]     |      0.0031107200000946023       |
+|     test_decompress_bytes[zstandard_level_10-agent_debug_log_3k]    |      0.0034114499999304826       |
+| test_decompress_bytes[zstandard_level_3_default-agent_debug_log_3k] |       0.003933345000035615       |
+|     test_decompress_bytes[zstandard_level_12-agent_debug_log_3k]    |      0.0041226899999458055       |
+|      test_decompress_bytes[brotli_quality_3-agent_debug_log_3k]     |      0.0057580300001092155       |
+|      test_decompress_bytes[brotli_quality_8-agent_debug_log_3k]     |       0.005844545000215362       |
+|      test_decompress_bytes[brotli_quality_5-agent_debug_log_3k]     |        0.0060654749999145        |
+|      test_decompress_bytes[deflate_level_3-agent_debug_log_3k]      |       0.006565090000236751       |
+|      test_decompress_bytes[deflate_level_9-agent_debug_log_3k]      |       0.006594805000190718       |
+|  test_decompress_bytes[deflate_level_6_default-agent_debug_log_3k]  |       0.006863874999822883       |
+|    test_decompress_bytes[bz2_level_6_default-agent_debug_log_3k]    |       0.07043438499991339        |
++---------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 10240 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------------+----------------------------------+
+|                                 name                                 | mean time in ms (less is better) |
++----------------------------------------------------------------------+----------------------------------+
+|    test_decompress_bytes[lz4_level_0_default-agent_debug_log_10k]    |      0.0019309500000730393       |
+|       test_decompress_bytes[lz4_level_16-agent_debug_log_10k]        |      0.0020365549999468158       |
+|          test_decompress_bytes[snappy-agent_debug_log_10k]           |       0.002075100000027419       |
+|        test_decompress_bytes[lz4_level_3-agent_debug_log_10k]        |      0.0020961600000646285       |
+|     test_decompress_bytes[zstandard_level_5-agent_debug_log_10k]     |       0.004630209999874068       |
+|    test_decompress_bytes[zstandard_level_10-agent_debug_log_10k]     |       0.004856190000097627       |
+|    test_decompress_bytes[zstandard_level_12-agent_debug_log_10k]     |       0.004948449999986337       |
+| test_decompress_bytes[zstandard_level_3_default-agent_debug_log_10k] |       0.005413734999919484       |
+|     test_decompress_bytes[brotli_quality_8-agent_debug_log_10k]      |       0.008009640000139484       |
+|     test_decompress_bytes[brotli_quality_3-agent_debug_log_10k]      |       0.008083219999974744       |
+|     test_decompress_bytes[brotli_quality_5-agent_debug_log_10k]      |       0.008454674999924805       |
+|      test_decompress_bytes[deflate_level_9-agent_debug_log_10k]      |       0.011463134999871727       |
+|  test_decompress_bytes[deflate_level_6_default-agent_debug_log_10k]  |       0.011717685000007805       |
+|      test_decompress_bytes[deflate_level_3-agent_debug_log_10k]      |       0.011850414999798886       |
+|    test_decompress_bytes[bz2_level_6_default-agent_debug_log_10k]    |        0.1480568900000634        |
++----------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+agent_debug_5_mb.log.gz 512000 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++-----------------------------------------------------------------------+----------------------------------+
+|                                  name                                 | mean time in ms (less is better) |
++-----------------------------------------------------------------------+----------------------------------+
+|        test_decompress_bytes[lz4_level_3-agent_debug_log_500k]        |       0.05619954000003702        |
+|        test_decompress_bytes[lz4_level_16-agent_debug_log_500k]       |       0.058027225000003575       |
+|    test_decompress_bytes[lz4_level_0_default-agent_debug_log_500k]    |       0.07475953999978913        |
+|           test_decompress_bytes[snappy-agent_debug_log_500k]          |       0.09891847499979178        |
+|     test_decompress_bytes[zstandard_level_12-agent_debug_log_500k]    |       0.10882369000007941        |
+|     test_decompress_bytes[zstandard_level_10-agent_debug_log_500k]    |        0.1092149699999112        |
+| test_decompress_bytes[zstandard_level_3_default-agent_debug_log_500k] |       0.13943820999998024        |
+|     test_decompress_bytes[zstandard_level_5-agent_debug_log_500k]     |       0.13960246999992876        |
+|      test_decompress_bytes[brotli_quality_8-agent_debug_log_500k]     |       0.24729756500008193        |
+|      test_decompress_bytes[brotli_quality_5-agent_debug_log_500k]     |       0.24955953999985073        |
+|      test_decompress_bytes[brotli_quality_3-agent_debug_log_500k]     |        0.2676143600000813        |
+|      test_decompress_bytes[deflate_level_9-agent_debug_log_500k]      |        0.5021964400001622        |
+|  test_decompress_bytes[deflate_level_6_default-agent_debug_log_500k]  |        0.5156504299999655        |
+|      test_decompress_bytes[deflate_level_3-agent_debug_log_500k]      |        0.5810804399997949        |
+|    test_decompress_bytes[bz2_level_6_default-agent_debug_log_500k]    |        6.593881410000009         |
++-----------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 3072 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++--------------------------------------------------------------+----------------------------------+
+|                             name                             | mean time in ms (less is better) |
++--------------------------------------------------------------+----------------------------------+
+|          test_decompress_bytes[snappy-json_log_3k]           |      0.0013749250000927304       |
+|       test_decompress_bytes[lz4_level_16-json_log_3k]        |      0.0015244499999056416       |
+|    test_decompress_bytes[lz4_level_0_default-json_log_3k]    |      0.0015816600001272718       |
+|        test_decompress_bytes[lz4_level_3-json_log_3k]        |      0.0018135249998607605       |
+|     test_decompress_bytes[zstandard_level_5-json_log_3k]     |      0.0037440850002212755       |
+|    test_decompress_bytes[zstandard_level_12-json_log_3k]     |       0.003939259999867772       |
+| test_decompress_bytes[zstandard_level_3_default-json_log_3k] |       0.004212580000313437       |
+|    test_decompress_bytes[zstandard_level_10-json_log_3k]     |       0.004431899999985944       |
+|     test_decompress_bytes[brotli_quality_8-json_log_3k]      |       0.006056860000001052       |
+|     test_decompress_bytes[brotli_quality_5-json_log_3k]      |       0.006286305000102743       |
+|  test_decompress_bytes[deflate_level_6_default-json_log_3k]  |       0.006361419999976192       |
+|      test_decompress_bytes[deflate_level_9-json_log_3k]      |       0.006377305000100364       |
+|      test_decompress_bytes[deflate_level_3-json_log_3k]      |       0.006504024999998137       |
+|     test_decompress_bytes[brotli_quality_3-json_log_3k]      |      0.0067362250000968515       |
+|    test_decompress_bytes[bz2_level_6_default-json_log_3k]    |       0.06221811499997897        |
++--------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 10240 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++---------------------------------------------------------------+----------------------------------+
+|                              name                             | mean time in ms (less is better) |
++---------------------------------------------------------------+----------------------------------+
+|        test_decompress_bytes[lz4_level_3-json_log_10k]        |       0.00243792999974346        |
+|        test_decompress_bytes[lz4_level_16-json_log_10k]       |       0.002599639999800729       |
+|    test_decompress_bytes[lz4_level_0_default-json_log_10k]    |      0.0030856899999776033       |
+|           test_decompress_bytes[snappy-json_log_10k]          |      0.0035200150000491703       |
+|     test_decompress_bytes[zstandard_level_12-json_log_10k]    |        0.008318409999859         |
+|     test_decompress_bytes[zstandard_level_5-json_log_10k]     |       0.008448694999785289       |
+|     test_decompress_bytes[zstandard_level_10-json_log_10k]    |       0.008666355000102044       |
+| test_decompress_bytes[zstandard_level_3_default-json_log_10k] |       0.008902510000154962       |
+|      test_decompress_bytes[brotli_quality_3-json_log_10k]     |       0.013906765000228916       |
+|      test_decompress_bytes[brotli_quality_5-json_log_10k]     |       0.014433119999992527       |
+|      test_decompress_bytes[brotli_quality_8-json_log_10k]     |       0.014712225000010905       |
+|      test_decompress_bytes[deflate_level_9-json_log_10k]      |       0.017125490000111654       |
+|  test_decompress_bytes[deflate_level_6_default-json_log_10k]  |        0.0171748150003026        |
+|      test_decompress_bytes[deflate_level_3-json_log_10k]      |       0.017866010000062715       |
+|    test_decompress_bytes[bz2_level_6_default-json_log_10k]    |       0.17729467499997043        |
++---------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+json_log_5_mb.log.gz 512000 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------+----------------------------------+
+|                              name                              | mean time in ms (less is better) |
++----------------------------------------------------------------+----------------------------------+
+|       test_decompress_bytes[lz4_level_16-json_log_500k]        |        0.1481837900000471        |
+|        test_decompress_bytes[lz4_level_3-json_log_500k]        |       0.15752736999999684        |
+|    test_decompress_bytes[lz4_level_0_default-json_log_500k]    |        0.1589898050001892        |
+|          test_decompress_bytes[snappy-json_log_500k]           |        0.2425788749998503        |
+|    test_decompress_bytes[zstandard_level_12-json_log_500k]     |       0.25652952500003323        |
+|    test_decompress_bytes[zstandard_level_10-json_log_500k]     |       0.26921772999997984        |
+| test_decompress_bytes[zstandard_level_3_default-json_log_500k] |       0.31843335499985415        |
+|     test_decompress_bytes[zstandard_level_5-json_log_500k]     |        0.3187127400000378        |
+|     test_decompress_bytes[brotli_quality_8-json_log_500k]      |        0.529624455000004         |
+|     test_decompress_bytes[brotli_quality_5-json_log_500k]      |        0.5699649999997547        |
+|     test_decompress_bytes[brotli_quality_3-json_log_500k]      |        0.6505250450000233        |
+|      test_decompress_bytes[deflate_level_9-json_log_500k]      |         0.95611100499994         |
+|  test_decompress_bytes[deflate_level_6_default-json_log_500k]  |        0.9934567450001454        |
+|      test_decompress_bytes[deflate_level_3-json_log_500k]      |        1.0433185949999313        |
+|    test_decompress_bytes[bz2_level_6_default-json_log_500k]    |        9.948491044999983         |
++----------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_10_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++-----------------------------------------------------------------------+----------------------------------+
+|                                  name                                 | mean time in ms (less is better) |
++-----------------------------------------------------------------------+----------------------------------+
+|           test_decompress_bytes[snappy-add_events_10_events]          |      0.0008913600000681754       |
+|    test_decompress_bytes[lz4_level_0_default-add_events_10_events]    |      0.0010463749999445326       |
+|        test_decompress_bytes[lz4_level_16-add_events_10_events]       |      0.0010908500001249877       |
+|        test_decompress_bytes[lz4_level_3-add_events_10_events]        |      0.0013740349998414558       |
+|     test_decompress_bytes[zstandard_level_5-add_events_10_events]     |      0.0025151049998584085       |
+|     test_decompress_bytes[zstandard_level_12-add_events_10_events]    |       0.002804159999882927       |
+|     test_decompress_bytes[zstandard_level_10-add_events_10_events]    |       0.002829400000194937       |
+| test_decompress_bytes[zstandard_level_3_default-add_events_10_events] |       0.003453499999963583       |
+|      test_decompress_bytes[brotli_quality_8-add_events_10_events]     |       0.00425444999976321        |
+|      test_decompress_bytes[brotli_quality_3-add_events_10_events]     |       0.004403085000035389       |
+|      test_decompress_bytes[brotli_quality_5-add_events_10_events]     |       0.004520015000011313       |
+|      test_decompress_bytes[deflate_level_3-add_events_10_events]      |       0.004571265000166136       |
+|      test_decompress_bytes[deflate_level_9-add_events_10_events]      |      0.0046015899999218846       |
+|  test_decompress_bytes[deflate_level_6_default-add_events_10_events]  |       0.004618835000016475       |
+|    test_decompress_bytes[bz2_level_6_default-add_events_10_events]    |       0.034706074999988346       |
++-----------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_100_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++------------------------------------------------------------------------+----------------------------------+
+|                                  name                                  | mean time in ms (less is better) |
++------------------------------------------------------------------------+----------------------------------+
+|       test_decompress_bytes[lz4_level_16-add_events_100_events]        |      0.0037813950000753493       |
+|        test_decompress_bytes[lz4_level_3-add_events_100_events]        |       0.003806619999906502       |
+|    test_decompress_bytes[lz4_level_0_default-add_events_100_events]    |       0.004190149999914183       |
+|          test_decompress_bytes[snappy-add_events_100_events]           |       0.004511175000061485       |
+|    test_decompress_bytes[zstandard_level_10-add_events_100_events]     |       0.010580979999872397       |
+|    test_decompress_bytes[zstandard_level_12-add_events_100_events]     |       0.010811615000108077       |
+|     test_decompress_bytes[zstandard_level_5-add_events_100_events]     |       0.010881484999956115       |
+| test_decompress_bytes[zstandard_level_3_default-add_events_100_events] |       0.011424354999860498       |
+|     test_decompress_bytes[brotli_quality_5-add_events_100_events]      |       0.017708220000258734       |
+|     test_decompress_bytes[brotli_quality_3-add_events_100_events]      |       0.017725630000100523       |
+|     test_decompress_bytes[brotli_quality_8-add_events_100_events]      |       0.018182339999839314       |
+|  test_decompress_bytes[deflate_level_6_default-add_events_100_events]  |       0.02288822499984633        |
+|      test_decompress_bytes[deflate_level_9-add_events_100_events]      |       0.02330365500014864        |
+|      test_decompress_bytes[deflate_level_3-add_events_100_events]      |       0.023628644999789117       |
+|    test_decompress_bytes[bz2_level_6_default-add_events_100_events]    |       0.22257672000030482        |
++------------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_200_events.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++------------------------------------------------------------------------+----------------------------------+
+|                                  name                                  | mean time in ms (less is better) |
++------------------------------------------------------------------------+----------------------------------+
+|       test_decompress_bytes[lz4_level_16-add_events_200_events]        |       0.006995099999969057       |
+|        test_decompress_bytes[lz4_level_3-add_events_200_events]        |      0.0077059149999314505       |
+|    test_decompress_bytes[lz4_level_0_default-add_events_200_events]    |       0.008326809999985585       |
+|          test_decompress_bytes[snappy-add_events_200_events]           |       0.008493165000018621       |
+|    test_decompress_bytes[zstandard_level_10-add_events_200_events]     |       0.018373115000187568       |
+|    test_decompress_bytes[zstandard_level_12-add_events_200_events]     |       0.01848706499998798        |
+|     test_decompress_bytes[zstandard_level_5-add_events_200_events]     |       0.019546680000033234       |
+| test_decompress_bytes[zstandard_level_3_default-add_events_200_events] |       0.01979195000018308        |
+|     test_decompress_bytes[brotli_quality_5-add_events_200_events]      |       0.033631265000053645       |
+|     test_decompress_bytes[brotli_quality_3-add_events_200_events]      |       0.03435419999995304        |
+|     test_decompress_bytes[brotli_quality_8-add_events_200_events]      |       0.03479973500006395        |
+|  test_decompress_bytes[deflate_level_6_default-add_events_200_events]  |       0.05434108499990486        |
+|      test_decompress_bytes[deflate_level_9-add_events_200_events]      |       0.055466309999800956       |
+|      test_decompress_bytes[deflate_level_3-add_events_200_events]      |       0.05919704000000081        |
+|    test_decompress_bytes[bz2_level_6_default-add_events_200_events]    |        0.4024306099999819        |
++------------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_10_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++---------------------------------------------------------------------------------------+----------------------------------+
+|                                          name                                         | mean time in ms (less is better) |
++---------------------------------------------------------------------------------------+----------------------------------+
+|           test_decompress_bytes[snappy-add_events_10_events_with_attributes]          |      0.0011924150001618727       |
+|        test_decompress_bytes[lz4_level_16-add_events_10_events_with_attributes]       |      0.0012758049998495835       |
+|    test_decompress_bytes[lz4_level_0_default-add_events_10_events_with_attributes]    |      0.0013028200002196397       |
+|        test_decompress_bytes[lz4_level_3-add_events_10_events_with_attributes]        |      0.0015899800002472375       |
+|     test_decompress_bytes[zstandard_level_10-add_events_10_events_with_attributes]    |      0.0038244450002622448       |
+|     test_decompress_bytes[zstandard_level_5-add_events_10_events_with_attributes]     |       0.003835454999929766       |
+|     test_decompress_bytes[zstandard_level_12-add_events_10_events_with_attributes]    |      0.0040743150000821515       |
+| test_decompress_bytes[zstandard_level_3_default-add_events_10_events_with_attributes] |       0.004631545000037818       |
+|      test_decompress_bytes[deflate_level_9-add_events_10_events_with_attributes]      |      0.0070777400001986734       |
+|      test_decompress_bytes[brotli_quality_5-add_events_10_events_with_attributes]     |       0.007103070000056277       |
+|      test_decompress_bytes[brotli_quality_3-add_events_10_events_with_attributes]     |       0.007302834999833863       |
+|      test_decompress_bytes[deflate_level_3-add_events_10_events_with_attributes]      |       0.00734444500004372        |
+|      test_decompress_bytes[brotli_quality_8-add_events_10_events_with_attributes]     |       0.007356550000281459       |
+|  test_decompress_bytes[deflate_level_6_default-add_events_10_events_with_attributes]  |       0.007405834999758554       |
+|    test_decompress_bytes[bz2_level_6_default-add_events_10_events_with_attributes]    |       0.08591587999994488        |
++---------------------------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_100_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------------------------------+----------------------------------+
+|                                          name                                          | mean time in ms (less is better) |
++----------------------------------------------------------------------------------------+----------------------------------+
+|        test_decompress_bytes[lz4_level_3-add_events_100_events_with_attributes]        |       0.007060660000277608       |
+|       test_decompress_bytes[lz4_level_16-add_events_100_events_with_attributes]        |       0.007369995000203744       |
+|    test_decompress_bytes[lz4_level_0_default-add_events_100_events_with_attributes]    |       0.008255085000072881       |
+|          test_decompress_bytes[snappy-add_events_100_events_with_attributes]           |       0.00934090999983539        |
+|    test_decompress_bytes[zstandard_level_10-add_events_100_events_with_attributes]     |       0.02041032999983372        |
+|    test_decompress_bytes[zstandard_level_12-add_events_100_events_with_attributes]     |       0.021021360000048617       |
+| test_decompress_bytes[zstandard_level_3_default-add_events_100_events_with_attributes] |       0.021494944999957966       |
+|     test_decompress_bytes[zstandard_level_5-add_events_100_events_with_attributes]     |       0.02204716000015594        |
+|     test_decompress_bytes[brotli_quality_3-add_events_100_events_with_attributes]      |       0.044263410000127124       |
+|     test_decompress_bytes[brotli_quality_8-add_events_100_events_with_attributes]      |       0.04518486999984361        |
+|     test_decompress_bytes[brotli_quality_5-add_events_100_events_with_attributes]      |       0.04767203999989533        |
+|      test_decompress_bytes[deflate_level_9-add_events_100_events_with_attributes]      |       0.06878755000016668        |
+|  test_decompress_bytes[deflate_level_6_default-add_events_100_events_with_attributes]  |       0.06959516000009103        |
+|      test_decompress_bytes[deflate_level_3-add_events_100_events_with_attributes]      |       0.07237873500017145        |
+|    test_decompress_bytes[bz2_level_6_default-add_events_100_events_with_attributes]    |        0.5174839799998665        |
++----------------------------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+
+add_events_request_200_events_with_attributes.log.gz -1 bytes (-1 means whole file)
+
+Best by timing (less is better)
+
++----------------------------------------------------------------------------------------+----------------------------------+
+|                                          name                                          | mean time in ms (less is better) |
++----------------------------------------------------------------------------------------+----------------------------------+
+|       test_decompress_bytes[lz4_level_16-add_events_200_events_with_attributes]        |       0.015016754999948034       |
+|        test_decompress_bytes[lz4_level_3-add_events_200_events_with_attributes]        |       0.01564145000010342        |
+|    test_decompress_bytes[lz4_level_0_default-add_events_200_events_with_attributes]    |       0.018984484999933215       |
+|          test_decompress_bytes[snappy-add_events_200_events_with_attributes]           |       0.01951811499992573        |
+|    test_decompress_bytes[zstandard_level_10-add_events_200_events_with_attributes]     |       0.038580405000061546       |
+|    test_decompress_bytes[zstandard_level_12-add_events_200_events_with_attributes]     |       0.03871856000003504        |
+| test_decompress_bytes[zstandard_level_3_default-add_events_200_events_with_attributes] |       0.04026865999989582        |
+|     test_decompress_bytes[zstandard_level_5-add_events_200_events_with_attributes]     |        0.0412411800000001        |
+|     test_decompress_bytes[brotli_quality_3-add_events_200_events_with_attributes]      |       0.08766996999973742        |
+|     test_decompress_bytes[brotli_quality_8-add_events_200_events_with_attributes]      |       0.08797422000007771        |
+|     test_decompress_bytes[brotli_quality_5-add_events_200_events_with_attributes]      |       0.08813766499997655        |
+|      test_decompress_bytes[deflate_level_9-add_events_200_events_with_attributes]      |       0.13559874499982527        |
+|  test_decompress_bytes[deflate_level_6_default-add_events_200_events_with_attributes]  |       0.13763943499995435        |
+|      test_decompress_bytes[deflate_level_3-add_events_200_events_with_attributes]      |       0.14878149499992332        |
+|    test_decompress_bytes[bz2_level_6_default-add_events_200_events_with_attributes]    |        0.9482837049998949        |
++----------------------------------------------------------------------------------------+----------------------------------+
+
+====================================================================================================
