@@ -29,7 +29,7 @@ from tests.common import install_deb
 from tests.utils.dockerized import dockerized_case
 from tests.utils.agent_runner import AgentRunner
 from tests.utils.agent_runner import PACKAGE_INSTALL
-from tests.image_builder.distributions.ubuntu import UbuntuBuilder
+from tests.image_builder.distributions.ubuntu1804 import UbuntuBuilder
 
 
 @pytest.mark.usefixtures("agent_environment")
