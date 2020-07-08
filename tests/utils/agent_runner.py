@@ -21,7 +21,7 @@ import os
 import atexit
 
 if False:  # NOSONAR
-    from typing import Dict, Optional, Any
+    from typing import Dict, Optional, Any, Union
 
 import copy
 import json
@@ -247,7 +247,11 @@ class AgentRunner(object):
         output = six.ensure_text(output)
         return output
 
-    def status_json(self):
+    def status_json(self, parse_json=False):
+        # type: (bool) -> Union[six.text_type, dict]
+        """
+        :param parse_json: True to parse result as json and return a dict.
+        """
         if self._installation_type == PACKAGE_INSTALL:
             cmd = "/usr/sbin/scalyr-agent-2 status -v --format=json"
         else:
@@ -255,6 +259,10 @@ class AgentRunner(object):
 
         output = compat.subprocess_check_output(cmd=cmd, shell=True)
         output = six.ensure_text(output)
+
+        if parse_json:
+            return json.loads(output)
+
         return output
 
     def switch_version(self, version, env=None):
@@ -330,6 +338,31 @@ class AgentRunner(object):
 
         print("Agent stopped.")
         self._stopped = True
+
+    def restart(self, executable="python"):
+        print("Restarting agent process...")
+
+        if self._installation_type == PACKAGE_INSTALL:
+            service_executable = find_executable("service")
+            if service_executable:
+                cmd = "%s scalyr-agent-2 restart" % (service_executable)
+            else:
+                # Special case for CentOS 6 where we need to use absolute path to service command
+                cmd = "/sbin/service scalyr-agent-2 restart"
+
+            result = subprocess.check_call(cmd, shell=True)
+
+            return result
+
+        else:
+            process = subprocess.Popen(
+                "{0} {1} restart".format(executable, _AGENT_MAIN_PATH), shell=True
+            )
+
+            process.wait()
+            self._agent_process.wait()
+
+        print("Agent process restarted.")
 
     def __del__(self):
         self.stop()
