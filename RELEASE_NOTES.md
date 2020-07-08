@@ -162,6 +162,10 @@ the usual `agent.log` file. The output can be limited with the new top level con
 `INFO`, `WARN`, `ERROR`, or `CRITICAL`. Only messages with a severity equal to or higher than this value
 will be output to stdout. The equivalent environment variable for this configuration is `SCALYR_STDOUT_SEVERITY`.
 
+If you are using a custom Docker image to run the Scalyr agent in Docker or Kubernetes and this may result in additional
+logs to `stdout` due to usually running with the `--no-fork` flag. If you wish to avoid this configure
+`stdout_severity` as `ERROR`, this is the configuration for the official Agent Docker image, see [here](https://github.com/scalyr/scalyr-agent-2/blob/7e50025373e1a70e87a2e8cb95e863cf28c1786e/docker/Dockerfile.k8s#L19).
+
 ## 2.1.1 "Millenium Falcon" - Mar 27, 2020
 
 This release includes significant changes to the Scalyr Agent code base.  The release highlights
