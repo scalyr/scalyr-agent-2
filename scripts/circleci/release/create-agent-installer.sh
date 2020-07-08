@@ -211,9 +211,9 @@ function create_repo_file() {
 
   cat > $1 <<EOF
 [scalyr]
-includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo1111
+includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
-baseurl=https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL/yum${ALT}/binaries/noarch
+baseurl=https://scalyr-repo.s3.amazonawssss.com/$REPO_BASE_URL/yum${ALT}/binaries/noarch
 mirror_expire=300
 metadata_expire=300
 enabled=1
