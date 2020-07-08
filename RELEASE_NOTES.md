@@ -2,8 +2,9 @@
 
 ## 2.1.8 - TBD
 
-* Change the default value for the ``compression_level`` configuration option when using
-  ``compression_type: deflate`` from ``9`` to ``6``.
+* Default value for the  ``compression_level`` configuration option when using
+  ``compression_type: deflate`` has been changed from ``9`` to ``6`` (``deflate`` is a default
+  value is ``compress_type`` configuration option is not specified by the end user).
 
   ``6`` offers a best compromise between CPU usage and compression ratio.
 
