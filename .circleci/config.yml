@@ -1119,7 +1119,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=150 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
 
       - slack/status:
@@ -1137,7 +1137,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=150 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
 
       - slack/status:
@@ -1170,7 +1170,7 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 150
       - run:
           name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
@@ -1221,7 +1221,7 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150
       - run:
           name: Submit Coverage Data to codecov.io
           command: |
@@ -1304,7 +1304,7 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs
+            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
       - run:
           name: Submit Coverage Data to codecov.io
           command: |
@@ -1729,6 +1729,15 @@ jobs:
             export PYTHONPATH=.
             ./scripts/send-benchmark-completion-notification-to-slack.py /tmp/codespeed-screenshots/
 
+  smoke-standalone-35-rate-limit:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.5"
+          tox_target: "py3.5-smoke-tests-rate-limit"
+
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2076,6 +2085,7 @@ workflows:
       - smoke-standalone-26
       - smoke-standalone-27
       - smoke-standalone-35
+      - smoke-standalone-35-rate-limit
       - smoke-standalone-26-tls12
       - smoke-standalone-27-tls12
        # NOTE: smoke test jobs below still use old smoke tests framework

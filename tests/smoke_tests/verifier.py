@@ -359,6 +359,178 @@ class DataJsonVerifier(AgentVerifier):
         return True
 
 
+class DataJsonVerifierRateLimited(AgentVerifier):
+    """
+    A verifier that writes 5000 large lines to data.log, then waits until it detects at least one such message in
+    Scalyr, then waits a set time before checking how many lines have been uploaded. The intent of this is to test
+    rate limiting, and as such the agent must be configured with a rate limit that is reflected in
+    `self._rate_limit_bytes_per_second`.
+    """
+
+    def __init__(self, runner, server_address):
+        super(DataJsonVerifierRateLimited, self).__init__(runner, server_address)
+
+        self._data_json_log_path = self._runner.add_log_file(
+            self._runner.agent_logs_dir_path / "data.log"
+        )
+        self._timestamp = datetime.datetime.now().isoformat()
+
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
+            "$logfile=='{0}'".format(
+                self._runner.get_file_path_text(self._data_json_log_path)
+            )
+        )
+        self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
+
+        self._message = {
+            "count": 0,
+            "stream_id": self._timestamp,
+            "filler": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f"
+            * 69,
+        }
+
+        self._lines_count = 5000
+        self._upload_wait_time = 30
+
+        # Estimate of line size
+        self._line_size = len(json.dumps(self._message))
+
+        # This value should match the rate limit configured for the agent when running this test
+        self._rate_limit_bytes_per_second = 500000
+
+        self._expected_lines_uploaded = (
+            self._rate_limit_bytes_per_second * (self._upload_wait_time + 4)
+        ) / self._line_size
+
+    def prepare(self):
+        print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
+        for i in range(self._lines_count):
+            self._message["count"] = i
+            json_data = json.dumps(self._message)
+            self._runner.write_line(self._data_json_log_path, json_data)
+        return
+
+    def verify(self, timeout=1 * 60):
+        """
+        We only need to check at one point in time and confirm that the amount of lines uploaded is roughly equal to
+        what we expect to be uploaded with the given rate.
+        """
+        self.prepare()
+
+        # This retry delay is not between attempts to verify the payload but to get the first uploaded logs
+        retry_delay = 2
+
+        start_time = time.time()
+        ingestion_start_timeout_time = start_time + 20
+
+        print("Verifying start of ingestion...")
+        while True:
+            if self._verify_ingest_began():
+                break
+
+            if time.time() >= ingestion_start_timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+            print(
+                "No matching logs found yet, will retry in %s second(s)" % retry_delay
+            )
+            time.sleep(retry_delay)
+
+        print("Successfully verified ingestion has begun.")
+
+        # Give more time for upload and ingestion
+        time.sleep(self._upload_wait_time)
+
+        start_time = time.time()
+        timeout_time = start_time + timeout
+
+        retry_delay = type(self).RETRY_DELAY
+
+        print("Verifying data has been ingested")
+        while True:
+            if self._verify():
+                break
+
+            if time.time() >= timeout_time:
+                raise ValueError(
+                    "Received no successful response in %s seconds. Timeout reached"
+                    % (timeout)
+                )
+            print(
+                "No matching logs found yet, will retry in %s second(s)" % retry_delay
+            )
+            time.sleep(retry_delay)
+
+        end_time = time.time()
+        print("Successfully verified all data has been correctly ingested.")
+        print("Success.")
+        print("Duration: %s" % (int(end_time - start_time)))
+        return True
+
+    def _verify_ingest_began(self):
+        """
+        Check that any lines have been uploaded, this helps keep the test consistent by working around ingest time.
+        """
+        try:
+            response = self._request.send()
+        except Exception as e:
+            print("Query failed: %s" % str(e))
+            return False
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
+        return len(response["matches"]) > 0
+
+    def _verify(self):
+        try:
+            response = self._request.send()
+        except Exception as e:
+            print("Query failed: %s" % str(e))
+            return False
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
+        matches = response["matches"]
+        if len(matches) < self._expected_lines_uploaded - (
+            self._expected_lines_uploaded * 0.1
+        ):
+            print(
+                "Not enough log lines were found (found %s, expected %s +- 10%%)."
+                % (len(matches), self._expected_lines_uploaded)
+            )
+            return False
+        if len(matches) > self._expected_lines_uploaded + (
+            self._expected_lines_uploaded * 0.1
+        ):
+            print(
+                "Too many log lines were found (found %s, expected %s +- 10%%)."
+                % (len(matches), self._expected_lines_uploaded)
+            )
+            return False
+
+        print(
+            "Enough log lines found (found %s, expected %s +- 10%%)."
+            % (len(matches), self._expected_lines_uploaded)
+        )
+
+        matches = [json.loads(m["message"]) for m in matches]
+
+        if not all([m["stream_id"] == self._timestamp for m in matches]):
+            print("Some of the fetched lines have wrong 'stream_id'")
+            return False
+
+        return True
+
+
 class SystemMetricsVerifier(AgentVerifier):
     """
     Verifier that checks that linux_system_metrics.log file was uploaded to the Scalyr server.
@@ -385,9 +557,16 @@ class SystemMetricsVerifier(AgentVerifier):
             print("Query failed.")
             return
 
+        print("Query response received.")
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
         if len(response["matches"]) < 220:
             print("Not enough system metrics were loaded to Scalyr.")
-            return
+            return False
 
         return True
 
@@ -418,8 +597,15 @@ class ProcessMetricsVerifier(AgentVerifier):
             print("Query failed.")
             return
 
+        print("Query response received.")
+
+        if "matches" not in response:
+            print('Response is missing "matches" field')
+            print("Response data: %s" % (str(response)))
+            return False
+
         if len(response["matches"]) < 14:
             print("Not enough process metrics were loaded to Scalyr.")
-            return
+            return False
 
         return True
