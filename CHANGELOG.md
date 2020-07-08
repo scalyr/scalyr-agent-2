@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.8 "TBD" - July 10, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on July 20, 2020 08:30 -0800
+--->
+
+Misc:
+* ``compression_level`` configuration option now defaults to ``6`` when using ``deflate`` ``compression_type`` (``deflate`` is the default value for the ``compression_type`` configuration option). 6 offers the best trade off between compression ratio and CPU usage. For more information, please refer to the release notes document.
+
 ## 2.1.7 "Serenity" - June 24, 2020
 
 <!---

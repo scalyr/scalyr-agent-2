@@ -1,5 +1,22 @@
 # Release Notes
 
+## 2.1.8 - TBD
+
+* Change the default value for the ``compression_level`` configuration option when using
+  ``compression_type: deflate`` from ``9`` to ``6``.
+
+  ``6`` offers a best compromise between CPU usage and compression ratio.
+
+  For the average case, using ``9`` usually only offers a very small increase in a compression
+  ratio (in the range of couple % at most), but it uses much more CPU time (that is especially
+  true for highly loaded scenarios and large request sizes).
+
+  Keep in mind that this default value will only be used if you don't explicitly specify
+  ``compression_level`` configuration option in your agent config.
+
+  If you want to use level 9, you can still do that by adding ``compression_level: 9`` to your
+  agent config.
+
 ## 2.1.7 "Serenity" - June 24, 2020
 
 * Windows 32-bit systems are no longer supported.
