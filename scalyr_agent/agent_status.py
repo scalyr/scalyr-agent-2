@@ -97,6 +97,10 @@ class AgentStatus(BaseAgentStatus):
         self.server_host = None
         # The URL of the scalyr server that the agent is connected to (such as https://www.scalyr.com/).
         self.scalyr_server = None
+        # Compression algorithm used by the agent
+        self.compression_type = None
+        # Compression level used by the agent
+        self.compression_level = None
         # The path for the agent's log file.
         self.log_path = None
         # The ConfigStatus object recording the status for the configuration file.
@@ -422,17 +426,22 @@ def report_status(output, status, current_time):
         file=output,
     )
     print("", file=output)
-    print("Current time:     %s" % scalyr_util.format_time(current_time), file=output)
     print(
-        "Agent started at: %s" % scalyr_util.format_time(status.launch_time),
+        "Current time:            %s" % scalyr_util.format_time(current_time),
         file=output,
     )
-    print("Version:          %s" % status.version, file=output)
-    print("VCS revision:     %s" % status.revision, file=output)
-    print("Python version:   %s" % status.python_version, file=output)
-    print("Agent running as: %s" % status.user, file=output)
-    print("Agent log:        %s" % status.log_path, file=output)
-    print("ServerHost:       %s" % status.server_host, file=output)
+    print(
+        "Agent started at:        %s" % scalyr_util.format_time(status.launch_time),
+        file=output,
+    )
+    print("Version:                 %s" % status.version, file=output)
+    print("VCS revision:            %s" % status.revision, file=output)
+    print("Python version:          %s" % status.python_version, file=output)
+    print("Agent running as:        %s" % status.user, file=output)
+    print("Agent log:               %s" % status.log_path, file=output)
+    print("ServerHost:              %s" % status.server_host, file=output)
+    print("Compression algorithm:   %s" % status.compression_type, file=output)
+    print("Compression level:       %s" % status.compression_level, file=output)
     print("", file=output)
     server = scalyr_util.get_web_url_from_upload_url(status.scalyr_server)
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,

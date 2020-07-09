@@ -127,9 +127,14 @@ COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
 
 # Maps compression type to a default compression level which is used if one is not specified by the
 # end user.
-# For more context on those defaults, please refer to micro benchmarks results.
+# For the justification on the default values, please refer to our compression algorithms micro
+# benchmark results in benchmarks/micro/results/compression_algorithms.txt.
+# Keep in mind that those results are based on running compression algorithms benchmarks on my
+# (@Kami) computer, but they can be re-produced by running
+# "tox -emicro-benchmarks-compression-algorithms" tox target (absolute values for the timings will
+# be different, but relative differences should stay mostly the same).
 COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
-    "deflate": 9,
+    "deflate": 6,  # 9 offers slight increase over 6 in compression ratio, but uses much more CPU
     "bz2": 9,
     "lz4": 0,  # the fastest, but not the best compression ratio
     "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
