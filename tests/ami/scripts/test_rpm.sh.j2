@@ -134,6 +134,8 @@ echo ""
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
     {% if upgrade_package["type"] == "url" -%}
+echo Download
+echo "{{ upgrade_package["source"] }}"
 wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% elif upgrade_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
