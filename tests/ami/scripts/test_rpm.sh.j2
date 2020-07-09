@@ -76,7 +76,7 @@ export INSTALL_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "install_p
     {% if installer_script_info["type"] == "url" -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_info["source"]}}"
     {% endif -%}
-sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}" --verbose
+sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
     {% if install_package["source"] == "current" -%}
     {# Install the latest agent version in repo. #}
     # Get version of the current package
@@ -134,8 +134,6 @@ echo ""
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
     {% if upgrade_package["type"] == "url" -%}
-echo Download
-echo "{{ upgrade_package["source"] }}"
 wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% elif upgrade_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
