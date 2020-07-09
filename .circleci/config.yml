@@ -706,6 +706,7 @@ commands:
             if [ "<< parameters.test_type >>" = "development" ]; then
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
+            export INSTALLER_SCRIPT_URL="https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
 
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
