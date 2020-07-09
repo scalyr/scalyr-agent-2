@@ -321,4 +321,3 @@ cp $SCRIPTPATH/installScalyrAgentV2.sh installScalyrAgentV2.sh
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
-
