@@ -8,3 +8,4 @@ omit =
     tests/ami/*
     tests/distribution/*
     tests/distribution_builders/*
+    tests/image_builder/*

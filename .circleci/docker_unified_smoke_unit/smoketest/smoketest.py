@@ -460,10 +460,17 @@ class StandaloneSmokeTestActor(SmokeTestActor):
             if resp.ok:
                 data = json.loads(resp.content)
                 if "matches" not in data:
+                    print('API response doesn\'t contain "matches" attribute')
+                    print("API response: %s" % (str(data)))
                     return False
                 matches = data["matches"]
                 if len(matches) == 0:
+                    print("Found 0 matches")
                     return False
+                print("")
+                print("Sample response for matches[0]")
+                print(matches[0])
+                print("")
                 att = matches[0]["attributes"]
                 verifier_type = att["verifier_type"]
                 python_version = att["python_version"]
@@ -478,6 +485,10 @@ class StandaloneSmokeTestActor(SmokeTestActor):
                     ]
                 ):
                     return True
+
+            print("Received non-OK (200) response")
+            print("Response status code: %s" % (resp.status_cde))
+            print("Response text: %s" % (resp.text))
             return False
 
         self.poll_until_max_wait(
@@ -588,6 +599,10 @@ class DockerSmokeTestActor(SmokeTestActor):
                     if len(matches) == 0:
                         return False
                     return True
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_cde))
+                print("Response text: %s" % (resp.text))
                 return False
 
             return _func
@@ -623,6 +638,10 @@ class DockerSmokeTestActor(SmokeTestActor):
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
         if att.get("containerName") != process_name:
+            print(
+                "containerName attribute doesn't match process name. Expected '%s' got '%s'"
+                % (process_name, att.get("containerName"))
+            )
             return False
         return True
 
@@ -659,15 +678,25 @@ class DockerSmokeTestActor(SmokeTestActor):
                 if resp.ok:
                     data = json.loads(resp.content)
                     if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
                         return False
                     matches = data["matches"]
                     if len(matches) == 0:
+                        print("Found 0 matches")
                         return False
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
                     att = matches[0]["attributes"]
                     return self._verify_queried_attributes(
                         att, stream_name, process_name
                     )
 
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_cde))
+                print("Response text: %s" % (resp.text))
                 return False  # Non-ok response
 
             return _func
@@ -721,13 +750,21 @@ class DockerSyslogActor(DockerSmokeTestActor):
     def _verify_queried_attributes(self, att, stream_name, process_name):
         if not super()._verify_queried_attributes(att, stream_name, process_name):
             return False
-        if not all(
-            [
-                att.get("monitor") == "agentSyslog",
-                att.get("parser") == "agentSyslogDocker",
-            ]
-        ):
+
+        expected_monitor = "agentSyslog"
+        # expected_parser = "agentSyslogDocker"
+
+        actual_monitor = att.get("monitor")
+        # actual_parser = att.get("parser")
+
+        # NOTE: "parser" attribute is not returned by the API anymore since early July 2020 so we
+        # only assert on the monitor name
+        if actual_monitor != expected_monitor:
+            print(
+                "Expected(monitor): '%s', got '%s'" % (expected_monitor, actual_monitor)
+            )
             return False
+
         return True
 
 

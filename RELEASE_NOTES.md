@@ -98,6 +98,9 @@
   Increased throughput may result in a larger amount of logs uploaded to Scalyr if the Agent has been skipping logs
   before this upgrade, and as a result a larger bill.
 
+  Increase to `max_allowed_request_size` may result in increased memory usage by the Agent, if this is an issue you may
+  wish to revert to the legacy behavior as described below.
+
   If you are interested in relying on the legacy behavior, you may set the `max_send_rate_enforcement` option to
   `legacy` either by setting it in your `agent.json` configuration file, or by setting the
   `SCALYR_MAX_SEND_RATE_ENFORCEMENT` environment variable to `legacy`.
@@ -158,6 +161,10 @@ the usual `agent.log` file. The output can be limited with the new top level con
 `stdout_severity` which requires a string value of a valid logging level, one of `NOTSET`, `DEBUG`,
 `INFO`, `WARN`, `ERROR`, or `CRITICAL`. Only messages with a severity equal to or higher than this value
 will be output to stdout. The equivalent environment variable for this configuration is `SCALYR_STDOUT_SEVERITY`.
+
+If you are using a custom Docker image to run the Scalyr agent in Docker or Kubernetes and this may result in additional
+logs to `stdout` due to usually running with the `--no-fork` flag. If you wish to avoid this configure
+`stdout_severity` as `ERROR`, this is the configuration for the official Agent Docker image, see [here](https://github.com/scalyr/scalyr-agent-2/blob/7e50025373e1a70e87a2e8cb95e863cf28c1786e/docker/Dockerfile.k8s#L19).
 
 ## 2.1.1 "Millenium Falcon" - Mar 27, 2020
 
