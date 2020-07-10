@@ -46,6 +46,7 @@ from scalyr_agent.agent_status import (
     MonitorManagerStatus,
     LogMatcherStatus,
     report_status,
+    report_health,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -195,6 +196,7 @@ class TestReportStatus(ScalyrTestCase):
         copying_status.total_errors = 0
         copying_status.total_bytes_uploaded = 10000
         copying_status.last_success_time = self.time - 60
+        copying_status.health_check_result = "Good"
 
         # Add in one log path that isn't a glob but does not have any matches yet.
         log_matcher = LogMatcherStatus()
@@ -556,6 +558,19 @@ Failed monitors:
         # Verify dict contains only simple types - JSON.dumps would fail if it doesn't
         result_json = json.dumps(result)
         self.assertEqual(json.loads(result_json), result)
+
+    def test_health_status(self):
+        output = io.StringIO()
+        report_health(output, self.status)
+        expected_output = "Health check: Good\n"
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_health_status_bad(self):
+        self.status.copying_manager_status.health_check_result = "Some bad message"
+        output = io.StringIO()
+        report_health(output, self.status)
+        expected_output = "Health check: Some bad message\n"
+        self.assertEquals(expected_output, output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):

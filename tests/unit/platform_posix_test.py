@@ -54,7 +54,7 @@ class PosixPlatformControllerTestCase(ScalyrTestCase):
         controller.start_agent_service(
             agent_run_method=lambda x: 0, quiet=True, fork=False
         )
-        self.assertEqual(mock_signal.call_count, 3 + 3)
+        self.assertEqual(mock_signal.call_count, 4 + 4)
 
         self.assertEqual(mock_signal.call_args_list[0][0][0], signal.SIGTERM)
         self.assertEqual(
@@ -68,6 +68,9 @@ class PosixPlatformControllerTestCase(ScalyrTestCase):
 
         self.assertEqual(mock_signal.call_args_list[2][0][0], signal.SIGUSR1)
         self.assertEqual(mock_signal.call_args_list[2][0][1].__name__, "handle_sigusr1")
+
+        self.assertEqual(mock_signal.call_args_list[3][0][0], signal.SIGUSR2)
+        self.assertEqual(mock_signal.call_args_list[3][0][1].__name__, "handle_sigusr2")
 
 
 class TestStatusReporter(ScalyrTestCase):
