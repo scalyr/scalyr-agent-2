@@ -323,10 +323,21 @@ class PlatformController(object):
         pass
 
     def request_agent_status(self):
-        """Invoked by a process that is not the agent to request the current agent dump the current detail
+        """Invoked by a process that is not the agent to request the current agent dump the current health
         status to the status file.
 
         This is used to implement the 'scalyr-agent-2 status -v' feature.
+
+        @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
+            have permission to request the status.  errno.ESRCH indicates the agent is not running.
+        """
+        pass
+
+    def request_agent_health_check(self):
+        """Invoked by a process that is not the agent to request the current agent dump the current detail
+        status to the status file.
+
+        This is used to implement the 'scalyr-agent-2 status -H' feature.
 
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
@@ -347,6 +358,18 @@ class PlatformController(object):
         """Register a method to be invoked if this process is requested to report its status.
 
         This is used to implement the 'scalyr-agent-2 status -v' feature.
+
+        This should only be invoked by the agent service once it has begun to run.
+
+        @param handler:  The method to invoke when status is requested.
+        @type handler: func
+        """
+        pass
+
+    def register_for_health_check(self, handler):
+        """Register a method to be invoked if this process is requested to report its status.
+
+        This is used to implement the 'scalyr-agent-2 status -H' feature.
 
         This should only be invoked by the agent service once it has begun to run.
 

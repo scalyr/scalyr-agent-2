@@ -76,7 +76,7 @@ spec:
             command:
             - scalyr-agent-2
             - status
-            - -v
+            - -H
           initialDelaySeconds: 60
           periodSeconds: 60
       dnsPolicy: ClusterFirst

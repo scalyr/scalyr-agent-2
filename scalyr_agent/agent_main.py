@@ -90,7 +90,10 @@ from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import GCStatus
-from scalyr_agent.agent_status import report_status
+from scalyr_agent.agent_status import (
+    report_status,
+    report_health,
+)
 from scalyr_agent.platform_controller import (
     PlatformController,
     AgentAlreadyRunning,
@@ -223,6 +226,7 @@ class ScalyrAgent(object):
         my_options = Options()
         my_options.quiet = True
         my_options.verbose = False
+        my_options.health_check = False
         my_options.status_format = "text"
         my_options.no_fork = True
         my_options.no_change_user = True
@@ -254,6 +258,7 @@ class ScalyrAgent(object):
         """
         quiet = command_options.quiet
         verbose = command_options.verbose
+        health_check = command_options.health_check
         status_format = command_options.status_format
         extra_config_dir = command_options.extra_config_dir
         self.__no_fork = command_options.no_fork
@@ -321,9 +326,9 @@ class ScalyrAgent(object):
                 return self.__run(self.__controller)
             elif command == "stop":
                 return self.__stop(quiet)
-            elif command == "status" and not verbose:
+            elif command == "status" and not (verbose or health_check):
                 return self.__status()
-            elif command == "status" and verbose:
+            elif command == "status" and (verbose or health_check):
                 if self.__config is not None:
                     agent_data_path = self.__config.agent_data_path
                 else:
@@ -333,7 +338,9 @@ class ScalyrAgent(object):
                         file=sys.stderr,
                     )
                 return self.__detailed_status(
-                    agent_data_path, status_format=status_format
+                    agent_data_path,
+                    status_format=status_format,
+                    health_check=health_check,
                 )
             elif command == "restart":
                 return self.__restart(quiet, no_check_remote)
@@ -618,8 +625,10 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def __detailed_status(self, data_directory, status_format="text"):
-        """Execute the status -v command.
+    def __detailed_status(
+        self, data_directory, status_format="text", health_check=False
+    ):
+        """Execute the status -v or -H command.
 
         This will request the current agent to dump its detailed status to a file in the data directory, which
         this process will then read.
@@ -690,7 +699,10 @@ class ScalyrAgent(object):
             fp.write(status_format)
 
         # Signal to the running process.  This should cause that process to write to the status file
-        result = self.__controller.request_agent_status()
+        if health_check:
+            result = self.__controller.request_agent_health_check()
+        else:
+            result = self.__controller.request_agent_status()
         if result is not None:
             if result == errno.ESRCH:
                 print(AGENT_NOT_RUNNING_MESSAGE, file=sys.stderr)
@@ -739,19 +751,14 @@ class ScalyrAgent(object):
             )
             return 1
 
-        health_check_error = None
+        return_code = 0
         fp = open(status_file)
         for line in fp:
             print(line.rstrip())
-            if "Health check:" in line and line.rstrip() != "Health check: Good":
-                health_check_error = line.rstrip()
+            if health_check and line.rstrip() != "Health check: Good":
+                return_code = 1
         fp.close()
-
-        if health_check_error:
-            print(health_check_error, file=sys.stderr)
-            return 1
-
-        return 0
+        return return_code
 
     def __stop(self, quiet):
         """Stop the current agent.
@@ -893,6 +900,10 @@ class ScalyrAgent(object):
         # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
         # a file because a user has run the 'detailed_status' command.
         self.__controller.register_for_status_requests(self.__report_status_to_file)
+
+        # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
+        # a file because a user has run the 'detailed_status' command.
+        self.__controller.register_for_health_check(self.__report_health_to_file)
 
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
@@ -1858,7 +1869,7 @@ class ScalyrAgent(object):
             agent_status = self.__generate_status()
 
             if not status_format or status_format == "text":
-                report_status(tmp_file, self.__generate_status(), time.time())
+                report_status(tmp_file, agent_status, time.time())
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
@@ -1878,6 +1889,69 @@ class ScalyrAgent(object):
         log.log(
             scalyr_logging.DEBUG_LEVEL_4,
             'Wrote agent status data in "%s" format to %s'
+            % (status_format, final_file_path),
+        )
+
+        return final_file_path
+
+    def __report_health_to_file(self):
+        # type: () -> str
+        """
+        Handles the signal sent to request this process write its current health check out.
+
+        :return: File path status data has been written to.
+        :rtype: ``str``
+        """
+        # First determine the format user request. If no file with the requested format, we assume
+        # text format is used (this way it's backward compatible and works correctly on upgraded)
+        status_format = "text"
+
+        status_format_file = os.path.join(
+            self.__config.agent_data_path, STATUS_FORMAT_FILE
+        )
+        if os.path.isfile(status_format_file):
+            with open(status_format_file, "r") as fp:
+                status_format = fp.read().strip()
+
+        if not status_format or status_format not in VALID_STATUS_FORMATS:
+            status_format = "text"
+
+        tmp_file = None
+        try:
+            # We do a little dance to write the status.  We write it to a temporary file first, and then
+            # move it into the real location after the write has finished.  This way, the process watching
+            # the file we are writing does not accidentally read it when it is only partially written.
+            tmp_file_path = os.path.join(
+                self.__config.agent_data_path, "last_status.tmp"
+            )
+            final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
+
+            if os.path.isfile(final_file_path):
+                os.remove(final_file_path)
+            tmp_file = open(tmp_file_path, "w")
+
+            agent_status = self.__generate_status()
+
+            if not status_format or status_format == "text":
+                report_health(tmp_file, agent_status)
+            elif status_format == "json":
+                status_data = agent_status.to_dict()
+                tmp_file.write(scalyr_util.json_encode(status_data))
+
+            tmp_file.close()
+            tmp_file = None
+
+            os.rename(tmp_file_path, final_file_path)
+        except (OSError, IOError):
+            log.exception(
+                "Exception caught will try to report health", error_code="failedHealth"
+            )
+            if tmp_file is not None:
+                tmp_file.close()
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_4,
+            'Wrote agent health data in "%s" format to %s'
             % (status_format, final_file_path),
         )
 
@@ -1953,6 +2027,14 @@ if __name__ == "__main__":
         dest="verbose",
         default=False,
         help="For status command, prints detailed information about running agent.",
+    )
+    parser.add_option(
+        "-H",
+        "--health_check",
+        action="store_true",
+        dest="health_check",
+        default=False,
+        help="For status command, prints health check status. Return code will be 0 for a passing check, and 1 for failing",
     )
     parser.add_option(
         "--format",
