@@ -1,5 +1,23 @@
 # Release Notes
 
+## 2.1.8 - TBD
+
+* Default value for the  ``compression_level`` configuration option when using
+  ``compression_type: deflate`` has been changed from ``9`` to ``6`` (``deflate`` is a default
+  value is ``compress_type`` configuration option is not specified by the end user).
+
+  ``6`` offers a best compromise between CPU usage and compression ratio.
+
+  For the average case, using ``9`` usually only offers a very small increase in a compression
+  ratio (in the range of couple % at most), but it uses much more CPU time (that is especially
+  true for highly loaded scenarios and large request sizes).
+
+  Keep in mind that this default value will only be used if you don't explicitly specify
+  ``compression_level`` configuration option in your agent config.
+
+  If you want to use level 9, you can still do that by adding ``compression_level: 9`` to your
+  agent config.
+
 ## 2.1.7 "Serenity" - June 24, 2020
 
 * Windows 32-bit systems are no longer supported.
@@ -161,6 +179,10 @@ the usual `agent.log` file. The output can be limited with the new top level con
 `stdout_severity` which requires a string value of a valid logging level, one of `NOTSET`, `DEBUG`,
 `INFO`, `WARN`, `ERROR`, or `CRITICAL`. Only messages with a severity equal to or higher than this value
 will be output to stdout. The equivalent environment variable for this configuration is `SCALYR_STDOUT_SEVERITY`.
+
+If you are using a custom Docker image to run the Scalyr agent in Docker or Kubernetes and this may result in additional
+logs to `stdout` due to usually running with the `--no-fork` flag. If you wish to avoid this configure
+`stdout_severity` as `ERROR`, this is the configuration for the official Agent Docker image, see [here](https://github.com/scalyr/scalyr-agent-2/blob/7e50025373e1a70e87a2e8cb95e863cf28c1786e/docker/Dockerfile.k8s#L19).
 
 ## 2.1.1 "Millenium Falcon" - Mar 27, 2020
 
