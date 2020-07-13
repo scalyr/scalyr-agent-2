@@ -326,7 +326,7 @@ class PlatformController(object):
         """Invoked by a process that is not the agent to request the current agent dump the current detail
         status to the status file.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.

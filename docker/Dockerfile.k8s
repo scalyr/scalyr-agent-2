@@ -17,6 +17,7 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Configure agent to only emit log messages with ERROR and above to stdout by default
 ENV SCALYR_STDOUT_SEVERITY ERROR
+ENV SCALYR_ENABLE_HEALTH_CHECK true
 COPY --from=scalyr-dependencies  /tmp/dependencies/ /
 ADD scalyr-k8s-agent.tar.gz /
 

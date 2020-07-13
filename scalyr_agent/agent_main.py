@@ -223,6 +223,7 @@ class ScalyrAgent(object):
         my_options = Options()
         my_options.quiet = True
         my_options.verbose = False
+        my_options.health_check = False
         my_options.status_format = "text"
         my_options.no_fork = True
         my_options.no_change_user = True
@@ -254,6 +255,7 @@ class ScalyrAgent(object):
         """
         quiet = command_options.quiet
         verbose = command_options.verbose
+        health_check = command_options.health_check
         status_format = command_options.status_format
         extra_config_dir = command_options.extra_config_dir
         self.__no_fork = command_options.no_fork
@@ -321,9 +323,9 @@ class ScalyrAgent(object):
                 return self.__run(self.__controller)
             elif command == "stop":
                 return self.__stop(quiet)
-            elif command == "status" and not verbose:
+            elif command == "status" and not (verbose or health_check):
                 return self.__status()
-            elif command == "status" and verbose:
+            elif command == "status" and (verbose or health_check):
                 if self.__config is not None:
                     agent_data_path = self.__config.agent_data_path
                 else:
@@ -333,7 +335,9 @@ class ScalyrAgent(object):
                         file=sys.stderr,
                     )
                 return self.__detailed_status(
-                    agent_data_path, status_format=status_format
+                    agent_data_path,
+                    status_format=status_format,
+                    health_check=health_check,
                 )
             elif command == "restart":
                 return self.__restart(quiet, no_check_remote)
@@ -618,8 +622,10 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def __detailed_status(self, data_directory, status_format="text"):
-        """Execute the status -v command.
+    def __detailed_status(
+        self, data_directory, status_format="text", health_check=False
+    ):
+        """Execute the status -v or -H command.
 
         This will request the current agent to dump its detailed status to a file in the data directory, which
         this process will then read.
@@ -630,6 +636,10 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        # Health check ignores format but uses `json` under the hood
+        if health_check:
+            status_format = "json"
+
         if status_format not in VALID_STATUS_FORMATS:
             print(
                 "Invalid status format: %s. Valid formats are: %s"
@@ -739,12 +749,44 @@ class ScalyrAgent(object):
             )
             return 1
 
+        return_code = 0
         fp = open(status_file)
         for line in fp:
-            print(line.rstrip())
-        fp.close()
+            if not health_check:
+                print(line.rstrip())
 
-        return 0
+            if status_format == "json" or health_check:
+                health_result = self.__find_health_result_in_status_json(line)
+                if health_result:
+                    if health_check:
+                        print("Health check: %s" % health_result)
+                    if health_result != "Good":
+                        return_code = 2
+                elif health_check:
+                    print(
+                        'Cannot get health check result, make sure you have configured "enable_health_check" as "true".'
+                    )
+            elif (
+                status_format == "text"
+                and "Health check" in line
+                and line.rstrip() != "Health check: Good"
+            ):
+                return_code = 2
+        fp.close()
+        return return_code
+
+    @staticmethod
+    def __find_health_result_in_status_json(line):
+        try:
+            status = scalyr_util.json_decode(line)
+            if (
+                "copying_manager_status" in status
+                and "health_check_result" in status["copying_manager_status"]
+            ):
+                return status["copying_manager_status"]["health_check_result"]
+        except ValueError:
+            pass
+        return None
 
     def __stop(self, quiet):
         """Stop the current agent.
@@ -1853,7 +1895,7 @@ class ScalyrAgent(object):
             agent_status = self.__generate_status()
 
             if not status_format or status_format == "text":
-                report_status(tmp_file, self.__generate_status(), time.time())
+                report_status(tmp_file, agent_status, time.time())
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
@@ -1948,6 +1990,14 @@ if __name__ == "__main__":
         dest="verbose",
         default=False,
         help="For status command, prints detailed information about running agent.",
+    )
+    parser.add_option(
+        "-H",
+        "--health_check",
+        action="store_true",
+        dest="health_check",
+        default=False,
+        help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
     )
     parser.add_option(
         "--format",
