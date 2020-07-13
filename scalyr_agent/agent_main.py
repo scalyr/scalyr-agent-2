@@ -90,10 +90,7 @@ from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import GCStatus
-from scalyr_agent.agent_status import (
-    report_status,
-    report_health,
-)
+from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import (
     PlatformController,
     AgentAlreadyRunning,
@@ -639,6 +636,10 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        # Health check ignores format but uses `json` under the hood
+        if health_check:
+            status_format = "json"
+
         if status_format not in VALID_STATUS_FORMATS:
             print(
                 "Invalid status format: %s. Valid formats are: %s"
@@ -699,10 +700,7 @@ class ScalyrAgent(object):
             fp.write(status_format)
 
         # Signal to the running process.  This should cause that process to write to the status file
-        if health_check:
-            result = self.__controller.request_agent_health_check()
-        else:
-            result = self.__controller.request_agent_status()
+        result = self.__controller.request_agent_status()
         if result is not None:
             if result == errno.ESRCH:
                 print(AGENT_NOT_RUNNING_MESSAGE, file=sys.stderr)
@@ -754,11 +752,41 @@ class ScalyrAgent(object):
         return_code = 0
         fp = open(status_file)
         for line in fp:
-            print(line.rstrip())
-            if health_check and line.rstrip() != "Health check: Good":
-                return_code = 1
+            if not health_check:
+                print(line.rstrip())
+
+            if status_format == "json" or health_check:
+                health_result = self.__find_health_result_in_status_json(line)
+                if health_result:
+                    if health_check:
+                        print("Health check: %s" % health_result)
+                    if health_result != "Good":
+                        return_code = 2
+                elif health_check:
+                    print(
+                        'Cannot get health check result, make sure you have configured "enable_health_check" as "true".'
+                    )
+            elif (
+                status_format == "text"
+                and "Health check" in line
+                and line.rstrip() != "Health check: Good"
+            ):
+                return_code = 2
         fp.close()
         return return_code
+
+    @staticmethod
+    def __find_health_result_in_status_json(line):
+        try:
+            status = scalyr_util.json_decode(line)
+            if (
+                "copying_manager_status" in status
+                and "health_check_result" in status["copying_manager_status"]
+            ):
+                return status["copying_manager_status"]["health_check_result"]
+        except ValueError:
+            pass
+        return None
 
     def __stop(self, quiet):
         """Stop the current agent.
@@ -1870,19 +1898,12 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            if health_check:
-                if not status_format or status_format == "text":
-                    report_health(tmp_file, agent_status)
-                elif status_format == "json":
-                    status_data = agent_status.to_dict()
-                    tmp_file.write(scalyr_util.json_encode(status_data))
-            else:
-                if not status_format or status_format == "text":
-                    report_status(tmp_file, agent_status, time.time())
-                elif status_format == "json":
-                    status_data = agent_status.to_dict()
-                    status_data["overall_stats"] = self.__overall_stats.to_dict()
-                    tmp_file.write(scalyr_util.json_encode(status_data))
+            if not health_check and (not status_format or status_format == "text"):
+                report_status(tmp_file, agent_status, time.time())
+            elif health_check or status_format == "json":
+                status_data = agent_status.to_dict()
+                status_data["overall_stats"] = self.__overall_stats.to_dict()
+                tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
             tmp_file = None
@@ -1990,7 +2011,7 @@ if __name__ == "__main__":
         action="store_true",
         dest="health_check",
         default=False,
-        help="For status command, prints health check status. Return code will be 0 for a passing check, and 1 for failing",
+        help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
     )
     parser.add_option(
         "--format",

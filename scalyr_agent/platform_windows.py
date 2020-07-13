@@ -667,7 +667,7 @@ class WindowsPlatformController(PlatformController):
         """Invoked by a process that is not the agent to request the current agent dump the current detail
         status to the status file.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
@@ -675,30 +675,6 @@ class WindowsPlatformController(PlatformController):
         try:
             win32serviceutil.ControlService(
                 _SCALYR_AGENT_SERVICE_, _SERVICE_CONTROL_DETAILED_REPORT_
-            )
-        except win32api.error as e:
-            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
-                return errno.ESRCH
-            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
-                raise AgentNotRunning(
-                    "The operating system indicates the Scalyr Agent Service is not installed.  "
-                    "This indicates a failed installation.  Try reinstalling the agent."
-                )
-            else:
-                raise e
-
-    def request_agent_health_check(self):
-        """Invoked by a process that is not the agent to request the current agent dump the current health
-        status to the status file.
-
-        This is used to implement the 'scalyr-agent-2 status -H' feature.
-
-        @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
-            have permission to request the status.  errno.ESRCH indicates the agent is not running.
-        """
-        try:
-            win32serviceutil.ControlService(
-                _SCALYR_AGENT_SERVICE_, _SERVICE_CONTROL_HEALTH_CHECK_
             )
         except win32api.error as e:
             if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:

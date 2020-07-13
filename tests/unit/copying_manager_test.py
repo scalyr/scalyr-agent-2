@@ -1313,6 +1313,33 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         self.assertEquals(2, len(status.log_matchers))
 
+    def test_health_check_status(self):
+        self.__create_test_instance()
+
+        # pylint: disable=no-member
+        self._manager._CopyingManager__config._Configuration__config[  # pylint: disable=no-member
+            "enable_health_check"
+        ] = True
+        self._manager._CopyingManager__last_attempt_time = time.time()
+
+        status = self._manager.generate_status()
+        self.assertEquals(status.health_check_result, "Good")
+
+    def test_health_check_status_failed(self):
+        self.__create_test_instance()
+
+        # pylint: disable=no-member
+        self._manager._CopyingManager__config._Configuration__config[
+            "enable_health_check"
+        ] = True
+        self._manager._CopyingManager__last_attempt_time = time.time() - (1000 * 65)
+
+        status = self._manager.generate_status()
+        self.assertEquals(
+            status.health_check_result,
+            "Failed, max time since last copy attempt (60.0 seconds) exceeded",
+        )
+
     def test_logs_initial_positions(self):
         controller = self.__create_test_instance(auto_start=False,)
 

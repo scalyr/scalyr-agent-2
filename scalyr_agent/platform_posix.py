@@ -82,8 +82,6 @@ class PosixPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
-        # The method to invoke when health check is requested by another process.
-        self.__health_check_handler = None
         self.__no_change_user = False
         # A list of log lines collected for debugging the initialization sequence.  The entries
         # are tuples of the line and a boolean indicating whether or not it is a debug entry.
@@ -659,19 +657,6 @@ class PosixPlatformController(PlatformController):
                 logger.debug("Invoking status handler...")
                 self.__status_handler()
 
-        # noinspection PyUnusedLocal
-        def handle_sigusr2(signal_num, frame):
-            """
-            Signal handler which is invoked on SIGUSR2 signal.
-
-            It takes care of invoking the health check handler function.
-            """
-            logger.debug("Received SIGUSR2 signal")
-
-            if self.__status_handler is not None:
-                logger.debug("Invoking health check handler...")
-                self.__health_check_handler()
-
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
         if fork:
@@ -693,7 +678,6 @@ class PosixPlatformController(PlatformController):
         original_term = signal.signal(signal.SIGTERM, handle_terminate)
         original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
         original_usr1 = signal.signal(signal.SIGUSR1, handle_sigusr1)
-        original_usr2 = signal.signal(signal.SIGUSR2, handle_sigusr2)
 
         try:
             self.__is_initializing = False
@@ -708,7 +692,6 @@ class PosixPlatformController(PlatformController):
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
             signal.signal(signal.SIGUSR1, original_usr1)
-            signal.signal(signal.SIGUSR2, original_usr2)
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
@@ -768,7 +751,7 @@ class PosixPlatformController(PlatformController):
         """Invoked by a process that is not the agent to request the current agent dump the current detail
         status to the status file.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
@@ -780,28 +763,6 @@ class PosixPlatformController(PlatformController):
 
         try:
             os.kill(pid, signal.SIGUSR1)
-        except OSError as e:
-            if e.errno == errno.ESRCH or e.errno == errno.EPERM:
-                return e.errno
-            raise e
-        return None
-
-    def request_agent_health_check(self):
-        """Invoked by a process that is not the agent to request the current agent dump the current health
-        status to the status file.
-
-        This is used to implement the 'scalyr-agent-2 status -H' feature.
-
-        @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
-            have permission to request the status.  errno.ESRCH indicates the agent is not running.
-        """
-
-        pid = self.__read_pidfile()
-        if pid is None:
-            return errno.ESRCH
-
-        try:
-            os.kill(pid, signal.SIGUSR2)
         except OSError as e:
             if e.errno == errno.ESRCH or e.errno == errno.EPERM:
                 return e.errno
@@ -821,7 +782,7 @@ class PosixPlatformController(PlatformController):
     def register_for_status_requests(self, handler):
         """Register a method to be invoked if this process is requested to report its status.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         This should only be invoked by the agent service once it has begun to run.
 
@@ -829,18 +790,6 @@ class PosixPlatformController(PlatformController):
         @type handler: func
         """
         self.__status_handler = handler
-
-    def register_for_health_check(self, handler):
-        """Register a method to be invoked if this process is requested to report its status.
-
-        This is used to implement the 'scalyr-agent-2 status -H' feature.
-
-        This should only be invoked by the agent service once it has begun to run.
-
-        @param handler:  The method to invoke when status is requested.
-        @type handler: func
-        """
-        self.__health_check_handler = handler
 
     @staticmethod
     def __sleep(seconds):

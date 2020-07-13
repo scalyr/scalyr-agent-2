@@ -1026,7 +1026,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
-            if self.__config.enable_health_check:
+            if self.__config.enable_health_check and self.__last_attempt_time:
                 result.health_check_result = "Good"
                 if (
                     time.time()

@@ -422,13 +422,6 @@ class MonitorStatus(BaseAgentStatus):
         self.is_alive = False
 
 
-def report_health(output, status):
-    print(
-        "Health check: %s" % status.copying_manager_status.health_check_result,
-        file=output,
-    )
-
-
 def report_status(output, status, current_time):
     print(
         "Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help",
@@ -612,6 +605,10 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
             "Total responses with errors:               %d (see '%s' for details)"
             % (manager_status.total_errors, agent_log_file_path,),
             file=output,
+        )
+    if manager_status.health_check_result:
+        print(
+            "Health check: %s" % manager_status.health_check_result, file=output,
         )
     print("", file=output)
 
