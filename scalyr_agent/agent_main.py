@@ -1830,8 +1830,8 @@ class ScalyrAgent(object):
 
         return result
 
-    def __report_status_to_file(self):
-        # type: () -> str
+    def __report_status_to_file(self, health_check=False):
+        # type: (bool) -> str
         """
         Handles the signal sent to request this process write its current detailed status out.
 
@@ -1868,12 +1868,19 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            if not status_format or status_format == "text":
-                report_status(tmp_file, agent_status, time.time())
-            elif status_format == "json":
-                status_data = agent_status.to_dict()
-                status_data["overall_stats"] = self.__overall_stats.to_dict()
-                tmp_file.write(scalyr_util.json_encode(status_data))
+            if health_check:
+                if not status_format or status_format == "text":
+                    report_health(tmp_file, agent_status)
+                elif status_format == "json":
+                    status_data = agent_status.to_dict()
+                    tmp_file.write(scalyr_util.json_encode(status_data))
+            else:
+                if not status_format or status_format == "text":
+                    report_status(tmp_file, agent_status, time.time())
+                elif status_format == "json":
+                    status_data = agent_status.to_dict()
+                    status_data["overall_stats"] = self.__overall_stats.to_dict()
+                    tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
             tmp_file = None
@@ -1902,60 +1909,7 @@ class ScalyrAgent(object):
         :return: File path status data has been written to.
         :rtype: ``str``
         """
-        # First determine the format user request. If no file with the requested format, we assume
-        # text format is used (this way it's backward compatible and works correctly on upgraded)
-        status_format = "text"
-
-        status_format_file = os.path.join(
-            self.__config.agent_data_path, STATUS_FORMAT_FILE
-        )
-        if os.path.isfile(status_format_file):
-            with open(status_format_file, "r") as fp:
-                status_format = fp.read().strip()
-
-        if not status_format or status_format not in VALID_STATUS_FORMATS:
-            status_format = "text"
-
-        tmp_file = None
-        try:
-            # We do a little dance to write the status.  We write it to a temporary file first, and then
-            # move it into the real location after the write has finished.  This way, the process watching
-            # the file we are writing does not accidentally read it when it is only partially written.
-            tmp_file_path = os.path.join(
-                self.__config.agent_data_path, "last_status.tmp"
-            )
-            final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
-
-            if os.path.isfile(final_file_path):
-                os.remove(final_file_path)
-            tmp_file = open(tmp_file_path, "w")
-
-            agent_status = self.__generate_status()
-
-            if not status_format or status_format == "text":
-                report_health(tmp_file, agent_status)
-            elif status_format == "json":
-                status_data = agent_status.to_dict()
-                tmp_file.write(scalyr_util.json_encode(status_data))
-
-            tmp_file.close()
-            tmp_file = None
-
-            os.rename(tmp_file_path, final_file_path)
-        except (OSError, IOError):
-            log.exception(
-                "Exception caught will try to report health", error_code="failedHealth"
-            )
-            if tmp_file is not None:
-                tmp_file.close()
-
-        log.log(
-            scalyr_logging.DEBUG_LEVEL_4,
-            'Wrote agent health data in "%s" format to %s'
-            % (status_format, final_file_path),
-        )
-
-        return final_file_path
+        return self.__report_status_to_file(health_check=True)
 
 
 class WorkerThread(object):
