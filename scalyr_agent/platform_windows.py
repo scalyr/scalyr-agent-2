@@ -125,8 +125,6 @@ _SCALYR_AGENT_SERVICE_DISPLAY_NAME_ = "Scalyr Agent Service"
 _SERVICE_DESCRIPTION_ = "Collects logs and metrics and forwards them to Scalyr.com"
 # A custom control message that is used to signal the agent should generate a detailed status report.
 _SERVICE_CONTROL_DETAILED_REPORT_ = win32service.SERVICE_USER_DEFINED_CONTROL - 1
-# A custom control message that is used to signal the agent should generate a health check report.
-_SERVICE_CONTROL_HEALTH_CHECK_ = win32service.SERVICE_USER_DEFINED_CONTROL - 2
 
 
 def _set_config_path_registry_entry(value):
@@ -252,8 +250,6 @@ class WindowsPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
-        # The method to invoke when health check is requested by another process.
-        self.__health_check_handler = None
         # The file path to the configuration.  We need to stash this so it is available when start is invoked.
         self.__config_file_path = None
 
@@ -650,18 +646,6 @@ class WindowsPlatformController(PlatformController):
         @type handler: func
         """
         self.__status_handler = handler
-
-    def register_for_health_check(self, handler):
-        """Register a method to be invoked if this process is requested to report its status.
-
-        This is used to implement the 'scalyr-agent-2 status -H' feature.
-
-        This should only be invoked by the agent service once it has begun to run.
-
-        @param handler:  The method to invoke when status is requested.
-        @type handler: func
-        """
-        self.__health_check_handler = handler
 
     def request_agent_status(self):
         """Invoked by a process that is not the agent to request the current agent dump the current detail

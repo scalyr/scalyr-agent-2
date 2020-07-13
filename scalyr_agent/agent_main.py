@@ -929,10 +929,6 @@ class ScalyrAgent(object):
         # a file because a user has run the 'detailed_status' command.
         self.__controller.register_for_status_requests(self.__report_status_to_file)
 
-        # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
-        # a file because a user has run the 'detailed_status' command.
-        self.__controller.register_for_health_check(self.__report_health_to_file)
-
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
         base_overall_stats = OverallStats()
@@ -1860,8 +1856,8 @@ class ScalyrAgent(object):
 
         return result
 
-    def __report_status_to_file(self, health_check=False):
-        # type: (bool) -> str
+    def __report_status_to_file(self):
+        # type: () -> str
         """
         Handles the signal sent to request this process write its current detailed status out.
 
@@ -1898,9 +1894,9 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            if not health_check and (not status_format or status_format == "text"):
+            if not status_format or status_format == "text":
                 report_status(tmp_file, agent_status, time.time())
-            elif health_check or status_format == "json":
+            elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
                 tmp_file.write(scalyr_util.json_encode(status_data))
@@ -1923,16 +1919,6 @@ class ScalyrAgent(object):
         )
 
         return final_file_path
-
-    def __report_health_to_file(self):
-        # type: () -> str
-        """
-        Handles the signal sent to request this process write its current health check out.
-
-        :return: File path status data has been written to.
-        :rtype: ``str``
-        """
-        return self.__report_status_to_file(health_check=True)
 
 
 class WorkerThread(object):

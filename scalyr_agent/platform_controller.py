@@ -355,18 +355,6 @@ class PlatformController(object):
         """
         pass
 
-    def register_for_health_check(self, handler):
-        """Register a method to be invoked if this process is requested to report its status.
-
-        This is used to implement the 'scalyr-agent-2 status -H' feature.
-
-        This should only be invoked by the agent service once it has begun to run.
-
-        @param handler:  The method to invoke when status is requested.
-        @type handler: func
-        """
-        pass
-
     def get_usage_info(self):
         """Returns CPU and memory usage information.
 
