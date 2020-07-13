@@ -47,7 +47,6 @@ from scalyr_agent.agent_status import (
     MonitorManagerStatus,
     LogMatcherStatus,
     report_status,
-    report_health,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -570,16 +569,16 @@ Failed monitors:
 
     def test_health_status(self):
         output = io.StringIO()
-        report_health(output, self.status)
+        report_status(output, self.status, self.time)
         expected_output = "Health check: Good\n"
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertIn(expected_output, output.getvalue())
 
     def test_health_status_bad(self):
         self.status.copying_manager_status.health_check_result = "Some bad message"
         output = io.StringIO()
-        report_health(output, self.status)
+        report_status(output, self.status, self.time)
         expected_output = "Health check: Some bad message\n"
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertIn(expected_output, output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):
