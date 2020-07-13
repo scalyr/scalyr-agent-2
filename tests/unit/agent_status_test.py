@@ -571,14 +571,14 @@ Failed monitors:
         output = io.StringIO()
         report_status(output, self.status, self.time)
         expected_output = "Health check: Good\n"
-        self.assertIn(expected_output, output.getvalue())
+        self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
         self.status.copying_manager_status.health_check_result = "Some bad message"
         output = io.StringIO()
         report_status(output, self.status, self.time)
         expected_output = "Health check: Some bad message\n"
-        self.assertIn(expected_output, output.getvalue())
+        self.assertTrue(expected_output in output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):
