@@ -763,9 +763,7 @@ class ScalyrAgent(object):
                     if health_result != "Good":
                         return_code = 2
                 elif health_check:
-                    print(
-                        'Cannot get health check result, make sure you have configured "enable_health_check" as "true".'
-                    )
+                    print("Cannot get health check result.")
             elif (
                 status_format == "text"
                 and "Health check" in line
