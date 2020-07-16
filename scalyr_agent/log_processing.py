@@ -1627,6 +1627,10 @@ class LogFileIterator(object):
             # Is this file currently at the file path of the log file (or is it a file a rotated log).
             self.is_log_file = state_json["is_log_file"]
 
+        def __str__(self):
+            """ Represent this object as a string """
+            return "%s" % self.to_json()
+
         def to_json(self):
             """Creates and returns the state serialized to Json.
 
@@ -3123,6 +3127,10 @@ class LogMatcher(object):
             # get checkpoints and close all processors
             for p in self.__processors:
                 result[p.log_path] = p.get_checkpoint()
+                log.info(
+                    "Closing processor %s, checkpoint is %s"
+                    % (p.log_path, result[p.log_path])
+                )
                 p.close()
 
             self.__processors = []
@@ -3246,6 +3254,10 @@ class LogMatcher(object):
             existing_processors[self.log_path].add_missing_attributes(
                 self.__log_entry_config["attributes"]
             )
+            log.info(
+                "LogMatcher for '%s' 'not self.__is_glob and self.log_path in existing_processors'"
+                % (self.log_path)
+            )
             return []
 
         self.__lock.acquire()
@@ -3260,6 +3272,10 @@ class LogMatcher(object):
         # check to see if the log matcher is finishing and we have checked it at least once
         if has_been_processed and is_finishing:
             # if so, then don't do any more matching on this log matcher
+            log.info(
+                "LogMatcher for '%s' has_been_processed and is_finishing"
+                % (self.log_path)
+            )
             return []
 
         result = []
@@ -3343,6 +3359,11 @@ class LogMatcher(object):
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,
+                    )
+
+                    log.info(
+                        "Creating new log processor - matched_file %s, checkpoint %s, stale_threshold_secs %s"
+                        % (matched_file, checkpoint_state, self.__stale_threshold_secs)
                     )
                     for rule in self.__log_entry_config["redaction_rules"]:
                         new_processor.add_redacter(
