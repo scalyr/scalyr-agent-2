@@ -20,7 +20,19 @@ from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
-windows_monitors = ['windows_process_metrics', 'windows_system_metrics', 'windows_event_log_monitor']
+windows_monitors = [
+    "windows_process_metrics",
+    "windows_system_metrics",
+    "windows_event_log_monitor",
+    "apache_monitor",
+    "graphite_monitor",
+    "mysql_monitor",
+    "nginx_monitor",
+    "shell_monitor",
+    "syslog_monitor",
+    "test_monitor",
+    "url_monitor",
+]
 
 if sys.platform == "win32":
     monitors = ["scalyr_agent.builtin_monitors." + m for m in windows_monitors]
