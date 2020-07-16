@@ -927,8 +927,14 @@ class LogFileIterator(object):
             for pending in self.__pending_files:
                 self.__close_file(pending)
                 log.info(
-                    "close_old_files_duration_in_seconds reached, closing file %s"
-                    % (pending)
+                    "close_old_files_duration_in_seconds reached, closing file %s, delta %s, current_time %s, modification_time_raw %s, max_modification_duration %s"
+                    % (
+                        pending,
+                        delta,
+                        current_time,
+                        self.__modification_time_raw,
+                        self.__max_modification_duration,
+                    )
                 )
 
     def close(self):
@@ -3293,7 +3299,8 @@ class LogMatcher(object):
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:
                         log.info(
-                            "%s has previous state %s" % (matched_file, previous_state)
+                            "Copying %s from checkpoint %s"
+                            % (matched_file, previous_state)
                         )
                         checkpoint_state = previous_state[matched_file]
                         del previous_state[matched_file]
