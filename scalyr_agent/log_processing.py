@@ -926,16 +926,17 @@ class LogFileIterator(object):
         if close_file:
             for pending in self.__pending_files:
                 self.__close_file(pending)
-                log.info(
-                    "close_old_files_duration_in_seconds reached, closing file %s, delta %s, current_time %s, modification_time_raw %s, max_modification_duration %s"
-                    % (
-                        pending,
-                        delta,
-                        current_time,
-                        self.__modification_time_raw,
-                        self.__max_modification_duration,
+                if pending.file_handle is not None:
+                    log.info(
+                        "close_old_files_duration_in_seconds reached, closing file %s, delta %s, current_time %s, modification_time_raw %s, max_modification_duration %s"
+                        % (
+                            pending.file_handle,
+                            delta,
+                            current_time,
+                            self.__modification_time_raw,
+                            self.__max_modification_duration,
+                        )
                     )
-                )
 
     def close(self):
         """Closes all files open for this iterator.  This should be called before it is discarded."""
@@ -1626,10 +1627,6 @@ class LogFileIterator(object):
             self.last_known_size = state_json["last_known_size"]
             # Is this file currently at the file path of the log file (or is it a file a rotated log).
             self.is_log_file = state_json["is_log_file"]
-
-        def __str__(self):
-            """ Represent this object as a string """
-            return "%s" % self.to_json()
 
         def to_json(self):
             """Creates and returns the state serialized to Json.
