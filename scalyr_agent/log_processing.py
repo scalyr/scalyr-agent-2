@@ -926,6 +926,10 @@ class LogFileIterator(object):
         if close_file:
             for pending in self.__pending_files:
                 self.__close_file(pending)
+                log.info(
+                    "close_old_files_duration_in_seconds reached, closing file %s"
+                    % (pending)
+                )
 
     def close(self):
         """Closes all files open for this iterator.  This should be called before it is discarded."""
@@ -3287,12 +3291,19 @@ class LogMatcher(object):
                     checkpoint_state = None
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:
+                        log.info(
+                            "%s has previous state %s" % (matched_file, previous_state)
+                        )
                         checkpoint_state = previous_state[matched_file]
                         del previous_state[matched_file]
                     elif copy_at_index_zero or copy_from_start:
                         # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
                         # then create a checkpoint to represent that.
                         checkpoint_state = LogFileProcessor.create_checkpoint(0)
+                        log.info(
+                            "Copying %s from start.  copy_at_index_zero is %s, copy_from_start is %s"
+                            % (matched_file, copy_at_index_zero, copy_from_start)
+                        )
 
                     renamed_log = self.__rename_log_file(
                         matched_file, self.__log_entry_config
