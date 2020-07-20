@@ -214,8 +214,8 @@ function create_repo_file() {
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
 baseurl=https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL/yum${ALT}/binaries/noarch
-mirror_expire=300
-metadata_expire=300
+mirror_expire=299
+metadata_expire=299
 enabled=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-scalyr-$KEYIDX
