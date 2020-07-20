@@ -2047,6 +2047,9 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
         - image: circleci/python:3.6-jessie
+    environment:
+      AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
+      REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
     steps:
       - checkout
       - restore_cache:
@@ -2123,9 +2126,6 @@ jobs:
             # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
             gpg --import scripts/circleci/release/public_keys/alt.asc
-
-            mkdir artifacts
-            mkdir package
 
             mkdir output
             pushd output
