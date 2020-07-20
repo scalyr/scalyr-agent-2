@@ -374,6 +374,11 @@ def main(
             _create_file_deployment_step(installer_script_url, "install-scalyr-agent-2")
         )
     else:
+        if not _verify_url_exists(installer_script_url):
+            raise ValueError(
+                'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+                % (installer_script_url)
+            )
         installer_script_info["type"] = "url"
 
     rendered_template = render_script_template(

@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# This script is used to create installer script fot  the scalyr agent.
+# It also creates packages with the  repository configuration.
+#
+# Usage: create-agent-installer.sh <MAIN_GPG_KEY_ID> <ALT_GPG_KEY_ID> <REPO_BASE_URL> <$AGENT_REPO_BRANCH>
 
 set -e;
 
@@ -6,6 +11,27 @@ function die() {
   echo "$1";
   exit 1;
 }
+
+
+set -e
+
+if [ -z "$1" ]; then
+  die "You must provide the ID of the GPG key which is supposed to be used in regular rpm and deb packages.";
+fi
+
+if [ -z "$2" ]; then
+  die "You must provide the ID of the GPG key which is supposed to be used in alternative rpm package.";
+fi
+
+if [ -z "$3" ]; then
+  die "You must provide the repository type. Possible values: 'stable', 'beta', 'internal'.";
+fi
+
+if [ -z "$4" ]; then
+  die "You must provide the repository type. Possible values: 'stable', 'beta', 'internal'.";
+fi
+
+
 
 function create_pubkey_file() {
   if [[ $2 == "main" ]]; then
@@ -214,8 +240,8 @@ function create_repo_file() {
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
 baseurl=https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL/yum${ALT}/binaries/noarch
-mirror_expire=299
-metadata_expire=299
+mirror_expire=300
+metadata_expire=300
 enabled=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-scalyr-$KEYIDX

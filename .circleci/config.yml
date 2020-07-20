@@ -65,7 +65,7 @@ parameters:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
     default: ""
-  repo_branch:
+  agent_repo_branch:
     description: "Configuration repo version."
     type: string
     default: ""
@@ -2130,15 +2130,15 @@ jobs:
             mkdir output
             pushd output
 
-            if [ -z "$REPO_BRANCH" ]; then
-              REPO_BRANCH="stable"
+            if [ -z "$AGENT_REPO_BRANCH" ]; then
+              AGENT_REPO_BRANCH="stable"
             fi
 
             if [ -z "$REPO_BASE_URL" ]; then
               REPO_BASE_URL="stable"
             fi
 
-            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$REPO_BRANCH"
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$AGENT_REPO_BRANCH"
 
             popd
 
@@ -2161,7 +2161,7 @@ jobs:
     docker:
       - image: circleci/python:3.6-jessie
     environment:
-      REPO_BRANCH: "<< pipeline.parameters.repo_branch >>"
+      AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
       REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
 
     steps:
@@ -2209,15 +2209,15 @@ jobs:
             mkdir output
             pushd output
 
-            if [ -z "$REPO_BRANCH" ]; then
-              REPO_BRANCH="stable"
+            if [ -z "$AGENT_REPO_BRANCH" ]; then
+              AGENT_REPO_BRANCH="stable"
             fi
 
             if [ -z "$REPO_BASE_URL" ]; then
               REPO_BASE_URL="stable"
             fi
 
-            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$REPO_BRANCH"
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$AGENT_REPO_BRANCH"
 
             popd
 

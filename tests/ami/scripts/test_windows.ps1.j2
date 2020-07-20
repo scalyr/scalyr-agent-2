@@ -91,7 +91,7 @@ Write-Output $status_output
 
 
 if ("$status_output" -notmatch "$msi_version")   {
-
+    # If there is a an internal build, we need to check version string for the 'windows version' format.
     $version_numbers=$msi_version.Split(".");
     $version_first_part=$version_numbers[0..2] -join ".";
     $version_second_part=$version_numbers[-1];
