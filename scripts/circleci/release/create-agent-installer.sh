@@ -236,6 +236,7 @@ function create_yum_repo_packages() {
     create_pubkey_file "etc/pki/rpm-gpg/RPM-GPG-KEY-scalyr-2" $1;
   else
     create_pubkey_file "etc/pki/rpm-gpg/RPM-GPG-KEY-scalyr-1" $1;
+    echo test.txt > "etc/test.txt"
   fi
   mkdir -p etc/yum.repos.d;
   create_repo_file "etc/yum.repos.d/scalyr.repo" $1;
