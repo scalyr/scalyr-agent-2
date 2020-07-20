@@ -2042,7 +2042,7 @@ jobs:
       - store_artifacts:
           path: artifacts
 
-  build-linux-packages:
+  build-linux-packages-and-installer-script:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2257,12 +2257,12 @@ workflows:
   version: 2
   package-tests:
     jobs:
-      - build-linux-packages
+      - build-linux-packages-and-installer-script
       - build-windows-package
       - ami-tests-development:
           requires:
             - build-windows-package
-            - build-linux-packages
+            - build-linux-packages-and-installer-script
 
 #workflows:
 #  version: 2
@@ -2302,7 +2302,7 @@ workflows:
 #            - smoke-monitors-tests
 #  package-tests:
 #    jobs:
-#      - build-linux-packages
+#      - build-linux-packages-and-installer-script
 #      - build-windows-package
 #      - package-test-rpm:
 #          <<: *master_and_release_only
@@ -2327,7 +2327,7 @@ workflows:
 #      - ami-tests-development:
 #          requires:
 #            - build-windows-package
-#            - build-linux-packages
+#            - build-linux-packages-and-installer-script
 #          <<: *master_and_release_only
 #      - ami-tests-stable:
 #          <<: *master_and_release_only
