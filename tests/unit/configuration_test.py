@@ -330,6 +330,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(len(config.monitor_configs), 0)
         self.assertIsNone(config.network_proxies)
 
+        self.assertEqual(config.healthy_max_time_since_last_copy_attempt, 60.0)
+
     def test_empty_config(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -412,7 +414,9 @@ class TestConfiguration(TestConfigurationBase):
 
 
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
-            journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ]
+            journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ],
+
+            healthy_max_time_since_last_copy_attempt: 30.0
           }
         """
         )
@@ -498,6 +502,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEqual(
             config.journald_log_configs[0].get_string("parser"), "journald_catchall"
         )
+
+        self.assertEqual(config.healthy_max_time_since_last_copy_attempt, 30.0)
 
     def test_missing_api_key(self):
         self._write_file_with_separator_conversion(

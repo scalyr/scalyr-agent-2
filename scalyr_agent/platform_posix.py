@@ -674,6 +674,7 @@ class PosixPlatformController(PlatformController):
         # On TERM we terminate the process, in USR1 we write a status file and on INT we terminate
         # the process when running in foreground (non-fork) mode
         # scalyr-agent-2 status -v uses SIGUSR1 underneath
+        # scalyr-agent-2 status -H uses SIGUSR2 underneath
         original_term = signal.signal(signal.SIGTERM, handle_terminate)
         original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
         original_usr1 = signal.signal(signal.SIGUSR1, handle_sigusr1)
@@ -750,7 +751,7 @@ class PosixPlatformController(PlatformController):
         """Invoked by a process that is not the agent to request the current agent dump the current detail
         status to the status file.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
@@ -781,7 +782,7 @@ class PosixPlatformController(PlatformController):
     def register_for_status_requests(self, handler):
         """Register a method to be invoked if this process is requested to report its status.
 
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
+        This is used to implement the 'scalyr-agent-2 status -v' and `-H` features.
 
         This should only be invoked by the agent service once it has begun to run.
 

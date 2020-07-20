@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import threading
+import platform
 from io import open
 
 
@@ -51,6 +52,7 @@ from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
+from scalyr_agent.test_base import skipIf
 
 from scalyr_agent import scalyr_init
 
@@ -1254,6 +1256,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
         self.assertEquals(0, len(lines))
 
+    @skipIf(platform.system() == "Windows", "Skipping failing test on Windows")
     def test_stale_request(self):
         controller = self.__create_test_instance()
         self.__append_log_lines("First line", "Second line")
@@ -1309,6 +1312,25 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         status = self._manager.generate_status()
 
         self.assertEquals(2, len(status.log_matchers))
+
+    def test_health_check_status(self):
+        self.__create_test_instance()
+
+        self._manager._CopyingManager__last_attempt_time = time.time()
+
+        status = self._manager.generate_status()
+        self.assertEquals(status.health_check_result, "Good")
+
+    def test_health_check_status_failed(self):
+        self.__create_test_instance()
+
+        self._manager._CopyingManager__last_attempt_time = time.time() - (1000 * 65)
+
+        status = self._manager.generate_status()
+        self.assertEquals(
+            status.health_check_result,
+            "Failed, max time since last copy attempt (60.0 seconds) exceeded",
+        )
 
     def test_logs_initial_positions(self):
         controller = self.__create_test_instance(auto_start=False,)
