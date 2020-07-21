@@ -26,6 +26,7 @@ import fnmatch
 import os
 import threading
 import time
+import traceback
 import sys
 
 import six
@@ -293,6 +294,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # A dict from file path to the LogFileProcessor that is processing it.
         self.__log_paths_being_processed = {}
+
+        # list list of log paths for debug
+        self.__log_paths_debug = []
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
@@ -869,6 +873,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                                         self.__pending_add_events_task.completion_callback(
                                             LogFileProcessor.FAIL_AND_RETRY
                                         )
+                                except Exception as e:
+                                    log.info(
+                                        "Unexpected exception when processing request response %s\n%s"
+                                        % (e, traceback.format_exc())
+                                    )
                                 finally:
                                     # No matter what, we want to throw away the current event since the server said we
                                     # could.  We have seen some bugs where we did not throw away the request because
@@ -1336,7 +1345,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                     self.__log_processors.append(processor)
                     self.__log_paths_being_processed[processor.log_path] = processor
                 else:
+                    log.info(
+                        "handle_completed_callback - callback says processor is closed, removing - %s"
+                        % (processor.log_path)
+                    )
                     processor.close()
+
+            if not self.__log_paths_being_processed:
+                log.info(
+                    "handle_completed_callback - log_paths_being_processed is now empty"
+                )
 
             return total_bytes_copied
 
@@ -1506,6 +1524,12 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.__log_processors.append(p)
                 self.__log_paths_being_processed[p.log_path] = p
 
+        if not self.__log_paths_being_processed:
+            log.info(
+                "remove_closed_processors - log_paths_being_processed is empty because all processors are closed\n%s"
+                % ("".join(traceback.format_stack()))
+            )
+
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
     ):
@@ -1537,6 +1561,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             if path in self.__log_paths_being_processed:
                 pending_removal[path] = True
 
+        if not self.__log_paths_being_processed:
+            log.info(
+                "log_paths_being_processed is empty.  Previous list was --\n   %s"
+                % ("\n   ".join(self.__log_paths_debug))
+            )
+
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
             for new_processor in matcher.find_matches(
@@ -1566,6 +1596,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # remove it anyway, otherwise the logs_`pending_removal list will just
                 # grow and grow
                 pending_removal[matcher.config["path"]] = True
+
+        # build debug copy of log_paths_being_processed
+        self.__log_paths_debug = []
+        for p in six.iterkeys(self.__log_paths_being_processed):
+            self.__log_paths_debug.append(p)
 
         # require the lock to update the pending removal dict to
         # mark which logs have been matched.

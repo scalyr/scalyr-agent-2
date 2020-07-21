@@ -37,6 +37,7 @@ import re
 import string
 import threading
 import time
+import traceback
 import uuid
 from io import open
 
@@ -2153,6 +2154,10 @@ class LogFileProcessor(object):
             self.__close_at_eof = True
         finally:
             self.__lock.release()
+        log.info(
+            "LogFileProcessor::close_at_eof() called for %s\n%s"
+            % (self.log_path, "".join(traceback.format_stack()))
+        )
 
     def add_missing_attributes(self, attributes):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
@@ -2714,6 +2719,10 @@ class LogFileProcessor(object):
                 self.__is_closed = True
         finally:
             self.__lock.release()
+        log.info(
+            "LogFileProcessor::close() called for %s\n%s"
+            % (self.log_path, "".join(traceback.format_stack()))
+        )
 
     def get_checkpoint(self):
         return self.__log_file_iterator.get_mark_checkpoint()
@@ -3251,10 +3260,6 @@ class LogMatcher(object):
             existing_processors[self.log_path].add_missing_attributes(
                 self.__log_entry_config["attributes"]
             )
-            log.info(
-                "LogMatcher for '%s' 'not self.__is_glob and self.log_path in existing_processors'"
-                % (self.log_path)
-            )
             return []
 
         self.__lock.acquire()
@@ -3310,10 +3315,7 @@ class LogMatcher(object):
                     checkpoint_state = None
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:
-                        log.info(
-                            "Copying %s from checkpoint %s"
-                            % (matched_file, previous_state)
-                        )
+                        log.info("Copying %s from checkpoint" % (matched_file))
                         checkpoint_state = previous_state[matched_file]
                         del previous_state[matched_file]
                     elif copy_at_index_zero or copy_from_start:
@@ -3358,9 +3360,17 @@ class LogMatcher(object):
                         close_when_staleness_exceeds=self.__stale_threshold_secs,
                     )
 
+                    processor_paths = []
+                    for p in six.iterkeys(existing_processors):
+                        processor_paths.append(p)
+
                     log.info(
-                        "Creating new log processor - matched_file %s, checkpoint %s, stale_threshold_secs %s"
-                        % (matched_file, checkpoint_state, self.__stale_threshold_secs)
+                        "List of existing processors:\n%s"
+                        % ("\n".join(processor_paths))
+                    )
+                    log.info(
+                        "Creating new log processor - matched_file %s\n%s"
+                        % (matched_file, "".join(traceback.format_stack()))
                     )
                     for rule in self.__log_entry_config["redaction_rules"]:
                         new_processor.add_redacter(
