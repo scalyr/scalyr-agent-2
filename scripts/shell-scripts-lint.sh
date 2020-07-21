@@ -41,3 +41,4 @@ shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv | 
 shellcheck -S info benchmarks/scripts/*.sh
 shellcheck -S info installer/scripts/*.sh
 shellcheck -S info scripts/*.sh
+shellcheck -S info scripts/circleci/*.sh
