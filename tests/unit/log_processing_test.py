@@ -1187,6 +1187,12 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor, "foo secretoption=czerwin", "foo secretoption=fake", True
         )
 
+    def test_regular_expression_with_unmatched_capture_group(self):
+        redactor = LogLineRedacter("/var/fake_log")
+        redactor.add_redaction_rule('secret(.*)=.*(;|("))', "secret\\1=fake\\3")
+
+        self._run_case(redactor, "foo secretoption=czerwin;", "", True)
+
     def test_unicode_redactions(self):
         redacter = LogLineRedacter("/var/fake_log")
         # 2->TODO there is a bugfix of 're.subn' in  python3.7 and higher.

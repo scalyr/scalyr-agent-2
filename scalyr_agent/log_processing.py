@@ -2877,11 +2877,29 @@ class LogLineRedacter(object):
 
         modified_it = False
 
-        for redaction_rule in self.__redaction_rules:
-            (input_line, redaction) = self.__apply_redaction_rule(
-                input_line, redaction_rule
-            )
-            modified_it = modified_it or redaction
+        try:
+            for redaction_rule in self.__redaction_rules:
+                (input_line, redaction) = self.__apply_redaction_rule(
+                    input_line, redaction_rule
+                )
+                modified_it = modified_it or redaction
+        except re.error as e:
+            if e.message == "unmatched group":  # pylint: disable=no-member
+                log.error(
+                    "Error while getting the default gateway: %s. Please make sure any redaction rules only reference groups that are guaranteed to match.",
+                    six.text_type(e.message),  # pylint: disable=no-member
+                    limit_once_per_x_secs=300,
+                    limit_key="redaction_unmatched_group",
+                )
+            else:
+                log.error(
+                    "Error while applying redaction rule: %s",
+                    six.text_type(e.message),  # pylint: disable=no-member
+                    limit_once_per_x_secs=300,
+                    limit_key="redaction_generic_re_error",
+                )
+            # Return a blank line so we don't upload it with data we possibly wanted redacted
+            return "", True
 
         return input_line, modified_it
 
