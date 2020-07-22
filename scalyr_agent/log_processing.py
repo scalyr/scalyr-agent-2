@@ -2876,9 +2876,11 @@ class LogLineRedacter(object):
             return input_line, False
 
         modified_it = False
+        redaction_rule_applying = None
 
         try:
             for redaction_rule in self.__redaction_rules:
+                redaction_rule_applying = redaction_rule
                 (input_line, redaction) = self.__apply_redaction_rule(
                     input_line, redaction_rule
                 )
@@ -2886,14 +2888,16 @@ class LogLineRedacter(object):
         except re.error as e:
             if e.message == "unmatched group":  # pylint: disable=no-member
                 log.error(
-                    "Error while getting the default gateway: %s. Please make sure any redaction rules only reference groups that are guaranteed to match.",
+                    'Error while applying redaction rule "%s": %s. Please make sure any redaction rules only reference groups that are guaranteed to match.',
+                    six.text_type(redaction_rule_applying.pattern),
                     six.text_type(e.message),  # pylint: disable=no-member
                     limit_once_per_x_secs=300,
                     limit_key="redaction_unmatched_group",
                 )
             else:
                 log.error(
-                    "Error while applying redaction rule: %s",
+                    'Error while applying redaction rule "%s": %s',
+                    six.text_type(redaction_rule_applying.pattern),
                     six.text_type(e.message),  # pylint: disable=no-member
                     limit_once_per_x_secs=300,
                     limit_key="redaction_generic_re_error",
