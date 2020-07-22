@@ -1187,6 +1187,10 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor, "foo secretoption=czerwin", "foo secretoption=fake", True
         )
 
+    @unittest.skipIf(
+        sys.version_info >= (3, 0, 0),
+        "`unmatched group` issue with `sub` and `subn` not present on python 3",
+    )
     def test_regular_expression_with_unmatched_capture_group(self):
         redactor = LogLineRedacter("/var/fake_log")
         redactor.add_redaction_rule('secret(.*)=.*(;|("))', "secret\\1=fake\\3")
