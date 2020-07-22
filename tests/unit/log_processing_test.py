@@ -1187,7 +1187,7 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor, "foo secretoption=czerwin", "foo secretoption=fake", True
         )
 
-    @unittest.skipIf(
+    @skipIf(
         sys.version_info >= (3, 0, 0),
         "`unmatched group` issue with `sub` and `subn` not present on python 3",
     )
