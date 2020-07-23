@@ -2082,6 +2082,9 @@ jobs:
                 name: Bump Version
                 shell: bash
                 command: |
+                  # Update agent version to avoid version conflict with current scalyr repository package.
+                  # This way we can also correctly assert that the upgrade has worked - if we didn't do
+                  # that, from and to version would be the same
                   echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
 
       - run:
