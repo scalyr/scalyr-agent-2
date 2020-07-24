@@ -365,6 +365,22 @@ def main(
     with open(cat_logs_script_file_path, "r") as fp:
         cat_logs_script_content = fp.read()
 
+    installer_script_info = {
+        "source": installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
+    }
+    if os.path.exists(installer_script_url):
+        installer_script_info["type"] = "file"
+        file_upload_steps.append(
+            _create_file_deployment_step(installer_script_url, "install-scalyr-agent-2")
+        )
+    else:
+        if not _verify_url_exists(installer_script_url):
+            raise ValueError(
+                'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+                % (installer_script_url)
+            )
+        installer_script_info["type"] = "url"
+
     rendered_template = render_script_template(
         script_template=script_content,
         distro_details=distro_details,
@@ -372,14 +388,14 @@ def main(
         test_type=test_type,
         install_package=install_package_info,
         upgrade_package=upgrade_package_info,
-        installer_script_url=installer_script_url,
+        installer_script_url=installer_script_info,
         additional_packages=additional_packages,
         verbose=verbose,
     )
 
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=120
+        rendered_template, name=remote_script_name, timeout=200
     )
 
     if file_upload_steps:
@@ -428,7 +444,7 @@ def main(
             ex_keyname=KEY_NAME,
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
-            ssh_timeout=10,
+            ssh_timeout=20,
             timeout=260,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
@@ -484,7 +500,7 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -495,7 +511,7 @@ def render_script_template(
 
     template_context["test_type"] = test_type
 
-    template_context["installer_script_url"] = (
+    template_context["installer_script_info"] = (
         installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
     )
     template_context["scalyr_api_key"] = SCALYR_API_KEY
@@ -677,13 +693,6 @@ if __name__ == "__main__":
         raise ValueError(
             "--from-version and --to-version options "
             'can not have the same "current" value.'
-        )
-
-    # Fail early if any of the provided URLs doesn't exist
-    if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
-        raise ValueError(
-            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
-            % (args.installer_script_url)
         )
 
     if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
