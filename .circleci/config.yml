@@ -61,6 +61,18 @@ parameters:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
+  agent_version:
+    description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
+    type: string
+    default: ""
+  agent_repo_branch:
+    description: "Configuration repo version."
+    type: string
+    default: ""
+  repo_base_url:
+    description: "Build artifacts path in S3 repo."
+    type: string
+    default: ""
 
 commands:
   unittest_tox:
@@ -691,6 +703,11 @@ commands:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+            # If testing type is "development" we use installer script which is built in another job.
+            if [ "<< parameters.test_type >>" = "development" ]; then
+              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
+            fi
+
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:
@@ -1918,45 +1935,81 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          name: Restore Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+          name: Restore Python installer Cache
+          key: windows-python-installer-python-{{ .Branch }}-python-installer-cache
+
+      - restore_cache:
+          name: Restore Wix cache
+          key: windows-wix-cache-{{ .Branch }}
+
+      - run:
+          name: Extract Wix.
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir wix311_binaries -Force
+            if (!(Test-Path .\wix311_binaries\wix311-binaries.zip -PathType Leaf)) {
+              wget https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -OutFile wix311_binaries\wix311-binaries.zip
+            }
+            Expand-Archive -LiteralPath wix311_binaries\wix311-binaries.zip -DestinationPath C:\wix311
 
       - run:
           name: Install python.
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.7.7-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.7.7-amd64.exe https://www.python.org/ftp/python/3.7.7/python-3.7.7-amd64.exe
+            if (!(Test-Path .\python_installer\python-2.7.18.amd64.msi -PathType Leaf)) {
+                wget -O .\python_installer\python-2.7.18.amd64.msi https://www.python.org/ftp/python/2.7.18/python-2.7.18.amd64.msi
             }
-            .\python_installer\python-3.7.7-amd64.exe /install /quiet TargetDir=c:\Python37 Include_tcltk=0
+            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
+            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+
+      - save_cache:
+          name: Save Wix Cache
+          key: windows-wix-cache-{{ .Branch }}
+          paths:
+            - "wix311_binaries"
 
       - save_cache:
           name: Save Pyinstaller Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-installer-cache
+          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
           paths:
             - "python_installer"
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
 
-      - run:
-          name: Bump Version
-          shell: bash
-          command: |
-            # Update agent version to avoid version conflict with current scalyr repository package.
-            # This way we can also correctly assert that the upgrade has worked - if we didn't do
-            # that, from and to version would be the same
-            # NOTE: We can't include git revision as part of the version since it's not a valid
-            # version on Windows.
-            echo "$(cat VERSION).1" > VERSION
-            cat VERSION
+      - when:
+          condition: << pipeline.parameters.agent_version >>
+          steps:
+            - run:
+                name: Change package version to << pipeline.parameters.agent_version >>.
+                shell: bash
+                command: |
+                  echo << pipeline.parameters.agent_version >> > VERSION
+      - unless:
+          condition: << pipeline.parameters.agent_version >>
+          steps:
+            - run:
+                name: Bump Version
+                shell: bash
+                command: |
+                  # Update agent version to avoid version conflict with current scalyr repository package.
+                  # This way we can also correctly assert that the upgrade has worked - if we didn't do
+                  # that, from and to version would be the same
+                  # NOTE: We can't include git revision as part of the version since it's not a valid
+                  # version on Windows.
+
+                  echo "$(cat VERSION).1" > VERSION
+                  cat VERSION
+
 
       - run:
           name: Build MSI package
           command: |
-             .\win32\build.ps1 c:\Python37
+              $Env:WIX = ";C:\wix311;"
+              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              c:\Python27\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
@@ -1978,7 +2031,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-3.7.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
@@ -1989,11 +2042,14 @@ jobs:
       - store_artifacts:
           path: artifacts
 
-  build-linux-packages:
+  build-linux-packages-and-installer-script:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
         - image: circleci/python:3.6-jessie
+    environment:
+      AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
+      REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
     steps:
       - checkout
       - restore_cache:
@@ -2010,14 +2066,27 @@ jobs:
             # as a temporaty solution explicitly specify ffi version.
             sudo gem install --no-document ffi:1.12.2 fpm
 
-      - run:
-          name: Bump Agent Version
-          command: |
-            # Update agent version to avoid version conflict with current scalyr repository package.
-            # This way we can also correctly assert that the upgrade has worked - if we didn't do
-            # that, from and to version would be the same
-            echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
-            cat VERSION
+
+      - when:
+          condition: << pipeline.parameters.agent_version >>
+          steps:
+            - run:
+                name: Change package version to << pipeline.parameters.agent_version >>.
+                shell: bash
+                command: |
+                  echo << pipeline.parameters.agent_version >> > VERSION
+      - unless:
+          condition: << pipeline.parameters.agent_version >>
+          steps:
+            - run:
+                name: Bump Version
+                shell: bash
+                command: |
+                  # Update agent version to avoid version conflict with current scalyr repository package.
+                  # This way we can also correctly assert that the upgrade has worked - if we didn't do
+                  # that, from and to version would be the same
+                  echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
+
       - run:
           name: Build deb and rpm packages
           command: |
@@ -2039,11 +2108,44 @@ jobs:
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
+      - run:
+          name: Build deb and rpm packages
+          command: |
+
+            gpg --update-trustdb
+
+            # import remote sign machine public keys from files in the Scalyr agent repo.
+            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+
+            # import gpg public keys.
+            gpg --import scripts/circleci/release/public_keys/main.asc
+            gpg --import scripts/circleci/release/public_keys/alt.asc
+
+            mkdir output
+            pushd output
+
+            if [ -z "$AGENT_REPO_BRANCH" ]; then
+              AGENT_REPO_BRANCH="stable"
+            fi
+
+            if [ -z "$REPO_BASE_URL" ]; then
+              REPO_BASE_URL="stable"
+            fi
+
+            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$AGENT_REPO_BRANCH"
+
+            popd
+
+            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
+            cp output/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
+
       - persist_to_workspace:
           root: package
           paths:
             - scalyr-agent-2.deb
             - scalyr-agent-2.rpm
+            - installScalyrAgentV2.sh
 
       - store_artifacts:
           path: artifacts
@@ -2066,130 +2168,131 @@ jobs:
       - ami-tests:
           test_type: "development"
 
+
 workflows:
-  version: 2
-  static-analysis:
-    jobs:
-      - lint-checks
-  unit-tests:
-    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-    # Python 3 versions
-    jobs:
-      - unittest-26
-      - unittest-27
-      - unittest-35
-      - unittest-35-osx
-      - unittest-35-windows
-  smoke-tests:
-    jobs:
-      - smoke-standalone-26
-      - smoke-standalone-27
-      - smoke-standalone-35
-      - smoke-standalone-35-rate-limit
-      - smoke-standalone-26-tls12
-      - smoke-standalone-27-tls12
-       # NOTE: smoke test jobs below still use old smoke tests framework
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-monitors-tests
-      - sonarcloud-scan:
-          requires:
-            # NOTE: This is not ideal, but Circle CI doesn't support cross
-            # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-            # slowest jobs
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
-            - smoke-monitors-tests
-  package-tests:
-    jobs:
-      - build-linux-packages
-      - build-windows-package
-      - package-test-rpm:
-          <<: *master_and_release_only
-      - package-test-deb:
-          <<: *master_and_release_only
-      - smoke-rpm-package-py2:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-rpm-package-py3:
-          requires:
-            - package-test-rpm
-          <<: *master_and_release_only
-      - smoke-deb-package-py2:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - smoke-deb-package-py3:
-          requires:
-            - package-test-deb
-          <<: *master_and_release_only
-      - ami-tests-development:
-          requires:
-            - build-windows-package
-            - build-linux-packages
-          <<: *master_and_release_only
-      - ami-tests-stable:
-          <<: *master_and_release_only
-  benchmarks:
-    jobs:
-      - benchmarks-micro-py-27
-      - benchmarks-micro-py-35
-      - benchmarks-idle-agent-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *benchmarks_master_and_release_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-          <<: *benchmarks_master_and_release_only
-      - send-benchmark-results-and-graphs-to-slack:
-          requires:
-            - benchmarks-idle-agent-py-27
-            - benchmarks-idle-agent-py-35
-            - benchmarks-idle-agent-no-monitors-py-27
-            - benchmarks-idle-agent-no-monitors-py-35
-            - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-            - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-            - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-          <<: *benchmarks_master_and_release_only
+ version: 2
+ static-analysis:
+   jobs:
+     - lint-checks
+ unit-tests:
+   # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+   # Python 3 versions
+   jobs:
+     - unittest-26
+     - unittest-27
+     - unittest-35
+     - unittest-35-osx
+     - unittest-35-windows
+ smoke-tests:
+   jobs:
+     - smoke-standalone-26
+     - smoke-standalone-27
+     - smoke-standalone-35
+     - smoke-standalone-35-rate-limit
+     - smoke-standalone-26-tls12
+     - smoke-standalone-27-tls12
+      # NOTE: smoke test jobs below still use old smoke tests framework
+     - smoke-docker-json
+     - smoke-docker-syslog
+     - smoke-k8s
+     - smoke-monitors-tests
+     - sonarcloud-scan:
+         requires:
+           # NOTE: This is not ideal, but Circle CI doesn't support cross
+           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           # slowest jobs
+           - smoke-docker-json
+           - smoke-docker-syslog
+           - smoke-k8s
+           - smoke-monitors-tests
+ package-tests:
+   jobs:
+     - build-linux-packages-and-installer-script
+     - build-windows-package
+     - package-test-rpm:
+         <<: *master_and_release_only
+     - package-test-deb:
+         <<: *master_and_release_only
+     - smoke-rpm-package-py2:
+         requires:
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-rpm-package-py3:
+         requires:
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-deb-package-py2:
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+     - smoke-deb-package-py3:
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+     - ami-tests-development:
+         requires:
+           - build-windows-package
+           - build-linux-packages-and-installer-script
+         <<: *master_and_release_only
+     - ami-tests-stable:
+         <<: *master_and_release_only
+ benchmarks:
+   jobs:
+     - benchmarks-micro-py-27
+     - benchmarks-micro-py-35
+     - benchmarks-idle-agent-py-27:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-idle-agent-py-35:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-idle-agent-no-monitors-py-27:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-idle-agent-no-monitors-py-35:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+         <<: *benchmarks_master_and_release_only
+     - send-benchmark-results-and-graphs-to-slack:
+         requires:
+           - benchmarks-idle-agent-py-27
+           - benchmarks-idle-agent-py-35
+           - benchmarks-idle-agent-no-monitors-py-27
+           - benchmarks-idle-agent-no-monitors-py-35
+           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+         <<: *benchmarks_master_and_release_only
 
-  weekly-circle-ci-usage-report:
-    triggers:
-      - schedule:
-          cron: "0 0 * * 0"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - send-circle-ci-usage-report
+ weekly-circle-ci-usage-report:
+   triggers:
+     - schedule:
+         cron: "0 0 * * 0"
+         filters:
+           branches:
+             only:
+               - master
+   jobs:
+     - send-circle-ci-usage-report
 
-  # We run AMI based package install tests which utilize installer script on
-  # daily basis.
-  # This helps us detect various installer script and other potential upstream
-  # issues.
-  daily-stable-ami-package-install-tests:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - ami-tests-stable
+ # We run AMI based package install tests which utilize installer script on
+ # daily basis.
+ # This helps us detect various installer script and other potential upstream
+ # issues.
+ daily-stable-ami-package-install-tests:
+   triggers:
+     - schedule:
+         cron: "0 0 * * *"
+         filters:
+           branches:
+             only:
+               - master
+   jobs:
+     - ami-tests-stable
