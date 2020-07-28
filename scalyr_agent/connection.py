@@ -21,6 +21,7 @@ from __future__ import absolute_import
 __author__ = "imron@scalyr.com"
 
 import re
+import ssl
 import socket
 
 import six
@@ -32,15 +33,6 @@ from scalyr_agent.compat import CertificateError
 
 
 log = scalyr_logging.getLogger(__name__)
-
-# noinspection PyBroadException
-try:
-    import ssl
-
-    __has_ssl__ = True
-except Exception:
-    __has_ssl__ = False
-    ssl = None  # type: ignore
 
 
 class ConnectionFactory:
@@ -157,26 +149,15 @@ class Connection(object):
 
     def __check_ssl(self):
         """ Helper function to check if ssl is available and enabled """
-        if self._use_ssl:
-            if not __has_ssl__:
-                log.warn(
-                    "No ssl library available so cannot verify server certificate when communicating with Scalyr. "
-                    "This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. "
-                    "To solve this, install the Python ssl library. "
-                    "For more details, see https://www.scalyr.com/help/scalyr-agent#ssl",
-                    limit_once_per_x_secs=86400,
-                    limit_key="nosslwarning",
-                    error_code="client/nossl",
-                )
-            elif self._ca_file is None:
-                log.warn(
-                    "Server certificate validation has been disabled while communicating with Scalyr. "
-                    "This means traffic is encrypted but can be intercepted through a man-in-the-middle attach. "
-                    "Please update your configuration file to re-enable server certificate validation.",
-                    limit_once_per_x_secs=86400,
-                    limit_key="nocertwarning",
-                    error_code="client/sslverifyoff",
-                )
+        if self._use_ssl and not self._ca_file:
+            log.warn(
+                "Server certificate validation has been disabled while communicating with Scalyr. "
+                "This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. "
+                "Please update your configuration file to re-enable server certificate validation.",
+                limit_once_per_x_secs=86400,
+                limit_key="nocertwarning",
+                error_code="client/sslverifyoff",
+            )
 
     def post(self, request_path, body):
         """Post requests"""
@@ -238,17 +219,9 @@ class ScalyrHttpConnection(Connection):
     def _init_connection(self):
         try:
             if self._use_ssl:
-                # If we do not have the SSL library, then we cannot do server certificate validation anyway.
-                if __has_ssl__:
-                    ca_file = self._ca_file
-                else:
-                    ca_file = None
+                ca_file = self._ca_file
                 self.__connection = HTTPSConnectionWithTimeoutAndVerification(
-                    self._host,
-                    self._port,
-                    self._request_deadline,
-                    ca_file,
-                    __has_ssl__,
+                    self._host, self._port, self._request_deadline, ca_file,
                 )
                 self.__connection.connect()
             else:
@@ -270,7 +243,7 @@ class ScalyrHttpConnection(Connection):
                     getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
                 )
-            elif __has_ssl__ and isinstance(error, ssl.SSLError):
+            elif isinstance(error, ssl.SSLError):
                 log.error(
                     'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
                     "for the root Certificate Authority could not be parsed, or we attempted to connect to "
@@ -387,7 +360,7 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
     class implements the necessary support.
     """
 
-    def __init__(self, host, port, timeout, ca_file, has_ssl):
+    def __init__(self, host, port, timeout, ca_file):
         """
         Creates an instance.
 
@@ -396,40 +369,16 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             port: The port to connect to.
             timeout: The timeout, in seconds, to use for all blocking operations on the underlying socket.
             ca_file:  If not None, then this is a file containing the certificate authority's root cert to use
-                for validating the certificate sent by the server.  This must be None if has_ssl is False.
+                for validating the certificate sent by the server.
                 If None is passed in, then no validation of the server certificate will be done whatsoever, so
                 you will be susceptible to man-in-the-middle attacks.  However, at least your traffic will be
                 encrypted.
-            has_ssl:  True if the ssl Python library is available.
         """
-        if not has_ssl and ca_file is not None:
-            raise Exception(
-                "If has_ssl is false, you are not allowed to specify a ca_file because it has no affect."
-            )
         self.__timeout = timeout
         self.__ca_file = ca_file
-        self.__has_ssl = has_ssl
         six.moves.http_client.HTTPSConnection.__init__(self, host, port)
 
     def connect(self):
-        # Do not delete the next line:
-        # SIMULATE_TLS12_FAILURE raise Exception('Fake a failed connection with ssl lib')
-
-        # If the ssl library is not available, then we just have to fall back on old HTTPSConnection.connect
-        # method.  There are too many dependencies to implement it directly here.
-        if not self.__has_ssl:
-            # Unfortunately, the only way to set timeout is to temporarily set the global default timeout
-            # for what it should be for this connection, and then reset it once the connection is established.
-            # Messy, but not much we can do.
-            old_timeout = None
-            try:
-                old_timeout = socket.getdefaulttimeout()
-                socket.setdefaulttimeout(self.__timeout)
-                six.moves.http_client.HTTPSConnection.connect(self)
-                return
-            finally:
-                socket.setdefaulttimeout(old_timeout)
-
         # Create the underlying socket.  Prefer Python's newer socket.create_connection method if it is available.
         if hasattr(socket, "create_connection"):
             self.sock = socket.create_connection((self.host, self.port), self.__timeout)
@@ -442,7 +391,7 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             self._tunnel()
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
-        if self.__ca_file is not None:
+        if self.__ca_file:
             self.sock = ssl.wrap_socket(
                 self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
             )
