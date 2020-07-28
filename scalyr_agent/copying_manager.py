@@ -624,6 +624,13 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type logs_initial_positions: dict
         @param scalyr_client:
         """
+
+        log.info(
+            "Starting the copying manager.\nPID: {0}\nObject ID: {1}\nStack frame:\n{2}".format(
+                os.getgid(), id(self), "".join(traceback.format_stack())
+            )
+        )
+
         self.__scalyr_client = scalyr_client
         self.__logs_initial_positions = logs_initial_positions
         self.start()
@@ -634,6 +641,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         @param wait_on_join: If True, will block on a join of the thread running the manager.
         @param join_timeout: The maximum number of seconds to block for the join.
         """
+        log.info(
+            "Stopping the copying manager.\nPID: {0}\nObject ID: {1}\nStack frame:\n{2}".format(
+                os.getgid(), id(self), "".join(traceback.format_stack())
+            )
+        )
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
     def run(self):
@@ -642,6 +654,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         This method will not terminate until the thread has been stopped.
         """
+
+        log.info(
+            "Entering the CopyingManager:run method.\nPID: {0}\nObject ID: {1}\nStack frame:\n{2}".format(
+                os.getgid(), id(self), "".join(traceback.format_stack())
+            )
+        )
+
         # Debug leak
         if self.__disable_copying_thread:
             log.log(
@@ -980,6 +999,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
+            log.info(
+                "Leaving the CopyingManager:run method .\nPID: {0}\nObject ID: {1}\nStack frame:\n{2}".format(
+                    os.getgid(), id(self), "".join(traceback.format_stack())
+                )
+            )
             self.__write_full_checkpoint_state(current_time)
             for processor in self.__log_processors:
                 processor.close()

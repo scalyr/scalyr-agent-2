@@ -34,6 +34,7 @@ import os
 import sys
 import time
 from threading import Lock
+import traceback
 
 import six
 
@@ -268,6 +269,15 @@ class ScalyrMonitor(StoppableThread):
         plugin.  See the documentation for 'scalyr_logging.AgentLogger.emit_value' method for more details.
         """
         # noinspection PyBroadException
+
+        log.info(
+            "Entering the run method of the '{0}' monitor.\nPID: {1}\nObject ID: {2}\nStack frame:\n{3}".format(
+                self.monitor_name,
+                os.getgid(),
+                id(self),
+                "".join(traceback.format_stack()),
+            )
+        )
         try:
             while not self._is_thread_stopped():
                 # noinspection PyBroadException
@@ -296,6 +306,30 @@ class ScalyrMonitor(StoppableThread):
             self._logger.exception(
                 "Monitor died from due to exception:", error_code="failedMonitor"
             )
+
+    def start(self) -> None:
+        log.info(
+            "Starting the '{0}' monitor.\nPID: {1}\nObject ID: {2}\nStack frame:\n{3}".format(
+                self.monitor_name,
+                os.getgid(),
+                id(self),
+                "".join(traceback.format_stack()),
+            )
+        )
+        super(ScalyrMonitor, self).start()
+
+    def stop(self, wait_on_join=True, join_timeout=5):
+        log.info(
+            "Stopping the '{0}' monitor.\nPID: {1}\nObject ID: {2}\nStack frame:\n{3}".format(
+                self.monitor_name,
+                os.getgid(),
+                id(self),
+                "".join(traceback.format_stack()),
+            )
+        )
+        super(ScalyrMonitor, self).stop(
+            wait_on_join=wait_on_join, join_timeout=join_timeout
+        )
 
     def get_extra_server_attributes(self):
         """Derived classes may optionally return a dict of server attributes to be added to the main config
