@@ -307,7 +307,7 @@ class ScalyrMonitor(StoppableThread):
                 "Monitor died from due to exception:", error_code="failedMonitor"
             )
 
-    def start(self) -> None:
+    def start(self):
         log.info(
             "Starting the '{0}' monitor.\nPID: {1}\nObject ID: {2}\nStack frame:\n{3}".format(
                 self.monitor_name,
