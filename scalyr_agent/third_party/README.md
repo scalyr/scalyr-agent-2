@@ -28,7 +28,7 @@ The following libraries are included:
   * [docker-pycreds](#docker-pycreds)
   * [ipaddress](#ipaddress)
   * [six](#six)
-  * [backports.ssl-match-hostname](#ssl-match-hostname)
+  * [backports.ssl_match_hostname](#ssl_match_hostname)
   * [PySocks](#PySocks)
   * [glob2](#glob2)
 
@@ -125,7 +125,7 @@ IPv4/IPv6 manipulation library.  A dependency of docker-py.  See project home [h
 
 Python 2 and 3 compatibility utilities.  A dependency of docker-py.  See project home [here](http://pypi.python.org/pypi/six/).
 
-## backports.ssl-match-hostname<a name="ssl-match-hostname"> (PSF)
+## backports.ssl_match_hostname<a name="ssl_match_hostname"> (PSF)
 
 The ssl.match_hostname() function from Python 3.5.  A dependency of docker-py.  See project home [here](http://bitbucket.org/brandon/backports.ssl_match_hostname).
 

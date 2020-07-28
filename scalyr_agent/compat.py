@@ -38,7 +38,7 @@ if PY2_pre_279 or PY3_pre_32:
     except ImportError:
         raise Exception("TODO - we should always fail since this means possible MITM")
 else:
-    # ssl module in Python 2>= 2.7.9 and Python 3 >= 3.2 includes match hostname function
+    # ssl module in Python 2 >= 2.7.9 and Python 3 >= 3.2 includes match hostname function
     from ssl import match_hostname as ssl_match_hostname  # NOQA
     from ssl import CertificateError  # type: ignore # NOQA
 
