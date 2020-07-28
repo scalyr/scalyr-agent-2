@@ -736,7 +736,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                     try:
                         # If we have a pending request and it's been too taken too long to send it, just drop it
                         # on the ground and advance.
-                        if current_time - last_success > self.__config.max_retry_time:
+                        if (
+                            last_success
+                            and current_time - last_success
+                            > self.__config.max_retry_time
+                        ):
                             if self.__pending_add_events_task is not None:
                                 self.__pending_add_events_task.completion_callback(
                                     LogFileProcessor.FAIL_AND_DROP
@@ -880,6 +884,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             if result == "success":
                                 last_success = current_time
+                            else:
+                                # There was no success so we shouldn't incorrectly set last_success
+                                # time which will make it report a wrong value in agent status
+                                # output
+                                last_success = None
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
