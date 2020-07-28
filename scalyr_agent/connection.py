@@ -242,7 +242,7 @@ class ScalyrHttpConnection(Connection):
                     "This likely indicates a MITM attack. Will not re-attempt.",
                     self._full_address,
                     getattr(error, "message", str(error)),
-                    error_code="client/connectionFailed",
+                    error_code="client/connectionFailedCertHostnameValidationFailed",
                 )
             elif isinstance(error, ssl.SSLError):
                 log.error(
@@ -254,7 +254,7 @@ class ScalyrHttpConnection(Connection):
                     self._full_address,
                     errno,
                     six.text_type(error),
-                    error_code="client/connectionFailed",
+                    error_code="client/connectionFailedSSLError",
                 )
             elif errno == 61:  # Connection refused
                 log.error(
