@@ -39,16 +39,6 @@ import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
 
-# noinspection PyBroadException
-try:
-    import ssl
-
-    __has_ssl__ = True
-except Exception:
-    __has_ssl__ = False
-    ssl = None  # type: ignore
-
-
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
@@ -94,7 +84,6 @@ class ScalyrClientSession(object):
         ca_file=None,
         intermediate_certs_file=None,
         use_requests_lib=False,
-        use_tlslite=False,
         proxies=None,
         compression_type=None,
         compression_level=9,
@@ -149,7 +138,6 @@ class ScalyrClientSession(object):
         # The Connection object that has been opened to the servers, if one has been opened.
         self.__connection = None
         self.__use_requests = use_requests_lib
-        self.__use_tlslite = use_tlslite
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
         self.__quiet = quiet
@@ -757,12 +745,7 @@ class ScalyrClientSession(object):
 
         # Include a string to indicate if python has a true ssl library available to record
         # whether or not the client is doing server certificate verification.
-        if __has_ssl__:
-            ssl_str = "ssllib"
-            if self.__connection and self.__connection.is_pure_python_tls:
-                ssl_str = "tlslite"
-        else:
-            ssl_str = "nossllib"
+        ssl_str = "ssllib"
 
         parts = [
             platform_value,
