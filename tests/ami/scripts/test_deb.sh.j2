@@ -132,19 +132,25 @@ sudo sed -i '$ d' /etc/scalyr-agent-2/agent.json
 echo -e ",\n scalyr_server: \"https://invalid.mitm.should.fail.test.agent.scalyr.com:443\"\n}" | sudo tee -a /etc/scalyr-agent-2/agent.json
 sudo cat /etc/scalyr-agent-2/agent.json
 
-# Agent should fail to start and fail to connect because cert hostname validation should fail
-echo ""
-echo "Verifying agent status output"
-echo ""
-sudo scalyr-agent-2 status -v
-echo ""
-
-sleep 10
-
 echo ""
 echo "Restarting agent"
 echo ""
 sudo /etc/init.d/scalyr-agent-2 restart
+
+sleep 10
+
+# Agent should fail to connection because hostname verification should fail
+echo ""
+echo "Verifying agent status output"
+echo ""
+STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
+echo ""
+
+echo ${STATUS_OUTPUT} | grep "Last successful communication with Scalyr: Never"
+echo ${STATUS_OUTPUT} | grep "Bytes uploaded successfully:               0"
+echo ${STATUS_OUTPUT} | grep "Last copy request size:                    0"
+echo ${STATUS_OUTPUT} | grep "Last copy response size:                   0"
+echo ${STATUS_OUTPUT} | grep "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed"
 
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "because of server certificate validation error"
