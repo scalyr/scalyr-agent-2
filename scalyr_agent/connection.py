@@ -236,15 +236,20 @@ class ScalyrHttpConnection(Connection):
                 errno = error.errno  # pylint: disable=no-member
             else:
                 errno = None
+
+            error_code = "client/connectionFailed"
+
             if isinstance(error, CertificateError):
+                error_code = "client/connectionFailedCertHostnameValidationFailed"
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s". '
                     "This likely indicates a MITM attack. Will not re-attempt.",
                     self._full_address,
                     getattr(error, "message", str(error)),
-                    error_code="client/connectionFailedCertHostnameValidationFailed",
+                    error_code=error_code,
                 )
             elif isinstance(error, ssl.SSLError):
+                error_code = "client/connectionFailedSSLError"
                 log.error(
                     'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
                     "for the root Certificate Authority could not be parsed, or we attempted to connect to "
@@ -254,42 +259,48 @@ class ScalyrHttpConnection(Connection):
                     self._full_address,
                     errno,
                     six.text_type(error),
-                    error_code="client/connectionFailedSSLError",
+                    error_code=error_code,
                 )
             elif errno == 61:  # Connection refused
+                error_code = "client/connectionFailedConnRefused"
                 log.error(
                     'Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
                     self._full_address,
-                    error_code="client/connectionFailed",
+                    error_code=error_code,
                 )
             elif errno == 8:  # Unknown name
+                error_code = "client/connectionFailed"
                 log.error(
                     'Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
                     self._full_address,
-                    error_code="client/connectionFailed",
+                    error_code=error_code,
                 )
             elif errno is not None:
+                error_code = "client/connectionFailed"
                 log.error(
                     'Failed to connect to "%s" due to errno=%d.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
                     errno,
                     six.text_type(error),
-                    error_code="client/connectionFailed",
+                    error_code=error_code,
                 )
             else:
+                error_code = "client/connectionFailed"
                 log.error(
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
                     six.text_type(error),
-                    error_code="client/connectionFailed",
+                    error_code=error_code,
                 )
 
             # TODO: We should probably propagate original exception class...
-            raise Exception(
+            exc = Exception(
                 "client/connectionFailed. Original error: %s" % (str(error))
             )
+            exc.error_code = error_code
+            raise exc
 
     # 2->TODO ensure that httplib request accepts only binary data, even method name and
     #  request path python2 httplib can not handle mixed data

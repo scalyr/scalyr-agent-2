@@ -310,9 +310,13 @@ class ScalyrClientSession(object):
                         proxies=self.__proxies,
                     )
                     self.total_connections_created += 1
-            except Exception:
+            except Exception as e:
+                error_code = (
+                    getattr(e, "error_code", "client/connectionFailed")
+                    or "client/connectionFailed"
+                )
                 return self.__wrap_response_if_necessary(
-                    "client/connectionFailed", 0, "", block_on_response
+                    error_code, 0, "", block_on_response
                 )
 
             if is_post:
