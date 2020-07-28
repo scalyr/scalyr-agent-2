@@ -1,0 +1,106 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------
+#
+
+from __future__ import absolute_import
+from __future__ import print_function
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
+
+import os
+import ssl
+import socket
+
+from scalyr_agent.connection import ConnectionFactory
+from scalyr_agent.connection import HTTPSConnectionWithTimeoutAndVerification
+
+from scalyr_agent.test_base import ScalyrTestCase
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+
+CA_FILE = os.path.join(BASE_DIR, "fixtures/certs/ca_certs.crt")
+INTERMEDIATE_CERTS_FILE = os.path.join(
+    BASE_DIR, "fixtures/certs/intermediate_certs.pem"
+)
+
+SCALYR_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/scalyr_com.pem")
+EXAMPLE_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/example_com.pem")
+
+ORIGINAL_CREATE_CONNECTION = socket.create_connection
+
+
+class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
+    def test_connect_valid_cert_and_hostname_success(self):
+        connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
+
+        conn = connection._ScalyrHttpConnection__connection  # pylint: disable=no-member
+        self.assertTrue(isinstance(conn, HTTPSConnectionWithTimeoutAndVerification))
+        self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
+        self.assertEqual(conn.sock.ca_certs, CA_FILE)
+
+    def test_connect_valid_cert_invalid_hostname_failure(self):
+        # TODO: Add the same tests but where we mock the host on system level (e.g. via
+        # /etc/hosts entry)
+        def mock_create_connection(address_pair, timeout, **kwargs):
+            # We want to connect to the actual Scalyr agent endpoint, but actual host
+            # specified in the config to be different
+            assert address_pair[0] == "agent.invalid.scalyr.com"
+            new_address_pair = ("agent.scalyr.com", address_pair[1])
+            return ORIGINAL_CREATE_CONNECTION(new_address_pair, timeout, **kwargs)
+
+        socket.create_connection = mock_create_connection
+
+        expected_msg = (
+            r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
+            "of '\*.scalyr.com', 'scalyr.com'"
+        )  # NOQA
+        self.assertRaisesRegexp(
+            Exception,
+            expected_msg,
+            self._get_connection_cls,
+            server="https://agent.invalid.scalyr.com:443",
+        )
+
+        socket.create_connection = ORIGINAL_CREATE_CONNECTION
+
+    def test_connect_invalid_cert_failure(self):
+        expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        self.assertRaisesRegexp(
+            Exception,
+            expected_msg,
+            self._get_connection_cls,
+            server="https://example.com:443",
+        )
+
+    def _get_connection_cls(self, server):
+        connection = ConnectionFactory.connection(
+            server=server,
+            request_deadline=10,
+            ca_file=CA_FILE,
+            intermediate_certs_file=INTERMEDIATE_CERTS_FILE,
+            headers={},
+            use_requests=False,
+            quiet=False,
+            proxies=None,
+        )
+
+        return connection
+
+
+class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
+    # TODO: Once we decide what to do with the requests code path
+    pass

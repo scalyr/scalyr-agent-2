@@ -28,6 +28,7 @@ import six.moves.http_client
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.compat import ssl_match_hostname
+from scalyr_agent.compat import CertificateError
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -220,10 +221,6 @@ class Connection(object):
         pass
 
 
-class CertValidationError(Exception):
-    pass
-
-
 class ScalyrHttpConnection(Connection):
     def __init__(
         self, server, request_deadline, ca_file, intermediate_certs_file, headers,
@@ -265,9 +262,10 @@ class ScalyrHttpConnection(Connection):
                 errno = error.errno  # pylint: disable=no-member
             else:
                 errno = None
-            if isinstance(error, CertValidationError):
+            if isinstance(error, CertificateError):
                 log.error(
-                    'Failed to connect to "%s" because of server certificate validation error: "%s"',
+                    'Failed to connect to "%s" because of server certificate validation error: "%s"'
+                    "This likely indicates a MITM attack. Will not re-attempt.",
                     self._full_address,
                     getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
@@ -313,7 +311,11 @@ class ScalyrHttpConnection(Connection):
                     six.text_type(error),
                     error_code="client/connectionFailed",
                 )
-            raise Exception("client/connectionFailed")
+
+            # TODO: We should probably propagate original exception class...
+            raise Exception(
+                "client/connectionFailed. Original error: %s" % (str(error))
+            )
 
     # 2->TODO ensure that httplib request accepts only binary data, even method name and
     #  request path python2 httplib can not handle mixed data
