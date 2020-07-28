@@ -709,7 +709,7 @@ class ScalyrClientSession(object):
         @rtype: six.text_type
         """
         # We will construct our agent string to look something like:
-        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib
+        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssltatus;requestsversion (if used)
 
         python_version = sys.version_info
         if len(python_version) >= 5:
@@ -757,6 +757,12 @@ class ScalyrClientSession(object):
             "agent-%s" % agent_version,
             ssl_str,
         ]
+
+        if self.__use_requests:
+            import scalyr_agent.third_party.requests as requests
+
+            parts.append("requests-%s" % (requests.__version__))
+
         if fragments:
             parts.extend(fragments)
         return ";".join(map(six.text_type, parts))
