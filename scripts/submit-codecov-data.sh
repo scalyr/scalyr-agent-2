@@ -16,6 +16,7 @@
 # Script which submits coverage data to codecov.io.
 # It takes occasional codecov API failures into account and tries to retry
 # upload.
+exit 0
 
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
 RETRY_DELAY=${RETRY_DELAY:-5}
