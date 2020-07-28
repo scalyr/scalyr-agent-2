@@ -30,6 +30,7 @@ import six.moves.http_client
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.compat import ssl_match_hostname
 from scalyr_agent.compat import CertificateError
+from scalyr_agent.compat import PY2_post_equal_279
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -392,9 +393,23 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
         if self.__ca_file:
-            self.sock = ssl.wrap_socket(
-                self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
-            )
+            # ssl.PROTOCOL_TLSv1_2 was added in Python 2.7.9 so we requested that protocol if we
+            # are running on that or newer version. Since July 2020, Scalyr API side now only
+            # supports TLSv1.2.
+            if PY2_post_equal_279:
+                self.sock = ssl.wrap_socket(
+                    self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
+                )
+            else:
+                self.sock = ssl.wrap_socket(
+                    self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
+                )
+
+            assert self.sock.ca_certs, "ca_certs is falsy"
+            assert (
+                self.sock.do_handshake_on_connect
+            ), "do_handshake_on_connection is False"
+            assert self.sock.cert_reqs == ssl.CERT_REQUIRED, "cert_reqs is invalid"
 
             cert = self.sock.getpeercert()
 
