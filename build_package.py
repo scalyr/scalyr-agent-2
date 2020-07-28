@@ -254,10 +254,6 @@ def build_win32_installer_package(variant, version):
         r".*\.pyc", r".*\.pyo", r".*\.pyd", r"all_tests\.py", r".*~"
     )
 
-    # exclude all the third_party_tls libs under windows
-    # because windows python has tls built in.
-    recursively_delete_dirs_by_name("third_party_tls")
-
     # Move back up to the root directory and populate the data_files.
     os.chdir("..")
     os.chdir("data_files")
