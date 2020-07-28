@@ -713,7 +713,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                 current_time = time.time()
 
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
+                # NOTE: We set this variable to current (start time) even if we never successfuly
+                # establish a connection because we want eventually drop __pending_add_events_task
+                # even if we can't establish a connection. If we didn't do that, that queue could
+                # grow unbounded.
+                # Because of that, we need to take this behavior into account when updating
+                # "__last_success_time" variable which is used for status reporting. We do that by
+                # utilizing another last_success_status variable which only gets updated when we
+                # successfuly send the request to the server.
                 last_success = current_time
+                last_success_status = None
 
                 # Force the agent to write a new full checkpoint as soon as it can
                 last_full_checkpoint_write = 0.0
@@ -735,11 +744,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     try:
                         # If we have a pending request and it's been too taken too long to send it, just drop it
                         # on the ground and advance.
-                        if (
-                            last_success
-                            and current_time - last_success
-                            > self.__config.max_retry_time
-                        ):
+                        if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
                                 self.__pending_add_events_task.completion_callback(
                                     LogFileProcessor.FAIL_AND_DROP
@@ -883,11 +888,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             if result == "success":
                                 last_success = current_time
-                            else:
-                                # There was no success so we shouldn't incorrectly set last_success
-                                # time which will make it report a wrong value in agent status
-                                # output
-                                last_success = None
+                                last_success_status = current_time
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
@@ -906,10 +907,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                             log.error("Failed to read logs for copying.  Will re-try")
 
                         # Update the statistics and our copying parameters.
+                        # Note:
                         self.__lock.acquire()
                         copying_params.update_params(result, bytes_sent)
                         self.__last_attempt_time = current_time
-                        self.__last_success_time = last_success
+                        self.__last_success_time = last_success_status
                         self.__last_attempt_size = bytes_sent
                         self.__last_response = six.ensure_text(full_response)
                         self.__last_response_status = result
