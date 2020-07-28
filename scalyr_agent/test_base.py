@@ -262,7 +262,7 @@ if sys.version_info[:2] < (2, 7):
                         % (exc_cls.__name__, e.__class__.__name__)
                     )
 
-                if not re.match(expected_msg, str(e)):
+                if not re.search(expected_msg, str(e)):
                     raise AssertionError(
                         'Expected "%s" message, got "%s"' % (expected_msg, str(e))
                     )
