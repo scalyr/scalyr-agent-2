@@ -12,6 +12,7 @@ master_and_release_only: &master_and_release_only
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
         - /automated_tests\/.*/
+        - simplify_connection_code
 
 # NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
 benchmarks_master_and_release_only: &benchmarks_master_and_release_only
@@ -2185,17 +2186,27 @@ workflows:
      - unittest-35-windows
  smoke-tests:
    jobs:
-     - smoke-standalone-26
-     - smoke-standalone-27
-     - smoke-standalone-35
-     - smoke-standalone-35-rate-limit
-     - smoke-standalone-26-tls12
-     - smoke-standalone-27-tls12
+     - smoke-standalone-26:
+         context: scalyr-agent
+     - smoke-standalone-27:
+         context: scalyr-agent
+     - smoke-standalone-35:
+         context: scalyr-agent
+     - smoke-standalone-35-rate-limit:
+         context: scalyr-agent
+     - smoke-standalone-26-tls12:
+         context: scalyr-agent
+     - smoke-standalone-27-tls12:
+         context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-json
-     - smoke-docker-syslog
-     - smoke-k8s
-     - smoke-monitors-tests
+     - smoke-docker-json:
+         context: scalyr-agent
+     - smoke-docker-syslog:
+         context: scalyr-agent
+     - smoke-k8s:
+         context: scalyr-agent
+     - smoke-monitors-tests:
+         context: scalyr-agent
      - sonarcloud-scan:
          requires:
            # NOTE: This is not ideal, but Circle CI doesn't support cross
@@ -2210,31 +2221,38 @@ workflows:
      - build-linux-packages-and-installer-script
      - build-windows-package
      - package-test-rpm:
+         context: scalyr-agent
          <<: *master_and_release_only
      - package-test-deb:
          <<: *master_and_release_only
      - smoke-rpm-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-rpm-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-deb-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - smoke-deb-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - ami-tests-development:
+         context: scalyr-agent
          requires:
            - build-windows-package
            - build-linux-packages-and-installer-script
          <<: *master_and_release_only
      - ami-tests-stable:
+         context: scalyr-agent
          <<: *master_and_release_only
  benchmarks:
    jobs:
