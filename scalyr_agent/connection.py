@@ -264,7 +264,7 @@ class ScalyrHttpConnection(Connection):
                 errno = None
             if isinstance(error, CertificateError):
                 log.error(
-                    'Failed to connect to "%s" because of server certificate validation error: "%s"'
+                    'Failed to connect to "%s" because of server certificate validation error: "%s". '
                     "This likely indicates a MITM attack. Will not re-attempt.",
                     self._full_address,
                     getattr(error, "message", str(error)),
