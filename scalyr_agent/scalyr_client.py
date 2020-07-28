@@ -318,7 +318,6 @@ class ScalyrClientSession(object):
                         self.__intermediate_certs_file,
                         self.__standard_headers,
                         self.__use_requests,
-                        self.__use_tlslite,
                         quiet=self.__quiet,
                         proxies=self.__proxies,
                     )

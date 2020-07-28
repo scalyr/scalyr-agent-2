@@ -24,6 +24,24 @@ import subprocess
 
 import six
 
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
+PY3_pre_32 = PY3 and sys.version_info < (3, 2)
+
+if PY2_pre_279 or PY3_pre_32:
+    try:
+        from backports.ssl_match_hostname import (
+            match_hostname as ssl_match_hostname,
+        )  # NOQA
+        from backports.ssl_match_hostname import CertificateError  # NOQA
+    except ImportError:
+        raise Exception("TODO - we should always fail since this means possible MITM")
+else:
+    # ssl module in Python 2>= 2.7.9 and Python 3 >= 3.2 includes match hostname function
+    from ssl import match_hostname as ssl_match_hostname  # NOQA
+    from ssl import CertificateError  # type: ignore # NOQA
+
 
 def custom_any(iterable):
     if sys.version_info[:2] > (2, 4):
@@ -210,3 +228,7 @@ def subprocess_check_output(cmd, *args, **kwargs):
         output = subprocess.check_output(cmd, *args, **kwargs)
 
     return output
+
+
+# MOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use version
+# from backports package
