@@ -2182,7 +2182,7 @@ workflows:
      - unittest-27
      - unittest-35
      - unittest-35-osx
-     - unittest-35-windows
+     #- unittest-35-windows
  smoke-tests:
    jobs:
      - smoke-standalone-26
