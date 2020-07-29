@@ -30,6 +30,12 @@ It depends on the following environment variables being set:
 
 - SCALYR_API_KEY - Scalyr API key to use.
 
+- LIBCLOUD_DEBUG=libcloud.log - Optionally set this variable to write Libcloud debug log into
+  libcloud.log file.
+
+  Keep in mind that you should never enable this on Circle CI since it will leak API keys into the
+  debug log.
+
 NOTE 1: You are recommended to use 2048 bit RSA key because CentOS 6 AMI we use doesn't support new
 key types or RSA keys of size 4096 bits.
 
