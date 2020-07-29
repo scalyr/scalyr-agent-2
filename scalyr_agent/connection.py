@@ -455,8 +455,15 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             cert = self.sock.getpeercert()
             ssl_match_hostname(cert=cert, hostname=self.host)
         else:
-            # TODO: PRINT BIG WARNING HERE (we already do it elsewhere, i think, but better to do it
-            # twice)
+            log.warn(
+                "Server certificate validation has been disabled while communicating with Scalyr. "
+                "This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. "
+                "Please update your configuration file to re-enable server certificate validation.",
+                limit_once_per_x_secs=86400,
+                limit_key="nocertwarning",
+                error_code="client/sslverifyoff",
+            )
+
             self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
 
 
