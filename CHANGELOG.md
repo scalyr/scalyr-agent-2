@@ -10,6 +10,10 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 20, 2020 08:30 -0800
 Misc:
 * ``compression_level`` configuration option now defaults to ``6`` when using ``deflate`` ``compression_type`` (``deflate`` is the default value for the ``compression_type`` configuration option). 6 offers the best trade off between compression ratio and CPU usage. For more information, please refer to the release notes document.
 
+Bug fixes:
+* Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v` command output and make sure the value is left padded and consistent with other lines.
+* Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
+
 ## 2.1.7 "Serenity" - June 24, 2020
 
 <!---
