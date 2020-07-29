@@ -1175,6 +1175,7 @@ class LogFileIterator(object):
                         current_log_file.position_start
                         + current_log_file.last_known_size
                     )
+                # Small change to update the commit id
                 log.exception(
                     "__refresh_pending_files: %s doesn't exist, or can no longer be read %s."
                     % (self.__path, e)
