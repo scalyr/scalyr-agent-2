@@ -26,6 +26,7 @@ import ssl
 import socket
 
 from scalyr_agent.compat import PY26
+from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.connection import ConnectionFactory
 from scalyr_agent.connection import HTTPSConnectionWithTimeoutAndVerification
 
@@ -50,8 +51,13 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 
         conn = connection._ScalyrHttpConnection__connection  # pylint: disable=no-member
         self.assertTrue(isinstance(conn, HTTPSConnectionWithTimeoutAndVerification))
-        self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
-        self.assertEqual(conn.sock.ca_certs, CA_FILE)
+
+        if PY_post_equal_279:
+            self.assertEqual(conn.sock._context.verify_mode, ssl.CERT_REQUIRED)
+            self.assertEqual(conn.sock._context.check_hostname, True)
+        else:
+            self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
+            self.assertEqual(conn.sock.ca_certs, CA_FILE)
 
     def test_connect_valid_cert_invalid_hostname_failure(self):
         # TODO: Add the same tests but where we mock the host on system level (e.g. via

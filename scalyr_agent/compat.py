@@ -28,7 +28,7 @@ PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 PY26 = sys.version_info[0] == 2 and sys.version_info[1] == 6
 PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
-PY2_post_equal_279 = PY2 and sys.version_info >= (2, 7, 9)
+PY_post_equal_279 = sys.version_info >= (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 
 if PY2_pre_279 or PY3_pre_32:

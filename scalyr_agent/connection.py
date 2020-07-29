@@ -30,7 +30,7 @@ import six.moves.http_client
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.compat import ssl_match_hostname
 from scalyr_agent.compat import CertificateError
-from scalyr_agent.compat import PY2_post_equal_279
+from scalyr_agent.compat import PY_post_equal_279
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -404,27 +404,55 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
         if self.__ca_file:
-            # ssl.PROTOCOL_TLSv1_2 was added in Python 2.7.9 so we requested that protocol if we
-            # are running on that or newer version. Since July 2020, Scalyr API side now only
-            # supports TLSv1.2.
-            if PY2_post_equal_279:
-                self.sock = ssl.wrap_socket(
-                    self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
+            if PY_post_equal_279:
+                # ssl.PROTOCOL_TLSv1_2 was added in Python 2.7.9 so we request that protocol if we
+                # are running on that or newer version. Since July 2020, Scalyr API side now only
+                # supports TLSv1.2.
+                # On newer versions we also use a more secure SSLContext which gives us more flexibility
+                # and control over the options vs using ssl.wrap_socket on older versions
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                ssl_context.options |= ssl.OP_NO_SSLv2
+                ssl_context.options |= ssl.OP_NO_SSLv3
+                ssl_context.options |= ssl.OP_NO_TLSv1
+                ssl_context.options |= ssl.OP_NO_TLSv1_1
+                ssl_context.verify_mode = ssl.CERT_REQUIRED
+                ssl_context.check_hostname = True
+                ssl_context.load_verify_locations(self.__ca_file)
+
+                self.sock = ssl_context.wrap_socket(
+                    self.sock, do_handshake_on_connect=True, server_hostname=self.host
                 )
+
+                # Additional asserts / guards
+                assert (
+                    self.sock._context.verify_mode == ssl.CERT_REQUIRED
+                ), "invalid verify_mode"
+                assert (
+                    self.sock._context.check_hostname is True
+                ), "check_hostname is False"
+                assert len(self.sock._context.get_ca_certs()) > 1, "ca certs not loaded"
+                assert (
+                    self.sock.do_handshake_on_connect is True
+                ), "do_handshake_on_connect is false"
             else:
+                # server_hostname argument was added in 2.7.9 so before that version we won't send
+                # SNI and also use ssl.wrap_socket instead of ssl.SSLContext
                 self.sock = ssl.wrap_socket(
                     self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
                 )
 
-            assert self.sock.ca_certs, "ca_certs is falsy"
-            assert (
-                self.sock.do_handshake_on_connect
-            ), "do_handshake_on_connection is False"
-            assert self.sock.cert_reqs == ssl.CERT_REQUIRED, "cert_reqs is invalid"
+                # Additional asserts / guards
+                assert self.sock.ca_certs, "ca_certs is falsy"
+                assert self.sock.cert_reqs == ssl.CERT_REQUIRED, "cert_reqs is invalid"
+                assert (
+                    self.sock.do_handshake_on_connect is True
+                ), "do_handshake_on_connect is false"
 
-            cert = self.sock.getpeercert()
-
+            # NOTE: In newer versions of Python when using SSLContext + check_hostname = True, this
+            # should happen automatically post handshake, but to also support older versions and
+            # ensure this verification is always performed, we call this method manually here.
             # Will throws CertificateError in case host validation fails
+            cert = self.sock.getpeercert()
             ssl_match_hostname(cert=cert, hostname=self.host)
         else:
             # TODO: PRINT BIG WARNING HERE (we already do it elsewhere, i think, but better to do it
