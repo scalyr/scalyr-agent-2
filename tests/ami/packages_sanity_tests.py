@@ -83,7 +83,8 @@ import random
 import argparse
 from io import open
 
-from jinja2 import Template
+from jinja2 import FileSystemLoader
+from jinja2 import Environment
 import requests
 
 from libcloud.compute.types import Provider
@@ -525,9 +526,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    template = Template(script_template)
+    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
-
     return rendered_template
 
 
