@@ -43,6 +43,8 @@ max_wait=$3
 SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
 
 SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/scalyr-agent-2/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+# TODO: Remove line below when merging to upstream
+SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
 DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o /tmp/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
 
 #----------------------------------------------------------------------------------------
