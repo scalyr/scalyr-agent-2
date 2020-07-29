@@ -414,7 +414,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
             self.__assertion_failed = True
             self.fail(
-                'File "%s" contain "%s" line expression, but it shouldn\'t.\n\nActual file content: %s'
+                'File "%s" contains "%s" line expression, but it shouldn\'t.\n\nActual file content: %s'
                 % (file_path, expression, content)
             )
 
@@ -460,7 +460,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
             self.__assertion_failed = True
             self.fail(
-                'File "%s" contain "%s" expression, but it shouldn\'t.\n\nActual file content: %s'
+                'File "%s" contains "%s" expression, but it shouldn\'t.\n\nActual file content: %s'
                 % (file_path, expression, content)
             )
 
