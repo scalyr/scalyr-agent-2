@@ -41,11 +41,14 @@ INTERMEDIATE_CERTS_FILE = os.path.join(
 SCALYR_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/scalyr_com.pem")
 EXAMPLE_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/example_com.pem")
 
-ORIGINAL_CREATE_CONNECTION = socket.create_connection
+ORIGINAL_SOCKET_CREATE_CONNECTION = socket.create_connection
 ORIGINAL_SOCKET_GETADDR_INFO = socket.getaddrinfo
 
 
 class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
+    def tearDown(self):
+        socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
+
     def test_connect_valid_cert_and_hostname_success(self):
         connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
 
@@ -67,7 +70,9 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             # specified in the config to be different
             assert address_pair[0] == "agent.invalid.scalyr.com"
             new_address_pair = ("agent.scalyr.com", address_pair[1])
-            return ORIGINAL_CREATE_CONNECTION(new_address_pair, timeout, **kwargs)
+            return ORIGINAL_SOCKET_CREATE_CONNECTION(
+                new_address_pair, timeout, **kwargs
+            )
 
         socket.create_connection = mock_create_connection
 
@@ -83,7 +88,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                 server="https://agent.invalid.scalyr.com:443",
             )
         finally:
-            socket.create_connection = ORIGINAL_CREATE_CONNECTION
+            socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
         if PY26:
@@ -118,6 +123,8 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
     # NOTE: With the requests library, connection is established lazily on first request and
     # that's also when SSL handshake and cert + hostname validation happens
+    def tearDown(self):
+        socket.getaddrinfo = ORIGINAL_SOCKET_GETADDR_INFO
 
     def test_connect_valid_cert_and_hostname_success(self):
         connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
@@ -164,7 +171,8 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             self.assertTrue(connection._RequestsConnection__session)
             # pylint: enable=no-member
         finally:
-            socket.create_connection = ORIGINAL_CREATE_CONNECTION
+            connection._RequestsConnection__session = None
+            socket.getaddrinfo = ORIGINAL_SOCKET_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
         if PY26:
