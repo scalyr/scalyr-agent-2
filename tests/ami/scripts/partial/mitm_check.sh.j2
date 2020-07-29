@@ -1,5 +1,7 @@
 # Test MITM attack - agent should fail to connect and start up with invalid hostname
-AGENT_SCALYR_COM_IP=$(dig +short agent.scalyr.com 2> /dev/null | tail -n 1 | tr -d "\n")
+# NOTE: Dig may not be available on all the distros by defualt
+#AGENT_SCALYR_COM_IP=$(dig +short agent.scalyr.com 2> /dev/null | tail -n 1 | tr -d "\n")
+AGENT_SCALYR_COM_IP=$(getent hosts agent.scalyr.com | awk '{ print $1 }' | tail -n 1 | tr -d "\n")
 MOCK_HOST="invalid.mitm.should.fail.test.agent.scalyr.com"
 ETC_HOSTS_ENTRY="${AGENT_SCALYR_COM_IP} ${MOCK_HOST}"
 
@@ -8,6 +10,9 @@ echo "${ETC_HOSTS_ENTRY}" | sudo tee -a /etc/hosts
 sudo sed -i '$ d' /etc/scalyr-agent-2/agent.json
 sudo sed -i '$ d' /etc/scalyr-agent-2/agent.json
 echo -e ",\n scalyr_server: \"https://invalid.mitm.should.fail.test.agent.scalyr.com:443\"\n}" | sudo tee -a /etc/scalyr-agent-2/agent.json
+
+sudo cat /etc/hosts
+sudo cat /etc/nsswitch.conf
 
 echo ""
 echo "Restarting agent"
