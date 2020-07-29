@@ -113,13 +113,10 @@ ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
-# Test MITM - agent should fail to connect and start up with invalid hostname
+# Test MITM attack - agent should fail to connect and start up with invalid hostname
 AGENT_SCALYR_COM_IP=$(dig +short agent.scalyr.com 2> /dev/null | tail -n 1 | tr -d "\n")
 MOCK_HOST="invalid.mitm.should.fail.test.agent.scalyr.com"
 ETC_HOSTS_ENTRY="${AGENT_SCALYR_COM_IP} ${MOCK_HOST}"
-
-sudo cat /etc/scalyr-agent-2/agent.json
-sudo cat /etc/hosts
 
 # Add mock /etc/hosts entry and agent config scalyr_server entry
 echo "${ETC_HOSTS_ENTRY}" | sudo tee -a /etc/hosts
