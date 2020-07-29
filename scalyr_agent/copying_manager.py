@@ -1365,6 +1365,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     total_bytes_copied += bytes_copied
                 else:
                     keep_it = True
+
                 if keep_it:
                     self.__log_processors.append(processor)
                     self.__log_paths_being_processed[processor.log_path] = processor
