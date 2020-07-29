@@ -1834,10 +1834,7 @@ class ScalyrAgent(object):
                             self.__config.copying_manager_stats_log_interval / 60.0,
                         )
                     )
-                elif (
-                    result.avg_bytes_copied_rate > 0
-                    and result.avg_bytes_produced_rate > 0
-                ):
+                else:
                     log.warning(
                         "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
                         "were generated over the last %.1f minutes.  This may be desired (due to excessive "
