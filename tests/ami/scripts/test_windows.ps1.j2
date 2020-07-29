@@ -112,11 +112,7 @@ echo ""
 echo "Performing MITM checks"
 echo ""
 
-type "c:\windows\system32\drivers\etc\hosts"
-type "C:\Program Files (x86)\Scalyr\config\agent.json"
-
 Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
-type "c:\windows\system32\drivers\etc\hosts"
 
 (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
     -replace 'server_attributes', 'scalyr_server: "https://invalid.mitm.should.fail.test.agent.scalyr.com:443", server_attributes' |
@@ -126,10 +122,6 @@ type "c:\windows\system32\drivers\etc\hosts"
 $ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
 $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
 [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
-
-type "C:\Program Files (x86)\Scalyr\config\agent.json"
-
-#echo -e ",\n scalyr_server: \"https://invalid.mitm.should.fail.test.agent.scalyr.com:443\"\n}" | tee -a /etc/scalyr-agent-2/agent.json
 
 scalyr-agent-2 stop;
 Start-Sleep 5
