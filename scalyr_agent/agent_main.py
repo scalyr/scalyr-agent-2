@@ -766,8 +766,8 @@ class ScalyrAgent(object):
                     print("Cannot get health check result.")
             elif (
                 status_format == "text"
-                and "Health check" in line
-                and line.rstrip() != "Health check: Good"
+                and "Health check:" in line
+                and "Good" not in line.rstrip()
             ):
                 return_code = 2
         fp.close()
