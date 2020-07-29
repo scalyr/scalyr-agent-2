@@ -1175,6 +1175,10 @@ class LogFileIterator(object):
                         current_log_file.position_start
                         + current_log_file.last_known_size
                     )
+                log.exception(
+                    "__refresh_pending_files: %s doesn't exist, or can no longer be read %s."
+                    % (self.__path, e)
+                )
                 if self.__log_deletion_time is None:
                     self.__log_deletion_time = current_time
                 self.at_end = (
@@ -2533,8 +2537,27 @@ class LogFileProcessor(object):
                             close = True
 
                         if close:
+                            self.__should_close_because_stale(current_time, debug=True)
+                            log.info(
+                                "completion_callback: log_file_iterator.at_end=%s"
+                                % (self.__log_file_iterator.at_end)
+                            )
+                            log.info(
+                                "completion_callback: close_at_eof=%s bytes_between_positions=%s __total_bytes_pending=%s"
+                                % (
+                                    close_at_eof,
+                                    bytes_between_positions,
+                                    self.__total_bytes_pending,
+                                )
+                            )
+
                             self.__log_file_iterator.close()
                             self.__is_closed = True
+
+                        if self.__is_closed:
+                            log.info(
+                                "completions_callback will return self.__is_closed=True"
+                            )
 
                         return self.__is_closed, bytes_copied
 
@@ -2586,7 +2609,7 @@ class LogFileProcessor(object):
 
             return None, False
 
-    def __should_close_because_stale(self, current_time):
+    def __should_close_because_stale(self, current_time, debug=False):
         """Returns true if the processor should be closed because the last time the file it is monitoring has been
         modified exceeds the number of seconds in ``__close_when_staleness_exceeds``.
 
@@ -2598,11 +2621,25 @@ class LogFileProcessor(object):
         @rtype: bool
         """
         if self.__close_when_staleness_exceeds is None:
+            if debug:
+                log.info("LogProcessor: __should_close_because_stale: False")
             return False
 
-        return (
+        should_close = (
             current_time - self.__log_file_iterator.last_modification_time
         ) > self.__close_when_staleness_exceeds
+        if debug:
+            log.info(
+                "LogProcessor: __should_close_because_stale: %s, current_time=%s last_modification_time=%s close_when_staleness_exceeds=%s"
+                % (
+                    should_close,
+                    current_time,
+                    self.__log_file_iterator.last_modification_time,
+                    self.__close_when_staleness_exceeds,
+                )
+            )
+
+        return should_close
 
     def skip_to_end(self, message, error_code, current_time=None):
         """Advances the iterator to the end of the log file due to some error.
