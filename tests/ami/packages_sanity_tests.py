@@ -453,7 +453,7 @@ def main(
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
             timeout=260,
-            wait_period=10,
+            wait_period=15,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
