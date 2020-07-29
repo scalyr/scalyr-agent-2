@@ -71,18 +71,19 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 
         socket.create_connection = mock_create_connection
 
-        expected_msg = (
-            r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
-            "of '\*.scalyr.com', 'scalyr.com'"
-        )  # NOQA
-        self.assertRaisesRegexp(
-            Exception,
-            expected_msg,
-            self._get_connection_cls,
-            server="https://agent.invalid.scalyr.com:443",
-        )
-
-        socket.create_connection = ORIGINAL_CREATE_CONNECTION
+        try:
+            expected_msg = (
+                r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
+                "of '\*.scalyr.com', 'scalyr.com'"
+            )  # NOQA
+            self.assertRaisesRegexp(
+                Exception,
+                expected_msg,
+                self._get_connection_cls,
+                server="https://agent.invalid.scalyr.com:443",
+            )
+        finally:
+            socket.create_connection = ORIGINAL_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
         if PY26:
@@ -143,26 +144,27 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
 
         socket.getaddrinfo = mock_socket_getaddrinfo
 
-        connection = self._get_connection_cls(
-            server="https://agent.invalid.scalyr.com:443",
-        )
+        try:
+            connection = self._get_connection_cls(
+                server="https://agent.invalid.scalyr.com:443",
+            )
 
-        # pylint: disable=no-member
-        self.assertEqual(connection._RequestsConnection__response, None)
-        self.assertEqual(connection._RequestsConnection__session, None)
-        # pylint: enable=no-member
+            # pylint: disable=no-member
+            self.assertEqual(connection._RequestsConnection__response, None)
+            self.assertEqual(connection._RequestsConnection__session, None)
+            # pylint: enable=no-member
 
-        expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
-        self.assertRaisesRegexp(
-            Exception, expected_msg, connection.get, request_path="/",
-        )
+            expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
+            self.assertRaisesRegexp(
+                Exception, expected_msg, connection.get, request_path="/",
+            )
 
-        # pylint: disable=no-member
-        self.assertEqual(connection._RequestsConnection__response, None)
-        self.assertTrue(connection._RequestsConnection__session)
-        # pylint: enable=no-member
-
-        socket.create_connection = ORIGINAL_CREATE_CONNECTION
+            # pylint: disable=no-member
+            self.assertEqual(connection._RequestsConnection__response, None)
+            self.assertTrue(connection._RequestsConnection__session)
+            # pylint: enable=no-member
+        finally:
+            socket.create_connection = ORIGINAL_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
         if PY26:
