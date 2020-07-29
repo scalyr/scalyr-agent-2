@@ -124,10 +124,10 @@ $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
 [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
 
 scalyr-agent-2 stop;
-Start-Sleep 5
+Start-Sleep 2
 
 scalyr-agent-2 start;
-Start-Sleep 10
+Start-Sleep 5
 
 echo ""
 echo "Verifying agent status output"
