@@ -31,6 +31,8 @@ PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
 PY_post_equal_279 = sys.version_info >= (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 
+# MOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use
+# version from backports package
 if PY2_pre_279 or PY3_pre_32:
     try:
         from backports.ssl_match_hostname import (
@@ -38,7 +40,12 @@ if PY2_pre_279 or PY3_pre_32:
         )  # NOQA
         from backports.ssl_match_hostname import CertificateError  # NOQA
     except ImportError:
-        raise Exception("TODO - we should always fail since this means possible MITM")
+        # NOTE: We should never come here in real life. If we do, it indicates we messed up package
+        # creation and / or path mangling in scalyr_init().
+        raise Exception(
+            "Missing backports.ssl_match_hostname module, hostname verification can't "
+            "be performed"
+        )
 else:
     # ssl module in Python 2 >= 2.7.9 and Python 3 >= 3.2 includes match hostname function
     from ssl import match_hostname as ssl_match_hostname  # NOQA
@@ -230,7 +237,3 @@ def subprocess_check_output(cmd, *args, **kwargs):
         output = subprocess.check_output(cmd, *args, **kwargs)
 
     return output
-
-
-# MOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use version
-# from backports package
