@@ -430,7 +430,12 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                 assert (
                     self.sock._context.check_hostname is True
                 ), "check_hostname is False"
-                assert len(self.sock._context.get_ca_certs()) > 1, "ca certs not loaded"
+                # NOTE: By default we use our bundled ca certs file with two CA certs, but user
+                # could specify to use a system bundle we can't assert on number being exactly
+                # 2
+                assert (
+                    len(self.sock._context.get_ca_certs()) >= 1
+                ), "ca certs not loaded"
                 assert (
                     self.sock.do_handshake_on_connect is True
                 ), "do_handshake_on_connect is false"
