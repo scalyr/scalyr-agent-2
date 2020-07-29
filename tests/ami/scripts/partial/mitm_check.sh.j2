@@ -1,4 +1,8 @@
 # Test MITM attack - agent should fail to connect and start up with invalid hostname
+echo ""
+echo "Running MITM checks"
+echo ""
+
 # NOTE: Dig may not be available on all the distros by defualt
 #AGENT_SCALYR_COM_IP=$(dig +short agent.scalyr.com 2> /dev/null | tail -n 1 | tr -d "\n")
 AGENT_SCALYR_COM_IP=$(getent hosts agent.scalyr.com | awk '{ print $1 }' | tail -n 1 | tr -d "\n")
