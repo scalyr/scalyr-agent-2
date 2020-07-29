@@ -15,9 +15,7 @@
 #
 # This script installs Scalyr agent MSI package for windows.
 
-
 $ProgressPreference = "SilentlyContinue"
-
 
 function GetMSIVersion {
     param (
@@ -50,7 +48,6 @@ try {
 }
 }
 
-
 $msi_version=GetMSIVersion -MSI .\install_package.msi
 echo $msi_version
 
@@ -62,7 +59,7 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
     -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
   Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
 
-# After string replacement we need to reencode config file without BOM.
+# After string replacement we need to reencode config file without BOM
 $ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
 $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
 [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
@@ -88,8 +85,6 @@ if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
 Write-Output $status_output
 
-
-
 if ("$status_output" -notmatch "$msi_version")   {
     # If there is a an internal build, we need to check version string for the 'windows version' format.
     $version_numbers=$msi_version.Split(".");
@@ -108,5 +103,66 @@ if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not fin
 
 # Verify build_info file exists
 echo ""
+echo "Verifying build_info file exists"
+echo ""
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
+echo ""
+
+echo ""
+echo "Performing MITM checks"
+echo ""
+
+type "c:\windows\system32\drivers\etc\hosts"
+type "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
+type "c:\windows\system32\drivers\etc\hosts"
+
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'server_attributes', 'scalyr_server: "https://invalid.mitm.should.fail.test.agent.scalyr.com:443", server_attributes' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+# After string replacement we need to reencode config file without BOM
+$ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
+[System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
+
+type "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+#echo -e ",\n scalyr_server: \"https://invalid.mitm.should.fail.test.agent.scalyr.com:443\"\n}" | tee -a /etc/scalyr-agent-2/agent.json
+
+scalyr-agent-2 stop;
+Start-Sleep 5
+
+scalyr-agent-2 start;
+Start-Sleep 10
+
+echo ""
+echo "Verifying agent status output"
+echo ""
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output
+
+if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
+
+echo ""
+echo "Status output successfuly verified."
+echo ""
+
+echo ""
+echo "Verifying agent logs"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+if ("$log_output" -notmatch "Failed to connect to") { Throw "Matching log line not found." };
+if ("$log_output" -notmatch "because of server certificate validation error") { Throw "Matching log line not found." };
+if ("$log_output" -notmatch "This likely indicates a MITM attack") { Throw "Matching log line not found." };
+
+echo ""
+echo "agent.log output successfuly verified"
 echo ""
