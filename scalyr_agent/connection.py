@@ -243,7 +243,7 @@ class ScalyrHttpConnection(Connection):
                 error_code = "client/connectionFailedCertHostnameValidationFailed"
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s". '
-                    "This likely indicates a MITM attack. Will not re-attempt.",
+                    "This likely indicates a MITM attack.",
                     self._full_address,
                     getattr(error, "message", str(error)),
                     error_code=error_code,
