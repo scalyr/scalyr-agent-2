@@ -15,7 +15,6 @@
 #
 
 from __future__ import absolute_import
-from __future__ import print_function
 
 from scalyr_agent import scalyr_init
 
@@ -43,6 +42,7 @@ SCALYR_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/scalyr_com.pem")
 EXAMPLE_COM_PEM_PATH = os.path.join(BASE_DIR, "fixtures/certs/example_com.pem")
 
 ORIGINAL_CREATE_CONNECTION = socket.create_connection
+ORIGINAL_SOCKET_GETADDR_INFO = socket.getaddrinfo
 
 
 class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
@@ -115,5 +115,79 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 
 
 class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
-    # TODO: Once we decide what to do with the requests code path
-    pass
+    # NOTE: With the requests library, connection is established lazily on first request and
+    # that's also when SSL handshake and cert + hostname validation happens
+
+    def test_connect_valid_cert_and_hostname_success(self):
+        connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
+        # pylint: disable=no-member
+        self.assertEqual(connection._RequestsConnection__response, None)
+        self.assertEqual(connection._RequestsConnection__session, None)
+        # pylint: enable=no-member
+
+        connection._get("/")
+        # pylint: disable=no-member
+        self.assertTrue(connection._RequestsConnection__response)
+        self.assertTrue(connection._RequestsConnection__session)
+        # pylint: enable=no-member
+
+    def test_connect_valid_cert_invalid_hostname_failure(self):
+        # TODO: Add the same tests but where we mock the host on system level (e.g. via
+        # /etc/hosts entry)
+        def mock_socket_getaddrinfo(host, *args, **kwargs):
+            # We want to connect to the actual Scalyr agent endpoint, but actual host
+            # specified in the config to be different
+            assert host == "agent.invalid.scalyr.com"
+            new_host = "agent.scalyr.com"
+            return ORIGINAL_SOCKET_GETADDR_INFO(new_host, *args, **kwargs)
+
+        socket.getaddrinfo = mock_socket_getaddrinfo
+
+        connection = self._get_connection_cls(
+            server="https://agent.invalid.scalyr.com:443",
+        )
+
+        # pylint: disable=no-member
+        self.assertEqual(connection._RequestsConnection__response, None)
+        self.assertEqual(connection._RequestsConnection__session, None)
+        # pylint: enable=no-member
+
+        expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
+        self.assertRaisesRegexp(
+            Exception, expected_msg, connection.get, request_path="/",
+        )
+
+        # pylint: disable=no-member
+        self.assertEqual(connection._RequestsConnection__response, None)
+        self.assertTrue(connection._RequestsConnection__session)
+        # pylint: enable=no-member
+
+        socket.create_connection = ORIGINAL_CREATE_CONNECTION
+
+    def test_connect_invalid_cert_failure(self):
+        if PY26:
+            # Under Python 2.6, error looks like this:
+            # [Errno 1] _ssl.c:498: error:14090086:SSL
+            # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
+            expected_msg = r"certificate verify failed"
+        else:
+            expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
+
+        connection = self._get_connection_cls(server="https://example.com:443")
+        self.assertRaisesRegexp(
+            Exception, expected_msg, connection.get, request_path="/",
+        )
+
+    def _get_connection_cls(self, server):
+        connection = ConnectionFactory.connection(
+            server=server,
+            request_deadline=10,
+            ca_file=CA_FILE,
+            intermediate_certs_file=INTERMEDIATE_CERTS_FILE,
+            headers={},
+            use_requests=True,
+            quiet=False,
+            proxies=None,
+        )
+
+        return connection
