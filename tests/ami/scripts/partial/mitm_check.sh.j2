@@ -21,18 +21,31 @@ echo ""
 echo "Verifying agent status output"
 echo ""
 STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
-echo ${STATUS_OUTPUT}
+echo -e "${STATUS_OUTPUT}"
 echo ""
 
-echo ${STATUS_OUTPUT} | grep "Last successful communication with Scalyr: Never"
-echo ${STATUS_OUTPUT} | grep "Bytes uploaded successfully:               0"
-echo ${STATUS_OUTPUT} | grep "Last copy request size:                    0"
-echo ${STATUS_OUTPUT} | grep "Last copy response size:                   0"
-echo ${STATUS_OUTPUT} | grep "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed"
+echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
+echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy request size:                    0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed"
+
+echo ""
+echo "Status output successfuly verified."
+echo ""
+
+echo ""
+echo "Verifying agent logs"
+echo ""
 
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to \"https://${MOCK_HOST}:443\""
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "because of server certificate validation error"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "This likely indicates a MITM attack"
+
+echo ""
+echo "agent.log output successfuly verified"
+echo ""
 
 # Clean up at the end and remove all the refernces to the mock host and IP
 sudo sed -i -n "/${AGENT_SCALYR_COM_IP}/!p" /etc/hosts
