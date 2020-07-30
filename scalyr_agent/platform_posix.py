@@ -615,10 +615,6 @@ class PosixPlatformController(PlatformController):
             It takes care of gracefully shutting down the process when running in foreground
             (non-fork) mode.
             """
-            # Reset to original SIGINT handler to make sure we don't potentially call
-            # handle_terminate() multiple times
-            signal.signal(signal.SIGINT, signal.default_int_handler)
-
             logger.debug("Received SIGINT signal")
 
             if not fork:
