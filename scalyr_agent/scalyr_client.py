@@ -709,7 +709,9 @@ class ScalyrClientSession(object):
         @rtype: six.text_type
         """
         # We will construct our agent string to look something like:
-        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssltatus;requestsversion (if used)
+        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib
+        # And for requests using requests library:
+        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib;requests-2.22.0
 
         python_version = sys.version_info
         if len(python_version) >= 5:
