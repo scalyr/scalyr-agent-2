@@ -208,7 +208,7 @@ sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validat
 echo ""
 {% endif -%}
 
-# NOTE: For now we only perform the check at the end of the upgrading. Once the PR / fix
+# NOTE: For now we only perform the check at the end of the upgrade. Once the PR / fix
 # is merged into master and packages build, we should also perform that check on install
 # run
 {% if test_type == "upgrade" -%}
