@@ -220,9 +220,8 @@ class ScalyrHttpConnection(Connection):
     def _init_connection(self):
         try:
             if self._use_ssl:
-                ca_file = self._ca_file
                 self.__connection = HTTPSConnectionWithTimeoutAndVerification(
-                    self._host, self._port, self._request_deadline, ca_file,
+                    self._host, self._port, self._request_deadline, self._ca_file,
                 )
                 self.__connection.connect()
             else:
