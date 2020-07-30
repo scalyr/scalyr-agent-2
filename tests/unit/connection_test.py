@@ -129,8 +129,8 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
     def test_connect_valid_cert_and_hostname_success(self):
         connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
         # pylint: disable=no-member
-        self.assertEqual(connection._RequestsConnection__response, None)
-        self.assertEqual(connection._RequestsConnection__session, None)
+        self.assertIsNone(connection._RequestsConnection__response)
+        self.assertIsNone(connection._RequestsConnection__session)
         # pylint: enable=no-member
 
         connection._get("/")
@@ -157,8 +157,8 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             )
 
             # pylint: disable=no-member
-            self.assertEqual(connection._RequestsConnection__response, None)
-            self.assertEqual(connection._RequestsConnection__session, None)
+            self.assertIsNone(connection._RequestsConnection__response)
+            self.assertIsNone(connection._RequestsConnection__session)
             # pylint: enable=no-member
 
             expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
@@ -167,7 +167,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             )
 
             # pylint: disable=no-member
-            self.assertEqual(connection._RequestsConnection__response, None)
+            self.assertIsNone(connection._RequestsConnection__response)
             self.assertTrue(connection._RequestsConnection__session)
             # pylint: enable=no-member
         finally:
