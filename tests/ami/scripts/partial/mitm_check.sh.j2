@@ -21,7 +21,14 @@ sudo cat /etc/nsswitch.conf
 echo ""
 echo "Restarting agent"
 echo ""
-sudo /etc/init.d/scalyr-agent-2 restart
+
+# NOTE: Before each restart and after each new set of checks, we delete the log file to ensure
+# assertions / checks we are performed are performed against the latest version of the logs and not
+# against old logs from previous start.
+sudo /etc/init.d/scalyr-agent-2 stop
+sudo rm -f /var/log/scalyr-agent-2/agent.log
+
+sudo /etc/init.d/scalyr-agent-2 start
 
 sleep 10
 
