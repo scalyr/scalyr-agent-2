@@ -209,5 +209,5 @@ echo ""
 # is merged into master and packages build, we should also perform that check on install
 # run
 {% if test_type == "upgrade" -%}
-{% include "partial/mitm_check.sh.j2" %}
+{% include "partial/ssl_checks.sh.j2" %}
 {% endif -%}

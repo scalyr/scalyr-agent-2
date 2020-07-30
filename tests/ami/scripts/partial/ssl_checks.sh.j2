@@ -28,7 +28,6 @@ STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
 EXIT_CODE=$?
 set -e
 
-
 echo -e "${STATUS_OUTPUT}"
 echo ""
 
@@ -163,8 +162,6 @@ sudo sed -i '$ d' /etc/scalyr-agent-2/agent.json
 sudo sed -i '$ d' /etc/scalyr-agent-2/agent.json
 echo -e ",\n scalyr_server: \"https://example.com:443\"\n}" | sudo tee -a /etc/scalyr-agent-2/agent.json
 
-sudo cat /etc/scalyr-agent-2/agent.json
-
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 echo ""
@@ -191,7 +188,7 @@ echo ""
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to \"https://example.com:443\""
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "due to some SSL error"
-sudo cat /var/log/scalyr-agent-2/agent.log | grep "CERTIFICATE_VERIFY_FAILED"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "certificate verify failed"
 
 echo ""
 echo "agent.log output successfuly verified"
