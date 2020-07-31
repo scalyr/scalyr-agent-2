@@ -151,8 +151,9 @@ def download_artifact_file(artifact_info, output_path):
         output_path, os.path.basename(artifact_info["path"]),
     )
 
-    with requests.Session() as session:
-        resp = session.get(url=artifact_info["url"], allow_redirects=True, stream=True)
+    resp = _do_request(
+        "GET", url=artifact_info["url"], allow_redirects=True, stream=True
+    )
 
     with open(artifact_output_path, "wb") as file:
         for chunk in resp.iter_content(chunk_size=8192):
@@ -264,6 +265,11 @@ def wait_for_pipeline(pipeline_number,):
             )
 
         time.sleep(10)
+
+    # not a great idea, but it looks like we can get incomplete list of workflows,
+    # even if we wait for pipeline status = 'created'.
+    # so we just wait a little to be sure that everything is created.
+    time.sleep(10)
 
     pipeline_id = pipeline_info["id"]
 
