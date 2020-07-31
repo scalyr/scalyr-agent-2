@@ -413,7 +413,7 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=10)
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=20)
     deployment.add(cat_logs_step)
 
     driver = get_libcloud_driver()
