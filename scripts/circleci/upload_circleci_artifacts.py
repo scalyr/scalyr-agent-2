@@ -266,6 +266,11 @@ def wait_for_pipeline(pipeline_number,):
 
         time.sleep(10)
 
+    # not a great idea, but it looks like we can get incomplete list of workflows,
+    # even if we wait for pipeline status = 'created'.
+    # so we just wait a little to be sure that everything is created.
+    time.sleep(10)
+
     pipeline_id = pipeline_info["id"]
 
     # get pipeline workflows
