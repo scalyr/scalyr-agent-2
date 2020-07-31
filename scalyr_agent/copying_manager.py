@@ -30,7 +30,6 @@ import traceback
 import sys
 
 import six
-from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -1257,9 +1256,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
-            (callback, buffer_filled) = self.__log_processors[
-                current_processor
-            ].perform_processing(add_events_request)
+            processor = self.__log_processors[current_processor]
+            (callback, buffer_filled) = processor.perform_processing(add_events_request)
 
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
@@ -1270,7 +1268,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.total_read_time += end_time - start_time
                 return None
 
-            all_callbacks[current_processor] = callback
+            all_callbacks[processor.unique_id] = callback
             logs_processed += 1
 
             # Advance if the buffer if not filled.  Also, even if it is filled, if we are on the first
@@ -1310,13 +1308,14 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             total_bytes_copied = 0
 
-            for i in range(0, len(processor_list)):
+            for processor in processor_list:
                 # Iterate over all the processors, seeing if we had a callback for that particular processor.
-                processor = processor_list[i]
-                if i in all_callbacks:
+                if processor.unique_id in all_callbacks:
                     # noinspection PyCallingNonCallable
                     # If we did have a callback for that processor, report the status and see if we callback is done.
-                    (closed_processor, bytes_copied) = all_callbacks[i](result)
+                    (closed_processor, bytes_copied) = all_callbacks[
+                        processor.unique_id
+                    ](result)
                     keep_it = not closed_processor
                     total_bytes_copied += bytes_copied
                 else:
