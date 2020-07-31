@@ -988,6 +988,61 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         responder_callback("success")
 
+    def test_pipelined_requests_with_processor_closes(self):
+        # Tests bug related to duplicate log upload (CT-107, AGENT-425, CT-114)
+        # The problem was related to mixing up the callbacks between two different log processors
+        # during pipeline execution and one of the log processors had been closed.
+        #
+        # To replicate, we need to upload to two log files.
+        controller = self.__create_test_instance(use_pipelining=True, test_files=2)
+        self.__append_log_lines("p_First line", "p_Second line")
+        self.__append_log_lines_to_beta("s_First line", "s_Second line")
+        # Mark the primary log file to be closed (remove its log processor) once all current bytes have
+        # been uploaded.
+        controller.close_at_eof(self.__test_log_file)
+
+        controller.perform_scan()
+        # Set up for the pipeline scan.  Just add a few more lines to the secondary file.
+        self.__append_log_lines_to_beta("s_Third line")
+        controller.perform_pipeline_scan()
+
+        (request, responder_callback) = controller.wait_for_rpc()
+        self.assertFalse(self.__was_pipelined(request))
+
+        lines = self.__extract_lines(request)
+        self.assertEquals(4, len(lines))
+        self.assertEquals("p_First line", lines[0])
+        self.assertEquals("p_Second line", lines[1])
+        self.assertEquals("s_First line", lines[2])
+        self.assertEquals("s_Second line", lines[3])
+
+        responder_callback("success")
+
+        # With the bug, at this point, the processor for the secondary log file has been removed.
+        # We can tell this by adding more log lines to it and see they aren't copied up.  However,
+        # we first have to read the request that was already created via pipelining.
+        (request, responder_callback) = controller.wait_for_rpc()
+        self.assertTrue(self.__was_pipelined(request))
+
+        lines = self.__extract_lines(request)
+        self.assertEquals(1, len(lines))
+        self.assertEquals("s_Third line", lines[0])
+
+        responder_callback("success")
+
+        # Now add in more lines to the secondary.  If the bug was present, these would not be copied up.
+        self.__append_log_lines_to_beta("s_Fourth line")
+        controller.perform_scan()
+
+        (request, responder_callback) = controller.wait_for_rpc()
+
+        self.assertFalse(self.__was_pipelined(request))
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(1, len(lines))
+        self.assertEquals("s_Fourth line", lines[0])
+        responder_callback("success")
+
     def test_pipelined_requests_with_normal_error(self):
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
@@ -1381,15 +1436,18 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         return "pipelined=1.0" in request.get_timing_data()
 
     def __create_test_instance(
-        self, use_pipelining=False, root_dir=None, auto_start=True,
+        self, use_pipelining=False, root_dir=None, auto_start=True, test_files=1
     ):
         """
         :param use_pipelining:
         :param root_dir: path to root directory, if None, new tempfile will be created.
         :param auto_start: If True, manager starts right after creation, defaults to True
         This is useful if we need to stop copying manager earlier than after first full iteration.
+        :param test_files: The number of test files to configure.  Can only be 1 or 2.
         :return:
         """
+        assert 0 < test_files <= 2
+
         if root_dir is None:
             root_dir = tempfile.mkdtemp()
         config_dir = os.path.join(root_dir, "config")
@@ -1403,11 +1461,14 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         if not os.path.exists(log_dir):
             os.mkdir(log_dir)
 
-        self.__test_log_file = os.path.join(root_dir, "test.log")
+        self.__test_log_file = self.__create_test_file(root_dir, "test.log")
+        log_configs = [{"path": self.__test_log_file}]
 
-        if not os.path.exists(self.__test_log_file):
-            fp = open(self.__test_log_file, "w")
-            fp.close()
+        if test_files == 2:
+            self.__test_log_file_secondary = self.__create_test_file(
+                root_dir, "test_secondary.log"
+            )
+            log_configs.append({"path": self.__test_log_file_secondary})
 
         config_file = os.path.join(config_dir, "agentConfig.json")
         config_fragments_dir = os.path.join(config_dir, "configs.d")
@@ -1425,7 +1486,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
                     {
                         "disable_max_send_rate_enforcement_overrides": True,
                         "api_key": "fake",
-                        "logs": [{"path": self.__test_log_file}],
+                        "logs": log_configs,
                         "pipeline_threshold": pipeline_threshold,
                     }
                 )
@@ -1443,8 +1504,41 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self._controller = self._manager.controller
         return self._controller
 
+    @staticmethod
+    def __create_test_file(root_dir, filename):
+        """Creates an empty test file at the specified filename in the specified directory.
+        :param root_dir: The path of the directory
+        :type root_dir: six.text_type
+        :param filename: The filename
+        :type filename: six.text_type
+        :return: The full path to the test file
+        :rtype: six.text_type
+        """
+        result = os.path.join(root_dir, filename)
+
+        if not os.path.exists(result):
+            fp = open(result, "w")
+            fp.close()
+        return result
+
     def __append_log_lines(self, *args):
-        fp = open(self.__test_log_file, "a")
+        """Appends the specified log lines to the (primary) test file.
+        :param args: The lines to append
+        :type args: [six.text_type]
+        """
+        self.__append_log_lines_to(self.__test_log_file, *args)
+
+    def __append_log_lines_to_beta(self, *args):
+        """Appends the specified log lines to the secondary test file.
+        :param args: The lines to append
+        :type args: [six.text_type]
+        """
+        self.__append_log_lines_to(self.__test_log_file_secondary, *args)
+
+    @staticmethod
+    def __append_log_lines_to(filepath, *args):
+        # NOTE: We open file in binary mode, otherwise \n gets converted to \r\n on Windows on write
+        fp = open(filepath, "ab")
         for l in args:
             fp.write(l)
             fp.write("\n")
@@ -1765,6 +1859,19 @@ class TestableCopyingManager(CopyingManager):
                 self.__copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
             return request, send_response
+
+        def close_at_eof(self, filepath):
+            """Tells the CopyingManager to mark the LogProcessor copying the specified path to close itself
+            once all bytes have been copied up to Scalyr.  This can be used to remove LogProcessors for
+            testing purposes.
+
+            :param filepath: The path of the processor.
+            :type filepath: six.text_type
+            """
+            # noinspection PyProtectedMember
+            self.__copying_manager._CopyingManager__log_paths_being_processed[
+                filepath
+            ].close_at_eof()
 
         def stop(self):
             self.__copying_manager.stop_manager()
