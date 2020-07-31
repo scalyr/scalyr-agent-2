@@ -402,7 +402,7 @@ def main(
 
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=280
+        rendered_template, name=remote_script_name, timeout=320
     )
 
     if file_upload_steps:
