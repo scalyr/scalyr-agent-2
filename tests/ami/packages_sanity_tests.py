@@ -395,7 +395,7 @@ def main(
 
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=200
+        rendered_template, name=remote_script_name, timeout=300
     )
 
     if file_upload_steps:
@@ -406,7 +406,7 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=20)
     deployment.add(cat_logs_step)
 
     driver = get_libcloud_driver()
@@ -445,7 +445,7 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
-            timeout=260,
+            timeout=300,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )

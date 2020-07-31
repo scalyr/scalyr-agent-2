@@ -151,8 +151,9 @@ def download_artifact_file(artifact_info, output_path):
         output_path, os.path.basename(artifact_info["path"]),
     )
 
-    with requests.Session() as session:
-        resp = session.get(url=artifact_info["url"], allow_redirects=True, stream=True)
+    resp = _do_request(
+        "GET", url=artifact_info["url"], allow_redirects=True, stream=True
+    )
 
     with open(artifact_output_path, "wb") as file:
         for chunk in resp.iter_content(chunk_size=8192):
