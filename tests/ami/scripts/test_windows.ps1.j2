@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +14,16 @@
 #
 # This script installs Scalyr agent MSI package for windows.
 
+# Enable strict mode and make sure we fail and exit with non zero on any error
+Set-StrictMode -Version 3.0
+Set-PSDebug -Strict
+
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+
 {% if verbose -%}
 Set-PSDebug -trace 2
 {% endif -%}
-
-$ProgressPreference = "SilentlyContinue"
 
 function GetMSIVersion {
     param (
@@ -69,10 +73,10 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
 $Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
 
 # enable disk performance counters
-if ($major -lt 10) {
-    Write-Output "Enable disk performance counters because it is required in Windows Server < 2019."
-    diskperf -y;
-}
+#if ($major -lt 10) {
+#    Write-Output "Enable disk performance counters because it is required in Windows Server < 2019."
+#    diskperf -y;
+#}
 
 # Backup originl config with the API key since we will reference it multiple times
 Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json.org"
