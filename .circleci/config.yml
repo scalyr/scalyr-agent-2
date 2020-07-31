@@ -2260,11 +2260,6 @@ workflows:
          <<: *master_and_release_only
      - ami-tests-stable:
          context: scalyr-agent
-         # NOTE: We add this dependency to ensure we don't try to spin and deploy too many
-         # EC2 instances concurrently which would make it likely to hit and exhaust EC2
-         # rate limits.
-         requires:
-           - ami-tests-development
          <<: *master_and_release_only
  benchmarks:
    jobs:
