@@ -17,6 +17,7 @@
 #
 # It depends on the following environment variables being set:
 # - CIRCLE_API_TOKEN - CircleCI API access token.
+# - AGENT_PROJECT_NAME - The name of the github project.
 #
 # Usage:
 #
@@ -55,8 +56,6 @@ import requests
 
 CIRCLE_API_URL = "https://circleci.com/api/v2"
 
-CIRCLE_API_PROJECT_URL = CIRCLE_API_URL + "/project/gh/scalyr/scalyr-agent-2"
-
 # 15 min
 CIRCLE_WAIT_TIMEOUT = 60 * 15
 
@@ -65,6 +64,14 @@ try:
 except KeyError:
     print("Environment variable 'CIRCLE_API_TOKEN' is not specified.")
     raise
+
+try:
+    AGENT_REPO_NAME = compat.os_environ_unicode["AGENT_REPO_NAME"]
+except KeyError:
+    print("Environment variable 'AGENT_REPO_NAME' is not specified.")
+    raise
+
+CIRCLE_API_PROJECT_URL = CIRCLE_API_URL + "/project/gh/scalyr/" + AGENT_REPO_NAME
 
 
 def _do_request(method, url, **kwargs):
