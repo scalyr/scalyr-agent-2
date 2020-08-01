@@ -243,7 +243,7 @@ class PlatformController(object):
         @param script_file: The path to the Python script file that was executed if it can be determined.  If it cannot
             then this will be None and script_binary will be supplied.
         @param script_binary:  The binary that is being executed.  This is only supplied if script_file is None.
-            On some systems, such as Windows running a script frozen by py2exe, the script is embedded in an actual
+            On some systems, such as Windows running a script frozen by PyInstaller, the script is embedded in an actual
             executable.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
