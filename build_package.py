@@ -302,6 +302,12 @@ def build_win32_installer_package(variant, version):
     )
 
     shutil.copy(pyinstaller_spec_path, "scalyr-agent.spec")
+
+    shutil.copy(
+        os.path.join(agent_source_root, "win32", "dynamic_modules.py"),
+        "dynamic_modules.py",
+    )
+
     shutil.copy(
         os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
         "wix-heat-bin-transform.xsl",
