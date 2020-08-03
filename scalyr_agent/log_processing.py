@@ -2034,6 +2034,10 @@ class LogFileProcessor(object):
         # happens).  However, this is how the old agent worked and the UI relies on it, so we just keep the old system
         # going for now.
         self.__thread_name = "Lines for file %s" % file_path
+
+        # Note: thread id is also used as a unique identifier for LogFileProcessors (see #CT-107)
+        # So even if "thread_id" is no longer used by the Scalyr API, we still need it as a unique
+        # integer identifier for the LogFileProcessor
         self.__thread_id = LogFileProcessor.generate_unique_id()
 
         self.__log_file_iterator = LogFileIterator(
@@ -2199,6 +2203,15 @@ class LogFileProcessor(object):
         result = self.__is_closed
         self.__lock.release()
         return result
+
+    @property
+    def unique_id(self):
+        """
+        @return: an identifier for the log processor that is unique for all processors for the
+            lifetime of the agent.
+        @rtype: int
+        """
+        return self.__thread_id
 
     @property
     def is_active(self):
