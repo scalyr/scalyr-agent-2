@@ -43,6 +43,7 @@ import gc
 import os
 import sys
 import time
+import re
 from io import open
 
 try:
@@ -767,7 +768,7 @@ class ScalyrAgent(object):
             elif (
                 status_format == "text"
                 and "Health check:" in line
-                and "Good" not in line.rstrip()
+                and not re.match(r"^Health check\:\s+Good$", line.strip())
             ):
                 return_code = 2
         fp.close()
