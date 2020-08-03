@@ -656,7 +656,9 @@ commands:
       installer_script_url:
         description: "URL to the installer script which to use for the install and upgrade tests."
         type: string
-        default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
+        # TODO: Change back once the simplify_connection_code is merged and pushed upstream
+        # default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
+        default: "https://scalyr-repo.s3.amazonaws.com/4adfas/internal/latest/install-scalyr-agent-2-internal.sh"
     steps:
       - add_ssh_keys:
           fingerprints:
@@ -704,11 +706,11 @@ commands:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+
             # If testing type is "development" we use installer script which is built in another job.
             if [ "<< parameters.test_type >>" = "development" ]; then
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
-
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:
