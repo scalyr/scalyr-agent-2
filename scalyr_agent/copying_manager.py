@@ -1241,6 +1241,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
         # collect all of the callback that they give us and wrap it into one massive one.
+        # all_callbacks maps the callback for a processor keyed by the processor's unique id.  We use the unique id to
+        # provide a stable mapping, even if the list of log processors changes between now and when we process
+        # the response (which it may if pipelining is turned on and we process the other request's response).
         all_callbacks = {}
         logs_processed = 0
 
