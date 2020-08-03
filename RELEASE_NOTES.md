@@ -5,9 +5,9 @@
 * The `status -v` and the new `status -H` command contain health check information and will have a return code
  of `2` if the health check is failing.
 
- The health check considers the time since the Agent last attempted to upload logs, these attempts don't need to
+ The health check considers the time since the Agent last attempted to upload logs. These attempts don't need to
  succeed to be considered healthy. The default time before the Agent is considered unhealthy after not making any
- attempts is `60.0` seconds, this can be changed with the `healthy_max_time_since_last_copy_attempt` configuration
+ attempts is `60.0` seconds. This can be changed with the `healthy_max_time_since_last_copy_attempt` configuration
  option.
 
  The Kubernetes yaml has been updated to make use of this as a liveliness check:

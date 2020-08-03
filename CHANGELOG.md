@@ -8,7 +8,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 3, 2020 12:30 -0800
 --->
 
 Features:
-* `status -v` command now contains health check information, and will have a return code of `2` if the health check has failed. New optional flag for the `status` CLI command `-H` returns a short status with only health check info, and new configuration feature `healthy_max_time_since_last_copy_attempt` defines how many seconds is acceptable for the Agent to not attempt to send up logs before the health check should fail, defaulting to `60.0`. For more information, please refer to the release notes document.
+* The `status -v` command now contains health check information, and will have a return code of `2` if the health check has failed. New optional flag for the `status` CLI command `-H` returns a short status with only health check info. A new configuration feature `healthy_max_time_since_last_copy_attempt` defines how many seconds is acceptable for the Agent to not attempt to send up logs before the health check should fail, defaulting to `60.0`. For more information, please refer to the release notes document.
 * Kubernetes yaml has been updated to include a liveliness check based on the new health check info, which will cause a pod restart if the agent is considered unhealthy.
 
 Bug fixes:
