@@ -2,6 +2,30 @@
 
 ## 2.1.8 - TBD
 
+* The `status -v` and the new `status -H` command contain health check information and will have a return code
+ of `2` if the health check is failing.
+
+ The health check considers the time since the Agent last attempted to upload logs, these attempts don't need to
+ succeed to be considered healthy. The default time before the Agent is considered unhealthy after not making any
+ attempts is `60.0` seconds, this can be changed with the `healthy_max_time_since_last_copy_attempt` configuration
+ option.
+
+ The Kubernetes yaml has been updated to make use of this as a liveliness check:
+
+ ```
+        livenessProbe:
+          exec:
+            command:
+            - scalyr-agent-2
+            - status
+            - -H
+          initialDelaySeconds: 60
+          periodSeconds: 60
+ ```
+
+ Health will be checked one minute after pod startup and every minute after that, with a failed check resulting in a
+ pod restart.
+
 * Default value for the  ``compression_level`` configuration option when using
   ``compression_type: deflate`` has been changed from ``9`` to ``6`` (``deflate`` is a default
   value is ``compress_type`` configuration option is not specified by the end user).
