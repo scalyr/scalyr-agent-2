@@ -1445,7 +1445,7 @@ class ScriptEscalator(object):
             script_binary = None
             script_file_path = None
 
-            # See if this is a py2exe executable.  If so, then we do not have a script file, but a binary executable
+            # See if this is a PyInstaller executable. If so, then we do not have a script file, but a binary executable
             # that contains the script.
             if hasattr(sys, "frozen"):
                 script_binary = sys.executable

@@ -9,6 +9,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 3, 2020 12:30 -0800
 
 Bug fixes:
 * Fixed race condition in pipelined requests which could lead to duplicate log upload, especially for systems with a large number of inactive log files.  Log files would be reuploaded from their start over short period of time (seconds to minutes).  This bug is triggered when pipelining is enabled, either by explicitly setting the `pipeline_threshold` config option or by using a Scalyr Agent release >= 2.1.6 (pipelining was turned on by default in 2.1.6).
+* Fixed the misconfiguration in Windows packager which causes some number of the monitors to not be included in Windows version.  This generates import errors when attempting to use monitors like the syslog or shell monitor.
 
 Misc:
 * ``compression_level`` configuration option now defaults to ``6`` when using ``deflate`` ``compression_type`` (``deflate`` is the default value for the ``compression_type`` configuration option). 6 offers the best trade off between compression ratio and CPU usage. For more information, please refer to the release notes document.
