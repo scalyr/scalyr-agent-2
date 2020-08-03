@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.8 "TBD" - July 10, 2020
+## 2.1.8 "TBD" - August 10, 2020
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 20, 2020 08:30 -0800
@@ -13,6 +13,10 @@ Misc:
 Bug fixes:
 * Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v` command output and make sure the value is left padded and consistent with other lines.
 * Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
+
+Security fixes and improvments:
+* When connecting to the Scalyr API, agent now explicitly requests TLS v1.2 and aborts connection if the server doesn't support it or tries to use an older version. Recently Scalyr API deprecated support for TLS v1.1 which allows us to implement this change which makes the agent more robust against potential downgrade attacks. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
+* When connecting to the Scalyr API, server now sends a SNI header which matches the host specified in the agent config. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
 
 ## 2.1.7 "Serenity" - June 24, 2020
 
