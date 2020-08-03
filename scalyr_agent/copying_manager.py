@@ -907,7 +907,6 @@ class CopyingManager(StoppableThread, LogWatcher):
                             log.error("Failed to read logs for copying.  Will re-try")
 
                         # Update the statistics and our copying parameters.
-                        # Note:
                         self.__lock.acquire()
                         copying_params.update_params(result, bytes_sent)
                         self.__last_attempt_time = current_time
