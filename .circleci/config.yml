@@ -2260,9 +2260,9 @@ workflows:
            - build-windows-package
            - build-linux-packages-and-installer-script
          <<: *master_and_release_only
-           # - ami-tests-stable:
-           #     context: scalyr-agent
-           #     <<: *master_and_release_only
+     - ami-tests-stable:
+         context: scalyr-agent
+         <<: *master_and_release_only
  benchmarks:
    jobs:
      - benchmarks-micro-py-27
