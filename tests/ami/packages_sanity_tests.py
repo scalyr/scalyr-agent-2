@@ -400,9 +400,18 @@ def main(
         verbose=verbose,
     )
 
+    if "windows" in distro.lower():
+        deploy_step_timeout = 320
+        deploy_overall_timeout = 320
+        max_tries = 10
+    else:
+        deploy_step_timeout = 260
+        deploy_overall_timeout = 280
+        max_tries = 3
+
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=260
+        rendered_template, name=remote_script_name, timeout=deploy_step_timeout
     )
 
     if file_upload_steps:
@@ -452,9 +461,9 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
-            max_tries=4,
+            max_tries=max_tries,
             wait_period=15,
-            timeout=280,
+            timeout=deploy_overall_timeout,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
