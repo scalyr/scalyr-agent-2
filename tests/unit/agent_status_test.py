@@ -358,7 +358,7 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -435,7 +435,7 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -510,7 +510,7 @@ Last copy response size:                   16
 Last copy response status:                 error
 Last copy response:                        Some weird stuff
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -687,7 +687,7 @@ Last copy response size:                   16
 Last copy response status:                 error
 Last copy response:                        Some weird stuff
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -751,14 +751,16 @@ Failed monitors:
     def test_health_status(self):
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = "Health check: Good\n"
+        expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
         self.status.copying_manager_status.health_check_result = "Some bad message"
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = "Health check: Some bad message\n"
+        expected_output = (
+            "Health check:                              Some bad message\n"
+        )
         self.assertTrue(expected_output in output.getvalue())
 
 
