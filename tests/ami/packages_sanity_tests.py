@@ -403,11 +403,13 @@ def main(
     if "windows" in distro.lower():
         deploy_step_timeout = 320
         deploy_overall_timeout = 320
+        cat_step_timeout = 10
         max_tries = 10
     else:
         deploy_step_timeout = 260
         deploy_overall_timeout = 280
         max_tries = 3
+        cat_step_timeout = 5
 
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
@@ -422,7 +424,7 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=cat_step_timeout)
     deployment.add(cat_logs_step)
 
     driver = get_libcloud_driver()
