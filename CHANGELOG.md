@@ -1,14 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.9 "TBD" - August 4, 2020
+## 2.1.9 "Ursa" - August 4, 2020
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 4, 2020 12:30 -0800
+Packaged by Oliver hsu <oliver@scalyr.com> on Aug 4, 2020 9:00 -0800
 --->
 
 Bug fixes:
-* Fix a regression in scalyr agent Windows cmdlet script (``ScalyrShell.cmd``) which would prevent agent from starting.
+* Fixed a regression in Scalyr Windows Agent cmdlet script (`ScalyrShell.cmd`) which prevents the agent from starting.
 
 ## 2.1.8 "Titan" - August 3, 2020
 
