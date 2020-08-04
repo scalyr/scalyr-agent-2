@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,44 +14,59 @@
 #
 # This script installs Scalyr agent MSI package for windows.
 
+# Enable strict mode and make sure we fail and exit with non zero on any error
+Set-StrictMode -Version 3.0
+Set-PSDebug -Strict
 
+$ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+{% if verbose -%}
+Set-PSDebug -trace 2
+{% endif -%}
 
 function GetMSIVersion {
     param (
-    [IO.FileInfo] $MSI
-)
-# this function gets version string from .msi package.
-if (!(Test-Path $MSI.FullName)) {
-    throw "File '{0}' does not exist" -f $MSI.FullName
-}
-
-try {
-    $windowsInstaller = New-Object -com WindowsInstaller.Installer
-    $database = $windowsInstaller.GetType().InvokeMember(
-        "OpenDatabase", "InvokeMethod", $Null,
-        $windowsInstaller, @($MSI.FullName, 0)
+        [IO.FileInfo] $MSI
     )
 
-    $q = "SELECT Value FROM Property WHERE Property = 'ProductVersion'"
-    $View = $database.GetType().InvokeMember(
-        "OpenView", "InvokeMethod", $Null, $database, ($q)
-    )
+    # this function gets version string from .msi package.
+    if (!(Test-Path $MSI.FullName)) {
+        throw "File '{0}' does not exist" -f $MSI.FullName
+    }
 
-    $View.GetType().InvokeMember("Execute", "InvokeMethod", $Null, $View, $Null)
-    $record = $View.GetType().InvokeMember( "Fetch", "InvokeMethod", $Null, $View, $Null )
-    $version = $record.GetType().InvokeMember( "StringData", "GetProperty", $Null, $record, 1 )
+    try {
+        $windowsInstaller = New-Object -com WindowsInstaller.Installer
+        $database = $windowsInstaller.GetType().InvokeMember(
+            "OpenDatabase", "InvokeMethod", $Null,
+            $windowsInstaller, @($MSI.FullName, 0)
+        )
 
-    return $version
-} catch {
-    throw "Failed to get MSI file version: {0}." -f $_
+        $q = "SELECT Value FROM Property WHERE Property = 'ProductVersion'"
+        $View = $database.GetType().InvokeMember(
+            "OpenView", "InvokeMethod", $Null, $database, ($q)
+        )
+
+        $View.GetType().InvokeMember("Execute", "InvokeMethod", $Null, $View, $Null)
+        $record = $View.GetType().InvokeMember( "Fetch", "InvokeMethod", $Null, $View, $Null )
+        $version = $record.GetType().InvokeMember( "StringData", "GetProperty", $Null, $record, 1 )
+
+        $View.GetType().InvokeMember("Close", "InvokeMethod", $Null, $View, $Null)
+
+        return $version
+    } catch {
+        throw "Failed to get MSI file version: {0}." -f $_
+    }
 }
-}
-
 
 $msi_version=GetMSIVersion -MSI .\install_package.msi
-echo $msi_version
+# Method returns an object so we need to cast it to a String
+$msi_version="$msi_version".Trim()
+echo "Retrieved version: $msi_version"
+
+if ($msi_version -eq $null) {
+    Throw "Unable to retrieve version from the msi package!"
+}
 
 # install scalyr agent and wait until it is done.
 Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
@@ -62,25 +76,20 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
     -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
   Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
 
-# After string replacement we need to reencode config file without BOM.
-$ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
-$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
-[System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)
+# After string replacement we need to reencode config file without BOM
+{% include "partial/reencode_config_without_bom.ps1.j2" %}
 
 $Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
 
-# enable disk performance counters
-if ($major -lt 10) {
-    Write-Output "Enable disk performance counters because it is required in Windows Server < 2019."
-    diskperf -y;
-
-}
+# Backup originl config with the API key since we will reference it multiple times
+Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json.org"
 
 scalyr-agent-2 start;
 
 Start-Sleep 5
 
 $status_output=scalyr-agent-2 status -v;
+echo $status_output
 
 if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
@@ -96,20 +105,31 @@ echo $status_output2
 if ("$status_output" -notmatch "$msi_version")   {
     # If there is a an internal build, we need to check version string for the 'windows version' format.
     $version_numbers=$msi_version.Split(".");
-    $version_first_part=$version_numbers[0..2] -join ".";
+    $version_first_part=$version_numbers[0..2] -join "\.";
     $version_second_part=$version_numbers[-1];
-    $pattern=$version_first_part + ".[a-zA-Z]+[0-9]+." + $version_second_part;
+    $pattern=$version_first_part.Trim() + "\.[a-zA-Z]+[0-9]+\." + $version_second_part.Trim();
+    $pattern=$pattern.Trim()
 
-    if ("$status_output" -notmatch "$pattern")
+    if ("$status_output" -notmatch $pattern)
     {
         Throw "Can not find version.";
     }
 };
+
 if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
 if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
 
+# Ensure CA validation is not disabled with default install
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -match "sslverifyoff") { Throw "cert validation is disabled" };
+if ("$log_output" -match "certificate validation has been disabled") { Throw "cert validation is disabled" };
+
 # Verify build_info file exists
 echo ""
+echo "Verifying build_info file exists"
+echo ""
+
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
 echo ""

@@ -30,6 +30,12 @@ It depends on the following environment variables being set:
 
 - SCALYR_API_KEY - Scalyr API key to use.
 
+- LIBCLOUD_DEBUG=libcloud.log - Optionally set this variable to write Libcloud debug log into
+  libcloud.log file.
+
+  Keep in mind that you should never enable this on Circle CI since it will leak API keys into the
+  debug log.
+
 NOTE 1: You are recommended to use 2048 bit RSA key because CentOS 6 AMI we use doesn't support new
 key types or RSA keys of size 4096 bits.
 
@@ -83,7 +89,8 @@ import random
 import argparse
 from io import open
 
-from jinja2 import Template
+from jinja2 import FileSystemLoader
+from jinja2 import Environment
 import requests
 
 from libcloud.compute.types import Provider
@@ -395,7 +402,7 @@ def main(
 
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=300
+        rendered_template, name=remote_script_name, timeout=260
     )
 
     if file_upload_steps:
@@ -406,7 +413,7 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=20)
+    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
     deployment.add(cat_logs_step)
 
     driver = get_libcloud_driver()
@@ -445,7 +452,9 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
-            timeout=300,
+            max_tries=4,
+            wait_period=15,
+            timeout=280,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
@@ -525,9 +534,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    template = Template(script_template)
+    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
-
     return rendered_template
 
 
