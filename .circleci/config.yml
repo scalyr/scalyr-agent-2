@@ -2229,13 +2229,13 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-     - ami-tests-development:
-         requires:
-           - build-windows-package
-           - build-linux-packages-and-installer-script
-         <<: *master_and_release_only
-     - ami-tests-stable:
-         <<: *master_and_release_only
+#     - ami-tests-development:
+#         requires:
+#           - build-windows-package
+#           - build-linux-packages-and-installer-script
+#         <<: *master_and_release_only
+#     - ami-tests-stable:
+#         <<: *master_and_release_only
  benchmarks:
    jobs:
      - benchmarks-micro-py-27
