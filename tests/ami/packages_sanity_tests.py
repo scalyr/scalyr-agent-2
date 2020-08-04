@@ -256,8 +256,14 @@ def _get_source_type(version_string):
         return "url"
     elif os.path.exists(version_string) and os.path.isfile(version_string):
         return "file"
-    else:
+    elif re.match(r"\d+\.\d+\.\d+", version_string) or version_string in ["current"]:
         return "install_script"
+    else:
+        raise ValueError(
+            'Invalid value "%s" for version_string. If it\'s a path to a file, make'
+            "sure the file exists and if it's a URL, ensure URL exists."
+            % (version_string)
+        )
 
 
 def _create_file_deployment_step(file_path, remote_file_name):
