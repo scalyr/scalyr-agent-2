@@ -30,6 +30,12 @@ It depends on the following environment variables being set:
 
 - SCALYR_API_KEY - Scalyr API key to use.
 
+- LIBCLOUD_DEBUG=libcloud.log - Optionally set this variable to write Libcloud debug log into
+  libcloud.log file.
+
+  Keep in mind that you should never enable this on Circle CI since it will leak API keys into the
+  debug log.
+
 NOTE 1: You are recommended to use 2048 bit RSA key because CentOS 6 AMI we use doesn't support new
 key types or RSA keys of size 4096 bits.
 
@@ -83,7 +89,8 @@ import random
 import argparse
 from io import open
 
-from jinja2 import Template
+from jinja2 import FileSystemLoader
+from jinja2 import Environment
 import requests
 
 from libcloud.compute.types import Provider
@@ -393,9 +400,20 @@ def main(
         verbose=verbose,
     )
 
+    if "windows" in distro.lower():
+        deploy_step_timeout = 320
+        deploy_overall_timeout = 320
+        cat_step_timeout = 10
+        max_tries = 3
+    else:
+        deploy_step_timeout = 260
+        deploy_overall_timeout = 280
+        max_tries = 3
+        cat_step_timeout = 5
+
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=250
+        rendered_template, name=remote_script_name, timeout=deploy_step_timeout
     )
 
     if file_upload_steps:
@@ -406,8 +424,14 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=10)
-    deployment.add(cat_logs_step)
+    if "windows" not in distro.lower():
+        # NOTE: We don't add it on Windows since it tends to time out often
+        cat_logs_step = ScriptDeployment(
+            cat_logs_script_content, timeout=cat_step_timeout
+        )
+        deployment.add(cat_logs_step)
+    else:
+        cat_logs_step = None  # type: ignore
 
     driver = get_libcloud_driver()
 
@@ -445,7 +469,9 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
-            timeout=280,
+            max_tries=max_tries,
+            wait_period=15,
+            timeout=deploy_overall_timeout,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
@@ -461,10 +487,10 @@ def main(
         stdout = test_package_step.stdout
         stderr = test_package_step.stderr
 
-        if cat_logs_step.stdout:
+        if cat_logs_step and cat_logs_step.stdout:
             stdout += "\n" + cat_logs_step.stdout
 
-        if cat_logs_step.stderr:
+        if cat_logs_step and cat_logs_step.stderr:
             stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
@@ -525,9 +551,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    template = Template(script_template)
+    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
-
     return rendered_template
 
 

@@ -35,12 +35,6 @@ if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     exit 1
 fi
 
-# Give it some time to finish provisioning process. It's possible that we can SSH in before
-# cloud-init fully finished
-# TODO: A more robust and correct way would be to poll cloud-init status file until it indicates
-# provisioning has finished.
-# sleep 20
-
 uname -a
 cat /etc/*-release
 
@@ -89,12 +83,7 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
-echo ""
-echo "Restarting agent"
-echo ""
-sudo /etc/init.d/scalyr-agent-2 restart
-
-sleep 5
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Run some basic sanity checks
 echo ""
@@ -152,15 +141,9 @@ export UPGRADE_PACKAGE_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{
 sudo yum install -y "scalyr-agent-2-{{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
       {% endif -%}
-
 {% endif -%}
 
-echo ""
-echo "Restarting agent"
-echo ""
-sudo /etc/init.d/scalyr-agent-2 restart
-
-sleep 5
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Verify status works and symlinks are in place
 echo ""

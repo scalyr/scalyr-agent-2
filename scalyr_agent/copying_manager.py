@@ -713,7 +713,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                 current_time = time.time()
 
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
+                # NOTE: We set this variable to current (start time) even if we never successfuly
+                # establish a connection because we want eventually drop __pending_add_events_task
+                # even if we can't establish a connection. If we didn't do that, that queue could
+                # grow unbounded.
+                # Because of that, we need to take this behavior into account when updating
+                # "__last_success_time" variable which is used for status reporting. We do that by
+                # utilizing another last_success_status variable which only gets updated when we
+                # successfuly send the request to the server.
                 last_success = current_time
+                last_success_status = None
 
                 # Force the agent to write a new full checkpoint as soon as it can
                 last_full_checkpoint_write = 0.0
@@ -879,6 +888,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             if result == "success":
                                 last_success = current_time
+                                last_success_status = current_time
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
@@ -900,7 +910,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__lock.acquire()
                         copying_params.update_params(result, bytes_sent)
                         self.__last_attempt_time = current_time
-                        self.__last_success_time = last_success
+                        self.__last_success_time = last_success_status
                         self.__last_attempt_size = bytes_sent
                         self.__last_response = six.ensure_text(full_response)
                         self.__last_response_status = result
