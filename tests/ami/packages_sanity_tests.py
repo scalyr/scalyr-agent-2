@@ -424,8 +424,14 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=cat_step_timeout)
-    deployment.add(cat_logs_step)
+    if "windows" not in distro.lower():
+        # NOTE: We don't add it on Windows since it tends to time out often
+        cat_logs_step = ScriptDeployment(
+            cat_logs_script_content, timeout=cat_step_timeout
+        )
+        deployment.add(cat_logs_step)
+    else:
+        cat_logs_step = None  # type: ignore
 
     driver = get_libcloud_driver()
 
@@ -481,10 +487,10 @@ def main(
         stdout = test_package_step.stdout
         stderr = test_package_step.stderr
 
-        if cat_logs_step.stdout:
+        if cat_logs_step and cat_logs_step.stdout:
             stdout += "\n" + cat_logs_step.stdout
 
-        if cat_logs_step.stderr:
+        if cat_logs_step and cat_logs_step.stderr:
             stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
