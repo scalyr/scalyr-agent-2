@@ -88,14 +88,11 @@ scalyr-agent-2 start;
 
 Start-Sleep 5
 
-$status_output=scalyr-agent-2 status -v;
-echo $status_output
-
-if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
-
-Write-Output $status_output
-
 # Also verify we can start the agent using the cmd script we provide
+echo ""
+echo "Verifying agent status via cmdlet"
+echo ""
+
 ScalyrShell.cmd status;
 
 if (!$?) {
@@ -103,6 +100,21 @@ if (!$?) {
 }
 
 if ($LASTEXITCODE -ne 0) { Throw "Status command via cmdlet failed" }
+
+echo ""
+echo "cmdlet agent status verified"
+echo ""
+
+echo ""
+echo "Verifying agent status via native scalyr-agent-2 binary"
+echo ""
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output
+
+if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
+
+Write-Output $status_output
 
 if ("$status_output" -notmatch "$msi_version")   {
     # If there is a an internal build, we need to check version string for the 'windows version' format.
@@ -114,7 +126,7 @@ if ("$status_output" -notmatch "$msi_version")   {
 
     if ("$status_output" -notmatch $pattern)
     {
-        Throw "Can not find version.";
+        Throw "Can not find a matching version.";
     }
 };
 
@@ -122,11 +134,23 @@ if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." 
 if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
 
+echo ""
+echo "native agent status output verified"
+echo ""
+
 # Ensure CA validation is not disabled with default install
+echo ""
+echo "Verifying SSL cert validation is enabled by default"
+echo ""
+
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
 if ("$log_output" -match "sslverifyoff") { Throw "cert validation is disabled" };
 if ("$log_output" -match "certificate validation has been disabled") { Throw "cert validation is disabled" };
+
+echo ""
+echo "SSL check validation completed"
+echo ""
 
 # Verify build_info file exists
 echo ""
@@ -134,4 +158,8 @@ echo "Verifying build_info file exists"
 echo ""
 
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
+echo ""
+
+echo ""
+echo "build_info validation completed"
 echo ""
