@@ -687,7 +687,7 @@ Last copy response size:                   16
 Last copy response status:                 error
 Last copy response:                        Some weird stuff
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
