@@ -12,7 +12,7 @@ master_and_release_only: &master_and_release_only
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
         - /automated_tests\/.*/
-        - ami_tests_improvements_windows
+        - fix_windows_issue
 
 # NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
 benchmarks_master_and_release_only: &benchmarks_master_and_release_only
@@ -2230,13 +2230,13 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-#     - ami-tests-development:
-#         requires:
-#           - build-windows-package
-#           - build-linux-packages-and-installer-script
-#         <<: *master_and_release_only
-#     - ami-tests-stable:
-#         <<: *master_and_release_only
+     - ami-tests-development:
+         requires:
+           - build-windows-package
+           - build-linux-packages-and-installer-script
+         <<: *master_and_release_only
+     - ami-tests-stable:
+         <<: *master_and_release_only
  benchmarks:
    jobs:
      - benchmarks-micro-py-27

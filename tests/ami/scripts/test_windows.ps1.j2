@@ -96,11 +96,13 @@ if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 Write-Output $status_output
 
 # Also verify we can start the agent using the cmd script we provide
-$status_output2="C:\Program Files (x86)\Scalyr\bin\ScalyrShell.cmd status"
+ScalyrShell.cmd status;
+
+if (!$?) {
+    throw "Status command via cmdlet failed"
+}
+
 if ($LASTEXITCODE -ne 0) { Throw "Status command via cmdlet failed" }
-
-echo $status_output2
-
 
 if ("$status_output" -notmatch "$msi_version")   {
     # If there is a an internal build, we need to check version string for the 'windows version' format.
