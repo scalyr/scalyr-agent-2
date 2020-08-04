@@ -93,7 +93,9 @@ echo ""
 echo "Verifying agent status via cmdlet"
 echo ""
 
-ScalyrShell.cmd status;
+# NOTE: We pipe a character to avoid PAUSE command waiting for the user input at the end
+# and hanging
+@() | ScalyrShell.cmd status;
 
 if (!$?) {
     throw "Status command via cmdlet failed"
