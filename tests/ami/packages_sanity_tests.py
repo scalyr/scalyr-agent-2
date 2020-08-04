@@ -404,7 +404,7 @@ def main(
         deploy_step_timeout = 320
         deploy_overall_timeout = 320
         cat_step_timeout = 10
-        max_tries = 10
+        max_tries = 3
     else:
         deploy_step_timeout = 260
         deploy_overall_timeout = 280
