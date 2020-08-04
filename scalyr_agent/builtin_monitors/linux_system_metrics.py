@@ -21,7 +21,6 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-# pylint: disable=six-moves-import-not-included-for-win32
 
 import os
 import re

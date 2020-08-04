@@ -82,18 +82,7 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
-echo "Restarting agent"
-echo ""
-
-# NOTE: Before each restart and after each new set of checks, we delete the log file to ensure
-# assertions / checks we are performed are performed against the latest version of the logs and not
-# against old logs from previous start.
-sudo /etc/init.d/scalyr-agent-2 stop
-sudo rm -f /var/log/scalyr-agent-2/agent.log
-
-sudo /etc/init.d/scalyr-agent-2 start
-
-sleep 5
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Run some basic sanity checks
 echo "Verifying agent status output"
@@ -161,19 +150,7 @@ export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
-echo ""
-echo "Restarting agent"
-echo ""
-
-# NOTE: Before each restart and after each new set of checks, we delete the log file to ensure
-# assertions / checks we are performed are performed against the latest version of the logs and not
-# against old logs from previous start.
-sudo /etc/init.d/scalyr-agent-2 stop
-sudo rm -f /var/log/scalyr-agent-2/agent.log
-
-sudo /etc/init.d/scalyr-agent-2 start
-
-sleep 5
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Verify status works and symlinks are in place
 echo ""

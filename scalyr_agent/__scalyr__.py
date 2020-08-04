@@ -52,7 +52,7 @@ PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 #
 # There are several different ways we can be running, and this files has to give the correct values for each of them.
 # For example, we could just be running out of the source tree as checked into github.  Or we can be running
-# out of an RPM.  Or as part of a single Windows executable created by Py2exe.  We handle of these cases.
+# out of an RPM.  Or as part of a single Windows executable created by PyInstaller.  We handle of these cases.
 #
 # Example layouts for different install types:
 #
@@ -85,7 +85,7 @@ PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 #   Here the install root is C:\Program Files (x86)\Scalyr\ and the package root is
 #   C:\Program Files (x86)\Scalyr\program_files\
 
-# Indicates if this code was compiled into a single Windows executable via Py2exe.  If that's the case,
+# Indicates if this code was compiled into a single Windows executable via PyInstaller.  If that's the case,
 # then we cannot rely on __file__ and the source is kind of through into the same directory.
 __is_frozen__ = hasattr(sys, "frozen")
 
