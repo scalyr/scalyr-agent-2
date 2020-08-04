@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.10 "TBD" - August 15, 2020
+
+<!---
+Packaged by Oliver hsu <oliver@scalyr.com> on Aug 15, 2020 9:00 -0800
+--->
+
+Bug fixes:
+* Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
+
 ## 2.1.9 "Ursa" - August 4, 2020
 
 <!---
