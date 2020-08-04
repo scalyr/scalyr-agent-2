@@ -400,9 +400,20 @@ def main(
         verbose=verbose,
     )
 
+    if "windows" in distro.lower():
+        deploy_step_timeout = 320
+        deploy_overall_timeout = 320
+        cat_step_timeout = 10
+        max_tries = 3
+    else:
+        deploy_step_timeout = 260
+        deploy_overall_timeout = 280
+        max_tries = 3
+        cat_step_timeout = 5
+
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=260
+        rendered_template, name=remote_script_name, timeout=deploy_step_timeout
     )
 
     if file_upload_steps:
@@ -413,8 +424,14 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
-    deployment.add(cat_logs_step)
+    if "windows" not in distro.lower():
+        # NOTE: We don't add it on Windows since it tends to time out often
+        cat_logs_step = ScriptDeployment(
+            cat_logs_script_content, timeout=cat_step_timeout
+        )
+        deployment.add(cat_logs_step)
+    else:
+        cat_logs_step = None  # type: ignore
 
     driver = get_libcloud_driver()
 
@@ -452,9 +469,9 @@ def main(
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
             ssh_timeout=20,
-            max_tries=4,
+            max_tries=max_tries,
             wait_period=15,
-            timeout=280,
+            timeout=deploy_overall_timeout,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
@@ -470,10 +487,10 @@ def main(
         stdout = test_package_step.stdout
         stderr = test_package_step.stderr
 
-        if cat_logs_step.stdout:
+        if cat_logs_step and cat_logs_step.stdout:
             stdout += "\n" + cat_logs_step.stdout
 
-        if cat_logs_step.stderr:
+        if cat_logs_step and cat_logs_step.stderr:
             stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
