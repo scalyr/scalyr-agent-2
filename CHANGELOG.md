@@ -1,15 +1,37 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.10 "TBD" - August 15, 2020
+
+<!---
+Packaged by Oliver hsu <oliver@scalyr.com> on Aug 15, 2020 9:00 -0800
+--->
+
+Bug fixes:
+* Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
+
+## 2.1.9 "Ursa" - August 4, 2020
+
+<!---
+Packaged by Oliver hsu <oliver@scalyr.com> on Aug 4, 2020 9:00 -0800
+--->
+
+Bug fixes:
+* Fixed a regression in Scalyr Windows Agent cmdlet script (`ScalyrShell.cmd`) which prevents the agent from starting.
+
 ## 2.1.8 "Titan" - August 3, 2020
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 3, 2020 12:30 -0800
 --->
 
+Features:
+* The `status -v` command now contains health check information, and will have a return code of `2` if the health check has failed. New optional flag for the `status` CLI command `-H` returns a short status with only health check info. A new configuration feature `healthy_max_time_since_last_copy_attempt` defines how many seconds is acceptable for the Agent to not attempt to send up logs before the health check should fail, defaulting to `60.0`. For more information, please refer to the release notes document.
+* Kubernetes yaml has been updated to include a liveliness check based on the new health check info, which will cause a pod restart if the agent is considered unhealthy.
+
 Bug fixes:
 * Fixed race condition in pipelined requests which could lead to duplicate log upload, especially for systems with a large number of inactive log files.  Log files would be reuploaded from their start over short period of time (seconds to minutes).  This bug is triggered when pipelining is enabled, either by explicitly setting the `pipeline_threshold` config option or by using a Scalyr Agent release >= 2.1.6 (pipelining was turned on by default in 2.1.6).
-* Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
+* Fixed the misconfiguration in Windows packager which causes some number of the monitors to not be included in Windows version.  This generates import errors when attempting to use monitors like the syslog or shell monitor.
 
 Misc:
 * ``compression_level`` configuration option now defaults to ``6`` when using ``deflate`` ``compression_type`` (``deflate`` is the default value for the ``compression_type`` configuration option). 6 offers the best trade off between compression ratio and CPU usage. For more information, please refer to the release notes document.

@@ -188,7 +188,7 @@ def set_log_level(level):
 #
 def __determine_file():
     # To determine file holding this code, we do not rely on __file__ because it is not portable to all
-    # versions of python, especially when on win32 when code is running using py2exe.  Instead, we do this
+    # versions of python, especially when on win32 when code is running using PyInstaller.  Instead, we do this
     # trick which is suppose to be more portable.
     base = os.getcwd()
     file_path = inspect.stack()[1][1]
