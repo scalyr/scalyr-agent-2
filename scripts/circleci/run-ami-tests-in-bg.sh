@@ -41,10 +41,9 @@ echo ""
 if [ "${TEST_TYPE}" == "stable" ]; then
   echo "Run sanity tests for the stable package versions."
   # For Windows tests we need to download latest stable version from the repo and use that
-  curl -o VERSION https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
+  curl -o VERSION -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
   LATEST_VERSION=$(cat VERSION)
-  curl -o /tmp/workspace/ScalyrAgentInstaller.msi "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
-  ls -la /tmp/workspace/ScalyrAgentInstaller.msi
+  curl -o /tmp/workspace/ScalyrAgentInstaller.msi -L -f "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
 
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
   #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
