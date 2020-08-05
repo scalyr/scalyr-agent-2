@@ -391,13 +391,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
             self.__assertion_failed = True
             self.fail(
-                'File "%s" doesn\'t contain "%s" line expression.\n\nActual file content: %s'
+                'File "%s" does not contain "%s" line expression.\n\nActual file content: %s'
                 % (file_path, expression, content)
             )
 
     def assertLogFileDoesntContainsLineRegex(self, expression, file_path=None):
         """
-        Custom assertion function which asserts that the provided log file path doesn\'t contains a
+        Custom assertion function which asserts that the provided log file path doesn't contains a
         line which matches the provided line regular expression.
 
         Keep in mind that this function is line oriented. If you want to perform assertion across
@@ -437,13 +437,13 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
             self.__assertion_failed = True
             self.fail(
-                'File "%s" doesn\'t contain "%s" expression.\n\nActual file content: %s'
+                'File "%s" does not contain "%s" expression.\n\nActual file content: %s'
                 % (file_path, expression, content)
             )
 
     def assertLogFileDoesntContainsRegex(self, expression, file_path=None):
         """
-        Custom assertion function which asserts that the provided log file path doesn\'t contain a
+        Custom assertion function which asserts that the provided log file path doesn't contain a
         string which matches the provided regular expression.
 
         This function performs checks against the whole file content which means it comes handy in
