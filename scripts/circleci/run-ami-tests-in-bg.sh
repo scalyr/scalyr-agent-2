@@ -46,8 +46,8 @@ if [ "${TEST_TYPE}" == "stable" ]; then
   curl -o /tmp/workspace/ScalyrAgentInstaller.msi -L -f "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
 
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
-  #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
-  #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
 
   # Tests below utilize installer script to test installing latest stable version of the package
   #python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1804-install.log &
