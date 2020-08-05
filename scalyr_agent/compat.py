@@ -31,7 +31,7 @@ PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
 PY_post_equal_279 = sys.version_info >= (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 
-# MOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use
+# NOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use
 # version from backports package
 if PY2_pre_279 or PY3_pre_32:
     try:
