@@ -240,7 +240,7 @@ class ScalyrHttpConnection(Connection):
 
             if isinstance(error, CertificateError):
                 error_code = "client/connectionFailedCertHostnameValidationFailed"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" because of server certificate validation error: "%s". '
                     "This likely indicates a MITM attack.",
                     self._full_address,
@@ -249,7 +249,7 @@ class ScalyrHttpConnection(Connection):
                 )
             elif isinstance(error, ssl.SSLError):
                 error_code = "client/connectionFailedSSLError"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
                     "for the root Certificate Authority could not be parsed, or we attempted to connect to "
                     "a server whose certificate could not be trusted (if so, maybe Scalyr's SSL cert has "
@@ -262,21 +262,21 @@ class ScalyrHttpConnection(Connection):
                 )
             elif errno == 61:  # Connection refused
                 error_code = "client/connectionFailedConnRefused"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
                     self._full_address,
                     error_code=error_code,
                 )
             elif errno == 8:  # Unknown name
                 error_code = "client/connectionFailed"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
                     self._full_address,
                     error_code=error_code,
                 )
             elif errno is not None:
                 error_code = "client/connectionFailed"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" due to errno=%d.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
@@ -286,7 +286,7 @@ class ScalyrHttpConnection(Connection):
                 )
             else:
                 error_code = "client/connectionFailed"
-                log.error(
+                log.exception(
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
