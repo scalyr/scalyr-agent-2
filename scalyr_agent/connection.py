@@ -295,9 +295,7 @@ class ScalyrHttpConnection(Connection):
                 )
 
             # TODO: We should probably propagate original exception class...
-            exc = Exception(
-                "client/connectionFailed. Original error: %s" % (str(error))
-            )
+            exc = Exception("%s. Original error: %s" % (error_code, str(error)))
             exc.error_code = error_code
             raise exc
 
