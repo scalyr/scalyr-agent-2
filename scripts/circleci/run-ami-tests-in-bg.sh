@@ -37,10 +37,18 @@ echo "Running AMI sanity tests concurrently in the background (this may take up 
 echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
 echo ""
 
+# We run sanity test for each image concurrently in background
 if [ "${TEST_TYPE}" == "stable" ]; then
   echo "Run sanity tests for the stable package versions."
+  # For Windows tests we need to download latest stable version from the repo and use that
+  curl -o VERSION https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
+  LATEST_VERSION=$(cat VERSION)
+  curl -o /tmp/workspace/ScalyrAgentInstaller.msi "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
 
-  # Run sanity test for each image concurrently in background
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+
   # Tests below utilize installer script to test installing latest stable version of the package
   python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/ubuntu1804-install.log &
   # NOTE: Here we also install "yum-utils" package so we test a regression where our installer
