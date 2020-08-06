@@ -79,6 +79,7 @@ from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
 
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.third_party.requests as requests
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -673,7 +674,20 @@ def upgrade_windows_install(
         try:
             try:
                 print("Downloading agent from %s." % url_path)
-                six.moves.urllib.request.urlretrieve(url_path, download_location)
+                # NOTE: We are using requests here since it correctly validated the cert and the
+                # server hostname. Using ScalyrClientSession here would be more complex since it's
+                # mostly meant to be used for long running requests to scalyr API endpoint and
+                # that's not what we are doing here.
+                # It's not ideal, ideally we would have a single consistent code path for it :/
+                # NOTE: We need ro allow redirects since that URL redirects us from
+                # https://www.scalyr.com -> https://app.scalyr.com
+                response = requests.get(
+                    url_path, allow_redirects=True, verify=config.ca_cert_path
+                )
+                assert config.ca_cert_path is True
+
+                with open(download_location, "wb") as fp:
+                    fp.write(response.content)
 
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure("Failed to download installation package")
