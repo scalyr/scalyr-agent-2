@@ -67,10 +67,11 @@ import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
+import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.scalyr_logging import set_log_destination
+log = scalyr_logging.getLogger(__name__)
 
-set_log_destination(use_stdout=True)
+scalyr_logging.set_log_destination(use_stdout=True)
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
@@ -1474,7 +1475,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, None)
+        config_file = Configuration(options.config_filename, default_paths, log)
         config_file.parse()
     except Exception as e:
         print(
