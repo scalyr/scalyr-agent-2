@@ -716,6 +716,10 @@ commands:
       - store_artifacts:
           path: outputs
 
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
 jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
