@@ -1,0 +1,4 @@
+# After string replacement we need to reencode config file without BOM
+$ConfigRawString = Get-Content -Raw "C:\Program Files (x86)\Scalyr\config\agent.json";
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False;
+[System.IO.File]::WriteAllLines("C:\Program Files (x86)\Scalyr\config\agent.json", $ConfigRawString, $Utf8NoBomEncoding)

@@ -29,7 +29,6 @@ import time
 import sys
 
 import six
-from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -714,7 +713,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                 current_time = time.time()
 
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
+                # NOTE: We set this variable to current (start time) even if we never successfuly
+                # establish a connection because we want eventually drop __pending_add_events_task
+                # even if we can't establish a connection. If we didn't do that, that queue could
+                # grow unbounded.
+                # Because of that, we need to take this behavior into account when updating
+                # "__last_success_time" variable which is used for status reporting. We do that by
+                # utilizing another last_success_status variable which only gets updated when we
+                # successfuly send the request to the server.
                 last_success = current_time
+                last_success_status = None
 
                 # Force the agent to write a new full checkpoint as soon as it can
                 last_full_checkpoint_write = 0.0
@@ -880,6 +888,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             if result == "success":
                                 last_success = current_time
+                                last_success_status = current_time
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
@@ -901,7 +910,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__lock.acquire()
                         copying_params.update_params(result, bytes_sent)
                         self.__last_attempt_time = current_time
-                        self.__last_success_time = last_success
+                        self.__last_success_time = last_success_status
                         self.__last_attempt_size = bytes_sent
                         self.__last_response = six.ensure_text(full_response)
                         self.__last_response_status = result
@@ -1242,6 +1251,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
         # collect all of the callback that they give us and wrap it into one massive one.
+        # all_callbacks maps the callback for a processor keyed by the processor's unique id.  We use the unique id to
+        # provide a stable mapping, even if the list of log processors changes between now and when we process
+        # the response (which it may if pipelining is turned on and we process the other request's response).
         all_callbacks = {}
         logs_processed = 0
 
@@ -1268,9 +1280,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
-            (callback, buffer_filled) = self.__log_processors[
-                current_processor
-            ].perform_processing(add_events_request)
+            processor = self.__log_processors[current_processor]
+            (callback, buffer_filled) = processor.perform_processing(add_events_request)
 
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
@@ -1281,7 +1292,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.total_read_time += end_time - start_time
                 return None
 
-            all_callbacks[current_processor] = callback
+            all_callbacks[processor.unique_id] = callback
             logs_processed += 1
 
             # Advance if the buffer if not filled.  Also, even if it is filled, if we are on the first
@@ -1321,13 +1332,14 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             total_bytes_copied = 0
 
-            for i in range(0, len(processor_list)):
+            for processor in processor_list:
                 # Iterate over all the processors, seeing if we had a callback for that particular processor.
-                processor = processor_list[i]
-                if i in all_callbacks:
+                if processor.unique_id in all_callbacks:
                     # noinspection PyCallingNonCallable
                     # If we did have a callback for that processor, report the status and see if we callback is done.
-                    (closed_processor, bytes_copied) = all_callbacks[i](result)
+                    (closed_processor, bytes_copied) = all_callbacks[
+                        processor.unique_id
+                    ](result)
                     keep_it = not closed_processor
                     total_bytes_copied += bytes_copied
                 else:

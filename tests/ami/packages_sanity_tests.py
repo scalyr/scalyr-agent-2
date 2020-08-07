@@ -30,6 +30,12 @@ It depends on the following environment variables being set:
 
 - SCALYR_API_KEY - Scalyr API key to use.
 
+- LIBCLOUD_DEBUG=libcloud.log - Optionally set this variable to write Libcloud debug log into
+  libcloud.log file.
+
+  Keep in mind that you should never enable this on Circle CI since it will leak API keys into the
+  debug log.
+
 NOTE 1: You are recommended to use 2048 bit RSA key because CentOS 6 AMI we use doesn't support new
 key types or RSA keys of size 4096 bits.
 
@@ -83,7 +89,8 @@ import random
 import argparse
 from io import open
 
-from jinja2 import Template
+from jinja2 import FileSystemLoader
+from jinja2 import Environment
 import requests
 
 from libcloud.compute.types import Provider
@@ -249,8 +256,14 @@ def _get_source_type(version_string):
         return "url"
     elif os.path.exists(version_string) and os.path.isfile(version_string):
         return "file"
-    else:
+    elif re.match(r"\d+\.\d+\.\d+", version_string) or version_string == "current":
         return "install_script"
+    else:
+        raise ValueError(
+            'Invalid value "%s" for version_string. If it\'s a path to a file, make'
+            "sure the file exists and if it's a URL, ensure URL exists."
+            % (version_string)
+        )
 
 
 def _create_file_deployment_step(file_path, remote_file_name):
@@ -365,6 +378,22 @@ def main(
     with open(cat_logs_script_file_path, "r") as fp:
         cat_logs_script_content = fp.read()
 
+    installer_script_info = {
+        "source": installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
+    }
+    if os.path.exists(installer_script_url):
+        installer_script_info["type"] = "file"
+        file_upload_steps.append(
+            _create_file_deployment_step(installer_script_url, "install-scalyr-agent-2")
+        )
+    else:
+        if not _verify_url_exists(installer_script_url):
+            raise ValueError(
+                'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
+                % (installer_script_url)
+            )
+        installer_script_info["type"] = "url"
+
     rendered_template = render_script_template(
         script_template=script_content,
         distro_details=distro_details,
@@ -372,14 +401,25 @@ def main(
         test_type=test_type,
         install_package=install_package_info,
         upgrade_package=upgrade_package_info,
-        installer_script_url=installer_script_url,
+        installer_script_url=installer_script_info,
         additional_packages=additional_packages,
         verbose=verbose,
     )
 
+    if "windows" in distro.lower():
+        deploy_step_timeout = 320
+        deploy_overall_timeout = 320
+        cat_step_timeout = 10
+        max_tries = 3
+    else:
+        deploy_step_timeout = 260
+        deploy_overall_timeout = 280
+        max_tries = 3
+        cat_step_timeout = 5
+
     remote_script_name = "deploy.{0}".format(script_extension)
     test_package_step = ScriptDeployment(
-        rendered_template, name=remote_script_name, timeout=120
+        rendered_template, name=remote_script_name, timeout=deploy_step_timeout
     )
 
     if file_upload_steps:
@@ -390,8 +430,14 @@ def main(
         deployment = MultiStepDeployment(add=test_package_step)  # type: ignore
 
     # Add a step which always cats agent.log file at the end. This helps us troubleshoot failures.
-    cat_logs_step = ScriptDeployment(cat_logs_script_content, timeout=5)
-    deployment.add(cat_logs_step)
+    if "windows" not in distro.lower():
+        # NOTE: We don't add it on Windows since it tends to time out often
+        cat_logs_step = ScriptDeployment(
+            cat_logs_script_content, timeout=cat_step_timeout
+        )
+        deployment.add(cat_logs_step)
+    else:
+        cat_logs_step = None  # type: ignore
 
     driver = get_libcloud_driver()
 
@@ -428,8 +474,10 @@ def main(
             ex_keyname=KEY_NAME,
             ex_security_groups=SECURITY_GROUPS,
             ssh_username=distro_details["ssh_username"],
-            ssh_timeout=10,
-            timeout=260,
+            ssh_timeout=20,
+            max_tries=max_tries,
+            wait_period=15,
+            timeout=deploy_overall_timeout,
             deploy=deployment,
             at_exit_func=destroy_node_and_cleanup,
         )
@@ -445,10 +493,10 @@ def main(
         stdout = test_package_step.stdout
         stderr = test_package_step.stderr
 
-        if cat_logs_step.stdout:
+        if cat_logs_step and cat_logs_step.stdout:
             stdout += "\n" + cat_logs_step.stdout
 
-        if cat_logs_step.stderr:
+        if cat_logs_step and cat_logs_step.stderr:
             stdout += "\n" + cat_logs_step.stderr
 
     duration = int(time.time()) - start_time
@@ -484,7 +532,7 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool) -> str
+    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
@@ -495,7 +543,7 @@ def render_script_template(
 
     template_context["test_type"] = test_type
 
-    template_context["installer_script_url"] = (
+    template_context["installer_script_info"] = (
         installer_script_url or DEFAULT_INSTALLER_SCRIPT_URL
     )
     template_context["scalyr_api_key"] = SCALYR_API_KEY
@@ -509,9 +557,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    template = Template(script_template)
+    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
-
     return rendered_template
 
 
@@ -677,13 +725,6 @@ if __name__ == "__main__":
         raise ValueError(
             "--from-version and --to-version options "
             'can not have the same "current" value.'
-        )
-
-    # Fail early if any of the provided URLs doesn't exist
-    if args.installer_script_url and not _verify_url_exists(args.installer_script_url):
-        raise ValueError(
-            'Failed to retrieve installer script from "%s". Ensure that the URL is correct.'
-            % (args.installer_script_url)
         )
 
     if _get_source_type(args.from_version) == "url" and not _verify_url_exists(
