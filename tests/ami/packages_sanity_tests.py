@@ -256,7 +256,7 @@ def _get_source_type(version_string):
         return "url"
     elif os.path.exists(version_string) and os.path.isfile(version_string):
         return "file"
-    elif re.match(r"\d+\.\d+\.\d+", version_string) or version_string in ["current"]:
+    elif re.match(r"\d+\.\d+\.\d+", version_string) or version_string == "current":
         return "install_script"
     else:
         raise ValueError(
