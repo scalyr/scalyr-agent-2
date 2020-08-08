@@ -674,20 +674,28 @@ def upgrade_windows_install(
         try:
             try:
                 print("Downloading agent from %s." % url_path)
-                # NOTE: We are using requests here since it correctly validated the cert and the
+                # NOTE: We are using requests here since it correctly validates the cert and the
                 # server hostname. Using ScalyrClientSession here would be more complex since it's
                 # mostly meant to be used for long running requests to scalyr API endpoint and
                 # that's not what we are doing here.
-                # It's not ideal, ideally we would have a single consistent code path for it :/
-                # NOTE: We need ro allow redirects since that URL redirects us from
+                # NOTE: We need to allow redirects since that URL redirects us from
                 # https://www.scalyr.com -> https://app.scalyr.com
                 response = requests.get(
                     url_path, allow_redirects=True, verify=config.ca_cert_path
                 )
-                assert config.ca_cert_path is True
+                assert (
+                    response.status_code == 200
+                ), "server returned %s instead of 200" % (response.status_code)
+                assert (
+                    config.ca_cert_path is True
+                ), "ca_cert_path config option is empty"
 
                 with open(download_location, "wb") as fp:
-                    fp.write(response.content)
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if not chunk:
+                            continue
+
+                        fp.write(chunk)
 
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure("Failed to download installation package")
