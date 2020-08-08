@@ -13,6 +13,7 @@ Bug fixes:
 
 Security fixes and improvments:
 * Fix a bug with the agent not correctly validating that the hostname which is stored inside the certificate returned by the server matches the one the agent is trying to connect to (``scalyr_config`` option). This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
+* Fix a bug with the agent not correctly validating the server certificate and hostname when using ``scalyr-agent-2-config --upgrade-windows`` functionality under Python < 2.7.9. This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
 * When connecting to the Scalyr API, agent now explicitly requests TLS v1.2 and aborts connection if the server doesn't support it or tries to use an older version. Recently Scalyr API deprecated support for TLS v1.1 which allows us to implement this change which makes the agent more robust against potential downgrade attacks. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
 * When connecting to the Scalyr API, server now sends a SNI header which matches the host specified in the agent config. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
 
