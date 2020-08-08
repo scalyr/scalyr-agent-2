@@ -10,6 +10,7 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 10, 2020 9:00 -0800
 Bug fixes:
 * Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v` command output and make sure the value is left padded and consistent with other lines.
 * Fix reporting of "Last successful communication with Scalyr" line value in the ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with the Scalyr API.
+* Fix a regression in ``scalyr-agent-2-config --upgrade-windows`` functionality which would sometimes throw an exception, depending on the configuration values.
 
 Security fixes and improvments:
 * Fix a bug with the agent not correctly validating that the hostname which is stored inside the certificate returned by the server matches the one the agent is trying to connect to (``scalyr_config`` option). This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
