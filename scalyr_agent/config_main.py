@@ -678,8 +678,11 @@ def upgrade_windows_install(
                 # server hostname. Using ScalyrClientSession here would be more complex since it's
                 # mostly meant to be used for long running requests to scalyr API endpoint and
                 # that's not what we are doing here.
-                # NOTE: We need to allow redirects since that URL redirects us from
+                # NOTE 1: We need to allow redirects since that URL redirects us from
                 # https://www.scalyr.com -> https://app.scalyr.com
+                # NOTE 2: Since we use the same bundle as we use for API requests, we need to make
+                # sure we also use the same cert for app.scalyr.com (which is indeed the case at
+                # this point).
                 response = requests.get(
                     url_path, allow_redirects=True, verify=config.ca_cert_path
                 )
