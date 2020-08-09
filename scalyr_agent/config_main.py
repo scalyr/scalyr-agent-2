@@ -79,7 +79,6 @@ from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
 
 import scalyr_agent.util as scalyr_util
-import scalyr_agent.third_party.requests as requests
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -683,6 +682,8 @@ def upgrade_windows_install(
                 # NOTE 2: Since we use the same bundle as we use for API requests, we need to make
                 # sure we also use the same cert for app.scalyr.com (which is indeed the case at
                 # this point).
+                import scalyr_agent.third_party.requests as requests
+
                 response = requests.get(
                     url_path, allow_redirects=True, verify=config.ca_cert_path
                 )
