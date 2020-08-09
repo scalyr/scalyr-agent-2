@@ -44,6 +44,7 @@ import os
 import sys
 import time
 import re
+import ssl
 from io import open
 
 try:
@@ -974,15 +975,18 @@ class ScalyrAgent(object):
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
                 python_version_str = sys.version.replace("\n", "")
                 build_revision = get_build_revision()
+                openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
 
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
-                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s)"
+                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+                    "(OpenSSL version: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
                         scalyr_util.get_pid_tid(),
                         python_version_str,
+                        openssl_version,
                     )
                 )
 
@@ -1414,7 +1418,6 @@ class ScalyrAgent(object):
             ca_file = None
             intermediate_certs_file = None
         use_requests_lib = self.__config.use_requests_lib
-        use_tlslite = self.__config.use_tlslite
         return ScalyrClientSession(
             self.__config.scalyr_server,
             self.__config.api_key,
@@ -1424,7 +1427,6 @@ class ScalyrAgent(object):
             ca_file=ca_file,
             intermediate_certs_file=intermediate_certs_file,
             use_requests_lib=use_requests_lib,
-            use_tlslite=use_tlslite,
             compression_type=self.__config.compression_type,
             compression_level=self.__config.compression_level,
             proxies=self.__config.network_proxies,

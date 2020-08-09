@@ -360,6 +360,8 @@ class Configuration(object):
         """
 
         options = [
+            "verify_server_certificate",
+            "ca_cert_path",
             "compression_type",
             "compression_level",
             "pipeline_threshold",

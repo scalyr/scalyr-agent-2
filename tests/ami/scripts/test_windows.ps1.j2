@@ -160,8 +160,129 @@ echo "Verifying build_info file exists"
 echo ""
 
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
-echo ""
 
 echo ""
 echo "build_info validation completed"
+echo ""
+
+echo ""
+echo "Performing certificate validation and MITM checks"
+echo ""
+
+echo ""
+echo "Peforming invalid ca_cert_path config option checks"
+echo ""
+
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'server_attributes', 'ca_cert_path: "C:\\invalid\\ca_certs.crt", server_attributes' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+{% include "partial/reencode_config_without_bom.ps1.j2" %}
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -notmatch "ca_cert_path: C:\\invalid\\ca_certs.crt") { Throw "Invalid ca cert path, agent shouldnt have started" };
+if ("$log_output" -notmatch "failedAgentMain") { Throw "Invalid ca cert path, agent shouldnt have started" };
+if ("$log_output" -notmatch 'Invalid path "C:\\invalid\\ca_certs.crt" specified for the "ca_cert_path"') { Throw "Invalid ca cert path, agent shouldnt have started" };
+
+echo ""
+echo "agent.log output successfuly verified"
+echo ""
+
+Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+echo ""
+echo "Performing MITM and hostname verification checks"
+echo ""
+
+Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
+
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'server_attributes', 'scalyr_server: "https://invalid.mitm.should.fail.test.agent.scalyr.com:443", server_attributes' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+{% include "partial/reencode_config_without_bom.ps1.j2" %}
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+echo ""
+echo "Verifying agent status output"
+echo ""
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output
+
+if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
+
+echo ""
+echo "Status output successfuly verified."
+echo ""
+
+echo ""
+echo "Verifying agent logs"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -notmatch "Failed to connect to") { Throw "Matching log line not found." };
+if ("$log_output" -notmatch "because of server certificate validation error") { Throw "Matching log line not found." };
+if ("$log_output" -notmatch "This likely indicates a MITM attack") { Throw "Matching log line not found." };
+
+echo ""
+echo "agent.log output successfuly verified"
+echo ""
+
+echo ""
+echo "Performing cert signed by CA we dont trust checks"
+echo ""
+
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'server_attributes', 'scalyr_server: "https://example.com:443", server_attributes' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+{% include "partial/reencode_config_without_bom.ps1.j2" %}
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+echo ""
+echo "Verifying agent status output"
+echo ""
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output
+
+if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedSSLError") { Throw "Invalid line found." };
+
+echo ""
+echo "Status output successfuly verified."
+echo ""
+
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -notmatch "Failed to connect to") { Throw "CA cert validation should have failed" };
+if ("$log_output" -notmatch "due to some SSL error") { Throw "CA cert validation should have failed" };
+if ("$log_output" -notmatch "certificate verify failed") { Throw "CA cert validation should have failed" };
+
+echo ""
+echo "agent.log output successfuly verified"
 echo ""

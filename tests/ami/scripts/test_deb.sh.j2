@@ -109,6 +109,15 @@ ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+# Ensure CA validation is not disabled with default install
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
+echo ""
+
 
 {% if test_type == "upgrade" -%}
 # Upgrade to new version
@@ -162,4 +171,15 @@ echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+# Ensure CA validation is not disabled with default install
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
+echo ""
 {% endif -%}
+
+{% include "partial/ssl_checks.sh.j2" %}

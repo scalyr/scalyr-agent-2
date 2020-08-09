@@ -12,6 +12,7 @@ master_and_release_only: &master_and_release_only
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
         - /automated_tests\/.*/
+        - simplify_connection_code
 
 # NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
 benchmarks_master_and_release_only: &benchmarks_master_and_release_only
@@ -655,7 +656,9 @@ commands:
       installer_script_url:
         description: "URL to the installer script which to use for the install and upgrade tests."
         type: string
-        default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
+        # TODO: Change back once the simplify_connection_code is merged and pushed upstream
+        # default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
+        default: "https://scalyr-repo.s3.amazonaws.com/4adfas/internal/latest/install-scalyr-agent-2-internal.sh"
     steps:
       - add_ssh_keys:
           fingerprints:
@@ -703,15 +706,19 @@ commands:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+
             # If testing type is "development" we use installer script which is built in another job.
             if [ "<< parameters.test_type >>" = "development" ]; then
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
 
-
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:
           path: outputs
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
 
 jobs:
   unittest-38:
@@ -2173,68 +2180,92 @@ workflows:
  version: 2
  static-analysis:
    jobs:
-     - lint-checks
+     - lint-checks:
+         context: scalyr-agent
  unit-tests:
    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
    # Python 3 versions
    jobs:
-     - unittest-26
-     - unittest-27
-     - unittest-35
-     - unittest-35-osx
-     - unittest-35-windows
+     - unittest-26:
+         context: scalyr-agent
+     - unittest-27:
+         context: scalyr-agent
+     - unittest-35:
+         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-35-windows:
+         context: scalyr-agent
  smoke-tests:
    jobs:
-     - smoke-standalone-26
-     - smoke-standalone-27
-     - smoke-standalone-35
-     - smoke-standalone-35-rate-limit
-     - smoke-standalone-26-tls12
-     - smoke-standalone-27-tls12
+     - smoke-standalone-26:
+         context: scalyr-agent
+     - smoke-standalone-27:
+         context: scalyr-agent
+     - smoke-standalone-35:
+         context: scalyr-agent
+     - smoke-standalone-35-rate-limit:
+         context: scalyr-agent
+     - smoke-standalone-26-tls12:
+         context: scalyr-agent
+     - smoke-standalone-27-tls12:
+         context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-json
-     - smoke-docker-syslog
-     - smoke-k8s
-     - smoke-monitors-tests
-     - sonarcloud-scan:
-         requires:
-           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           # slowest jobs
-           - smoke-docker-json
-           - smoke-docker-syslog
-           - smoke-k8s
-           - smoke-monitors-tests
+     - smoke-docker-json:
+         context: scalyr-agent
+     - smoke-docker-syslog:
+         context: scalyr-agent
+     - smoke-k8s:
+         context: scalyr-agent
+     - smoke-monitors-tests:
+         context: scalyr-agent
+           #     - sonarcloud-scan:
+           #         requires:
+           #           # NOTE: This is not ideal, but Circle CI doesn't support cross
+           #           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           #           # slowest jobs
+           #           - smoke-docker-json
+           #           - smoke-docker-syslog
+           #           - smoke-k8s
+           #           - smoke-monitors-tests
  package-tests:
    jobs:
      - build-linux-packages-and-installer-script
      - build-windows-package
      - package-test-rpm:
+         context: scalyr-agent
          <<: *master_and_release_only
      - package-test-deb:
+         context: scalyr-agent
          <<: *master_and_release_only
      - smoke-rpm-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-rpm-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-deb-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - smoke-deb-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - ami-tests-development:
+         context: scalyr-agent
          requires:
            - build-windows-package
            - build-linux-packages-and-installer-script
          <<: *master_and_release_only
      - ami-tests-stable:
+         context: scalyr-agent
          <<: *master_and_release_only
  benchmarks:
    jobs:
