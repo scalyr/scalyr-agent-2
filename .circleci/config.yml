@@ -2180,6 +2180,8 @@ workflows:
            - build-windows-package
            - build-linux-packages-and-installer-script
      - ami-tests-stable:
+         requires:
+           - build-windows-package
 
 
 
