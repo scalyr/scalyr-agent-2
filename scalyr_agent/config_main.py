@@ -685,7 +685,10 @@ def upgrade_windows_install(
                 import scalyr_agent.third_party.requests as requests
 
                 response = requests.get(
-                    url_path, allow_redirects=True, verify=config.ca_cert_path
+                    url_path,
+                    allow_redirects=True,
+                    verify=config.ca_cert_path,
+                    stream=True,
                 )
                 assert (
                     response.status_code == 200
@@ -695,7 +698,8 @@ def upgrade_windows_install(
                 ), "ca_cert_path config option is empty"
 
                 with open(download_location, "wb") as fp:
-                    for chunk in response.iter_content(chunk_size=1024):
+                    # We use 1 MB chunk size
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
                         if not chunk:
                             continue
 
