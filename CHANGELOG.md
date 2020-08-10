@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.10 "TBD" - August 10, 2020
+## 2.1.10 "Alcor" - August 10, 2020
 
 <!---
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 10, 2020 9:00 -0800
