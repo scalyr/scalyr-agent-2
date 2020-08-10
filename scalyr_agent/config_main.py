@@ -67,10 +67,11 @@ import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
+import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.scalyr_logging import set_log_destination
+log = scalyr_logging.getLogger(__name__)
 
-set_log_destination(use_stdout=True)
+scalyr_logging.set_log_destination(use_stdout=True)
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
@@ -672,7 +673,37 @@ def upgrade_windows_install(
         try:
             try:
                 print("Downloading agent from %s." % url_path)
-                six.moves.urllib.request.urlretrieve(url_path, download_location)
+                # NOTE: We are using requests here since it correctly validates the cert and the
+                # server hostname. Using ScalyrClientSession here would be more complex since it's
+                # mostly meant to be used for long running requests to scalyr API endpoint and
+                # that's not what we are doing here.
+                # NOTE 1: We need to allow redirects since that URL redirects us from
+                # https://www.scalyr.com -> https://app.scalyr.com
+                # NOTE 2: Since we use the same bundle as we use for API requests, we need to make
+                # sure we also use the same cert for app.scalyr.com (which is indeed the case at
+                # this point).
+                import scalyr_agent.third_party.requests as requests
+
+                response = requests.get(
+                    url_path,
+                    allow_redirects=True,
+                    verify=config.ca_cert_path,
+                    stream=True,
+                )
+                assert (
+                    response.status_code == 200
+                ), "server returned %s instead of 200" % (response.status_code)
+                assert (
+                    config.ca_cert_path is True
+                ), "ca_cert_path config option is empty"
+
+                with open(download_location, "wb") as fp:
+                    # We use 1 MB chunk size
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+
+                        fp.write(chunk)
 
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure("Failed to download installation package")
@@ -1474,7 +1505,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, None)
+        config_file = Configuration(options.config_filename, default_paths, log)
         config_file.parse()
     except Exception as e:
         print(
