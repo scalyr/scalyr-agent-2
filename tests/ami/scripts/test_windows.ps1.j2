@@ -20,6 +20,7 @@ Set-PSDebug -Strict
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 {% if verbose -%}
 Set-PSDebug -trace 2
@@ -59,17 +60,117 @@ function GetMSIVersion {
     }
 }
 
-$msi_version=GetMSIVersion -MSI .\install_package.msi
-# Method returns an object so we need to cast it to a String
-$msi_version="$msi_version".Trim()
-echo "Retrieved version: $msi_version"
+function BasicCheck() {
+    param (
+        [String] $msi_version
+    )
+    scalyr-agent-2 start;
 
-if ($msi_version -eq $null) {
-    Throw "Unable to retrieve version from the msi package!"
+    Start-Sleep 5
+
+    # Also verify we can start the agent using the cmd script we provide
+    echo ""
+    echo "Verifying agent status via cmdlet"
+    echo ""
+
+    # NOTE: We pipe a character to avoid PAUSE command waiting for the user input at the end
+    # and hanging
+    @() | ScalyrShell.cmd status;
+
+    if (!$?) {
+        throw "Status command via cmdlet failed"
+    }
+
+    if ($LASTEXITCODE -ne 0) { Throw "Status command via cmdlet failed" }
+
+    echo ""
+    echo "cmdlet agent status verified"
+    echo ""
+
+    echo ""
+    echo "Verifying agent status via native scalyr-agent-2 binary"
+    echo ""
+
+    $status_output=scalyr-agent-2 status -v;
+    echo $status_output
+
+    if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
+
+    Write-Output $status_output
+
+    if ("$status_output" -notmatch "$msi_version")   {
+        # If there is a an internal build, we need to check version string for the 'windows version' format.
+        $version_numbers=$msi_version.Split(".");
+        $version_first_part=$version_numbers[0..2] -join "\.";
+        $version_second_part=$version_numbers[-1];
+        $pattern=$version_first_part.Trim() + "\.[a-zA-Z]+[0-9]+\." + $version_second_part.Trim();
+        $pattern=$pattern.Trim()
+
+        if ("$status_output" -notmatch $pattern)
+        {
+            Throw "Can not find a matching version.";
+        }
+    };
+
+    if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
+    if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
+    if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
+
+    echo ""
+    echo "native agent status output verified"
+    echo ""
+
+    # Ensure CA validation is not disabled with default install
+    echo ""
+    echo "Verifying SSL cert validation is enabled by default"
+    echo ""
+
+    $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+    if ("$log_output" -match "sslverifyoff") { Throw "cert validation is disabled" };
+    if ("$log_output" -match "certificate validation has been disabled") { Throw "cert validation is disabled" };
+
+    echo ""
+    echo "SSL check validation completed"
+    echo ""
+
+    # Verify build_info file exists
+    echo ""
+    echo "Verifying build_info file exists"
+    echo ""
+
+    type "C:\Program Files (x86)\Scalyr\bin\build_info"
+    echo ""
+
+    echo ""
+    echo "build_info validation completed"
+    echo ""
+
+    scalyr-agent-2 stop;
 }
 
-# install scalyr agent and wait until it is done.
-Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
+
+
+# get content of the windows package download page on the Scalyr website.
+
+$scalyr_download_page_content=Invoke-WebRequest -Method Get -Uri "https://app.scalyr.com/help/install-agent-windows" -UseBasicParsing
+
+$url_pattern = "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-2\.\d\.\d\.msi"
+$stable_package_url=($scalyr_download_page_content.Content | Select-String -Pattern $url_pattern).Matches.Value
+echo "Download and install package from $stable_package_url"
+
+
+wget "$stable_package_url" -OutFile stable_package.msi
+Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i stable_package.msi /quiet /qn" -wait
+
+$stable_msi_version=GetMSIVersion -MSI .\stable_package.msi
+# Method returns an object so we need to cast it to a String
+$stable_msi_version="$stable_msi_version".Trim()
+echo "Retrieved version: $stable_msi_version"
+
+if ($stable_msi_version -eq $null) {
+    Throw "Unable to retrieve version from the stable msi package!"
+}
 
 # replace api_key and serverHost
 (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
@@ -79,89 +180,41 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
 # After string replacement we need to reencode config file without BOM
 {% include "partial/reencode_config_without_bom.ps1.j2" %}
 
-$Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
-
-# Backup originl config with the API key since we will reference it multiple times
+# Backup original config with the API key since we will reference it multiple times
 Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json.org"
 
-scalyr-agent-2 start;
+$Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
 
-Start-Sleep 5
+BasicCheck $stable_msi_version
 
-# Also verify we can start the agent using the cmd script we provide
-echo ""
-echo "Verifying agent status via cmdlet"
-echo ""
 
-# NOTE: We pipe a character to avoid PAUSE command waiting for the user input at the end
-# and hanging
-@() | ScalyrShell.cmd status;
+{% if test_type == "upgrade" -%}
 
-if (!$?) {
-    throw "Status command via cmdlet failed"
-}
+    echo "===================================================================="
+    echo "Upgrade scalyr agent"
+    echo "===================================================================="
 
-if ($LASTEXITCODE -ne 0) { Throw "Status command via cmdlet failed" }
 
-echo ""
-echo "cmdlet agent status verified"
-echo ""
+    $msi_version=GetMSIVersion -MSI .\install_package.msi
+    # Method returns an object so we need to cast it to a String
+    $msi_version="$msi_version".Trim()
+    echo "Retrieved version: $msi_version"
 
-echo ""
-echo "Verifying agent status via native scalyr-agent-2 binary"
-echo ""
-
-$status_output=scalyr-agent-2 status -v;
-echo $status_output
-
-if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
-
-Write-Output $status_output
-
-if ("$status_output" -notmatch "$msi_version")   {
-    # If there is a an internal build, we need to check version string for the 'windows version' format.
-    $version_numbers=$msi_version.Split(".");
-    $version_first_part=$version_numbers[0..2] -join "\.";
-    $version_second_part=$version_numbers[-1];
-    $pattern=$version_first_part.Trim() + "\.[a-zA-Z]+[0-9]+\." + $version_second_part.Trim();
-    $pattern=$pattern.Trim()
-
-    if ("$status_output" -notmatch $pattern)
-    {
-        Throw "Can not find a matching version.";
+    if ($msi_version -eq $null) {
+        Throw "Unable to retrieve version from the msi package!"
     }
-};
 
-if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
-if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
-if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
+    # install scalyr agent and wait until it is done.
+    Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
-echo ""
-echo "native agent status output verified"
-echo ""
+    # replace api_key and serverHost
+    (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+        -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
+      Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
 
-# Ensure CA validation is not disabled with default install
-echo ""
-echo "Verifying SSL cert validation is enabled by default"
-echo ""
+    # After string replacement we need to reencode config file without BOM
+    {% include "partial/reencode_config_without_bom.ps1.j2" %}
 
-$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+    BasicCheck $msi_version
 
-if ("$log_output" -match "sslverifyoff") { Throw "cert validation is disabled" };
-if ("$log_output" -match "certificate validation has been disabled") { Throw "cert validation is disabled" };
-
-echo ""
-echo "SSL check validation completed"
-echo ""
-
-# Verify build_info file exists
-echo ""
-echo "Verifying build_info file exists"
-echo ""
-
-type "C:\Program Files (x86)\Scalyr\bin\build_info"
-echo ""
-
-echo ""
-echo "build_info validation completed"
-echo ""
+{% endif -%}
