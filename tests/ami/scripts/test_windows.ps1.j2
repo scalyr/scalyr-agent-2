@@ -195,7 +195,7 @@ BasicCheck $stable_msi_version
     echo "===================================================================="
 
 
-    $msi_version=GetMSIVersion -MSI .\install_package.msi
+    $msi_version=GetMSIVersion -MSI .\upgrade_package.msi
     # Method returns an object so we need to cast it to a String
     $msi_version="$msi_version".Trim()
     echo "Retrieved version: $msi_version"
@@ -205,7 +205,7 @@ BasicCheck $stable_msi_version
     }
 
     # install scalyr agent and wait until it is done.
-    Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
+    Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i upgrade_package.msi /quiet /qn" -wait
 
     # replace api_key and serverHost
     (Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
