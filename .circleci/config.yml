@@ -12,7 +12,6 @@ master_and_release_only: &master_and_release_only
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
         - /automated_tests\/.*/
-        - fix_windows_upgrade
 
 # NOTE: We intentionally don't want benchmarks to run on automated_tests/ branches.
 benchmarks_master_and_release_only: &benchmarks_master_and_release_only
@@ -2267,40 +2266,40 @@ workflows:
      - ami-tests-stable:
          context: scalyr-agent
          <<: *master_and_release_only
- benchmarks:
-   jobs:
-     - benchmarks-micro-py-27
-     - benchmarks-micro-py-35
-     - benchmarks-idle-agent-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - send-benchmark-results-and-graphs-to-slack:
-         requires:
-           - benchmarks-idle-agent-py-27
-           - benchmarks-idle-agent-py-35
-           - benchmarks-idle-agent-no-monitors-py-27
-           - benchmarks-idle-agent-no-monitors-py-35
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-         <<: *benchmarks_master_and_release_only
+           # benchmarks:
+           #   jobs:
+           #     - benchmarks-micro-py-27
+           #     - benchmarks-micro-py-35
+           #     - benchmarks-idle-agent-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-no-monitors-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-no-monitors-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - send-benchmark-results-and-graphs-to-slack:
+           #         requires:
+           #           - benchmarks-idle-agent-py-27
+           #           - benchmarks-idle-agent-py-35
+           #           - benchmarks-idle-agent-no-monitors-py-27
+           #           - benchmarks-idle-agent-no-monitors-py-35
+           #           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+           #           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+           #           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+           #           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+           #           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+           #         <<: *benchmarks_master_and_release_only
 
  weekly-circle-ci-usage-report:
    triggers:
