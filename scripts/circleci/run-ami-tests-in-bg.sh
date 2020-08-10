@@ -63,9 +63,9 @@ else
   echo "Run sanity tests for the new packages from the current revision."
 
   # Tests below install package which is built as part of a Circle CI job
-  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
-  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
-  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=upgrade --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-upgrade.log &
 
   # Tests below install latest stable version using an installer script and then upgrade to a
   # version which was built as part of a Circle CI job
