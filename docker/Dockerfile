@@ -5,8 +5,6 @@ FROM python:2.7-buster as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apt-get update && apt-get install -y build-essential libsystemd-dev
-# necessary for journald monitor
-RUN apt-get install libsystemd-dev -y
 
 # install python dependencies
 ADD requirements.txt requirements.txt
