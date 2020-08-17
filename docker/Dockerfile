@@ -1,10 +1,12 @@
 # base image that creates all necessary dependencies for
 # the scalyr-agent
 # NOTE: multi-stage builds require Docker 17.05 or greater
-FROM python:2.7-slim as scalyr-dependencies
+FROM python:2.7-buster as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-RUN apt-get update && apt-get install -y build-essential
+RUN apt-get update && apt-get install -y build-essential libsystemd-dev
+# necessary for journald monitor
+RUN apt-get install libsystemd-dev -y
 
 # install python dependencies
 ADD requirements.txt requirements.txt
