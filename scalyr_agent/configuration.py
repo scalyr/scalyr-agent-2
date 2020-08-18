@@ -446,7 +446,7 @@ class Configuration(object):
                 # This error should not be fatal
                 maxstdio = "unknown"
 
-            self.__logger.info("maxstdio: %s" % (maxstdio))
+            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
