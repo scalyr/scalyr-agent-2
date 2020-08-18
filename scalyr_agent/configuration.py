@@ -23,6 +23,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import re
+import sys
 import socket
 import time
 import logging
@@ -30,6 +31,12 @@ import logging
 import six
 import six.moves.urllib.parse
 from six.moves import range
+
+try:
+    import win32file
+except ImportError:
+    # Likely not running on Windows
+    win32file = None
 
 import scalyr_agent.util as scalyr_util
 
@@ -410,6 +417,16 @@ class Configuration(object):
                     first = False
 
                 self.__logger.info("\t%s: %s" % (option, value))
+
+        # Print additional useful Windows specific information on Windows
+        if sys.platform.startswith("win") and win32file:
+            try:
+                maxstdio = win32file._getmaxstdio()
+            except Exception:
+                # This error should not be fatal
+                maxstdio = "unknown"
+
+            self.__logger.info("maxstdio: %s" % (maxstdio))
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
