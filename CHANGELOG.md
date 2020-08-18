@@ -8,8 +8,10 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 30, 2020 9:00 -0800
 --->
 
 Features:
-
 * Add new ``win32_max_open_fds`` configuration option which allows user to overwrite maximum open file limit on Windows for the scalyr agent process.
+
+Bug fixes:
+* Fix bug in packaging which would cause agent to sometimes crash on Windows when using windows event log monitor.
 
 ## 2.1.10 "Alcor" - August 10, 2020
 
