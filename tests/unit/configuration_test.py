@@ -1464,6 +1464,10 @@ class TestConfiguration(TestConfigurationBase):
                     if field == "debug_level":
                         existing_level = config_obj.get_int(field, none_if_missing=True)
                         fake_env[field] = existing_level + 1
+                    # special case for win32_max_open_fds which specified minimum and maximum values
+                    elif field == "win32_max_open_fds":
+                        existing_value = config_obj.get_int(field, none_if_missing=True)
+                        fake_env[field] = existing_value + 1
                     elif field == "compression_level":
                         fake_env[field] = 8
                     else:
