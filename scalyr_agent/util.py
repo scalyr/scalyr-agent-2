@@ -481,13 +481,21 @@ def atomic_write_dict_as_json_file(file_path, tmp_path, info):
         if sys.platform == "win32" and os.path.isfile(file_path):
             os.unlink(file_path)
         os.rename(tmp_path, file_path)
-    except (IOError, OSError):
+    except Exception:
         if fp is not None:
             fp.close()
         import scalyr_agent.scalyr_logging
 
         scalyr_agent.scalyr_logging.getLogger(__name__).exception(
-            "Could not write checkpoint file due to error",
+            "Could not write checkpoint file.\n"
+            + "File path: '{0}', type: {1}.\n".format(file_path, type(file_path))
+            + "Temporary file path: '{0}', type: {1}.\n".format(
+                tmp_path, type(tmp_path)
+            )
+            + "File exists: {0}.\n".format(os.path.isfile(file_path))
+            + "Temporary file exists: {0}.\n".format(os.path.isfile(tmp_path))
+            + "File system encoding: {0}.\n".format(sys.getfilesystemencoding())
+            + "Error:",
             error_code="failedCheckpointWrite",
         )
 
