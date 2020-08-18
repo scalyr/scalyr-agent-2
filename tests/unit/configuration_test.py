@@ -1735,6 +1735,72 @@ class TestConfiguration(TestConfigurationBase):
         config.print_useful_settings(other_config=other_config)
         mock_logger.info.assert_not_called()
 
+    def test_print_config_raw_config_value_debug_level_off(self):
+        # default value (debug_level not explicitly specified)
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            max_line_size: 49900
+            }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        other_config = self._create_test_configuration_instance(logger=mock_logger)
+        other_config.parse()
+
+        config.print_useful_settings(other_config=other_config)
+        mock_logger.info.assert_not_called()
+
+        # debug_level specifies, but the value is < 5
+        for level in range(0, 4):
+            self._write_file_with_separator_conversion(
+                """{
+                api_key: "hi there",
+                max_line_size: 49900
+                debug_level: %s
+                }
+            """
+                % (level)
+            )
+            mock_logger = Mock()
+            config = self._create_test_configuration_instance(logger=mock_logger)
+            config.parse()
+
+            other_config = self._create_test_configuration_instance(logger=mock_logger)
+            other_config.parse()
+
+            config.print_useful_settings(other_config=other_config)
+            mock_logger.info.assert_not_called()
+
+    def test_print_config_raw_config_value_debug_level_5(self):
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            max_line_size: 49900,
+            debug_level: 5
+            }
+        """
+        )
+
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        other_config = self._create_test_configuration_instance(logger=mock_logger)
+        other_config.parse()
+
+        self.assertEqual(mock_logger.info.call_count, 0)
+        config.print_useful_settings(other_config=other_config)
+        self.assertEqual(mock_logger.info.call_count, 1)
+
+        call_msg = mock_logger.info.call_args_list[0][0][0]
+        self.assertTrue("Raw config value:" in call_msg)
+        self.assertTrue("*** MASKED ***" in call_msg)
+        self.assertTrue('"debug_level": 5' in call_msg)
+
     def test_import_vars_in_configuration_directory(self):
         os.environ["TEST_VAR"] = "bye"
         self._write_file_with_separator_conversion(
