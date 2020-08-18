@@ -237,7 +237,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
             print(config_content, file=tmp_file)
             tmp_file.close()
 
-            if sys.platform.startswith("with") and os.path.isfile(host_path):
+            if sys.platform.startswith("win") and os.path.isfile(host_path):
                 os.unlink(host_path)
 
             os.rename(tmp_host_path, host_path)
