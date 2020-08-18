@@ -980,13 +980,14 @@ class ScalyrAgent(object):
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
                     "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s)"
+                    "(OpenSSL version: %s) (default fs encoding: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
                         scalyr_util.get_pid_tid(),
                         python_version_str,
                         openssl_version,
+                        sys.getfilesystemencoding(),
                     )
                 )
 
