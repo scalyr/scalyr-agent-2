@@ -1948,6 +1948,10 @@ jobs:
           name: Restore Wix cache
           key: windows-wix-cache-{{ .Branch }}
 
+      - restore_cache:
+          name: Restore patched win32evtlog.pyd
+          key: windows-win32evtlog-cache-{{ .Branch }}
+
       - run:
           name: Extract Wix.
           command: |
@@ -1969,11 +1973,26 @@ jobs:
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
 
+      - run:
+          name: Download patched win32evtlog.pyd
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir win32evtlog-cache -Force
+            if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
+                  wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+            }
+
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
           paths:
             - "wix311_binaries"
+
+      - save_cache:
+          name: Save patched win32evtlog.pyd
+          key: windows-win32evtlog-cache-{{ .Branch }}
+          paths:
+            - "win32evtlog-cache"
 
       - save_cache:
           name: Save Pyinstaller Cache
@@ -2015,6 +2034,10 @@ jobs:
           command: |
               $Env:WIX = ";C:\wix311;"
               c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+
+              # copy patched win32evtlog.pyd.
+              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+
               c:\Python27\python.exe build_package.py win32
 
               mkdir package
@@ -2195,73 +2218,76 @@ workflows:
          context: scalyr-agent
      - unittest-35-windows:
          context: scalyr-agent
-           # smoke-tests:
-           #   jobs:
-           #     - smoke-standalone-26:
-           #         context: scalyr-agent
-           #     - smoke-standalone-27:
-           #         context: scalyr-agent
-           #     - smoke-standalone-35:
-           #         context: scalyr-agent
-           #     - smoke-standalone-35-rate-limit:
-           #         context: scalyr-agent
-           #     - smoke-standalone-26-tls12:
-           #         context: scalyr-agent
-           #     - smoke-standalone-27-tls12:
-           #         context: scalyr-agent
-           #      # NOTE: smoke test jobs below still use old smoke tests framework
-           #     - smoke-docker-json:
-           #         context: scalyr-agent
-           #     - smoke-docker-syslog:
-           #         context: scalyr-agent
-           #     - smoke-k8s:
-           #         context: scalyr-agent
-           #     - smoke-monitors-tests:
-           #         context: scalyr-agent
-           #           #     - sonarcloud-scan:
-           #           #         requires:
-           #           #           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           #           #           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           #           #           # slowest jobs
-           #           #           - smoke-docker-json
-           #           #           - smoke-docker-syslog
-           #           #           - smoke-k8s
-           #           #           - smoke-monitors-tests
+ smoke-tests:
+   jobs:
+     - smoke-standalone-26:
+         context: scalyr-agent
+     - smoke-standalone-27:
+         context: scalyr-agent
+     - smoke-standalone-35:
+         context: scalyr-agent
+     - smoke-standalone-35-rate-limit:
+         context: scalyr-agent
+     - smoke-standalone-26-tls12:
+         context: scalyr-agent
+     - smoke-standalone-27-tls12:
+         context: scalyr-agent
+      # NOTE: smoke test jobs below still use old smoke tests framework
+     - smoke-docker-json:
+         context: scalyr-agent
+     - smoke-docker-syslog:
+         context: scalyr-agent
+     - smoke-k8s:
+         context: scalyr-agent
+     - smoke-monitors-tests:
+         context: scalyr-agent
+           #     - sonarcloud-scan:
+           #         requires:
+           #           # NOTE: This is not ideal, but Circle CI doesn't support cross
+           #           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           #           # slowest jobs
+           #           - smoke-docker-json
+           #           - smoke-docker-syslog
+           #           - smoke-k8s
+           #           - smoke-monitors-tests
  package-tests:
    jobs:
      - build-linux-packages-and-installer-script
      - build-windows-package
-       # - package-test-rpm:
-       #     context: scalyr-agent
-       #     <<: *master_and_release_only
-       # - package-test-deb:
-       #     context: scalyr-agent
-       #     <<: *master_and_release_only
-       # - smoke-rpm-package-py2:
-       #     context: scalyr-agent
-       #     requires:
-       #       - package-test-rpm
-       #     <<: *master_and_release_only
-       # - smoke-rpm-package-py3:
-       #     context: scalyr-agent
-       #     requires:
-       #       - package-test-rpm
-       #     <<: *master_and_release_only
-       # - smoke-deb-package-py2:
-       #     context: scalyr-agent
-       #     requires:
-       #       - package-test-deb
-       #     <<: *master_and_release_only
-       # - smoke-deb-package-py3:
-       #     context: scalyr-agent
-       #     requires:
-       #       - package-test-deb
-       #     <<: *master_and_release_only
-     - ami-tests-development:
+     - package-test-rpm:
+         context: scalyr-agent
+         <<: *master_and_release_only
+     - package-test-deb:
+         context: scalyr-agent
+         <<: *master_and_release_only
+     - smoke-rpm-package-py2:
          context: scalyr-agent
          requires:
-           - build-windows-package
-           - build-linux-packages-and-installer-script
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-rpm-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-deb-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+     - smoke-deb-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+     - ami-tests-development:
+          context: scalyr-agent
+          requires:
+            - build-windows-package
+            - build-linux-packages-and-installer-script
+     - ami-tests-stable:
+          context: scalyr-agent
+          <<: *master_and_release_only
            # benchmarks:
            #   jobs:
            #     - benchmarks-micro-py-27

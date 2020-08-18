@@ -69,6 +69,16 @@ else
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
   python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+
+  # Tests below install latest stable version using an installer script and then upgrade to a
+  # version which was built as part of a Circle CI job
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/debian1003-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos7-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=centos8 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos8-upgrade.log &
+  python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/amazonlinux2-upgrade.log &
 fi
 
 # Store command line args and log paths for all the jobs for a friendlier output on failure

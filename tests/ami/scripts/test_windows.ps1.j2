@@ -76,11 +76,6 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
     -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
   Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
 
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'server_attributes', 'debug_level: 5, win32_max_open_fds: 2048, server_attributes' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-
 # After string replacement we need to reencode config file without BOM
 {% include "partial/reencode_config_without_bom.ps1.j2" %}
 
@@ -137,13 +132,8 @@ if ("$status_output" -notmatch "$msi_version")   {
     }
 };
 
-{% include "partial/cat_agent_config_remove_secrets.ps1.j2" %}
-
-type "C:\Program Files (x86)\Scalyr\log\agent.log"
-type "C:\Program Files (x86)\Scalyr\log\agent_debug.log"
-
 if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
-#if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
+if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
 
 echo ""
