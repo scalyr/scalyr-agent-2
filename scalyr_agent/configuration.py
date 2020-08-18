@@ -338,7 +338,8 @@ class Configuration(object):
         """
         Apply global configuration object based on the configuration values.
 
-        At this point this only applies to the JSON library which is used.
+        At this point this only applies to the JSON library which is used and maxstdio settings on
+        Windows.
         """
         if not self.__config:
             # parse() hasn't been called yet. We should probably throw here
@@ -356,6 +357,25 @@ class Configuration(object):
                 % (current_json_library, json_library)
             )
             scalyr_util.set_json_lib(json_library)
+
+        # Change the value for maxstdio process specific option
+        if sys.platform.startswith("win") and win32file:
+            # TODO: We should probably use platform Windows module for this
+            max_open_fds = self.win32_max_open_fds
+            current_max_open_fds = win32file._getmaxstdio()
+
+            if (max_open_fds and current_max_open_fds) and (
+                max_open_fds != current_max_open_fds
+            ):
+                self.__logger.debug(
+                    'Changing limit for max open fds (maxstdio) from "%s" to "%s"'
+                    % (current_max_open_fds, max_open_fds)
+                )
+
+                try:
+                    win32file._setmaxstdio(max_open_fds)
+                except Exception:
+                    self.__logger.exception("Failed to change the value of maxstdio")
 
     def print_useful_settings(self, other_config=None):
         """
@@ -1248,6 +1268,15 @@ class Configuration(object):
         """
         return self.__get_config().get_float("healthy_max_time_since_last_copy_attempt")
 
+    # Windows specific options below
+
+    @property
+    def win32_max_open_fds(self):
+        """
+        Returns value of the win32_max_open_fds config option which is Windows specific.
+        """
+        return self.__get_config().get_int("win32_max_open_fds")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -1915,6 +1944,15 @@ class Configuration(object):
             config,
             "healthy_max_time_since_last_copy_attempt",
             60.0,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_int(
+            config,
+            "win32_max_open_fds",
+            None,
             description,
             apply_defaults,
             env_aware=True,
