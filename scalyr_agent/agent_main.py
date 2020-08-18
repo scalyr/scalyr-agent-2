@@ -355,9 +355,12 @@ class ScalyrAgent(object):
             if command == "inner_run_with_checks":
                 raise e
             else:
+                import traceback
+
                 raise Exception(
-                    "Caught exception when attempt to execute command %s.  Exception was %s"
-                    % (command, six.text_type(e))
+                    "Caught exception when attempt to execute command %s.  Exception was %s. "
+                    "Traceback:\n%s"
+                    % (command, six.text_type(e), traceback.format_exc())
                 )
 
     def __read_and_verify_config(self, config_file_path):
