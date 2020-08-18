@@ -380,9 +380,6 @@ class Configuration(object):
         max_open_fds = self.win32_max_open_fds
         current_max_open_fds = win32file._getmaxstdio()
 
-        self.__logger.info("win32_max_open_fds: %s" % max_open_fds)
-        self.__logger.info("current_win32_max_open_fds: %s" % current_max_open_fds)
-
         if (max_open_fds and current_max_open_fds) and (
             max_open_fds != current_max_open_fds
         ):
@@ -459,7 +456,7 @@ class Configuration(object):
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file or True:
+        if sys.platform.startswith("win") and win32file:
             try:
                 maxstdio = win32file._getmaxstdio()
             except Exception:
