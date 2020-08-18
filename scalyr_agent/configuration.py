@@ -423,6 +423,7 @@ class Configuration(object):
             "line_completion_wait_time",
             "max_log_offset_size",
             "max_existing_log_offset_size",
+            "json_library",
         ]
 
         # get options (if any) from the other configuration object
@@ -458,12 +459,15 @@ class Configuration(object):
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file:
+        if sys.platform.startswith("win") and win32file or True:
             try:
                 maxstdio = win32file._getmaxstdio()
             except Exception:
                 # This error should not be fatal
                 maxstdio = "unknown"
+
+            if first:
+                self.__logger.info("Configuration settings")
 
             self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
 

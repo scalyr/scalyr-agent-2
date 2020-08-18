@@ -1002,6 +1002,12 @@ class ScalyrAgent(object):
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
+                # NOTE: We call this twice - once before and once after creating the client and
+                # applying global config options. This way we ensure config options are also printed
+                # even if the agent fails to connect.
+                config_1 = self.__config
+                self.__config.print_useful_settings()
+
                 self.__scalyr_client = self.__create_client()
 
                 def start_worker_thread(config, logs_initial_positions=None):
@@ -1022,7 +1028,7 @@ class ScalyrAgent(object):
                 # NOTE: It's important we call this after worker thread has been created since
                 # some of the global configuration options are only applied after creating a worker
                 # thread
-                self.__config.print_useful_settings()
+                self.__config.print_useful_settings(config_1)
 
                 # JSON library setting is applied as part of __create_worker_thread method
                 log.log(
