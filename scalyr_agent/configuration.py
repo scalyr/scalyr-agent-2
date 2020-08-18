@@ -27,6 +27,8 @@ import sys
 import socket
 import time
 import logging
+import copy
+import json
 
 import six
 import six.moves.urllib.parse
@@ -464,6 +466,32 @@ class Configuration(object):
                 maxstdio = "unknown"
 
             self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+
+        # If debug level 5 is set also log the raw config JSON excluding the api_key
+        # This makes various troubleshooting easier.
+        if self.debug_level >= 5:
+            raw_config = self.__get_sanitized_raw_config()
+            self.__logger.info("Raw config value: %s" % (json.dumps(raw_config)))
+
+    def __get_sanitized_raw_config(self):
+        # type: () -> dict
+        """
+        Return raw config values as a dictionary, masking any secret values such as  "api_key".
+        """
+        if not self.__config:
+            return {}
+
+        values_to_mask = [
+            "api_key",
+        ]
+
+        raw_config = copy.deepcopy(self.__config.to_dict())
+
+        for key in values_to_mask:
+            if key in raw_config:
+                raw_config[key] = "********** MASKED **********"
+
+        return raw_config
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
