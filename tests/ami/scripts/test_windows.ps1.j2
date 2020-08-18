@@ -137,7 +137,8 @@ if ("$status_output" -notmatch "$msi_version")   {
     }
 };
 
-type "C:\Program Files (x86)\Scalyr\config\agent.json"
+{% include "partial/cat_agent_config_remove_secrets.ps1.j2" %}
+
 type "C:\Program Files (x86)\Scalyr\log\agent.log"
 type "C:\Program Files (x86)\Scalyr\log\agent_debug.log"
 
