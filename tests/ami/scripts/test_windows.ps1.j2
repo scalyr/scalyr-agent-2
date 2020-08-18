@@ -139,6 +139,7 @@ if ("$status_output" -notmatch "$msi_version")   {
 
 type "C:\Program Files (x86)\Scalyr\config\agent.json"
 type "C:\Program Files (x86)\Scalyr\log\agent.log"
+type "C:\Program Files (x86)\Scalyr\log\agent_debug.log"
 
 if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." };
 #if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };

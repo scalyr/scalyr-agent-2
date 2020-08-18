@@ -378,6 +378,9 @@ class Configuration(object):
         max_open_fds = self.win32_max_open_fds
         current_max_open_fds = win32file._getmaxstdio()
 
+        self.__logger.info("win32_max_open_fds: %s" % max_open_fds)
+        self.__logger.info("current_win32_max_open_fds: %s" % current_max_open_fds)
+
         if (max_open_fds and current_max_open_fds) and (
             max_open_fds != current_max_open_fds
         ):
