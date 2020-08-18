@@ -1975,6 +1975,8 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+            min_value=512,
+            max_value=2048,
         )
 
         self.__verify_or_set_optional_int(
@@ -3154,6 +3156,8 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        min_value=None,
+        max_value=None,
     ):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
@@ -3170,6 +3174,8 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param min_value: Optional minimum value for this configuration value.
+        @param max_value: Optional maximum value for this configuration value.
         """
         try:
             value = self.__get_config_or_environment_val(
@@ -3187,6 +3193,22 @@ class Configuration(object):
                 % (field, config_description),
                 field,
                 "notInt",
+            )
+
+        if value is not None and min_value is not None and value < min_value:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Value must be greater than %s'
+                % (value, field, min_value),
+                field,
+                "invalidValue",
+            )
+
+        if value is not None and max_value is not None and value > max_value:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Value must be less than %s'
+                % (value, field, max_value),
+                field,
+                "invalidValue",
             )
 
     def __verify_or_set_optional_float(
