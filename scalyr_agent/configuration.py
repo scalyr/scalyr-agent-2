@@ -1966,7 +1966,8 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "win32_max_open_fds",
-            None,
+            # We default it to 512 which is also the default value for Python processes on Windows
+            512,
             description,
             apply_defaults,
             env_aware=True,
