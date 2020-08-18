@@ -2385,6 +2385,81 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
+    def test__verify_or_set_optional_int_with_min_and_max_value(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Valid value1
+        config_object = JsonObject(content={"foo": 10})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 10)
+
+        config_object = JsonObject(content={"foo": 50})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 50)
+
+        config_object = JsonObject(content={"foo": 100})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 100)
+
+        # 2. value < min
+        config_object = JsonObject(content={"foo": 9})
+        expected_msg = (
+            'Got invalid value "9" for field "foo". Value must be greater than 10'
+        )
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_int,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+
+        # 3. value > max
+        config_object = JsonObject(content={"foo": 101})
+        expected_msg = (
+            'Got invalid value "101" for field "foo". Value must be less than 100'
+        )
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_int,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+
+        pass
+
     def test___verify_or_set_optional_string_with_valid_values(self):
         config = self._create_test_configuration_instance()
 
