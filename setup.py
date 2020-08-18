@@ -111,8 +111,7 @@ def perform_setup():
 
     _file_version = SCALYR_VERSION
 
-    if "win32" == sys.platform:
-
+    if sys.platform.startswith("win"):
         # For prereleases, we use weird version numbers like 4.0.4.pre5.1 .  That does not work for Windows which
         # requires X.X.X.X.  So, we convert if necessary.
         if len(_file_version.split(".")) == 5:
@@ -180,7 +179,7 @@ def perform_setup():
 
     # Determine which of the two uses cases we are executing.. either we are on Windows building the
     # Windows installer using py2exe, or we are uploading the module to pypi.
-    if "win32" == sys.platform:
+    if sys.platform.startswith("win"):
         my_data_files = [("", [path.join("source_root", "VERSION")])]
         for my_license in os.listdir(path.join("data_files", "licenses")):
             license_file = path.join("data_files", "licenses", my_license)
@@ -296,8 +295,8 @@ def perform_setup():
         },
     )
 
-    if "win32" != sys.platform:
-        # Delete the temporary copy of VERSION that we created above.
+    if not sys.platform.startswith("win"):
+        # Delete the temporary copy of VERSION that we created above (Linux only)
         tmp_path = os.path.join("scalyr_agent", "VERSION")
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)

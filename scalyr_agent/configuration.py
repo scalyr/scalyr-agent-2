@@ -23,13 +23,22 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import re
+import sys
 import socket
 import time
 import logging
+import copy
+import json
 
 import six
 import six.moves.urllib.parse
 from six.moves import range
+
+try:
+    import win32file
+except ImportError:
+    # Likely not running on Windows
+    win32file = None
 
 import scalyr_agent.util as scalyr_util
 
@@ -331,7 +340,8 @@ class Configuration(object):
         """
         Apply global configuration object based on the configuration values.
 
-        At this point this only applies to the JSON library which is used.
+        At this point this only applies to the JSON library which is used and maxstdio settings on
+        Windows.
         """
         if not self.__config:
             # parse() hasn't been called yet. We should probably throw here
@@ -349,6 +359,39 @@ class Configuration(object):
                 % (current_json_library, json_library)
             )
             scalyr_util.set_json_lib(json_library)
+
+        # Call method which applies Windows specific global config options
+        self.__apply_win32_global_config_options()
+
+    def __apply_win32_global_config_options(self):
+        """
+        Method which applies Windows specific global configuration options.
+        """
+        if not sys.platform.startswith("win"):
+            # Not a Windows platformn
+            return
+
+        # Change the value for maxstdio process specific option
+        if not win32file:
+            # win32file module not available
+            return None
+
+        # TODO: We should probably use platform Windows module for this
+        max_open_fds = self.win32_max_open_fds
+        current_max_open_fds = win32file._getmaxstdio()
+
+        if (max_open_fds and current_max_open_fds) and (
+            max_open_fds != current_max_open_fds
+        ):
+            self.__logger.debug(
+                'Changing limit for max open fds (maxstdio) from "%s" to "%s"'
+                % (current_max_open_fds, max_open_fds)
+            )
+
+            try:
+                win32file._setmaxstdio(max_open_fds)
+            except Exception:
+                self.__logger.exception("Failed to change the value of maxstdio")
 
     def print_useful_settings(self, other_config=None):
         """
@@ -377,6 +420,7 @@ class Configuration(object):
             "line_completion_wait_time",
             "max_log_offset_size",
             "max_existing_log_offset_size",
+            "json_library",
         ]
 
         # get options (if any) from the other configuration object
@@ -410,6 +454,49 @@ class Configuration(object):
                     first = False
 
                 self.__logger.info("\t%s: %s" % (option, value))
+
+        # Print additional useful Windows specific information on Windows
+        if sys.platform.startswith("win") and win32file:
+            try:
+                maxstdio = win32file._getmaxstdio()
+            except Exception:
+                # This error should not be fatal
+                maxstdio = "unknown"
+
+            if first:
+                self.__logger.info("Configuration settings")
+
+            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+
+        # If debug level 5 is set also log the raw config JSON excluding the api_key
+        # This makes various troubleshooting easier.
+        if self.debug_level >= 5:
+            try:
+                raw_config = self.__get_sanitized_raw_config()
+                self.__logger.info("Raw config value: %s" % (json.dumps(raw_config)))
+            except Exception:
+                # If for some reason we fail to serialize the config, this should not be fatal
+                pass
+
+    def __get_sanitized_raw_config(self):
+        # type: () -> dict
+        """
+        Return raw config values as a dictionary, masking any secret values such as  "api_key".
+        """
+        if not self.__config:
+            return {}
+
+        values_to_mask = [
+            "api_key",
+        ]
+
+        raw_config = copy.deepcopy(self.__config.to_dict())
+
+        for key in values_to_mask:
+            if key in raw_config:
+                raw_config[key] = "********** MASKED **********"
+
+        return raw_config
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
@@ -1231,6 +1318,15 @@ class Configuration(object):
         """
         return self.__get_config().get_float("healthy_max_time_since_last_copy_attempt")
 
+    # Windows specific options below
+
+    @property
+    def win32_max_open_fds(self):
+        """
+        Returns value of the win32_max_open_fds config option which is Windows specific.
+        """
+        return self.__get_config().get_int("win32_max_open_fds")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -1901,6 +1997,19 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+
+        self.__verify_or_set_optional_int(
+            config,
+            "win32_max_open_fds",
+            # We default it to 512 which is also the default value for Python processes on Windows.
+            # Max is 2048.
+            512,
+            description,
+            apply_defaults,
+            env_aware=True,
+            min_value=512,
+            max_value=2048,
         )
 
         self.__verify_or_set_optional_int(
@@ -3080,6 +3189,8 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        min_value=None,
+        max_value=None,
     ):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
@@ -3096,6 +3207,8 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param min_value: Optional minimum value for this configuration value.
+        @param max_value: Optional maximum value for this configuration value.
         """
         try:
             value = self.__get_config_or_environment_val(
@@ -3113,6 +3226,22 @@ class Configuration(object):
                 % (field, config_description),
                 field,
                 "notInt",
+            )
+
+        if value is not None and min_value is not None and value < min_value:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Value must be greater than %s'
+                % (value, field, min_value),
+                field,
+                "invalidValue",
+            )
+
+        if value is not None and max_value is not None and value > max_value:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Value must be less than %s'
+                % (value, field, max_value),
+                field,
+                "invalidValue",
             )
 
     def __verify_or_set_optional_float(

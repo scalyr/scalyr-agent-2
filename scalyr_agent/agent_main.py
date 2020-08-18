@@ -980,13 +980,14 @@ class ScalyrAgent(object):
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
                     "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s)"
+                    "(OpenSSL version: %s) (default fs encoding: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
                         scalyr_util.get_pid_tid(),
                         python_version_str,
                         openssl_version,
+                        sys.getfilesystemencoding(),
                     )
                 )
 
@@ -1001,6 +1002,10 @@ class ScalyrAgent(object):
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
+                # NOTE: We call this twice - once before and once after creating the client and
+                # applying global config options. This way we ensure config options are also printed
+                # even if the agent fails to connect.
+                config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
                 self.__scalyr_client = self.__create_client()
@@ -1020,17 +1025,10 @@ class ScalyrAgent(object):
                     self.__monitors_manager,
                 ) = start_worker_thread(self.__config, logs_initial_positions)
 
-                # JSON library setting is applied as part of __create_worker_thread method
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using JSON library "%s"' % (scalyr_util.get_json_lib()),
-                )
-
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using "%s" compression algorithm with level "%s"'
-                    % (self.__config.compression_type, self.__config.compression_level),
-                )
+                # NOTE: It's important we call this after worker thread has been created since
+                # some of the global configuration options are only applied after creating a worker
+                # thread
+                self.__config.print_useful_settings(config_pre_global_apply)
 
                 current_time = time.time()
 
