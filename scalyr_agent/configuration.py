@@ -471,8 +471,12 @@ class Configuration(object):
         # If debug level 5 is set also log the raw config JSON excluding the api_key
         # This makes various troubleshooting easier.
         if self.debug_level >= 5:
-            raw_config = self.__get_sanitized_raw_config()
-            self.__logger.info("Raw config value: %s" % (json.dumps(raw_config)))
+            try:
+                raw_config = self.__get_sanitized_raw_config()
+                self.__logger.info("Raw config value: %s" % (json.dumps(raw_config)))
+            except Exception:
+                # If for some reason we fail to serialize the config, this should not be fatal
+                pass
 
     def __get_sanitized_raw_config(self):
         # type: () -> dict
