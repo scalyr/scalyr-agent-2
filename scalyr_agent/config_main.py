@@ -42,7 +42,7 @@ from io import open
 from optparse import OptionParser
 
 # TODO: The following two imports have been modified to facilitate Windows platforms
-if "win32" != sys.platform:
+if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
 from __scalyr__ import (
@@ -136,7 +136,7 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file.close()
             original_file = None
 
-            if "win32" == sys.platform:
+            if sys.platform.startswith("win"):
                 os.unlink(config_file_path)
 
             # Determine how to make the file have the same permissions as the original config file.  For now, it
@@ -237,7 +237,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
             print(config_content, file=tmp_file)
             tmp_file.close()
 
-            if "win32" == sys.platform and os.path.isfile(host_path):
+            if sys.platform.startswith("with") and os.path.isfile(host_path):
                 os.unlink(host_path)
 
             os.rename(tmp_host_path, host_path)
@@ -1363,7 +1363,7 @@ if __name__ == "__main__":
     )
 
     # TODO: These options are only available on Windows platforms
-    if "win32" == sys.platform:
+    if sys.platform.startswith("win"):
         parser.add_option(
             "",
             "--upgrade-windows",
@@ -1456,7 +1456,7 @@ if __name__ == "__main__":
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
-    if "win32" == sys.platform and options.init_config:
+    if sys.platform.startswith("win") and options.init_config:
         # Create a copy of the configuration file and set the owner to be the current user.
         config_path = options.config_filename
         template_dir = os.path.join(os.path.dirname(config_path), "templates")
@@ -1521,10 +1521,10 @@ if __name__ == "__main__":
     controller.consume_config(config_file, options.config_filename)
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
-    if "win32" == sys.platform and options.mark_conditional_restart:
+    if sys.platform.startswith("win") and options.mark_conditional_restart:
         mark_conditional_restart(controller, config_file)
 
-    if "win32" == sys.platform and options.conditional_restart:
+    if sys.platform.startswith("win") and options.conditional_restart:
         restart_if_conditional_marker_exists(controller, config_file)
 
     if options.set_key_from_stdin:
@@ -1558,7 +1558,7 @@ if __name__ == "__main__":
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
-    if "win32" == sys.platform and options.upgrade_windows:
+    if sys.platform.startswith("win") and options.upgrade_windows:
         sys.exit(
             upgrade_windows_install(
                 config_file,
