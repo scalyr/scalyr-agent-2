@@ -358,24 +358,38 @@ class Configuration(object):
             )
             scalyr_util.set_json_lib(json_library)
 
+        # Call method which applies Windows specific global config options
+        self.__apply_win32_global_config_options()
+
+    def __apply_win32_global_config_options(self):
+        """
+        Method which applies Windows specific global configuration options.
+        """
+        if not sys.platform.startswith("win"):
+            # Not a Windows platformn
+            return
+
         # Change the value for maxstdio process specific option
-        if sys.platform.startswith("win") and win32file:
-            # TODO: We should probably use platform Windows module for this
-            max_open_fds = self.win32_max_open_fds
-            current_max_open_fds = win32file._getmaxstdio()
+        if not win32file:
+            # win32file module not available
+            return None
 
-            if (max_open_fds and current_max_open_fds) and (
-                max_open_fds != current_max_open_fds
-            ):
-                self.__logger.debug(
-                    'Changing limit for max open fds (maxstdio) from "%s" to "%s"'
-                    % (current_max_open_fds, max_open_fds)
-                )
+        # TODO: We should probably use platform Windows module for this
+        max_open_fds = self.win32_max_open_fds
+        current_max_open_fds = win32file._getmaxstdio()
 
-                try:
-                    win32file._setmaxstdio(max_open_fds)
-                except Exception:
-                    self.__logger.exception("Failed to change the value of maxstdio")
+        if (max_open_fds and current_max_open_fds) and (
+            max_open_fds != current_max_open_fds
+        ):
+            self.__logger.debug(
+                'Changing limit for max open fds (maxstdio) from "%s" to "%s"'
+                % (current_max_open_fds, max_open_fds)
+            )
+
+            try:
+                win32file._setmaxstdio(max_open_fds)
+            except Exception:
+                self.__logger.exception("Failed to change the value of maxstdio")
 
     def print_useful_settings(self, other_config=None):
         """
