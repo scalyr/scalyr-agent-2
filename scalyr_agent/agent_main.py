@@ -1002,8 +1002,6 @@ class ScalyrAgent(object):
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
-                self.__config.print_useful_settings()
-
                 self.__scalyr_client = self.__create_client()
 
                 def start_worker_thread(config, logs_initial_positions=None):
@@ -1020,6 +1018,11 @@ class ScalyrAgent(object):
                     self.__copying_manager,
                     self.__monitors_manager,
                 ) = start_worker_thread(self.__config, logs_initial_positions)
+
+                # NOTE: It's important we call this after worker thread has been created since
+                # some of the global configuration options are only applied after creating a worker
+                # thread
+                self.__config.print_useful_settings()
 
                 # JSON library setting is applied as part of __create_worker_thread method
                 log.log(
