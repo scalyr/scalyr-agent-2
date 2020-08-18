@@ -1005,7 +1005,7 @@ class ScalyrAgent(object):
                 # NOTE: We call this twice - once before and once after creating the client and
                 # applying global config options. This way we ensure config options are also printed
                 # even if the agent fails to connect.
-                config_1 = self.__config
+                config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
                 self.__scalyr_client = self.__create_client()
@@ -1028,19 +1028,7 @@ class ScalyrAgent(object):
                 # NOTE: It's important we call this after worker thread has been created since
                 # some of the global configuration options are only applied after creating a worker
                 # thread
-                self.__config.print_useful_settings(config_1)
-
-                # JSON library setting is applied as part of __create_worker_thread method
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using JSON library "%s"' % (scalyr_util.get_json_lib()),
-                )
-
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using "%s" compression algorithm with level "%s"'
-                    % (self.__config.compression_type, self.__config.compression_level),
-                )
+                self.__config.print_useful_settings(config_pre_global_apply)
 
                 current_time = time.time()
 
