@@ -133,6 +133,48 @@ echo "native agent status output verified"
 echo ""
 
 #
+# Verify build_info file exists
+#
+
+echo ""
+echo "Verifying build_info file exists"
+echo ""
+
+type "C:\Program Files (x86)\Scalyr\bin\build_info"
+
+echo ""
+echo "build_info validation completed"
+echo ""
+
+#
+# Perform basic Windows Event Log sanity checks
+#
+
+echo ""
+echo "Performing Windows Event Log monitor checks"
+echo ""
+
+Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+Start-Sleep 5
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output
+
+if ("$status_output" -notmatch "windows_event_log_monitor\.log")   { Throw "Can not find windows_event_log_monitor." };
+if ("$status_output" -notmatch "windows_event_log_monitor\(\)")   { Throw "Can not find windows_event_log_monitor." };
+
+# Verify event log monitor emitted some events
+$event_log_output=type "C:\Program Files (x86)\Scalyr\log\windows_event_log_monitor.log"
+
+if ("$event_log_output" -notmatch "EventLog")   { Throw "Event log monitor didnt emit any events" };
+if ("$event_log_output" -notmatch "EventID")   { Throw "Event log monitor didnt emit any events" };
+if ("$event_log_output" -notmatch "RecordId")   { Throw "Event log monitor didnt emit any events" };
+if ("$event_log_output" -notmatch "Level")   { Throw "Event log monitor didnt emit any events" };
+
+#
 # Ensure CA validation is not disabled with default install
 #
 
@@ -147,20 +189,6 @@ if ("$log_output" -match "certificate validation has been disabled") { Throw "ce
 
 echo ""
 echo "SSL check validation completed"
-echo ""
-
-#
-# Verify build_info file exists
-#
-
-echo ""
-echo "Verifying build_info file exists"
-echo ""
-
-type "C:\Program Files (x86)\Scalyr\bin\build_info"
-
-echo ""
-echo "build_info validation completed"
 echo ""
 
 #
