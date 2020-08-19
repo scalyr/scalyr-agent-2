@@ -1,0 +1,11 @@
+{
+  api_key: "REPLACE_THIS",
+
+  scalyr_server: "https://invalid.mitm.should.fail.test.agent.scalyr.com:443",
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}

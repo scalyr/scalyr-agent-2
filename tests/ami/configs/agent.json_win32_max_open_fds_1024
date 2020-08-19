@@ -1,0 +1,10 @@
+{
+  api_key: "REPLACE_THIS",
+  win32_max_open_fds: 1024,
+
+  logs: [
+     { path: "C:\\logs\\*.log" }
+  ],
+
+  monitors: []
+}
