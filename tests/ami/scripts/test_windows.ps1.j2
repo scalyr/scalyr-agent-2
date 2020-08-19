@@ -158,7 +158,7 @@ Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-Start-Sleep 5
+Start-Sleep 10
 
 $status_output=scalyr-agent-2 status -v;
 echo $status_output
