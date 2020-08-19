@@ -71,18 +71,10 @@ if ($msi_version -eq $null) {
 # install scalyr agent and wait until it is done.
 Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
-# replace api_key and serverHost
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'REPLACE_THIS', '{{scalyr_api_key}}' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-# After string replacement we need to reencode config file without BOM
-{% include "partial/reencode_config_without_bom.ps1.j2" %}
+# Copy over agent.json with the API key set up
+Copy-Item ".\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 $Env:Path += ";C:\Program Files (x86)\Scalyr\bin"
-
-# Backup originl config with the API key since we will reference it multiple times
-Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json.org"
 
 scalyr-agent-2 start;
 
@@ -183,11 +175,7 @@ echo ""
 echo "Peforming invalid ca_cert_path config option checks"
 echo ""
 
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'server_attributes', 'ca_cert_path: "C:\\invalid\\ca_certs.crt", server_attributes' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-{% include "partial/reencode_config_without_bom.ps1.j2" %}
+Copy-Item ".\agent.json_invalid_ca_cert_path" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -205,21 +193,12 @@ echo ""
 echo "agent.log output successfuly verified"
 echo ""
 
-Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-
 echo ""
 echo "Performing MITM and hostname verification checks"
 echo ""
 
-Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-
+Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
-
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'server_attributes', 'scalyr_server: "https://invalid.mitm.should.fail.test.agent.scalyr.com:443", server_attributes' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-{% include "partial/reencode_config_without_bom.ps1.j2" %}
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -258,11 +237,7 @@ echo ""
 echo "Performing cert signed by CA we dont trust checks"
 echo ""
 
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'server_attributes', 'scalyr_server: "https://example.com:443", server_attributes' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-{% include "partial/reencode_config_without_bom.ps1.j2" %}
+Copy-Item ".\agent.json_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -304,7 +279,7 @@ echo ""
 #
 # win32_max_open_fds settings tests below
 #
-Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+Copy-Item ".\agent.json_win32_max_open_fds_512" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -322,11 +297,7 @@ echo "agent.log output successfuly verified"
 echo ""
 
 # Bumping the limit should work
-(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
-    -replace 'server_attributes', 'win32_max_open_fds: 1024, server_attributes' |
-  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
-
-{% include "partial/reencode_config_without_bom.ps1.j2" %}
+Copy-Item ".\agent.json_win32_max_open_fds_1024" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 

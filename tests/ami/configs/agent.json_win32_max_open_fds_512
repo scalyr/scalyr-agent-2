@@ -1,5 +1,6 @@
 {
   api_key: "REPLACE_THIS",
+
   win32_max_open_fds: 512,
 
   logs: [
