@@ -324,6 +324,49 @@ echo ""
 echo "agent.log output successfuly verified"
 echo ""
 
+#
+# Verify that monitoring many files (2k) works fine even with a low open FD limit
+#
+mkdir c:\logs\
+
+# Create monitored files with mock content
+$files_to_create = 2048
+
+For ($i=0; $i -le $files_to_create; $i++) {
+    Add-Content c:\logs\test$i.txt.log "initial line"
+}
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+For ($i=0; $i -le $files_to_create; $i++) {
+    Add-Content c:\logs\test$i.txt.log "line $i"
+}
+
+Start-Sleep 10
+
+echo ""
+echo "Verifying agent status output"
+echo ""
+
+$status_output=scalyr-agent-2 status -v;
+echo $status_output;
+
+if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
+if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };
+if ("$status_output" -notmatch "test2048.txt.log") { Throw "test2048.txt.log file not found in status output" };
+
+echo ""
+echo "Status output successfuly verified."
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -match "errno=24") { Throw "Found errno 24 which shouldnt be there" };
+
+# Clean up / remove all the created log files
+Remove-Item "C:\\logs\*.log"
+Get-ChildItem -Path C:\logs\
+
 # Bumping the limit should work
 Copy-Item ".\agent.json_win32_max_open_fds_1024" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
