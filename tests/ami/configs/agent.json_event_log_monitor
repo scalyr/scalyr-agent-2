@@ -8,6 +8,9 @@
       {
           module:                  "scalyr_agent.builtin_monitors.windows_event_log_monitor",
           channels: [
+              { "channel": ["Application"],
+              "query": "*"
+              },
               { "channel": [ "Application", "Security", "System" ],
               "query": "*[System/Level=0 or System/Level=1 or System/Level=2 or System/Level=3 or System/Level=4]"
               }

@@ -170,6 +170,11 @@ Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
+# Write mock entry to event log and ensure Scalyr picks it up
+New-EventLog –LogName Application –Source “ScalyrAgentTest”
+[system.diagnostics.EventLog]::CreateEventSource("ScalyrAgentTest", "Application")
+Write-EventLog -LogName "Application" -Source "ScalyrAgentTest" -EventID 30001 -EntryType Information -Message "Scalyr automated tests event." -Category 1 -RawData 10,20
+
 Start-Sleep 10
 
 $status_output=scalyr-agent-2 status -v;
@@ -185,6 +190,10 @@ if ("$event_log_output" -notmatch "EventLog")   { Throw "Event log monitor didnt
 if ("$event_log_output" -notmatch "EventID")   { Throw "Event log monitor didnt emit any events" };
 if ("$event_log_output" -notmatch "RecordId")   { Throw "Event log monitor didnt emit any events" };
 if ("$event_log_output" -notmatch "Level")   { Throw "Event log monitor didnt emit any events" };
+
+# Verify that the event we inserted exists
+if ("$event_log_output" -notmatch "ScalyrAgentTest")   { Throw "Matching event not found in event log" };
+if ("$event_log_output" -notmatch "Scalyr automated tests event")   { Throw "Matching event not found in event log" };
 
 #
 # Ensure CA validation is not disabled with default install
