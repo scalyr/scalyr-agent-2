@@ -334,11 +334,17 @@ mkdir c:\logs\
 # Create monitored files with mock content
 $files_to_create = 1024
 
+echo "Creating initial files..."
+
 For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "initial line"
 }
 
+echo "Initial files created, restarting agent..."
+
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+echo "Writting mock data..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "line $i"
