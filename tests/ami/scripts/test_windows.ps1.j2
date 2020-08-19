@@ -325,13 +325,14 @@ echo "agent.log output successfuly verified"
 echo ""
 
 #
-# Verify that monitoring many files (2k) works fine even with a low open FD limit
+# Verify that monitoring many files (1k) works fine even with a low open FD limit
 #
 scalyr-agent-2 stop
+
 mkdir c:\logs\
 
 # Create monitored files with mock content
-$files_to_create = 2048
+$files_to_create = 1024
 
 For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "initial line"
@@ -354,7 +355,7 @@ echo $status_output;
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };
-if ("$status_output" -notmatch "test2048.txt.log") { Throw "test2048.txt.log file not found in status output" };
+if ("$status_output" -notmatch "test1024.txt.log") { Throw "test1024.txt.log file not found in status output" };
 
 echo ""
 echo "Status output successfuly verified."
