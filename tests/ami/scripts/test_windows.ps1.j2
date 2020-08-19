@@ -116,7 +116,7 @@ Log-Message "Verifying agent status via native scalyr-agent-2 binary"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-Log-Message $status_output
+echo $status_output
 
 if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
@@ -173,7 +173,7 @@ Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\
 Start-Sleep 10
 
 $status_output=scalyr-agent-2 status -v;
-Log-Message $status_output
+echo $status_output
 
 if ("$status_output" -notmatch "windows_event_log_monitor\.log")   { Throw "Can not find windows_event_log_monitor." };
 if ("$status_output" -notmatch "windows_event_log_monitor\(\)")   { Throw "Can not find windows_event_log_monitor." };
@@ -247,7 +247,7 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-Log-Message $status_output
+echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
@@ -286,7 +286,7 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-Log-Message $status_output
+echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
@@ -369,7 +369,7 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-Log-Message $status_output;
+echo $status_output
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };
