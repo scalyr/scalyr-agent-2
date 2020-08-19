@@ -25,6 +25,18 @@ $ProgressPreference = "SilentlyContinue"
 Set-PSDebug -trace 2
 {% endif -%}
 
+function Log-Message {
+    [CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$true, Position=0)]
+        [AllowEmptyString()]
+        [string]$LogMessage
+    )
+
+    Write-Output ("[{0}] - {1}" -f (Get-Date), $LogMessage)
+}
+
 function GetMSIVersion {
     param (
         [IO.FileInfo] $MSI
@@ -62,7 +74,7 @@ function GetMSIVersion {
 $msi_version=GetMSIVersion -MSI .\install_package.msi
 # Method returns an object so we need to cast it to a String
 $msi_version="$msi_version".Trim()
-echo "Retrieved version: $msi_version"
+Log-Message "Retrieved version: $msi_version"
 
 if ($msi_version -eq $null) {
     Throw "Unable to retrieve version from the msi package!"
@@ -81,9 +93,9 @@ scalyr-agent-2 start;
 Start-Sleep 5
 
 # Also verify we can start the agent using the cmd script we provide
-echo ""
-echo "Verifying agent status via cmdlet"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent status via cmdlet"
+Log-Message ""
 
 # NOTE: We pipe a character to avoid PAUSE command waiting for the user input at the end
 # and hanging
@@ -95,16 +107,16 @@ if (!$?) {
 
 if ($LASTEXITCODE -ne 0) { Throw "Status command via cmdlet failed" }
 
-echo ""
-echo "cmdlet agent status verified"
-echo ""
+Log-Message ""
+Log-Message "cmdlet agent status verified"
+Log-Message ""
 
-echo ""
-echo "Verifying agent status via native scalyr-agent-2 binary"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent status via native scalyr-agent-2 binary"
+Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+Log-Message $status_output
 
 if ($LASTEXITCODE -ne 0) { Throw "Status command failed" }
 
@@ -128,31 +140,31 @@ if ("$status_output" -notmatch "agent.log")   { Throw "Can not find agent log." 
 if ("$status_output" -notmatch "windows_system_metrics")   { Throw "Can not find windows_system_metrics." };
 if ("$status_output" -notmatch "windows_process_metrics")   { Throw "Can not find windows_process_metrics." };
 
-echo ""
-echo "native agent status output verified"
-echo ""
+Log-Message ""
+Log-Message "native agent status output verified"
+Log-Message ""
 
 #
 # Verify build_info file exists
 #
 
-echo ""
-echo "Verifying build_info file exists"
-echo ""
+Log-Message ""
+Log-Message "Verifying build_info file exists"
+Log-Message ""
 
 type "C:\Program Files (x86)\Scalyr\bin\build_info"
 
-echo ""
-echo "build_info validation completed"
-echo ""
+Log-Message ""
+Log-Message "build_info validation completed"
+Log-Message ""
 
 #
 # Perform basic Windows Event Log sanity checks
 #
 
-echo ""
-echo "Performing Windows Event Log monitor checks"
-echo ""
+Log-Message ""
+Log-Message "Performing Windows Event Log monitor checks"
+Log-Message ""
 
 Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
@@ -161,7 +173,7 @@ Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\
 Start-Sleep 10
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+Log-Message $status_output
 
 if ("$status_output" -notmatch "windows_event_log_monitor\.log")   { Throw "Can not find windows_event_log_monitor." };
 if ("$status_output" -notmatch "windows_event_log_monitor\(\)")   { Throw "Can not find windows_event_log_monitor." };
@@ -178,38 +190,38 @@ if ("$event_log_output" -notmatch "Level")   { Throw "Event log monitor didnt em
 # Ensure CA validation is not disabled with default install
 #
 
-echo ""
-echo "Verifying SSL cert validation is enabled by default"
-echo ""
+Log-Message ""
+Log-Message "Verifying SSL cert validation is enabled by default"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
 if ("$log_output" -match "sslverifyoff") { Throw "cert validation is disabled" };
 if ("$log_output" -match "certificate validation has been disabled") { Throw "cert validation is disabled" };
 
-echo ""
-echo "SSL check validation completed"
-echo ""
+Log-Message ""
+Log-Message "SSL check validation completed"
+Log-Message ""
 
 #
 # Certificate and MITM checks below
 #
 
-echo ""
-echo "Performing certificate validation and MITM checks"
-echo ""
+Log-Message ""
+Log-Message "Performing certificate validation and MITM checks"
+Log-Message ""
 
-echo ""
-echo "Peforming invalid ca_cert_path config option checks"
-echo ""
+Log-Message ""
+Log-Message "Peforming invalid ca_cert_path config option checks"
+Log-Message ""
 
 Copy-Item ".\agent.json_invalid_ca_cert_path" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-echo ""
-echo "Verifying agent.log"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent.log"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
@@ -217,25 +229,25 @@ if ("$log_output" -notmatch "ca_cert_path: C:\\invalid\\ca_certs.crt") { Throw "
 if ("$log_output" -notmatch "failedAgentMain") { Throw "Invalid ca cert path, agent shouldnt have started" };
 if ("$log_output" -notmatch 'Invalid path "C:\\invalid\\ca_certs.crt" specified for the "ca_cert_path"') { Throw "Invalid ca cert path, agent shouldnt have started" };
 
-echo ""
-echo "agent.log output successfuly verified"
-echo ""
+Log-Message ""
+Log-Message "agent.log output successfuly verified"
+Log-Message ""
 
-echo ""
-echo "Performing MITM and hostname verification checks"
-echo ""
+Log-Message ""
+Log-Message "Performing MITM and hostname verification checks"
+Log-Message ""
 
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-echo ""
-echo "Verifying agent status output"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent status output"
+Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+Log-Message $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
@@ -243,13 +255,13 @@ if ("$status_output" -notmatch "Last copy request size:                    0") {
 if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
 
-echo ""
-echo "Status output successfuly verified."
-echo ""
+Log-Message ""
+Log-Message "Status output successfuly verified."
+Log-Message ""
 
-echo ""
-echo "Verifying agent logs"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent logs"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
@@ -257,24 +269,24 @@ if ("$log_output" -notmatch "Failed to connect to") { Throw "Matching log line n
 if ("$log_output" -notmatch "because of server certificate validation error") { Throw "Matching log line not found." };
 if ("$log_output" -notmatch "This likely indicates a MITM attack") { Throw "Matching log line not found." };
 
-echo ""
-echo "agent.log output successfuly verified"
-echo ""
+Log-Message ""
+Log-Message "agent.log output successfuly verified"
+Log-Message ""
 
-echo ""
-echo "Performing cert signed by CA we dont trust checks"
-echo ""
+Log-Message ""
+Log-Message "Performing cert signed by CA we dont trust checks"
+Log-Message ""
 
 Copy-Item ".\agent.json_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-echo ""
-echo "Verifying agent status output"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent status output"
+Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+Log-Message $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
@@ -282,13 +294,13 @@ if ("$status_output" -notmatch "Last copy request size:                    0") {
 if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedSSLError") { Throw "Invalid line found." };
 
-echo ""
-echo "Status output successfuly verified."
-echo ""
+Log-Message ""
+Log-Message "Status output successfuly verified."
+Log-Message ""
 
-echo ""
-echo "Verifying agent.log"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent.log"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
@@ -296,13 +308,13 @@ if ("$log_output" -notmatch "Failed to connect to") { Throw "CA cert validation 
 if ("$log_output" -notmatch "due to some SSL error") { Throw "CA cert validation should have failed" };
 if ("$log_output" -notmatch "certificate verify failed") { Throw "CA cert validation should have failed" };
 
-echo ""
-echo "agent.log output successfuly verified"
-echo ""
+Log-Message ""
+Log-Message "agent.log output successfuly verified"
+Log-Message ""
 
-echo ""
-echo "Performing win32_max_open_fds checks"
-echo ""
+Log-Message ""
+Log-Message "Performing win32_max_open_fds checks"
+Log-Message ""
 
 #
 # win32_max_open_fds settings tests below
@@ -312,17 +324,17 @@ Copy-Item ".\agent.json_win32_max_open_fds_512" -Destination "C:\Program Files (
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
 # Default limit should be 512
-echo ""
-echo "Verifying agent.log"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent.log"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
 if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 512") { Throw "Matching win32_max_open_fds line not found" };
 
-echo ""
-echo "agent.log output successfuly verified"
-echo ""
+Log-Message ""
+Log-Message "agent.log output successfuly verified"
+Log-Message ""
 
 #
 # Verify that monitoring many files (1k) works fine even with a low open FD limit
@@ -334,17 +346,17 @@ mkdir c:\logs\
 # Create monitored files with mock content
 $files_to_create = 1024
 
-echo "Creating initial files..."
+Log-Message "Creating initial files..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "initial line"
 }
 
-echo "Initial files created, restarting agent..."
+Log-Message "Initial files created, restarting agent..."
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-echo "Writting mock data..."
+Log-Message "Writting mock data..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "line $i"
@@ -352,20 +364,20 @@ For ($i=0; $i -le $files_to_create; $i++) {
 
 Start-Sleep 5
 
-echo ""
-echo "Verifying agent status output"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent status output"
+Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output;
+Log-Message $status_output;
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test1024.txt.log") { Throw "test1024.txt.log file not found in status output" };
 
-echo ""
-echo "Status output successfuly verified."
-echo ""
+Log-Message ""
+Log-Message "Status output successfuly verified."
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
@@ -379,14 +391,14 @@ Copy-Item ".\agent.json_win32_max_open_fds_1024" -Destination "C:\Program Files 
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-echo ""
-echo "Verifying agent.log"
-echo ""
+Log-Message ""
+Log-Message "Verifying agent.log"
+Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 
 if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 1024") { Throw "Matching win32_max_open_fds line not found" };
 
-echo ""
-echo "agent.log output successfuly verified"
-echo ""
+Log-Message ""
+Log-Message "agent.log output successfuly verified"
+Log-Message ""
