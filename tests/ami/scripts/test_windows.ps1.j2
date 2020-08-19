@@ -327,6 +327,7 @@ echo ""
 #
 # Verify that monitoring many files (2k) works fine even with a low open FD limit
 #
+scalyr-agent-2 stop
 mkdir c:\logs\
 
 # Create monitored files with mock content
@@ -342,7 +343,7 @@ For ($i=0; $i -le $files_to_create; $i++) {
     Add-Content c:\logs\test$i.txt.log "line $i"
 }
 
-Start-Sleep 10
+Start-Sleep 5
 
 echo ""
 echo "Verifying agent status output"
@@ -365,7 +366,6 @@ if ("$log_output" -match "errno=24") { Throw "Found errno 24 which shouldnt be t
 
 # Clean up / remove all the created log files
 Remove-Item "C:\\logs\*.log"
-Get-ChildItem -Path C:\logs\
 
 # Bumping the limit should work
 Copy-Item ".\agent.json_win32_max_open_fds_1024" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
