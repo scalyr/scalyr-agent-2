@@ -140,7 +140,10 @@ echo ""
 echo "native agent status output verified"
 echo ""
 
+#
 # Ensure CA validation is not disabled with default install
+#
+
 echo ""
 echo "Verifying SSL cert validation is enabled by default"
 echo ""
@@ -154,7 +157,10 @@ echo ""
 echo "SSL check validation completed"
 echo ""
 
+#
 # Verify build_info file exists
+#
+
 echo ""
 echo "Verifying build_info file exists"
 echo ""
@@ -164,6 +170,10 @@ type "C:\Program Files (x86)\Scalyr\bin\build_info"
 echo ""
 echo "build_info validation completed"
 echo ""
+
+#
+# Certificate and MITM checks below
+#
 
 echo ""
 echo "Performing certificate validation and MITM checks"
@@ -282,6 +292,51 @@ $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 if ("$log_output" -notmatch "Failed to connect to") { Throw "CA cert validation should have failed" };
 if ("$log_output" -notmatch "due to some SSL error") { Throw "CA cert validation should have failed" };
 if ("$log_output" -notmatch "certificate verify failed") { Throw "CA cert validation should have failed" };
+
+echo ""
+echo "agent.log output successfuly verified"
+echo ""
+
+echo ""
+echo "Performing win32_max_open_fds checks"
+echo ""
+
+#
+# win32_max_open_fds settings tests below
+#
+Copy-Item "C:\Program Files (x86)\Scalyr\config\agent.json.org" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+# Default limit should be 512
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 512") { Throw "Matching win32_max_open_fds line not found" };
+
+echo ""
+echo "agent.log output successfuly verified"
+echo ""
+
+# Bumping the limit should work
+(Get-Content "C:\Program Files (x86)\Scalyr\config\agent.json") `
+    -replace 'server_attributes', 'win32_max_open_fds: 1024, server_attributes' |
+  Out-File "C:\Program Files (x86)\Scalyr\config\agent.json";
+
+{% include "partial/reencode_config_without_bom.ps1.j2" %}
+
+{% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+echo ""
+echo "Verifying agent.log"
+echo ""
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+
+if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 1024") { Throw "Matching win32_max_open_fds line not found" };
 
 echo ""
 echo "agent.log output successfuly verified"
