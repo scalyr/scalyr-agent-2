@@ -1,0 +1,11 @@
+{
+  api_key: "REPLACE_THIS",
+
+  ca_cert_path: "/etc/ssl/system-ca-bundle.crt",
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}
