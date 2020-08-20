@@ -655,9 +655,7 @@ commands:
       installer_script_url:
         description: "URL to the installer script which to use for the install and upgrade tests."
         type: string
-        # TODO: Change back once the simplify_connection_code is merged and pushed upstream
-        # default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
-        default: "https://scalyr-repo.s3.amazonaws.com/4adfas/internal/latest/install-scalyr-agent-2-internal.sh"
+        default: "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh"
     steps:
       - add_ssh_keys:
           fingerprints:
