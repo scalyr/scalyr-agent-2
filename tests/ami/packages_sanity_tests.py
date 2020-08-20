@@ -512,6 +512,11 @@ def main(
 
     start_time = int(time.time())
 
+    if destroy_node:
+        at_exit_func = destroy_node_and_cleanup
+    else:
+        at_exit_func = None
+
     try:
         node = driver.deploy_node(
             name=name,
@@ -526,7 +531,7 @@ def main(
             wait_period=15,
             timeout=deploy_overall_timeout,
             deploy=deployment,
-            at_exit_func=destroy_node_and_cleanup,
+            at_exit_func=at_exit_func,
         )
     except DeploymentError as e:
         print("Deployment failed: %s" % (str(e)))
