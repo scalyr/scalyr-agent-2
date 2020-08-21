@@ -107,32 +107,10 @@ from libcloud.compute.deployment import (
     FileDeployment,
     MultiStepDeployment,
 )
-import libcloud.compute.base
 
 from scalyr_agent import compat
 
 from tests.ami.utils import get_env_throw_if_not_set
-
-
-# if we try to run deployment script on windows machine with openssh,
-# ParamikoSSHClient does not return valid remote path after "put" operation.
-# For example if we put script file by path 'C:\users\admin' it adds slash at the beginning - '/C:\users\admin'.
-# When it is time to execute this script on the remote machine,
-# it ends with error because '/C:\users\admin' is invalid path.
-class ParamikoSSHClient(libcloud.compute.ssh.ParamikoSSHClient):
-    def put(self, path, contents=None, chmod=None, mode="w"):
-        result = super(ParamikoSSHClient, self).put(
-            path, contents=contents, chmod=chmod, mode=mode
-        )
-        # just remove first slash.
-        if re.match(r"^\/\w\:.*$", result):
-            return result[1:]
-
-        return result
-
-
-# monkeypatch original ParamikoSSHClient
-libcloud.compute.base.SSHClient = ParamikoSSHClient
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
@@ -512,10 +490,9 @@ def main(
 
     start_time = int(time.time())
 
+    kwargs = {}
     if destroy_node:
-        at_exit_func = destroy_node_and_cleanup
-    else:
-        at_exit_func = None
+        kwargs["at_exit_func"] = destroy_node_and_cleanup
 
     try:
         node = driver.deploy_node(
@@ -531,7 +508,7 @@ def main(
             wait_period=15,
             timeout=deploy_overall_timeout,
             deploy=deployment,
-            at_exit_func=at_exit_func,
+            **kwargs
         )
     except DeploymentError as e:
         print("Deployment failed: %s" % (str(e)))
