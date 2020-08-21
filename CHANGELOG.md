@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.11 "TBD" - August 30, 2020
+## 2.1.11 "Aqua" - August 21, 2020
 
 <!---
-Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 30, 2020 9:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 21, 2020 19:00 -0800
 --->
 
 Features:
