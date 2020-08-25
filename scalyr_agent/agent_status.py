@@ -608,7 +608,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         )
     if manager_status.health_check_result:
         print(
-            "Health check: %s" % manager_status.health_check_result, file=output,
+            "Health check:                              %s"
+            % manager_status.health_check_result,
+            file=output,
         )
     print("", file=output)
 

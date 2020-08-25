@@ -358,7 +358,7 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -435,7 +435,7 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -510,7 +510,7 @@ Last copy response size:                   16
 Last copy response status:                 error
 Last copy response:                        Some weird stuff
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-Health check: Good
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -636,6 +636,83 @@ Failed monitors:
 
         self.assertEquals(expected_output, output.getvalue())
 
+    def test_last_success_is_none(self):
+        self.status.copying_manager_status.last_response = "Some weird stuff"
+        self.status.copying_manager_status.last_response_status = "error"
+        self.status.copying_manager_status.total_errors = 5
+        self.status.copying_manager_status.last_success_time = None
+
+        output = io.StringIO()
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Bytes uploaded successfully:               10000
+Last successful communication with Scalyr: Never
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Last copy request size:                    10000
+Last copy response size:                   16
+Last copy response status:                 error
+Last copy response:                        Some weird stuff
+Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
+Health check:                              Good
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+"""
+
+        self.assertEquals(expected_output, output.getvalue())
+
     def test_status_to_dict(self):
         result = self.status.to_dict()
 
@@ -674,14 +751,16 @@ Failed monitors:
     def test_health_status(self):
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = "Health check: Good\n"
+        expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
         self.status.copying_manager_status.health_check_result = "Some bad message"
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = "Health check: Some bad message\n"
+        expected_output = (
+            "Health check:                              Some bad message\n"
+        )
         self.assertTrue(expected_output in output.getvalue())
 
 
