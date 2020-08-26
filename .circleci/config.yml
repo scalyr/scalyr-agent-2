@@ -703,11 +703,11 @@ commands:
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+
             # If testing type is "development" we use installer script which is built in another job.
             if [ "<< parameters.test_type >>" = "development" ]; then
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
-
 
             ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
       - store_artifacts:
@@ -1946,6 +1946,10 @@ jobs:
           name: Restore Wix cache
           key: windows-wix-cache-{{ .Branch }}
 
+      - restore_cache:
+          name: Restore patched win32evtlog.pyd
+          key: windows-win32evtlog-cache-{{ .Branch }}
+
       - run:
           name: Extract Wix.
           command: |
@@ -1967,11 +1971,26 @@ jobs:
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
             Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
 
+      - run:
+          name: Download patched win32evtlog.pyd
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            mkdir win32evtlog-cache -Force
+            if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
+                  wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+            }
+
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
           paths:
             - "wix311_binaries"
+
+      - save_cache:
+          name: Save patched win32evtlog.pyd
+          key: windows-win32evtlog-cache-{{ .Branch }}
+          paths:
+            - "win32evtlog-cache"
 
       - save_cache:
           name: Save Pyinstaller Cache
@@ -2013,6 +2032,10 @@ jobs:
           command: |
               $Env:WIX = ";C:\wix311;"
               c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+
+              # copy patched win32evtlog.pyd.
+              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+
               c:\Python27\python.exe build_package.py win32
 
               mkdir package
@@ -2177,103 +2200,126 @@ workflows:
  version: 2
  static-analysis:
    jobs:
-     - lint-checks
+     - lint-checks:
+         context: scalyr-agent
  unit-tests:
    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
    # Python 3 versions
    jobs:
-     - unittest-26
-     - unittest-27
-     - unittest-35
-     - unittest-35-osx
-     - unittest-35-windows
+     - unittest-26:
+         context: scalyr-agent
+     - unittest-27:
+         context: scalyr-agent
+     - unittest-35:
+         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-35-windows:
+         context: scalyr-agent
  smoke-tests:
    jobs:
-     - smoke-standalone-26
-     - smoke-standalone-27
-     - smoke-standalone-35
-     - smoke-standalone-35-rate-limit
-     - smoke-standalone-26-tls12
-     - smoke-standalone-27-tls12
+     - smoke-standalone-26:
+         context: scalyr-agent
+     - smoke-standalone-27:
+         context: scalyr-agent
+     - smoke-standalone-35:
+         context: scalyr-agent
+     - smoke-standalone-35-rate-limit:
+         context: scalyr-agent
+     - smoke-standalone-26-tls12:
+         context: scalyr-agent
+     - smoke-standalone-27-tls12:
+         context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-json
-     - smoke-docker-syslog
-     - smoke-k8s
-     - smoke-monitors-tests
-     - sonarcloud-scan:
-         requires:
-           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           # slowest jobs
-           - smoke-docker-json
-           - smoke-docker-syslog
-           - smoke-k8s
-           - smoke-monitors-tests
+     - smoke-docker-json:
+         context: scalyr-agent
+     - smoke-docker-syslog:
+         context: scalyr-agent
+     - smoke-k8s:
+         context: scalyr-agent
+     - smoke-monitors-tests:
+         context: scalyr-agent
+           #     - sonarcloud-scan:
+           #         requires:
+           #           # NOTE: This is not ideal, but Circle CI doesn't support cross
+           #           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           #           # slowest jobs
+           #           - smoke-docker-json
+           #           - smoke-docker-syslog
+           #           - smoke-k8s
+           #           - smoke-monitors-tests
  package-tests:
    jobs:
      - build-linux-packages-and-installer-script
      - build-windows-package
      - package-test-rpm:
+         context: scalyr-agent
          <<: *master_and_release_only
      - package-test-deb:
+         context: scalyr-agent
          <<: *master_and_release_only
      - smoke-rpm-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-rpm-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-rpm
          <<: *master_and_release_only
      - smoke-deb-package-py2:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - smoke-deb-package-py3:
+         context: scalyr-agent
          requires:
            - package-test-deb
          <<: *master_and_release_only
      - ami-tests-development:
-         requires:
-           - build-windows-package
-           - build-linux-packages-and-installer-script
-         <<: *master_and_release_only
+          context: scalyr-agent
+          requires:
+            - build-windows-package
+            - build-linux-packages-and-installer-script
      - ami-tests-stable:
-         <<: *master_and_release_only
- benchmarks:
-   jobs:
-     - benchmarks-micro-py-27
-     - benchmarks-micro-py-35
-     - benchmarks-idle-agent-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - send-benchmark-results-and-graphs-to-slack:
-         requires:
-           - benchmarks-idle-agent-py-27
-           - benchmarks-idle-agent-py-35
-           - benchmarks-idle-agent-no-monitors-py-27
-           - benchmarks-idle-agent-no-monitors-py-35
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-         <<: *benchmarks_master_and_release_only
+          context: scalyr-agent
+          <<: *master_and_release_only
+           # benchmarks:
+           #   jobs:
+           #     - benchmarks-micro-py-27
+           #     - benchmarks-micro-py-35
+           #     - benchmarks-idle-agent-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-no-monitors-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-idle-agent-no-monitors-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+           #         <<: *benchmarks_master_and_release_only
+           #     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+           #         <<: *benchmarks_master_and_release_only
+           #     - send-benchmark-results-and-graphs-to-slack:
+           #         requires:
+           #           - benchmarks-idle-agent-py-27
+           #           - benchmarks-idle-agent-py-35
+           #           - benchmarks-idle-agent-no-monitors-py-27
+           #           - benchmarks-idle-agent-no-monitors-py-35
+           #           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+           #           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+           #           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+           #           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+           #           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+           #         <<: *benchmarks_master_and_release_only
 
  weekly-circle-ci-usage-report:
    triggers:

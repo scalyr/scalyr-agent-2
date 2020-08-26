@@ -18,6 +18,10 @@ set -e
 set -x
 {% endif -%}
 
+echo_with_date() {
+    date +"[%Y-%m-%d %H:%M:%S] $*"
+}
+
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 CLOUD_INIT_RESULT_FILE="/run/cloud-init/result.json"
@@ -25,13 +29,13 @@ MAX_WAIT_COUNTER=20 # we wait a maximum of 20 x 2 seconds for provision to finis
 
 WAIT_COUNTER=0
 while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_COUNTER} ]; do
-    echo "Waiting for cloud init provisioning to complete..."
+    echo_with_date "Waiting for cloud init provisioning to complete..."
     ((WAIT_COUNTER=WAIT_COUNTER+1))
     sleep 2
 done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
-    echo "Provisioning didn't finish in 40 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "Provisioning didn't finish in 40 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
     exit 1
 fi
 
@@ -46,10 +50,10 @@ sudo apt-get install -y {{additional_packages}}
 {% endif -%}
 
 # Install Sclayr agent.
-echo ""
-echo "Installing Scalyr agent"
-echo "Using package: {{ install_package["source"] }}"
-echo ""
+echo_with_date ""
+echo_with_date "Installing Scalyr agent"
+echo_with_date "Using package: {{ install_package["source"] }}"
+echo_with_date ""
 
 {% if install_package["type"] in ("file", "url") -%}
 {# type of the package is 'file' or 'url', that means that file
@@ -85,10 +89,10 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Run some basic sanity checks
-echo "Verifying agent status output"
-echo ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
 sudo scalyr-agent-2 status -v
-echo ""
+echo_with_date ""
 
 sudo scalyr-agent-2 status -v | grep "${INSTALL_PACKAGE_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
@@ -96,26 +100,35 @@ sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify build_info file with build metadata is present
-echo ""
-echo "Verifying build_info file exists"
-cat /usr/share/scalyr-agent-2/build_info || (echo "build_info file is missing" ; exit 1)
-echo ""
+echo_with_date ""
+echo_with_date "Verifying build_info file exists"
+cat /usr/share/scalyr-agent-2/build_info || (echo_with_date "build_info file is missing" ; exit 1)
+echo_with_date ""
 
 # Verify rc*.d symlinks are in place
-echo ""
-echo "Verifying rc.d symlinks exist"
-echo ""
+echo_with_date ""
+echo_with_date "Verifying rc.d symlinks exist"
+echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
-echo ""
+echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+echo_with_date ""
+echo_with_date "Verifying agent.log"
+echo_with_date ""
+
+# Ensure CA validation is not disabled with default install
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
+echo_with_date ""
 
 
 {% if test_type == "upgrade" -%}
 # Upgrade to new version
-echo ""
-echo "Upgrading Scalyr agent"
-echo "Using version: {{ upgrade_package["source"] }}"
-echo ""
+echo_with_date ""
+echo_with_date "Upgrading Scalyr agent"
+echo_with_date "Using version: {{ upgrade_package["source"] }}"
+echo_with_date ""
 {% if upgrade_package["type"] in ("file", "url") -%}
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
@@ -125,7 +138,7 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-echo "Upgrade Scalyr agent from file."
+echo_with_date "Upgrade Scalyr agent from file."
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i upgrade_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(dpkg-deb -f "upgrade_package.deb" Version)
@@ -144,11 +157,11 @@ export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Verify status works and symlinks are in place
-echo ""
-echo "Verifying agent status output"
-echo ""
+echo_with_date ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
 sudo scalyr-agent-2 status -v
-echo ""
+echo_with_date ""
 
 sudo scalyr-agent-2 status -v | grep "${UPGRADE_PACKAGE_VERSION}"
 sudo scalyr-agent-2 status -v | grep agent.log
@@ -156,10 +169,21 @@ sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify rc*.d symlinks are in place
-echo ""
-echo "Verifying rc.d symlinks exist"
-echo ""
+echo_with_date ""
+echo_with_date "Verifying rc.d symlinks exist"
+echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
-echo ""
+echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
+
+echo_with_date ""
+echo_with_date "Verifying agent.log"
+echo_with_date ""
+
+# Ensure CA validation is not disabled with default install
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
+echo_with_date ""
 {% endif -%}
+
+{% include "partial/ssl_checks.sh.j2" %}

@@ -1,15 +1,34 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.10 "TBD" - August 15, 2020
+## 2.1.11 "Aqua" - August 21, 2020
 
 <!---
-Packaged by Oliver hsu <oliver@scalyr.com> on Aug 15, 2020 9:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 21, 2020 19:00 -0800
+--->
+
+Features:
+* Add new ``win32_max_open_fds`` configuration option which allows user to overwrite maximum open file limit on Windows for the scalyr agent process.
+
+Bug fixes:
+* Fix bug in packaging which would cause agent to sometimes crash on Windows when using windows event log monitor.
+
+## 2.1.10 "Alcor" - August 10, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 10, 2020 9:00 -0800
 --->
 
 Bug fixes:
-* Fix reporting of "Last successful communication with Scalyr" line value in ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with Scalyr API.
-* Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v` command output and make sure the value is left padded and consistent with other lines.
+* Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v`` command output and make sure the value is left padded and consistent with other lines.
+* Fix reporting of "Last successful communication with Scalyr" line value in the ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with the Scalyr API.
+* Fix a regression in ``scalyr-agent-2-config --upgrade-windows`` functionality which would sometimes throw an exception, depending on the configuration values.
+
+Security fixes and improvments:
+* Fix a bug with the agent not correctly validating that the hostname which is stored inside the certificate returned by the server matches the one the agent is trying to connect to (``scalyr_config`` option). This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
+* Fix a bug with the agent not correctly validating the server certificate and hostname when using ``scalyr-agent-2-config --upgrade-windows`` functionality under Python < 2.7.9. This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
+* When connecting to the Scalyr API, agent now explicitly requests TLS v1.2 and aborts connection if the server doesn't support it or tries to use an older version. Recently Scalyr API deprecated support for TLS v1.1 which allows us to implement this change which makes the agent more robust against potential downgrade attacks. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
+* When connecting to the Scalyr API, server now sends a SNI header which matches the host specified in the agent config. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
 
 ## 2.1.9 "Ursa" - August 4, 2020
 
