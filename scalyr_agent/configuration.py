@@ -94,6 +94,8 @@ class Configuration(object):
         self.__log_configs = []
         # Optional configuration for journald monitor logging
         self.__journald_log_configs = []
+        # Optional configuration for syslog monitor logging
+        self.__syslog_log_configs = []
         # Optional configuration for k8s monitor logging
         self.__k8s_log_configs = []
         # The monitor configuration objects from the configuration file.  This does not include monitors that
@@ -153,6 +155,7 @@ class Configuration(object):
                 "import_vars",
                 "logs",
                 "journald_logs",
+                "syslog_logs",
                 "k8s_logs",
                 "monitors",
                 "server_attributes",
@@ -192,6 +195,7 @@ class Configuration(object):
 
                 self.__add_elements_from_array("logs", content, self.__config)
                 self.__add_elements_from_array("journald_logs", content, self.__config)
+                self.__add_elements_from_array("syslog_logs", content, self.__config)
                 self.__add_elements_from_array("k8s_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
@@ -296,6 +300,10 @@ class Configuration(object):
 
             self.__journald_log_configs = list(
                 self.__config.get_json_array("journald_logs")
+            )
+
+            self.__syslog_log_configs = list(
+                self.__config.get_json_array("syslog_logs")
             )
 
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
@@ -840,6 +848,13 @@ class Configuration(object):
 
         @rtype list<JsonObject>"""
         return self.__journald_log_configs
+
+    @property
+    def syslog_log_configs(self):
+        """Returns the list of configuration entries for all the syslog loggers specified in the configuration file.
+
+        @rtype list<JsonObject>"""
+        return self.__syslog_log_configs
 
     @property
     def k8s_log_configs(self):
@@ -2608,6 +2623,7 @@ class Configuration(object):
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, "logs", description)
         self.__verify_or_set_optional_array(config, "journald_logs", description)
+        self.__verify_or_set_optional_array(config, "syslog_logs", description)
         self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
 
@@ -2625,6 +2641,13 @@ class Configuration(object):
                 key="journald_unit",
                 config_file_path=file_path,
                 entry_index=i,
+            )
+            i += 1
+
+        i = 0
+        for log_entry in config.get_json_array("syslog_logs"):
+            self.__verify_log_entry_with_key_and_set_defaults(
+                log_entry, key="syslog_app", config_file_path=file_path, entry_index=i,
             )
             i += 1
 

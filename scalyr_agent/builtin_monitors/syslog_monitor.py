@@ -18,6 +18,10 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 from scalyr_agent import compat
+from scalyr_agent.builtin_monitors.syslog_utils import (
+    SyslogLogConfigManager,
+    SyslogLogFormatter,
+)
 
 __author__ = "imron@scalyr.com"
 
@@ -110,7 +114,7 @@ define_config_option(
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
     convert_to=six.text_type,
-    default="agent_syslog.log",
+    default="agent_syslog${ID}.log",
 )
 
 define_config_option(
@@ -792,6 +796,7 @@ class SyslogHandler(object):
         logger,
         line_reporter,
         config,
+        log_manager,
         server_host,
         log_path,
         get_log_watcher,
@@ -871,6 +876,11 @@ class SyslogHandler(object):
         self.__max_log_rotations = rotation_count
         self.__max_log_size = max_log_size
         self.__flush_delay = config.get("log_flush_delay")
+
+        self.__log_manager = log_manager
+
+    def __del__(self):
+        self.__log_manager.close()
 
     def __get_regex(self, config, field_name):
         value = config.get(field_name)
@@ -1127,6 +1137,19 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
+    @staticmethod
+    def _get_app_and_host(data):
+        app = "unknown"
+        host = "unknown"
+
+        splitdata = data.split(" ")
+        if len(splitdata) > 3:
+            host = splitdata[3]
+        if len(splitdata) > 4:
+            app = splitdata[4].split("[")[0]
+
+        return app, host
+
     def handle(self, data):  # type: (six.text_type) -> None
         """
         Feed syslog messages to the appropriate loggers.
@@ -1138,9 +1161,15 @@ class SyslogHandler(object):
         if self.__docker_logging:
             self.__handle_docker_logs(data)
         else:
+            app, host = self._get_app_and_host(data)
+            logger = self.__log_manager.get_logger(app)
+            logger.info(data)
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
+
+    def set_log_watcher(self, log_watcher):
+        self.__log_manager.set_log_watcher(log_watcher)
 
 
 class RequestVerifier(object):
@@ -1184,6 +1213,7 @@ class SyslogServer(object):
         port,
         logger,
         config,
+        log_manager,
         line_reporter,
         accept_remote=False,
         server_host=None,
@@ -1248,6 +1278,7 @@ class SyslogServer(object):
             logger,
             line_reporter,
             config,
+            log_manager,
             server_host,
             log_path,
             get_log_watcher,
@@ -1279,6 +1310,9 @@ class SyslogServer(object):
             # need to think of what to do for 2.4, which will hang on shutdown when run as standalone
             if hasattr(server, "shutdown"):
                 run_state.register_on_stop_callback(server.shutdown)
+
+    def set_log_watcher(self, watcher):
+        self.__server.syslog_handler.set_log_watcher(watcher)
 
     def start(self, run_state):
         self.__prepare_run_state(run_state)
@@ -1413,17 +1447,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         # configure the logger and path
         self.__message_log = self._config.get("message_log")
 
-        self.log_config = {
-            "parser": self._config.get("parser"),
-            "path": self.__message_log,
-        }
-
         self.__flush_delay = self._config.get("log_flush_delay")
-        try:
-            attributes = JsonObject({"monitor": "agentSyslog"})
-            self.log_config["attributes"] = attributes
-        except Exception:
-            global_log.error("Error setting monitor attribute in SyslogMonitor")
 
         (
             default_rotation_count,
@@ -1439,6 +1463,16 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__max_log_rotations = default_rotation_count
 
         self._docker_options = None
+
+        self._log_manager = SyslogLogConfigManager(
+            self._global_config,
+            SyslogLogFormatter(),
+            self.__max_log_size,
+            self.__max_log_rotations,
+            extra_config=self._config,
+        )
+
+        self.log_config = self._log_manager.get_config(".*")
 
     def __build_server_list(self, protocol_string):
         """Builds a list containing (protocol, port) tuples, based on a comma separated list
@@ -1585,6 +1619,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 protocol[1],
                 self.__disk_logger,
                 self._config,
+                self._log_manager,
                 line_reporter,
                 accept_remote=self.__accept_remote_connections,
                 server_host=self.__server_host,
@@ -1601,6 +1636,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                     p[1],
                     self.__disk_logger,
                     self._config,
+                    self._log_manager,
                     line_reporter,
                     accept_remote=self.__accept_remote_connections,
                     server_host=self.__server_host,
@@ -1609,6 +1645,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                     rotate_options=rotate_options,
                     docker_options=self._docker_options,
                 )
+                server.set_log_watcher(self.__log_watcher)
                 self.__extra_servers.append(server)
 
             # start any extra servers in their own threads

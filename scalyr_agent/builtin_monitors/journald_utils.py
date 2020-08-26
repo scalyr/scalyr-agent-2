@@ -50,6 +50,7 @@ class LogConfigManager:
         formatter,
         max_log_size=20 * 1024 * 1024,
         max_log_rotations=2,
+        extra_config=None,
     ):
         self._loggers = {}
         self._max_log_size = max_log_size
@@ -57,6 +58,7 @@ class LogConfigManager:
         self._global_config = global_config
         self._formatter = formatter
         self.log_watcher = None
+        self._extra_config = extra_config
 
         self.__log_config_creators = self.initialize()
 
