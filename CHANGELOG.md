@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.12 "TBD" - TBD
+
+<!---
+Packaged by TBD <TBD@scalyr.com> on TBD
+--->
+
+Bug fixes:
+* Add additional dependencies to the Agent Docker image to allow running the journald monitor.
+
 ## 2.1.11 "Aqua" - August 21, 2020
 
 <!---
