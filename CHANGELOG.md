@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.1.12 "TBD" - TBD
 
 <!---
-Packaged by TBD <TBD@scalyr.com> on TBD
+Packaged by TBD TBD <TBD@scalyr.com> on Aug 21, 2020 19:00 -0800
 --->
 
 Bug fixes:
