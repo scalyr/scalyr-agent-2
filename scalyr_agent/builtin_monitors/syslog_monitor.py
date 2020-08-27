@@ -18,10 +18,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 from scalyr_agent import compat
-from scalyr_agent.builtin_monitors.syslog_utils import (
-    SyslogLogConfigManager,
-    SyslogLogFormatter,
-)
+from scalyr_agent.builtin_monitors.syslog_utils import SyslogLogConfigManager
 
 __author__ = "imron@scalyr.com"
 
@@ -1466,7 +1463,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
 
         self._log_manager = SyslogLogConfigManager(
             self._global_config,
-            SyslogLogFormatter(),
+            None,
             self.__max_log_size,
             self.__max_log_rotations,
             extra_config=self._config,

@@ -152,7 +152,8 @@ class LogConfigManager:
             maxBytes=self._max_log_size,
             backupCount=self._max_log_rotations,
         )
-        log_handler.setFormatter(self._formatter)
+        if self._formatter:
+            log_handler.setFormatter(self._formatter)
         logger.addHandler(log_handler)
         logger.propagate = False
 

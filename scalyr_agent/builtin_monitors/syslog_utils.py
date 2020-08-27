@@ -5,26 +5,10 @@ import copy
 from string import Template
 
 import six
-from scalyr_agent import scalyr_logging
 
 from scalyr_agent.json_lib import JsonObject
 
 from scalyr_agent.builtin_monitors.journald_utils import LogConfigManager
-
-
-class SyslogLogFormatter(scalyr_logging.BaseFormatter):
-    """Formatter used for the logs produced by the journald monitor.
-
-    In general, it formats each line as:
-        time (with milliseconds)
-        component (`journald_monitor()` so we don't have to have ugly hashes in the log line for extended config.)
-        message (the logged message)
-    """
-
-    def __init__(self):
-        scalyr_logging.BaseFormatter.__init__(
-            self, "%(asctime)s [syslog_monitor()] %(message)s", "metric-formatter"
-        )
 
 
 class SyslogLogConfigManager(LogConfigManager):
