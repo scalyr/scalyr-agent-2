@@ -44,8 +44,6 @@ class SyslogLogConfigManager(LogConfigManager):
             max_log_rotations=max_log_rotations,
             extra_config=extra_config,
         )
-        self.default_parser = self._extra_config.get("parser")
-        self.file_template_string = self._extra_config.get("message_log")
 
     def initialize(self):
         """ Generate the config matchers for this manager from the global config
@@ -72,10 +70,12 @@ class SyslogLogConfigManager(LogConfigManager):
         if "syslog_app" not in config:
             config["syslog_app"] = ".*"
         if "parser" not in config:
-            config["parser"] = self.default_parser
+            config["parser"] = self._extra_config.get("parser")
         if "attributes" not in config:
-            config["attributes"] = JsonObject({"monitor": "agentSyslog"})
-        file_template = Template(self.file_template_string)
+            config["attributes"] = JsonObject({"monitor": six.text_type("agentSyslog")})
+        elif "monitor" not in config["attributes"]:
+            config["attributes"]["monitor"] = six.text_type("agentSyslog")
+        file_template = Template(self._extra_config.get("message_log"))
         regex = re.compile(config["syslog_app"])
         match_hash = six.text_type(hash(config["syslog_app"]))
         if config["syslog_app"] == ".*":
