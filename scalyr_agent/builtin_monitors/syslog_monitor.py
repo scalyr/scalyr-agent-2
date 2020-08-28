@@ -111,7 +111,7 @@ define_config_option(
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
     convert_to=six.text_type,
-    default="agent_syslog${ID}.log",
+    default="agent_syslog${HASH}.log",
 )
 
 define_config_option(
@@ -1409,6 +1409,15 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 "Failing syslog monitor since docker mode was requested but the docker module could not be imported. "
                 "This may be due to not including the docker library when building container image.",
                 "mode",
+            )
+        if (
+            "${HASH}" not in self._config.get("message_log")
+            and len(self._global_config.syslog_log_configs) > 0
+        ):
+            raise BadMonitorConfiguration(
+                "Failing `syslog_logs` is defined in the but `message_log` does not contain a template placeholder "
+                "`${HASH}`. This is required for syslog_logs configurations to function correctly.",
+                "message_log",
             )
 
         # the main server

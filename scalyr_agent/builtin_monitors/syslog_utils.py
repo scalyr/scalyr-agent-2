@@ -66,7 +66,7 @@ class SyslogLogConfigManager(LogConfigManager):
             match_hash = ""
         full_path = os.path.join(
             self._global_config.agent_log_path,
-            file_template.safe_substitute({"ID": match_hash}),
+            file_template.safe_substitute({"HASH": match_hash}),
         )
         matched_config = JsonObject({"parser": "syslog", "path": full_path})
         matched_config.update(config)
