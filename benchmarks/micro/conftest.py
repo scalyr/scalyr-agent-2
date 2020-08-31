@@ -25,6 +25,8 @@ from scalyr_agent import compat
 # file
 CUSTOM_METRICS = [
     "compression_ratio",
+    "size_before_compression",
+    "size_after_compression",
 ]
 
 # If set, we will force all the pytest benchmark units to the provided values.
@@ -88,7 +90,7 @@ def pytest_benchmark_generate_json(
         benchmark.options["submit_result_to_codespeed"] = submit_result_to_codespeed
 
         for metric_name in CUSTOM_METRICS:
-            metric_value = getattr(benchmark.stats, "compression_ratio", None)
+            metric_value = getattr(benchmark.stats, metric_name, None)
 
             if metric_value is None:
                 continue

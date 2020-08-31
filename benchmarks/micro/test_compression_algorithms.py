@@ -201,8 +201,8 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     size_after_compression = len(result)
     compression_ratio = float(size_before_compression) / size_after_compression
 
-    benchmark.stats.size_before_compression = size_before_compression
-    benchmark.stats.size_after_compression = size_after_compression
+    benchmark.stats.stats.size_before_compression = size_before_compression
+    benchmark.stats.stats.size_after_compression = size_after_compression
     benchmark.stats.stats.compression_ratio = compression_ratio
 
     assert result is not None
