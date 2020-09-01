@@ -60,10 +60,7 @@ from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 docker_module_available = True
 
 try:
-    from scalyr_agent.builtin_monitors.docker_monitor import (
-        get_attributes_and_config_from_labels,
-        DockerOptions,
-    )
+    from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
 except ImportError:
     # Should typically not happen when using the docker mode because the Docker images we publish have this module
     # installed
@@ -793,6 +790,7 @@ class SyslogHandler(object):
         logger,
         line_reporter,
         config,
+        global_config,
         log_manager,
         server_host,
         log_path,
@@ -800,6 +798,8 @@ class SyslogHandler(object):
         rotate_options,
         docker_options,
     ):
+        self._global_config = global_config
+        self._config = config
 
         docker_logging = config.get("mode") == "docker"
         self.__docker_regex = None
@@ -874,10 +874,13 @@ class SyslogHandler(object):
         self.__max_log_size = max_log_size
         self.__flush_delay = config.get("log_flush_delay")
 
+        self.__log_watcher = None
         self.__log_manager = log_manager
 
     def __del__(self):
         self.__log_manager.close()
+        for cname in self.__docker_loggers:
+            self.__docker_loggers[cname].close()
 
     def __get_regex(self, config, field_name):
         value = config.get(field_name)
@@ -1037,7 +1040,6 @@ class SyslogHandler(object):
     def __handle_docker_logs(self, data):
 
         watcher = None
-        module = None
         # log watcher for adding/removing logs from the agent
         if self.__get_log_watcher:
             watcher, module = self.__get_log_watcher()
@@ -1047,82 +1049,37 @@ class SyslogHandler(object):
         if cname is None:
             return
 
-        current_time = time.time()
-        current_log_files = []
         self.__logger_lock.acquire()
         try:
-            logger = None
             if cname is not None and cid is not None:
                 # check if we already have a logger for this container
                 # and if not, then create it
                 if cname not in self.__docker_loggers:
-                    info = dict()
-
-                    attrs, base_config = get_attributes_and_config_from_labels(
-                        labels, self._docker_options
+                    # the log manager uses the "message_log" config to name files, so we take the docker file template,
+                    # sub in known values, and pass that along as "message_log"
+                    modified_config = {
+                        "message_log": self.__docker_file_template.safe_substitute(
+                            {"CNAME": cname, "CID": cid}
+                        ),
+                        "parser": "agentSyslogDocker",
+                    }
+                    self.__docker_loggers[cname] = SyslogLogConfigManager(
+                        self._global_config,
+                        None,
+                        self.__max_log_size,
+                        self.__max_log_rotations,
+                        extra_config=modified_config,
                     )
+                    self.__docker_loggers[cname].set_log_watcher(watcher)
+            app, host = self._get_app_and_host(data)
+            logger = self.__docker_loggers[cname].get_logger(app)
 
-                    # get the config and set the attributes
-                    info["log_config"] = self.__create_log_config(
-                        cname, cid, base_config, attrs
-                    )
-                    info["cid"] = cid
-
-                    # create the physical log files
-                    info["logger"] = self.__create_log_file(
-                        cname, cid, info["log_config"]
-                    )
-                    info["last_seen"] = current_time
-
-                    # if we created the log file
-                    if info["logger"]:
-                        # add it to the main scalyr log watcher
-                        if watcher and module:
-                            info["log_config"] = watcher.add_log_config(
-                                module.module_name, info["log_config"]
-                            )
-
-                        # and keep a record for ourselves
-                        self.__docker_loggers[cname] = info
-                    else:
-                        global_log.warn("Unable to create logger for %s." % cname)
-                        return
-
-                # at this point __docker_loggers will always contain
-                # a logger for this container name, so log the message
-                # and mark the time
-                logger = self.__docker_loggers[cname]
-                logger["last_seen"] = current_time
-
-            if self.__expire_count >= RUN_EXPIRE_COUNT:
-                self.__expire_count = 0
-
-                # find out which if any of the loggers in __docker_loggers have
-                # expired
-                expired = []
-
-                for key, info in six.iteritems(self.__docker_loggers):
-                    if current_time - info["last_seen"] > self.__docker_expire_log:
-                        expired.append(key)
-
-                # remove all the expired loggers
-                for key in expired:
-                    info = self.__docker_loggers.pop(key, None)
-                    if info:
-                        info["logger"].close()
-                        if watcher and module:
-                            watcher.remove_log_path(
-                                module.module_name, info["log_config"]["path"]
-                            )
-            self.__expire_count += 1
-
-            for key, info in six.iteritems(self.__docker_loggers):
-                current_log_files.append(info["log_config"]["path"])
+            # TODO: recreate `if self.__expire_count >= RUN_EXPIRE_COUNT:` section
         finally:
             self.__logger_lock.release()
 
         if logger:
-            logger["logger"].write(line_content)
+            logger.info(data)
         else:
             global_log.warning(
                 "Syslog writing docker logs to syslog file instead of container log",
@@ -1131,8 +1088,8 @@ class SyslogHandler(object):
             )
             self.__logger.info(data)
 
-        if self.__docker_log_deleter:
-            self.__docker_log_deleter.check_for_old_logs(current_log_files)
+        # if self.__docker_log_deleter:  # TODO: rework this for log managers
+        #    self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
     @staticmethod
     def _get_app_and_host(data):
@@ -1141,9 +1098,12 @@ class SyslogHandler(object):
 
         splitdata = data.split(" ")
         if len(splitdata) > 3:
-            host = splitdata[3]
-        if len(splitdata) > 4:
-            app = splitdata[4].split("[")[0]
+            if splitdata[3].endswith(":"):
+                app = splitdata[3].split("[")[0]
+            else:
+                host = splitdata[3]
+                if len(splitdata) > 4:
+                    app = splitdata[4].split("[")[0]
 
         return app, host
 
@@ -1161,7 +1121,6 @@ class SyslogHandler(object):
             app, host = self._get_app_and_host(data)
             logger = self.__log_manager.get_logger(app)
             logger.info(data)
-            self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
 
@@ -1210,6 +1169,7 @@ class SyslogServer(object):
         port,
         logger,
         config,
+        global_config,
         log_manager,
         line_reporter,
         accept_remote=False,
@@ -1275,6 +1235,7 @@ class SyslogServer(object):
             logger,
             line_reporter,
             config,
+            global_config,
             log_manager,
             server_host,
             log_path,
@@ -1411,13 +1372,24 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 "mode",
             )
         if (
-            "${HASH}" not in self._config.get("message_log")
+            not self._config.get("mode") == "docker"
+            and "${HASH}" not in self._config.get("message_log")
             and len(self._global_config.syslog_log_configs) > 0
         ):
             raise BadMonitorConfiguration(
                 "Failing `syslog_logs` is defined in the but `message_log` does not contain a template placeholder "
                 "`${HASH}`. This is required for syslog_logs configurations to function correctly.",
                 "message_log",
+            )
+        if (
+            self._config.get("mode") == "docker"
+            and "${HASH}" not in self._config.get("docker_logfile_template")
+            and len(self._global_config.syslog_log_configs) > 0
+        ):
+            raise BadMonitorConfiguration(
+                "Failing `syslog_logs` is defined in the but `docker_logfile_template` does not contain a template placeholder "
+                "`${HASH}`. This is required for syslog_logs configurations to function correctly.",
+                "docker_logfile_template",
             )
 
         # the main server
@@ -1625,6 +1597,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 protocol[1],
                 self.__disk_logger,
                 self._config,
+                self._global_config,
                 self._log_manager,
                 line_reporter,
                 accept_remote=self.__accept_remote_connections,
@@ -1634,6 +1607,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 rotate_options=rotate_options,
                 docker_options=self._docker_options,
             )
+            self.__server.set_log_watcher(self.__log_watcher)
 
             # iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
@@ -1642,6 +1616,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                     p[1],
                     self.__disk_logger,
                     self._config,
+                    self._global_config,
                     self._log_manager,
                     line_reporter,
                     accept_remote=self.__accept_remote_connections,
