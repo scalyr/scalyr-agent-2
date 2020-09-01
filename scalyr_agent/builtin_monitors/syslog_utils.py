@@ -59,6 +59,10 @@ class SyslogLogConfigManager(LogConfigManager):
             config["attributes"] = JsonObject({"monitor": six.text_type("agentSyslog")})
         elif "monitor" not in config["attributes"]:
             config["attributes"]["monitor"] = six.text_type("agentSyslog")
+        config["attributes"]["modified_config"] = self._extra_config.get(
+            "modified_config"
+        )
+        config["attributes"]["containerId"] = self._extra_config.get("containerId")
         file_template = Template(self._extra_config.get("message_log"))
         regex = re.compile(config["syslog_app"])
         match_hash = six.text_type(hash(config["syslog_app"]))

@@ -1062,7 +1062,12 @@ class SyslogHandler(object):
                             {"CNAME": cname, "CID": cid}
                         ),
                         "parser": "agentSyslogDocker",
+                        "containerName": cname,
+                        "containerId": cid,
                     }
+                    if self.__server_host:
+                        modified_config["serverHost"] = self.__server_host
+
                     self.__docker_loggers[cname] = SyslogLogConfigManager(
                         self._global_config,
                         None,
