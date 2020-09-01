@@ -18,6 +18,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from scalyr_agent.log_watcher import LogWatcher
+
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from tests.unit.configuration_test import TestConfigurationBase
@@ -570,6 +572,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.monitor = TestSyslogMonitor(
             config, self.logger, global_config=global_config
         )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
 
         self.monitor.start()
@@ -634,6 +637,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             scalyr_logging.getLogger("syslog_monitor[test]"),
             global_config=global_config,
         )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
         self.monitor.start()
 
@@ -680,6 +684,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             scalyr_logging.getLogger("syslog_monitor[test]"),
             global_config=global_config,
         )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
 
         self.monitor.start()
