@@ -244,7 +244,7 @@ define_config_option(
     "the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log "
     "directory.",
     convert_to=six.text_type,
-    default="containers/${CNAME}.log",
+    default="containers/${CNAME}${HASH}.log",
 )
 
 define_config_option(
