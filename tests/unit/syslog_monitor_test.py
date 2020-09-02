@@ -557,7 +557,8 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     def test_run_tcp_server(self):
         self._write_file_with_separator_conversion(
             """ {
-            api_key: "hi there"
+            api_key: "hi there",
+            agent_log_path: ""
           }
         """
         )
@@ -621,7 +622,8 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     def test_run_udp_server(self):
         self._write_file_with_separator_conversion(
             """ {
-            api_key: "hi there"
+            api_key: "hi there",
+            agent_log_path: ""
           }
         """
         )
@@ -668,7 +670,8 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     def test_run_multiple_servers(self):
         self._write_file_with_separator_conversion(
             """ {
-            api_key: "hi there"
+            api_key: "hi there",
+            agent_log_path: ""
           }
         """
         )
