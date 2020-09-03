@@ -18,6 +18,16 @@
 # Errors shouldn't be considered as fatal
 set +e
 
+if [ -f "scalyr_install.log" ]; then
+  echo "--------------------------------------------------------------------"
+  echo ""
+  echo "Catting scalyr_install.log file"
+  echo ""
+
+  cat scalyr_install.log
+fi
+
+
 echo "--------------------------------------------------------------------"
 echo ""
 echo "Catting agent.log file"

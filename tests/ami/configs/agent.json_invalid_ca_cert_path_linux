@@ -1,0 +1,11 @@
+{
+  api_key: "REPLACE_THIS",
+
+  ca_cert_path: "/tmp/invalid/ca_certs.crt",
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}

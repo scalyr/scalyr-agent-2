@@ -43,6 +43,8 @@ import gc
 import os
 import sys
 import time
+import re
+import ssl
 from io import open
 
 try:
@@ -353,9 +355,12 @@ class ScalyrAgent(object):
             if command == "inner_run_with_checks":
                 raise e
             else:
+                import traceback
+
                 raise Exception(
-                    "Caught exception when attempt to execute command %s.  Exception was %s"
-                    % (command, six.text_type(e))
+                    "Caught exception when attempt to execute command %s.  Exception was %s. "
+                    "Traceback:\n%s"
+                    % (command, six.text_type(e), traceback.format_exc())
                 )
 
     def __read_and_verify_config(self, config_file_path):
@@ -766,8 +771,8 @@ class ScalyrAgent(object):
                     print("Cannot get health check result.")
             elif (
                 status_format == "text"
-                and "Health check" in line
-                and line.rstrip() != "Health check: Good"
+                and "Health check:" in line
+                and not re.match(r"^Health check\:\s+Good$", line.strip())
             ):
                 return_code = 2
         fp.close()
@@ -973,15 +978,19 @@ class ScalyrAgent(object):
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
                 python_version_str = sys.version.replace("\n", "")
                 build_revision = get_build_revision()
+                openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
 
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
-                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s)"
+                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+                    "(OpenSSL version: %s) (default fs encoding: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
                         scalyr_util.get_pid_tid(),
                         python_version_str,
+                        openssl_version,
+                        sys.getfilesystemencoding(),
                     )
                 )
 
@@ -996,6 +1005,10 @@ class ScalyrAgent(object):
                 raw_scalyr_server = self.__config.raw_scalyr_server
                 self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
+                # NOTE: We call this twice - once before and once after creating the client and
+                # applying global config options. This way we ensure config options are also printed
+                # even if the agent fails to connect.
+                config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
                 self.__scalyr_client = self.__create_client()
@@ -1015,17 +1028,10 @@ class ScalyrAgent(object):
                     self.__monitors_manager,
                 ) = start_worker_thread(self.__config, logs_initial_positions)
 
-                # JSON library setting is applied as part of __create_worker_thread method
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using JSON library "%s"' % (scalyr_util.get_json_lib()),
-                )
-
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    'Using "%s" compression algorithm with level "%s"'
-                    % (self.__config.compression_type, self.__config.compression_level),
-                )
+                # NOTE: It's important we call this after worker thread has been created since
+                # some of the global configuration options are only applied after creating a worker
+                # thread
+                self.__config.print_useful_settings(config_pre_global_apply)
 
                 current_time = time.time()
 
@@ -1413,7 +1419,6 @@ class ScalyrAgent(object):
             ca_file = None
             intermediate_certs_file = None
         use_requests_lib = self.__config.use_requests_lib
-        use_tlslite = self.__config.use_tlslite
         return ScalyrClientSession(
             self.__config.scalyr_server,
             self.__config.api_key,
@@ -1423,7 +1428,6 @@ class ScalyrAgent(object):
             ca_file=ca_file,
             intermediate_certs_file=intermediate_certs_file,
             use_requests_lib=use_requests_lib,
-            use_tlslite=use_tlslite,
             compression_type=self.__config.compression_type,
             compression_level=self.__config.compression_level,
             proxies=self.__config.network_proxies,

@@ -42,7 +42,7 @@ from io import open
 from optparse import OptionParser
 
 # TODO: The following two imports have been modified to facilitate Windows platforms
-if "win32" != sys.platform:
+if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
 from __scalyr__ import (
@@ -67,10 +67,11 @@ import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
+import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.scalyr_logging import set_log_destination
+log = scalyr_logging.getLogger(__name__)
 
-set_log_destination(use_stdout=True)
+scalyr_logging.set_log_destination(use_stdout=True)
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
@@ -135,7 +136,7 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file.close()
             original_file = None
 
-            if "win32" == sys.platform:
+            if sys.platform.startswith("win"):
                 os.unlink(config_file_path)
 
             # Determine how to make the file have the same permissions as the original config file.  For now, it
@@ -236,7 +237,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
             print(config_content, file=tmp_file)
             tmp_file.close()
 
-            if "win32" == sys.platform and os.path.isfile(host_path):
+            if sys.platform.startswith("win") and os.path.isfile(host_path):
                 os.unlink(host_path)
 
             os.rename(tmp_host_path, host_path)
@@ -672,7 +673,37 @@ def upgrade_windows_install(
         try:
             try:
                 print("Downloading agent from %s." % url_path)
-                six.moves.urllib.request.urlretrieve(url_path, download_location)
+                # NOTE: We are using requests here since it correctly validates the cert and the
+                # server hostname. Using ScalyrClientSession here would be more complex since it's
+                # mostly meant to be used for long running requests to scalyr API endpoint and
+                # that's not what we are doing here.
+                # NOTE 1: We need to allow redirects since that URL redirects us from
+                # https://www.scalyr.com -> https://app.scalyr.com
+                # NOTE 2: Since we use the same bundle as we use for API requests, we need to make
+                # sure we also use the same cert for app.scalyr.com (which is indeed the case at
+                # this point).
+                import scalyr_agent.third_party.requests as requests
+
+                response = requests.get(
+                    url_path,
+                    allow_redirects=True,
+                    verify=config.ca_cert_path,
+                    stream=True,
+                )
+                assert (
+                    response.status_code == 200
+                ), "server returned %s instead of 200" % (response.status_code)
+                assert (
+                    config.ca_cert_path is True
+                ), "ca_cert_path config option is empty"
+
+                with open(download_location, "wb") as fp:
+                    # We use 1 MB chunk size
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+
+                        fp.write(chunk)
 
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure("Failed to download installation package")
@@ -1332,7 +1363,7 @@ if __name__ == "__main__":
     )
 
     # TODO: These options are only available on Windows platforms
-    if "win32" == sys.platform:
+    if sys.platform.startswith("win"):
         parser.add_option(
             "",
             "--upgrade-windows",
@@ -1425,7 +1456,7 @@ if __name__ == "__main__":
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
-    if "win32" == sys.platform and options.init_config:
+    if sys.platform.startswith("win") and options.init_config:
         # Create a copy of the configuration file and set the owner to be the current user.
         config_path = options.config_filename
         template_dir = os.path.join(os.path.dirname(config_path), "templates")
@@ -1474,7 +1505,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, None)
+        config_file = Configuration(options.config_filename, default_paths, log)
         config_file.parse()
     except Exception as e:
         print(
@@ -1490,10 +1521,10 @@ if __name__ == "__main__":
     controller.consume_config(config_file, options.config_filename)
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
-    if "win32" == sys.platform and options.mark_conditional_restart:
+    if sys.platform.startswith("win") and options.mark_conditional_restart:
         mark_conditional_restart(controller, config_file)
 
-    if "win32" == sys.platform and options.conditional_restart:
+    if sys.platform.startswith("win") and options.conditional_restart:
         restart_if_conditional_marker_exists(controller, config_file)
 
     if options.set_key_from_stdin:
@@ -1527,7 +1558,7 @@ if __name__ == "__main__":
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
-    if "win32" == sys.platform and options.upgrade_windows:
+    if sys.platform.startswith("win") and options.upgrade_windows:
         sys.exit(
             upgrade_windows_install(
                 config_file,

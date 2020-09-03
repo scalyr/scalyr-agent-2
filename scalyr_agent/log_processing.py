@@ -909,7 +909,7 @@ class LogFileIterator(object):
         # not allow for file deletes while someone has a file handle open, but you have to use the native win32 api
         # to be able to open files that work in such a way.. and it still does not allow for the parent dirs to be
         # deleted.)
-        close_file = sys.platform == "win32"
+        close_file = sys.platform.startswith("win")
 
         # also close any files that haven't been modified for a certain amount of time.
         # This can help prevent errors from having too many open files if we are scanning
@@ -3524,7 +3524,7 @@ class FileSystem(object):
     """
 
     def __init__(self):
-        self.trust_inodes = sys.platform != "win32"
+        self.trust_inodes = not sys.platform.startswith("win")
 
     def open(self, file_path):
         """Returns a file object to read the file at file_path.

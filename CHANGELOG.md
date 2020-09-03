@@ -1,6 +1,35 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.11 "Aqua" - August 21, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 21, 2020 19:00 -0800
+--->
+
+Features:
+* Add new ``win32_max_open_fds`` configuration option which allows user to overwrite maximum open file limit on Windows for the scalyr agent process.
+
+Bug fixes:
+* Fix bug in packaging which would cause agent to sometimes crash on Windows when using windows event log monitor.
+
+## 2.1.10 "Alcor" - August 10, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Aug 10, 2020 9:00 -0800
+--->
+
+Bug fixes:
+* Fix formatting of the "Health Check:" line in ``scalyr-agent-2 status -v`` command output and make sure the value is left padded and consistent with other lines.
+* Fix reporting of "Last successful communication with Scalyr" line value in the ``scalyr-agent-2 status -v` command output if we never successfuly establish connection with the Scalyr API.
+* Fix a regression in ``scalyr-agent-2-config --upgrade-windows`` functionality which would sometimes throw an exception, depending on the configuration values.
+
+Security fixes and improvments:
+* Fix a bug with the agent not correctly validating that the hostname which is stored inside the certificate returned by the server matches the one the agent is trying to connect to (``scalyr_config`` option). This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
+* Fix a bug with the agent not correctly validating the server certificate and hostname when using ``scalyr-agent-2-config --upgrade-windows`` functionality under Python < 2.7.9. This would open up a possibility for MITM attack in case the attacker was able to spoof or control the DNS.
+* When connecting to the Scalyr API, agent now explicitly requests TLS v1.2 and aborts connection if the server doesn't support it or tries to use an older version. Recently Scalyr API deprecated support for TLS v1.1 which allows us to implement this change which makes the agent more robust against potential downgrade attacks. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
+* When connecting to the Scalyr API, server now sends a SNI header which matches the host specified in the agent config. Due to lack of required functionality in older Python versions, this is only true when running the agent under Python >= 2.7.9.
+
 ## 2.1.9 "Ursa" - August 4, 2020
 
 <!---
@@ -23,7 +52,6 @@ Features:
 Bug fixes:
 * Fixed race condition in pipelined requests which could lead to duplicate log upload, especially for systems with a large number of inactive log files.  Log files would be reuploaded from their start over short period of time (seconds to minutes).  This bug is triggered when pipelining is enabled, either by explicitly setting the `pipeline_threshold` config option or by using a Scalyr Agent release >= 2.1.6 (pipelining was turned on by default in 2.1.6).
 * Fixed the misconfiguration in Windows packager which causes some number of the monitors to not be included in Windows version.  This generates import errors when attempting to use monitors like the syslog or shell monitor.
-
 Misc:
 * ``compression_level`` configuration option now defaults to ``6`` when using ``deflate`` ``compression_type`` (``deflate`` is the default value for the ``compression_type`` configuration option). 6 offers the best trade off between compression ratio and CPU usage. For more information, please refer to the release notes document.
 
