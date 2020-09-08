@@ -30,7 +30,7 @@ from scalyr_agent.scalyr_client import Event
 from scalyr_agent.scalyr_client import AddEventsRequest
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/logs"))
+LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/fixtures/logs"))
 
 
 def generate_random_dict(keys_count=10):
