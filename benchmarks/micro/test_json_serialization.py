@@ -73,8 +73,8 @@ def test_json_encode_with_custom_options(benchmark, json_lib, keys_count, sort_k
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
-        ("agent_debug_5_mb.log.gz", 3 * 1024),
-        ("agent_debug_5_mb.log.gz", 500 * 1024),
+        ("agent_debug_5_mb.log", 3 * 1024),
+        ("agent_debug_5_mb.log", 500 * 1024),
     ],
     ids=[
         "agent_debug_log_3k",
@@ -95,8 +95,8 @@ def test_json_encode(benchmark, json_lib, log_tuple):
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
-        ("json_log_5_mb.log.gz", 3 * 1024),
-        ("json_log_5_mb.log.gz", 500 * 1024),
+        ("json_log_5_mb.log", 3 * 1024),
+        ("json_log_5_mb.log", 500 * 1024),
     ],
     ids=[
         "json_log_3k",
