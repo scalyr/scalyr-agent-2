@@ -99,7 +99,7 @@ def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
     else:
         open_func = open  # type: ignore
 
-    with open_func(file_path) as fp:
+    with open_func(file_path, "rb") as fp:
         data = fp.read(bytes_to_read)
 
     last_newline_index = data.rfind(b"\n")
