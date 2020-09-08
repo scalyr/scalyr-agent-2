@@ -298,6 +298,11 @@ commands:
         default: "none"
     steps:
       - checkout
+      - run:
+          name: "Checkout Fixture FIle Submodules"
+          command: |
+            git submodule init
+            git submodule update --remote
       - restore_cache:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
       - run:
