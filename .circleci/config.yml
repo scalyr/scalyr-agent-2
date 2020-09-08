@@ -299,7 +299,7 @@ commands:
     steps:
       - checkout
       - run:
-          name: "Checkout Fixture FIle Submodules"
+          name: "Checkout Log Fixture Files Submodule"
           command: |
             git submodule init
             git submodule update --remote
