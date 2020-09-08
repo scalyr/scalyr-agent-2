@@ -26,6 +26,9 @@ from __future__ import absolute_import
 import sys
 import six
 
+from scalyr_ingestion_client.agent_compat import convert_agent_event_to_ingestion_event
+from scalyr_ingestion_client.log_stream import LogStream
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -1991,6 +1994,8 @@ class LogFileProcessor(object):
         file_path,
         config,
         log_config,
+        data_plane_client,
+        session,
         close_when_staleness_exceeds=None,
         log_attributes=None,
         file_system=None,
@@ -2018,6 +2023,11 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
+        self._log_stream = LogStream(uid=file_path)
+        self._data_plane_client = data_plane_client
+        self._session = session
+        self._event_id = 0
+
         if file_system is None:
             file_system = FileSystem()
         if log_attributes is None:
@@ -2335,6 +2345,8 @@ class LogFileProcessor(object):
             buffer_filled = False
             added_thread_id = False
 
+            new_events_buffer = []
+
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
                 # debug leak
@@ -2395,6 +2407,10 @@ class LogFileProcessor(object):
 
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
+                    new_event = convert_agent_event_to_ingestion_event(event)
+                    new_event.uuid = str(self._event_id)
+                    self._event_id += 1
+                    new_events_buffer.append(new_event)
                     if not add_events_request.add_event(
                         event,
                         timestamp=line_object.timestamp,
@@ -2439,6 +2455,15 @@ class LogFileProcessor(object):
                 self.__is_active = bytes_read > 0
 
             final_position = self.__log_file_iterator.tell()
+
+            # TODO: for now im just sending the lines right away, do better buffering later
+            self._data_plane_client.send_events(
+                session=self._session,
+                log_stream=self._log_stream,
+                events=new_events_buffer,
+                sequence_range_start=int(new_events_buffer[0].uuid),
+                sequence_range_end=int(new_events_buffer[-1].uuid),
+            )
 
             # start_process_time = fast_get_time() - start_process_time
             # add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
@@ -3070,7 +3095,14 @@ class LogMatcher(object):
     log when sent to the server.
     """
 
-    def __init__(self, overall_config, log_entry_config, file_system=None):
+    def __init__(
+        self,
+        overall_config,
+        log_entry_config,
+        data_plane_client,
+        session,
+        file_system=None,
+    ):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
             processed such as ``max_line_length``.
@@ -3083,6 +3115,9 @@ class LogMatcher(object):
         @type log_entry_config: dict
         @type file_system: FileSystem
         """
+        self._data_plane_client = data_plane_client
+        self._session = session
+
         if file_system is None:
             self.__file_system = FileSystem()
         else:
@@ -3357,6 +3392,8 @@ class LogMatcher(object):
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
+                        self._data_plane_client,
+                        self._session,
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,

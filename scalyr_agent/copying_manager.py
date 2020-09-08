@@ -18,6 +18,14 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import uuid
+
+from scalyr_ingestion_client.session import Session
+from scalyr_ingestion_client.client import (
+    ControlPlaneAPIClient,
+    DataPlaneAPIClient,
+)
+
 __author__ = "czerwin@scalyr.com"
 
 import copy
@@ -224,6 +232,20 @@ class CopyingManager(StoppableThread, LogWatcher):
         StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
 
+        self._session = Session(uuid=str(uuid.uuid4()))
+
+        self._control_plane_client = ControlPlaneAPIClient(
+            api_token=str(configuration.api_key),
+            cert_path=str(configuration.new_ca_cert_path),
+        )
+        manager_address = self._control_plane_client.send_client_hello()
+
+        self._data_plane_client = DataPlaneAPIClient(
+            api_token=str(configuration.api_key),
+            service_address=(manager_address.ip_address, manager_address.port),
+            cert_path=str(configuration.new_ca_cert_path),
+        )
+
         # Rate limiter
         self.__rate_limiter = None
         if self.__config.parsed_max_send_rate_enforcement:
@@ -393,7 +415,9 @@ class CopyingManager(StoppableThread, LogWatcher):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(self.__config, log_config)
+            matcher = LogMatcher(
+                self.__config, log_config, self._data_plane_client, self._session
+            )
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -602,7 +626,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         result = []
 
         for log_config in configs:
-            result.append(LogMatcher(configuration, log_config))
+            result.append(
+                LogMatcher(
+                    configuration, log_config, self._data_plane_client, self._session
+                )
+            )
 
         return result
 

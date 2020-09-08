@@ -1075,6 +1075,11 @@ class Configuration(object):
         return self.__get_config().get_string("ca_cert_path")
 
     @property
+    def new_ca_cert_path(self):
+        """Returns the configuration value for 'new_ca_cert_path'."""
+        return self.__get_config().get_string("new_ca_cert_path")
+
+    @property
     def compression_type(self):
         """Returns the configuration value for 'compression_type'."""
         return self.__get_config().get_string("compression_type", none_if_missing=True)
@@ -1940,6 +1945,14 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config,
             "ca_cert_path",
+            Configuration.default_ca_cert_path(),
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "new_ca_cert_path",
             Configuration.default_ca_cert_path(),
             description,
             apply_defaults,
