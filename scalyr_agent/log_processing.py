@@ -28,6 +28,7 @@ import six
 
 from scalyr_ingestion_client.agent_compat import convert_agent_event_to_ingestion_event
 from scalyr_ingestion_client.log_stream import LogStream
+import scalyr_ingestion_client.log_line as ingestion_client_line
 
 __author__ = "czerwin@scalyr.com"
 
@@ -2407,11 +2408,16 @@ class LogFileProcessor(object):
 
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
-                    new_event = convert_agent_event_to_ingestion_event(event)
-                    new_event.uuid = str(self._event_id)
+
+                    new_event = ingestion_client_line.LogLine(
+                        str(self._event_id),
+                        line_object.line,
+                        line_object.timestamp,
+                        line_object.attrs
+                    )
                     self._event_id += 1
-                    new_event.attributes.update(self.__base_event.attrs)
                     new_events_buffer.append(new_event)
+
                     if not add_events_request.add_event(
                         event,
                         timestamp=line_object.timestamp,
