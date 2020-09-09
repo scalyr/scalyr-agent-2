@@ -2457,13 +2457,14 @@ class LogFileProcessor(object):
             final_position = self.__log_file_iterator.tell()
 
             # TODO: for now im just sending the lines right away, do better buffering later
-            self._data_plane_client.send_events(
-                session=self._session,
-                log_stream=self._log_stream,
-                events=new_events_buffer,
-                sequence_range_start=int(new_events_buffer[0].uuid),
-                sequence_range_end=int(new_events_buffer[-1].uuid),
-            )
+            if new_events_buffer:
+                self._data_plane_client.send_events(
+                    session=self._session,
+                    log_stream=self._log_stream,
+                    events=new_events_buffer,
+                    sequence_range_start=int(new_events_buffer[0].uuid),
+                    sequence_range_end=int(new_events_buffer[-1].uuid),
+                )
 
             # start_process_time = fast_get_time() - start_process_time
             # add_events_request.increment_timing_data(serialization_time=time_spent_serializing,

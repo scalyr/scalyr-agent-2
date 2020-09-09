@@ -879,6 +879,11 @@ class Configuration(object):
         return self.__get_config().get_string("api_key")
 
     @property
+    def new_api_key(self):
+        """Returns the configuration value for 'new_api_key'."""
+        return self.__get_config().get_string("new_api_key")
+
+    @property
     def scalyr_server(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_string("scalyr_server")
@@ -1453,6 +1458,9 @@ class Configuration(object):
 
         self.__verify_or_set_optional_string(
             config, "api_key", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "new_api_key", "", description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config, "allow_http", False, description, apply_defaults, env_aware=True
