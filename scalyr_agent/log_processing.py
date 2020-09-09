@@ -2023,7 +2023,7 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
-        self._log_stream = LogStream(uid=file_path)
+        self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
         self._data_plane_client = data_plane_client
         self._session = session
         self._event_id = 0
@@ -2410,6 +2410,7 @@ class LogFileProcessor(object):
                     new_event = convert_agent_event_to_ingestion_event(event)
                     new_event.uuid = str(self._event_id)
                     self._event_id += 1
+                    new_event.attributes.update(self.__base_event.attrs)
                     new_events_buffer.append(new_event)
                     if not add_events_request.add_event(
                         event,
