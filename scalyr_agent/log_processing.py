@@ -2409,11 +2409,14 @@ class LogFileProcessor(object):
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
 
+                    new_event_timestamp = line_object.timestamp
+                    if not new_event_timestamp:
+                        new_event_timestamp = int(current_time)
                     new_event = ingestion_client_line.LogLine(
                         str(self._event_id),
                         line_object.line,
-                        line_object.timestamp,
-                        line_object.attrs
+                        new_event_timestamp,
+                        line_object.attrs,
                     )
                     self._event_id += 1
                     new_events_buffer.append(new_event)
