@@ -232,19 +232,23 @@ class CopyingManager(StoppableThread, LogWatcher):
         StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
 
-        self._session = Session(uuid=str(uuid.uuid4()))
+        self._session = None
+        self._control_plane_client = None
+        self._data_plane_client = None
+        if self.__config.use_new_ingestion:
+            self._session = Session(uuid=str(uuid.uuid4()))
 
-        self._control_plane_client = ControlPlaneAPIClient(
-            api_token=str(configuration.new_api_key),
-            cert_path=str(configuration.new_ca_cert_path),
-        )
-        manager_address = self._control_plane_client.send_client_hello()
+            self._control_plane_client = ControlPlaneAPIClient(
+                api_token=str(configuration.api_key),
+                cert_path=str(configuration.ca_cert_path),
+            )
+            manager_address = self._control_plane_client.send_client_hello()
 
-        self._data_plane_client = DataPlaneAPIClient(
-            api_token=str(configuration.new_api_key),
-            service_address=(manager_address.ip_address, manager_address.port),
-            cert_path=str(configuration.new_ca_cert_path),
-        )
+            self._data_plane_client = DataPlaneAPIClient(
+                api_token=str(configuration.api_key),
+                service_address=(manager_address.ip_address, manager_address.port),
+                cert_path=str(configuration.ca_cert_path),
+            )
 
         # Rate limiter
         self.__rate_limiter = None
@@ -818,9 +822,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                             )
                             # Send the request, but don't block for the response yet.
                             send_request_time_start = time.time()
-                            get_response = self._send_events(
-                                self.__pending_add_events_task
-                            )
+                            get_response = None
+                            if not self.__config.use_new_ingestion:
+                                get_response = self._send_events(
+                                    self.__pending_add_events_task
+                                )
 
                             # Check to see if pipelining should be disabled
                             disable_pipelining = self.__has_pending_log_changes()
@@ -849,7 +855,12 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             # Now block for the response.
                             blocking_response_time_start = time.time()
-                            (result, bytes_sent, full_response) = get_response()
+                            if self.__config.use_new_ingestion:
+                                result = "success"
+                                bytes_sent = 0
+                                full_response = ""
+                            else:
+                                (result, bytes_sent, full_response) = get_response()
                             blocking_response_time_end = time.time()
                             self.total_blocking_response_time += (
                                 blocking_response_time_end

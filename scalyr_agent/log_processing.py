@@ -2409,17 +2409,18 @@ class LogFileProcessor(object):
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
 
-                    new_event_timestamp = line_object.timestamp
-                    if not new_event_timestamp:
-                        new_event_timestamp = int(current_time)
-                    new_event = ingestion_client_line.LogLine(
-                        str(self._event_id),
-                        line_object.line,
-                        new_event_timestamp,
-                        line_object.attrs,
-                    )
-                    self._event_id += 1
-                    new_events_buffer.append(new_event)
+                    if self._data_plane_client:
+                        new_event_timestamp = line_object.timestamp
+                        if not new_event_timestamp:
+                            new_event_timestamp = int(current_time)
+                        new_event = ingestion_client_line.LogLine(
+                            str(self._event_id),
+                            line_object.line,
+                            new_event_timestamp,
+                            line_object.attrs,
+                        )
+                        self._event_id += 1
+                        new_events_buffer.append(new_event)
 
                     if not add_events_request.add_event(
                         event,
@@ -2467,7 +2468,7 @@ class LogFileProcessor(object):
             final_position = self.__log_file_iterator.tell()
 
             # TODO: for now im just sending the lines right away, do better buffering later
-            if new_events_buffer:
+            if new_events_buffer and self._data_plane_client:
                 self._data_plane_client.send_events(
                     session=self._session,
                     log_stream=self._log_stream,
