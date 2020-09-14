@@ -298,6 +298,11 @@ commands:
         default: "none"
     steps:
       - checkout
+      - run:
+          name: "Checkout Log Fixture Files Submodule"
+          command: |
+            git submodule init
+            git submodule update --remote
       - restore_cache:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "benchmarks/scripts/requirements.txt" }}
       - run:
@@ -2239,15 +2244,15 @@ workflows:
          context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
-           #     - sonarcloud-scan:
-           #         requires:
-           #           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           #           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           #           # slowest jobs
-           #           - smoke-docker-json
-           #           - smoke-docker-syslog
-           #           - smoke-k8s
-           #           - smoke-monitors-tests
+     - sonarcloud-scan:
+         requires:
+           # NOTE: This is not ideal, but Circle CI doesn't support cross
+           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           # slowest jobs
+           - smoke-docker-json
+           - smoke-docker-syslog
+           - smoke-k8s
+           - smoke-monitors-tests
  package-tests:
    jobs:
      - build-linux-packages-and-installer-script
