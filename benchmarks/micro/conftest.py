@@ -14,7 +14,7 @@
 
 from __future__ import absolute_import
 
-from scalyr_agent.pytest_util import PYTEST_BENCH_FORCE_UNIT  # NOQA
+from scalyr_agent.pytest_util import pytest_benchmark_scale_unit  # NOQA
 from scalyr_agent.pytest_util import pytest_benchmark_generate_json  # NOQA
 
-__all__ = ["PYTEST_BENCH_FORCE_UNIT", "pytest_benchmark_generate_json"]
+__all__ = ["pytest_benchmark_scale_unit", "pytest_benchmark_generate_json"]

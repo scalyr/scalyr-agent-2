@@ -25,6 +25,8 @@ from pytest_benchmark.fixture import BenchmarkFixture
 
 from scalyr_agent import compat
 
+__all__ = ["pytest_benchmark_scale_unit", "pytest_benchmark_generate_json"]
+
 # A list of custom metrics which should be included in the generated pytest benchmark result JSON
 # file
 CUSTOM_METRICS = [
@@ -75,6 +77,12 @@ if PYTEST_BENCH_FORCE_UNIT:
             raise RuntimeError("Unexpected measurement unit %r" % unit)
 
         return prefix, scale
+
+
+else:
+
+    def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
+        pass
 
 
 @pytest.mark.hookwrapper
