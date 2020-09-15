@@ -77,6 +77,12 @@ if PYTEST_BENCH_FORCE_UNIT:
         return prefix, scale
 
 
+else:
+
+    def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):
+        pass
+
+
 @pytest.mark.hookwrapper
 def pytest_benchmark_generate_json(
     config, benchmarks, include_data, machine_info, commit_info
