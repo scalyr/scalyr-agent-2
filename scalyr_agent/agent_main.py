@@ -1389,7 +1389,7 @@ class ScalyrAgent(object):
             key in the configuration file.
         @rtype: ScalyrClientSession
         """
-        if self.__config.verify_server_certificate:
+        if self.__config.verify_server_certificate and not self.__config.use_new_ingestion:
             is_dev_install = INSTALL_TYPE == DEV_INSTALL
             is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
 
