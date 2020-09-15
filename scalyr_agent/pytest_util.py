@@ -25,6 +25,8 @@ from pytest_benchmark.fixture import BenchmarkFixture
 
 from scalyr_agent import compat
 
+__all__ = ["pytest_benchmark_scale_unit", "pytest_benchmark_generate_json"]
+
 # A list of custom metrics which should be included in the generated pytest benchmark result JSON
 # file
 CUSTOM_METRICS = [
