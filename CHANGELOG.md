@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.12 "Betelgeuze" - September 16, 2020
+## 2.1.12 "Betelgeuze" - September 17, 2020
 
 <!---
-Packaged by Arthur Kamalov <tomaz@scalyr.com> on Sep 16, 2020 19:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Sep 17, 2020 19:00 -0800
 --->
 
 Mics:
