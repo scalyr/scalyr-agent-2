@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.12 "Betelgeuze" - September 16, 2020
+
+<!---
+Packaged by Arthur Kamalov <tomaz@scalyr.com> on Sep 16, 2020 19:00 -0800
+--->
+
+Mics:
+* Upgrade `psutil` dependency which incorporates many critical fixes. As part of the change, Windows Server 2003/XP is no longer supported.
+* Small fix for the `pywin32` library which is used in the Windows package.
+
 ## 2.1.11 "Aqua" - August 21, 2020
 
 <!---
