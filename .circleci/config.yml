@@ -42,6 +42,16 @@ non_master_and_release: &non_master_and_release
         # merging a PR.
         - /automated_tests\/.*/
 
+
+# the "release_build" branch is used in the release process and should be triggered only through CircleCI API
+# so, we skip triggering from regular git push.
+skip_release_build_branch_push: &skip_release_build_branch_push
+  unless:
+    and:
+      - equal: [ false, << pipeline.parameters.is_release_build >>]
+      - equal: [ release_build,  << pipeline.git.branch >>]
+
+
 version: 2.1
 
 orbs:
@@ -61,6 +71,10 @@ parameters:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
     default: "v4"
+  is_release_build:
+    description: "Only true when the pipeline is triggered for the release."
+    type: boolean
+    default: false
   agent_version:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
@@ -2204,10 +2218,12 @@ jobs:
 workflows:
  version: 2
  static-analysis:
+   <<: *skip_release_build_branch_push
    jobs:
      - lint-checks:
          context: scalyr-agent
  unit-tests:
+   <<: *skip_release_build_branch_push
    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
    # Python 3 versions
    jobs:
@@ -2222,6 +2238,7 @@ workflows:
      - unittest-35-windows:
          context: scalyr-agent
  smoke-tests:
+   <<: *skip_release_build_branch_push
    jobs:
      - smoke-standalone-26:
          context: scalyr-agent
@@ -2254,6 +2271,7 @@ workflows:
            - smoke-k8s
            - smoke-monitors-tests
  package-tests:
+   <<: *skip_release_build_branch_push
    jobs:
      - build-linux-packages-and-installer-script
      - build-windows-package
