@@ -17,13 +17,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 from scalyr_agent import compat
 from scalyr_agent.builtin_monitors.syslog_utils import SyslogLogConfigManager
 
 __author__ = "imron@scalyr.com"
 
 import errno
-import glob
 import logging
 import logging.handlers
 import os
@@ -38,7 +38,6 @@ from string import Template
 from io import open
 
 import six
-from six.moves import range
 import six.moves.socketserver
 
 from scalyr_agent import (
@@ -47,9 +46,6 @@ from scalyr_agent import (
     AutoFlushingRotatingFileHandler,
 )
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
-    AutoFlushingRotatingFile,
-)
 from scalyr_agent.util import (
     StoppableThread,
     get_parser_from_config,
@@ -678,106 +674,6 @@ class SyslogTCPServer(
         return False
 
 
-class LogDeleter(object):
-    """Deletes unused log files that match a log_file_template"""
-
-    def __init__(
-        self,
-        check_interval_mins,
-        delete_interval_hours,
-        check_rotated_timestamps,
-        max_log_rotations,
-        log_path,
-        log_file_template,
-    ):
-        self._check_interval = check_interval_mins * 60
-        self._delete_interval = delete_interval_hours * 60 * 60
-        self._check_rotated_timestamps = check_rotated_timestamps
-        self._max_log_rotations = max_log_rotations
-        self._log_glob = os.path.join(
-            log_path, log_file_template.safe_substitute(CID="*", CNAME="*")
-        )
-
-        self._last_check = time.time()
-
-    def _get_old_logs_for_glob(
-        self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations
-    ):
-
-        result = []
-
-        for matching_file in glob.glob(glob_pattern):
-            try:
-                added = False
-                mtime = os.path.getmtime(matching_file)
-                if (
-                    current_time - mtime > self._delete_interval
-                    and matching_file not in existing_logs
-                ):
-                    result.append(matching_file)
-                    added = True
-
-                for i in range(max_rotations, 0, -1):
-                    rotated_file = matching_file + (".%d" % i)
-                    try:
-                        if not os.path.isfile(rotated_file):
-                            continue
-
-                        if check_rotated:
-                            mtime = os.path.getmtime(rotated_file)
-                            if current_time - mtime > self._delete_interval:
-                                result.append(rotated_file)
-                        else:
-                            if added:
-                                result.append(rotated_file)
-
-                    except OSError as e:
-                        global_log.warn(
-                            "Unable to read modification time for file '%s', %s"
-                            % (rotated_file, six.text_type(e)),
-                            limit_once_per_x_secs=300,
-                            limit_key="mtime-%s" % rotated_file,
-                        )
-
-            except OSError as e:
-                global_log.warn(
-                    "Unable to read modification time for file '%s', %s"
-                    % (matching_file, six.text_type(e)),
-                    limit_once_per_x_secs=300,
-                    limit_key="mtime-%s" % matching_file,
-                )
-        return result
-
-    def check_for_old_logs(self, existing_logs):
-
-        old_logs = []
-        current_time = time.time()
-        if current_time - self._last_check > self._check_interval:
-
-            old_logs = self._get_old_logs_for_glob(
-                current_time,
-                self._log_glob,
-                existing_logs,
-                self._check_rotated_timestamps,
-                self._max_log_rotations,
-            )
-            self._last_check = current_time
-
-        for filename in old_logs:
-            try:
-                os.remove(filename)
-                global_log.log(
-                    scalyr_logging.DEBUG_LEVEL_1, "Deleted old log file '%s'" % filename
-                )
-            except OSError as e:
-                global_log.warn(
-                    "Error deleting old log file '%s', %s"
-                    % (filename, six.text_type(e)),
-                    limit_once_per_x_secs=300,
-                    limit_key="delete-%s" % filename,
-                )
-
-
 class SyslogHandler(object):
     """Protocol neutral class for handling messages that come in from a syslog server
 
@@ -833,14 +729,14 @@ class SyslogHandler(object):
             self.__docker_file_template = Template(
                 config.get("docker_logfile_template")
             )
-            self.__docker_log_deleter = LogDeleter(
-                config.get("docker_check_for_unused_logs_mins"),
-                config.get("docker_delete_unused_logs_hours"),
-                config.get("docker_check_rotated_timestamps"),
-                rotation_count,
-                log_path,
-                self.__docker_file_template,
-            )
+            # self.__docker_log_deleter = LogDeleter(
+            #    config.get("docker_check_for_unused_logs_mins"),
+            #    config.get("docker_delete_unused_logs_hours"),
+            #    config.get("docker_check_rotated_timestamps"),
+            #    rotation_count,
+            #    log_path,
+            #    self.__docker_file_template,
+            # )
 
             if config.get("docker_use_daemon_to_resolve"):
                 from scalyr_agent.builtin_monitors.docker_monitor import (
@@ -932,26 +828,6 @@ class SyslogHandler(object):
             raise
 
         return attributes
-
-    def __create_log_file(self, cname, cid, log_config):
-        """create our own rotating logger which will log raw messages out to disk.
-        """
-        result = None
-        try:
-            result = AutoFlushingRotatingFile(
-                filename=log_config["path"],
-                max_bytes=self.__max_log_size,
-                backup_count=self.__max_log_rotations,
-                flush_delay=self.__flush_delay,
-            )
-
-        except Exception as e:
-            global_log.error(
-                "Unable to open SyslogMonitor log file: %s" % six.text_type(e)
-            )
-            result = None
-
-        return result
 
     def __extract_container_info(self, data):
         """Attempts to extract the container id, container name and container labels from the log line received from Docker via
@@ -1057,14 +933,18 @@ class SyslogHandler(object):
                 if cname not in self.__docker_loggers:
                     # the log manager uses the "message_log" config to name files, so we take the docker file template,
                     # sub in known values, and pass that along as "message_log"
-                    modified_config = {
-                        "message_log": self.__docker_file_template.safe_substitute(
-                            {"CNAME": cname, "CID": cid}
-                        ),
-                        "parser": "agentSyslogDocker",
-                        "containerName": cname,
-                        "containerId": cid,
-                    }
+                    modified_config = {}
+                    modified_config.update(self._config)
+                    modified_config.update(
+                        {
+                            "message_log": self.__docker_file_template.safe_substitute(
+                                {"CNAME": cname, "CID": cid}
+                            ),
+                            "parser": "agentSyslogDocker",
+                            "containerName": cname,
+                            "containerId": cid,
+                        }
+                    )
                     if self.__server_host:
                         modified_config["serverHost"] = self.__server_host
 
@@ -1078,6 +958,8 @@ class SyslogHandler(object):
                     self.__docker_loggers[cname].set_log_watcher(watcher)
             app, host = self._get_app_and_host(data)
             logger = self.__docker_loggers[cname].get_logger(app)
+            print(cname)
+            print(app)
 
             # TODO: recreate `if self.__expire_count >= RUN_EXPIRE_COUNT:` section
         finally:
@@ -1093,8 +975,8 @@ class SyslogHandler(object):
             )
             self.__logger.info(data)
 
-        # if self.__docker_log_deleter:  # TODO: rework this for log managers
-        #    self.__docker_log_deleter.check_for_old_logs(current_log_files)
+        for cname in self.__docker_loggers:
+            self.__docker_loggers[cname].check_for_old_logs()
 
     @staticmethod
     def _get_app_and_host(data):
