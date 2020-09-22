@@ -38,9 +38,9 @@ class SyslogLogConfigManager(LogConfigManager):
         )
         self.current_log_files = []
         self.log_deleter = LogDeleter(
-            extra_config.get("docker_check_for_unused_logs_mins"),
-            extra_config.get("docker_delete_unused_logs_hours"),
-            extra_config.get("docker_check_rotated_timestamps"),
+            extra_config.get("docker_check_for_unused_logs_mins", 60),
+            extra_config.get("docker_delete_unused_logs_hours", 24),
+            extra_config.get("docker_check_rotated_timestamps", True),
             max_log_rotations,
             Template(extra_config.get("message_log")),
             self._global_config.agent_log_path,

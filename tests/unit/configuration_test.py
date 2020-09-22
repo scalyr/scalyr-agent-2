@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 from scalyr_agent import scalyr_logging
+from scalyr_agent.builtin_monitors.syslog_utils import SyslogLogConfigManager
 
 __author__ = "czerwin@scalyr.com"
 
@@ -415,6 +416,7 @@ class TestConfiguration(TestConfigurationBase):
 
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
             journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ],
+            syslog_logs: [ { syslog_app: ".*", parser: "syslog_catchall" } ],
 
             healthy_max_time_since_last_copy_attempt: 30.0
           }
@@ -501,6 +503,10 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEqual(
             config.journald_log_configs[0].get_string("parser"), "journald_catchall"
+        )
+
+        self.assertEqual(
+            config.syslog_log_configs[0].get_string("parser"), "syslog_catchall"
         )
 
         self.assertEqual(config.healthy_max_time_since_last_copy_attempt, 30.0)
@@ -2506,3 +2512,264 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.max_request_spacing_interval, 4.0)
         self.assertEquals(config.max_log_offset_size, 1234)
         self.assertEquals(config.max_existing_log_offset_size, 1234)
+
+
+class TestSyslogLogConfigManager(TestConfigurationBase):
+    def setUp(self):
+        super(TestSyslogLogConfigManager, self).setUp()
+        self._temp_dir = tempfile.mkdtemp()
+        self._log_dir = os.path.join(self._temp_dir, "log")
+        self._extra_config = {
+            "message_log": "agent_syslog${HASH}.log",
+            "parser": "agentSyslog",
+        }
+        os.makedirs(self._log_dir)
+
+    def get_configuration(self):
+        default_paths = DefaultPaths(
+            self.convert_path(self._log_dir),
+            self.convert_path("/etc/scalyr-agent-2/agent.json"),
+            self.convert_path("/var/lib/scalyr-agent-2"),
+        )
+        return Configuration(self._config_file, default_paths, None)
+
+    def get_configuration_with_logger(self):
+        default_paths = DefaultPaths(
+            self.convert_path(self._log_dir),
+            self.convert_path("/etc/scalyr-agent-2/agent.json"),
+            self.convert_path("/var/lib/scalyr-agent-2"),
+        )
+        return Configuration(
+            self._config_file, default_paths, scalyr_logging.AgentLogger("config_test")
+        )
+
+    def test_default_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("agentSyslog", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("agentSyslog", matched_config["parser"])
+
+    def test_catchall_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ { syslog_app: ".*", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_specific_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ { syslog_app: "test", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("agentSyslog", matched_config["parser"])
+
+    def test_multiple_configs(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [
+                    { syslog_app: "test", parser: "TestParser" },
+                    { syslog_app: "confirm", parser: "ConfirmParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("agentSyslog", matched_config["parser"])
+        matched_config = lcm.get_config("confirm")
+        self.assertEqual("ConfirmParser", matched_config["parser"])
+
+    def test_regex_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [
+                    { syslog_app: "test.*test", parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("testtest")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("agentSyslog", matched_config["parser"])
+        matched_config = lcm.get_config("test_somethingarbitrary:test")
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_big_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [
+                    {
+                        syslog_app: "test",
+                        parser: "TestParser",
+                        redaction_rules: [ { match_expression: "a", replacement: "yes" } ],
+                        sampling_rules: [ { match_expression: "INFO", sampling_rate: 0.1} ],
+                        attributes: {
+                            webServer: "true"
+                        }
+                    }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        matched_config = lcm.get_config("test")
+
+        # NOTE: We need to sort the values since we can't rely on dict ordering
+        expected = [{"match_expression": "a", "replacement": "yes"}]
+        expected[0] = sorted(expected[0].items())
+
+        actual = list(matched_config["redaction_rules"])
+        actual[0] = sorted(actual[0].items())
+        self.assertEqual(expected, actual)
+
+        expected = [{"match_expression": "INFO", "sampling_rate": 0.1}]
+        expected[0] = sorted(expected[0].items())
+
+        actual = list(matched_config["sampling_rules"])
+        actual[0] = sorted(actual[0].items())
+        self.assertEqual(expected, actual)
+        self.assertEqual("true", matched_config["attributes"]["webServer"])
+
+    def test_default_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("test")
+        logger.info("Find this string")
+
+        expected_path = os.path.join(self._log_dir, "agent_syslog.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+    def test_modified_default_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ { syslog_app: ".*", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("test")
+        logger.info("Find this string")
+
+        expected_path = os.path.join(self._log_dir, "agent_syslog.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+    def test_specific_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ { syslog_app: "TEST", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("TEST")
+        logger.info("Find this string")
+        logger2 = lcm.get_logger("Other")
+        logger2.info("Other thing")
+
+        expected_path = os.path.join(
+            self._log_dir, "agent_syslog" + six.text_type(hash("TEST")) + ".log",
+        )
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+        expected_path = os.path.join(self._log_dir, "agent_syslog.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Other thing" in f.read())
+
+    def test_regex_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                syslog_logs: [ { syslog_app: "test.*test", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = SyslogLogConfigManager(config, None, extra_config=self._extra_config)
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("testestestestestest")
+        logger.info("Find this string")
+        logger2 = lcm.get_logger("Other")
+        logger2.info("Other thing")
+
+        expected_path = os.path.join(
+            self._log_dir, "agent_syslog" + six.text_type(hash("test.*test")) + ".log",
+        )
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+        expected_path = os.path.join(self._log_dir, "agent_syslog.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Other thing" in f.read())
