@@ -43,6 +43,7 @@ class SyslogLogConfigManager(LogConfigManager):
             extra_config.get("docker_check_rotated_timestamps"),
             max_log_rotations,
             Template(extra_config.get("message_log")),
+            self._global_config.agent_log_path,
         )
 
     def initialize(self):
@@ -98,7 +99,7 @@ class SyslogLogConfigManager(LogConfigManager):
 
     def get_logger(self, unit):
         result = LogConfigManager.get_logger(self, unit)
-        # self.log_deleter.add_current_log(self.get_config(unit)["path"])
+        self.log_deleter.add_current_log(self.get_config(unit)["path"])
         return result
 
     def check_for_old_logs(self):
@@ -115,12 +116,15 @@ class LogDeleter(object):
         check_rotated_timestamps,
         max_log_rotations,
         log_file_template,
+        agent_log_path,
     ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
         self._check_rotated_timestamps = check_rotated_timestamps
         self._max_log_rotations = max_log_rotations
-        self._log_glob = log_file_template.safe_substitute(HASH="*")
+        self._log_glob = os.path.join(
+            agent_log_path, log_file_template.safe_substitute(HASH="*")
+        )
 
         self._last_check = time.time()
         self.existing_logs = []
@@ -177,7 +181,6 @@ class LogDeleter(object):
         return result
 
     def check_for_old_logs(self):
-
         old_logs = []
         current_time = time.time()
         if current_time - self._last_check > self._check_interval:
