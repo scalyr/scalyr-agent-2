@@ -729,14 +729,6 @@ class SyslogHandler(object):
             self.__docker_file_template = Template(
                 config.get("docker_logfile_template")
             )
-            # self.__docker_log_deleter = LogDeleter(
-            #    config.get("docker_check_for_unused_logs_mins"),
-            #    config.get("docker_delete_unused_logs_hours"),
-            #    config.get("docker_check_rotated_timestamps"),
-            #    rotation_count,
-            #    log_path,
-            #    self.__docker_file_template,
-            # )
 
             if config.get("docker_use_daemon_to_resolve"):
                 from scalyr_agent.builtin_monitors.docker_monitor import (
