@@ -2657,7 +2657,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.max_request_spacing_interval, 4.0)
         self.assertEquals(config.max_log_offset_size, 1234)
         self.assertEquals(config.max_existing_log_offset_size, 1234)
-        
+
     def test_win32_max_open_fds(self):
         # 1. default value
         self._write_file_with_separator_conversion(
