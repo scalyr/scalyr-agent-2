@@ -487,7 +487,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
                     return True
 
             print("Received non-OK (200) response")
-            print("Response status code: %s" % (resp.status_cde))
+            print("Response status code: %s" % (resp.status_code))
             print("Response text: %s" % (resp.text))
             return False
 
@@ -601,7 +601,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                     return True
 
                 print("Received non-OK (200) response")
-                print("Response status code: %s" % (resp.status_cde))
+                print("Response status code: %s" % (resp.status_code))
                 print("Response text: %s" % (resp.text))
                 return False
 
@@ -695,7 +695,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                     )
 
                 print("Received non-OK (200) response")
-                print("Response status code: %s" % (resp.status_cde))
+                print("Response status code: %s" % (resp.status_code))
                 print("Response text: %s" % (resp.text))
                 return False  # Non-ok response
 

@@ -40,6 +40,11 @@ import os
 import sys
 from io import open
 
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
+PY3_pre_32 = PY3 and sys.version_info < (3, 2)
+
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
 # type :
 #   package_root:  The directory containing the Scalyr source (contains files like 'agent_main.py', etc)
@@ -175,8 +180,15 @@ def __add_scalyr_package_to_path():
         sys.path.insert(0, os.path.join(get_package_root(), "third_party_python3"))
 
     # if we are not on windows, prepend the third party tls directory first so it appears after the package root
-    if not __is_frozen__:
-        sys.path.insert(0, os.path.join(get_package_root(), "third_party_tls"))
+    if not __is_frozen__ and (PY2_pre_279 or PY3_pre_32):
+        # Special case for backports module which is a multiple package module so we also need to
+        # add sub directory to pack when bundling a package and not installing it using setup.py
+        sys.path.insert(
+            0,
+            os.path.join(
+                get_package_root(), "third_party_tls/backports_ssl_match_hostname"
+            ),
+        )
 
     sys.path.insert(0, os.path.dirname(get_package_root()))
 

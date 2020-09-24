@@ -1,0 +1,9 @@
+{
+  api_key: "REPLACE_THIS",
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}

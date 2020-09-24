@@ -23,6 +23,7 @@ from scalyr_agent import compat
 __author__ = "czerwin@scalyr.com"
 
 from io import open
+import re
 
 from scalyr_agent import scalyr_init
 
@@ -59,6 +60,8 @@ from scalyr_agent.json_lib import JsonObject
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+from scalyr_agent import scalyr_logging
 
 
 class TestUtilCompression(ScalyrTestCase):
@@ -367,6 +370,45 @@ class TestUtil(ScalyrTestCase):
         self.assertEqual(
             scalyr_util.get_web_url_from_upload_url("https://logstaging.eu.scalyr.com"),
             "https://logstaging.eu.scalyr.com",
+        )
+
+
+class TestUtilWithLogCapture(BaseScalyrLogCaptureTestCase):
+    def setUp(self):
+        super(TestUtilWithLogCapture, self).setUp()
+        self.__logger = scalyr_logging.getLogger("util")
+        self.__logger.set_keep_last_record(False)
+        self.__tempdir = tempfile.mkdtemp()
+        self.__path = os.path.join(self.__tempdir, "testing.json")
+        self.__temp_file_path = self.__path + "~"
+
+    def test_atomic_write_dict_as_json_file_error(self):
+        # mock of the 'atomic_write_dict_as_json_file' internal funtion calls to raise an error
+        # and validate the error log message.
+        info = {"a": "hi"}
+        with patch("os.rename") as os_rename_mock:
+            os_rename_mock.side_effect = Exception("I am an error.")
+            scalyr_util.atomic_write_dict_as_json_file(
+                self.__path, self.__temp_file_path, info
+            )
+
+        self.assertLogFileContainsLineRegex(expression="I am an error.")
+        self.assertLogFileContainsLineRegex(
+            expression="File path: '{0}', type: {1}".format(
+                re.escape(self.__path), type(self.__path)
+            )
+        )
+        self.assertLogFileContainsLineRegex(
+            expression="Temporary file path: '{0}', type: {1}".format(
+                re.escape(self.__temp_file_path), type(self.__temp_file_path)
+            )
+        )
+        self.assertLogFileContainsLineRegex(expression="File exists: False.")
+        self.assertLogFileContainsLineRegex(expression="Temporary file exists: True.")
+        self.assertLogFileContainsLineRegex(
+            expression="File system encoding: {0}".format(
+                re.escape(sys.getfilesystemencoding())
+            )
         )
 
 

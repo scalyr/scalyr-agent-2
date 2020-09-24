@@ -5,7 +5,7 @@ echo ""
 scalyr-agent-2 stop;
 Start-Sleep 2
 
-Remove-Item -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Force
+Remove-Item -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Force -ErrorAction SilentlyContinue
 
 scalyr-agent-2 start;
 Start-Sleep 5

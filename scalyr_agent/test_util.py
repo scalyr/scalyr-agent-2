@@ -31,11 +31,14 @@ import threading
 from io import open
 
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_logging import AgentLogger
+
+LOG = scalyr_logging.getLogger(__name__)
 
 
 class ScalyrTestUtils(object):
@@ -67,7 +70,7 @@ class ScalyrTestUtils(object):
             "/var/lib/scalyr-agent-2",
         )
 
-        config = Configuration(config_file, default_paths, None)
+        config = Configuration(config_file, default_paths, LOG)
         config.parse()
 
         # we need to delete the config dir when done

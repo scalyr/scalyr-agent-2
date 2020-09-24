@@ -1,0 +1,11 @@
+{
+  api_key: "REPLACE_THIS",
+
+  scalyr_server: "https://example.com:443",
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}
