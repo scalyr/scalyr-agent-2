@@ -1464,6 +1464,10 @@ class TestConfiguration(TestConfigurationBase):
                     if field == "debug_level":
                         existing_level = config_obj.get_int(field, none_if_missing=True)
                         fake_env[field] = existing_level + 1
+                    # special case for win32_max_open_fds which specified minimum and maximum values
+                    elif field == "win32_max_open_fds":
+                        existing_value = config_obj.get_int(field, none_if_missing=True)
+                        fake_env[field] = existing_value + 1
                     elif field == "compression_level":
                         fake_env[field] = 8
                     else:
@@ -1730,6 +1734,72 @@ class TestConfiguration(TestConfigurationBase):
 
         config.print_useful_settings(other_config=other_config)
         mock_logger.info.assert_not_called()
+
+    def test_print_config_raw_config_value_debug_level_off(self):
+        # default value (debug_level not explicitly specified)
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            max_line_size: 49900
+            }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        other_config = self._create_test_configuration_instance(logger=mock_logger)
+        other_config.parse()
+
+        config.print_useful_settings(other_config=other_config)
+        mock_logger.info.assert_not_called()
+
+        # debug_level specifies, but the value is < 5
+        for level in range(0, 4):
+            self._write_file_with_separator_conversion(
+                """{
+                api_key: "hi there",
+                max_line_size: 49900
+                debug_level: %s
+                }
+            """
+                % (level)
+            )
+            mock_logger = Mock()
+            config = self._create_test_configuration_instance(logger=mock_logger)
+            config.parse()
+
+            other_config = self._create_test_configuration_instance(logger=mock_logger)
+            other_config.parse()
+
+            config.print_useful_settings(other_config=other_config)
+            mock_logger.info.assert_not_called()
+
+    def test_print_config_raw_config_value_debug_level_5(self):
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            max_line_size: 49900,
+            debug_level: 5
+            }
+        """
+        )
+
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+
+        other_config = self._create_test_configuration_instance(logger=mock_logger)
+        other_config.parse()
+
+        self.assertEqual(mock_logger.info.call_count, 0)
+        config.print_useful_settings(other_config=other_config)
+        self.assertEqual(mock_logger.info.call_count, 1)
+
+        call_msg = mock_logger.info.call_args_list[0][0][0]
+        self.assertTrue("Raw config value:" in call_msg)
+        self.assertTrue("*** MASKED ***" in call_msg)
+        self.assertTrue('"debug_level": 5' in call_msg)
 
     def test_import_vars_in_configuration_directory(self):
         os.environ["TEST_VAR"] = "bye"
@@ -2381,6 +2451,81 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
+    def test__verify_or_set_optional_int_with_min_and_max_value(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Valid value1
+        config_object = JsonObject(content={"foo": 10})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 10)
+
+        config_object = JsonObject(content={"foo": 50})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 50)
+
+        config_object = JsonObject(content={"foo": 100})
+        config._Configuration__verify_or_set_optional_int(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+        self.assertEqual(config_object["foo"], 100)
+
+        # 2. value < min
+        config_object = JsonObject(content={"foo": 9})
+        expected_msg = (
+            'Got invalid value "9" for field "foo". Value must be greater than 10'
+        )
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_int,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+
+        # 3. value > max
+        config_object = JsonObject(content={"foo": 101})
+        expected_msg = (
+            'Got invalid value "101" for field "foo". Value must be less than 100'
+        )
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_int,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            min_value=10,
+            max_value=100,
+        )
+
+        pass
+
     def test___verify_or_set_optional_string_with_valid_values(self):
         config = self._create_test_configuration_instance()
 
@@ -2506,3 +2651,29 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.max_request_spacing_interval, 4.0)
         self.assertEquals(config.max_log_offset_size, 1234)
         self.assertEquals(config.max_existing_log_offset_size, 1234)
+
+    def test_win32_max_open_fds(self):
+        # 1. default value
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "foo",
+            }
+            """
+        )
+        config = self.get_configuration_with_logger()
+        config.parse()
+
+        self.assertEquals(config.win32_max_open_fds, 512)
+
+        # 2. overwritten value
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "foo",
+                win32_max_open_fds: 1024
+            }
+            """
+        )
+        config = self.get_configuration_with_logger()
+        config.parse()
+
+        self.assertEquals(config.win32_max_open_fds, 1024)

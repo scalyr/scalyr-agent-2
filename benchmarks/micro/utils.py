@@ -30,7 +30,7 @@ from scalyr_agent.scalyr_client import Event
 from scalyr_agent.scalyr_client import AddEventsRequest
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/logs"))
+LOGS_FIXTURES_DIR = os.path.abspath(os.path.join(BASE_DIR, "../fixtures/fixtures/logs"))
 
 
 def generate_random_dict(keys_count=10):
@@ -99,7 +99,7 @@ def read_bytes_from_log_fixture_file(file_name, bytes_to_read):
     else:
         open_func = open  # type: ignore
 
-    with open_func(file_path) as fp:
+    with open_func(file_path, "rb") as fp:
         data = fp.read(bytes_to_read)
 
     last_newline_index = data.rfind(b"\n")

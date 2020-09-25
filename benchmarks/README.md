@@ -126,3 +126,11 @@ are benchmarks where larger value is better (think throughput).
 
 Agents under load utilize static log file fixtures from this repo -
 https://github.com/scalyr/codespeed-agent-fixtures.
+
+NOTE: If you want to run the micro benchmarks locally you need to make sure the submodule with the
+fixture files has been checked out:
+
+```bash
+git submodule init
+git submodule update
+```

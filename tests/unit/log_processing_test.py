@@ -371,11 +371,9 @@ class TestLogFileIterator(ScalyrTestCase):
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
 
+    # Since it cannot keep file handles open when they are deleted, win32 cannot handle this case
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     def test_deleted_file(self):
-        # Since it cannot keep file handles open when they are deleted, win32 cannot handle this case:
-        if sys.platform == "win32":
-            return
-
         _, first_sequence_number = self.log_file.get_sequence()
 
         self.append_file(self.__path, b"L001\n", b"L002\n")
@@ -394,11 +392,10 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes(time_advance=60 * 11)
         self.assertTrue(self.log_file.at_end)
 
+    # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    @skipIf(sys.version_info[:2] == (2, 6), "Skipping under Python 2.6")
     def test_losing_read_access(self):
-        # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
-        if sys.platform == "win32" or sys.version_info[:2] == (2, 6):
-            return
-
         self.append_file(self.__path, b"L001\n", b"L002\n")
         restore_access = self.remove_read_access()
         os.chmod(self.__tempdir, 0)
@@ -433,11 +430,9 @@ class TestLogFileIterator(ScalyrTestCase):
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
 
+    # Since it cannot keep file handles open when they are deleted/moved, win32 cannot handle this case:
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     def test_rotating_log_file_with_move(self):
-        # Since it cannot keep file handles open when they are deleted/moved, win32 cannot handle this case:
-        if sys.platform == "win32":
-            return
-
         self.append_file(self.__path, b"L001\n")
         self.log_file.scan_for_new_bytes()
 

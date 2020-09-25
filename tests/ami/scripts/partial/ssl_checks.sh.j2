@@ -1,0 +1,182 @@
+# Test MITM attack - agent should fail to connect and start up with invalid hostname
+echo_with_date ""
+echo_with_date "Performing certificate validation and MITM checks"
+echo_with_date ""
+
+#
+# 1. Configure invalid path for "ca_cert_path" and verify agent throws and fails to start
+#
+echo_with_date ""
+echo_with_date "Peforming invalid ca_cert_path config option checks"
+echo_with_date ""
+
+sudo cp agent.json_invalid_ca_cert_path_linux /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
+echo_with_date ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
+
+set +e
+STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
+EXIT_CODE=$?
+set -e
+
+echo -e "${STATUS_OUTPUT}"
+echo_with_date ""
+
+if [ "${EXIT_CODE}" -ne 1 ]; then
+    echo_with_date "scalyr-agent-2 status -v command should have exited with 1 exit code"
+    exit 1
+fi
+
+echo -e "${STATUS_OUTPUT}" | grep "The agent does not appear to be running"
+
+echo_with_date ""
+echo_with_date "Verifying agent.log"
+echo_with_date ""
+
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "ca_cert_path: /tmp/invalid/ca_certs.crt"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "failedAgentMain"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Invalid path \"/tmp/invalid/ca_certs.crt\" specified for the \"ca_cert_path\""
+echo_with_date ""
+
+#
+# 2. Configure agent to use system CA bundle to verify the server cert and verify it works
+#
+echo_with_date ""
+echo_with_date "Performing system CA bundle checks"
+echo_with_date ""
+
+if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
+    # Ubuntu
+    SYSTEM_CA_BUNDLE_PATH="/etc/ssl/certs/ca-certificates.crt"
+elif [ -f "/etc/ssl/certs/ca-bundle.crt" ]; then
+    # Fedora, etc.
+    SYSTEM_CA_BUNDLE_PATH="/etc/ssl/certs/ca-bundle.crt"
+else
+    echo_with_date "No system CA bundle found"
+    exit 1
+fi
+
+# NOTE: We create a symlink so we can re-use config with a fixed value for ca_cert_path
+sudo ln -s ${SYSTEM_CA_BUNDLE_PATH} /etc/ssl/system-ca-bundle.crt
+
+sudo cp agent.json_system_ca_bundle /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
+echo_with_date ""
+echo_with_date "Verifying agent.log"
+echo_with_date ""
+
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "ca_cert_path: /etc/ssl/system-ca-bundle.crt"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "HttpConnection uses native os ssl"
+
+echo_with_date ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
+STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
+echo -e "${STATUS_OUTPUT}"
+echo_with_date ""
+
+echo -e "${STATUS_OUTPUT}" | grep -v "Last successful communication with Scalyr: Never"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 success"
+
+#
+# 3. Mimic MITM attack by pointing a random domain oo agent.scalyr.com and verify hostname
+# check post SSL handshake and cert validation fails
+#
+echo_with_date ""
+echo_with_date "Performing MITM and hostname verification checks"
+echo_with_date ""
+
+# NOTE: Dig may not be available on all the distros by defualt
+#AGENT_SCALYR_COM_IP=$(dig +short agent.scalyr.com 2> /dev/null | tail -n 1 | tr -d "\n")
+AGENT_SCALYR_COM_IP=$(getent hosts agent.scalyr.com | awk '{ print $1 }' | tail -n 1 | tr -d "\n")
+MOCK_HOST="invalid.mitm.should.fail.test.agent.scalyr.com"
+ETC_HOSTS_ENTRY="${AGENT_SCALYR_COM_IP} ${MOCK_HOST}"
+
+# Add mock /etc/hosts entry and agent config scalyr_server entry
+echo "${ETC_HOSTS_ENTRY}" | sudo tee -a /etc/hosts
+
+sudo cp agent.json_invalid_host_mitm /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
+echo_with_date ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
+STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
+echo -e "${STATUS_OUTPUT}"
+echo_with_date ""
+
+echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
+echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy request size:                    0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed"
+
+echo_with_date ""
+echo_with_date "Status output successfuly verified."
+echo_with_date ""
+
+echo_with_date ""
+echo_with_date "Verifying agent logs"
+echo_with_date ""
+
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to \"https://${MOCK_HOST}:443\""
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "because of server certificate validation error"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "This likely indicates a MITM attack"
+
+echo_with_date ""
+echo_with_date "agent.log output successfuly verified"
+echo_with_date ""
+
+# Clean up at the end and remove all the refernces to the mock host and IP
+sudo sed -i -n "/${AGENT_SCALYR_COM_IP}/!p" /etc/hosts
+sudo sed -i -n "/${MOCK_HOST}/!p" /etc/scalyr-agent-2/agent.json
+
+#
+# 4. Vertify that CA cerification fail if we connection to a server with certificate issues by CA
+# which we don't trust
+#
+echo_with_date ""
+echo_with_date "Performing cert signed by CA we dont trust checks"
+echo_with_date ""
+
+sudo cp agent.json_invalid_bad_cert /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
+echo_with_date ""
+echo_with_date "Verifying agent status output"
+echo_with_date ""
+STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
+echo -e "${STATUS_OUTPUT}"
+echo_with_date ""
+
+echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
+echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy request size:                    0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedSSLError"
+
+echo_with_date ""
+echo_with_date "Status output successfuly verified."
+echo_with_date ""
+
+echo_with_date ""
+echo_with_date "Verifying agent logs"
+echo_with_date ""
+
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to \"https://example.com:443\""
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "due to some SSL error"
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "certificate verify failed"
+
+echo_with_date ""
+echo_with_date "agent.log output successfuly verified"
+echo_with_date ""
