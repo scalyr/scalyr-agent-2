@@ -135,7 +135,16 @@ class LogDeleter(object):
     def _get_old_logs_for_glob(
         self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations
     ):
+        """ Checks the age of files that match `glob_pattern`, returning a list of any older than
+        `self._delete_interval`.
 
+        :param current_time: int, Time from `time.time()`
+        :param glob_pattern: str, Glob pattern to use when checking files for oldness
+        :param existing_logs: List<str>, List of log paths to ignore in our check
+        :param check_rotated: bool, If true we will also check for rotated out files for any file we match
+        :param max_rotations: int, Max rotated out files we could expect to find
+        :return: List<str>, List of file paths of logs that match the glob pattern and are considered old
+        """
         result = []
 
         for matching_file in glob.glob(glob_pattern):
