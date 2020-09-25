@@ -2022,7 +2022,9 @@ class LogFileProcessor(object):
         """
         self._data_plane_client = data_plane_client
         if self._data_plane_client:
-            from scalyr_ingestion_client.log_stream import LogStream
+            from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
+                LogStream,
+            )
 
             self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
         self._session = session
@@ -2409,7 +2411,7 @@ class LogFileProcessor(object):
                     event = self.__create_events_object(line_object, sample_result)
 
                     if self._data_plane_client:
-                        import scalyr_ingestion_client.log_line as ingestion_client_line
+                        import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
 
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:

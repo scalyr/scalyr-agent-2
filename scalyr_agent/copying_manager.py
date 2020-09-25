@@ -230,8 +230,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         self._control_plane_client = None
         self._data_plane_client = None
         if self.__config.use_new_ingestion:
-            from scalyr_ingestion_client.session import Session
-            from scalyr_ingestion_client.client import (
+            from scalyr_ingestion_client.session import (  # pylint: disable=import-error
+                Session,
+            )
+            from scalyr_ingestion_client.client import (  # pylint: disable=import-error
                 ControlPlaneAPIClient,
                 DataPlaneAPIClient,
             )
