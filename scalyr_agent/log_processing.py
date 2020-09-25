@@ -3112,8 +3112,8 @@ class LogMatcher(object):
         self,
         overall_config,
         log_entry_config,
-        data_plane_client,
-        session,
+        data_plane_client=None,
+        session=None,
         file_system=None,
     ):
         """Initializes an instance.
