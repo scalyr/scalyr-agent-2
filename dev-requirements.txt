@@ -31,4 +31,3 @@ pathlib2==2.3.5; python_version <= '2.7'
 # Used for performanice optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
 udatetime==0.0.16
-git+https://github.com/scalyr/python-ingestion-library.git
