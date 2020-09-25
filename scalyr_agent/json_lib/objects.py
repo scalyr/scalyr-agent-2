@@ -701,5 +701,10 @@ def convert_to_builtin_type(value):
         for x in value:
             result.append(convert_to_builtin_type(x))
         return result
+    elif value_type in [ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]:
+        result = []
+        for x in value._items:
+            result.append(convert_to_builtin_type(x))
+        return result
     else:
         return value

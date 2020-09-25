@@ -37,18 +37,18 @@ from .time_utils import process_time
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
-        ("agent_debug_5_mb.log.gz", 3 * 1024),
-        ("agent_debug_5_mb.log.gz", 10 * 1024),
-        ("agent_debug_5_mb.log.gz", 500 * 1024),
-        ("json_log_5_mb.log.gz", 3 * 1024),
-        ("json_log_5_mb.log.gz", 10 * 1024),
-        ("json_log_5_mb.log.gz", 500 * 1024),
-        ("add_events_request_10_events.log.gz", -1),
-        ("add_events_request_100_events.log.gz", -1),
-        ("add_events_request_200_events.log.gz", -1),
-        ("add_events_request_10_events_with_attributes.log.gz", -1),
-        ("add_events_request_100_events_with_attributes.log.gz", -1),
-        ("add_events_request_200_events_with_attributes.log.gz", -1),
+        ("agent_debug_5_mb.log", 3 * 1024),
+        ("agent_debug_5_mb.log", 10 * 1024),
+        ("agent_debug_5_mb.log", 500 * 1024),
+        ("json_log_5_mb.log", 3 * 1024),
+        ("json_log_5_mb.log", 10 * 1024),
+        ("json_log_5_mb.log", 500 * 1024),
+        ("add_events_request_10_events.log", -1),
+        ("add_events_request_100_events.log", -1),
+        ("add_events_request_200_events.log", -1),
+        ("add_events_request_10_events_with_attributes.log", -1),
+        ("add_events_request_100_events_with_attributes.log", -1),
+        ("add_events_request_200_events_with_attributes.log", -1),
     ],
     ids=[
         "agent_debug_log_3k",
@@ -111,18 +111,18 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
 # fmt: off
 @pytest.mark.parametrize("log_tuple",
     [
-        ("agent_debug_5_mb.log.gz", 3 * 1024),
-        ("agent_debug_5_mb.log.gz", 10 * 1024),
-        ("agent_debug_5_mb.log.gz", 500 * 1024),
-        ("json_log_5_mb.log.gz", 3 * 1024),
-        ("json_log_5_mb.log.gz", 10 * 1024),
-        ("json_log_5_mb.log.gz", 500 * 1024),
-        ("add_events_request_10_events.log.gz", -1),
-        ("add_events_request_100_events.log.gz", -1),
-        ("add_events_request_200_events.log.gz", -1),
-        ("add_events_request_10_events_with_attributes.log.gz", -1),
-        ("add_events_request_100_events_with_attributes.log.gz", -1),
-        ("add_events_request_200_events_with_attributes.log.gz", -1),
+        ("agent_debug_5_mb.log", 3 * 1024),
+        ("agent_debug_5_mb.log", 10 * 1024),
+        ("agent_debug_5_mb.log", 500 * 1024),
+        ("json_log_5_mb.log", 3 * 1024),
+        ("json_log_5_mb.log", 10 * 1024),
+        ("json_log_5_mb.log", 500 * 1024),
+        ("add_events_request_10_events.log", -1),
+        ("add_events_request_100_events.log", -1),
+        ("add_events_request_200_events.log", -1),
+        ("add_events_request_10_events_with_attributes.log", -1),
+        ("add_events_request_100_events_with_attributes.log", -1),
+        ("add_events_request_200_events_with_attributes.log", -1),
     ],
     ids=[
         "agent_debug_log_3k",
@@ -201,8 +201,8 @@ def _test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     size_after_compression = len(result)
     compression_ratio = float(size_before_compression) / size_after_compression
 
-    benchmark.stats.size_before_compression = size_before_compression
-    benchmark.stats.size_after_compression = size_after_compression
+    benchmark.stats.stats.size_before_compression = size_before_compression
+    benchmark.stats.stats.size_after_compression = size_after_compression
     benchmark.stats.stats.compression_ratio = compression_ratio
 
     assert result is not None

@@ -1014,6 +1014,31 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
+    def test_get_user_agent_includes_requests_version(self):
+        # without requests
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertEqual(split[-1], "ssllib")
+        self.assertTrue(split[1].startswith("python-"))
+
+        # with requests
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            use_requests_lib=True,
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertEqual(split[-1], "requests-2.15.1")
+        self.assertEqual(split[-2], "ssllib")
+        self.assertTrue(split[1].startswith("python-"))
+
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
         """
