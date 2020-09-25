@@ -20,12 +20,6 @@ from __future__ import absolute_import
 
 import uuid
 
-from scalyr_ingestion_client.session import Session
-from scalyr_ingestion_client.client import (
-    ControlPlaneAPIClient,
-    DataPlaneAPIClient,
-)
-
 __author__ = "czerwin@scalyr.com"
 
 import copy
@@ -236,6 +230,12 @@ class CopyingManager(StoppableThread, LogWatcher):
         self._control_plane_client = None
         self._data_plane_client = None
         if self.__config.use_new_ingestion:
+            from scalyr_ingestion_client.session import Session
+            from scalyr_ingestion_client.client import (
+                ControlPlaneAPIClient,
+                DataPlaneAPIClient,
+            )
+
             self._session = Session(uuid=str(uuid.uuid4()))
 
             self._control_plane_client = ControlPlaneAPIClient(

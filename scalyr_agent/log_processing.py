@@ -26,10 +26,6 @@ from __future__ import absolute_import
 import sys
 import six
 
-from scalyr_ingestion_client.agent_compat import convert_agent_event_to_ingestion_event
-from scalyr_ingestion_client.log_stream import LogStream
-import scalyr_ingestion_client.log_line as ingestion_client_line
-
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -2024,8 +2020,11 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
-        self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
         self._data_plane_client = data_plane_client
+        if self._data_plane_client:
+            from scalyr_ingestion_client.log_stream import LogStream
+
+            self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
         self._session = session
         self._event_id = 0
 
@@ -2410,6 +2409,8 @@ class LogFileProcessor(object):
                     event = self.__create_events_object(line_object, sample_result)
 
                     if self._data_plane_client:
+                        import scalyr_ingestion_client.log_line as ingestion_client_line
+
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
                             new_event_timestamp = int(current_time)
