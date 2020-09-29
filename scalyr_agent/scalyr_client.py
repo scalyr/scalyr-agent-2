@@ -23,6 +23,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import uuid
+
 __author__ = "czerwin@scalyr.com"
 
 import platform
@@ -66,6 +68,41 @@ def _set_last_timestamp(val):
     """
     global __last_time_stamp__
     __last_time_stamp__ = val
+
+
+class NewScalyrClientSession(object):
+    def __init__(self, configuration):
+        if configuration.use_new_ingestion:
+            from scalyr_ingestion_client.session import (  # pylint: disable=import-error
+                Session,
+            )
+            from scalyr_ingestion_client.client import (  # pylint: disable=import-error
+                ControlPlaneAPIClient,
+                DataPlaneAPIClient,
+            )
+
+            self._session = Session(uuid=str(uuid.uuid4()))
+
+            self._control_plane_client = ControlPlaneAPIClient(
+                api_token=str(configuration.api_key),
+                cert_path=str(configuration.ca_cert_path),
+            )
+            manager_address = self._control_plane_client.send_client_hello()
+
+            self._data_plane_client = DataPlaneAPIClient(
+                api_token=str(configuration.api_key),
+                service_address=(manager_address.ip_address, manager_address.port),
+                cert_path=str(configuration.ca_cert_path),
+            )
+
+    def send_events(self, log_stream, events):
+        self._data_plane_client.send_events(
+            session=self._session,
+            log_stream=log_stream,
+            events=events,
+            sequence_range_start=int(events[0].uuid),
+            sequence_range_end=int(events[-1].uuid),
+        )
 
 
 class ScalyrClientSession(object):

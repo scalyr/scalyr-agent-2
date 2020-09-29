@@ -18,8 +18,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import uuid
-
 __author__ = "czerwin@scalyr.com"
 
 import copy
@@ -227,30 +225,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__config = configuration
 
         self._session = None
-        self._control_plane_client = None
-        self._data_plane_client = None
-        if self.__config.use_new_ingestion:
-            from scalyr_ingestion_client.session import (  # pylint: disable=import-error
-                Session,
-            )
-            from scalyr_ingestion_client.client import (  # pylint: disable=import-error
-                ControlPlaneAPIClient,
-                DataPlaneAPIClient,
-            )
-
-            self._session = Session(uuid=str(uuid.uuid4()))
-
-            self._control_plane_client = ControlPlaneAPIClient(
-                api_token=str(configuration.api_key),
-                cert_path=str(configuration.ca_cert_path),
-            )
-            manager_address = self._control_plane_client.send_client_hello()
-
-            self._data_plane_client = DataPlaneAPIClient(
-                api_token=str(configuration.api_key),
-                service_address=(manager_address.ip_address, manager_address.port),
-                cert_path=str(configuration.ca_cert_path),
-            )
+        self.__new_scalyr_client = None
 
         # Rate limiter
         self.__rate_limiter = None
@@ -313,7 +288,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__pending_log_matchers = []
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = self.__create_log_matches(configuration, monitors)
+        self.__log_matchers = None
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -421,9 +396,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(
-                self.__config, log_config, self._data_plane_client, self._session
-            )
+            matcher = LogMatcher(self.__config, log_config, self.__new_scalyr_client)
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -633,14 +606,14 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         for log_config in configs:
             result.append(
-                LogMatcher(
-                    configuration, log_config, self._data_plane_client, self._session
-                )
+                LogMatcher(configuration, log_config, self.__new_scalyr_client)
             )
 
         return result
 
-    def start_manager(self, scalyr_client, logs_initial_positions=None):
+    def start_manager(
+        self, scalyr_client, new_scalyr_client, logs_initial_positions=None
+    ):
         """Starts the manager running and will not return until it has been stopped.
 
         This will start a new thread to run the manager.
@@ -650,10 +623,13 @@ class CopyingManager(StoppableThread, LogWatcher):
             if none can be found from the checkpoint files.  This can be used to override the default behavior of
             just reading from the current end of the file if there is no checkpoint for the file
         @type scalyr_client: scalyr_client.ScalyrClientSession
+        @type new_scalyr_client: scalyr_client.NewScalyrClientSession
         @type logs_initial_positions: dict
         @param scalyr_client:
         """
         self.__scalyr_client = scalyr_client
+        self.__new_scalyr_client = new_scalyr_client
+        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
         self.__logs_initial_positions = logs_initial_positions
         self.start()
 

@@ -173,6 +173,8 @@ class ScalyrAgent(object):
         self.__monitors_manager = None
         # The current ScalyrClientSession to use for sending requests.
         self.__scalyr_client = None
+        # The current NewScalyrClientSession to use for sending requests.
+        self.__new_scalyr_client = None
 
         # Tracks whether or not the agent should still be running.  When a terminate signal is received,
         # the run state is set to false.  Threads are expected to notice this and finish as quickly as
@@ -1012,6 +1014,7 @@ class ScalyrAgent(object):
                 self.__config.print_useful_settings()
 
                 self.__scalyr_client = self.__create_client()
+                self.__new_scalyr_client = self.__create_new_client()
 
                 def start_worker_thread(config, logs_initial_positions=None):
                     wt = self.__create_worker_thread(config)
@@ -1019,7 +1022,11 @@ class ScalyrAgent(object):
                     wt.monitors_manager.set_user_agent_augment_callback(
                         self.__scalyr_client.augment_user_agent
                     )
-                    wt.start(self.__scalyr_client, logs_initial_positions)
+                    wt.start(
+                        self.__scalyr_client,
+                        self.__new_scalyr_client,
+                        logs_initial_positions,
+                    )
                     return wt, wt.copying_manager, wt.monitors_manager
 
                 (
@@ -1379,6 +1386,14 @@ class ScalyrAgent(object):
         ]
 
         scalyr_logging.set_log_level(levels[debug_level])
+
+    def __create_new_client(self):
+        result = None
+        if self.__config.use_new_ingestion:
+            from scalyr_agent.scalyr_client import NewScalyrClientSession
+
+            result = NewScalyrClientSession(self.__config)
+        return result
 
     def __create_client(self, quiet=False):
         """Creates and returns a new client to the Scalyr servers.
@@ -1932,16 +1947,20 @@ class WorkerThread(object):
 
     def __init__(self, configuration, copying_manager, monitors):
         self.__scalyr_client = None
+        self.__new_scalyr_client = None
         self.config = configuration
         self.copying_manager = copying_manager
         self.monitors_manager = monitors
 
-    def start(self, scalyr_client, log_initial_positions=None):
+    def start(self, scalyr_client, new_scalyr_client, log_initial_positions=None):
         if self.__scalyr_client is not None:
             self.__scalyr_client.close()
         self.__scalyr_client = scalyr_client
+        self.__new_scalyr_client = new_scalyr_client
 
-        self.copying_manager.start_manager(scalyr_client, log_initial_positions)
+        self.copying_manager.start_manager(
+            scalyr_client, new_scalyr_client, log_initial_positions
+        )
         # We purposely wait for the copying manager to begin copying so that if the monitors create any new
         # files, they will be guaranteed to be copying up to the server starting at byte index zero.
         # Note, if copying never begins then the copying manager will sys exit, so this next call will never just

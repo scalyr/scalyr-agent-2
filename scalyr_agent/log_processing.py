@@ -1991,8 +1991,7 @@ class LogFileProcessor(object):
         file_path,
         config,
         log_config,
-        data_plane_client=None,
-        session=None,
+        new_scalyr_client=None,
         close_when_staleness_exceeds=None,
         log_attributes=None,
         file_system=None,
@@ -2020,14 +2019,13 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
-        self._data_plane_client = data_plane_client
-        if self._data_plane_client:
+        self._new_scalyr_client = new_scalyr_client
+        if self._new_scalyr_client:
             from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
                 LogStream,
             )
 
             self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
-        self._session = session
         self._event_id = 0
 
         if file_system is None:
@@ -2410,7 +2408,7 @@ class LogFileProcessor(object):
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
 
-                    if self._data_plane_client:
+                    if self._new_scalyr_client:
                         import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
 
                         new_event_timestamp = line_object.timestamp
@@ -2471,13 +2469,9 @@ class LogFileProcessor(object):
             final_position = self.__log_file_iterator.tell()
 
             # TODO: for now im just sending the lines right away, do better buffering later
-            if new_events_buffer and self._data_plane_client:
-                self._data_plane_client.send_events(
-                    session=self._session,
-                    log_stream=self._log_stream,
-                    events=new_events_buffer,
-                    sequence_range_start=int(new_events_buffer[0].uuid),
-                    sequence_range_end=int(new_events_buffer[-1].uuid),
+            if new_events_buffer and self._new_scalyr_client:
+                self._new_scalyr_client.send_events(
+                    log_stream=self._log_stream, events=new_events_buffer,
                 )
 
             # start_process_time = fast_get_time() - start_process_time
@@ -3114,8 +3108,7 @@ class LogMatcher(object):
         self,
         overall_config,
         log_entry_config,
-        data_plane_client=None,
-        session=None,
+        new_scalyr_client=None,
         file_system=None,
     ):
         """Initializes an instance.
@@ -3130,8 +3123,7 @@ class LogMatcher(object):
         @type log_entry_config: dict
         @type file_system: FileSystem
         """
-        self._data_plane_client = data_plane_client
-        self._session = session
+        self._new_scalyr_client = new_scalyr_client
 
         if file_system is None:
             self.__file_system = FileSystem()
@@ -3407,8 +3399,7 @@ class LogMatcher(object):
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
-                        self._data_plane_client,
-                        self._session,
+                        self._new_scalyr_client,
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,
