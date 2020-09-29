@@ -84,8 +84,12 @@ class NewScalyrClientSession(object):
             self._session = Session(uuid=str(uuid.uuid4()))
 
             self._control_plane_client = ControlPlaneAPIClient(
+                service_address=configuration.new_ingestion_bootstrap_address.split(
+                    ":"
+                ),
                 api_token=str(configuration.api_key),
                 cert_path=str(configuration.ca_cert_path),
+                use_tls=configuration.new_ingestion_use_tls,
             )
             manager_address = self._control_plane_client.send_client_hello()
 
@@ -93,6 +97,7 @@ class NewScalyrClientSession(object):
                 api_token=str(configuration.api_key),
                 service_address=(manager_address.ip_address, manager_address.port),
                 cert_path=str(configuration.ca_cert_path),
+                use_tls=configuration.new_ingestion_use_tls,
             )
 
     def send_events(self, log_stream, events):
