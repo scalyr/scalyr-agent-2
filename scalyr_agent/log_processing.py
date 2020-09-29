@@ -1991,7 +1991,7 @@ class LogFileProcessor(object):
         file_path,
         config,
         log_config,
-        copying_manager=None,
+        new_scalyr_client=None,
         close_when_staleness_exceeds=None,
         log_attributes=None,
         file_system=None,
@@ -2019,7 +2019,7 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
-        self._copying_manager = copying_manager
+        self._new_scalyr_client = new_scalyr_client
         self._log_stream = None
         if config.use_new_ingestion:
             from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
@@ -2144,6 +2144,9 @@ class LogFileProcessor(object):
         self.__last_success = None
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
+
+    def set_new_scalyr_client(self, new_scalyr_client):
+        self._new_scalyr_client = new_scalyr_client
 
     def close_at_eof(self):
         """
@@ -2471,7 +2474,7 @@ class LogFileProcessor(object):
 
             # TODO: for now im just sending the lines right away, do better buffering later
             if new_events_buffer and self._log_stream:
-                self._copying_manager.new_scalyr_client.send_events(
+                self._new_scalyr_client.send_events(
                     log_stream=self._log_stream, events=new_events_buffer,
                 )
 
@@ -3106,7 +3109,11 @@ class LogMatcher(object):
     """
 
     def __init__(
-        self, overall_config, log_entry_config, copying_manager=None, file_system=None,
+        self,
+        overall_config,
+        log_entry_config,
+        new_scalyr_client=None,
+        file_system=None,
     ):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
@@ -3120,13 +3127,13 @@ class LogMatcher(object):
         @type log_entry_config: dict
         @type file_system: FileSystem
         """
-        self._copying_manager = copying_manager
-
         if file_system is None:
             self.__file_system = FileSystem()
         else:
             self.__file_system = file_system
         self.__overall_config = overall_config
+
+        self.__new_scalyr_client = new_scalyr_client
 
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
@@ -3144,6 +3151,11 @@ class LogMatcher(object):
         )
         # The time in seconds past epoch when we last checked for new files that match the glob.
         self.__last_check = None
+
+    def set_new_scalyr_client(self, new_scalyr_client):
+        self.__new_scalyr_client = new_scalyr_client
+        for processor in self.__processors:
+            processor.set_new_scalyr_client(new_scalyr_client)
 
     def update_log_entry_config(self, log_entry_config):
         """
@@ -3396,7 +3408,7 @@ class LogMatcher(object):
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
-                        self._copying_manager,
+                        self.__new_scalyr_client,
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,
