@@ -225,7 +225,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__config = configuration
 
         self._session = None
-        self.__new_scalyr_client = None
+        self.new_scalyr_client = None
 
         # Rate limiter
         self.__rate_limiter = None
@@ -288,7 +288,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__pending_log_matchers = []
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = None
+        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -396,7 +396,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(self.__config, log_config, self.__new_scalyr_client)
+            matcher = LogMatcher(self.__config, log_config, self)
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -605,9 +605,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         result = []
 
         for log_config in configs:
-            result.append(
-                LogMatcher(configuration, log_config, self.__new_scalyr_client)
-            )
+            result.append(LogMatcher(configuration, log_config, self))
 
         return result
 
@@ -628,8 +626,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @param scalyr_client:
         """
         self.__scalyr_client = scalyr_client
-        self.__new_scalyr_client = new_scalyr_client
-        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
+        self.new_scalyr_client = new_scalyr_client
         self.__logs_initial_positions = logs_initial_positions
         self.start()
 

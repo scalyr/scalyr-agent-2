@@ -1991,7 +1991,7 @@ class LogFileProcessor(object):
         file_path,
         config,
         log_config,
-        new_scalyr_client=None,
+        copying_manager=None,
         close_when_staleness_exceeds=None,
         log_attributes=None,
         file_system=None,
@@ -2019,8 +2019,9 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
-        self._new_scalyr_client = new_scalyr_client
-        if self._new_scalyr_client:
+        self._copying_manager = copying_manager
+        self._log_stream = None
+        if config.use_new_ingestion:
             from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
                 LogStream,
             )
@@ -2408,7 +2409,7 @@ class LogFileProcessor(object):
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
 
-                    if self._new_scalyr_client:
+                    if self._log_stream:
                         import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
 
                         new_event_timestamp = line_object.timestamp
@@ -2469,8 +2470,8 @@ class LogFileProcessor(object):
             final_position = self.__log_file_iterator.tell()
 
             # TODO: for now im just sending the lines right away, do better buffering later
-            if new_events_buffer and self._new_scalyr_client:
-                self._new_scalyr_client.send_events(
+            if new_events_buffer and self._log_stream:
+                self._copying_manager.new_scalyr_client.send_events(
                     log_stream=self._log_stream, events=new_events_buffer,
                 )
 
@@ -3105,11 +3106,7 @@ class LogMatcher(object):
     """
 
     def __init__(
-        self,
-        overall_config,
-        log_entry_config,
-        new_scalyr_client=None,
-        file_system=None,
+        self, overall_config, log_entry_config, copying_manager=None, file_system=None,
     ):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
@@ -3123,7 +3120,7 @@ class LogMatcher(object):
         @type log_entry_config: dict
         @type file_system: FileSystem
         """
-        self._new_scalyr_client = new_scalyr_client
+        self._copying_manager = copying_manager
 
         if file_system is None:
             self.__file_system = FileSystem()
@@ -3399,7 +3396,7 @@ class LogMatcher(object):
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
-                        self._new_scalyr_client,
+                        self._copying_manager,
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,
