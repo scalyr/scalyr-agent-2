@@ -1991,6 +1991,7 @@ class LogFileProcessor(object):
         file_path,
         config,
         log_config,
+        new_scalyr_client=None,
         close_when_staleness_exceeds=None,
         log_attributes=None,
         file_system=None,
@@ -2018,6 +2019,16 @@ class LogFileProcessor(object):
         @type file_system: FileSystem
         @type checkpoint: dict or None
         """
+        self._new_scalyr_client = new_scalyr_client
+        self._log_stream = None
+        if config.use_new_ingestion:
+            from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
+                LogStream,
+            )
+
+            self._log_stream = LogStream(uid=file_path, attributes=log_attributes)
+        self._event_id = 0
+
         if file_system is None:
             file_system = FileSystem()
         if log_attributes is None:
@@ -2133,6 +2144,9 @@ class LogFileProcessor(object):
         self.__last_success = None
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
+
+    def set_new_scalyr_client(self, new_scalyr_client):
+        self._new_scalyr_client = new_scalyr_client
 
     def close_at_eof(self):
         """
@@ -2335,6 +2349,10 @@ class LogFileProcessor(object):
             buffer_filled = False
             added_thread_id = False
 
+            new_events_buffer = []
+            sequence_start_number = 0
+            sequence_end_number = 0
+
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
                 # debug leak
@@ -2395,6 +2413,25 @@ class LogFileProcessor(object):
 
                     # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
+
+                    if self._log_stream:
+                        import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
+
+                        if not new_events_buffer:
+                            sequence_start_number = sequence_number
+                        sequence_end_number = sequence_number
+                        new_event_timestamp = line_object.timestamp
+                        if not new_event_timestamp:
+                            new_event_timestamp = int(current_time)
+                        new_event = ingestion_client_line.LogLine(
+                            str(self._event_id),
+                            line_object.line,
+                            new_event_timestamp,
+                            line_object.attrs,
+                        )
+                        self._event_id += 1
+                        new_events_buffer.append(new_event)
+
                     if not add_events_request.add_event(
                         event,
                         timestamp=line_object.timestamp,
@@ -2439,6 +2476,15 @@ class LogFileProcessor(object):
                 self.__is_active = bytes_read > 0
 
             final_position = self.__log_file_iterator.tell()
+
+            # TODO: for now im just sending the lines right away, do better buffering later
+            if new_events_buffer and self._log_stream:
+                self._new_scalyr_client.send_events(
+                    log_stream=self._log_stream,
+                    events=new_events_buffer,
+                    sequence_range_start=sequence_start_number,
+                    sequence_range_end=sequence_end_number,
+                )
 
             # start_process_time = fast_get_time() - start_process_time
             # add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
@@ -3070,7 +3116,13 @@ class LogMatcher(object):
     log when sent to the server.
     """
 
-    def __init__(self, overall_config, log_entry_config, file_system=None):
+    def __init__(
+        self,
+        overall_config,
+        log_entry_config,
+        new_scalyr_client=None,
+        file_system=None,
+    ):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
             processed such as ``max_line_length``.
@@ -3089,6 +3141,8 @@ class LogMatcher(object):
             self.__file_system = file_system
         self.__overall_config = overall_config
 
+        self.__new_scalyr_client = new_scalyr_client
+
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
         self.__processors = []
@@ -3105,6 +3159,11 @@ class LogMatcher(object):
         )
         # The time in seconds past epoch when we last checked for new files that match the glob.
         self.__last_check = None
+
+    def set_new_scalyr_client(self, new_scalyr_client):
+        self.__new_scalyr_client = new_scalyr_client
+        for processor in self.__processors:
+            processor.set_new_scalyr_client(new_scalyr_client)
 
     def update_log_entry_config(self, log_entry_config):
         """
@@ -3357,6 +3416,7 @@ class LogMatcher(object):
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
+                        self.__new_scalyr_client,
                         log_attributes=log_attributes,
                         checkpoint=checkpoint_state,
                         close_when_staleness_exceeds=self.__stale_threshold_secs,

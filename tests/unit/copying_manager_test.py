@@ -682,6 +682,7 @@ class CopyingParamsTest(ScalyrTestCase):
 class CopyingManagerInitializationTest(ScalyrTestCase):
     def test_from_config_file(self):
         test_manager = self._create_test_instance([{"path": "/tmp/hi.log"}], [])
+
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(test_manager.log_matchers[0].config["path"], "/tmp/hi.log")
         self.assertEquals(
@@ -1830,7 +1831,7 @@ class TestableCopyingManager(CopyingManager):
         if scalyr_client is None:
             scalyr_client = dict(fake_client=True)
         super(TestableCopyingManager, self).start_manager(
-            scalyr_client, logs_initial_positions=logs_initial_positions
+            scalyr_client, None, logs_initial_positions=logs_initial_positions
         )
 
     class TestController(object):
