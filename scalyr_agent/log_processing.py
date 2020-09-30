@@ -2350,6 +2350,8 @@ class LogFileProcessor(object):
             added_thread_id = False
 
             new_events_buffer = []
+            sequence_start_number = 0
+            sequence_end_number = 0
 
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
@@ -2415,6 +2417,9 @@ class LogFileProcessor(object):
                     if self._log_stream:
                         import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
 
+                        if not new_events_buffer:
+                            sequence_start_number = sequence_number
+                        sequence_end_number = sequence_number
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
                             new_event_timestamp = int(current_time)
@@ -2475,7 +2480,10 @@ class LogFileProcessor(object):
             # TODO: for now im just sending the lines right away, do better buffering later
             if new_events_buffer and self._log_stream:
                 self._new_scalyr_client.send_events(
-                    log_stream=self._log_stream, events=new_events_buffer,
+                    log_stream=self._log_stream,
+                    events=new_events_buffer,
+                    sequence_range_start=sequence_start_number,
+                    sequence_range_end=sequence_end_number,
                 )
 
             # start_process_time = fast_get_time() - start_process_time

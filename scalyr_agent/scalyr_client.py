@@ -100,13 +100,13 @@ class NewScalyrClientSession(object):
                 use_tls=configuration.new_ingestion_use_tls,
             )
 
-    def send_events(self, log_stream, events):
+    def send_events(self, log_stream, events, sequence_range_start, sequence_range_end):
         self._data_plane_client.send_events(
             session=self._session,
             log_stream=log_stream,
             events=events,
-            sequence_range_start=int(events[0].uuid),
-            sequence_range_end=int(events[-1].uuid),
+            sequence_range_start=sequence_range_start,
+            sequence_range_end=sequence_range_end,
         )
 
 
