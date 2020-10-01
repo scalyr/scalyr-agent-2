@@ -79,6 +79,9 @@ class EncodeDecodeTest(ScalyrTestCase):
     def test_negative_long(self):
         self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
 
+    def test_long_long_int(self):
+        self.__test_encode_decode("18446744073709551615", 18446744073709551615)
+
     def test_bool(self):
         self.__test_encode_decode(r"false", False)
         self.__test_encode_decode(r"true", True)

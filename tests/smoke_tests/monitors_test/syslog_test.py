@@ -28,7 +28,7 @@ import pytest
 import six
 
 from tests.utils.agent_runner import AgentRunner
-from tests.utils.log_reader import LogReader
+from tests.utils.log_reader import LogReader, AgentLogReader
 from tests.utils.dockerized import dockerized_case
 from tests.image_builder.monitors.common import CommonMonitorBuilder
 
@@ -66,28 +66,28 @@ def _test(python_version):
     runner.start(executable=python_version)
     time.sleep(1)
     reader = LogReader(runner.syslog_log_path)
-
-    reader.start(wait_for_data=False)
+    agent_log_reader = AgentLogReader(runner.agent_log_file_path)
 
     os.system("logger message1 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
 
-    last_line = reader.wait_for_new_line()
+    last_line = reader.wait_for_next_line()
 
     assert "message1" in last_line
 
     os.system("logger message2 --port {0} --tcp --server 127.0.0.1".format(TCP_PORT))
 
-    last_line = reader.wait_for_new_line()
+    last_line = reader.wait_for_next_line()
 
     assert "message2" in last_line
 
     os.system("logger message3 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
 
-    last_line = reader.wait_for_new_line()
+    last_line = reader.wait_for_next_line()
 
     assert "message3" in last_line
 
-    runner.stop()
+    agent_log_reader.go_to_end()
+
 
 
 @pytest.mark.usefixtures("agent_environment")

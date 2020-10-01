@@ -32,6 +32,7 @@ from tests.utils.agent_runner import AgentRunner
 from tests.utils.dockerized import dockerized_case
 from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader
+from tests.utils.log_reader import AgentLogReader
 
 import six
 
@@ -107,7 +108,9 @@ def _test(request, python_version):
     )
 
     reader = MySqlLogReader(runner.mysql_log_path)
-    reader.start()
+    agent_log_reader = AgentLogReader(runner.agent_log_file_path)
+
+    agent_log_reader.wait(5)
 
     metrics_to_check = [
         "mysql.global.com_insert",
@@ -116,7 +119,7 @@ def _test(request, python_version):
         "mysql.global.com_update",
     ]
 
-    previous_metric_values = reader.get_metrics(metrics_to_check)
+    previous_metric_values = reader.wait_for_metrics_exist(metrics_to_check)
 
     rows = mysql_cursor.execute("SELECT * FROM test_table")
 
@@ -155,7 +158,7 @@ def _test(request, python_version):
 
     reader.wait_for_metrics_increase(metrics_to_check, previous_metric_values)
 
-    current_metrics = reader.get_metrics(metrics_to_check)
+    current_metrics = reader.wait_for_metrics_exist(metrics_to_check)
 
     diff = dict(
         (name, current_metrics[name] - previous_metric_values[name])
@@ -169,7 +172,7 @@ def _test(request, python_version):
         "mysql.global.com_insert": 2,
     }
 
-    runner.stop()
+    agent_log_reader.go_to_end()
 
 
 @pytest.mark.usefixtures("agent_environment")

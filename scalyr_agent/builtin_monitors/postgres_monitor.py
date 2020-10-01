@@ -68,7 +68,7 @@ define_config_option(
     __monitor__,
     "database_port",
     "Name of port on the host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=six.text_type,
+    convert_to=int,
 )
 define_config_option(
     __monitor__,

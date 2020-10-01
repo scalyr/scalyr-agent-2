@@ -24,80 +24,111 @@ import threading
 import time
 from io import open
 import collections
+import queue
 
 import six
 
+ErrorPatternInfo = collections.namedtuple("ErrorPatternInfo", ["pattern", "message"])
+
+
+class LogReaderError(Exception):
+    pass
+
+
+class LogReaderTimeoutError(LogReaderError):
+    pass
+
 
 class LogReader(threading.Thread):
-    """Reader that allows to read file in separate thread and read and wait for new lines"""
+    """Reader that allows to read file and wait for new lines"""
 
     def __init__(self, file_path):
         super(LogReader, self).__init__()
-        self.daemon = True
+        self._file_path = file_path
         self._file = open(six.text_type(file_path), "r")
-        self._stop_event = threading.Event()
-        self._lines_lock = threading.Lock()
-        self._start_cv = threading.Condition()
-        self._has_data = False
-        self._lines = collections.deque(maxlen=1000)
-        self._wait_for_line_cv = threading.Condition()
+        self._error_line_patterns = dict()
+        self._lines = list()
 
-        self._has_new_line = False
+    def _check_line_for_error(self, line):
+        for pattern, (compiled_pattern, message) in self._error_line_patterns.items():
+            if compiled_pattern.match(line):
+                if not message:
+                    message = "Log file {0} contains error line: '{1}'. Pattern: {2}.".format(
+                        self._file_path, line, pattern
+                    )
+                raise LogReaderError(message)
 
-    def handle_new_line(self, line):
-        with self._lines_lock:
-            self._lines.append(line)
-        with self._wait_for_line_cv:
-            self._has_new_line = True
-            self._wait_for_line_cv.notify()
+    def _handle_new_line(self, line):
+        self._lines.append(line)
+        self._check_line_for_error(line)
 
-    def run(self):
-        def get_line():
-            while not self._stop_event.is_set():
-                _line = self._file.readline()
-                if _line:
-                    return _line
-                time.sleep(0.1)
+    def _read_line(self):
+        line = self._file.readline()
+        if line:
+            self._handle_new_line(line)
 
-        get_line()
-        with self._start_cv:
-            self._has_data = True
-            self._start_cv.notify()
-        self._file.seek(0)
-        while not self._stop_event.is_set():
-            line = get_line()
-            self.handle_new_line(line)
+        return line
 
-    def start(self, wait_for_data=False):
-        super(LogReader, self).start()
-        if not wait_for_data:
-            return
-        with self._start_cv:
-            while not self._has_data:
-                self._start_cv.wait(0.1)
-        return
+    def wait_for_next_line(self, timeout=10):
+        timeout_time = time.time() + timeout
+        while True:
+            line = self._read_line()
+            if line:
+                return line
+
+            if time.time() >= timeout_time:
+                raise LogReaderTimeoutError("Timeout of %s seconds reached while waiting for metrics" % timeout)
+
+            time.sleep(0.01)
+
+    def go_to_end(self):
+        while True:
+            line = self._read_line()
+            if not line:
+                break
+
+        pass
+
+    def wait_for_lines(self, line_number):
+        for _ in range(line_number):
+            self.wait_for_next_line()
 
     @property
-    def lines(self):
-        with self._lines_lock:
-            return list(self._lines)
+    def last_line(self):
+        if len(self._lines):
+            return self._lines[-1]
 
-    def wait_for_new_line(self, timeout=10):
-        start_time = time.time()
-        timeout_time = start_time + timeout
+    def wait_for_matching_line(self, pattern, timeout=10):
+        compiled_pattern = re.compile(pattern)
+        while True:
+            line = self.wait_for_next_line(timeout=timeout)
+            if compiled_pattern.match(line):
+                return line
 
-        with self._wait_for_line_cv:
-            while not self._has_new_line:
-                if time.time() >= timeout_time:
-                    raise ValueError(
-                        "timeout of %s seconds reached while waiting for metrics"
-                        % (timeout)
-                    )
+    def wait(self, seconds):
+        """
+        Keep checking for new lines for some period of time in 'seconds'.
+        """
+        stop_time = time.time() + seconds
+        while True:
+            try:
+                self.wait_for_next_line()
+            except LogReaderTimeoutError:
+                continue
 
-                self._wait_for_line_cv.wait(0.1)
-            self._has_new_line = False
-            with self._lines_lock:
-                return self._lines[-1]
+            if time.time() >= stop_time:
+                break
+
+    def add_error_check(self, pattern, message=None):
+        compiled_pattern = re.compile(pattern)
+        info = ErrorPatternInfo(compiled_pattern, message)
+        self._error_line_patterns[pattern] = info
+
+
+class AgentLogReader(LogReader):
+    def __init__(self, file_path):
+        super(AgentLogReader, self).__init__(file_path)
+        self.add_error_check(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z ERROR")
 
 
 class LogMetricReader(LogReader):
@@ -107,13 +138,7 @@ class LogMetricReader(LogReader):
 
     def __init__(self, file_path):
         super(LogMetricReader, self).__init__(file_path)
-        self._current_metrics = dict()
-
-    def handle_new_line(self, line):
-        super(LogMetricReader, self).handle_new_line(line)
-        name, value = self._parse_line(line)
-        with self._lines_lock:
-            self._current_metrics[name] = value
+        self.current_metrics = dict()
 
     def _parse_line(self, line):
         m = re.match(type(self).LINE_PATTERN, line)
@@ -130,40 +155,45 @@ class LogMetricReader(LogReader):
 
         return metric_name, metric_value
 
-    def get_metrics(self, names, timeout=10):
-        def get():
-            _metrics = dict()
+    def _handle_new_line(self, line):
+        super(LogMetricReader, self)._handle_new_line(line)
+        name, value = self._parse_line(line)
+        self.current_metrics[name] = value
+
+    def wait_for_metrics_exist(self, names, timeout=10):
+        while True:
+            needed_metrics = dict()
             for name in names:
-                metric_value = self._current_metrics.get(name)
-                if metric_value is None:
-                    return None
-                _metrics[name] = metric_value
-            return _metrics
+                value = self.current_metrics.get(name)
+                if value is None:
+                    break
+                needed_metrics[name] = value
+            else:
+                return needed_metrics
 
-        start_time = time.time()
-        timeout_time = start_time + timeout
+            try:
+                self.wait_for_next_line()
+            except LogReaderTimeoutError():
+                if time.time() >= timeout_time:
+                    raise LogReaderTimeoutError(
+                        "Timeout of %s seconds reached while waiting for metrics"
+                        % (timeout)
+                    )
 
-        while not self._stop_event.is_set():
-            with self._lines_lock:
-                metrics = get()
-            if metrics is not None:
-                return metrics
+            time.sleep(0.01)
 
-            if time.time() >= timeout_time:
-                raise ValueError(
-                    "timeout of %s seconds reached while waiting for metrics"
-                    % (timeout)
-                )
+    def wait_for_metrics_change(self, metric_names, previous_values, predicate, timeout=10):
+        timeout_time = time.time() + timeout
+        while True:
+            try:
+                self.wait_for_next_line()
+            except LogReaderTimeoutError:
+                if time.time() >= timeout_time:
+                    raise
+                else:
+                    continue
 
-            time.sleep(0.1)
-
-    def get_metric(self, name):
-        metrics = self.get_metrics([name])
-        return metrics[name]
-
-    def wait_for_metrics_change(self, metric_names, previous_values, predicate):
-        while not self._stop_event.is_set():
-            current_values = self.get_metrics(metric_names)
+            current_values = {name: self.current_metrics[name] for name in metric_names}
 
             predicate_results = [
                 predicate(current_values[name], previous_values[name])
@@ -171,15 +201,15 @@ class LogMetricReader(LogReader):
             ]
 
             if all(predicate_results):
-                return
+                return current_values
             time.sleep(0.1)
 
-    def wait_for_metrics_increase(self, metric_names, previous_values):
+    def wait_for_metrics_increase(self, metric_names, previous_values, timeout=10):
         self.wait_for_metrics_change(
-            metric_names, previous_values, lambda cur, prev: cur > prev,
+            metric_names, previous_values, lambda cur, prev: cur > prev, timeout=timeout
         )
 
-    def wait_for_metrics_increment(self, metric_names, previous_values):
+    def wait_for_metrics_increment(self, metric_names, previous_values, timeout=10):
         self.wait_for_metrics_change(
-            metric_names, previous_values, lambda cur, prev: prev + 1 == cur
+            metric_names, previous_values, lambda cur, prev: prev + 1 == cur, timeout=timeout
         )
