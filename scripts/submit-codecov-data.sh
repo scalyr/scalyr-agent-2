@@ -40,3 +40,5 @@ if [ "${EXIT_CODE}" -ne 0 ]; then
     echo "Submitting code coverage to codecov.io failed after ${MAX_ATTEMPTS} attempts"
     exit 1
 fi
+
+echo "Data successfully submitted to codecov.io"
