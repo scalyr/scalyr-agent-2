@@ -160,25 +160,25 @@ class LogDeleter(object):
 
                 for i in range(max_rotations, 0, -1):
                     rotated_file = matching_file + (".%d" % i)
-                    try:
-                        if not os.path.isfile(rotated_file):
-                            continue
+                    if not os.path.isfile(rotated_file):
+                        continue
 
-                        if check_rotated:
+                    if check_rotated:
+                        try:
                             mtime = os.path.getmtime(rotated_file)
-                            if current_time - mtime > self._delete_interval:
-                                result.append(rotated_file)
-                        else:
-                            if added:
-                                result.append(rotated_file)
-
-                    except OSError as e:
-                        global_log.warn(
-                            "Unable to read modification time for file '%s', %s"
-                            % (rotated_file, six.text_type(e)),
-                            limit_once_per_x_secs=300,
-                            limit_key="mtime-%s" % rotated_file,
-                        )
+                        except OSError as e:
+                            global_log.warn(
+                                "Unable to read modification time for file '%s', %s"
+                                % (rotated_file, six.text_type(e)),
+                                limit_once_per_x_secs=300,
+                                limit_key="mtime-%s" % rotated_file,
+                            )
+                            continue
+                        if current_time - mtime > self._delete_interval:
+                            result.append(rotated_file)
+                    else:
+                        if added:
+                            result.append(rotated_file)
 
             except OSError as e:
                 global_log.warn(
