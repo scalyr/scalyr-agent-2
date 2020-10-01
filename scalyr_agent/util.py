@@ -204,15 +204,12 @@ def get_json_implementation(lib_name):
             This function falls back to native json library when there is a big unsigned 64 bit integer.
             :return:
             """
-            options = None
-            if SORT_KEYS:
-                options = orjson.OPT_SORT_KEYS
 
             def dump():
                 if fp is not None:
-                    return orjson.dump(obj, fp, option=options)
+                    return orjson.dump(obj, fp)
                 else:
-                    return orjson.dumps(obj, option=options)
+                    return orjson.dumps(obj)
 
             try:
                 return dump()
