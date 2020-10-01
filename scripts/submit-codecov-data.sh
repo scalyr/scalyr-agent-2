@@ -21,6 +21,8 @@ exit 0
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
 RETRY_DELAY=${RETRY_DELAY:-5}
 
+echo "Submitting coverage data to codecov.io"
+
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     # NOTE: We pass --required flag to the binary since we also want it to return non-zero (and fail
