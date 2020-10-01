@@ -45,7 +45,9 @@ DATABASE = "scalyr_test_db"
 def postgresql_client():
     os.system("service postgresql start")
 
-    os.system('psql -c "CREATE USER {} WITH PASSWORD \'{}\'";'.format(USERNAME, PASSWORD))
+    os.system(
+        "psql -c \"CREATE USER {} WITH PASSWORD '{}'\";".format(USERNAME, PASSWORD)
+    )
     os.system('psql -c "CREATE DATABASE {};"'.format(USERNAME))
     os.system('psql -c "CREATE DATABASE {};"'.format(DATABASE))
 
@@ -87,11 +89,12 @@ class PostgresAgentRunner(AgentRunner):
                 "database_port": 5432,
                 "database_username": USERNAME,
                 "id": "mydb",
-                "module": "scalyr_agent.builtin_monitors.postgres_monitor"
+                "module": "scalyr_agent.builtin_monitors.postgres_monitor",
             }
         )
 
         return config
+
 
 class PostgresLogReader(LogMetricReader):
     LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[postgres_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
@@ -124,11 +127,9 @@ def _test(request, python_version):
     reader = PostgresLogReader(runner.mysql_log_path)
     reader.start()
 
-    metrics_to_check = [
-        "postgres.database.size"
-    ]
+    metrics_to_check = ["postgres.database.size"]
 
-    previous_metric_values = reader.wait_for_metrics_exist(metrics_to_check)
+    reader.wait_for_metrics_exist(metrics_to_check)
 
     postgres_cursor.execute("SELECT * FROM test_table")
 
@@ -136,7 +137,9 @@ def _test(request, python_version):
 
     assert len(rows) == 0
 
-    postgres_cursor.execute('INSERT INTO test_table (text) values (\'row1\') RETURNING id')
+    postgres_cursor.execute(
+        "INSERT INTO test_table (text) values ('row1') RETURNING id"
+    )
     (row1_id,) = postgres_cursor.fetchone()
 
     postgres_cursor.execute("SELECT * FROM test_table")
@@ -144,7 +147,9 @@ def _test(request, python_version):
 
     assert len(rows) == 1
 
-    postgres_cursor.execute("INSERT INTO test_table (text) values ('row2') RETURNING id")
+    postgres_cursor.execute(
+        "INSERT INTO test_table (text) values ('row2') RETURNING id"
+    )
     (row2_id,) = postgres_cursor.fetchone()
 
     postgres_cursor.execute("SELECT * FROM test_table")

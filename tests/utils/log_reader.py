@@ -15,6 +15,7 @@
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
+from six.moves import range
 
 if False:  # NOSONAR
     from typing import Optional
@@ -24,7 +25,6 @@ import threading
 import time
 from io import open
 import collections
-import queue
 
 import six
 
@@ -77,7 +77,9 @@ class LogReader(threading.Thread):
                 return line
 
             if time.time() >= timeout_time:
-                raise LogReaderTimeoutError("Timeout of %s seconds reached while waiting for metrics" % timeout)
+                raise LogReaderTimeoutError(
+                    "Timeout of %s seconds reached while waiting for metrics" % timeout
+                )
 
             time.sleep(0.01)
 
@@ -161,6 +163,7 @@ class LogMetricReader(LogReader):
         self.current_metrics[name] = value
 
     def wait_for_metrics_exist(self, names, timeout=10):
+        timeout_time = time.time() + timeout
         while True:
             needed_metrics = dict()
             for name in names:
@@ -182,7 +185,9 @@ class LogMetricReader(LogReader):
 
             time.sleep(0.01)
 
-    def wait_for_metrics_change(self, metric_names, previous_values, predicate, timeout=10):
+    def wait_for_metrics_change(
+        self, metric_names, previous_values, predicate, timeout=10
+    ):
         timeout_time = time.time() + timeout
         while True:
             try:
@@ -211,5 +216,8 @@ class LogMetricReader(LogReader):
 
     def wait_for_metrics_increment(self, metric_names, previous_values, timeout=10):
         self.wait_for_metrics_change(
-            metric_names, previous_values, lambda cur, prev: prev + 1 == cur, timeout=timeout
+            metric_names,
+            previous_values,
+            lambda cur, prev: prev + 1 == cur,
+            timeout=timeout,
         )

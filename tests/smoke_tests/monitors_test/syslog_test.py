@@ -89,7 +89,6 @@ def _test(python_version):
     agent_log_reader.go_to_end()
 
 
-
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_syslog_python2(request):
