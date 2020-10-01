@@ -25,7 +25,7 @@ RETRY_DELAY=${RETRY_DELAY:-5}
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
     # NOTE: We pass --required flag to the binary since we also want it to return non-zero (and fail
     # the build) if upload fails
-    codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml --required
+    codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml --required --verbose
     EXIT_CODE=$?
 
     if [ "${EXIT_CODE}" -eq 0 ]; then
