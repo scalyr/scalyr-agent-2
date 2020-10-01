@@ -224,6 +224,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
 
+        self._session = None
+        self._new_scalyr_client = None
+
         # Rate limiter
         self.__rate_limiter = None
         if self.__config.parsed_max_send_rate_enforcement:
@@ -285,7 +288,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__pending_log_matchers = []
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = self.__create_log_matches(configuration, monitors)
+        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -393,7 +396,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(self.__config, log_config)
+            matcher = LogMatcher(self.__config, log_config, self._new_scalyr_client)
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -602,11 +605,15 @@ class CopyingManager(StoppableThread, LogWatcher):
         result = []
 
         for log_config in configs:
-            result.append(LogMatcher(configuration, log_config))
+            result.append(
+                LogMatcher(configuration, log_config, self._new_scalyr_client)
+            )
 
         return result
 
-    def start_manager(self, scalyr_client, logs_initial_positions=None):
+    def start_manager(
+        self, scalyr_client, new_scalyr_client, logs_initial_positions=None
+    ):
         """Starts the manager running and will not return until it has been stopped.
 
         This will start a new thread to run the manager.
@@ -616,10 +623,14 @@ class CopyingManager(StoppableThread, LogWatcher):
             if none can be found from the checkpoint files.  This can be used to override the default behavior of
             just reading from the current end of the file if there is no checkpoint for the file
         @type scalyr_client: scalyr_client.ScalyrClientSession
+        @type new_scalyr_client: scalyr_client.NewScalyrClientSession
         @type logs_initial_positions: dict
         @param scalyr_client:
         """
         self.__scalyr_client = scalyr_client
+        self._new_scalyr_client = new_scalyr_client
+        for matcher in self.log_matchers:
+            matcher.set_new_scalyr_client(new_scalyr_client)
         self.__logs_initial_positions = logs_initial_positions
         self.start()
 
@@ -790,9 +801,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                             )
                             # Send the request, but don't block for the response yet.
                             send_request_time_start = time.time()
-                            get_response = self._send_events(
-                                self.__pending_add_events_task
-                            )
+                            get_response = None
+                            if not self.__config.use_new_ingestion:
+                                get_response = self._send_events(
+                                    self.__pending_add_events_task
+                                )
 
                             # Check to see if pipelining should be disabled
                             disable_pipelining = self.__has_pending_log_changes()
@@ -821,7 +834,12 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                             # Now block for the response.
                             blocking_response_time_start = time.time()
-                            (result, bytes_sent, full_response) = get_response()
+                            if self.__config.use_new_ingestion:
+                                result = "success"
+                                bytes_sent = 0
+                                full_response = ""
+                            else:
+                                (result, bytes_sent, full_response) = get_response()
                             blocking_response_time_end = time.time()
                             self.total_blocking_response_time += (
                                 blocking_response_time_end

@@ -53,6 +53,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         config.verify_server_certificate = False
         config.ca_cert_path = "/tmp/doesnt.exist"
+        config.use_new_ingestion = False
 
         agent = ScalyrAgent(PlatformController())
         agent._ScalyrAgent__config = config
@@ -110,6 +111,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         config.verify_server_certificate = True
         config.ca_cert_path = "/tmp/doesnt.exist"
+        config.use_new_ingestion = False
 
         agent = ScalyrAgent(PlatformController())
         agent._ScalyrAgent__config = config
@@ -132,6 +134,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         config.verify_server_certificate = True
         config.ca_cert_path = "/tmp/doesnt.exist"
+        config.use_new_ingestion = False
 
         agent = ScalyrAgent(PlatformController())
         agent._ScalyrAgent__config = config
