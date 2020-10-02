@@ -724,19 +724,37 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
             finally:
                 sys.stdout, sys.stderr = old_out, old_err
 
-    def test_error_response(self):
+    @mock.patch("scalyr_agent.monitor_utils.k8s.global_log")
+    def test_error_response(self, mock_global_log):
         def fake_get(self, url, verify):
             resp = FakeResponse()
             resp.status_code = 404
+            resp.text = "foo bar error"
             return resp
 
         with mock.patch.object(KubeletApi, "_get", fake_get):
             api = KubeletApi(
                 FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode",
             )
-            self.assertRaisesRegexp(KubeletApiException, ".*", api.query_stats)
 
-    def test_fallback(self):
+            self.assertEqual(mock_global_log.error.call_count, 0)
+            expected_msg = (
+                r"Invalid response from Kubelet API when querying '/stats/summary' "
+                r"\(https://127.0.0.1:10250/stats/summary\): foo bar error"
+            )
+            self.assertRaisesRegexp(KubeletApiException, expected_msg, api.query_stats)
+
+            expected_msg = (
+                "Invalid response while querying the Kubelet API on "
+                "https://127.0.0.1:10250/stats/summary"
+            )
+            self.assertEqual(mock_global_log.error.call_count, 1)
+            self.assertTrue(
+                expected_msg in mock_global_log.error.call_args_list[0][0][0]
+            )
+
+    @mock.patch("scalyr_agent.monitor_utils.k8s.global_log")
+    def test_fallback(self, mock_global_log):
         self._fake_get_called = False
 
         def fake_get(self2, url, verify):
@@ -752,8 +770,21 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
             api = KubeletApi(
                 FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode",
             )
+
+            self.assertEqual(mock_global_log.warn.call_count, 0)
             result = api.query_stats()
             self.assertEqual(result, {})
+
+            expected_msg = (
+                "Invalid response while querying the Kubelet API on "
+                "https://127.0.0.1:10250/stats/summary. Falling back to older endpoint "
+                "(http://127.0.0.1:10255)."
+            )
+
+            self.assertEqual(mock_global_log.warn.call_count, 1)
+            self.assertTrue(
+                expected_msg in mock_global_log.warn.call_args_list[0][0][0]
+            )
 
     def test_host_ip_format(self):
         def fake_get(self2, url, verify):
