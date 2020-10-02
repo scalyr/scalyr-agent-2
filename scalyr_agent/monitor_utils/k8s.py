@@ -2372,18 +2372,24 @@ class KubeletApi(object):
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
-                    global_log.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
-                        "Invalid response while querying the Kubelet API: %d. Falling back to older endpoint."
+                    global_log.warn(
+                        "Invalid response while querying the Kubelet API (status_code=%d,body=%s). Falling back to older endpoint."
                         % response.status_code,
+                        response.text,
+                        limit_once_per_x_secs=300,
+                        limit_key="kubelet_api_query_non_fallback",
                     )
                     self._switch_to_fallback()
                     continue
                 else:
-                    global_log.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
-                        "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                        % (url, response.status_code, len(response.text)),
+                    global_log.error(
+                        "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse: %s\n\tresponse length: %d"
+                        % (
+                            url,
+                            response.status_code,
+                            response.text,
+                            len(response.text),
+                        ),
                         limit_once_per_x_secs=300,
                         limit_key="kubelet_api_query",
                     )
