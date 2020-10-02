@@ -182,7 +182,15 @@ class LogFileIterator(object):
     but then return to it by invoking 'seek'.
     """
 
-    def __init__(self, path, config, log_config, file_system=None, checkpoint=None):
+    def __init__(
+        self,
+        path,
+        config,
+        log_config,
+        log_grouper_config=None,
+        file_system=None,
+        checkpoint=None,
+    ):
         """
 
         @param path: The path of the file to read.
@@ -200,6 +208,8 @@ class LogFileIterator(object):
         """
         # The full path of the log file.
         self.__path = path
+        # Agent configuration
+        self.__config = config
         # The representation of the iterator is a little tricky.  To handle log rotation, we actually
         # keep a list of pending files that represent the file handles we have to read from (in order) to get
         # all of the log content.  Typically, this should just be a list of one and two at the most (when a log
@@ -293,8 +303,12 @@ class LogFileIterator(object):
             self.__max_extended_line_length = config.max_line_size
 
         # create the line matcher objects for matching single and multiple lines
+        if not config.use_new_ingestion:
+            log_grouper_config = log_config["lineGroupers"]
+        if not log_grouper_config:
+            log_grouper_config = JsonObject({})
         self.__line_matcher = LineMatcher.create_line_matchers(
-            log_config,
+            log_grouper_config,
             max(config.max_line_size, self.__max_extended_line_length),
             config.line_completion_wait_time,
         )
@@ -381,6 +395,13 @@ class LogFileIterator(object):
                     for file_state in self.__pending_files:
                         self.__close_file(file_state)
                     self.__pending_files = []
+
+    def set_line_matcher_config(self, line_matcher_config):
+        self.__line_matcher = LineMatcher.create_line_matchers(
+            line_matcher_config,
+            max(self.__config.max_line_size, self.__max_extended_line_length),
+            self.__config.line_completion_wait_time,
+        )
 
     def set_line_matcher(self, line_matcher):
         """Sets the line matcher
@@ -2051,10 +2072,14 @@ class LogFileProcessor(object):
         # integer identifier for the LogFileProcessor
         self.__thread_id = LogFileProcessor.generate_unique_id()
 
+        log_grouper_config = None
+        if new_scalyr_client:
+            log_grouper_config = new_scalyr_client.get_line_matcher_config()
         self.__log_file_iterator = LogFileIterator(
             file_path,
             config,
             log_config,
+            log_grouper_config=log_grouper_config,
             file_system=file_system,
             checkpoint=checkpoint,
         )
@@ -2147,6 +2172,9 @@ class LogFileProcessor(object):
 
     def set_new_scalyr_client(self, new_scalyr_client):
         self._new_scalyr_client = new_scalyr_client
+        self.__log_file_iterator.set_line_matcher_config(
+            new_scalyr_client.get_line_matcher_config()
+        )
 
     def close_at_eof(self):
         """

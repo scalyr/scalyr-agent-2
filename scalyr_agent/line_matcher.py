@@ -40,20 +40,18 @@ class LineMatcher(object):
     """
 
     @staticmethod
-    def create_line_matchers(log_config, max_line_length, line_completion_wait_time):
+    def create_line_matchers(line_groupers, max_line_length, line_completion_wait_time):
         """Creates line matchers based on the config passed in
         see: https://www.scalyr.com/help/parsing-logs#multiline for more info
 
         If no lineGroupers attribute is found, then it defaults to a single line matcher
 
-        @param log_config: A JsonObject containing the log config
+        @param line_groupers: A JsonObject containing the line grouper config
         @param max_line_length: The maximum amount to read before returning a new line
         @param line_completion_wait_time: The maximum amount of time to wait
             if only a partial line is ready
         @return - a line matcher object based on the config
         """
-
-        line_groupers = log_config["lineGroupers"]
 
         # return a single line matcher if line_groupers is empty or None
         if not line_groupers:
