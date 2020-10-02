@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.13 "TBD" - October 20, 2020
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Oct 20, 2020 19:00 -0800
+--->
+
+Improvements:
+* Kubernetes monitor has been updated to log 403 errors when connecting to the Kubernetes API before falling back to the old fallback URL under warning log level. Previously those errors were logged under debug log level which would make it hard to troubleshoot some issues related to missing permissions, etc. since those log messages would only end up in debug log file which is disabled by default.
+
 ## 2.1.12 "Betelgeuze" - September 17, 2020
 
 <!---
