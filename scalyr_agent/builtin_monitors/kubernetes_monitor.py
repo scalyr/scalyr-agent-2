@@ -1056,6 +1056,18 @@ class ControlledCacheWarmer(StoppableThread):
         finally:
             self.__condition_var.release()
 
+    def stop(self, wait_on_join=True, join_timeout=5):
+        if self.isAlive():
+            super(ControlledCacheWarmer, self).stop(
+                wait_on_join=wait_on_join, join_timeout=join_timeout
+            )
+
+        if self.__k8s_cache:
+            # NOTE: It's important that we also call stop() on the underlying KubernetesCache object
+            # otherwise in some situations such as when exceptions are encountered on start up,
+            # underlying objects won't be correctly stopped and CTRL+C won't work correctly
+            self.__k8s_cache.stop()
+
     def mark_has_been_used(self, container_id, unmark_to_warm=False):
         """
         Marks a WarmingEntry as having been used.  This typically means that
@@ -2534,6 +2546,8 @@ class ContainerChecker(object):
         # give this an initial empty value
         self.raw_logs = []
 
+        self.__stopped = False
+
     def _is_running_in_docker(self):
         """
         Checks to see if the agent is running inside a docker container
@@ -2601,7 +2615,7 @@ class ContainerChecker(object):
             message_time = start_time
 
             # wait until the k8s_cache is initialized before aborting
-            while not self.k8s_cache.is_initialized():
+            while not self.k8s_cache.is_initialized() and not self.__stopped:
                 time.sleep(delay)
                 current_time = time.time()
                 last_initialization_error = self.k8s_cache.last_initialization_error()
@@ -2734,12 +2748,16 @@ class ContainerChecker(object):
             )
 
     def stop(self, wait_on_join=True, join_timeout=5):
+        self.__stopped = True
+
         if self.__controlled_warmer is not None:
             self.__controlled_warmer.stop(
                 wait_on_join=wait_on_join, join_timeout=join_timeout
             )
 
-        self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+        if self.__thread.isAlive():
+            # NOTE: We don't call join on thread if thread hasn't been started yet
+            self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
         self.raw_logs = []
 
@@ -4176,10 +4194,7 @@ cluster.
         ScalyrMonitor.run(self)
 
     def stop(self, wait_on_join=True, join_timeout=5):
-        if (
-            self.__metrics_controlled_warmer is not None
-            and self.__metrics_controlled_warmer.is_running()
-        ):
+        if self.__metrics_controlled_warmer is not None:
             self.__metrics_controlled_warmer.stop(
                 wait_on_join=wait_on_join, join_timeout=join_timeout
             )

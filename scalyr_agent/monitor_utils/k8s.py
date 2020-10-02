@@ -1243,8 +1243,11 @@ class KubernetesCache(object):
         if start_caching:
             self.start()
 
+        self.__stopped = False
+
     def stop(self):
         """Stops the cache, specifically stopping the background thread that refreshes the cache"""
+        self.__stopped = True
         self._thread.stop()
 
     def start(self):
@@ -1402,7 +1405,9 @@ class KubernetesCache(object):
 
         start_time = time.time()
         retry_delay_secs = None
-        while run_state.is_running() and not self.is_initialized():
+        while (
+            run_state.is_running() and not self.is_initialized() and not self.__stopped
+        ):
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
 
