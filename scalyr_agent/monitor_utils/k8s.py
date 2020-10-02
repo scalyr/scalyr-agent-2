@@ -2377,30 +2377,40 @@ class KubeletApi(object):
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
+                    msg = (
+                        "Invalid response while querying the Kubelet API on %s. Falling back "
+                        "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n"
+                        % (
+                            url,
+                            self._fallback_kubelet_url,
+                            url,
+                            response.status_code,
+                            response.text,
+                        )
+                    )
+
                     global_log.warn(
-                        "Invalid response while querying the Kubelet API (status_code=%d,body=%s). Falling back to older endpoint."
-                        % response.status_code,
-                        response.text,
+                        msg,
                         limit_once_per_x_secs=300,
                         limit_key="kubelet_api_query_non_fallback",
                     )
                     self._switch_to_fallback()
                     continue
                 else:
+                    msg = (
+                        "Invalid response while querying the Kubelet API on %s. "
+                        "\n\nurl: %s\nstatus: %s\nresponse: %s\n"
+                        % (url, url, response.status_code, response.text)
+                    )
+
                     global_log.error(
-                        "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse: %s\n\tresponse length: %d"
-                        % (
-                            url,
-                            response.status_code,
-                            response.text,
-                            len(response.text),
-                        ),
+                        msg,
                         limit_once_per_x_secs=300,
-                        limit_key="kubelet_api_query",
+                        limit_key="kubelet_api_query_fallback",
                     )
                     raise KubeletApiException(
-                        "Invalid response from Kubelet API when querying '%s': %s"
-                        % (path, six.text_type(response))
+                        "Invalid response from Kubelet API when querying '%s' (%s): %s"
+                        % (path, url, six.text_type(response.text))
                     )
 
             return util.json_decode(response.text)
