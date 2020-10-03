@@ -47,7 +47,9 @@ def postgresql_client():
     os.system("service postgresql start")
 
     os.system(
-        "psql -c \"CREATE USER {} WITH PASSWORD '{}'\";".format(shlex.quote(USERNAME), shlex.quote(PASSWORD))
+        "psql -c \"CREATE USER {} WITH PASSWORD '{}'\";".format(
+            shlex.quote(USERNAME), shlex.quote(PASSWORD)
+        )
     )
     os.system('psql -c "CREATE DATABASE {};"'.format(shlex.quote(USERNAME)))
     os.system('psql -c "CREATE DATABASE {};"'.format(shlex.quote(DATABASE)))
