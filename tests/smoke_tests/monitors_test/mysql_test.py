@@ -119,7 +119,17 @@ def _test(request, python_version):
         "mysql.global.com_update",
     ]
 
-    previous_metric_values = reader.wait_for_metrics_exist(metrics_to_check)
+    reader.wait_for_metrics_exist(metrics_to_check, timeout=60)
+
+    reader.wait_for_metrics_equal(
+        expected={
+            "mysql.global.com_insert": 0,
+            "mysql.global.com_select": 2,
+            "mysql.global.com_delete": 0,
+            "mysql.global.com_update": 0,
+        },
+        timeout=60,
+    )
 
     rows = mysql_cursor.execute("SELECT * FROM test_table")
 
@@ -156,21 +166,15 @@ def _test(request, python_version):
     (row1_text,) = mysql_cursor.fetchone()
     assert row1_text == "updated_row1"
 
-    reader.wait_for_metrics_increase(metrics_to_check, previous_metric_values)
-
-    current_metrics = reader.wait_for_metrics_exist(metrics_to_check)
-
-    diff = dict(
-        (name, current_metrics[name] - previous_metric_values[name])
-        for name in metrics_to_check
+    reader.wait_for_metrics_equal(
+        expected={
+            "mysql.global.com_insert": 2,
+            "mysql.global.com_select": 9,
+            "mysql.global.com_delete": 1,
+            "mysql.global.com_update": 1,
+        },
+        timeout=60,
     )
-
-    assert diff == {
-        "mysql.global.com_select": 7,
-        "mysql.global.com_delete": 1,
-        "mysql.global.com_update": 1,
-        "mysql.global.com_insert": 2,
-    }
 
     agent_log_reader.go_to_end()
 
