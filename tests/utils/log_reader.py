@@ -32,6 +32,8 @@ import collections
 
 import six
 
+import logging
+
 ErrorPatternInfo = collections.namedtuple("ErrorPatternInfo", ["pattern", "message"])
 
 

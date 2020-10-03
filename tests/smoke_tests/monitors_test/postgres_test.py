@@ -22,6 +22,7 @@ if False:  # NOSONAR
 
 import time
 import os
+import shlex
 
 import pytest
 
@@ -46,10 +47,10 @@ def postgresql_client():
     os.system("service postgresql start")
 
     os.system(
-        "psql -c \"CREATE USER {} WITH PASSWORD '{}'\";".format(USERNAME, PASSWORD)
+        "psql -c \"CREATE USER {} WITH PASSWORD '{}'\";".format(shlex.quote(USERNAME), shlex.quote(PASSWORD))
     )
-    os.system('psql -c "CREATE DATABASE {};"'.format(USERNAME))
-    os.system('psql -c "CREATE DATABASE {};"'.format(DATABASE))
+    os.system('psql -c "CREATE DATABASE {};"'.format(shlex.quote(USERNAME)))
+    os.system('psql -c "CREATE DATABASE {};"'.format(shlex.quote(DATABASE)))
 
     time.sleep(3)
 
