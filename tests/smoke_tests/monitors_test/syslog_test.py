@@ -60,9 +60,58 @@ class SyslogAgentRunner(AgentRunner):
         return config
 
 
-def _test(python_version):
-    runner = SyslogAgentRunner()
+class SyslogAgentRunnerDifferentCatchall(AgentRunner):
+    def __init__(self):
+        super(SyslogAgentRunnerDifferentCatchall, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
 
+        self.syslog_log_path = self.add_log_file(
+            self.agent_logs_dir_path / "agent_syslog.log"
+        )
+
+    @property
+    def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
+        config = super(SyslogAgentRunnerDifferentCatchall, self)._agent_config
+        config["monitors"].append(
+            {
+                "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+                "protocols": "tcp:{0}, udp:{1}".format(TCP_PORT, UDP_PORT),
+                "accept_remote_connections": False,
+            }
+        )
+        config["syslog_logs"] = [{"syslog_app": ".*", "parser": "test"}]
+
+        return config
+
+
+class SyslogAgentRunnerDifferentLog(AgentRunner):
+    def __init__(self):
+        super(SyslogAgentRunnerDifferentLog, self).__init__(
+            enable_coverage=True, send_to_server=False
+        )
+
+        self.syslog_log_path = self.add_log_file(
+            self.agent_logs_dir_path
+            / ("agent_syslog%s.log" % six.text_type(hash(".?.*")))
+        )
+
+    @property
+    def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
+        config = super(SyslogAgentRunnerDifferentLog, self)._agent_config
+        config["monitors"].append(
+            {
+                "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+                "protocols": "tcp:{0}, udp:{1}".format(TCP_PORT, UDP_PORT),
+                "accept_remote_connections": False,
+            }
+        )
+        config["syslog_logs"] = [{"syslog_app": ".?.*", "parser": "test"}]
+
+        return config
+
+
+def _test(python_version, runner):
     runner.start(executable=python_version)
     time.sleep(1)
     reader = LogReader(runner.syslog_log_path)
@@ -93,10 +142,34 @@ def _test(python_version):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_syslog_python2(request):
-    _test(python_version="python2")
+    _test(python_version="python2", runner=SyslogAgentRunner())
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_syslog_python3(request):
-    _test(python_version="python3")
+    _test(python_version="python3", runner=SyslogAgentRunner())
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_syslog_python_different_catchall2(request):
+    _test(python_version="python2", runner=SyslogAgentRunnerDifferentCatchall())
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_syslog_python_different_catchall3(request):
+    _test(python_version="python3", runner=SyslogAgentRunnerDifferentCatchall())
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_syslog_python_different_log2(request):
+    _test(python_version="python2", runner=SyslogAgentRunnerDifferentLog())
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_syslog_python_different_log3(request):
+    _test(python_version="python3", runner=SyslogAgentRunnerDifferentLog())
