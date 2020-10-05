@@ -128,7 +128,7 @@ class LogReader(threading.Thread):
         but there is need to check all new lines (for errors specified by 'add_error_check' for example.).
         It does not block or wait, it just reads and processes new lines until EOF.
         """
-        #TODO: make LogReader do this autimatically by using ContextManager.
+        # TODO: make LogReader do this autimatically by using ContextManager.
 
         for _ in self._line_generator():
             pass
