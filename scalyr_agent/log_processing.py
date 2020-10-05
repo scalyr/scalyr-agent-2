@@ -2021,6 +2021,7 @@ class LogFileProcessor(object):
         """
         self._new_scalyr_client = new_scalyr_client
         self._log_stream = None
+        self._last_sequence_end_number = -1
         if config.use_new_ingestion:
             from scalyr_ingestion_client.log_stream import (  # pylint: disable=import-error
                 LogStream,
@@ -2350,7 +2351,6 @@ class LogFileProcessor(object):
             added_thread_id = False
 
             new_events_buffer = []
-            sequence_start_number = 0
             sequence_end_number = 0
 
             # Keep looping, add more events until there are no more or there is no more room.
@@ -2417,8 +2417,6 @@ class LogFileProcessor(object):
                     if self._log_stream:
                         import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
 
-                        if not new_events_buffer:
-                            sequence_start_number = sequence_number
                         sequence_end_number = sequence_number
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
@@ -2479,12 +2477,20 @@ class LogFileProcessor(object):
 
             # TODO: for now im just sending the lines right away, do better buffering later
             if new_events_buffer and self._log_stream:
+                sequence_start_number = self._last_sequence_end_number
+                start_of_sequence = False
+                if sequence_start_number < 0:
+                    sequence_start_number = 0
+                    start_of_sequence = True
+
                 self._new_scalyr_client.send_events(
                     log_stream=self._log_stream,
                     events=new_events_buffer,
                     sequence_range_start=sequence_start_number,
                     sequence_range_end=sequence_end_number,
+                    start_of_sequence=start_of_sequence,
                 )
+                self._last_sequence_end_number = sequence_end_number
 
             # start_process_time = fast_get_time() - start_process_time
             # add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
