@@ -34,6 +34,7 @@ from scalyr_agent.test_base import skipIf
 
 if six.PY3:
     reload = importlib.reload
+    import orjson
 
 JSON = 1
 UJSON = 2
@@ -78,6 +79,16 @@ class EncodeDecodeTest(ScalyrTestCase):
 
     def test_negative_long(self):
         self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
+
+    def test_64_bit_int(self):
+        if six.PY3:
+            # this should throw an error because orjson can not serialize more than signed 64 integer.
+            with self.assertRaises(orjson.JSONEncodeError):
+                orjson.dumps(18446744073709551615)
+
+        # here we do the regular json tests to be sure that
+        # we fall back to native json library in case of too bit integer.
+        self.__test_encode_decode("18446744073709551615", 18446744073709551615)
 
     def test_bool(self):
         self.__test_encode_decode(r"false", False)
