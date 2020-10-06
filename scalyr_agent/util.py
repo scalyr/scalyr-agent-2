@@ -199,7 +199,30 @@ def get_json_implementation(lib_name):
         except ImportError as e:
             raise ImportError(ORJSON_NOT_AVAILABLE_MSG % (str(e)))
 
-        return lib_name, orjson.dumps, orjson.loads
+        def orjson_dumps_custom(obj, fp):
+            """
+            This function falls back to native json library when there is a big unsigned 64 bit integer.
+            :return:
+            """
+
+            def dump():
+                if fp is not None:
+                    return orjson.dump(obj, fp)
+                else:
+                    return orjson.dumps(obj)
+
+            try:
+                return dump()
+            except orjson.JSONEncodeError as e:
+                # if there is an integer size error, fall back to native json
+                if str(e) == "Integer exceeds 64-bit range":
+                    _, _json_dumps, _ = get_json_implementation("json")
+
+                    return _json_dumps(obj, fp)
+                else:
+                    raise
+
+        return lib_name, orjson_dumps_custom, orjson.loads
 
     else:
         if lib_name != "json":
