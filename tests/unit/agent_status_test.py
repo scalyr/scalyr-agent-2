@@ -782,6 +782,13 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.agent = ScalyrAgent(PlatformController())
         self.agent._ScalyrAgent__config = config
 
+        self.original_generate_status = self.agent._ScalyrAgent__generate_status
+
+    def tearDown(self):
+        super(AgentMainStatusHandlerTestCase, self).setUp()
+
+        self.agent._ScalyrAgent__generate_status = self.original_generate_status
+
     def test_report_status_to_file_no_format_specified(self):
         # No format is provided, should default to "text"
         status_file = self.agent._ScalyrAgent__report_status_to_file()
@@ -828,6 +835,43 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue("config_status" in parsed)
         self.assertTrue("user" in parsed)
         self.assertTrue("scalyr_server" in parsed)
+
+    def test__find_health_result_in_status_data_json_format_good(self):
+        def mock_generate_status(*args, **kwargs):
+            result = self.original_generate_status(*args, **kwargs)
+            result.copying_manager_status = CopyingManagerStatus()
+            result.copying_manager_status.health_check_result = "Good"
+            return result
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status
+
+        self._write_status_format_file("json")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        result = self.agent._ScalyrAgent__find_health_result_in_status_data(content)
+        self.assertEqual(result, "Good")
+
+    def test__find_health_result_in_status_data_text_format_good(self):
+        def mock_generate_status(*args, **kwargs):
+            result = self.original_generate_status(*args, **kwargs)
+            result.copying_manager_status = CopyingManagerStatus()
+            result.copying_manager_status.total_errors = 0
+            result.copying_manager_status.health_check_result = "Good"
+            return result
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status
+
+        self._write_status_format_file("text")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        result = self.agent._ScalyrAgent__find_health_result_in_status_data(content)
+        self.assertEqual(result, "Good")
 
     def _write_status_format_file(self, status_format):
         with open(self.status_format_file, "w") as fp:
