@@ -1891,9 +1891,14 @@ class ScalyrAgent(object):
         status_format_file = os.path.join(
             self.__config.agent_data_path, STATUS_FORMAT_FILE
         )
+
         if os.path.isfile(status_format_file):
-            with open(status_format_file, "r") as fp:
-                status_format = fp.read().strip()
+            try:
+                with open(status_format_file, "r") as fp:
+                    status_format = fp.read().strip()
+            except OSError:
+                # Non fatal race
+                status_format = "text"
 
         if not status_format or status_format not in VALID_STATUS_FORMATS:
             status_format = "text"
@@ -1925,7 +1930,19 @@ class ScalyrAgent(object):
             tmp_file = None
 
             os.rename(tmp_file_path, final_file_path)
-        except (OSError, IOError):
+        except (OSError, IOError) as e:
+            # Temporary workaround to make race conditions less likely.
+            # If agent status or health check is requested multiple times or concurrently around the
+            # same time, it's likely the race will occur and rename will fail because the file  was
+            # already renamed by the other process.
+            # This workaround is not 100%, only 100% solution is to use a global read write lock
+            # and only allow single invocation of status command at the same time.
+            if tmp_file is not None:
+                tmp_file.close()
+
+            if os.path.isfile(final_file_path):
+                return final_file_path
+
             log.exception(
                 "Exception caught will try to report status", error_code="failedStatus"
             )
