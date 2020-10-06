@@ -18,6 +18,12 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from scalyr_agent.log_watcher import LogWatcher
+
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
+
+from tests.unit.configuration_test import TestConfigurationBase
+
 __author__ = "imron@scalyr.com"
 
 import time
@@ -136,7 +142,7 @@ class SyslogFrameParserTestCase(unittest.TestCase):
         )
 
 
-class SyslogMonitorTestCase(unittest.TestCase):
+class SyslogMonitorTestCase(TestConfigurationBase):
     def assertNoException(self, func):
         try:
             func()
@@ -147,84 +153,117 @@ class SyslogMonitorTestCase(unittest.TestCase):
 
 
 class SyslogMonitorConfigTest(SyslogMonitorTestCase):
+    def _get_basic_global_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        return global_config
+
     def test_config_protocol_udp(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_udp_upper(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "UDP",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_tcp(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_tcp_upper(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "TCP",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_multiple(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp, udp",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_multiple_with_ports(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:4096, udp:5082",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_multiple_two(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp, udp",
         }
         self.assertNoException(
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             )
         )
 
     def test_config_protocol_invalid(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "XXX",
@@ -232,11 +271,14 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
         self.assertRaises(
             Exception,
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             ),
         )
 
     def test_config_protocol_empty(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "",
@@ -244,11 +286,14 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
         self.assertRaises(
             Exception,
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             ),
         )
 
     def test_config_port_too_high(self):
+        global_config = self._get_basic_global_config()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:70000",
@@ -256,7 +301,115 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
         self.assertRaises(
             Exception,
             lambda: SyslogMonitor(
-                config, scalyr_logging.getLogger("syslog_monitor[test]")
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
+            ),
+        )
+
+    def test_config_log_configs(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            syslog_logs: [
+                { syslog_app: "test", parser: "blahblah" },
+                { syslog_app: ".*", parser: "blahblah2" }
+            ]
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "udp",
+        }
+        self.assertNoException(
+            lambda: SyslogMonitor(
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
+            )
+        )
+
+    def test_config_log_configs_with_bad_message_log(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            syslog_logs: [
+                { syslog_app: "test", parser: "blahblah" },
+                { syslog_app: ".*", parser: "blahblah2" }
+            ]
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "udp",
+            "message_log": "log_path.log",
+        }
+        self.assertRaises(
+            BadMonitorConfiguration,
+            lambda: SyslogMonitor(
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
+            ),
+        )
+
+    def test_config_log_configs_docker(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            syslog_logs: [
+                { syslog_app: "test", parser: "blahblah" },
+                { syslog_app: ".*", parser: "blahblah2" }
+            ]
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "udp",
+            "mode": "docker",
+        }
+        self.assertNoException(
+            lambda: SyslogMonitor(
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
+            )
+        )
+
+    def test_config_log_configs_with_bad_message_log_docker(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            syslog_logs: [
+                { syslog_app: "test", parser: "blahblah" },
+                { syslog_app: ".*", parser: "blahblah2" }
+            ]
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "udp",
+            "docker_logfile_template": "log_path${CNAME}.log",
+            "mode": "docker",
+        }
+        self.assertRaises(
+            BadMonitorConfiguration,
+            lambda: SyslogMonitor(
+                config,
+                scalyr_logging.getLogger("syslog_monitor[test]"),
+                global_config=global_config,
             ),
         )
 
@@ -402,14 +555,25 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_tcp_server(self):
-
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            agent_log_path: ""
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
             "log_flush_delay": 0.0,
         }
 
-        self.monitor = TestSyslogMonitor(config, self.logger)
+        self.monitor = TestSyslogMonitor(
+            config, self.logger, global_config=global_config
+        )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
 
         self.monitor.start()
@@ -456,14 +620,26 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_udp_server(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            agent_log_path: ""
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:5514",
             "log_flush_delay": 0.0,
         }
         self.monitor = TestSyslogMonitor(
-            config, scalyr_logging.getLogger("syslog_monitor[test]")
+            config,
+            scalyr_logging.getLogger("syslog_monitor[test]"),
+            global_config=global_config,
         )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
         self.monitor.start()
 
@@ -492,14 +668,26 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_multiple_servers(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            agent_log_path: ""
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:8000, tcp:8001, udp:8002, tcp:8003",
             "log_flush_delay": 0.0,
         }
         self.monitor = TestSyslogMonitor(
-            config, scalyr_logging.getLogger("syslog_monitor[test]")
+            config,
+            scalyr_logging.getLogger("syslog_monitor[test]"),
+            global_config=global_config,
         )
+        self.monitor.set_log_watcher(LogWatcher())
         self.monitor.open_metric_log()
 
         self.monitor.start()
@@ -537,6 +725,96 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.monitor = None
 
         f = open("agent_syslog.log", "r")
+        actual = f.read().strip()
+
+        expected_tcp1 = expected_tcp1.strip()
+        expected_tcp2 = expected_tcp2.strip()
+
+        self.assertTrue(
+            expected_udp1 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_udp1, actual),
+        )
+        self.assertTrue(
+            expected_udp2 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_udp2, actual),
+        )
+        self.assertTrue(
+            expected_tcp1 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_tcp1, actual),
+        )
+        self.assertTrue(
+            expected_tcp2 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_tcp2, actual),
+        )
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_run_multiple_servers_log_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            agent_log_path: "",
+            syslog_logs: [
+                {
+                    syslog_app: ".?",
+                    parser: "TestParser",
+                }
+            ]
+          }
+        """
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "udp:8000, tcp:8001, udp:8002, tcp:8003",
+            "log_flush_delay": 0.0,
+        }
+        self.monitor = TestSyslogMonitor(
+            config,
+            scalyr_logging.getLogger("syslog_monitor[test]"),
+            global_config=global_config,
+        )
+        self.monitor.set_log_watcher(LogWatcher())
+        self.monitor.open_metric_log()
+
+        self.monitor.start()
+
+        time.sleep(0.05)
+
+        udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sockets.append(udp)
+
+        tcp1 = socket.socket()
+        self.sockets.append(tcp1)
+
+        tcp2 = socket.socket()
+        self.sockets.append(tcp2)
+
+        self.connect(tcp1, ("localhost", 8001))
+        self.connect(tcp2, ("localhost", 8003))
+
+        expected_udp1 = "UDP Test"
+        self.send_and_wait_for_lines(udp, expected_udp1, ("localhost", 8000))
+
+        expected_udp2 = "UDP2 Test"
+        self.send_and_wait_for_lines(udp, expected_udp2, ("localhost", 8002))
+
+        expected_tcp1 = "TCP Test\n"
+        self.send_and_wait_for_lines(tcp1, expected_tcp1)
+
+        expected_tcp2 = "TCP2 Test\n"
+        self.send_and_wait_for_lines(tcp2, expected_tcp2)
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
+        self.monitor.stop(wait_on_join=False)
+        self.monitor = None
+
+        f = open("agent_syslog%s.log" % six.text_type(hash(".?")), "r")
         actual = f.read().strip()
 
         expected_tcp1 = expected_tcp1.strip()

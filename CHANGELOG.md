@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.13 "TBD" - TBD
+
+<!---
+Packaged by TBD TBD <tbd@scalyr.com> on Sep 17, 2020 19:00 -0800
+--->
+
+Features:
+* Added support to `syslog` monitor to create separate log files (with distinct configuration such as parsers) based on `app` field.
+
 ## 2.1.12 "Betelgeuze" - September 17, 2020
 
 <!---
