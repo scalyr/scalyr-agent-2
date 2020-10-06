@@ -761,17 +761,24 @@ class ScalyrAgent(object):
         with open(status_file, "r") as fp:
             content = fp.read()
 
-        if not health_check:
-            # Regular non-health check invocation, just print the stats
-            print(content)
-            return return_code
-
         # Health check invocation, try to parse status from the report and print and handle it here
         health_result = self.__find_health_result_in_status_data(content)
 
         if health_result:
+            if health_result.lower() == "good":
+                return_code = 0
+            else:
+                return_code = 2
+
+        # Regular non-health check invocation, just print the stats, but still use the correct exit
+        # code based on the health check value.
+        if not health_check:
+            print(content)
+            return return_code
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        if health_result:
             print("Health check: %s" % health_result)
-            return_code = 0 if health_result.lower() == "good" else 2
         elif not health_result:
             return_code = 3
             print("Cannot get health check result.")
@@ -1960,8 +1967,6 @@ class ScalyrAgent(object):
             log.exception(
                 "Exception caught will try to report status", error_code="failedStatus"
             )
-            if tmp_file is not None:
-                tmp_file.close()
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_4,
