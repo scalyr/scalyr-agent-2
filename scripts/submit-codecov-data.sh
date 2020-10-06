@@ -16,10 +16,11 @@
 # Script which submits coverage data to codecov.io.
 # It takes occasional codecov API failures into account and tries to retry
 # upload.
-exit 0
 
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
 RETRY_DELAY=${RETRY_DELAY:-5}
+
+echo "Submitting coverage data to codecov.io"
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
@@ -40,3 +41,5 @@ if [ "${EXIT_CODE}" -ne 0 ]; then
     echo "Submitting code coverage to codecov.io failed after ${MAX_ATTEMPTS} attempts"
     exit 1
 fi
+
+echo "Data successfully submitted to codecov.io"
