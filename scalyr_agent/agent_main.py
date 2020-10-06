@@ -630,7 +630,11 @@ class ScalyrAgent(object):
             self.__run_state.stop()
 
     def __detailed_status(
-        self, data_directory, status_format="text", health_check=False
+        self,
+        data_directory,
+        status_format="text",
+        health_check=False,
+        zero_content=True,
     ):
         """Execute the status -v or -H command.
 
@@ -639,6 +643,11 @@ class ScalyrAgent(object):
 
         @param data_directory: The path to the data directory.
         @type data_directory: str
+
+        :param zero_content: True to zero the content so we can detect when agent writes a new
+                             content. This is primary meant to be used in testing where we can
+                             set it to False which means we can avoid a lot of nasty mocking if
+                             open() and related functiond.
 
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
@@ -696,7 +705,7 @@ class ScalyrAgent(object):
             return 1
 
         # Zero out the current file so that we can detect once the agent process has updated it.
-        if os.path.isfile(status_file):
+        if os.path.isfile(status_file) and zero_content:
             f = open(status_file, "w")
             f.truncate(0)
             f.close()

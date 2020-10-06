@@ -781,6 +781,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         self.agent = ScalyrAgent(PlatformController())
         self.agent._ScalyrAgent__config = config
+        self.agent._ScalyrAgent__escalator = mock.Mock()
+        self.agent._ScalyrAgent__escalator.is_user_change_required = mock.Mock(
+            return_value=False
+        )
 
         self.original_generate_status = self.agent._ScalyrAgent__generate_status
 
@@ -872,6 +876,153 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         result = self.agent._ScalyrAgent__find_health_result_in_status_data(content)
         self.assertEqual(result, "Good")
+
+    def test__detailed_status_correct_exit_return_code_is_returned(self):
+        def mock_generate_status_wrapper(health_check_result):
+            def mock_generate_status(*args, **kwargs):
+                result = self.original_generate_status(*args, **kwargs)
+                result.copying_manager_status = CopyingManagerStatus()
+                result.copying_manager_status.total_errors = 0
+                result.copying_manager_status.health_check_result = health_check_result
+                return result
+
+            return mock_generate_status
+
+        # status_format=text, health_check=False, health_result="Good" - should return 0
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Good")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=False, zero_content=False
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=True, health_result="Good" - should return 0
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Good")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=True, zero_content=False
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=False, health_result="Bad" - should return 2
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=False, zero_content=False
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=text, health_check=True, health_result="Bad" - should return 2
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=True, zero_content=False
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=json, health_check=False, health_result="Bad" - should return 2
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="json", health_check=False, zero_content=False
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=json, health_check=True, health_result="Bad" - should return 2
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="json", health_check=True, zero_content=False
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=text, health_check=False, health_result="" - should return 0
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=False, zero_content=False
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=True, health_result="" - should return 3
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="text", health_check=True, zero_content=False
+        )
+        self.assertEqual(return_code, 3)
+
+        # status_format=json, health_check=False, health_result="" - should return 0
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="json", health_check=False, zero_content=False
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=json, health_check=True, health_result="" - should return 3
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path, status_format="json", health_check=True, zero_content=False
+        )
+        self.assertEqual(return_code, 3)
 
     def _write_status_format_file(self, status_format):
         with open(self.status_format_file, "w") as fp:
