@@ -898,7 +898,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=False, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 0)
 
@@ -910,7 +913,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=True, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 0)
 
@@ -924,7 +930,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=False, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 2)
 
@@ -936,7 +945,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue(status_file)
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=True, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 2)
 
@@ -950,7 +962,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="json", health_check=False, zero_content=False
+            self.data_path,
+            status_format="json",
+            health_check=False,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 2)
 
@@ -964,7 +979,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="json", health_check=True, zero_content=False
+            self.data_path,
+            status_format="json",
+            health_check=True,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 2)
 
@@ -978,7 +996,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=False, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 0)
 
@@ -992,7 +1013,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="text", health_check=True, zero_content=False
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 3)
 
@@ -1006,7 +1030,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="json", health_check=False, zero_content=False
+            self.data_path,
+            status_format="json",
+            health_check=False,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 0)
 
@@ -1020,7 +1047,10 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue(content.startswith("{") and content.endswith("}"))
 
         return_code = self.agent._ScalyrAgent__detailed_status(
-            self.data_path, status_format="json", health_check=True, zero_content=False
+            self.data_path,
+            status_format="json",
+            health_check=True,
+            zero_status_file=False,
         )
         self.assertEqual(return_code, 3)
 

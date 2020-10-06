@@ -634,7 +634,7 @@ class ScalyrAgent(object):
         data_directory,
         status_format="text",
         health_check=False,
-        zero_content=True,
+        zero_status_file=True,
     ):
         """Execute the status -v or -H command.
 
@@ -644,8 +644,8 @@ class ScalyrAgent(object):
         @param data_directory: The path to the data directory.
         @type data_directory: str
 
-        :param zero_content: True to zero the content so we can detect when agent writes a new
-                             content. This is primary meant to be used in testing where we can
+        :param zero_status_file: True to zero the status file content so we can detect when agent writes
+                             a new status file This is primary meant to be used in testing where we can
                              set it to False which means we can avoid a lot of nasty mocking if
                              open() and related functiond.
 
@@ -705,7 +705,7 @@ class ScalyrAgent(object):
             return 1
 
         # Zero out the current file so that we can detect once the agent process has updated it.
-        if os.path.isfile(status_file) and zero_content:
+        if os.path.isfile(status_file) and zero_status_file:
             f = open(status_file, "w")
             f.truncate(0)
             f.close()
