@@ -757,40 +757,54 @@ class ScalyrAgent(object):
             return 1
 
         return_code = 0
-        fp = open(status_file)
-        for line in fp:
-            if not health_check:
-                print(line.rstrip())
 
-            if status_format == "json" or health_check:
-                health_result = self.__find_health_result_in_status_json(line)
-                if health_result:
-                    if health_check:
-                        print("Health check: %s" % health_result)
-                    if health_result != "Good":
-                        return_code = 2
-                elif health_check:
-                    print("Cannot get health check result.")
-            elif (
-                status_format == "text"
-                and "Health check:" in line
-                and not re.match(r"^Health check\:\s+Good$", line.strip())
-            ):
-                return_code = 2
-        fp.close()
+        with open(status_file, "r") as fp:
+            content = fp.read()
+
+        if not health_check:
+            # Regular non-health check invocation, just print the stats
+            print(content)
+            return return_code
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        health_result = self.__find_health_result_in_status_data(content)
+
+        if health_result:
+            print("Health check: %s" % health_result)
+            return_code = 0 if health_result.lower() == "good" else 2
+        elif not health_result:
+            return_code = 3
+            print("Cannot get health check result.")
+
         return return_code
 
     @staticmethod
-    def __find_health_result_in_status_json(line):
+    def __find_health_result_in_status_data(data):
+        """
+        Parse health result from the agent status content (either in JSON or text format).
+
+        param data: last_status agent file content (either in JSON or text format).
+        """
+        # Keep in mind that user could have requested health check (json format), but concurrent
+        # scalyr-agent status invocation requested text format so we handle both here to avoid
+        # introducing global agent status read write lock.
         try:
-            status = scalyr_util.json_decode(line)
-            if (
-                "copying_manager_status" in status
-                and "health_check_result" in status["copying_manager_status"]
-            ):
-                return status["copying_manager_status"]["health_check_result"]
-        except ValueError:
-            pass
+            status = scalyr_util.json_decode(data.strip())
+
+            copying_manager_status = status.get("copying_manager_status", {}) or {}
+            health_check_result = copying_manager_status.get(
+                "health_check_result", None
+            )
+
+            if health_check_result:
+                return health_check_result
+        except ValueError as e:
+            # Likely not JSON, assume it's text format
+            match = re.search(r"^Health check\:\s+(.*?)$", data, flags=re.MULTILINE)
+
+            if match:
+                return match.groups()[0]
+
         return None
 
     def __stop(self, quiet):
