@@ -26,7 +26,7 @@ import pytest
 import six
 
 from tests.utils.agent_runner import AgentRunner
-from tests.utils.log_reader import LogReader
+from tests.utils.log_reader import LogReader, AgentLogReader
 from tests.utils.dockerized import dockerized_case
 from tests.image_builder.monitors.common import CommonMonitorBuilder
 
@@ -61,14 +61,14 @@ def _test(python_version):
     runner.start(executable=python_version)
     time.sleep(1)
     reader = LogReader(runner.shell_monitor_log_path)
-    reader.start(wait_for_data=False)
+    agent_log_reader = AgentLogReader(runner.agent_log_file_path)
 
-    last_line = reader.wait_for_new_line()
+    last_line = reader.wait_for_next_line()
 
     assert "Hello" in last_line
     assert "[shell_monitor(echo)]" in last_line
 
-    runner.stop()
+    agent_log_reader.go_to_end()
 
 
 @pytest.mark.usefixtures("agent_environment")

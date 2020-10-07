@@ -79,7 +79,7 @@ def _test(request, python_version):
         "nginx.connections.writing",
         "nginx.connections.waiting",
     ]
-    metrics = reader.get_metrics(metric_names)
+    metrics = reader.wait_for_metrics_exist(metric_names)
 
     assert list(sorted(metrics.keys())) == sorted(metric_names)
 
