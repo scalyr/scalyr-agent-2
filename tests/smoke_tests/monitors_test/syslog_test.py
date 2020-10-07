@@ -46,8 +46,6 @@ class SyslogAgentRunner(AgentRunner):
             self.agent_logs_dir_path / "agent_syslog.log"
         )
 
-        os.environ["SCALYR_API_KEY"] = "1"
-
     @property
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
         config = super(SyslogAgentRunner, self)._agent_config
