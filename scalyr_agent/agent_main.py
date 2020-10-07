@@ -279,7 +279,7 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            log_warnings = command not in ["status"]
+            log_warnings = command not in ["status", "stop"]
             self.__config = self.__read_and_verify_config(
                 config_file_path, log_warnings=log_warnings
             )
