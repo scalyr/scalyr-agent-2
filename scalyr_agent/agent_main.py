@@ -279,7 +279,10 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            self.__config = self.__read_and_verify_config(config_file_path)
+            log_warnings = command not in ["status", "stop"]
+            self.__config = self.__read_and_verify_config(
+                config_file_path, log_warnings=log_warnings
+            )
 
             # check if not a tty and override the no check remote variable
             if not sys.stdout.isatty():
@@ -365,27 +368,35 @@ class ScalyrAgent(object):
                     % (command, six.text_type(e), traceback.format_exc())
                 )
 
-    def __read_and_verify_config(self, config_file_path):
+    def __read_and_verify_config(self, config_file_path, log_warnings=True):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
 
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
+
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__make_config(config_file_path)
+        config = self.__make_config(config_file_path, log_warnings=log_warnings)
         self.__verify_config(config)
         return config
 
-    def __make_config(self, config_file_path):
+    def __make_config(self, config_file_path, log_warnings=True):
         """Make Configuration object. Does not read nor verify.
 
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
+
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -395,6 +406,7 @@ class ScalyrAgent(object):
             self.__default_paths,
             log,
             extra_config_dir=self.__extra_config_dir,
+            log_warnings=log_warnings,
         )
 
     def __verify_config(
@@ -409,6 +421,7 @@ class ScalyrAgent(object):
 
         @param config: The configuration object.
         @type config: scalyr_agent.Configuration
+
         @return: A boolean value indicating whether or not the configuration was fully verified
         """
         try:
@@ -630,7 +643,11 @@ class ScalyrAgent(object):
             self.__run_state.stop()
 
     def __detailed_status(
-        self, data_directory, status_format="text", health_check=False
+        self,
+        data_directory,
+        status_format="text",
+        health_check=False,
+        zero_status_file=True,
     ):
         """Execute the status -v or -H command.
 
@@ -639,6 +656,11 @@ class ScalyrAgent(object):
 
         @param data_directory: The path to the data directory.
         @type data_directory: str
+
+        :param zero_status_file: True to zero the status file content so we can detect when agent writes
+                             a new status file This is primary meant to be used in testing where we can
+                             set it to False which means we can avoid a lot of nasty mocking if
+                             open() and related functiond.
 
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
@@ -696,7 +718,7 @@ class ScalyrAgent(object):
             return 1
 
         # Zero out the current file so that we can detect once the agent process has updated it.
-        if os.path.isfile(status_file):
+        if os.path.isfile(status_file) and zero_status_file:
             f = open(status_file, "w")
             f.truncate(0)
             f.close()
@@ -757,40 +779,61 @@ class ScalyrAgent(object):
             return 1
 
         return_code = 0
-        fp = open(status_file)
-        for line in fp:
-            if not health_check:
-                print(line.rstrip())
 
-            if status_format == "json" or health_check:
-                health_result = self.__find_health_result_in_status_json(line)
-                if health_result:
-                    if health_check:
-                        print("Health check: %s" % health_result)
-                    if health_result != "Good":
-                        return_code = 2
-                elif health_check:
-                    print("Cannot get health check result.")
-            elif (
-                status_format == "text"
-                and "Health check:" in line
-                and not re.match(r"^Health check\:\s+Good$", line.strip())
-            ):
+        with open(status_file, "r") as fp:
+            content = fp.read()
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        health_result = self.__find_health_result_in_status_data(content)
+
+        if health_result:
+            if health_result.lower() == "good":
+                return_code = 0
+            else:
                 return_code = 2
-        fp.close()
+
+        # Regular non-health check invocation, just print the stats, but still use the correct exit
+        # code based on the health check value.
+        if not health_check:
+            print(content)
+            return return_code
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        if health_result:
+            print("Health check: %s" % health_result)
+        elif not health_result:
+            return_code = 3
+            print("Cannot get health check result.")
+
         return return_code
 
     @staticmethod
-    def __find_health_result_in_status_json(line):
+    def __find_health_result_in_status_data(data):
+        """
+        Parse health result from the agent status content (either in JSON or text format).
+
+        param data: last_status agent file content (either in JSON or text format).
+        """
+        # Keep in mind that user could have requested health check (json format), but concurrent
+        # scalyr-agent status invocation requested text format so we handle both here to avoid
+        # introducing global agent status read write lock.
         try:
-            status = scalyr_util.json_decode(line)
-            if (
-                "copying_manager_status" in status
-                and "health_check_result" in status["copying_manager_status"]
-            ):
-                return status["copying_manager_status"]["health_check_result"]
-        except ValueError:
-            pass
+            status = scalyr_util.json_decode(data.strip())
+
+            copying_manager_status = status.get("copying_manager_status", {}) or {}
+            health_check_result = copying_manager_status.get(
+                "health_check_result", None
+            )
+
+            if health_check_result:
+                return health_check_result
+        except ValueError as e:
+            # Likely not JSON, assume it's text format
+            match = re.search(r"^Health check\:\s+(.*?)$", data, flags=re.MULTILINE)
+
+            if match:
+                return match.groups()[0]
+
         return None
 
     def __stop(self, quiet):
@@ -1891,9 +1934,14 @@ class ScalyrAgent(object):
         status_format_file = os.path.join(
             self.__config.agent_data_path, STATUS_FORMAT_FILE
         )
+
         if os.path.isfile(status_format_file):
-            with open(status_format_file, "r") as fp:
-                status_format = fp.read().strip()
+            try:
+                with open(status_format_file, "r") as fp:
+                    status_format = fp.read().strip()
+            except OSError:
+                # Non fatal race
+                status_format = "text"
 
         if not status_format or status_format not in VALID_STATUS_FORMATS:
             status_format = "text"
@@ -1925,12 +1973,22 @@ class ScalyrAgent(object):
             tmp_file = None
 
             os.rename(tmp_file_path, final_file_path)
-        except (OSError, IOError):
+        except (OSError, IOError) as e:
+            # Temporary workaround to make race conditions less likely.
+            # If agent status or health check is requested multiple times or concurrently around the
+            # same time, it's likely the race will occur and rename will fail because the file  was
+            # already renamed by the other process.
+            # This workaround is not 100%, only 100% solution is to use a global read write lock
+            # and only allow single invocation of status command at the same time.
+            if tmp_file is not None:
+                tmp_file.close()
+
+            if os.path.isfile(final_file_path):
+                return final_file_path
+
             log.exception(
                 "Exception caught will try to report status", error_code="failedStatus"
             )
-            if tmp_file is not None:
-                tmp_file.close()
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_4,
