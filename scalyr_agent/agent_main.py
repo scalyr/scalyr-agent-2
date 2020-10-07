@@ -279,7 +279,10 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            self.__config = self.__read_and_verify_config(config_file_path)
+            log_warnings = command not in ["status"]
+            self.__config = self.__read_and_verify_config(
+                config_file_path, log_warnings=log_warnings
+            )
 
             # check if not a tty and override the no check remote variable
             if not sys.stdout.isatty():
@@ -365,27 +368,35 @@ class ScalyrAgent(object):
                     % (command, six.text_type(e), traceback.format_exc())
                 )
 
-    def __read_and_verify_config(self, config_file_path):
+    def __read_and_verify_config(self, config_file_path, log_warnings=True):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
 
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
+
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__make_config(config_file_path)
+        config = self.__make_config(config_file_path, log_warnings=log_warnings)
         self.__verify_config(config)
         return config
 
-    def __make_config(self, config_file_path):
+    def __make_config(self, config_file_path, log_warnings=True):
         """Make Configuration object. Does not read nor verify.
 
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
+
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -395,6 +406,7 @@ class ScalyrAgent(object):
             self.__default_paths,
             log,
             extra_config_dir=self.__extra_config_dir,
+            log_warnings=log_warnings,
         )
 
     def __verify_config(
@@ -409,6 +421,7 @@ class ScalyrAgent(object):
 
         @param config: The configuration object.
         @type config: scalyr_agent.Configuration
+
         @return: A boolean value indicating whether or not the configuration was fully verified
         """
         try:
