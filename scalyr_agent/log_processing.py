@@ -2420,7 +2420,7 @@ class LogFileProcessor(object):
                         sequence_end_number = sequence_number
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
-                            new_event_timestamp = int(current_time)
+                            new_event_timestamp = int(current_time * 1000000000)
                         new_event = ingestion_client_line.LogLine(
                             str(self._event_id),
                             line_object.line,
