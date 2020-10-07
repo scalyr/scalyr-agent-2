@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.13 "TBD" - October 17, 2020
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Sep 17, 2020 19:00 -0800
+--->
+
+Bug fixes:
+* Fix ``scalyr-agent-2 status`` command and make sure it doesn't result in an non-fatal error in
+  the agent process and the command itself when running status command multiple times concurrently
+  or in a short time frame.
+* Fix ``scalyr-agent-status`` command and make sure config override warning is not logged to stdout
+  when running this command since it may interfere with consumers of the status command output.
+
 ## 2.1.12 "Betelgeuze" - September 17, 2020
 
 <!---
