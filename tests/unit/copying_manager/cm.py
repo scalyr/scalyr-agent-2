@@ -1,4 +1,6 @@
 from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
 
 import time
 import threading
@@ -146,8 +148,8 @@ class BaseTestableCopyingManager:
                 )
             # If we are already in the required_transition_state, consume it.
             if (
-                    self._test_is_stopped
-                    and self._test_stop_state == required_transition_state
+                self._test_is_stopped
+                and self._test_stop_state == required_transition_state
             ):
                 self._test_required_transition = None
             else:
@@ -176,7 +178,7 @@ class BaseTestableCopyingManager:
         @param start_time:  The start time when we first began waiting on this condition, in seconds past epoch.
         @type start_time: Number
         """
-        print("State %s" % self._test_stop_state)
+        print(("State %s" % self._test_stop_state))
         deadline = start_time + TestableCopyingManagerWorker.WAIT_TIMEOUT
         self._test_state_cv.wait(timeout=(deadline - time.time()) + 0.5)
         if time.time() > deadline:
@@ -488,9 +490,7 @@ class TestableCopyingManagerWorker(CopyingManagerWorker, BaseTestableCopyingMana
         """
         if scalyr_client is None:
             scalyr_client = dict(fake_client=True)
-        super(TestableCopyingManagerWorker, self).start_worker(
-            scalyr_client
-        )
+        super(TestableCopyingManagerWorker, self).start_worker(scalyr_client)
 
         if stop_at:
             self.run_and_stop_at(stop_at)
@@ -562,12 +562,16 @@ class TestableCopyingManagerWorker(CopyingManagerWorker, BaseTestableCopyingMana
                 when invoked will return the passed in status message as the response to the AddEventsRequest.
             @rtype: (AddEventsRequest, func)
             """
-            self.__copying_worker.run_and_stop_at(TestableCopyingManagerWorker.RESPONDING)
+            self.__copying_worker.run_and_stop_at(
+                TestableCopyingManagerWorker.RESPONDING
+            )
             request = self.__copying_worker.captured_request()
 
             def send_response(status_message):
                 self.__copying_worker.set_response(status_message)
-                self.__copying_worker.run_and_stop_at(TestableCopyingManagerWorker.SLEEPING)
+                self.__copying_worker.run_and_stop_at(
+                    TestableCopyingManagerWorker.SLEEPING
+                )
 
             return request, send_response
 
@@ -578,12 +582,12 @@ class TestableCopyingManagerWorker(CopyingManagerWorker, BaseTestableCopyingMana
 
             self.__copying_worker.run_and_stop_at(
                 TestableCopyingManagerWorker.SENDING,
-                required_transition_state=TestableCopyingManagerWorker.SLEEPING
+                required_transition_state=TestableCopyingManagerWorker.SLEEPING,
             )
 
             self.__copying_worker.run_and_stop_at(
                 TestableCopyingManagerWorker.SLEEPING,
-                required_transition_state=TestableCopyingManagerWorker.SENDING
+                required_transition_state=TestableCopyingManagerWorker.SENDING,
             )
 
         def close_at_eof(self, filepath):
@@ -595,9 +599,7 @@ class TestableCopyingManagerWorker(CopyingManagerWorker, BaseTestableCopyingMana
             :type filepath: six.text_type
             """
             # noinspection PyProtectedMember
-            self.__copying_worker.log_processors[
-                filepath
-            ].close_at_eof()
+            self.__copying_worker.log_processors[filepath].close_at_eof()
 
         def stop(self):
             self.__copying_worker.stop_worker()

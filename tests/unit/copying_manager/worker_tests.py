@@ -7,6 +7,8 @@ import json
 import time
 from contextlib import contextmanager
 
+from six.moves import range
+
 if False:
     from typing import Union
     from typing import Dict
@@ -292,7 +294,7 @@ class CopyingManagerWorkerStatusTest(CopyingManagerWorkerTest):
     def test_health_check_status(self):
         (test_file,), worker = self._create_worker_instance()
 
-        #worker._CopyingManagerWorker__last_attempt_time = time.time()
+        # worker._CopyingManagerWorker__last_attempt_time = time.time()
 
         status = worker.generate_status()
         assert status.health_check_result == "Good"
