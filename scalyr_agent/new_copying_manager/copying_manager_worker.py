@@ -17,99 +17,9 @@ from scalyr_agent.util import StoppableThread, RateLimiter
 from scalyr_agent.agent_status import CopyingManagerWorkerStatus
 
 log = scalyr_logging.getLogger(__name__)
+log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 import six
-
-
-class CopyingManagerCommon(LogWatcher):
-    def __init__(self, configuration):
-        StoppableThread.__init__(self, name="log copier thread")
-        self.__config = configuration
-
-        # Rate limiter
-        self.__rate_limiter = None
-        if self.__config.parsed_max_send_rate_enforcement:
-            self.__rate_limiter = RateLimiter(
-                # Making the bucket size 4 times the bytes per second, it shouldn't affect the rate over a long time
-                # meaningfully but we don't have a rationale for this value.
-                # TODO: Make this configurable as part of the `max_send_rate_enforcement` configuration option
-                self.__config.parsed_max_send_rate_enforcement * 4.0,
-                self.__config.parsed_max_send_rate_enforcement,
-            )
-
-        # collect monitor-specific extra server-attributes.  seed with a copy of the attributes and converted to a dict.
-        self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
-
-        # a dict of paths -> log matchers for log matchers that have been dynamically added
-        # this dict should only be touched by the main thread
-        self.__dynamic_matchers = {}
-
-        # a dict of paths -> monitor names that have been dynamically added to the copying manager
-        # the copying manager ensures that operations on a dynamically added path can only be performed
-        # by the same monitor (i.e. only the monitor that dynamically added a path can remove or update
-        # that monitor).
-        self.__dynamic_monitor_paths = {}
-
-        # a dict of log paths pending removal once their bytes pending count reaches 0
-        # keyed on the log path, with a value of True or False depending on whether the
-        # log file has been processed yet
-        self.__logs_pending_removal = {}
-
-        # a dict of log_configs keyed by log_path for logs with configs that need to be reloaded.
-        # Logs need to be reloaded if their configuration changes at runtime
-        # e.g. with the k8s monitor if an annotation attribute changes such as the
-        # sampling rules or the parser, and this is outside the usual configuration reload mechanism.
-        # By keeping logs that need reloading in a separate 'pending' list
-        # we can avoid locking around log_processors and log_paths_being_processed containers,
-        # and simply process the contents of this list on the main loop
-        self.__logs_pending_reload = {}
-
-        # a list of dynamically added log_matchers that have not been processed yet
-        self.__pending_log_matchers = []
-
-        # A lock that protects the status variables and the __log_matchers variable, the only variables that
-        # are access in generate_status() which needs to be thread safe.
-        self.__lock = threading.Lock()
-
-        # The last time we scanned for new files that match the __log_matchers.
-        self.__last_new_file_scan_time = 0
-
-        # Status variables that track statistics reported to the status page.
-        self.__last_attempt_time = None
-        self.__last_success_time = None
-        self.__last_attempt_size = None
-        self.__last_response = None
-        self.__last_response_status = None
-        self.__total_bytes_uploaded = 0
-        self.__total_errors = 0
-        self.__total_rate_limited_time = 0
-        self.__rate_limited_time_since_last_status = 0
-
-        # The positions to use for a given file if there is not already a checkpoint for that file.
-        # Set in the start_manager call.
-        self._logs_initial_positions = None
-
-        # A semaphore that we increment when this object has begun copying files (after first scan).
-        self.__copying_semaphore = threading.Semaphore()
-
-        # debug leaks
-        self.__disable_new_file_matches = configuration.disable_new_file_matches
-        self.__disable_scan_for_new_bytes = configuration.disable_scan_for_new_bytes
-        self.__disable_copying_thread = configuration.disable_copying_thread
-
-        # Statistics for copying_manager_status messages
-        self.total_copy_iterations = 0
-        self.total_read_time = 0
-        self.total_waiting_time = 0
-        self.total_blocking_response_time = 0
-        self.total_request_time = 0
-        self.total_pipelined_requests = 0
-
-        self._log_matchers = dict()
-
-    @abc.abstractmethod
-    def run(self):
-        pass
 
 
 class AddEventsTask(object):
@@ -269,8 +179,12 @@ class CopyingParameters(object):
 
 
 class CopyingManagerWorker(StoppableThread):
-    def __init__(self, configuration):
-        super(CopyingManagerWorker, self).__init__(name="log copier thread")
+    def __init__(self, configuration, worker_id):
+        super(CopyingManagerWorker, self).__init__(
+            name="copying manager worker thread #%s" % worker_id
+        )
+
+        self._id = worker_id
         self.__config = configuration
 
         self.__rate_limiter = None
@@ -291,7 +205,7 @@ class CopyingManagerWorker(StoppableThread):
         self.__lock = threading.Lock()
 
         # A semaphore that we increment when this object has begun copying files (after first scan).
-        self.__copying_semaphore = threading.Semaphore()
+        self.__copying_semaphore = threading.Semaphore(0)
 
         # collect monitor-specific extra server-attributes.  seed with a copy of the attributes and converted to a dict.
         self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
@@ -345,22 +259,14 @@ class CopyingManagerWorker(StoppableThread):
         """
         Add new log_processor.
         """
-
-        self.__pending_log_processors[log_processor.log_path] = log_processor
-
-    def __add_new_log_processor(self, log_processor):
-        """
-        """
+        with self.__lock:
+            self.__pending_log_processors[log_processor.log_path] = log_processor
 
     def remove_log_processor(self, path):
 
-        self.__lock.acquire()
-
-        processor = self.__log_processors[path]
-
-        self.__log_processors_scheduled_for_removal[path] = processor
-
-        self.__lock.release()
+        with self.__lock:
+            processor = self.__log_processors[path]
+            self.__log_processors_scheduled_for_removal[path] = processor
 
     def _add_pending_log_processors(self):
         """
@@ -383,6 +289,11 @@ class CopyingManagerWorker(StoppableThread):
                 )
                 continue
             self.__log_processors[path] = log_processor
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Log processor for file: '%s' has been added to worker #%s"
+                % (path, self._id),
+            )
 
     def __remove_scheduled_log_processors(self):
 
@@ -398,21 +309,23 @@ class CopyingManagerWorker(StoppableThread):
                         (
                             "Can not remove log processor for file: '{0}' from worker '{1}'. "
                             "There is no such log processor."
-                        ).format(path, self.__id)
+                        ).format(path, self._id)
                     )
                     continue
 
                 self.__log_processors.pop(path)
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Log processor for file '%s' is removed." % path,
+                    "Log processor for file '%s' has been removed from worker #%s"
+                    % (path, self._id),
                 )
         finally:
             self.__lock.release()
 
-    def start_worker(self, scalyr_slient):
-        self.__scalyr_client = scalyr_slient
+    def start_worker(self, scalyr_client):
+        self.__scalyr_client = scalyr_client
         self.start()
+        log.info("Worker started.")
 
     def stop_worker(self, wait_on_join=True, join_timeout=5):
         """Stops the worker.
@@ -483,13 +396,11 @@ class CopyingManagerWorker(StoppableThread):
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
-                counter = -1
-
                 while self._run_state.is_running():
-                    counter += 1
-                    print("Counter:", counter)
                     log.log(
-                        scalyr_logging.DEBUG_LEVEL_1, "At top of copy log files loop."
+                        scalyr_logging.DEBUG_LEVEL_1,
+                        "At top of copy log files loop on worker #%s. (Iteration #%s)"
+                        % (self._id, self.total_copy_iterations),
                     )
                     current_time = time.time()
                     pipeline_time = 0.0
@@ -514,6 +425,11 @@ class CopyingManagerWorker(StoppableThread):
                                 )
 
                         # add pending log processors.
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_5,
+                            "Start adding pending log processors on worker #%s"
+                            % self._id,
+                        )
                         self._add_pending_log_processors()
 
                         # Collect log lines to send if we don't have one already.
@@ -1034,6 +950,50 @@ class CopyingManagerWorker(StoppableThread):
             self.__rate_limited_time_since_last_status = 0
 
         return result
+
+    def wait_for_copying_to_begin(self):
+        """Block the current thread until this instance has finished its first scan and has begun copying.
+
+        It is good to wait for the first scan to finish before possibly creating new files to copy because
+        if the first scan has not completed, the copier will just begin copying at the end of the file when
+        it is first noticed.  However, if the first scan has completed, then the copier will know that the
+        new file was just newly created and should therefore have all of its bytes copied to Scalyr.
+
+        TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
+        we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
+        """
+        self.__copying_semaphore.acquire(True)
+
+    def _sleep_but_awaken_if_stopped(self, seconds):
+        """Makes the current thread (the copying manager worker thread) go to sleep for the specified number of seconds,
+        or until the manager is stopped, whichever comes first.
+
+        Note, this method is exposed for testing purposes.
+
+        @param seconds: The number of seconds to sleep.
+        @type seconds: float
+        """
+        self._run_state.sleep_but_awaken_if_stopped(seconds)
+
+    def _create_add_events_request(self, session_info=None, max_size=None):
+        """Creates and returns a new AddEventRequest.
+
+        This is created using the current instance of the scalyr client.
+
+        Note, this method is exposed for testing purposes.
+
+        @param session_info:  The attributes to include as session attributes
+        @param max_size:  The maximum number of bytes that request is allowed (when serialized)
+
+        @type session_info: JsonObject or dict
+        @type max_size: int
+
+        @return: The add events request
+        @rtype: AddEventsRequest
+        """
+        return self.__scalyr_client.add_events_request(
+            session_info=session_info, max_size=max_size
+        )
 
 
 # class CopyingManager(object):

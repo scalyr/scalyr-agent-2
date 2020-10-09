@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import json
 import shutil
 import tempfile
+import collections
 
 try:
     import pathlib
@@ -142,7 +143,7 @@ class ConfigBuilder(object):
         self._initialized = False
 
         # additional log files that should be reflected in the "logs" section of the configuration.
-        self._log_files = dict()  # type: Dict[str, TestableLogFile]
+        self._log_files = collections.OrderedDict()  # type: Dict[str, TestableLogFile]
 
         self.__use_pipelining = None
 
@@ -194,6 +195,9 @@ class ConfigBuilder(object):
 
         if "api_key" not in config_data:
             config_data["api_key"] = "fake"
+
+        if "debug_level" not in config_data:
+            config_data["debug_level"] = 5
 
         logs = config_data.get("logs", list())
 

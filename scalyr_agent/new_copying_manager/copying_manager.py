@@ -8,14 +8,19 @@ import sys
 if False:
     from typing import Dict
 
+import scalyr_agent.util as scalyr_util
 from scalyr_agent.util import StoppableThread
-from scalyr_agent.new_copying_manager.worker import CopyingManagerWorker
+from scalyr_agent.new_copying_manager.copying_manager_worker import CopyingManagerWorker
 from scalyr_agent import scalyr_logging
+from scalyr_agent.log_processing import LogMatcher
+from scalyr_agent.log_processing import LogFileProcessor
+from scalyr_agent.agent_status import CopyingManagerStatus
 
 import six
 
 
 log = scalyr_logging.getLogger(__name__)
+log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 
 class CopyingParameters(object):
@@ -209,6 +214,12 @@ class CopyingManager(StoppableThread):
         # The last time we scanned for new files that match the __log_matchers.
         self.__last_new_file_scan_time = 0
 
+        # The list of LogMatcher objects that are watching for new files to appear.
+        self.__log_matchers = self.__create_log_matches(configuration, monitors)
+
+        # A dict from file path to the LogFileProcessor that is processing it.
+        self.__log_paths_being_processed = {}
+
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
@@ -249,10 +260,11 @@ class CopyingManager(StoppableThread):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-        # The list of LogMatcher objects that are watching for new files to appear.
-        self._log_matchers = list()
-
         self._workers = dict()  # type: Dict[six.text_type, CopyingManagerWorker]
+
+        for i in range(1):
+            i = six.text_type(i)
+            self._workers[i] = CopyingManagerWorker(configuration, i)
 
     def run(self):
         """Processes the log files as requested by the configuration, looking for matching log files, reading their
@@ -291,6 +303,14 @@ class CopyingManager(StoppableThread):
             profile_dump_interval = 0
 
         current_time = time.time()
+
+        # start all workers.
+        for worker in self._workers.values():
+            worker.start_worker(scalyr_client=self.__scalyr_client)
+
+        # wait for workers started copying.
+        for worker in self._workers.values():
+            worker.wait_for_copying_to_begin()
 
         try:
             # noinspection PyBroadException
@@ -368,23 +388,11 @@ class CopyingManager(StoppableThread):
                             current_time=current_time, copy_at_index_zero=True
                         )
 
-                        # Update the statistics and our copying parameters.
-                        self.__lock.acquire()
-                        copying_params.update_params(result, bytes_sent)
-                        self.__last_attempt_time = current_time
-                        self.__last_success_time = last_success_status
-                        self.__last_attempt_size = bytes_sent
-                        self.__last_response = six.ensure_text(full_response)
-                        self.__last_response_status = result
-                        if result == "success":
-                            self.__total_bytes_uploaded += bytes_sent
-                        self.__lock.release()
-
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Start removing finished log matchers",
                         )
-                        self._scan_for_pending_log_files()
+                        self.__scan_for_pending_log_files()
                         self.__remove_logs_scheduled_for_deletion()
                         self.__purge_finished_log_matchers()
                         log.log(
@@ -420,36 +428,24 @@ class CopyingManager(StoppableThread):
                         self.__total_errors += 1
                         self.__lock.release()
 
-                    if (
-                        current_time - last_full_checkpoint_write
-                        > self.__config.full_checkpoint_interval
-                    ):
-                        self.__write_full_checkpoint_state(current_time)
-                        last_full_checkpoint_write = current_time
-
-                    if pipeline_time < copying_params.current_sleep_interval:
-                        self._sleep_but_awaken_if_stopped(
-                            copying_params.current_sleep_interval - pipeline_time
-                        )
-                        self.total_waiting_time += (
-                            copying_params.current_sleep_interval - pipeline_time
-                        )
+                    print("slep")
+                    self._sleep_but_awaken_if_stopped(
+                        copying_params.current_sleep_interval
+                    )
+                    self.total_waiting_time += copying_params.current_sleep_interval
 
                     # End of the copy loop
                     self.total_copy_iterations += 1
-            except Exception:
+            except Exception as e:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
-            pass
-            # self.__write_full_checkpoint_state(current_time)
-            # for processor in self.__log_processors:
-            #     processor.close()
-            # if profiler is not None:
-            #     profiler.disable()
+            # stopping all workers.
+            for worker in self._workers.values():
+                worker.stop_worker()
 
-        print("WORKER END")
+        print("MANAGER END")
 
     def _scan_for_new_logs_if_necessary(
         self,
@@ -509,7 +505,7 @@ class CopyingManager(StoppableThread):
         log_matchers = []
         self.__lock.acquire()
         try:
-            log_matchers = self._log_matchers[:]
+            log_matchers = self.__log_matchers[:]
         finally:
             self.__lock.release()
 
@@ -555,7 +551,7 @@ class CopyingManager(StoppableThread):
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
             ):
-                self._handle_new_processor(new_processor)
+                self.__handle_new_log_processor(new_processor)
                 # self.__log_processors.append(new_processor)
                 # self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
@@ -647,12 +643,262 @@ class CopyingManager(StoppableThread):
             )
             return None
 
-    def start_manager(self, scalyr_client, logs_initial_positions=None):
+    def __create_log_matches(self, configuration, monitors):
+        """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
+        @param configuration: The Configuration object.
+        @param monitors: A list of ScalyrMonitor instances whose logs should be copied.
+
+        @type configuration: Configuration
+        @type monitors: list<ScalyrMonitor>
+
+        @return: The list of log matchers.
+        @rtype: list<LogMatcher>
+        """
+        configs = []
+
+        # We keep track of which paths we have configs for so that when we add in the configuration for the monitor
+        # log files we don't re-add in the same path.  This can easily happen if a monitor is used multiple times
+        # but they are all just writing to the same monitor file.
+        all_paths = {}
+        for entry in configuration.log_configs:
+            if "path" in entry:
+                configs.append(entry.copy())
+                all_paths[entry["path"]] = 1
+
+        for monitor in monitors:
+            log_config = configuration.parse_log_config(
+                monitor.log_config,
+                default_parser="agent-metrics",
+                context_description='log entry requested by module "%s"'
+                % monitor.module_name,
+            ).copy()
+
+            if log_config["path"] not in all_paths:
+                configs.append(log_config)
+                all_paths[log_config["path"]] = 1
+
+            monitor.log_config = log_config
+
+        result = []
+
+        for log_config in configs:
+            result.append(LogMatcher(configuration, log_config))
+
+        return result
+
+    def __scan_for_pending_log_files(self):
+        """
+        Creates log processors for any recent, dynamically added log matchers
+        """
+
+        # make a shallow copy of pending log_matchers, and pending reloads
+        log_matchers = []
+        pending_reload = {}
+        self.__lock.acquire()
+        try:
+            log_matchers = self.__pending_log_matchers[:]
+
+            # get any logs that need reloading and reset the pending reload list
+            pending_reload = self.__logs_pending_reload.copy()
+            self.__logs_pending_reload = {}
+        finally:
+            self.__lock.release()
+
+        # add new matchers
+        for matcher in log_matchers:
+            self.__dynamic_matchers[matcher.log_path] = matcher
+
+        # Try to read the checkpoint state from disk.
+        checkpoints_state = self.__read_checkpoint_state()
+        if checkpoints_state is None:
+            log.info("The checkpoints were not read from the filesystem.")
+        elif (
+            time.time() - checkpoints_state["time"]
+        ) > self.__config.max_allowed_checkpoint_age:
+            log.warn(
+                'The current checkpoint is too stale (written at "%s").  Ignoring it.',
+                scalyr_util.format_time(checkpoints_state["time"]),
+                error_code="staleCheckpointFile",
+            )
+            checkpoints_state = None
+
+        if checkpoints_state is None:
+            checkpoints = {}
+        else:
+            checkpoints = checkpoints_state["checkpoints"]
+
+        # reload the config of any matchers/processors that need reloading
+        reloaded = []
+        for path, log_config in six.iteritems(pending_reload):
+            log.log(scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % path)
+
+            # only reload matchers that have been dynamically added
+            matcher = self.__dynamic_matchers.get(path, None)
+            if matcher is None:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0, "Log matcher not found for %s" % path
+                )
+                continue
+
+            # update the log config of the matcher, which closes any open processors, and returns
+            # their checkpoints
+            closed_processors = matcher.update_log_entry_config(log_config)
+            for processor_path, checkpoint in six.iteritems(closed_processors):
+                checkpoints[processor_path] = checkpoint
+
+            reloaded.append(matcher)
+
+        self.__remove_closed_processors()
+
+        self.__create_log_processors_for_log_matchers(
+            log_matchers, checkpoints=checkpoints, copy_at_index_zero=True
+        )
+        self.__create_log_processors_for_log_matchers(
+            reloaded, checkpoints=checkpoints, copy_at_index_zero=True
+        )
+
+        self.__lock.acquire()
+        try:
+            self.__log_matchers.extend(log_matchers)
+            self.__pending_log_matchers = [
+                lm for lm in self.__pending_log_matchers if lm not in log_matchers
+            ]
+        finally:
+            self.__lock.release()
+
+    def __remove_logs_scheduled_for_deletion(self):
+        """
+            Removes any logs scheduled for deletion, if there are 0 bytes left to copy and
+            the log file has been matched/processed at least once
+        """
+
+        # make a shallow copy of logs_pending_removal
+        # so we can iterate without a lock (remove_log_path also acquires the lock so best
+        # not to do that while the lock is already aquired
+        self.__lock.acquire()
+        try:
+            pending_removal = self.__logs_pending_removal.copy()
+        finally:
+            self.__lock.release()
+
+        # if we have a log matcher for the path, then set it to finished
+        for path in six.iterkeys(pending_removal):
+            matcher = self.__dynamic_matchers.get(path, None)
+            if matcher is None:
+                log.warn("Log scheduled for removal is not being monitored: %s" % path)
+                continue
+
+            matcher.finish()
+
+        # remove from list of logs pending removal
+        self.__lock.acquire()
+        try:
+            self.__logs_pending_removal = {}
+        finally:
+            self.__lock.release()
+
+    def __purge_finished_log_matchers(self):
+        """
+        Removes from the list of log matchers any log matchers that are finished
+        """
+        # make a shallow copy for iteration
+        matchers = self.__dynamic_matchers.copy()
+
+        for path, m in six.iteritems(matchers):
+            if m.is_finished():
+                self.remove_log_path(SCHEDULED_DELETION, path)
+                self.__dynamic_matchers.pop(path, None)
+
+    def __remove_closed_processors(self):
+        pass
+
+    def generate_status(self, warn_on_rate_limit=False):
+        """Generate the status for the copying manager to be reported.
+
+        This is used in such features as 'scalyr-agent-2 status -v'.
+
+        Note, this method is thread safe.  It needs to be since another thread will ask this object for its
+        status.
+
+        @return:  The status object containing the statistics for the copying manager.
+        @rtype: CopyingManagerStatus
+        """
+        try:
+            self.__lock.acquire()
+
+            result = CopyingManagerStatus()
+            result.total_bytes_uploaded = self.__total_bytes_uploaded
+            result.last_success_time = self.__last_success_time
+            result.last_attempt_time = self.__last_attempt_time
+            result.last_attempt_size = self.__last_attempt_size
+            result.last_response = self.__last_response
+            result.last_response_status = self.__last_response_status
+            result.total_errors = self.__total_errors
+            result.total_rate_limited_time = self.__total_rate_limited_time
+            result.rate_limited_time_since_last_status = (
+                self.__rate_limited_time_since_last_status
+            )
+            result.total_copy_iterations = self.total_copy_iterations
+            result.total_read_time = self.total_read_time
+            result.total_waiting_time = self.total_waiting_time
+            result.total_blocking_response_time = self.total_blocking_response_time
+            result.total_request_time = self.total_request_time
+            result.total_pipelined_requests = self.total_pipelined_requests
+
+            for entry in self.__log_matchers:
+                result.log_matchers.append(entry.generate_status())
+
+            if self.__last_attempt_time:
+                result.health_check_result = "Good"
+                if (
+                    time.time()
+                    > self.__last_attempt_time
+                    + self.__config.healthy_max_time_since_last_copy_attempt
+                ):
+                    result.health_check_result = (
+                        "Failed, max time since last copy attempt (%s seconds) exceeded"
+                        % self.__config.healthy_max_time_since_last_copy_attempt
+                    )
+
+        finally:
+            self.__lock.release()
+        if warn_on_rate_limit:
+            if self.__rate_limited_time_since_last_status > 0:
+                log.warning(
+                    "Warning, the maximum send rate has been exceeded (configured through "
+                    "'max_send_rate_enforcement').  Log upload is being delayed and may result in skipped log "
+                    "lines.  Copying has been delayed %.1f seconds in the last %.1f minutes. This may be "
+                    "desired (due to excessive bytes from a problematic log file) or you may wish to adjust "
+                    "the allowed send rate."
+                    % (
+                        self.__rate_limited_time_since_last_status,
+                        self.__config.copying_manager_stats_log_interval / 60.0,
+                    )
+                )
+            self.__rate_limited_time_since_last_status = 0
+
+        return result
+
+    def start_manager(self, scalyr_client, logs_initial_positions=None):
         self.__scalyr_client = scalyr_client
         self._logs_initial_positions = logs_initial_positions
 
-        for name, worker in self._workers.items():
-            worker.start_worker(scalyr_slient=scalyr_client)
-
         self.start()
+
+    def stop_manager(self, wait_on_join=True, join_timeout=5):
+        """Stops the manager.
+
+        @param wait_on_join: If True, will block on a join of the thread running the manager.
+        @param join_timeout: The maximum number of seconds to block for the join.
+        """
+
+        # for worker in self._workers.values():
+        #     worker.stop_worker(wait_on_join=True, join_timeout=join_timeout)
+
+        self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
+    def __handle_new_log_processor(self, processor):
+        # type: (LogFileProcessor) -> None
+        worker = list(self._workers.values())[0]
+        worker.add_log_processor(processor)

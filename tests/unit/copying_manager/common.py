@@ -2,16 +2,162 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
-import time
-import threading
 
-from scalyr_agent.new_copying_manager.worker import CopyingManagerWorker
-from scalyr_agent.new_copying_manager.worker import AddEventsTask
+import threading
+import time
+import itertools
+
+import unittest
+from contextlib import contextmanager
 
 from scalyr_agent.new_copying_manager.copying_manager import CopyingManager
+from scalyr_agent.new_copying_manager.copying_manager_worker import CopyingManagerWorker
 
+if False:
+    from typing import Optional
+    from typing import List
+
+import six
+
+from scalyr_agent import test_util
+from tests.unit.copying_manager.config_builder import ConfigBuilder
 
 from scalyr_agent.scalyr_client import AddEventsRequest
+
+
+def extract_lines_from_request(request):
+    # type: (AddEventsRequest) -> List[six.text_type]
+    result = list()
+    if isinstance(request, (list, tuple)):
+        for req in request:
+            lines = extract_lines_from_request(req)
+            result.append(lines)
+
+        return list(itertools.chain(*result))
+
+    parsed_request = test_util.parse_scalyr_request(request.get_payload())
+
+    lines = []
+
+    if "events" in parsed_request:
+        for event in parsed_request["events"]:
+            if "attrs" in event:
+                attrs = event["attrs"]
+                if "message" in attrs:
+                    lines.append(attrs["message"].strip())
+
+    return lines
+
+
+class CopyingManagerCommonTest(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(CopyingManagerCommonTest, self).__init__(*args, **kwargs)
+        self._config_builder = None  # type: Optional[ConfigBuilder]
+        self._instance = None
+
+        # variable used by 'current_log_file' context manager.
+        self._current_log_file = None
+
+    def setUp(self):
+        self._config_builder = None  # type: Optional[ConfigBuilder]
+        self._instance = None
+
+    def tearDown(self):
+        if self._instance is not None:
+            self._instance.controller.stop()
+
+        if self._config_builder is not None:
+            self._config_builder.clear()
+
+    def _extract_lines(self, request):
+
+        return extract_lines_from_request(request)
+
+    def _create_config(self, log_files_number=1, use_pipelining=False):
+        pipeline_threshold = 1.1
+        if use_pipelining:
+            pipeline_threshold = 0.0
+
+        config_data = {
+            "debug_level": 5,
+            "disable_max_send_rate_enforcement_overrides": True,
+            "pipeline_threshold": pipeline_threshold,
+        }
+
+        test_files, self._config_builder = ConfigBuilder.build_config_with_n_files(
+            log_files_number, config_data=config_data
+        )
+
+    def _append_lines(self, *lines, **kwargs):
+        # type: (*str, **TestableLogFile) -> None
+        log_file = kwargs.get(six.ensure_str("log_file"))
+        if log_file is None:
+            if self._current_log_file is not None:
+                log_file = self._current_log_file
+            else:
+                raise RuntimeError("File is not specified.")
+
+        log_file.append_lines(*lines)
+
+    def _wait_for_rpc(self):
+        (request, responder_callback) = self._instance.controller.wait_for_rpc()
+        request_lines = self._extract_lines(request)
+        return request_lines, responder_callback
+
+    def _wait_for_rpc_and_respond(self, response="success"):
+        (request_lines, responder_callback) = self._wait_for_rpc()
+        responder_callback(response)
+
+        return request_lines
+
+    def _append_lines_with_with_callback(self, *lines, **kwargs):
+        # type: (*str, **Dict[str, Union[str, TestableLogFile]]) -> Tuple[List[str], Callable]
+
+        self._instance.run_and_stop_at(TestableCopyingManagerWorker.SLEEPING)
+
+        self._append_lines(*lines, **kwargs)
+        (request, responder_callback) = self._instance.controller.wait_for_rpc()
+        request_lines = self._extract_lines(request)
+        return request_lines, responder_callback
+
+    def _append_lines_and_wait_for_rpc(self, *lines, **kwargs):
+        # type: (*str, **Union[str, TestableLogFile]) -> List[str]
+        """
+        Append some lines to log file, wait for response and set response.
+        :param lines: Previously appended lines fetched from request.
+        :param kwargs:
+        :return:
+        """
+        response = kwargs.pop("response", "success")
+
+        # set worker into sleeping state, so it can process new lines and send them.
+        self._instance.run_and_stop_at(TestableCopyingManagerWorker.SLEEPING)
+
+        self._append_lines(*lines, **kwargs)
+        request_lines = self._wait_for_rpc_and_respond(response)
+        return request_lines
+
+    def _append_lines_and_check(self, *lines, **kwargs):
+        # type: (*six.text_type, **Union[six.text_type, TestableLogFile]) -> None
+        """
+        Appends line and waits for next rpc request
+        and also verifies that lines from request are equal to input lines.
+        """
+
+        request_lines = self._append_lines_and_wait_for_rpc(*lines, **kwargs)
+        assert list(lines) == request_lines
+
+    @contextmanager
+    def current_log_file(self, log_file):
+        # type: (TestableLogFile) -> Generator[TestableLogFile]
+        """
+        Context manager for fast access to the selected log file.
+        """
+
+        self._current_log_file = log_file
+        yield
+
+        self._current_log_file = None
 
 
 class BaseTestableCopyingManager:
@@ -59,6 +205,8 @@ class BaseTestableCopyingManager:
         self._test_required_transition = None
         # Whether or not the CopyingManager is stopped at __test_stop_state.
         self._test_is_stopped = False
+
+        self._pending_response = None
 
     def captured_request(self):
         """Returns the last request that was passed into ``_send_events`` by the CopyingManager, or None if there
@@ -270,8 +418,8 @@ class TestableCopyingManagerWorker(CopyingManagerWorker, BaseTestableCopyingMana
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
     WAIT_TIMEOUT = 50000.0
 
-    def __init__(self, configuration):
-        CopyingManagerWorker.__init__(self, configuration)
+    def __init__(self, configuration, worker_id):
+        CopyingManagerWorker.__init__(self, configuration, worker_id)
         BaseTestableCopyingManager.__init__(self)
 
         # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
@@ -610,7 +758,7 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
         from scalyr_agent.new_copying_manager import copying_manager
 
         original = copying_manager.CopyingManager
-        copying_manager.CopyingManager = TestableCopyingManager
+        copying_manager.CopyingManagerWorker = TestableCopyingManagerWorker
         CopyingManager.__init__(self, configuration, monitors)
         BaseTestableCopyingManager.__init__(self)
 
@@ -618,11 +766,13 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
 
         from typing import List
 
-        self._workers = self._workers  # type: List[TestableCopyingManager]
+        self._workers = self._workers  # type: List[TestableCopyingManagerWorker]
 
         self._workers_captured_requests = None
 
-    def start_manager(self, scalyr_client=None, logs_initial_positions=None):
+        self.controller = TestableCopyingManager.TestController(self)
+
+    def start_manager(self, scalyr_client=None, logs_initial_positions=None, stop_at=BaseTestableCopyingManager.SLEEPING):
         """
         Overrides base class method, to initialize "scalyr_client" by default.
         """
@@ -632,12 +782,13 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
             scalyr_client, logs_initial_positions=logs_initial_positions
         )
 
+
+
     def _workers_run_and_stop_at(self, stopping_at, required_transition_state=None):
         for worker in self._workers:
             worker.run_and_stop_at(
                 stopping_at, required_transition_state=required_transition_state
             )
-
     def _workers_wait_for_rpc(self):
         requests = list()
         request_callbacks = list()
@@ -647,32 +798,16 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
             request_callbacks.append(requrst_callback)
         return requests, request_callbacks
 
-    def rrr(self, r):
-        parsed_request = test_util.parse_scalyr_request(r.get_payload())
-
-        lines = []
-
-        if "events" in parsed_request:
-            for event in parsed_request["events"]:
-                if "attrs" in event:
-                    attrs = event["attrs"]
-                    if "message" in attrs:
-                        lines.append(attrs["message"].strip())
-
-        return lines
-
     def _sleep_but_awaken_if_stopped(self, seconds):
-
         self._test_state_cv.acquire()
         try:
             self._block_if_should_stop_at(BaseTestableCopyingManager.SENDING)
             responder_callbacks = list()
             requests = list()
-            for worker in self._workers:
-                r, rc = worker.controller.wait_for_rpc()
-                lll = self.rrr(r)
-                responder_callbacks.append(rc)
-                requests.append(r)
+            for worker in self._workers.values():
+                request, responder_callback = worker.controller.wait_for_rpc()
+                responder_callbacks.append(responder_callback)
+                requests.append(request)
 
             self._captured_request = requests
             self._responder_callbacks = responder_callbacks
@@ -699,93 +834,6 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
         finally:
             self._test_state_cv.release()
 
-    def _sleep_but_awaken_if_stopped2(self, seconds):
-
-        # return super(TestableCopyingManagerFacade, self)._sleep_but_awaken_if_stopped(seconds)
-        # self._workers_run_and_stop_at(
-        #     BaseTestableCopyingManager.SENDING,
-        #     required_transition_state=BaseTestableCopyingManager.SENDING
-        # )
-
-        self._test_state_cv.acquire()
-
-        try:
-            self._block_if_should_stop_at(BaseTestableCopyingManager.SENDING)
-        finally:
-            self._test_state_cv.release()
-            requests = list()
-            responder_callbacks = list()
-            for worker in self._workers:
-                worker.run_and_stop_at(BaseTestableCopyingManager.SENDING)
-                # request, responder_callback = worker.controller.wait_for_rpc()
-                # requests.append(request)
-                # responder_callbacks.append(responder_callback)
-
-            # self._captured_request = requests
-            # self._responder_callbacks = responder_callbacks
-
-            def emit_responses():
-                self._test_state_cv.acquire()
-                try:
-                    self._block_if_should_stop_at(TestableCopyingManager.RESPONDING)
-
-                    # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
-                    # requests will just be processed.
-                    result = self._pending_response
-                    self._pending_response = None
-                finally:
-                    self._test_state_cv.release()
-
-                for worker in self._workers:
-                    worker.set_responce()
-
-                if result is not None:
-                    return result, 0, "fake"
-                else:
-                    return "success", 0, "fake"
-
-            self._test_state_cv.release()
-
-        # emit_responses()
-        # r = self._pending_response
-        # for responder_callback in responder_callbacks:
-        #     responder_callback(result)
-
-        # self._test_state_cv.acquire()
-        # try:
-        #     self._block_if_should_stop_at(BaseTestableCopyingManager.RESPONDING)
-        #
-        #
-        # finally:
-        #     self._test_state_cv.release()
-
-        self._test_state_cv.acquire()
-        try:
-            self._block_if_should_stop_at(BaseTestableCopyingManager.SLEEPING)
-        finally:
-            self._test_state_cv.release()
-        #
-        #
-        #
-        # self._workers_run_and_stop_at(
-        #     BaseTestableCopyingManager.RESPONDING,
-        #     required_transition_state=BaseTestableCopyingManager.SENDING
-        # )
-        # self._block_if_should_stop_at(BaseTestableCopyingManager.RESPONDING)
-        # self._workers_run_and_stop_at(
-        #     BaseTestableCopyingManager.SLEEPING,
-        #     required_transition_state=BaseTestableCopyingManager.RESPONDING
-        # )
-
-    # def _scan_for_new_logs_if_necessary(
-    #         self,
-    #         current_time=None,
-    #         checkpoints=None,
-    #         logs_initial_positions=None,
-    #         copy_at_index_zero=False,
-    # ):
-    #     pass
-
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops the manager's thread.
 
@@ -803,7 +851,7 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
         self._test_state_cv.notifyAll()
         self._test_state_cv.release()
 
-        CopyingManage.stop_manager(
+        CopyingManager.stop_manager(
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
 
@@ -829,7 +877,7 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
                 required_transition_state=TestableCopyingManager.SLEEPING,
             )
 
-            for worker in self.__copying_manager._workers:
+            for worker in self.__copying_manager._workers.values():
                 worker.controller.perform_scan()
 
         def perform_pipeline_scan(self):
@@ -851,13 +899,6 @@ class TestableCopyingManager(CopyingManager, BaseTestableCopyingManager):
                 when invoked will return the passed in status message as the response to the AddEventsRequest.
             @rtype: (AddEventsRequest, func)
             """
-
-            # requests = list()
-            # responder_callbacks = list()
-            # for worker in self.__copying_manager._workers:
-            #     request, responder_callback = worker.controller.wait_for_rpc()
-            #     requests.append(request)
-            #     responder_callbacks.append(responder_callback)
 
             self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING)
             requests = self.__copying_manager.captured_request()
