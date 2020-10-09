@@ -33,6 +33,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
+import collections
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -312,6 +313,44 @@ class ConfigStatus(BaseAgentStatus):
 
     def to_dict(self):
         return self.__dict__
+
+
+class CopyingManagerWorkerStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying manager worker components."""
+
+    def __init__(self):
+        # The total number of bytes successfully uploaded.
+        self.total_bytes_uploaded = 0
+        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
+        self.last_success_time = None
+        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
+        self.last_attempt_time = None
+        # The size of the request for the last attempt.
+        self.last_attempt_size = None
+        # The last response from the Scalyr servers.
+        self.last_response = None
+        # The last status from the last response (should be 'success').
+        self.last_response_status = None
+        # The total number of failed copy requests.
+        self.total_errors = None
+        # The total time in seconds we were blocked by the rate limiter
+        self.total_rate_limited_time = 0
+        # The time in seconds we were blocked by the rate limiter since the last status
+        self.rate_limited_time_since_last_status = 0
+
+        self.total_copy_iterations = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.avg_bytes_produced_rate = 0
+        self.avg_bytes_copied_rate = 0
+
+        self.health_check_result = None
+
+        # LogProcessorStatus objects for each of the log files being processed by worker.
+        self.log_processors = collections.OrderedDict()
 
 
 class CopyingManagerStatus(BaseAgentStatus):
