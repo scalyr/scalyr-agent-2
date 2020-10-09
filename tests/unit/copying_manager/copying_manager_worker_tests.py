@@ -472,7 +472,7 @@ class CopyingManagerWorkerCheckpointTests(CopyingManagerWorkerTest):
 
         worker.controller.stop()
 
-        checkpoints = self._config_builder.checkpoints["checkpoints"]
+        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)["checkpoints"]
 
         assert test_file.str_path in checkpoints
 
@@ -495,7 +495,7 @@ class CopyingManagerWorkerCheckpointTests(CopyingManagerWorkerTest):
 
         worker.controller.stop()
 
-        checkpoints = self._config_builder.checkpoints["checkpoints"]
+        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)["checkpoints"]
         assert test_file.str_path in checkpoints
 
         # create new worker. Imitate third launch.

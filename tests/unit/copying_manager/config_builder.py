@@ -318,15 +318,21 @@ class ConfigBuilder(object):
 
         return log_file, config_builder
 
-    @property
-    @after_initialize
-    def checkpoints(self):
-        return json.loads(self.checpoints_path.read_text())
+    def get_checkpoints_path(self, worker_id):  # type: (six.text_type) -> pathlib.Path
+        return self._data_dir_path / "checkpoints" / ("checkpoints-%s.json" % worker_id)
 
-    @property
+    def get_active_checkpoints_path(
+        self, worker_id
+    ):  # type: (six.text_type) -> pathlib.Path
+        return self._data_dir_path / "checkpoints" / "active-checkpoints-%s.json" % worker_id
+
     @after_initialize
-    def active_checkpoints(self):
-        return json.loads(self.active_checkpoints_path.read_text())
+    def get_checkpoints(self, worker_id):
+        return json.loads(self.get_checkpoints_path(worker_id).read_text())
+
+    @after_initialize
+    def get_active_checkpoints(self, worker_id):
+        return json.loads(self.get_active_checkpoints_path(worker_id).read_text())
 
     def spawn_checkpoints(self):
         # type: () -> Dict
@@ -339,14 +345,6 @@ class ConfigBuilder(object):
             checkpoints[log_file.path] = {"initial_position": 0}
 
         checkpoints
-
-    @property
-    def checpoints_path(self):
-        return self._data_dir_path / "checkpoints.json"
-
-    @property
-    def active_checkpoints_path(self):
-        return self._data_dir_path / "active-checkpoints.json"
 
     def write_checkpoints(self, data):
         self.checpoints_path.write_text(six.text_type(json.dumps(data)))

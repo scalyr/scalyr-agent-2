@@ -23,6 +23,8 @@ log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 
+SCHEDULED_DELETION = "scheduled-deletion"
+
 class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
@@ -192,7 +194,7 @@ class CopyingManager(StoppableThread):
         # the copying manager ensures that operations on a dynamically added path can only be performed
         # by the same monitor (i.e. only the monitor that dynamically added a path can remove or update
         # that monitor).
-        self.__dynamic_monitor_paths = {}
+        self.__dynamic_paths = {}
 
         # a dict of log paths pending removal once their bytes pending count reaches 0
         # keyed on the log path, with a value of True or False depending on whether the
@@ -902,3 +904,209 @@ class CopyingManager(StoppableThread):
         # type: (LogFileProcessor) -> None
         worker = list(self._workers.values())[0]
         worker.add_log_processor(processor)
+
+    def add_log_config(self, monitor_name, log_config):
+        """Add the log_config item to the list of paths being watched
+        param: monitor_name - the name of the monitor adding the log config
+        param: log_config - a log_config object containing the path to be added
+        returns: an updated log_config object
+        """
+        log_config = self.__config.parse_log_config(
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Additional log entry requested by module "%s"'
+            % monitor_name,
+        ).copy()
+
+        self.__lock.acquire()
+        try:
+            # Make sure the path isn't already being dynamically monitored
+            path = log_config["path"]
+            if path in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to add new log file '%s' for monitor '%s', but it is already being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
+                return log_config
+
+            # add the path and matcher
+            matcher = LogMatcher(self.__config, log_config)
+            self.__dynamic_paths[path] = monitor_name
+            self.__pending_log_matchers.append(matcher)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Adding new log file '%s' for monitor '%s'" % (path, monitor_name),
+            )
+
+            # If the log was previously pending removal, cancel the pending removal
+            self.__logs_pending_removal.pop(path, None)
+
+        finally:
+            self.__lock.release()
+
+        return log_config
+
+    def update_log_config(self, monitor_name, log_config):
+        """ Updates the log config of the log matcher that has the same
+        path as the one specified in the log_config param
+        """
+        log_config = self.__config.parse_log_config(
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Updating log entry requested by module "%s"'
+            % monitor_name,
+        ).copy()
+        try:
+            self.__lock.acquire()
+
+            path = log_config["path"]
+            # Make sure the log path is being dynamically monitored
+            if path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (path, monitor_name),
+                )
+                return
+
+            # Make sure only the monitor that added this path can update it
+            if (
+                path in self.__dynamic_paths
+                and self.__dynamic_paths[path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
+                return
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Updating config for log file '%s' for monitor '%s'"
+                % (path, monitor_name),
+            )
+            self.__logs_pending_reload[path] = log_config
+        finally:
+            self.__lock.release()
+
+    def remove_log_path(self, monitor_name, log_path):
+        """Remove the log_path from the list of paths being watched
+        params: log_path - a string containing the path to the file no longer being watched
+        """
+        # get the list of paths with 0 reference counts
+        self.__lock.acquire()
+        try:
+            # Make sure the log path is being dynamically monitored
+            if log_path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
+                )
+                return
+
+            # If we are not a scheduled deletion, make sure only the monitor that added this path can remove it
+            if (
+                monitor_name != SCHEDULED_DELETION
+                and log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
+                return
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Removing log file '%s' for '%s'" % (log_path, monitor_name),
+            )
+            # do the removals
+            matchers = []
+            for m in self.__log_matchers:
+                if m.log_path == log_path:
+                    # Make sure the matcher is always finished if called from a non scheduled deletion (e.g. on shutdown/config reload).
+                    # This ensures that the __dynamic_matchers dict on the main thread will also clean
+                    # itself up when it notices the matcher is finished.
+                    # We set the matcher to finish immediately, because we want the matcher to finish now, not when it's finished
+                    # any existing processing
+                    m.finish(immediately=True)
+                else:
+                    matchers.append(m)
+
+            self.__log_matchers[:] = matchers
+            self.__logs_pending_removal.pop(log_path, None)
+            self.__logs_pending_reload.pop(log_path, None)
+            self.__dynamic_paths.pop(log_path, None)
+
+        finally:
+            self.__lock.release()
+
+    def schedule_log_path_for_removal(self, monitor_name, log_path):
+        """
+            Schedules a log path for removal.  The logger will only
+            be removed once the number of pending bytes reaches 0
+        """
+        self.__lock.acquire()
+        try:
+            # Make sure the log path is being dynamically monitored
+            if log_path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
+                )
+                return
+
+            # Make sure only the monitor that added this path can remove it
+            if (
+                log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
+                return
+
+            if log_path not in self.__logs_pending_removal:
+                self.__logs_pending_removal[log_path] = True
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "log path '%s' for monitor '%s' is pending removal"
+                    % (log_path, monitor_name),
+                )
+        finally:
+            self.__lock.release()
+
+    def dynamic_matchers_count(self):
+        """
+            Used for testing - returns the number of dynamic matchers
+        """
+        return len(self.__dynamic_matchers)
+
+    def logs_pending_removal_count(self):
+        """
+            Used for testing - returns the number of logs pending removal
+        """
+
+        self.__lock.acquire()
+        try:
+            return len(self.__logs_pending_removal)
+        finally:
+            self.__lock.release()
+
+    @property
+    def log_matchers(self):
+        """Returns the list of log matchers that were created based on the configuration and passed in monitors.
+
+        This is really only exposed for testing purposes.
+
+        @return: The log matchers.
+        @rtype: list<LogMatcher>
+        """
+        return self.__log_matchers

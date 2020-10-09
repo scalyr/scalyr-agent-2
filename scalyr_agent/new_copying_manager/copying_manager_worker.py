@@ -6,6 +6,7 @@ import time
 import sys
 import os
 import collections
+import shutil
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import scalyr_logging, log_processing
@@ -184,7 +185,7 @@ class CopyingManagerWorker(StoppableThread):
             name="copying manager worker thread #%s" % worker_id
         )
 
-        self._id = worker_id
+        self._id = six.text_type(worker_id)
         self.__config = configuration
 
         self.__rate_limiter = None
@@ -844,18 +845,34 @@ class CopyingManagerWorker(StoppableThread):
         }
 
         for path, processor in log_processors.items():
-            if not full_checkpoint and processor.is_active:
-                a = 10
             if full_checkpoint or processor.is_active:
                 checkpoints[path] = processor.get_checkpoint()
 
             if full_checkpoint:
                 processor.set_inactive()
 
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+
+        try:
+            os.mkdir(checkpoints_dir_path)
+        except OSError as e:
+            # re-raise if there is no 'already exists' error.
+            if e.errno != 17:
+                raise
+            if os.path.isfile(checkpoints_dir_path):
+                # if there is a file, remove it.
+                os.unlink(checkpoints_dir_path)
+
         # We write to a temporary file and then rename it to the real file name to make the write more atomic.
         # We have had problems in the past with corrupted checkpoint files due to failures during the write.
-        file_path = os.path.join(self.__config.agent_data_path, base_file)
-        tmp_path = os.path.join(self.__config.agent_data_path, base_file + "~")
+        file_path = os.path.join(
+            self.__config.agent_data_path, checkpoints_dir_path, base_file
+        )
+        tmp_path = os.path.join(
+            self.__config.agent_data_path, checkpoints_dir_path, base_file + "~"
+        )
         scalyr_util.atomic_write_dict_as_json_file(file_path, tmp_path, state)
 
     def __write_active_checkpoint_state(self, current_time):
@@ -863,7 +880,7 @@ class CopyingManagerWorker(StoppableThread):
         """
         self.__write_checkpoint_state(
             self.__log_processors,
-            "active-checkpoints.json",
+            "active-checkpoints-%s.json" % self._id,
             current_time,
             full_checkpoint=False,
         )
@@ -877,7 +894,7 @@ class CopyingManagerWorker(StoppableThread):
         """
         self.__write_checkpoint_state(
             self.__log_processors,
-            "checkpoints.json",
+            "checkpoints-%s.json" % self._id,
             current_time,
             full_checkpoint=True,
         )
@@ -995,165 +1012,6 @@ class CopyingManagerWorker(StoppableThread):
             session_info=session_info, max_size=max_size
         )
 
-
-# class CopyingManager(object):
-#     def __init__(self, configuration, monitors):
-#         super(CopyingManager, self).__init__(configuration)
-#
-#     def _scan_for_pending_log_files(
-#             self
-#     ):
-#         """
-#         Creates log processors for any recent, dynamically added log matchers
-#         """
-#
-#         # make a shallow copy of pending log_matchers, and pending reloads
-#         log_matchers = []
-#         pending_reload = {}
-#         self.__lock.acquire()
-#         try:
-#             log_matchers = self.__pending_log_matchers[:]
-#
-#             # get any logs that need reloading and reset the pending reload list
-#             pending_reload = self.__logs_pending_reload.copy()
-#             self.__logs_pending_reload = {}
-#         finally:
-#             self.__lock.release()
-#
-#         # add new matchers
-#         for matcher in log_matchers:
-#             self.__dynamic_matchers[matcher.log_path] = matcher
-#
-#         # Try to read the checkpoint state from disk.
-#         checkpoints_state = self.__read_checkpoint_state()
-#         if checkpoints_state is None:
-#             log.info("The checkpoints were not read from the filesystem.")
-#         elif (
-#                 time.time() - checkpoints_state["time"]
-#         ) > self.__config.max_allowed_checkpoint_age:
-#             log.warn(
-#                 'The current checkpoint is too stale (written at "%s").  Ignoring it.',
-#                 scalyr_util.format_time(checkpoints_state["time"]),
-#                 error_code="staleCheckpointFile",
-#             )
-#             checkpoints_state = None
-#
-#         if checkpoints_state is None:
-#             checkpoints = {}
-#         else:
-#             checkpoints = checkpoints_state["checkpoints"]
-#
-#         # reload the config of any matchers/processors that need reloading
-#         reloaded = []
-#         for path, log_config in six.iteritems(pending_reload):
-#             log.log(scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % path)
-#
-#             # only reload matchers that have been dynamically added
-#             matcher = self.__dynamic_matchers.get(path, None)
-#             if matcher is None:
-#                 log.log(
-#                     scalyr_logging.DEBUG_LEVEL_0, "Log matcher not found for %s" % path
-#                 )
-#                 continue
-#
-#             # update the log config of the matcher, which closes any open processors, and returns
-#             # their checkpoints
-#             closed_processors = matcher.update_log_entry_config(log_config)
-#             for processor_path, checkpoint in six.iteritems(closed_processors):
-#                 checkpoints[processor_path] = checkpoint
-#
-#             reloaded.append(matcher)
-#
-#         self.__remove_closed_processors()
-#
-#         self.__create_log_processors_for_log_matchers(
-#             log_matchers, checkpoints=checkpoints, copy_at_index_zero=True
-#         )
-#         self.__create_log_processors_for_log_matchers(
-#             reloaded, checkpoints=checkpoints, copy_at_index_zero=True
-#         )
-#
-#         self.__lock.acquire()
-#         try:
-#             self._log_matchers.extend(log_matchers)
-#             self.__pending_log_matchers = [
-#                 lm for lm in self.__pending_log_matchers if lm not in log_matchers
-#             ]
-#         finally:
-#             self.__lock.release()
-#
-#     def __create_log_processors_for_log_matchers(
-#             self, log_matchers, checkpoints=None, copy_at_index_zero=False
-#     ):
-#         """
-#         Creates log processors for any files on disk that match any file matching the
-#         passed in log_matchers
-#
-#         @param log_matchers: A list of log_matchers to check against.  Note:  No locking is done on the log_matchers
-#           passed in, so the caller needs to ensure that the list is thread-safe and only accessed from the main
-#           loop.
-#         @param checkpoints: A dict mapping file paths to the checkpoint to use for them to determine where copying
-#             should begin.
-#         @param copy_at_index_zero: If True, then any new file that doesn't have a checkpoint or an initial position,
-#             will begin being copied from the start of the file rather than the current end.
-#         """
-#
-#         # make a shallow copy of logs pending removal so we don't need to hold the lock
-#         # while iterating
-#         pending_removal = {}
-#         self.__lock.acquire()
-#         try:
-#             pending_removal = self.__logs_pending_removal.copy()
-#         finally:
-#             self.__lock.release()
-#
-#         # check if any pending removal have already been processed
-#         # and update the processed status
-#         for path in pending_removal.keys():
-#             if path in self.__log_paths_being_processed:
-#                 pending_removal[path] = True
-#
-#         # iterate over the log_matchers while we create the LogFileProcessors
-#         for matcher in log_matchers:
-#             for new_processor in matcher.find_matches(
-#                     self.__log_paths_being_processed,
-#                     checkpoints,
-#                     copy_at_index_zero=copy_at_index_zero,
-#             ):
-#                 self._handle_new_processor(new_processor)
-#                 # self.__log_processors.append(new_processor)
-#                 # self.__log_paths_being_processed[new_processor.log_path] = new_processor
-#
-#                 # if the log file pending removal, mark that it has now been processed
-#                 if new_processor.log_path in pending_removal:
-#                     pending_removal[new_processor.log_path] = True
-#
-#             # check to see if no matches were found for pending removal
-#             # if none were found, this is indicative that the log file has already been
-#             # removed
-#             if (
-#                     matcher.config["path"] in pending_removal
-#                     and not pending_removal[matcher.config["path"]]
-#             ):
-#                 log.warn(
-#                     "No log matches were found for %s.  This is likely indicative that the log file no longer exists.\n",
-#                     matcher.config["path"],
-#                 )
-#
-#                 # remove it anyway, otherwise the logs_`pending_removal list will just
-#                 # grow and grow
-#                 pending_removal[matcher.config["path"]] = True
-#
-#         # require the lock to update the pending removal dict to
-#         # mark which logs have been matched.
-#         # This is so we can catch short lived log files that are added but then removed
-#         # before any log matching takes place
-#         self.__lock.acquire()
-#         try:
-#             # go over all items in pending_removal, and update the master
-#             # logs_pending_removal list
-#             for path, processed in six.iteritems(pending_removal):
-#                 if path in self.__logs_pending_removal:
-#                     self.__logs_pending_removal[path] = processed
-#         finally:
-#             self.__lock.release()
+    @property
+    def worker_id(self):  # type: () -> six.text_type
+        return self._id
