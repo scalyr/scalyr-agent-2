@@ -18,9 +18,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from __future__ import print_function
-from six.moves import range
-
 __author__ = "czerwin@scalyr.com"
 
 import copy
@@ -268,7 +265,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # the copying manager ensures that operations on a dynamically added path can only be performed
         # by the same monitor (i.e. only the monitor that dynamically added a path can remove or update
         # that monitor).
-        self.__dynamic_monitor_paths = {}
+        self.__dynamic_paths = {}
 
         # a dict of log paths pending removal once their bytes pending count reaches 0
         # keyed on the log path, with a value of True or False depending on whether the
@@ -286,6 +283,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # a list of dynamically added log_matchers that have not been processed yet
         self.__pending_log_matchers = []
+
+        # The list of LogMatcher objects that are watching for new files to appear.
+        self.__log_matchers = self.__create_log_matches(configuration, monitors)
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -320,7 +320,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # The positions to use for a given file if there is not already a checkpoint for that file.
         # Set in the start_manager call.
-        self._logs_initial_positions = None
+        self.__logs_initial_positions = None
 
         # A semaphore that we increment when this object has begun copying files (after first scan).
         self.__copying_semaphore = threading.Semaphore()
@@ -343,10 +343,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-        # The list of LogMatcher objects that are watching for new files to appear.
-
-        self._log_matchers = list()
-
     @property
     def expanded_server_attributes(self):
         """Return deepcopy of expanded server attributes"""
@@ -361,7 +357,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: The log matchers.
         @rtype: list<LogMatcher>
         """
-        return self._log_matchers
+        return self.__log_matchers
 
     def __path_in_globs(self, path, path_globs):
         """ Returns the first glob pattern in 'path_globs' that matches 'path' if one exists."""
@@ -371,55 +367,39 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return None
 
-    def _add_log_config(self, log_config, monitor_name=None):
+    def add_log_config(self, monitor_name, log_config):
         """Add the log_config item to the list of paths being watched
         param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
         returns: an updated log_config object
         """
-        is_monitor = monitor_name is not None
-
-        log_config_parse_params = {}
-        if is_monitor:
-            log_config_parse_params = {
-                "context_description": 'Additional log entry requested by module "%s"'
-                % monitor_name
-            }
-
         log_config = self.__config.parse_log_config(
-            log_config, default_parser="agent-metrics", **log_config_parse_params
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Additional log entry requested by module "%s"'
+            % monitor_name,
         ).copy()
 
         self.__lock.acquire()
         try:
+            # Make sure the path isn't already being dynamically monitored
             path = log_config["path"]
-            if is_monitor:
-                # Make sure the path isn't already being dynamically monitored
-                if path in self.__dynamic_monitor_paths:
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried to add new log file '%s' for monitor '%s', but it is already being monitored by '%s'"
-                        % (path, monitor_name, self.__dynamic_monitor_paths[path]),
-                    )
-                    return log_config
+            if path in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to add new log file '%s' for monitor '%s', but it is already being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
+                return log_config
 
             # add the path and matcher
             matcher = LogMatcher(self.__config, log_config)
-
-            if is_monitor:
-                self.__dynamic_monitor_paths[path] = monitor_name
-
+            self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
-
-            if is_monitor:
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    "Adding new log file '%s' for monitor '%s'" % (path, monitor_name),
-                )
-            else:
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0, "Adding new log file '%s'" % path,
-                )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Adding new log file '%s' for monitor '%s'" % (path, monitor_name),
+            )
 
             # If the log was previously pending removal, cancel the pending removal
             self.__logs_pending_removal.pop(path, None)
@@ -429,112 +409,86 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return log_config
 
-    def _update_log_config(self, log_config, monitor_name=None):
+    def update_log_config(self, monitor_name, log_config):
         """ Updates the log config of the log matcher that has the same
         path as the one specified in the log_config param
         """
-
-        is_monitor = monitor_name is not None
-
-        log_config_parse_params = {}
-        if is_monitor:
-            log_config_parse_params = {
-                "context_description": 'Updating log entry requested by module "%s"'
-                % monitor_name,
-            }
-
         log_config = self.__config.parse_log_config(
-            log_config, default_parser="agent-metrics", **log_config_parse_params
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Updating log entry requested by module "%s"'
+            % monitor_name,
         ).copy()
-
         try:
             self.__lock.acquire()
 
             path = log_config["path"]
-            if is_monitor:
-                # Make sure the log path is being dynamically monitored
-                if path not in self.__dynamic_monitor_paths:
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried to updating a log file '%s' for monitor '%s', but it is not being monitored"
-                        % (path, monitor_name),
-                    )
-                    return
-
-                # Make sure only the monitor that added this path can update it
-                if (
-                    path in self.__dynamic_monitor_paths
-                    and self.__dynamic_monitor_paths[path] != monitor_name
-                ):
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried to updating a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
-                        % (path, monitor_name, self.__dynamic_monitor_paths[path]),
-                    )
-                    return
-
-            if is_monitor:
-                update_message = (
-                    "Updating config for log file '%s' for monitor '%s'"
-                    % (path, monitor_name)
+            # Make sure the log path is being dynamically monitored
+            if path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (path, monitor_name),
                 )
-            else:
-                update_message = "Updating config for log file '%s'" % path
-            log.log(scalyr_logging.DEBUG_LEVEL_0, update_message)
+                return
+
+            # Make sure only the monitor that added this path can update it
+            if (
+                path in self.__dynamic_paths
+                and self.__dynamic_paths[path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
+                return
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Updating config for log file '%s' for monitor '%s'"
+                % (path, monitor_name),
+            )
             self.__logs_pending_reload[path] = log_config
         finally:
             self.__lock.release()
 
-    def _remove_log_path(self, log_path, monitor_name=None):
+    def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
         params: log_path - a string containing the path to the file no longer being watched
         """
-
-        is_monitor = monitor_name is not None
-
         # get the list of paths with 0 reference counts
         self.__lock.acquire()
         try:
-
-            if is_monitor:
-                # Make sure the log path is being dynamically monitored
-                if log_path not in self.__dynamic_monitor_paths:
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried removing a log file '%s' for monitor '%s', but it is not being monitored"
-                        % (log_path, monitor_name),
-                    )
-                    return
-
-                # If we are not a scheduled deletion, make sure only the monitor that added this path can remove it
-                if (
-                    monitor_name != SCHEDULED_DELETION
-                    and log_path in self.__dynamic_monitor_paths
-                    and self.__dynamic_monitor_paths[log_path] != monitor_name
-                ):
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried removing a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
-                        % (
-                            log_path,
-                            monitor_name,
-                            self.__dynamic_monitor_paths[log_path],
-                        ),
-                    )
-                    return
-
-            if is_monitor:
-                remove_message = "Removing log file '%s' for '%s'" % (
-                    log_path,
-                    monitor_name,
+            # Make sure the log path is being dynamically monitored
+            if log_path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
                 )
-            else:
-                remove_message = "Removing log file '%s'" % log_path
+                return
 
-            log.log(scalyr_logging.DEBUG_LEVEL_0, remove_message)
+            # If we are not a scheduled deletion, make sure only the monitor that added this path can remove it
+            if (
+                monitor_name != SCHEDULED_DELETION
+                and log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
+                return
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Removing log file '%s' for '%s'" % (log_path, monitor_name),
+            )
             # do the removals
             matchers = []
-            for m in self._log_matchers:
+            for m in self.__log_matchers:
                 if m.log_path == log_path:
                     # Make sure the matcher is always finished if called from a non scheduled deletion (e.g. on shutdown/config reload).
                     # This ensures that the __dynamic_matchers dict on the main thread will also clean
@@ -545,63 +499,49 @@ class CopyingManager(StoppableThread, LogWatcher):
                 else:
                     matchers.append(m)
 
-            self._log_matchers[:] = matchers
+            self.__log_matchers[:] = matchers
             self.__logs_pending_removal.pop(log_path, None)
             self.__logs_pending_reload.pop(log_path, None)
-            if is_monitor:
-                self.__dynamic_monitor_paths.pop(log_path, None)
+            self.__dynamic_paths.pop(log_path, None)
 
         finally:
             self.__lock.release()
 
-    def _schedule_log_path_for_removal(self, log_path, monitor_name=None):
+    def schedule_log_path_for_removal(self, monitor_name, log_path):
         """
             Schedules a log path for removal.  The logger will only
             be removed once the number of pending bytes reaches 0
         """
-
-        is_monitor = monitor_name is not None
-
         self.__lock.acquire()
         try:
-            if is_monitor:
-                # Make sure the log path is being dynamically monitored
-                if log_path not in self.__dynamic_monitor_paths:
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried scheduling the removal of log file '%s' for monitor '%s', but it is not being monitored"
-                        % (log_path, monitor_name),
-                    )
-                    return
+            # Make sure the log path is being dynamically monitored
+            if log_path not in self.__dynamic_paths:
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
+                )
+                return
 
-                # Make sure only the monitor that added this path can remove it
-                if (
-                    log_path in self.__dynamic_monitor_paths
-                    and self.__dynamic_monitor_paths[log_path] != monitor_name
-                ):
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Tried scheduling the removal of log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
-                        % (
-                            log_path,
-                            monitor_name,
-                            self.__dynamic_monitor_paths[log_path],
-                        ),
-                    )
-                    return
+            # Make sure only the monitor that added this path can remove it
+            if (
+                log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
+                return
 
             if log_path not in self.__logs_pending_removal:
                 self.__logs_pending_removal[log_path] = True
-
-                if is_monitor:
-                    message = "log path '%s' for monitor '%s' is pending removal" % (
-                        log_path,
-                        monitor_name,
-                    )
-                else:
-                    message = "log path '%s' is pending removal" % log_path
-
-                log.log(scalyr_logging.DEBUG_LEVEL_0, message)
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "log path '%s' for monitor '%s' is pending removal"
+                    % (log_path, monitor_name),
+                )
         finally:
             self.__lock.release()
 
@@ -622,7 +562,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def _create_log_matches(self, configuration, monitors):
+    def __create_log_matches(self, configuration, monitors):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
         @param configuration: The Configuration object.
@@ -680,7 +620,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @param scalyr_client:
         """
         self.__scalyr_client = scalyr_client
-        self._logs_initial_positions = logs_initial_positions
+        self.__logs_initial_positions = logs_initial_positions
         self.start()
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
@@ -760,13 +700,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
-                self._scan_for_new_logs_if_necessary(
+                self.__scan_for_new_logs_if_necessary(
                     current_time=current_time,
                     checkpoints=checkpoints,
-                    logs_initial_positions=self._logs_initial_positions,
+                    logs_initial_positions=self.__logs_initial_positions,
                 )
-
-                self._scan_for_pending_log_files()
 
                 # The copying params that tell us how much we are allowed to send and how long we have to wait between
                 # attempts.
@@ -824,7 +762,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                         # Check for new logs.  If we do detect some new log files, they must have been created since our
                         # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
-                        self._scan_for_new_logs_if_necessary(
+                        self.__scan_for_new_logs_if_necessary(
                             current_time=current_time, copy_at_index_zero=True
                         )
 
@@ -984,7 +922,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Start removing finished log matchers",
                         )
-                        self._scan_for_pending_log_files()
+                        self.__scan_for_pending_log_files()
                         self.__remove_logs_scheduled_for_deletion()
                         self.__purge_finished_log_matchers()
                         log.log(
@@ -1048,8 +986,6 @@ class CopyingManager(StoppableThread, LogWatcher):
             if profiler is not None:
                 profiler.disable()
 
-        print("WORKER END")
-
     def wait_for_copying_to_begin(self):
         """Block the current thread until this instance has finished its first scan and has begun copying.
 
@@ -1096,7 +1032,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             result.total_request_time = self.total_request_time
             result.total_pipelined_requests = self.total_pipelined_requests
 
-            for entry in self._log_matchers:
+            for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
             if self.__last_attempt_time:
@@ -1485,38 +1421,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
 
-    def _get_checkpoints(self, logs_initial_positions=None):
-        # Try to read the checkpoint state from disk.
-        checkpoints_state = self.__read_checkpoint_state()
-        if checkpoints_state is None:
-            log.info("The checkpoints were not read from the filesystem.")
-        elif (
-            time.time() - checkpoints_state["time"]
-        ) > self.__config.max_allowed_checkpoint_age:
-            log.warn(
-                'The current checkpoint is too stale (written at "%s").  Ignoring it.',
-                scalyr_util.format_time(checkpoints_state["time"]),
-                error_code="staleCheckpointFile",
-            )
-            checkpoints_state = None
-
-        if checkpoints_state is None:
-            checkpoints = {}
-        else:
-            checkpoints = checkpoints_state["checkpoints"]
-
-        if logs_initial_positions is not None:
-            for log_path in logs_initial_positions:
-                if log_path not in checkpoints:
-                    checkpoints[log_path] = LogFileProcessor.create_checkpoint(
-                        logs_initial_positions[log_path]
-                    )
-
-        return checkpoints
-
-    def _scan_for_pending_log_files(
-        self, checkpoints=None, logs_initial_positions=None
-    ):
+    def __scan_for_pending_log_files(self):
         """
         Creates log processors for any recent, dynamically added log matchers
         """
@@ -1589,7 +1494,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         self.__lock.acquire()
         try:
-            self._log_matchers.extend(log_matchers)
+            self.__log_matchers.extend(log_matchers)
             self.__pending_log_matchers = [
                 lm for lm in self.__pending_log_matchers if lm not in log_matchers
             ]
@@ -1612,10 +1517,6 @@ class CopyingManager(StoppableThread, LogWatcher):
             if not p.is_closed():
                 self.__log_processors.append(p)
                 self.__log_paths_being_processed[p.log_path] = p
-
-    def _handle_new_processor(self, new_processor):
-        self.__log_processors.append(new_processor)
-        self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
@@ -1655,9 +1556,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
             ):
-                self._handle_new_processor(new_processor)
-                # self.__log_processors.append(new_processor)
-                # self.__log_paths_being_processed[new_processor.log_path] = new_processor
+                self.__log_processors.append(new_processor)
+                self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
                 # if the log file pending removal, mark that it has now been processed
                 if new_processor.log_path in pending_removal:
@@ -1693,7 +1593,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def _scan_for_new_logs_if_necessary(
+    def __scan_for_new_logs_if_necessary(
         self,
         current_time=None,
         checkpoints=None,
@@ -1751,7 +1651,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         log_matchers = []
         self.__lock.acquire()
         try:
-            log_matchers = self._log_matchers[:]
+            log_matchers = self.__log_matchers[:]
         finally:
             self.__lock.release()
 
@@ -1776,64 +1676,3 @@ class CopyingManager(StoppableThread, LogWatcher):
             current_time = time.time()
         for processor in self.__log_processors:
             processor.scan_for_new_bytes(current_time)
-
-    def handle_new_log_processor(self, processor):
-        pass
-
-
-class CopyingManagerFacade(CopyingManager):
-    def __init__(self, configuration, monitors):
-        super(CopyingManagerFacade, self).__init__(configuration, monitors)
-        self._config = configuration
-
-        self._log_ma = self._create_log_matches(configuration, monitors)
-
-        self._tracked_log_paths = set()
-
-        self._workers = [CopyingManager(self._config, []) for _ in range(1)]
-        self._current_worker = 0
-
-        self._log_matchers = self._create_log_matches(configuration, monitors)
-
-    def _get_next_worker(self):
-        if self._current_worker == len(self._workers) - 1:
-            self._current_worker = 0
-        else:
-            self._current_worker += 1
-
-        return self._workers[self._current_worker]
-
-    def _handle_new_processor(self, new_processor):
-        self._tracked_log_paths.add(new_processor.log_path)
-        worker = self._get_next_worker()
-        worker._add_log_config({"path": new_processor.log_path})
-
-    def start_manager(self, scalyr_client, logs_initial_positions=None):
-        super(CopyingManagerFacade, self).start_manager(
-            scalyr_client, logs_initial_positions=logs_initial_positions
-        )
-
-        for worker in self._workers:
-            worker.start_manager(
-                scalyr_client, logs_initial_positions=logs_initial_positions
-            )
-
-    def stop_manager(self, wait_on_join=True, join_timeout=5):
-
-        super(CopyingManagerFacade, self).stop_manager(
-            wait_on_join=wait_on_join, join_timeout=join_timeout
-        )
-
-        for worker in self._workers:
-            worker.stop_manager(wait_on_join=wait_on_join, join_timeout=join_timeout)
-
-    def run(self):
-        self._scan_for_pending_log_files()
-        self._scan_for_new_logs_if_necessary()
-
-        while self._run_state.is_running():
-            self._scan_for_new_logs_if_necessary()
-            self._scan_for_pending_log_files()
-            self._sleep_but_awaken_if_stopped(10)
-
-        print("FACADE END")
