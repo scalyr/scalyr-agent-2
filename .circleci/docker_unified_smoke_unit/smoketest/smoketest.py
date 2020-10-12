@@ -303,8 +303,9 @@ class SmokeTestActor(object):
 
         url += "&filter={}".format("+and+".join(filter_frags))
         if self._debug:
-            print("\nURL quoted = {}".format(url))
-            print("  unquoted = {}".format(urllib.parse.unquote_plus(url)))
+            print("\nURL quoted: {}".format(url))
+            print("  unquoted: {}".format(urllib.parse.unquote_plus(url)))
+            print("  curl command: curl -v '{}'".format(url))
         return url
 
     def _get_base_query_params(self):
