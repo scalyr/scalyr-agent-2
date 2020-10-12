@@ -2352,6 +2352,7 @@ class LogFileProcessor(object):
 
             new_events_buffer = []
             sequence_end_number = 0
+            last_event_timestamp = None
 
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
@@ -2421,10 +2422,20 @@ class LogFileProcessor(object):
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
                             new_event_timestamp = int(current_time * 1000000000)
+
+                        if not last_event_timestamp:
+                            last_event_timestamp = new_event_timestamp
+                            line_timestamp = last_event_timestamp
+                        elif last_event_timestamp == new_event_timestamp:
+                            line_timestamp = None
+                        else:
+                            last_event_timestamp = new_event_timestamp
+                            line_timestamp = last_event_timestamp
+
                         new_event = ingestion_client_line.LogLine(
                             str(self._event_id),
                             line_object.line,
-                            new_event_timestamp,
+                            line_timestamp,
                             line_object.attrs,
                         )
                         self._event_id += 1
