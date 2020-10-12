@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from __future__ import absolute_import
-
 from __future__ import print_function
+
 import os
 import sys
 import unittest
@@ -54,6 +54,4 @@ class StandaloneSmokeTestActorTestCase(unittest.TestCase):
         url = st._make_query_url(
             filter_dict=filter_dict, message=message, override_serverHost=server_host
         )
-        print(expected_url)
-        print(url)
         self.assertEqual(url, expected_url)
