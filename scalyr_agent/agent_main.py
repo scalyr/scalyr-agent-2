@@ -749,8 +749,17 @@ class ScalyrAgent(object):
 
         # Now loop until we see it show up.
         while True:
-            if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
-                break
+            try:
+                if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
+                    break
+            except OSError as e:
+                if e.errno == 2:
+                    # File doesn't exist - it could mean isfile() returned true, but getsize()
+                    # raised an exception since the file was deleted after isfile() call, but
+                    # before getsize()
+                    pass
+                else:
+                    raise e
 
             if time.time() > deadline:
                 if self.__config is not None:
