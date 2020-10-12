@@ -85,7 +85,11 @@ import threading
 from io import open
 from copy import deepcopy
 
-from six.moves import urllib
+
+try:
+    from urllib.parse import urlencode, quote_plus, unquote_plus
+except ImportError:
+    from urllib import urlencode, quote_plus, unquote_plus
 
 NAME_SUFFIX_UPLOADER = "uploader"
 NAME_SUFFIX_VERIFIER = "verifier"
@@ -264,7 +268,7 @@ class SmokeTestActor(object):
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
         url += "{0}/api/query?queryType=log&{1}".format(
-            self._scalyr_server, urllib.parse.urlencode(base_params)
+            self._scalyr_server, urlencode(base_params)
         )
 
         # NOTE: In theory we could also escape $, but API doesn't require it. It does appear to work
@@ -284,9 +288,9 @@ class SmokeTestActor(object):
         filter_frags = []
         for k, v in sorted(filter_dict.items()):
             if type(v) == str:
-                v = urllib.parse.quote_plus('"{0}"'.format(v))
+                v = quote_plus('"{0}"'.format(v))
             elif type(v) == bool:
-                v = urllib.parse.quote_plus('"{0}"'.format(str(v).lower()))
+                v = quote_plus('"{0}"'.format(str(v).lower()))
 
             filter_frags.append("{0}=={1}".format(k, v))
 
@@ -300,14 +304,14 @@ class SmokeTestActor(object):
         if message:
             filter_frags.append(
                 "$message{0}".format(
-                    urllib.parse.quote_plus(' contains "{0}"'.format(message))
+                    quote_plus(' contains "{0}"'.format(message))
                 )
             )
 
         url += "&filter={0}".format("+and+".join(filter_frags))
         if self._debug:
             print("\nURL quoted: {0}".format(url))
-            print("  unquoted: {0}".format(urllib.parse.unquote_plus(url)))
+            print("  unquoted: {0}".format(unquote_plus(url)))
             print("  curl command: curl -v '{0}'".format(url))
         return url
 
