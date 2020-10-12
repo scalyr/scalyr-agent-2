@@ -264,6 +264,9 @@ class SmokeTestActor(object):
             self._scalyr_server, urllib.parse.urlencode(base_params)
         )
 
+        # NOTE: In theory we could also escape $, but API doesn't require it. It does appear to work
+        # both ways though.
+
         # Set serverHost/logfile from object state if not overridden
         if not filter_dict:
             filter_dict = {}
@@ -276,9 +279,12 @@ class SmokeTestActor(object):
             )
 
         filter_frags = []
-        for k, v in filter_dict.items():
+        for k, v in sorted(filter_dict.items()):
             if type(v) == str:
-                v = '"{}"'.format(urllib.parse.quote_plus(v))
+                v = urllib.parse.quote_plus('"{}"'.format(v))
+            elif type(v) == bool:
+                v = urllib.parse.quote_plus('"{}"'.format(str(v).lower()))
+
             filter_frags.append("{}=={}".format(k, v))
 
         # If log regex is provided, add a regex matches clause
