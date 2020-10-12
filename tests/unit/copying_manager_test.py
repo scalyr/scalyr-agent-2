@@ -84,6 +84,19 @@ def _create_test_copying_manager(configuration, monitors, auto_start=True):
     return manager
 
 
+class MockLogProcessor(object):
+    def __init__(self, log_path, is_active, checkpoint):
+        self.log_path = log_path
+        self.is_active = is_active
+        self.checkpoint = checkpoint
+
+    def set_inactive(self):
+        self.is_active = False
+
+    def get_checkpoint(self):
+        return self.checkpoint
+
+
 class DynamicLogPathTest(ScalyrTestCase):
     def setUp(self):
         super(DynamicLogPathTest, self).setUp()
@@ -1441,6 +1454,138 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
                 if controller:
                     controller.stop()
 
+    def test__read_checkpoint_state(self):
+        root_dir, config_dir, data_dir, log_dir = self.__create_test_directories()
+        config_file = os.path.join(config_dir, "agentConfig.json")
+
+        with open(config_file, "w") as fp:
+            fp.write('{"api_key": "foo"}')
+
+        config = self.__create_test_config_instance(log_dir, config_file, data_dir)
+        manager = _create_test_copying_manager(config, [], auto_start=False)
+
+        active_checkpoints_path = os.path.join(
+            config.agent_data_path, "active-checkpoints.json"
+        )
+        checkpoints_path = os.path.join(config.agent_data_path, "checkpoints.json")
+
+        # 1. Verify both files are empty / don't exist on start
+        self.assertFalse(os.path.isfile(active_checkpoints_path))
+        self.assertFalse(os.path.isfile(checkpoints_path))
+
+        # pylint: disable=no-member
+        state = manager._CopyingManager__read_checkpoint_state()
+        # pylint: enable=no-member
+        self.assertIsNone(state)
+
+        # 2. active-checkpoints.json and checkpoints.json are the same
+        self.assertFalse(os.path.isfile(active_checkpoints_path))
+        self.assertFalse(os.path.isfile(checkpoints_path))
+
+        manager._CopyingManager__log_processors = [
+            MockLogProcessor("1.log", True, {"position": 1}),
+            MockLogProcessor("2.log", True, {"position": 2}),
+            MockLogProcessor("3.log", False, {"position": 3}),
+        ]
+        expected_state = {
+            "time": 1,
+            "checkpoints": {
+                "1.log": {"position": 1},
+                "2.log": {"position": 2},
+                "3.log": {"position": 3},
+            },
+        }
+
+        # pylint: disable=no-member
+        manager._CopyingManager__write_full_checkpoint_state(current_time=1)
+        # pylint: enable=no-member
+
+        self.assertTrue(os.path.isfile(active_checkpoints_path))
+        self.assertTrue(os.path.isfile(checkpoints_path))
+
+        # pylint: disable=no-member
+        state = manager._CopyingManager__read_checkpoint_state()
+        # pylint: enable=no-member
+        self.assertEqual(state, expected_state)
+
+        # 2. active-checkpoints.json file and checkpoints.json exist, and active checkpoints
+        # time < full checkpoint time - should use data from full checkpoint file
+        os.unlink(active_checkpoints_path)
+        os.unlink(checkpoints_path)
+
+        expected_state = {
+            "time": 2,
+            "checkpoints": {
+                "1.log": {"position": 1},
+                "2.log": {"position": 2},
+                "3.log": {"position": 3},
+            },
+        }
+
+        manager._CopyingManager__log_processors = [
+            MockLogProcessor("1.log", True, {"position": 1}),
+            MockLogProcessor("2.log", True, {"position": 2}),
+            MockLogProcessor("3.log", False, {"position": 3}),
+        ]
+        # pylint: disable=no-member
+        manager._CopyingManager__write_full_checkpoint_state(current_time=2)
+        # pylint: enable=no-member
+
+        manager._CopyingManager__log_processors = [
+            MockLogProcessor("1.log", True, {"position": 100}),
+            MockLogProcessor("2.log", True, {"position": 200}),
+            MockLogProcessor("7.log", True, {"position": 9}),
+        ]
+        # pylint: disable=no-member
+        manager._CopyingManager__write_active_checkpoint_state(current_time=2)
+        # pylint: enable=no-member
+
+        # pylint: disable=no-member
+        state = manager._CopyingManager__read_checkpoint_state()
+        # pylint: enable=no-member
+
+        self.assertEqual(state, expected_state)
+
+        # 3. active-checkpoints.json file and checkpoints.json exist, and active checkpoints
+        # time > full checkpoint time - should merge in data from active checkpoints file
+        os.unlink(active_checkpoints_path)
+        os.unlink(checkpoints_path)
+
+        expected_state = {
+            "time": 3,
+            "checkpoints": {
+                "1.log": {"position": 100},
+                "2.log": {"position": 200},
+                "3.log": {"position": 3},
+                "7.log": {"position": 9},
+            },
+        }
+
+        manager._CopyingManager__log_processors = [
+            MockLogProcessor("1.log", True, {"position": 1}),
+            MockLogProcessor("2.log", True, {"position": 2}),
+            MockLogProcessor("3.log", False, {"position": 3}),
+        ]
+        # pylint: disable=no-member
+        manager._CopyingManager__write_full_checkpoint_state(current_time=2)
+        # pylint: enable=no-member
+
+        manager._CopyingManager__log_processors = [
+            MockLogProcessor("1.log", True, {"position": 100}),
+            MockLogProcessor("2.log", True, {"position": 200}),
+            MockLogProcessor("7.log", True, {"position": 9}),
+            # Is active is False so it should not be included in active-checkpoints.json
+            MockLogProcessor("8.log", False, {"position": 9}),
+        ]
+        # pylint: disable=no-member
+        manager._CopyingManager__write_active_checkpoint_state(current_time=3)
+        # pylint: enable=no-member
+
+        # pylint: disable=no-member
+        state = manager._CopyingManager__read_checkpoint_state()
+        # pylint: enable=no-member
+        self.assertEqual(state, expected_state)
+
     def __extract_lines(self, request):
         parsed_request = test_util.parse_scalyr_request(request.get_payload())
 
@@ -1458,6 +1603,31 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def __was_pipelined(self, request):
         return "pipelined=1.0" in request.get_timing_data()
 
+    def __create_test_directories(self, root_dir=None):
+        if root_dir is None:
+            root_dir = tempfile.mkdtemp()
+
+        config_dir = os.path.join(root_dir, "config")
+        data_dir = os.path.join(root_dir, "data")
+        log_dir = os.path.join(root_dir, "log")
+
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+        if not os.path.exists(config_dir):
+            os.mkdir(config_dir)
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
+
+        return (root_dir, config_dir, data_dir, log_dir)
+
+    def __create_test_config_instance(self, log_dir, config_file, data_dir):
+        default_paths = DefaultPaths(log_dir, config_file, data_dir)
+
+        config = Configuration(config_file, default_paths, None)
+        config.parse()
+
+        return config
+
     def __create_test_instance(
         self, use_pipelining=False, root_dir=None, auto_start=True, test_files=1
     ):
@@ -1471,18 +1641,9 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         """
         assert 0 < test_files <= 2
 
-        if root_dir is None:
-            root_dir = tempfile.mkdtemp()
-        config_dir = os.path.join(root_dir, "config")
-        data_dir = os.path.join(root_dir, "data")
-        log_dir = os.path.join(root_dir, "log")
-
-        if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
-        if not os.path.exists(config_dir):
-            os.mkdir(config_dir)
-        if not os.path.exists(log_dir):
-            os.mkdir(log_dir)
+        root_dir, config_dir, data_dir, log_dir = self.__create_test_directories(
+            root_dir=root_dir
+        )
 
         self.__test_log_file = self.__create_test_file(root_dir, "test.log")
         log_configs = [{"path": self.__test_log_file}]
@@ -1516,14 +1677,13 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             )
             fp.close()
 
-        default_paths = DefaultPaths(log_dir, config_file, data_dir)
+        self._config = self.__create_test_config_instance(
+            log_dir, config_file, data_dir
+        )
 
-        config = Configuration(config_file, default_paths, None)
-        config.parse()
-
-        self._config = config
-
-        self._manager = _create_test_copying_manager(config, [], auto_start=auto_start)
+        self._manager = _create_test_copying_manager(
+            self._config, [], auto_start=auto_start
+        )
         self._controller = self._manager.controller
         return self._controller
 
