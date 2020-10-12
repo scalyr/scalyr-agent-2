@@ -263,7 +263,7 @@ class SmokeTestActor(object):
         base_params = sorted(self._get_base_query_params().items())
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
-        url += "{}/api/query?queryType=log&{}".format(
+        url += "{0}/api/query?queryType=log&{1}".format(
             self._scalyr_server, urllib.parse.urlencode(base_params)
         )
 
@@ -284,31 +284,31 @@ class SmokeTestActor(object):
         filter_frags = []
         for k, v in sorted(filter_dict.items()):
             if type(v) == str:
-                v = urllib.parse.quote_plus('"{}"'.format(v))
+                v = urllib.parse.quote_plus('"{0}"'.format(v))
             elif type(v) == bool:
-                v = urllib.parse.quote_plus('"{}"'.format(str(v).lower()))
+                v = urllib.parse.quote_plus('"{0}"'.format(str(v).lower()))
 
-            filter_frags.append("{}=={}".format(k, v))
+            filter_frags.append("{0}=={1}".format(k, v))
 
         # If log regex is provided, add a regex matches clause
         if override_log_regex:
             filter_frags.append(
-                '{} matches "{}"'.format("$logfile", override_log_regex)
+                '{0} matches "{1}"'.format("$logfile", override_log_regex)
             )
 
         # Add message
         if message:
             filter_frags.append(
-                "$message{}".format(
-                    urllib.parse.quote_plus(' contains "{}"'.format(message))
+                "$message{0}".format(
+                    urllib.parse.quote_plus(' contains "{0}"'.format(message))
                 )
             )
 
-        url += "&filter={}".format("+and+".join(filter_frags))
+        url += "&filter={0}".format("+and+".join(filter_frags))
         if self._debug:
-            print("\nURL quoted: {}".format(url))
-            print("  unquoted: {}".format(urllib.parse.unquote_plus(url)))
-            print("  curl command: curl -v '{}'".format(url))
+            print("\nURL quoted: {0}".format(url))
+            print("  unquoted: {0}".format(urllib.parse.unquote_plus(url)))
+            print("  curl command: curl -v '{0}'".format(url))
         return url
 
     def _get_base_query_params(self):
