@@ -162,7 +162,7 @@ LOGFILE='/var/log/scalyr-agent-2/data.json'
 print_header 'Querying Scalyr server to verify log upload'
 
 # The smoketest python process requires python 3
-sudo -E bash -c "source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
+sudo -E bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
 ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
 --scalyr_server $SCALYR_SERVER --read_api_key $READ_API_KEY \
 --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
