@@ -69,8 +69,10 @@ Note:
     This test code require python 3 with specific packages installed (i.e. requests)
 """
 
-__author__ = "echee@scalyr.com"
+from __future__ import print_function
+from __future__ import absolute_import
 
+__author__ = "echee@scalyr.com"
 
 import argparse
 import os
@@ -80,9 +82,10 @@ import requests
 import socket
 import sys
 import threading
-import urllib
+from io import open
 from copy import deepcopy
 
+from six.moves import urllib
 
 NAME_SUFFIX_UPLOADER = "uploader"
 NAME_SUFFIX_VERIFIER = "verifier"
@@ -257,7 +260,7 @@ class SmokeTestActor(object):
         Make url for querying Scalyr server.  Any str filter values will be url-encoded
         """
 
-        base_params = self._get_base_query_params()
+        base_params = sorted(self._get_base_query_params().items())
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
         url += "{}/api/query?queryType=log&{}".format(
@@ -389,7 +392,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
     VERIFIER_TYPE = "Standalone"
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super(StandaloneSmokeTestActor, self).__init__(**kwargs)
         self._logfile = kwargs.get("monitored_logfile")
         self._python_version = kwargs.get("python_version")
 
@@ -978,7 +981,7 @@ if __name__ == "__main__":
         _exit(
             1,
             message="Bad test config: process_name must start with one of {}".format(
-                CONTAINER_PREFIX_2_VERIFIER_CLASS.keys()
+                list(CONTAINER_PREFIX_2_VERIFIER_CLASS.keys())
             ),
         )
 
