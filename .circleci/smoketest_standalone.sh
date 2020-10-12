@@ -47,7 +47,7 @@ git checkout $TEST_BRANCH
 # (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
 # /tmp/smoketest.py) so we simply download this file from the github before running the tests.
 # That's not great, but it works.
-SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
+SMOKE_TESTS_SCRIPT_BRANCH=${TEST_BRANCH:-"master"}
 SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
 
 SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
