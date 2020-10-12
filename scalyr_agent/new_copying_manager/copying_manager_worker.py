@@ -1,16 +1,19 @@
 from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
 
-import abc
 import threading
 import time
 import sys
 import os
 import collections
-import shutil
+import datetime
+
+if False:
+    from typing import Dict
 
 import scalyr_agent.util as scalyr_util
-from scalyr_agent import scalyr_logging, log_processing
-from scalyr_agent.log_watcher import LogWatcher
+from scalyr_agent import scalyr_logging
 
 from scalyr_agent.log_processing import LogFileProcessor
 
@@ -254,6 +257,15 @@ class CopyingManagerWorker(StoppableThread):
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
+
+    @property
+    def log_processors(self):
+        # type: () -> Dict[six.text_type, LogFileProcessor]
+        """
+        List of log processors. Exposed only for test purposes.
+        """
+        with self.__lock:
+            return self.__log_processors.copy()
 
     def add_log_processor(self, log_processor):
         # type: (LogFileProcessor) -> None
@@ -608,7 +620,7 @@ class CopyingManagerWorker(StoppableThread):
                                     )
                                 )
                                 profiler.enable()
-                    except Exception as e:
+                    except Exception:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception(
                             "Failed while attempting to scan and transmit logs"
@@ -639,7 +651,7 @@ class CopyingManagerWorker(StoppableThread):
 
                     # End of the copy loop
                     self.total_copy_iterations += 1
-            except Exception as e:
+            except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)

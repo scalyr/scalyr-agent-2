@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from __future__ import absolute_import
 
 import json
 import shutil
@@ -22,6 +23,7 @@ from scalyr_agent.platform_controller import DefaultPaths
 
 
 import six
+from six.moves import range
 
 
 class TestableLogFile(object):
@@ -50,7 +52,7 @@ class TestableLogFile(object):
 
     def spawn_log_processors(
         self, checkpoints=None, copy_at_index_zero=False
-    ):  # type: (Dict) -> Dict[str, LogFileProcessor]
+    ):  # type: (Dict, bool) -> Dict[str, LogFileProcessor]
         matcher = self.spawn_log_matcher_for_log_file()
 
         if checkpoints is None:
@@ -324,7 +326,11 @@ class ConfigBuilder(object):
     def get_active_checkpoints_path(
         self, worker_id
     ):  # type: (six.text_type) -> pathlib.Path
-        return self._data_dir_path / "checkpoints" / "active-checkpoints-%s.json" % worker_id
+        return (
+            self._data_dir_path
+            / "checkpoints"
+            / ("active-checkpoints-%s.json" % worker_id)
+        )
 
     @after_initialize
     def get_checkpoints(self, worker_id):
@@ -333,21 +339,3 @@ class ConfigBuilder(object):
     @after_initialize
     def get_active_checkpoints(self, worker_id):
         return json.loads(self.get_active_checkpoints_path(worker_id).read_text())
-
-    def spawn_checkpoints(self):
-        # type: () -> Dict
-        """
-        Spawn checkpoints dict for all log files in this builder.
-        It can be modified and used as initial checkpoints objects in tests.
-        """
-        checkpoints = {}
-        for log_file in self._log_files.values():
-            checkpoints[log_file.path] = {"initial_position": 0}
-
-        checkpoints
-
-    def write_checkpoints(self, data):
-        self.checpoints_path.write_text(six.text_type(json.dumps(data)))
-
-    def write_active_checkpoints(self, data):
-        self.active_checpoints_path.write_text(six.text_type(json.dumps(data)))

@@ -1,9 +1,16 @@
 from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
 
 import threading
 import time
 import os
 import sys
+import collections
+import glob
+import re
+import operator
+import datetime
 
 if False:
     from typing import Dict
@@ -16,7 +23,9 @@ from scalyr_agent.log_processing import LogMatcher
 from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
 
+
 import six
+from six.moves import range
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -24,6 +33,7 @@ log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 
 SCHEDULED_DELETION = "scheduled-deletion"
+
 
 class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
@@ -257,12 +267,15 @@ class CopyingManager(StoppableThread):
         # Statistics for copying_manager_status messages
         self.total_copy_iterations = 0
         self.total_read_time = 0
-        self.total_waiting_time = 0
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-        self._workers = dict()  # type: Dict[six.text_type, CopyingManagerWorker]
+        self._workers = (
+            collections.OrderedDict()
+        )  # type: Dict[six.text_type, CopyingManagerWorker]
+
+        self._current_worker = 0
 
         for i in range(1):
             i = six.text_type(i)
@@ -306,38 +319,19 @@ class CopyingManager(StoppableThread):
 
         current_time = time.time()
 
-        # start all workers.
-        for worker in self._workers.values():
-            worker.start_worker(scalyr_client=self.__scalyr_client)
-
-        # wait for workers started copying.
-        for worker in self._workers.values():
-            worker.wait_for_copying_to_begin()
-
         try:
             # noinspection PyBroadException
             try:
-                # Try to read the checkpoint state from disk.
-                checkpoints_state = self.__read_checkpoint_state()
-                if checkpoints_state is None:
-                    log.info(
-                        "The checkpoints were not read.  All logs will be copied starting at their current end"
-                    )
-                elif (
-                    current_time - checkpoints_state["time"]
-                ) > self.__config.max_allowed_checkpoint_age:
-                    log.warn(
-                        'The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
-                        "be copied starting at their current end.",
-                        scalyr_util.format_time(checkpoints_state["time"]),
-                        error_code="staleCheckpointFile",
-                    )
-                    checkpoints_state = None
 
-                if checkpoints_state is None:
-                    checkpoints = None
-                else:
-                    checkpoints = checkpoints_state["checkpoints"]
+                checkpoints = self.__get_checkpoints(current_time)
+
+                # start all workers.
+                for worker in self._workers.values():
+                    worker.start_worker(scalyr_client=self.__scalyr_client)
+
+                # wait for workers started copying.
+                for worker in self._workers.values():
+                    worker.wait_for_copying_to_begin()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
@@ -345,31 +339,6 @@ class CopyingManager(StoppableThread):
                     current_time=current_time,
                     checkpoints=checkpoints,
                     logs_initial_positions=self._logs_initial_positions,
-                )
-
-                # The copying params that tell us how much we are allowed to send and how long we have to wait between
-                # attempts.
-                copying_params = CopyingParameters(self.__config)
-
-                current_time = time.time()
-
-                # Just initialize the last time we had a success to now.  Make the logic below easier.
-                # NOTE: We set this variable to current (start time) even if we never successfuly
-                # establish a connection because we want eventually drop __pending_add_events_task
-                # even if we can't establish a connection. If we didn't do that, that queue could
-                # grow unbounded.
-                # Because of that, we need to take this behavior into account when updating
-                # "__last_success_time" variable which is used for status reporting. We do that by
-                # utilizing another last_success_status variable which only gets updated when we
-                # successfuly send the request to the server.
-                last_success = current_time
-                last_success_status = None
-
-                # Force the agent to write a new full checkpoint as soon as it can
-                last_full_checkpoint_write = 0.0
-
-                pipeline_byte_threshold = self.__config.pipeline_threshold * float(
-                    self.__config.max_allowed_request_size
                 )
 
                 # We are about to start copying.  We can tell waiting threads.
@@ -380,7 +349,6 @@ class CopyingManager(StoppableThread):
                         scalyr_logging.DEBUG_LEVEL_1, "At top of copy log files loop."
                     )
                     current_time = time.time()
-                    pipeline_time = 0.0
                     # noinspection PyBroadException
                     try:
 
@@ -430,24 +398,21 @@ class CopyingManager(StoppableThread):
                         self.__total_errors += 1
                         self.__lock.release()
 
-                    print("slep")
                     self._sleep_but_awaken_if_stopped(
-                        copying_params.current_sleep_interval
+                        self.__config.max_request_spacing_interval
                     )
-                    self.total_waiting_time += copying_params.current_sleep_interval
 
                     # End of the copy loop
                     self.total_copy_iterations += 1
-            except Exception as e:
+            except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
             # stopping all workers.
             for worker in self._workers.values():
-                worker.stop_worker()
-
-        print("MANAGER END")
+                if worker.is_alive():
+                    worker.stop_worker()
 
     def _scan_for_new_logs_if_necessary(
         self,
@@ -591,7 +556,7 @@ class CopyingManager(StoppableThread):
         finally:
             self.__lock.release()
 
-    def __read_checkpoint_state(self):
+    def __read_checkpoint_state2(self):
         """Reads the checkpoint state from disk and returns it.
 
         The checkpoint state maps each file path to the offset within that log file where we left off copying it.
@@ -620,6 +585,149 @@ class CopyingManager(StoppableThread):
             )
 
             if not os.path.isfile(active_checkpoint_file_path):
+                return full_checkpoints
+
+            # if the active checkpoint file is newer, overwrite any checkpoint values with the
+            # updated full checkpoint
+            active_checkpoints = scalyr_util.read_file_as_json(
+                active_checkpoint_file_path, strict_utf8=True
+            )
+
+            if active_checkpoints["time"] > full_checkpoints["time"]:
+                full_checkpoints["time"] = active_checkpoints["time"]
+                for path, checkpoint in six.iteritems(
+                    active_checkpoints["checkpoints"]
+                ):
+                    full_checkpoints[path] = checkpoint
+
+            return full_checkpoints
+
+        except Exception:
+            # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
+            log.exception(
+                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
+                error_code="failedCheckpointRead",
+            )
+            return None
+
+    def _read_worker_checkpoints(self):
+        """
+                Read for all checkpoint files that
+                :return:
+                """
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+
+        if not os.path.isdir(checkpoints_dir_path):
+            return None
+
+        glob_path = os.path.join(checkpoints_dir_path, "checkpoints-*.json")
+
+        for path in glob.glob(glob_path):
+            pass
+
+    def __get_checkpoints(self, current_time):
+        """Find and read worker checkpoints that were previously written."""
+        workers_checkpoints = self.__find_and_read_workers_checkpoints()
+
+        if not workers_checkpoints:
+            log.info(
+                "The checkpoints were not read.  All logs will be copied starting at their current end"
+            )
+            return {}
+
+        # discard stale checkpoints.
+        non_stale_checkpoints = list()
+
+        for wc in workers_checkpoints:
+            if current_time - wc["time"] > self.__config.max_allowed_checkpoint_age:
+                log.warn(
+                    'The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
+                    "be copied starting at their current end.",
+                    scalyr_util.format_time(wc["time"]),
+                    error_code="staleCheckpointFile",
+                )
+            else:
+                non_stale_checkpoints.append(wc)
+
+        result = {}
+
+        # merge checkpoints from  all workers to one checkpoint.
+
+        # checkpoints from different workers may contain checkpoint for the same file,
+        # so we sort checkpoints by time and update resulting collection with the same order.
+        non_stale_checkpoints.sort(operator.itemgetter("time"))
+
+        for wc in non_stale_checkpoints:
+            result.update(wc["checkpoints"])
+
+        return result
+
+    def __find_and_read_workers_checkpoints(self):
+        """
+        Read for all checkpoint files that
+        :return:
+        """
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+
+        if not os.path.isdir(checkpoints_dir_path):
+            return []
+
+        glob_path = os.path.join(checkpoints_dir_path, "checkpoints-*.json")
+
+        workers_checkpoints = list()
+
+        for full_checkpoints_path in glob.glob(glob_path):
+            m = re.search(
+                r".*/checkpoints-(?P<number>\d+)\.json", full_checkpoints_path
+            )
+            if m:
+                worker_id = m.group("number")
+                active_checkpoints_path = os.path.join(
+                    checkpoints_dir_path, "active-checkpoints-%s.json" % worker_id
+                )
+            else:
+                active_checkpoints_path = None
+
+            checkpoints = self.__read_worker_checkpoint_state(
+                full_checkpoints_path, active_checkpoints_path
+            )
+
+            if checkpoints:
+                workers_checkpoints.append(checkpoints)
+
+        return workers_checkpoints
+
+    def __read_worker_checkpoint_state(
+        self, full_checkpoint_file_path, active_checkpoint_file_path
+    ):
+        """Reads the checkpoint state from disk and returns it.
+
+        The checkpoint state maps each file path to the offset within that log file where we left off copying it.
+
+        @return:  The checkpoint state
+        @rtype: dict
+        """
+
+        if not os.path.isfile(full_checkpoint_file_path):
+            log.info(
+                'The log copying checkpoint file "%s" does not exist, skipping.'
+                % full_checkpoint_file_path
+            )
+            return None
+
+        # noinspection PyBroadException
+        try:
+            full_checkpoints = scalyr_util.read_file_as_json(
+                full_checkpoint_file_path, strict_utf8=True
+            )
+
+            if active_checkpoint_file_path is None or not os.path.isfile(
+                active_checkpoint_file_path
+            ):
                 return full_checkpoints
 
             # if the active checkpoint file is newer, overwrite any checkpoint values with the
@@ -711,24 +819,7 @@ class CopyingManager(StoppableThread):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        # Try to read the checkpoint state from disk.
-        checkpoints_state = self.__read_checkpoint_state()
-        if checkpoints_state is None:
-            log.info("The checkpoints were not read from the filesystem.")
-        elif (
-            time.time() - checkpoints_state["time"]
-        ) > self.__config.max_allowed_checkpoint_age:
-            log.warn(
-                'The current checkpoint is too stale (written at "%s").  Ignoring it.',
-                scalyr_util.format_time(checkpoints_state["time"]),
-                error_code="staleCheckpointFile",
-            )
-            checkpoints_state = None
-
-        if checkpoints_state is None:
-            checkpoints = {}
-        else:
-            checkpoints = checkpoints_state["checkpoints"]
+        checkpoints = self.__get_checkpoints(time.time())
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -829,6 +920,13 @@ class CopyingManager(StoppableThread):
         try:
             self.__lock.acquire()
 
+            worker_statuses = dict()
+            for worker_id, worker in self._workers.items():
+
+                worker_statuses[worker_id] = worker.generate_status(
+                    warn_on_rate_limit=warn_on_rate_limit
+                )
+
             result = CopyingManagerStatus()
             result.total_bytes_uploaded = self.__total_bytes_uploaded
             result.last_success_time = self.__last_success_time
@@ -843,7 +941,6 @@ class CopyingManager(StoppableThread):
             )
             result.total_copy_iterations = self.total_copy_iterations
             result.total_read_time = self.total_read_time
-            result.total_waiting_time = self.total_waiting_time
             result.total_blocking_response_time = self.total_blocking_response_time
             result.total_request_time = self.total_request_time
             result.total_pipelined_requests = self.total_pipelined_requests
@@ -886,6 +983,16 @@ class CopyingManager(StoppableThread):
         self.__scalyr_client = scalyr_client
         self._logs_initial_positions = logs_initial_positions
 
+        # self._initial_checkpoints = self.__get_checkpoints(time.time())
+        #
+        # # start all workers.
+        # for worker in self._workers.values():
+        #     worker.start_worker(scalyr_client=self.__scalyr_client)
+        #
+        # # wait for workers started copying.
+        # for worker in self._workers.values():
+        #     worker.wait_for_copying_to_begin()
+
         self.start()
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
@@ -902,8 +1009,25 @@ class CopyingManager(StoppableThread):
 
     def __handle_new_log_processor(self, processor):
         # type: (LogFileProcessor) -> None
-        worker = list(self._workers.values())[0]
-        worker.add_log_processor(processor)
+
+        current_worker = list(self._workers.values())[self._current_worker]
+        if self._current_worker == len(self._workers) - 1:
+            self._current_worker = 0
+        else:
+            self._current_worker += 1
+
+        current_worker.add_log_processor(processor)
+
+    def _sleep_but_awaken_if_stopped(self, seconds):
+        """Makes the current thread (the copying manager thread) go to sleep for the specified number of seconds,
+        or until the manager is stopped, whichever comes first.
+
+        Note, this method is exposed for testing purposes.
+
+        @param seconds: The number of seconds to sleep.
+        @type seconds: float
+        """
+        self._run_state.sleep_but_awaken_if_stopped(seconds)
 
     def add_log_config(self, monitor_name, log_config):
         """Add the log_config item to the list of paths being watched

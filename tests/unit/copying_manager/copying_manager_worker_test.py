@@ -1,19 +1,22 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import unittest
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import platform
 import mock
 
+if False:
+    from typing import Tuple
+
 
 from scalyr_agent.test_base import skipIf
-from tests.unit.copying_manager.common import (
-    CopyingManagerCommonTest,
-    TestableCopyingManagerWorker,
-)
+from tests.unit.copying_manager.common import CopyingManagerCommonTest
+from tests.unit.copying_manager.common import TestableCopyingManagerWorker
+from tests.unit.copying_manager.config_builder import TestableLogFile
+
+
 from scalyr_agent import scalyr_logging
 
 
@@ -472,7 +475,9 @@ class CopyingManagerWorkerCheckpointTests(CopyingManagerWorkerTest):
 
         worker.controller.stop()
 
-        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)["checkpoints"]
+        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)[
+            "checkpoints"
+        ]
 
         assert test_file.str_path in checkpoints
 
@@ -495,7 +500,9 @@ class CopyingManagerWorkerCheckpointTests(CopyingManagerWorkerTest):
 
         worker.controller.stop()
 
-        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)["checkpoints"]
+        checkpoints = self._config_builder.get_checkpoints(worker.worker_id)[
+            "checkpoints"
+        ]
         assert test_file.str_path in checkpoints
 
         # create new worker. Imitate third launch.
