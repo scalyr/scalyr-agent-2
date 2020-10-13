@@ -422,7 +422,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         retry_delay = 2
 
         start_time = time.time()
-        ingestion_start_timeout_time = start_time + 20
+        # ingestion_start_timeout_time = start_time + 20
+        ingestion_start_timeout_time = start_time + timeout
 
         print("Verifying start of ingestion...")
         while True:
