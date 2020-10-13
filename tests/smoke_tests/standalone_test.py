@@ -23,6 +23,6 @@ from tests.smoke_tests.common import _test_standalone_smoke
 
 
 @pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(1200)
 def test_standalone_smoke():
     _test_standalone_smoke(DEV_INSTALL)

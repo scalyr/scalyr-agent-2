@@ -69,8 +69,10 @@ Note:
     This test code require python 3 with specific packages installed (i.e. requests)
 """
 
-__author__ = "echee@scalyr.com"
+from __future__ import print_function
+from __future__ import absolute_import
 
+__author__ = "echee@scalyr.com"
 
 import argparse
 import os
@@ -80,9 +82,14 @@ import requests
 import socket
 import sys
 import threading
-import urllib
+from io import open
 from copy import deepcopy
 
+
+try:
+    from urllib.parse import urlencode, quote_plus, unquote_plus
+except ImportError:
+    from urllib import urlencode, quote_plus, unquote_plus
 
 NAME_SUFFIX_UPLOADER = "uploader"
 NAME_SUFFIX_VERIFIER = "verifier"
@@ -257,12 +264,15 @@ class SmokeTestActor(object):
         Make url for querying Scalyr server.  Any str filter values will be url-encoded
         """
 
-        base_params = self._get_base_query_params()
+        base_params = sorted(self._get_base_query_params().items())
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
-        url += "{}/api/query?queryType=log&{}".format(
-            self._scalyr_server, urllib.parse.urlencode(base_params)
+        url += "{0}/api/query?queryType=log&{1}".format(
+            self._scalyr_server, urlencode(base_params)
         )
+
+        # NOTE: In theory we could also escape $, but API doesn't require it. It does appear to work
+        # both ways though.
 
         # Set serverHost/logfile from object state if not overridden
         if not filter_dict:
@@ -276,29 +286,33 @@ class SmokeTestActor(object):
             )
 
         filter_frags = []
-        for k, v in filter_dict.items():
+        for k, v in sorted(filter_dict.items()):
             if type(v) == str:
-                v = '"{}"'.format(urllib.parse.quote_plus(v))
-            filter_frags.append("{}=={}".format(k, v))
+                v = quote_plus('"{0}"'.format(v))
+            elif type(v) == bool:
+                v = quote_plus('"{0}"'.format(str(v).lower()))
+
+            filter_frags.append("{0}=={1}".format(k, v))
 
         # If log regex is provided, add a regex matches clause
         if override_log_regex:
             filter_frags.append(
-                '{} matches "{}"'.format("$logfile", override_log_regex)
+                '{0} matches "{1}"'.format("$logfile", override_log_regex)
             )
 
         # Add message
         if message:
             filter_frags.append(
-                "$message{}".format(
-                    urllib.parse.quote_plus(' contains "{}"'.format(message))
+                "$message{0}".format(
+                    quote_plus(' contains "{0}"'.format(message))
                 )
             )
 
-        url += "&filter={}".format("+and+".join(filter_frags))
+        url += "&filter={0}".format("+and+".join(filter_frags))
         if self._debug:
-            print("\nURL quoted = {}".format(url))
-            print("  unquoted = {}".format(urllib.parse.unquote_plus(url)))
+            print("\nURL quoted: {0}".format(url))
+            print("  unquoted: {0}".format(unquote_plus(url)))
+            print("  curl command: curl -v '{0}'".format(url))
         return url
 
     def _get_base_query_params(self):
@@ -382,7 +396,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
     VERIFIER_TYPE = "Standalone"
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super(StandaloneSmokeTestActor, self).__init__(**kwargs)
         self._logfile = kwargs.get("monitored_logfile")
         self._python_version = kwargs.get("python_version")
 
@@ -971,7 +985,7 @@ if __name__ == "__main__":
         _exit(
             1,
             message="Bad test config: process_name must start with one of {}".format(
-                CONTAINER_PREFIX_2_VERIFIER_CLASS.keys()
+                list(CONTAINER_PREFIX_2_VERIFIER_CLASS.keys())
             ),
         )
 

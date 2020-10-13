@@ -44,8 +44,6 @@ SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
 SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
 
 SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
-# TODO: Remove when pushing to open source remote
-SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
 DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o /tmp/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
 
 #----------------------------------------------------------------------------------------

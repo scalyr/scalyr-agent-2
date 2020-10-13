@@ -1176,10 +1176,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             if active_checkpoints["time"] > full_checkpoints["time"]:
                 full_checkpoints["time"] = active_checkpoints["time"]
-                for path, checkpoint in six.iteritems(
-                    active_checkpoints["checkpoints"]
-                ):
-                    full_checkpoints[path] = checkpoint
+                full_checkpoints["checkpoints"].update(
+                    active_checkpoints["checkpoints"],
+                )
 
             return full_checkpoints
 

@@ -42,6 +42,16 @@ fi
 cd scalyr-agent-2
 git checkout $TEST_BRANCH
 
+# We don't have an easy way to update base test docker images which come bundled
+# with the smoketest.py file
+# (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
+# /tmp/smoketest.py) so we simply download this file from the github before running the tests.
+# That's not great, but it works.
+SMOKE_TESTS_SCRIPT_BRANCH=${TEST_BRANCH:-"master"}
+SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
+
+SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o ${FILES}/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
 
 # Switch python version and set PATH.  Also symlink /usr/bin/python to Tcollector doesn't
 # inadvertently use preinstalled 2.7
@@ -152,7 +162,7 @@ LOGFILE='/var/log/scalyr-agent-2/data.json'
 print_header 'Querying Scalyr server to verify log upload'
 
 # The smoketest python process requires python 3
-sudo -E bash -c "source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
+sudo -E bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
 ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
 --scalyr_server $SCALYR_SERVER --read_api_key $READ_API_KEY \
 --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
