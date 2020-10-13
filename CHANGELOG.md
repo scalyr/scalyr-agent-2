@@ -1,16 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.13 "TBD" - October 17, 2020
+## 2.1.13 "Celaeno" - October 17, 2020
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Oct 17, 2020 19:00 -0800
+Packaged by Oliver Hsu <oliver@scalyr.com> on Oct 17, 2020 19:00 -0800
 --->
 
 Bug fixes:
-* Fix ``scalyr-agent-2 status`` command and make sure it doesn't result in an non-fatal error in the agent process and the command itself when running status command multiple times concurrently or in a short time frame.
-* Fix ``scalyr-agent-status`` command and make sure config override warning is not logged to stdout when running this command since it may interfere with consumers of the status command output.
+* Fix ``scalyr-agent-2 status`` command non-fatal error when running status command multiple times concurrently or in a short time frame.
+* Fix ``scalyr-agent-status`` command to not log config override warning to stdout since it may interfere with consumers of the status command output.
 * Fix merging of active-checkpoints.json and checkpoints.json checkpoint file data. Previously data from active checkpoints file was not correctly merged into full checkpoint data file which means that under some scenarios (e.g. agent crashed after active checkpoint file was written, but before full checkpoint file was written), data which was already sent to the server could be sent twice. Actual time window when this could happen was relatively small since full checkpoint data is written out every 60 seconds by default. Reported by @anton-ryzhov. #638
+* Fix Postgres monitor error when specifying the Postgres ``database_port`` in the agent config.
 
 ## 2.1.12 "Betelgeuze" - September 17, 2020
 
