@@ -94,7 +94,7 @@ class AgentVerifier(object):
         """
         pass
 
-    def verify(self, timeout=2 * 60):
+    def verify(self, timeout=15 * 60):
         # type: (int) -> bool
         """"
         :param timeout: How to long to wait (in seconds) before timing out if no successful response is found.
@@ -141,7 +141,7 @@ class AgentLogVerifier(AgentVerifier):
             )
         )
 
-    def verify(self, timeout=2 * 60):
+    def verify(self, timeout=15 * 60):
         # Give agent some time to start up before checking for version string.
         # This version check is done against a local agent.log file and status -v --format=json
         # output and not Scalyr API so we don't need to retry it and wait for logs to be shipped to
@@ -411,7 +411,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
             self._runner.write_line(self._data_json_log_path, json_data)
         return
 
-    def verify(self, timeout=1 * 60):
+    def verify(self, timeout=15 * 60):
         """
         We only need to check at one point in time and confirm that the amount of lines uploaded is roughly equal to
         what we expect to be uploaded with the given rate.
