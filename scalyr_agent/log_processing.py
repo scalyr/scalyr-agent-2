@@ -2273,6 +2273,7 @@ class LogFileProcessor(object):
         """
         if current_time is None:
             current_time = time.time()
+        current_time_nano = int(current_time * 1000000000)
 
         # If this is our first time processing this log file, just pretend like we had a recent success.
         if self.__last_success is None:
@@ -2421,7 +2422,7 @@ class LogFileProcessor(object):
                         sequence_end_number = sequence_number
                         new_event_timestamp = line_object.timestamp
                         if not new_event_timestamp:
-                            new_event_timestamp = int(current_time * 1000000000)
+                            new_event_timestamp = current_time_nano
 
                         if not last_event_timestamp:
                             last_event_timestamp = new_event_timestamp
