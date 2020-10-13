@@ -2273,7 +2273,13 @@ class LogFileProcessor(object):
         """
         if current_time is None:
             current_time = time.time()
-        current_time_nano = int(current_time * 1000000000)
+        current_time_nano = None
+        if self._log_stream:
+            import scalyr_ingestion_client.time_utils as ingestion_client_time_utils  # pylint: disable=import-error
+
+            current_time_nano = (
+                ingestion_client_time_utils.get_nanoseconds_since_epoch()
+            )
 
         # If this is our first time processing this log file, just pretend like we had a recent success.
         if self.__last_success is None:
