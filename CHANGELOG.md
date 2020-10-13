@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.13 "Celaeno" - October 17, 2020
+## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
 Packaged by Oliver Hsu <oliver@scalyr.com> on Oct 17, 2020 19:00 -0800
