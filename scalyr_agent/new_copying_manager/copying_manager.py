@@ -11,17 +11,23 @@ import glob
 import re
 import operator
 import datetime
+import functools
+import copy
 
 if False:
     from typing import Dict
+    from typing import List
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.new_copying_manager.copying_manager_worker import CopyingManagerWorker
+from scalyr_agent.new_copying_manager.copying_manager_worker import LogProcessorSpawner
 from scalyr_agent import scalyr_logging
 from scalyr_agent.log_processing import LogMatcher
 from scalyr_agent.log_processing import LogFileProcessor
+from scalyr_agent.log_processing import AbstractLogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
+from scalyr_agent.configuration import Configuration
 
 
 import six
@@ -29,10 +35,70 @@ from six.moves import range
 
 
 log = scalyr_logging.getLogger(__name__)
-log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
+log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
 
 SCHEDULED_DELETION = "scheduled-deletion"
+
+
+class ProxyLogFileProcessor(AbstractLogFileProcessor):
+    ACTIVE = 0
+    CLOSED_AT_EOF = 1
+    WAITING_CLOSE_AT_EOF = 2
+    CLOSED = 3
+
+    def __init__(self, *args, **kwargs):
+
+        self.__copying_manager = None
+
+        self.__path = args[0]
+        self.__args = args
+        self.__kwargs = kwargs
+
+        self.__is_closing = False
+        self.__is_closing_at_eof = False
+        self.__is_closed_recently = False
+
+        self.__is_closed = False
+
+        self.__state = ProxyLogFileProcessor.ACTIVE
+
+    def set_state(self, state):
+        self.__state = state
+
+    @property
+    def state(self):
+        return self.__state
+
+    def close(self):
+        if self.__state != ProxyLogFileProcessor.ACTIVE:
+            return
+        self.set_state(ProxyLogFileProcessor.CLOSED)
+        self.__is_closing_at_eof = False
+
+    def close_at_eof(self):
+        if self.__state != ProxyLogFileProcessor.ACTIVE:
+            return
+        self.__state = ProxyLogFileProcessor.CLOSED_AT_EOF
+        self.__is_closing_at_eof = True
+
+    @property
+    def is_closing_at_eof(self):
+        return self.__is_closing_at_eof
+
+    def is_closed(self):
+        return self.__state == ProxyLogFileProcessor.CLOSED
+
+    def set_copying_manager(self, manager):
+        # type: (CopyingManager) -> None
+        self.__copying_manager = manager
+
+    def get_log_processor_spawner(self):
+        return LogProcessorSpawner(*self.__args, **self.__kwargs)
+
+    @property
+    def log_path(self):
+        return self.__path
 
 
 class CopyingParameters(object):
@@ -171,6 +237,7 @@ class CopyingParameters(object):
 
 class CopyingManager(StoppableThread):
     def __init__(self, configuration, monitors):
+        # type: (Configuration, List) -> None
         StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
 
@@ -232,6 +299,12 @@ class CopyingManager(StoppableThread):
         # A dict from file path to the LogFileProcessor that is processing it.
         self.__log_paths_being_processed = {}
 
+        self.__log_processors = {}  # type: Dict[six.text_type, ProxyLogFileProcessor]
+        self.__worker_processors = collections.defaultdict(
+            dict
+        )  # type:  Dict[CopyingManagerWorker, Dict[six.text_type, ProxyLogFileProcessor]]
+        self.__new_log_processors = []
+
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
@@ -271,15 +344,22 @@ class CopyingManager(StoppableThread):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-        self._workers = (
+        self.__workers = (
             collections.OrderedDict()
         )  # type: Dict[six.text_type, CopyingManagerWorker]
 
         self._current_worker = 0
 
-        for i in range(1):
-            i = six.text_type(i)
-            self._workers[i] = CopyingManagerWorker(configuration, i)
+        # for i in range(1):
+        #     i = six.text_type(i)
+        #     self._workers[i] = CopyingManagerWorker(configuration, i)
+
+        # def __log_processor_factory(*args, **kwargs):
+        #     return ProxyLogFileProcessor(*args, **)
+
+        self.__log_processor_factory = ProxyLogFileProcessor
+
+        self.__create_workers()
 
     def run(self):
         """Processes the log files as requested by the configuration, looking for matching log files, reading their
@@ -326,11 +406,11 @@ class CopyingManager(StoppableThread):
                 checkpoints = self.__get_checkpoints(current_time)
 
                 # start all workers.
-                for worker in self._workers.values():
+                for worker in self.__workers.values():
                     worker.start_worker(scalyr_client=self.__scalyr_client)
 
                 # wait for workers started copying.
-                for worker in self._workers.values():
+                for worker in self.__workers.values():
                     worker.wait_for_copying_to_begin()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
@@ -358,11 +438,14 @@ class CopyingManager(StoppableThread):
                             current_time=current_time, copy_at_index_zero=True
                         )
 
+                        self.__scan_for_pending_log_files()
+
+                        self.__interact_with_workers()
+
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Start removing finished log matchers",
                         )
-                        self.__scan_for_pending_log_files()
                         self.__remove_logs_scheduled_for_deletion()
                         self.__purge_finished_log_matchers()
                         log.log(
@@ -384,7 +467,7 @@ class CopyingManager(StoppableThread):
                                     )
                                 )
                                 profiler.enable()
-                    except Exception:
+                    except Exception as e:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception(
                             "Failed while attempting to scan and transmit logs"
@@ -404,15 +487,35 @@ class CopyingManager(StoppableThread):
 
                     # End of the copy loop
                     self.total_copy_iterations += 1
-            except Exception:
+            except Exception as e:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
             # stopping all workers.
-            for worker in self._workers.values():
+            for worker in self.__workers.values():
                 if worker.is_alive():
                     worker.stop_worker()
+
+    @property
+    def workers(self):
+        return self.__workers
+
+    def __create_workers(self):
+
+        worker_counter = 0
+        for worker_config in self.__config.worker_configs:
+            workers_number = worker_config["number"]
+            for _ in range(workers_number):
+                worker = CopyingManagerWorker(
+                    self.__config, worker_config, six.text_type(worker_counter)
+                )
+                self.__workers[worker.worker_id] = worker
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "CopyingManagerWorker #%s is created." % worker.worker_id,
+                )
+                worker_counter += 1
 
     def _scan_for_new_logs_if_necessary(
         self,
@@ -518,9 +621,14 @@ class CopyingManager(StoppableThread):
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
             ):
-                self.__handle_new_log_processor(new_processor)
+
+                new_processor.set_copying_manager(self)
+                self.__log_processors[new_processor.log_path] = new_processor
+                self.__new_log_processors.append(new_processor)
+
+                # self.__handle_new_log_processor(new_processor)
                 # self.__log_processors.append(new_processor)
-                # self.__log_paths_being_processed[new_processor.log_path] = new_processor
+                self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
                 # if the log file pending removal, mark that it has now been processed
                 if new_processor.log_path in pending_removal:
@@ -657,7 +765,7 @@ class CopyingManager(StoppableThread):
 
         # checkpoints from different workers may contain checkpoint for the same file,
         # so we sort checkpoints by time and update resulting collection with the same order.
-        non_stale_checkpoints.sort(operator.itemgetter("time"))
+        non_stale_checkpoints.sort(key=operator.itemgetter("time"))
 
         for wc in non_stale_checkpoints:
             result.update(wc["checkpoints"])
@@ -793,7 +901,11 @@ class CopyingManager(StoppableThread):
         result = []
 
         for log_config in configs:
-            result.append(LogMatcher(configuration, log_config))
+            result.append(
+                LogMatcher(
+                    configuration, log_config, log_processor_cls=ProxyLogFileProcessor,
+                )
+            )
 
         return result
 
@@ -921,7 +1033,7 @@ class CopyingManager(StoppableThread):
             self.__lock.acquire()
 
             worker_statuses = dict()
-            for worker_id, worker in self._workers.items():
+            for worker_id, worker in self.__workers.items():
 
                 worker_statuses[worker_id] = worker.generate_status(
                     warn_on_rate_limit=warn_on_rate_limit
@@ -979,6 +1091,11 @@ class CopyingManager(StoppableThread):
 
         return result
 
+    @property
+    def expanded_server_attributes(self):
+        """Return deepcopy of expanded server attributes"""
+        return copy.deepcopy(self.__expanded_server_attributes)
+
     def start_manager(self, scalyr_client, logs_initial_positions=None):
         self.__scalyr_client = scalyr_client
         self._logs_initial_positions = logs_initial_positions
@@ -1010,8 +1127,8 @@ class CopyingManager(StoppableThread):
     def __handle_new_log_processor(self, processor):
         # type: (LogFileProcessor) -> None
 
-        current_worker = list(self._workers.values())[self._current_worker]
-        if self._current_worker == len(self._workers) - 1:
+        current_worker = list(self.__workers.values())[self._current_worker]
+        if self._current_worker == len(self.__workers) - 1:
             self._current_worker = 0
         else:
             self._current_worker += 1
@@ -1055,7 +1172,11 @@ class CopyingManager(StoppableThread):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(self.__config, log_config)
+            matcher = LogMatcher(
+                self.__config,
+                log_config,
+                log_processor_cls=self.__log_processor_factory,
+            )
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -1234,3 +1355,87 @@ class CopyingManager(StoppableThread):
         @rtype: list<LogMatcher>
         """
         return self.__log_matchers
+
+    def distribute_new_processors(self):
+        # type: () -> Dict[six.text_type, List[ProxyLogFileProcessor]]
+        """
+        Group new log_processors by workers.
+        Each log processor is mapped to the worker which is considered as the best option for this log processor.
+        :return:
+        """
+        worker_processors = collections.defaultdict(list)
+
+        for processor in self.__new_log_processors:
+
+            # the magic of the distribution of the log processors happens here.
+            worker = self.find_best_worker_to_processor(processor)
+
+            worker_processors[worker].append(processor)
+
+            self.__worker_processors[worker][processor.log_path] = processor
+
+        self.__new_log_processors = []
+
+        return worker_processors
+
+    def find_best_worker_to_processor(self, processor):
+        # type: (LogFileProcessor) -> CopyingManagerWorker
+        """
+        Find the best worker for the given log processor with given conditions.
+        For example log file handled by processor may be configured to be sent only by particular scalyr account and etc.
+        Now it is just a simple round-robin algorithm.
+        TODO: implement processor->api_key binding.
+        :return:
+        """
+
+        current_worker = list(self.__workers.values())[self._current_worker]
+        if self._current_worker == len(self.__workers) - 1:
+            self._current_worker = 0
+        else:
+            self._current_worker += 1
+
+        return current_worker
+
+    def __interact_with_workers(self):
+        # type: () -> None
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "Start interacting with workers to update statesof the log processors."
+        )
+
+        # get all newly added workers and distribute them among workers according to some chosen balancing logic.
+        new_worker_processors = self.distribute_new_processors()
+
+        active_processors = list()
+        closed_processors = list()
+        for worker_id, worker in self.__workers.items():
+
+            worker_processors = self.__worker_processors[worker]
+            processors_to_close = set()
+            processors_to_close_at_eof = set()
+
+            # prepare information about closed processors for the worker.
+            for processor in worker_processors.values():
+                if processor.state == ProxyLogFileProcessor.CLOSED_AT_EOF:
+                    # this processor is marked to close only when it reaches the EOF.
+                    processor.set_state(ProxyLogFileProcessor.WAITING_CLOSE_AT_EOF)
+                    processors_to_close_at_eof.add(processor.log_path)
+                elif processor.state == ProxyLogFileProcessor.CLOSED:
+                    processors_to_close.add(processor.log_path)
+
+            active, closed = worker.interact(
+                new_processor_spawners=[
+                    processor.get_log_processor_spawner()
+                    for processor in new_worker_processors[worker]
+                ],
+                processors_to_close=processors_to_close,
+                processors_to_close_at_eof=processors_to_close_at_eof
+            )
+            active_processors.extend(active)
+            closed_processors.extend(closed)
+
+        for path in closed_processors:
+            processor = self.__log_processors[path]
+            processor.set_state(ProxyLogFileProcessor.CLOSED)
+            self.__log_processors.pop(path)

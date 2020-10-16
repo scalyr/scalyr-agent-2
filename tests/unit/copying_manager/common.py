@@ -384,7 +384,7 @@ class TestableCopyingManagerWorker(
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
     WAIT_TIMEOUT = 50000.0
 
-    def __init__(self, configuration, worker_id):
+    def __init__(self, configuration, worker_config_entry, worker_id):
         # Approach:  We will override key methods of CopyingManagerWorker, blocking them from returning until the controller
         # tells it to proceed.  This allows us to then do things like write new log lines while the CopyingManager is
         # blocked.   Coordinating the communication between the two threads is done using one condition variable.
@@ -396,7 +396,7 @@ class TestableCopyingManagerWorker(
         # 'sleeping' when it attempts to sleep).  The test controller will manipulate this state, notifying changes on
         # the condition variable. The CopyingManager will block in this state (and indicate it is blocked) until the
         # test controller sets a new state to block at.
-        CopyingManagerWorker.__init__(self, configuration, worker_id)
+        CopyingManagerWorker.__init__(self, configuration, worker_config_entry, worker_id)
         TestableCopyingManagerInterface.__init__(self)
 
         # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
@@ -628,11 +628,6 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
 
         TestableCopyingManagerInterface.__init__(self)
 
-        # this is only for static analyzer.
-        self._workers = (
-            self._workers
-        )  # type: Dict[six.text_type, TestableCopyingManagerWorker]
-
         self.controller = TestableCopyingManager.TestController(self)
 
     def start_manager(
@@ -663,7 +658,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
             responder_callbacks = list()
             requests = list()
             # get requests from every worker
-            for worker in self._workers.values():
+            for worker in self.workers.values():
                 request, responder_callback = worker.controller.wait_for_rpc()
 
                 # save respond callbacks to be able to set responses for requests that were made by workers.
@@ -742,7 +737,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
                 required_transition_state=TestableCopyingManager.SLEEPING,
             )
 
-            for worker in self.__copying_manager._workers.values():
+            for worker in self.__copying_manager.workers.values():
                 worker.controller.perform_scan()
 
         def perform_pipeline_scan(self):

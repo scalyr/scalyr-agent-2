@@ -51,7 +51,7 @@ class TestableLogFile(object):
         return LogMatcher(self._config_builder.config, log_config)
 
     def spawn_log_processors(
-        self, checkpoints=None, copy_at_index_zero=False
+        self, checkpoints=None, copy_at_index_zero=False, log_processor_cls=LogFileProcessor
     ):  # type: (Dict, bool) -> Dict[str, LogFileProcessor]
         matcher = self.spawn_log_matcher_for_log_file()
 

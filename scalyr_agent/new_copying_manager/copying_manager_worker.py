@@ -11,6 +11,9 @@ import datetime
 
 if False:
     from typing import Dict
+    from typing import List
+    from typing import Set
+    from typing import Optional
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import scalyr_logging
@@ -21,9 +24,32 @@ from scalyr_agent.util import StoppableThread, RateLimiter
 from scalyr_agent.agent_status import CopyingManagerWorkerStatus
 
 log = scalyr_logging.getLogger(__name__)
-log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
+#log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 import six
+
+
+class LogProcessorSpawner(object):
+    def __init__(self, *args, **kwargs):
+        self.__args = args
+        self.__log_config = args[2]
+        self.__kwargs = kwargs
+
+    def spawn_log_processor(self):
+        new_processor = LogFileProcessor(*self.__args, **self.__kwargs)
+
+        for rule in self.__log_config["redaction_rules"]:
+            new_processor.add_redacter(
+                rule["match_expression"],
+                rule["replacement"],
+                six.text_type(rule.get("hash_salt", default_value="")),
+            )
+        for rule in self.__log_config["sampling_rules"]:
+            new_processor.add_sampler(
+                rule["match_expression"], rule.get_float("sampling_rate", 1.0),
+            )
+
+        return new_processor
 
 
 class AddEventsTask(object):
@@ -183,13 +209,14 @@ class CopyingParameters(object):
 
 
 class CopyingManagerWorker(StoppableThread):
-    def __init__(self, configuration, worker_id):
+    def __init__(self, configuration, worker_config_entry, worker_id):
         super(CopyingManagerWorker, self).__init__(
             name="copying manager worker thread #%s" % worker_id
         )
 
         self._id = six.text_type(worker_id)
         self.__config = configuration
+        self.__worker_config_entry = worker_config_entry
 
         self.__rate_limiter = None
         if self.__config.parsed_max_send_rate_enforcement:
@@ -219,7 +246,16 @@ class CopyingManagerWorker(StoppableThread):
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
 
-        self.__log_processors = collections.OrderedDict()
+        self.__log_processors = (
+            collections.OrderedDict()
+        )  # type: Dict[six.text_type, LogFileProcessor]
+
+        self.__log_processors_to_close = {}
+        self.__log_processors_to_close_at_eof = []
+        self.__closed_processors = []
+        self.__log_processors_to_remove = []
+
+        self.__log_processors_closed_at_eof = {}
 
         # Temporary collection of recently added log processors.
         # Every log processor which is added during the iteration of the worker is placed in here.
@@ -267,48 +303,30 @@ class CopyingManagerWorker(StoppableThread):
         with self.__lock:
             return self.__log_processors.copy()
 
-    def add_log_processor(self, log_processor):
+    @property
+    def worker_config_entry(self):
+        return self.__worker_config_entry
+
+    def add_log_processors(self, log_processors_infos):
         # type: (LogFileProcessor) -> None
         """
         Add new log_processor.
         """
         with self.__lock:
-            self.__pending_log_processors[log_processor.log_path] = log_processor
+            for info in log_processors_infos:
+                self.__pending_log_processors[info.path] = info.spawn_log_processor()
 
-    def remove_log_processor(self, path):
-
+    def close_processors(self, processors_paths, at_eof=False):
         with self.__lock:
-            processor = self.__log_processors[path]
-            self.__log_processors_scheduled_for_removal[path] = processor
+            for path in processors_paths:
+                processor = self.__log_processors[path]
+                if at_eof:
+                    processor.close_at_eof()
+                else:
+                    processor.close()
 
-    def _add_pending_log_processors(self):
-        """
-
-        """
-
-        self.__lock.acquire()
-
-        new_log_processors = self.__pending_log_processors
-        self.__pending_log_processors = collections.OrderedDict()
-
-        self.__lock.release()
-
-        for path, log_processor in new_log_processors.items():
-            if path in self.__log_processors:
-                log.warning(
-                    "Log processor for file: '{0}' has already been added to worker {1}".format(
-                        path, self.__id
-                    )
-                )
-                continue
-            self.__log_processors[path] = log_processor
-            log.log(
-                scalyr_logging.DEBUG_LEVEL_0,
-                "Log processor for file: '%s' has been added to worker #%s"
-                % (path, self._id),
-            )
-
-    def __remove_scheduled_log_processors(self):
+    def move_closed_processors(self):
+        pass
 
         self.__lock.acquire()
         try:
@@ -430,26 +448,27 @@ class CopyingManagerWorker(StoppableThread):
                             # Tell all of the processors to go to the end of the current log file.  We will start
                             # copying
                             # from there.
-                            for processor in self.__log_processors.values():
-                                processor.skip_to_end(
-                                    "Too long since last successful request to server.",
-                                    "skipNoServerSuccess",
-                                    current_time=current_time,
-                                )
+                            with self.__lock:
+                                for processor in self.__log_processors.values():
+                                    processor.skip_to_end(
+                                        "Too long since last successful request to server.",
+                                        "skipNoServerSuccess",
+                                        current_time=current_time,
+                                    )
 
-                        # add pending log processors.
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_5,
-                            "Start adding pending log processors on worker #%s"
-                            % self._id,
-                        )
-                        self._add_pending_log_processors()
+                        # # add pending log processors.
+                        # log.log(
+                        #     scalyr_logging.DEBUG_LEVEL_5,
+                        #     "Start adding pending log processors on worker #%s"
+                        #     % self._id,
+                        # )
 
                         # Collect log lines to send if we don't have one already.
                         if self.__pending_add_events_task is None:
-                            self.__pending_add_events_task = self.__get_next_add_events_task(
-                                copying_params.current_bytes_allowed_to_send
-                            )
+                            with self.__lock:
+                                self.__pending_add_events_task = self.__get_next_add_events_task(
+                                    copying_params.current_bytes_allowed_to_send
+                                )
                         else:
                             log.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
@@ -459,7 +478,8 @@ class CopyingManagerWorker(StoppableThread):
                             # the statistics for each pending file.  This is important to do for status purposes if we
                             # have not tried to invoke get_next_send_events_task in a while (since that already updates
                             # the statistics).
-                            self.__scan_for_new_bytes(current_time=current_time)
+                            with self.__lock:
+                                self.__scan_for_new_bytes(current_time=current_time)
 
                         # Try to send the request if we have one.
                         if self.__pending_add_events_task is not None:
@@ -487,16 +507,18 @@ class CopyingManagerWorker(StoppableThread):
                                 # have to wait before we send the next request.
                                 pipeline_time = time.time()
                                 self.total_pipelined_requests += 1
-                                self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
-                                    copying_params.current_bytes_allowed_to_send,
-                                    for_pipelining=True,
-                                )
+                                with self.__lock:
+                                    self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
+                                        copying_params.current_bytes_allowed_to_send,
+                                        for_pipelining=True,
+                                    )
                             else:
                                 pipeline_time = 0.0
 
                             # Now block for the response.
                             blocking_response_time_start = time.time()
-                            (result, bytes_sent, full_response) = get_response()
+                            with self.__lock:
+                                (result, bytes_sent, full_response) = get_response()
                             blocking_response_time_end = time.time()
                             self.total_blocking_response_time += (
                                 blocking_response_time_end
@@ -593,18 +615,15 @@ class CopyingManagerWorker(StoppableThread):
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
 
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_2,
-                            "Start removing log processors.",
-                        )
-
-                        # remove all scheduled processors.
-                        self.__remove_scheduled_log_processors()
-
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_2,
-                            "Done removing log processors.",
-                        )
+                        # log.log(
+                        #     scalyr_logging.DEBUG_LEVEL_2,
+                        #     "Start removing log processors.",
+                        # )
+                        #
+                        # log.log(
+                        #     scalyr_logging.DEBUG_LEVEL_2,
+                        #     "Done removing log processors.",
+                        # )
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
@@ -620,7 +639,7 @@ class CopyingManagerWorker(StoppableThread):
                                     )
                                 )
                                 profiler.enable()
-                    except Exception:
+                    except Exception as e:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception(
                             "Failed while attempting to scan and transmit logs"
@@ -638,8 +657,9 @@ class CopyingManagerWorker(StoppableThread):
                         current_time - last_full_checkpoint_write
                         > self.__config.full_checkpoint_interval
                     ):
-                        self.__write_full_checkpoint_state(current_time)
-                        last_full_checkpoint_write = current_time
+                        with self.__lock:
+                            self.__write_full_checkpoint_state(current_time)
+                            last_full_checkpoint_write = current_time
 
                     if pipeline_time < copying_params.current_sleep_interval:
                         self._sleep_but_awaken_if_stopped(
@@ -656,11 +676,12 @@ class CopyingManagerWorker(StoppableThread):
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
-            self.__write_full_checkpoint_state(current_time)
-            for processor in self.__log_processors.values():
-                processor.close()
-            if profiler is not None:
-                profiler.disable()
+            with self.__lock:
+                self.__write_full_checkpoint_state(current_time)
+                for processor in self.__log_processors.values():
+                    processor.close()
+                if profiler is not None:
+                    profiler.disable()
 
         print("WORKER END")
 
@@ -785,6 +806,7 @@ class CopyingManagerWorker(StoppableThread):
                 if keep_it:
                     self.__log_processors[path] = processor
                 else:
+                    self.__log_processors_closed_at_eof[path] = processor
                     processor.close()
 
             return total_bytes_copied
@@ -1027,3 +1049,111 @@ class CopyingManagerWorker(StoppableThread):
     @property
     def worker_id(self):  # type: () -> six.text_type
         return self._id
+
+    def interact(
+        self,
+        new_processor_spawners=None,
+        processors_to_close=None,
+        processors_to_close_at_eof=None
+    ):
+        # type: (Optional[List[LogProcessorSpawner]], Optional[Set[six.text_type]], Optional[Set[six.text_type]]) -> Tuple[Set[six.text_type], Set[six.text_type]
+        """
+        This function does all needed interaction with the worker instance.
+        NOTE: Since workers can work in multiprocessing mode, this function is also the main and single point
+        of the IPC between worker processes and process of the main manager.
+        Due to that this is important to keep all its arguments picklable.
+
+        :param new_processor_spawners: Callables that creates new log processor. As mentioned above,
+        this method gets only picklable objects, so we can not pass a new log processors directly from the master manager.
+        That's why it gets only a "spawner" objects which are just store all information that is needed to create log processor.
+        new processors argument contains only
+        :param processors_to_close: dict that stores information about processors that need to be close
+        where key is a path of the file and value is a bool. If value is True,
+        then processor must be closed only when it reaches "EOF"
+        :return:
+        """
+
+        if processors_to_close:
+            a =10
+
+        if processors_to_close is None:
+            processors_to_close = {}
+
+        if processors_to_close_at_eof is None:
+            processors_to_close_at_eof = {}
+
+        # it is important to create log processors as soon as possible
+        # to open and to keep holding the file descriptor.
+        new_processors = collections.OrderedDict()
+        if new_processor_spawners:
+            for spawner in new_processor_spawners:
+                new_processor = spawner.spawn_log_processor()
+                new_processors[new_processor.log_path] = new_processor
+
+        closed_processors = {}
+        active_processors = set()
+        with self.__lock:
+            # add newly create processors to the main collection.
+            self.__log_processors.update(new_processors)
+            active_processors.update(new_processors)
+
+            # remove closing log processors from the main collection and
+            # store them in separate list to close them outside of the lock.
+            for path, log_processor in list(self.__log_processors.items()):
+                if path in processors_to_close:
+                    closed_processors[path] = log_processor
+                elif path in processors_to_close_at_eof:
+                    log_processor.close_at_eof()
+                else:
+                    active_processors.add(log_processor.log_path)
+
+                # # if log processor is presented this dict that means that it should be closed.
+                # # Also, the returned value shows how exactly log processor should be closed.
+                # is_close_at_eof = processors_to_close.get(path)
+                #
+                # is_removed = False
+                #
+                # if is_close_at_eof is not None:
+                #     if is_close_at_eof:
+                #         # wait for close, do not remove from log processors main collection.
+                #         log_processor.close_at_eof()
+                #     else:
+                #         # prepare to close and remove this log processor.
+                #         is_removed = True
+                # if log_processor.is_closed():
+                #     # also remove log processor if it was closed by itself.
+                #     is_removed = True
+                #
+                # if is_removed:
+                #     # if processor is closed immediately, so we also remove it from the main collection.
+                #     self.__log_processors.pop(path)
+                #     # also add it to separate collection to be able to close all processors outside of the lock.
+                #     self.__log_processors.pop(log_processor.log_path)
+                #     closed_processors[log_processor.log_path] = log_processor
+                # else:
+                #     active_processors.add(log_processor.log_path)
+
+            closed_processors.update(self.__log_processors_closed_at_eof)
+            self.__log_processors_closed_at_eof = {}
+
+
+
+        # finally close needed log processors.
+        for processor in closed_processors.values():
+            processor.close()
+
+
+
+
+
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "Worker #{0} has interacted with copying manager. Log file processors active: [{1}], closed [{2}]".format(
+                self._id,
+                "".join(active_processors),
+                "".join(closed_processors)
+            )
+        )
+
+        return active_processors, set(closed_processors)

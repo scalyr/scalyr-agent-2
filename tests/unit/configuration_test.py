@@ -27,6 +27,7 @@ import tempfile
 from io import open
 
 import mock
+import pytest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -2677,3 +2678,128 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(config.win32_max_open_fds, 1024)
+
+
+class TestShardedManagerConfiguration(TestConfigurationBase):
+    def test_no_workers_entry_(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # only defaults are created.
+        assert config.worker_configs == JsonArray(
+            JsonObject(number=2, api_key=config.api_key)
+        )
+
+    def test_empty_workers_entry(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there"
+                workers: [
+
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.worker_configs == JsonArray(
+            JsonObject(number=2, api_key=config.api_key)
+        )
+
+    def test_default_worker_no_api_key(self):
+        # the first worker config entry is default so if api key is not specified, it uses main api_key.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "number": 3
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.worker_configs == JsonArray(
+            JsonObject(number=3, api_key=config.api_key)
+        )
+
+    def test_default_worker_and_invalid_second(self):
+        # secong log entry is empty, this is not allowed.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "number": 3
+                    },
+                    {
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration):
+            config.parse()
+
+        # second entry does not have api_key.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "number": 3
+                    },
+                    {
+                        "number": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration):
+            config.parse()
+
+    def test_default_worker_with_second(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "number": 3
+                    },
+                    {
+                        api_key: "key2"
+                        "number": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.worker_configs) == 2
+        assert config.worker_configs[0] == JsonObject(number=3, api_key=config.api_key)
+        assert config.worker_configs[1] == JsonObject(number=4, api_key="key2")

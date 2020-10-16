@@ -40,6 +40,7 @@ import string
 import threading
 import time
 import uuid
+import abc
 from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -1983,7 +1984,21 @@ class LogFileIterator(object):
             return self.__data_position
 
 
-class LogFileProcessor(object):
+@six.add_metaclass(abc.ABCMeta)
+class AbstractLogFileProcessor(object):
+    @abc.abstractmethod
+    def close(self):
+        pass
+
+    @abc.abstractmethod
+    def close_at_eof(self):
+        pass
+
+
+
+
+
+class LogFileProcessor(AbstractLogFileProcessor):
     """Performs all processing on a single log file (identified by a path) including returning which lines are ready
     to be sent to the server after applying any sampling and redaction rules.
     """
@@ -3072,7 +3087,7 @@ class LogMatcher(object):
     log when sent to the server.
     """
 
-    def __init__(self, overall_config, log_entry_config, file_system=None):
+    def __init__(self, overall_config, log_entry_config, file_system=None, log_processor_cls=LogFileProcessor):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
             processed such as ``max_line_length``.
@@ -3090,6 +3105,8 @@ class LogMatcher(object):
         else:
             self.__file_system = file_system
         self.__overall_config = overall_config
+
+        self.__log_processor_cls = log_processor_cls
 
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
@@ -3270,9 +3287,10 @@ class LogMatcher(object):
         @rtype: list of LogFileProcessor
         """
         if not self.__is_glob and self.log_path in existing_processors:
-            existing_processors[self.log_path].add_missing_attributes(
-                self.__log_entry_config["attributes"]
-            )
+            # TODO: adapt to sharded copying manager.
+            # existing_processors[self.log_path].add_missing_attributes(
+            #     self.__log_entry_config["attributes"]
+            # )
             return []
 
         self.__lock.acquire()
@@ -3355,7 +3373,7 @@ class LogMatcher(object):
                             log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(
+                    new_processor = self.__log_processor_cls(
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,

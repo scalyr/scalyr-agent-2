@@ -15,6 +15,7 @@ from tests.unit.copying_manager.common import (
 )
 
 log = scalyr_logging.getLogger(__name__)
+log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
 
 class CopyingManagerTest(CopyingManagerCommonTest):
@@ -25,6 +26,10 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         use_pipelining=False,
         config_data=None,
     ):  # type: (int, bool, bool, Dict) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
+
+        if config_data is None:
+            config_data = {"workers": [{"number": 2}, {"number": 2, "api_key": "key"}]}
+
         self._create_config(
             log_files_number=log_files_number,
             use_pipelining=use_pipelining,
@@ -41,6 +46,16 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 
 
 class Test(CopyingManagerTest):
+    def test_workers(self):
+
+        config_data = {"workers": [{"number": 3}, {"number": 2, "api_key": "key"}]}
+
+        (test_file, test_file2), manager = self._create_manager_instanse(
+            2, config_data=config_data
+        )
+
+        assert len(manager.workers) == 5
+
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
 

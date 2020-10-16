@@ -109,6 +109,8 @@ class Configuration(object):
         # are created by default by the platform.
         self.__monitor_configs = []
 
+        self.__worker_configs = []
+
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
@@ -1326,6 +1328,10 @@ class Configuration(object):
         Returns value of the win32_max_open_fds config option which is Windows specific.
         """
         return self.__get_config().get_int("win32_max_open_fds")
+
+    @property
+    def worker_configs(self):
+        return self.__get_config().get_json_array("workers")
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -2702,7 +2708,7 @@ class Configuration(object):
         if config_val is not None:
             return config_val
 
-        config_object.update({param_name: env_val})
+        config_object.interact({param_name: env_val})
         return env_val
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
@@ -2721,6 +2727,7 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
+        self.__verify_or_set_optional_array(config, "workers", description)
 
         i = 0
         for log_entry in config.get_json_array("logs"):
@@ -2752,6 +2759,17 @@ class Configuration(object):
                 monitor_entry, file_path=file_path, entry_index=i
             )
             i += 1
+
+        workers = config.get_json_array("workers")
+        if not workers:
+            # Add first worker config entry. This entry acts like default.
+            # The default entry do not need to have "api_key" because it uses main "api_key"
+            workers.add(JsonObject(number=2, api_key=self.api_key))
+
+        for i, worker_entry in enumerate(config.get_json_array("workers")):
+            self.__verify_worker_entry_and_set_dafaults(
+                worker_entry, entry_index=i, description=description
+            )
 
     def __verify_k8s_log_entry_and_set_defaults(
         self, log_entry, description=None, config_file_path=None, entry_index=None,
@@ -3037,6 +3055,24 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             monitor_entry, "log_path", module_name + ".log", description
         )
+
+    def __verify_worker_entry_and_set_dafaults(
+        self, worker_entry, entry_index=None, description=None
+    ):
+        description = "worker entry #{0}".format(entry_index)
+
+        if entry_index > 0:
+            # this is not default worker entry, so it should have all fields.
+            self.__verify_required_string(
+                worker_entry, "api_key", config_description=description
+            )
+            self.__verify_required_string(
+                worker_entry, "number", config_description=description
+            )
+        else:
+            if "api_key" not in worker_entry:
+                worker_entry["api_key"] = self.api_key
+
 
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
         """Merges the contents of the server attribute read from a configuration fragment to the main config object.
