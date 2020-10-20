@@ -1715,6 +1715,11 @@ def _get_containers(
                 short_cid = _get_short_cid(cid)
 
                 if ignore_container is not None and cid == ignore_container:
+                    logger.log(
+                        scalyr_logging.DEBUG_LEVEL_2,
+                        "Excluding container '%s' based on `ignore_container`, %s"
+                        % (short_cid, ignore_container,),
+                    )
                     continue
 
                 # Note we need to *include* results that were created after the 'running_or_created_after' time.
@@ -1732,6 +1737,11 @@ def _get_containers(
 
                 # ignore containers that are old and dead and whose logs are already being copied
                 if is_old_dead_container and not pending_first_use:
+                    logger.log(
+                        scalyr_logging.DEBUG_LEVEL_2,
+                        "Excluding container '%s' based on `is_old_dead_contaienr` %s, and `pending_first_use` %s"
+                        % (short_cid, is_old_dead_container, pending_first_use,),
+                    )
                     continue
 
                 if len(container["Names"]) > 0:
@@ -1743,6 +1753,11 @@ def _get_containers(
                             "io.kubernetes.docker.type", ""
                         )
                         if container_type == "podsandbox":
+                            logger.log(
+                                scalyr_logging.DEBUG_LEVEL_2,
+                                "Excluding container '%s' because it is a pod sandbox"
+                                % (short_cid,),
+                            )
                             continue
 
                     add_container = True
@@ -1754,7 +1769,13 @@ def _get_containers(
                                 add_container = True
                                 break
 
-                    if add_container:
+                    if not add_container:
+                        logger.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Excluding ontainer '%s' because `glob_list` is defined and does not contain it"
+                            % (short_cid,),
+                        )
+                    else:
                         log_path = None
                         k8s_info = None
                         status = None
@@ -1771,7 +1792,13 @@ def _get_containers(
                                 if not only_running_containers:
                                     status = info["State"]["Status"]
 
-                                if k8s_cache is not None:
+                                if k8s_cache is None:
+                                    logger.log(
+                                        scalyr_logging.DEBUG_LEVEL_2,
+                                        "Skipping interesting work for container '%s' because `k8s_cache` is None"
+                                        % (short_cid,),
+                                    )
+                                else:
                                     config = info.get("Config", {})
                                     labels = config.get("Labels", {})
 
@@ -1803,9 +1830,19 @@ def _get_containers(
                                         )
 
                                     if (
-                                        "pod_name" in k8s_info
-                                        and "pod_namespace" in k8s_info
+                                        "pod_name" not in k8s_info
+                                        or "pod_namespace" not in k8s_info
                                     ):
+                                        logger.log(
+                                            scalyr_logging.DEBUG_LEVEL_2,
+                                            "Skipping interesting work for container '%s' because `k8s_info` is incomplete. 'pod_name' present: %s. 'pod_namespace' present: %s"
+                                            % (
+                                                short_cid,
+                                                "pod_name" in k8s_info,
+                                                "pod_namespace" in k8s_info,
+                                            ),
+                                        )
+                                    else:
                                         # TODOOcz:
                                         if (
                                             k8s_info["pod_namespace"]
@@ -1924,6 +1961,12 @@ def _get_containers(
                                     limit_once_per_x_secs=300,
                                     limit_key="docker-api-inspect",
                                 )
+                        else:
+                            logger.log(
+                                scalyr_logging.DEBUG_LEVEL_2,
+                                "No log_path for container '%s' because `include_log_path` %s, and `k8s_cache` %s"
+                                % (short_cid, include_log_path, k8s_cache,),
+                            )
 
                         result[cid] = {"name": name, "log_path": log_path}
 
@@ -1935,6 +1978,10 @@ def _get_containers(
 
                 else:
                     result[cid] = {"name": cid, "log_path": None}
+                    logger.log(
+                        scalyr_logging.DEBUG_LEVEL_2,
+                        "Found no container names for '%s'" % (short_cid,),
+                    )
         finally:
             if controlled_warmer is not None:
                 controlled_warmer.end_marking()
