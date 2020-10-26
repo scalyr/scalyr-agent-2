@@ -207,43 +207,6 @@ class AddEventsTask(object):
         self.next_pipelined_task = None
 
 
-class CopyingManagerWorkerPool(object):
-    def __init__(self, workers):
-        self.workers = workers
-        self.__current_worker = 0
-
-    def find_next_worker(self):
-        current_worker = self.workers[self.__current_worker]
-        if self.__current_worker == len(self.workers) - 1:
-            self.__current_worker = 0
-        else:
-            self.__current_worker += 1
-
-        return current_worker
-
-    @classmethod
-    def create_pool_from_config(cls, config, worker_config):
-        pool_id = worker_config["id"]
-
-        workers = []
-        for i in range(worker_config["workers"]):
-
-            # combine workers positional number in pool and poll id.
-            worker_id = "%s_%s" % (pool_id, i)
-
-            worker = CopyingManagerWorker(
-                config, worker_config, worker_id=worker_id
-            )
-            workers.append(worker)
-            log.log(
-                scalyr_logging.DEBUG_LEVEL_1,
-                "CopyingManagerWorker #%s is created." % worker.worker_id,
-            )
-        pool = cls(workers)
-
-        return pool
-
-
 class ShardedCopyingManager(StoppableThread):
     def __init__(self, configuration, monitors):
         # type: (Configuration, List) -> None
@@ -1441,6 +1404,42 @@ class ShardedCopyingManager(StoppableThread):
             session_stats[worker.worker_id] = worker.scalyr_client.generate_status()
 
         return session_stats
+
+class CopyingManagerWorkerPool(object):
+    def __init__(self, workers):
+        self.workers = workers
+        self.__current_worker = 0
+
+    def find_next_worker(self):
+        current_worker = self.workers[self.__current_worker]
+        if self.__current_worker == len(self.workers) - 1:
+            self.__current_worker = 0
+        else:
+            self.__current_worker += 1
+
+        return current_worker
+
+    @classmethod
+    def create_pool_from_config(cls, config, worker_config):
+        pool_id = worker_config["id"]
+
+        workers = []
+        for i in range(worker_config["workers"]):
+
+            # combine workers positional number in pool and poll id.
+            worker_id = "%s_%s" % (pool_id, i)
+
+            worker = CopyingManagerWorker(
+                config, worker_config, worker_id=worker_id
+            )
+            workers.append(worker)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "CopyingManagerWorker #%s is created." % worker.worker_id,
+            )
+        pool = cls(workers)
+
+        return pool
 
 
 class CopyingManagerWorker2(StoppableThread):
