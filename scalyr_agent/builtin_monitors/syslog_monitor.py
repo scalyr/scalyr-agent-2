@@ -528,10 +528,12 @@ class SyslogRequestParser(object):
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data
             if frame_end == -1:
+                # TODO: Add a safe guard and abort if we failed to fill the buffer in X seconds or
+                # if message size is more than X bytes
 
                 # if the remaining bytes exceed the maximum buffer size, issue a warning
                 # and dump existing contents to the handler
-                if size - self._offset >= self._max_buffer_size:
+                if size - self._offset >= self._max_buffer_size and False:
                     global_log.warning(
                         "Syslog frame exceeded maximum buffer size",
                         limit_once_per_x_secs=300,
@@ -1215,12 +1217,10 @@ class SyslogServer(object):
                 docker_logging=docker_logging, accept_remote=accept_remote
             )
             if protocol == "tcp":
+                tcp_buffer_size = config.get("tcp_buffer_size")
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting TCP Server")
                 server = SyslogTCPServer(
-                    port,
-                    config.get("tcp_buffer_size"),
-                    bind_address=bind_address,
-                    verifier=verifier,
+                    port, tcp_buffer_size, bind_address=bind_address, verifier=verifier,
                 )
             elif protocol == "udp":
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")

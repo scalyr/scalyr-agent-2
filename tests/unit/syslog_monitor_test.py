@@ -18,6 +18,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
+
+if False:
+    from typing import List
+
 __author__ = "imron@scalyr.com"
 
 import time
@@ -36,6 +41,7 @@ from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
+from scalyr_agent.scalyr_monitor import MonitorInformation
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -336,6 +342,13 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.handler = logging.StreamHandler(self.stream)
         self.logger.addHandler(self.handler)
 
+        # Allow tcp_buffer_size to be set to less than 2k
+        for option in MonitorInformation.__monitor_info__[
+            "scalyr_agent.builtin_monitors.syslog_monitor"
+        ].config_options:
+            if option.option_name == "tcp_buffer_size":
+                option.min_value = 0
+
         # hide stdout
         self.old = sys.stdout
 
@@ -363,8 +376,11 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.handler.close()
 
         # restore stdout
-        self.dummy_stream.close()
         sys.stdout = self.old
+
+        # Print any accumulated stdout at the end for ease of debugging
+        print((self.dummy_stream.getvalue()))
+        self.dummy_stream.close()
 
     def connect(self, socket, addr, max_tries=3):
         connected = False
@@ -387,22 +403,108 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         :param dest_addr: if not None, sends 'data' via UDP.
         :param expected_line_count: number of expected lines.
         :type dest_addr: tuple
-        :type data: six.text_type
+        :type data: six.text_type or list of six.text_type
         """
-        data = data.encode("utf-8")
+        data_to_send = []  # type: List[bytes]
+
+        if not isinstance(data, list):
+            data_to_send = [data]
+        else:
+            data_to_send = data
 
         if dest_addr is None:
-            sock.sendall(data)
+            for chunk in data_to_send:
+                if not isinstance(chunk, six.binary_type):
+                    chunk = chunk.encode("utf-8")
+                sock.sendall(chunk)
         else:
-            sock.sendto(data, dest_addr)
+            for chunk in data_to_send:
+                if not isinstance(chunk, six.binary_type):
+                    chunk = chunk.encode("utf-8")
+                sock.sendto(chunk, dest_addr)
+
         self.monitor.wait_for_new_lines(expected_line_number=expected_line_count)
 
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_run_tcp_server(self):
+    def test_run_tcp_server_small_tcp_buffer_size(self):
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "tcp:8514",
+            "log_flush_delay": 0.0,
+            "tcp_buffer_size": 5,
+        }
 
+        self.monitor = TestSyslogMonitor(config, self.logger)
+        self.monitor.open_metric_log()
+
+        self.monitor.start()
+        time.sleep(0.05)
+
+        s = socket.socket(socket.AF_INET)
+        self.sockets.append(s)
+
+        self.connect(s, ("localhost", 8514))
+
+        # Single line which is sent as part of a single TCP send call which exceeds the buffer size
+        self._reported_lines_count = 0
+
+        expected_line1 = "TCP TestXX Foo bar baz"
+        self.send_and_wait_for_lines(s, expected_line1 + "\n", expected_line_count=1)
+
+        # Single line which is split across multiple TCP packets
+        self._reported_lines_count = 0
+
+        expected_line2_partial_1 = "Hello "
+        expected_line2_partial_2 = "Howdy "
+        expected_line2_partial_3 = "stranger bar foo bar ponies"
+        expected_line2 = (
+            expected_line2_partial_1
+            + expected_line2_partial_2
+            + expected_line2_partial_3
+        )
+        self.send_and_wait_for_lines(
+            s,
+            [
+                expected_line2_partial_1,
+                expected_line2_partial_2,
+                expected_line2_partial_3 + "\n",
+            ],
+            expected_line_count=1,
+        )
+
+        # Multiple lines which exceed tcp buffer size
+        # NOTE: It's important we reset _reported_lines_count between each test scenario
+        self._reported_lines_count = 0
+
+        expected_line3 = "hello this is line one\nbut also line two\nand maybe also line three\nand so on and so on"
+        self.send_and_wait_for_lines(s, expected_line3 + "\n", expected_line_count=4)
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
+        self.monitor.stop(wait_on_join=False)
+        self.monitor = None
+
+        with open("agent_syslog.log", "r") as fp:
+            actual = fp.read().strip()
+
+        self.assertTrue(
+            expected_line1 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_line1, actual),
+        )
+        self.assertTrue(
+            expected_line2 in actual,
+            "Unable to find '%s' in output:\n\t %s" % (expected_line2, actual),
+        )
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_run_tcp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
