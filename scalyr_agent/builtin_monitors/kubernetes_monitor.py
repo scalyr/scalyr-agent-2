@@ -4158,14 +4158,19 @@ cluster.
             )
             self.__report_k8s_metrics = False
 
-        always_use_docker = self._config.get("k8s_always_use_docker")
-        always_use_cri = self._config.get("k8s_always_use_cri")
-        container_runtime = self.__container_checker._container_runtime
+        if self.__log_mode != "syslog":
+            always_use_docker = self._config.get("k8s_always_use_docker")
+            always_use_cri = self._config.get("k8s_always_use_cri")
+            container_runtime = self.__container_checker._container_runtime
 
-        if always_use_docker or (container_runtime == "docker" and not always_use_cri):
-            container_list_mode = "docker"
+            if always_use_docker or (
+                container_runtime == "docker" and not always_use_cri
+            ):
+                container_list_mode = "docker"
+            else:
+                container_list_mode = "cri (fs)"
         else:
-            container_list_mode = "cri (fs)"
+            container_list_mode = "none (in syslog mode)"
 
         global_log.info(
             (
