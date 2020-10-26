@@ -85,7 +85,8 @@ from optparse import OptionParser
 
 from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
-from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.scalyr_client import create_client
+from scalyr_agent.copying_manager import ShardedCopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus
@@ -171,8 +172,6 @@ class ScalyrAgent(object):
         self.__copying_manager = None
         # The current monitors manager.
         self.__monitors_manager = None
-        # The current ScalyrClientSession to use for sending requests.
-        self.__scalyr_client = None
 
         # Tracks whether or not the agent should still be running.  When a terminate signal is received,
         # the run state is set to false.  Threads are expected to notice this and finish as quickly as
@@ -422,7 +421,7 @@ class ScalyrAgent(object):
                 log.info("verify_config - creation of copying manager disabled")
                 return False
 
-            copying_manager = CopyingManager(config, monitors_manager.monitors)
+            copying_manager = ShardedCopyingManager(config, monitors_manager.monitors)
             # To do the full verification, we have to create the managers.  However, this call does not need them,
             # but it is very likely the caller of this method will invoke ``__create_worker_thread`` next, so let's
             # save them for that call.  This helps us avoid having to read and instantiate the monitors multiple times.
@@ -508,7 +507,7 @@ class ScalyrAgent(object):
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
         if not no_check_remote:
-            client = self.__create_client(quiet=True)
+            client = create_client(self.__config, quiet=True)
             try:
                 ping_result = client.ping()
                 if ping_result != "success":
@@ -1011,15 +1010,13 @@ class ScalyrAgent(object):
                 config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
-                self.__scalyr_client = self.__create_client()
-
                 def start_worker_thread(config, logs_initial_positions=None):
                     wt = self.__create_worker_thread(config)
                     # attach callbacks before starting monitors
                     wt.monitors_manager.set_user_agent_augment_callback(
-                        self.__scalyr_client.augment_user_agent
+                        wt.copying_manager.augment_user_agent_for_workers_sessions
                     )
-                    wt.start(self.__scalyr_client, logs_initial_positions)
+                    wt.start(logs_initial_positions)
                     return wt, wt.copying_manager, wt.monitors_manager
 
                 (
@@ -1291,7 +1288,6 @@ class ScalyrAgent(object):
 
                     prev_server = scalyr_server
 
-                    self.__scalyr_client = self.__create_client()
 
                     log.info("Starting new copying and metrics threads")
                     (
@@ -1379,62 +1375,6 @@ class ScalyrAgent(object):
         ]
 
         scalyr_logging.set_log_level(levels[debug_level])
-
-    def __create_client(self, quiet=False):
-        """Creates and returns a new client to the Scalyr servers.
-
-        @param quiet: If true, only errors should be written to stdout.
-        @type quiet: bool
-
-        @return: The client to use for sending requests to Scalyr, using the server address and API write logs
-            key in the configuration file.
-        @rtype: ScalyrClientSession
-        """
-        if self.__config.verify_server_certificate:
-            is_dev_install = INSTALL_TYPE == DEV_INSTALL
-            is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
-
-            ca_file = self.__config.ca_cert_path
-            intermediate_certs_file = self.__config.intermediate_certs_path
-
-            # Validate provided CA cert file and intermediate cert file exists. If they don't
-            # exist, throw and fail early and loudly
-            if not is_dev_install and not os.path.isfile(ca_file):
-                raise ValueError(
-                    'Invalid path "%s" specified for the "ca_cert_path" config '
-                    "option: file does not exist" % (ca_file)
-                )
-
-            # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
-            # under the MSI / Windows install
-            if not is_dev_or_msi_install and not os.path.isfile(
-                intermediate_certs_file
-            ):
-                raise ValueError(
-                    'Invalid path "%s" specified for the '
-                    '"intermediate_certs_path" config '
-                    "option: file does not exist" % (intermediate_certs_file)
-                )
-        else:
-            ca_file = None
-            intermediate_certs_file = None
-        use_requests_lib = self.__config.use_requests_lib
-        return ScalyrClientSession(
-            self.__config.scalyr_server,
-            self.__config.api_key,
-            SCALYR_VERSION,
-            quiet=quiet,
-            request_deadline=self.__config.request_deadline,
-            ca_file=ca_file,
-            intermediate_certs_file=intermediate_certs_file,
-            use_requests_lib=use_requests_lib,
-            compression_type=self.__config.compression_type,
-            compression_level=self.__config.compression_level,
-            proxies=self.__config.network_proxies,
-            disable_send_requests=self.__config.disable_send_requests,
-            disable_logfile_addevents_format=self.__config.disable_logfile_addevents_format,
-            enforce_monotonic_timestamps=self.__config.enforce_monotonic_timestamps,
-        )
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
@@ -1769,24 +1709,28 @@ class ScalyrAgent(object):
                 )
                 delta_stats.total_monitor_errors += monitor_status.errors
 
-        delta_stats.total_requests_sent = self.__scalyr_client.total_requests_sent
-        delta_stats.total_requests_failed = self.__scalyr_client.total_requests_failed
-        delta_stats.total_request_bytes_sent = (
-            self.__scalyr_client.total_request_bytes_sent
-        )
-        delta_stats.total_compressed_request_bytes_sent = (
-            self.__scalyr_client.total_compressed_request_bytes_sent
-        )
-        delta_stats.total_response_bytes_received = (
-            self.__scalyr_client.total_response_bytes_received
-        )
-        delta_stats.total_request_latency_secs = (
-            self.__scalyr_client.total_request_latency_secs
-        )
-        delta_stats.total_connections_created = (
-            self.__scalyr_client.total_connections_created
-        )
-        delta_stats.total_compression_time = self.__scalyr_client.total_compression_time
+        # get client session states from all workers of the copying manager and sup up all their stats.
+        session_states = self.__copying_manager.get_worker_session_statuses()
+        for session_state in session_states.values():
+
+            delta_stats.total_requests_sent += session_state.total_requests_sent
+            delta_stats.total_requests_failed += session_state.total_requests_failed
+            delta_stats.total_request_bytes_sent += (
+                session_state.total_request_bytes_sent
+            )
+            delta_stats.total_compressed_request_bytes_sent += (
+                session_state.total_compressed_request_bytes_sent
+            )
+            delta_stats.total_response_bytes_received += (
+                session_state.total_response_bytes_received
+            )
+            delta_stats.total_request_latency_secs += (
+                session_state.total_request_latency_secs
+            )
+            delta_stats.total_connections_created += (
+                session_state.total_connections_created
+            )
+            delta_stats.total_compression_time += session_state.total_compression_time
 
         # Add in the latest stats to the stats before the last restart.
         result = delta_stats + base_overall_stats
@@ -1928,17 +1872,13 @@ class WorkerThread(object):
     """
 
     def __init__(self, configuration, copying_manager, monitors):
-        self.__scalyr_client = None
         self.config = configuration
         self.copying_manager = copying_manager
         self.monitors_manager = monitors
 
-    def start(self, scalyr_client, log_initial_positions=None):
-        if self.__scalyr_client is not None:
-            self.__scalyr_client.close()
-        self.__scalyr_client = scalyr_client
+    def start(self, log_initial_positions=None):
 
-        self.copying_manager.start_manager(scalyr_client, log_initial_positions)
+        self.copying_manager.start_manager(log_initial_positions)
         # We purposely wait for the copying manager to begin copying so that if the monitors create any new
         # files, they will be guaranteed to be copying up to the server starting at byte index zero.
         # Note, if copying never begins then the copying manager will sys exit, so this next call will never just
@@ -1952,10 +1892,6 @@ class WorkerThread(object):
 
         log.debug("Shutting copy monitors")
         self.copying_manager.stop_manager()
-
-        log.debug("Shutting client")
-        if self.__scalyr_client is not None:
-            self.__scalyr_client.close()
 
 
 if __name__ == "__main__":

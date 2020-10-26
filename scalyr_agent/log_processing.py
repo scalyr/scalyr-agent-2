@@ -2076,6 +2076,7 @@ class LogFileProcessor(AbstractLogFileProcessor):
 
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
+        self.__is_marked_to_be_closed = False
 
         # Tracks whether the processor has recently logged data
         self.__is_active = False
@@ -2220,6 +2221,25 @@ class LogFileProcessor(AbstractLogFileProcessor):
         result = self.__is_closed
         self.__lock.release()
         return result
+
+    def mark_to_close(self):
+        """
+        Set special flag for the log file processor as "to be closed",
+        so other entities, which may be responsible for processors removal, can remove them in a deferred fashion,
+        so there is no need to worry about synchronization.
+        """
+        with self.__lock:
+            self.__is_marked_to_be_closed = True
+
+    @property
+    def is_marked_to_be_closed(self):
+        # type: () -> bool
+        """
+        Other related entities, which may be responsible for processors removal,
+        can use this property to remove the logprocessor.
+        """
+        with self.__lock:
+            return self.__is_marked_to_be_closed
 
     @property
     def unique_id(self):
@@ -2734,6 +2754,7 @@ class LogFileProcessor(AbstractLogFileProcessor):
         finally:
             self.__lock.release()
 
+
     def get_checkpoint(self):
         return self.__log_file_iterator.get_mark_checkpoint()
 
@@ -3125,6 +3146,10 @@ class LogMatcher(object):
         # The time in seconds past epoch when we last checked for new files that match the glob.
         self.__last_check = None
 
+    @property
+    def log_entry_config(self):
+        return self.__log_entry_config
+
     def update_log_entry_config(self, log_entry_config):
         """
         Updates the log config for the log matcher and any of its processors.
@@ -3167,7 +3192,7 @@ class LogMatcher(object):
             # get checkpoints and close all processors
             for p in self.__processors:
                 result[p.log_path] = p.get_checkpoint()
-                p.close()
+                p.mark_to_close()
 
             self.__processors = []
         finally:
@@ -3209,7 +3234,7 @@ class LogMatcher(object):
             # otherwise set them to close when they reach eof
             for processor in self.__processors:
                 if immediately:
-                    processor.close()
+                    processor.mark_to_close()
                 else:
                     processor.close_at_eof()
         finally:

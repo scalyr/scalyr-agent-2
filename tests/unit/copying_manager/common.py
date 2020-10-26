@@ -6,12 +6,17 @@ from __future__ import print_function
 import threading
 import time
 import itertools
+import json
 
 import unittest
 from contextlib import contextmanager
 
-from scalyr_agent.new_copying_manager.copying_manager import CopyingManager
-from scalyr_agent.new_copying_manager.copying_manager_worker import CopyingManagerWorker
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
+
+from scalyr_agent.copying_manager import CopyingManagerWorker
 from tests.unit.copying_manager.config_builder import TestableLogFile
 
 if False:
@@ -27,6 +32,7 @@ import six
 
 from scalyr_agent import test_util
 from tests.unit.copying_manager.config_builder import ConfigBuilder
+from scalyr_agent.copying_manager import ShardedCopyingManager
 
 from scalyr_agent.scalyr_client import AddEventsRequest
 
@@ -398,6 +404,7 @@ class TestableCopyingManagerWorker(
         # test controller sets a new state to block at.
         CopyingManagerWorker.__init__(self, configuration, worker_config_entry, worker_id)
         TestableCopyingManagerInterface.__init__(self)
+        self.__config = configuration
 
         # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
         self.__captured_request = None
@@ -491,7 +498,7 @@ class TestableCopyingManagerWorker(
         """
         if scalyr_client is None:
             scalyr_client = dict(fake_client=True)
-        super(TestableCopyingManagerWorker, self).start_worker(scalyr_client)
+        super(TestableCopyingManagerWorker, self).start_worker()
 
         if stop_at:
             self.run_and_stop_at(stop_at)
@@ -516,6 +523,33 @@ class TestableCopyingManagerWorker(
         CopyingManagerWorker.stop_worker(
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
+
+    def __create_client(self, quiet=False):
+        pass
+
+    @property
+    def checkpoints_path(self):
+        checkpoints_dir_path = pathlib.Path(self.__config.agent_data_path, "checkpoints")
+        file_name = "checkpoints-%s.json" % self.worker_id
+        return checkpoints_dir_path / file_name
+
+    @property
+    def active_checkpoints_path(self):
+        checkpoints_dir_path = pathlib.Path(self.__config.agent_data_path, "checkpoints")
+        file_name = "active-checkpoints-%s.json" % self.worker_id
+        return checkpoints_dir_path / file_name
+
+    def get_checkpoints(self):
+        checkpoints = json.loads(self.checkpoints_path.read_text())
+        active_checkpoints = json.loads(self.active_checkpoints_path.read_text())
+
+        return checkpoints, active_checkpoints
+
+    def write_checkpoints(self, path, data):
+        # type: (pathlib.Path, Dict) -> None
+        path.write_text(six.ensure_text(json.dumps(data)))
+
+
 
     class TestController(object):
         """Used to control the TestableCopyingManagerWorker.
@@ -600,35 +634,42 @@ class TestableCopyingManagerWorker(
             self.__copying_worker.stop_worker()
 
 
-class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
+class TestableShardedCopyingManager(ShardedCopyingManager, TestableCopyingManagerInterface):
     """
     Since the real copying happens in the workers of the CopyingManager, this abstraction
     is used to synchronize its worker instances.
     """
 
     def __init__(self, configuration, monitors):
+        ShardedCopyingManager.__init__(self, configuration, monitors)
+        TestableCopyingManagerInterface.__init__(self)
 
+        self.controller = TestableShardedCopyingManager.TestController(self)
+
+    @property
+    def workers(self):
+        # type: () -> List[TestableCopyingManagerWorker]
+        return super(TestableShardedCopyingManager, self).workers
+
+
+    def _create_worker_pools(self):
         # We are going to control the flow of our
         # workers by using 'TestableCopyingManagerWorker' subclass of the 'CopyingManagerWorker'
         # that's why we need change original worker class by testable class.
-        from scalyr_agent.new_copying_manager import copying_manager
+        from scalyr_agent import copying_manager
 
         # save original class of the CopyingManager from 'copying_manager' module
-        original = copying_manager.CopyingManager
+        original = copying_manager.CopyingManagerWorker
 
         # replace original class by testable.
         copying_manager.CopyingManagerWorker = TestableCopyingManagerWorker
 
         try:
-            # invoke constructor which should initialize testable workers.
-            CopyingManager.__init__(self, configuration, monitors)
+            super(TestableShardedCopyingManager, self)._create_worker_pools()
         finally:
             # return back original worker class.
-            copying_manager.CopyingManager = original
+            copying_manager.CopyingManagerWorker = original
 
-        TestableCopyingManagerInterface.__init__(self)
-
-        self.controller = TestableCopyingManager.TestController(self)
 
     def start_manager(
         self, scalyr_client=None, logs_initial_positions=None,
@@ -639,7 +680,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
 
         if scalyr_client is None:
             scalyr_client = dict(fake_client=True)
-        super(TestableCopyingManager, self).start_manager(
+        super(TestableShardedCopyingManager, self).start_manager(
             scalyr_client, logs_initial_positions=logs_initial_positions
         )
 
@@ -658,7 +699,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
             responder_callbacks = list()
             requests = list()
             # get requests from every worker
-            for worker in self.workers.values():
+            for worker in self.workers:
                 request, responder_callback = worker.controller.wait_for_rpc()
 
                 # save respond callbacks to be able to set responses for requests that were made by workers.
@@ -711,7 +752,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         self._test_state_cv.notifyAll()
         self._test_state_cv.release()
 
-        CopyingManager.stop_manager(
+        ShardedCopyingManager.stop_manager(
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
 
@@ -733,11 +774,11 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
 
             # We guarantee it has scanned by making sure it has gone from sleeping to sending.
             self.__copying_manager.run_and_stop_at(
-                TestableCopyingManager.SENDING,
-                required_transition_state=TestableCopyingManager.SLEEPING,
+                TestableShardedCopyingManager.SENDING,
+                required_transition_state=TestableShardedCopyingManager.SLEEPING,
             )
 
-            for worker in self.__copying_manager.workers.values():
+            for worker in self.__copying_manager.workers:
                 worker.controller.perform_scan()
 
         def perform_pipeline_scan(self):
@@ -748,8 +789,8 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
             """
             # We guarantee it has done the pipeline scan by making sure it has gone through responding to sending.
             self.__copying_manager.run_and_stop_at(
-                TestableCopyingManager.RESPONDING,
-                required_transition_state=TestableCopyingManager.SENDING,
+                TestableShardedCopyingManager.RESPONDING,
+                required_transition_state=TestableShardedCopyingManager.SENDING,
             )
 
         def wait_for_rpc(self):
@@ -760,12 +801,12 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
             @rtype: (AddEventsRequest, func)
             """
 
-            self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING)
+            self.__copying_manager.run_and_stop_at(TestableShardedCopyingManager.RESPONDING)
             requests = self.__copying_manager.captured_request()
 
             def send_response(status_message):
                 self.__copying_manager.set_response(status_message)
-                self.__copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
+                self.__copying_manager.run_and_stop_at(TestableShardedCopyingManager.SLEEPING)
 
             return requests, send_response
 

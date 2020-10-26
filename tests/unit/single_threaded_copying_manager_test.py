@@ -14,15 +14,11 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
-###
-### Those test just the same test from previos copying manager, but adapted to the new copying manager.
-###
-
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import threading
+import platform
 from io import open
 
 
@@ -31,51 +27,36 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-# import logging
+import logging
 import shutil
 import sys
 import time
-import glob
 
 from six.moves import range
 
-# root = logging.getLogger()
-# root.setLevel(logging.DEBUG)
-#
-# ch = logging.StreamHandler(sys.stdout)
-# ch.setLevel(logging.DEBUG)
-# formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-# ch.setFormatter(formatter)
-# root.addHandler(ch)
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
 
-"""
-Those tests are copy of original copying manager tests but with new, sharded copying manager.
-"""
-
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+ch.setFormatter(formatter)
+root.addHandler(ch)
 
 from scalyr_agent.configuration import Configuration
+from scalyr_agent.copying_manager import CopyingParameters, CopyingManager
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.test_util as test_util
 from scalyr_agent.test_base import skipIf
 
 from scalyr_agent import scalyr_init
 
-from tests.unit.copying_manager.common import (
-    TestableCopyingManager,
-    extract_lines_from_request,
-)
-from scalyr_agent.new_copying_manager.copying_manager import CopyingParameters, CopyingManager
-
 scalyr_init()
-
-from scalyr_agent import scalyr_logging
-
-log = scalyr_logging.getLogger(__name__)
-log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
 ONE_MIB = 1024 * 1024
 ALMOST_SIX_MB = 5900000
@@ -279,7 +260,6 @@ class DynamicLogPathTest(ScalyrTestCase):
         self.assertEquals(path, matchers[0].log_path)
 
         self._manager.schedule_log_path_for_removal("unittest", path)
-        self.fake_scan()
         self.fake_scan()
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -1010,7 +990,6 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         responder_callback("success")
 
-    @skipIf(True, "This test is moved to ")
     def test_pipelined_requests_with_processor_closes(self):
         # Tests bug related to duplicate log upload (CT-107, AGENT-425, CT-114)
         # The problem was related to mixing up the callbacks between two different log processors
@@ -1178,11 +1157,9 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.__append_log_lines("Fifth line", "Sixth line")
 
         # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
-        for path in glob.glob(
-            os.path.join(self._config.agent_data_path, "checkpoints", "*.json")
-        ):
+        for name in ["checkpoints.json", "active-checkpoints.json"]:
             _shift_time_in_checkpoint_file(
-                path,
+                os.path.join(self._config.agent_data_path, name),
                 # set negative value to shift checkpoint time to the past.
                 -(self._config.max_allowed_checkpoint_age + 1),
             )
@@ -1215,18 +1192,13 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         # "active_checkpoints" file is used if it is newer than "full_checkpoints",
         # so we read "full_checkpoints" ...
-
-        checkpoints_path = os.path.join(
-            self._config.agent_data_path, "checkpoints", "checkpoints-0.json"
+        checkpoints = scalyr_util.read_file_as_json(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
         )
-
-        checkpoints = scalyr_util.read_file_as_json(checkpoints_path)
 
         # ... and make bigger time value for "active_checkpoints".
         _shift_time_in_checkpoint_file(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "active-checkpoints-0.json"
-            ),
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json"),
             checkpoints["time"] + 1,
         )
 
@@ -1259,11 +1231,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         self.__append_log_lines("Third line", "Fourth line")
 
-        os.remove(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "active-checkpoints-0.json"
-            )
-        )
+        os.remove(os.path.join(self._config.agent_data_path, "active-checkpoints.json"))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1292,14 +1260,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.__append_log_lines("Third line", "Fourth line")
 
         _write_bad_checkpoint_file(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "active-checkpoints-0.json"
-            )
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
         )
         _write_bad_checkpoint_file(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "checkpoints-0.json"
-            )
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
         )
 
         controller = self.__create_test_instance(
@@ -1330,14 +1294,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.__append_log_lines("Third line", "Fourth line")
 
         _add_non_utf8_to_checkpoint_file(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "active-checkpoints-0.json"
-            )
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
         )
         _add_non_utf8_to_checkpoint_file(
-            os.path.join(
-                self._config.agent_data_path, "checkpoints", "checkpoints-0.json"
-            )
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
         )
 
         controller = self.__create_test_instance(
@@ -1351,8 +1311,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
         self.assertEquals(0, len(lines))
 
-    # @skipIf(platform.system() == "Windows", "Skipping failing test on Windows")
-    @skipIf(True, "")
+    @skipIf(platform.system() == "Windows", "Skipping failing test on Windows")
     def test_stale_request(self):
         controller = self.__create_test_instance()
         self.__append_log_lines("First line", "Second line")
@@ -1363,7 +1322,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
 
-        from scalyr_agent.new_copying_manager import copying_manager
+        from scalyr_agent import copying_manager
 
         # backup original 'time' module
         orig_time = copying_manager.time
@@ -1374,7 +1333,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             def time(_self):  # pylint: disable=no-self-argument
                 result = (
                     orig_time.time()
-                    + self._manager._CopyingManager__config.max_retry_time  # pylint: disable=no-member
+                    + self._config.max_retry_time  # pylint: disable=no-member
                 )
                 return result
 
@@ -1412,8 +1371,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def test_health_check_status(self):
         self.__create_test_instance()
 
-        for worker in self._manager._workers.values():
-            worker._CopyingManagerWorker__last_attempt_time = time.time()
+        self._manager._CopyingManager__last_attempt_time = time.time()
 
         status = self._manager.generate_status()
         self.assertEquals(status.health_check_result, "Good")
@@ -1421,9 +1379,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def test_health_check_status_failed(self):
         self.__create_test_instance()
 
-        # self._manager._CopyingManager__last_attempt_time = time.time() - (1000 * 65)
-        for worker in self.manager.workers.values():
-            worker._CopyingManagerWorker__last_attempt_time = time.time() - (1000 * 65)
+        self._manager._CopyingManager__last_attempt_time = time.time() - (1000 * 65)
 
         status = self._manager.generate_status()
         self.assertEquals(
@@ -1438,7 +1394,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         # Start copying manager from 10 bytes offset.
         self._manager.start_manager(
-            logs_initial_positions={self.__test_log_file: 5 * 2},
+            logs_initial_positions={self.__test_log_file: 5 * 2}
         )
 
         request, cb = controller.wait_for_rpc()
@@ -1485,22 +1441,21 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
                     controller.stop()
 
     def __extract_lines(self, request):
-        return extract_lines_from_request(request)
-        # parsed_request = test_util.parse_scalyr_request(request.get_payload())
-        #
-        # lines = []
-        #
-        # if "events" in parsed_request:
-        #     for event in parsed_request["events"]:
-        #         if "attrs" in event:
-        #             attrs = event["attrs"]
-        #             if "message" in attrs:
-        #                 lines.append(attrs["message"].strip())
-        #
-        # return lines
+        parsed_request = test_util.parse_scalyr_request(request.get_payload())
+
+        lines = []
+
+        if "events" in parsed_request:
+            for event in parsed_request["events"]:
+                if "attrs" in event:
+                    attrs = event["attrs"]
+                    if "message" in attrs:
+                        lines.append(attrs["message"].strip())
+
+        return lines
 
     def __was_pipelined(self, request):
-        return "pipelined=1.0" in request[0].get_timing_data()
+        return "pipelined=1.0" in request.get_timing_data()
 
     def __create_test_instance(
         self, use_pipelining=False, root_dir=None, auto_start=True, test_files=1
@@ -1610,6 +1565,338 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             fp.write(l.encode("utf-8"))
             fp.write(b"\n")
         fp.close()
+
+
+class TestableCopyingManager(CopyingManager):
+    """An instrumented version of the CopyingManager which allows intercepting of requests sent, control when
+    the manager processes new logs, etc.
+
+    This allows for end-to-end testing of the core of the CopyingManager.
+
+    Doing this right is a bit complicated because the CopyingManager runs in its own thread.
+
+    To actually control the copying manager, use the TestController object returned by ``controller``.
+    """
+
+    __test__ = False
+
+    # The different points at which the CopyingManager can be stopped.  See below.
+    SLEEPING = "SLEEPING"
+    SENDING = "SENDING"
+    RESPONDING = "RESPONDING"
+
+    # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
+    WAIT_TIMEOUT = 5000.0
+
+    def __init__(self, configuration, monitors):
+        CopyingManager.__init__(self, configuration, monitors)
+        # Approach:  We will override key methods of CopyingManager, blocking them from returning until the controller
+        # tells it to proceed.  This allows us to then do things like write new log lines while the CopyingManager is
+        # blocked.   Coordinating the communication between the two threads is done using one condition variable.
+        # We changed the CopyingManager to block in three places: while it is sleeping before it starts a new loop,
+        # when it invokes `_send_events` to send a new request, and when it blocks to receive the response.
+        # These three states are referred to as 'sleeping', 'sending', 'responding'.
+        #
+        # The CopyingManager will have state to record where it should next block (i.e., if it should block at
+        # 'sleeping' when it attempts to sleep).  The test controller will manipulate this state, notifying changes on
+        # the condition variable. The CopyingManager will block in this state (and indicate it is blocked) until the
+        # test controller sets a new state to block at.
+        #
+        # This cv protects all of the variables written by the CopyingManager thread.
+        self.__test_state_cv = threading.Condition()
+        # Which state the CopyingManager should block in -- "sleeping", "sending", "responding"
+        # We initialize it to a special value "all" so that it stops as soon the CopyingManager starts up.
+        self.__test_stop_state = "all"
+        # If not none, a state the test must pass through before it tries to stop at `__test_stop_state`.
+        # If this transition is not observed by the time it does get to the stop state, an assertion is thrown.
+        self.__test_required_transition = None
+        # Whether or not the CopyingManager is stopped at __test_stop_state.
+        self.__test_is_stopped = False
+        # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
+        self.__captured_request = None
+        # Protected by __test_state_cv.  The status message to return for the next call to ``_send_events``.
+        self.__pending_response = None
+
+        self.__controller = TestableCopyingManager.TestController(self,)
+
+    @property
+    def controller(self):
+        return self.__controller
+
+    def _sleep_but_awaken_if_stopped(self, seconds):
+        """Blocks the CopyingManager thread until the controller tells it to proceed.
+        """
+        self.__test_state_cv.acquire()
+        try:
+            self.__block_if_should_stop_at(TestableCopyingManager.SLEEPING)
+        finally:
+            self.__test_state_cv.release()
+
+    def _create_add_events_request(self, session_info=None, max_size=None):
+        # Need to override this to return an AddEventsRequest even though we don't have a real scalyr client instance.
+        if session_info is None:
+            body = dict(server_attributes=session_info, token="fake")
+        else:
+            body = dict(token="fake")
+
+        return AddEventsRequest(body, max_size=max_size)
+
+    def _send_events(self, add_events_task):
+        """Captures ``add_events_task`` and emulates sending an AddEventsTask.
+
+        This method will not return until the controller tells it to advance to the next state.
+        """
+        # First, block even returning from this method until the controller advances us.
+        self.__test_state_cv.acquire()
+        try:
+            self.__block_if_should_stop_at(TestableCopyingManager.SENDING)
+            self.__captured_request = add_events_task.add_events_request
+        finally:
+            self.__test_state_cv.release()
+
+        # Create a method that we can return that will (when invoked) return the response
+        def emit_response():
+            # Block on return the response until the state is advanced.
+            self.__test_state_cv.acquire()
+            try:
+                self.__block_if_should_stop_at(TestableCopyingManager.RESPONDING)
+
+                # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
+                # requests will just be processed.
+                result = self.__pending_response
+                self.__pending_response = None
+            finally:
+                self.__test_state_cv.release()
+
+            if result is not None:
+                return result, 0, "fake"
+            else:
+                return "success", 0, "fake"
+
+        return emit_response
+
+    def captured_request(self):
+        """Returns the last request that was passed into ``_send_events`` by the CopyingManager, or None if there
+        wasn't any.
+
+        This will also reset the captured request to None so the returned request won't be returned twice.
+
+        @return: The last request
+        @rtype: AddEventsRequest
+        """
+        self.__test_state_cv.acquire()
+        try:
+            result = self.__captured_request
+            self.__captured_request = None
+            return result
+        finally:
+            self.__test_state_cv.release()
+
+    def set_response(self, status_message):
+        """Sets the status_message to return as the response for the next AddEventsRequest.
+
+        @param status_message: The status message
+        @type status_message: six.text_type
+        """
+        self.__test_state_cv.acquire()
+        self.__pending_response = status_message
+        self.__test_state_cv.release()
+
+    def __block_if_should_stop_at(self, current_point):
+        """Invoked by the CopyManager thread to report it has transitioned to the specified state and will block if
+        `run_and_stop_at` has been invoked with `current_point` as the stopping point.
+
+        @param current_point: The point reached by the CopyingManager thread, only valid values are
+            `SLEEPING`, `SENDING`, and `RESPONDING`.
+        @type current_point: six.text_type
+        """
+        # If we are passing through the required_transition state, consume it to signal we have accomplished
+        # the transition.
+        if current_point == self.__test_required_transition:
+            self.__test_required_transition = None
+
+        # Block if it has been requested that we block here.  Note, __test_stop_state can only be:
+        # 'all'  -- indicating it should stop at the first state it sees.
+        # None -- indicating the test is shutting down and the CopyingManger thread should just run until it finishes
+        # One of `SLEEPING`, `SENDING`, and `RESPONDING` -- indicating where we should next block the CopyingManager.
+        start_time = time.time()
+        while (
+            self.__test_stop_state == "all" or current_point == self.__test_stop_state
+        ):
+            self.__test_is_stopped = True
+            if self.__test_required_transition is not None:
+                raise AssertionError(
+                    "Stopped at %s state but did not transition through %s"
+                    % (current_point, self.__test_required_transition)
+                )
+            # This notifies any threads waiting in the `run_and_stop_at` method.  They would be blocking waiting for
+            # the CopyingManager thread to stop at this point.
+            self.__test_state_cv.notifyAll()
+            # We need to wait until some other state is set as the stop state.  The `notifyAll` in `run_and_stop_at`
+            # method will wake us up.
+            self.__test_state_cv_wait_with_timeout(start_time)
+
+        self.__test_is_stopped = False
+
+    def run_and_stop_at(self, stopping_at, required_transition_state=None):
+        """Invoked by the testing thread to indicate the CopyingManager thread should run and keep running until
+        it enters the specified state.  If `required_transition_state` is specified, then the CopyingManager thread
+        must transition through the specified state before it stops, otherwise an AssertionError will be raised.
+
+        Note, if the CopyingManager thread is already stopping in the `stopping_at` thread, then this call will
+        immediately return.  It does not wait for the next occurrence of that state.
+
+        @param stopping_at: The state to stop at.  Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
+        @param required_transition_state: If not None, requires that the CopyingManager transitions through the
+            specified state before it gets to `stopping_at`.  Otherwise an AssertionError will be thrown.
+              Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
+
+        @type stopping_at: six.text_type
+        @type required_transition_state: six.text_type or None
+        """
+        self.__test_state_cv.acquire()
+        try:
+            # Just to avoid mistakes in testing, make sure we successfully consumed any require transitions before
+            # we tell it to stop anywhere else.
+            if self.__test_required_transition is not None:
+                raise AssertionError(
+                    "Setting new stop state %s with pending required transition %s"
+                    % (stopping_at, self.__test_required_transition)
+                )
+            # If we are already in the required_transition_state, consume it.
+            if (
+                self.__test_is_stopped
+                and self.__test_stop_state == required_transition_state
+            ):
+                self.__test_required_transition = None
+            else:
+                self.__test_required_transition = required_transition_state
+
+            if self.__test_is_stopped and self.__test_stop_state == stopping_at:
+                return
+
+            self.__test_stop_state = stopping_at
+            self.__test_is_stopped = False
+            # This will wake up threads in `__block_if_should_stop_at` which are waiting for a new stopping point.
+            self.__test_state_cv.notifyAll()
+
+            start_time = time.time()
+            # Wait until we get to this point.
+            while not self.__test_is_stopped:
+                # This will be woken up by the notify in `__block_if_should_stop_at` method.
+                self.__test_state_cv_wait_with_timeout(start_time)
+        finally:
+            self.__test_state_cv.release()
+
+    def __test_state_cv_wait_with_timeout(self, start_time):
+        """Waits on the `__test_state_cv` condition variable, but will also throw an AssertionError if the wait
+        time exceeded the `start_time` plus `WAIT_TIMEOUT`.
+
+        @param start_time:  The start time when we first began waiting on this condition, in seconds past epoch.
+        @type start_time: Number
+        """
+        deadline = start_time + TestableCopyingManager.WAIT_TIMEOUT
+        self.__test_state_cv.wait(timeout=(deadline - time.time()) + 0.5)
+        if time.time() > deadline:
+            raise AssertionError(
+                "Deadline exceeded while waiting on condition variable"
+            )
+
+    def stop_manager(self, wait_on_join=True, join_timeout=5):
+        """Stops the manager's thread.
+
+        @param wait_on_join:  Whether or not to wait on thread to finish.
+        @param join_timeout:  The number of seconds to wait on the join.
+        @type wait_on_join: bool
+        @type join_timeout: float
+        @return:
+        @rtype:
+        """
+        # We need to do some extra work here in case the CopyingManager thread is currently in a blocked state.
+        # We need to tell it to keep running.
+        self.__test_state_cv.acquire()
+        self.__test_stop_state = None
+        self.__test_state_cv.notifyAll()
+        self.__test_state_cv.release()
+
+        CopyingManager.stop_manager(
+            self, wait_on_join=wait_on_join, join_timeout=join_timeout
+        )
+
+    def start_manager(self, scalyr_client=None, logs_initial_positions=None):
+        """
+        Overrides base class method, to initialize "scalyr_client" by default.
+        """
+        if scalyr_client is None:
+            scalyr_client = dict(fake_client=True)
+        super(TestableCopyingManager, self).start_manager(
+            scalyr_client, logs_initial_positions=logs_initial_positions
+        )
+
+    class TestController(object):
+        """Used to control the TestableCopyingManager.
+
+        Its main role is to tell the manager thread when to unblock and how far to run.
+        """
+
+        def __init__(self, copying_manager):
+            self.__copying_manager = copying_manager
+
+        def perform_scan(self):
+            """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
+            the scan of the file system looking for new bytes in the log file.
+
+            At this point, the CopyingManager should have a request ready to be sent.
+            """
+            # We guarantee it has scanned by making sure it has gone from sleeping to sending.
+            self.__copying_manager.run_and_stop_at(
+                TestableCopyingManager.SENDING,
+                required_transition_state=TestableCopyingManager.SLEEPING,
+            )
+
+        def perform_pipeline_scan(self):
+            """Tells the CopyingManager thread to advance far enough where it has performed the file system scan
+            for the pipelined AddEventsRequest, if the manager is configured to send one..
+
+            This is only valid to call immediately after a ``perform_scan``
+            """
+            # We guarantee it has done the pipeline scan by making sure it has gone through responding to sending.
+            self.__copying_manager.run_and_stop_at(
+                TestableCopyingManager.RESPONDING,
+                required_transition_state=TestableCopyingManager.SENDING,
+            )
+
+        def wait_for_rpc(self):
+            """Tells the CopyingManager thread to advance to the point where it has emulated sending an RPC.
+
+            @return:  A tuple containing the AddEventsRequest that was sent by the CopyingManager and a function that
+                when invoked will return the passed in status message as the response to the AddEventsRequest.
+            @rtype: (AddEventsRequest, func)
+            """
+            self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING)
+            request = self.__copying_manager.captured_request()
+
+            def send_response(status_message):
+                self.__copying_manager.set_response(status_message)
+                self.__copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
+
+            return request, send_response
+
+        def close_at_eof(self, filepath):
+            """Tells the CopyingManager to mark the LogProcessor copying the specified path to close itself
+            once all bytes have been copied up to Scalyr.  This can be used to remove LogProcessors for
+            testing purposes.
+
+            :param filepath: The path of the processor.
+            :type filepath: six.text_type
+            """
+            # noinspection PyProtectedMember
+            self.__copying_manager._CopyingManager__log_paths_being_processed[
+                filepath
+            ].close_at_eof()
+
+        def stop(self):
+            self.__copying_manager.stop_manager()
 
 
 class FakeMonitor(object):

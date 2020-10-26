@@ -320,6 +320,10 @@ class ConfigBuilder(object):
 
         return log_file, config_builder
 
+    @property
+    def checkpoints_dir_path(self):
+        return self._data_dir_path / "checkpoints"
+
     def get_checkpoints_path(self, worker_id):  # type: (six.text_type) -> pathlib.Path
         return self._data_dir_path / "checkpoints" / ("checkpoints-%s.json" % worker_id)
 

@@ -109,7 +109,7 @@ class Configuration(object):
         # are created by default by the platform.
         self.__monitor_configs = []
 
-        self.__worker_configs = []
+        self.__api_keys_configs = []
 
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
@@ -325,6 +325,23 @@ class Configuration(object):
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
+
+            # group worker entries by id
+            api_keys_configs = {w["id"]: w for w in self.api_key_configs}
+            for log_config in self.log_configs:
+                api_key_id = log_config.get("api_key_id", none_if_missing=True)
+                if api_key_id is not None:
+
+                    api_key_id = six.text_type(api_key_id)
+                    if api_key_id not in api_keys_configs:
+                        raise BadConfiguration(
+                            "Log file config for '%s' has api key id '%s', but there is no such api key."
+                            % (log_config["path"], api_key_id),
+                            None,
+                            "noSuchApiKey"
+                        )
+
+
         except BadConfiguration as e:
             self.__last_error = e
             raise e
@@ -1330,8 +1347,8 @@ class Configuration(object):
         return self.__get_config().get_int("win32_max_open_fds")
 
     @property
-    def worker_configs(self):
-        return self.__get_config().get_json_array("workers")
+    def api_key_configs(self):
+        return self.__get_config().get_json_array("api_keys")
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -2708,7 +2725,7 @@ class Configuration(object):
         if config_val is not None:
             return config_val
 
-        config_object.interact({param_name: env_val})
+        config_object.update({param_name: env_val})
         return env_val
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
@@ -2727,7 +2744,7 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
-        self.__verify_or_set_optional_array(config, "workers", description)
+        self.__verify_or_set_optional_array(config, "api_keys", description)
 
         i = 0
         for log_entry in config.get_json_array("logs"):
@@ -2760,15 +2777,15 @@ class Configuration(object):
             )
             i += 1
 
-        workers = config.get_json_array("workers")
-        if not workers:
+        api_keys = config.get_json_array("api_keys")
+        if not api_keys:
             # Add first worker config entry. This entry acts like default.
             # The default entry do not need to have "api_key" because it uses main "api_key"
-            workers.add(JsonObject(number=2, api_key=self.api_key))
+            api_keys.add(JsonObject())
 
-        for i, worker_entry in enumerate(config.get_json_array("workers")):
-            self.__verify_worker_entry_and_set_dafaults(
-                worker_entry, entry_index=i, description=description
+        for i, api_key_entry in enumerate(config.get_json_array("api_keys")):
+            self.__verify_api_keys_entry_and_set_dafaults(
+                api_key_entry, entry_index=i, description=description
             )
 
     def __verify_k8s_log_entry_and_set_defaults(
@@ -3056,23 +3073,35 @@ class Configuration(object):
             monitor_entry, "log_path", module_name + ".log", description
         )
 
-    def __verify_worker_entry_and_set_dafaults(
-        self, worker_entry, entry_index=None, description=None
+    def __verify_api_keys_entry_and_set_dafaults(
+        self, api_key_entry, entry_index=None, description=None
     ):
-        description = "worker entry #{0}".format(entry_index)
+        """
+        Verify the copying manager api_keys entry. and set defaults.
+        """
 
         if entry_index > 0:
-            # this is not default worker entry, so it should have all fields.
+            # this is not default api_key entry, so it should have all fields below.
             self.__verify_required_string(
-                worker_entry, "api_key", config_description=description
+                api_key_entry, "api_key", config_description=description
             )
             self.__verify_required_string(
-                worker_entry, "number", config_description=description
+                api_key_entry, "workers", config_description=description
             )
         else:
-            if "api_key" not in worker_entry:
-                worker_entry["api_key"] = self.api_key
+            # if there is a first(default) api_key entry, and there is no 'api_key',
+            # so we use the 'api_key' from the 'root' scope.
+            if "api_key" not in api_key_entry:
+                api_key_entry["api_key"] = self.api_key
 
+            # set default number of workers for the default  api_key entry.
+            if "workers" not in api_key_entry:
+                # TODO: move default number to constant or separate config entry.
+                api_key_entry["workers"] = 1
+
+        # if the id for the api_key entry is not specified, just set the entry index as id.
+        if "id" not in api_key_entry:
+            api_key_entry["id"] = six.text_type(entry_index)
 
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
         """Merges the contents of the server attribute read from a configuration fragment to the main config object.
