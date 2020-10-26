@@ -4158,10 +4158,19 @@ cluster.
             )
             self.__report_k8s_metrics = False
 
+        always_use_docker = self._config.get("k8s_always_use_docker")
+        always_use_cri = self._config.get("k8s_always_use_cri")
+        container_runtime = self.__container_checker._container_runtime
+
+        if always_use_docker or (container_runtime == "docker" and not always_use_cri):
+            container_list_mode = "docker"
+        else:
+            container_list_mode = "cri (fs)"
+
         global_log.info(
             (
                 "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, "
-                "report_metrics: %s, report_k8s_metrics: %s, log_mode: %s"
+                "report_metrics: %s, report_k8s_metrics: %s, log_mode: %s, container_list_mode: %s"
             )
             % (
                 self.__namespaces_to_include,
@@ -4169,6 +4178,7 @@ cluster.
                 self.__report_container_metrics,
                 self.__report_k8s_metrics,
                 self.__log_mode,
+                container_list_mode,
             )
         )
 
