@@ -256,6 +256,41 @@ class DynamicLogPathTest(ScalyrTestCase):
         matchers = self._manager.log_matchers
         self.assertEquals(0, len(matchers))
 
+    def test_schedule_log_path_for_removal_and_re_add_before_actual_removal(self):
+        config = {}
+        self.create_copying_manager(config)
+        self.fake_scan()
+
+        path = os.path.join(self._log_dir, "newlog.log")
+        self.append_log_lines(path, "line1\n")
+
+        log_config = {"path": path}
+
+        self._manager.add_log_config("unittest", log_config)
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals(1, len(matchers))
+        self.assertEquals(path, matchers[0].log_path)
+
+        self.assertFalse(path in self._get_manager_log_pending_removal())
+
+        self._manager.schedule_log_path_for_removal("unittest", path)
+        self.assertTrue(path in self._get_manager_log_pending_removal())
+
+        # We use force_add=True when adding the log file which means scheduled removal should be
+        # canceled / removed
+        self._manager.add_log_config("unittest", log_config, force_add=True)
+        self.assertFalse(path in self._get_manager_log_pending_removal())
+
+        self.fake_scan()
+        self.fake_scan()
+
+        self.assertFalse(path in self._get_manager_log_pending_removal())
+
+        # Matcher should still be there since removal should have been canceled
+        matchers = self._manager.log_matchers
+        self.assertEquals(1, len(matchers))
+
     def test_schedule_log_path_for_removal(self):
         config = {}
         self.create_copying_manager(config)
@@ -272,9 +307,14 @@ class DynamicLogPathTest(ScalyrTestCase):
         self.assertEquals(1, len(matchers))
         self.assertEquals(path, matchers[0].log_path)
 
+        self.assertFalse(path in self._get_manager_log_pending_removal())
         self._manager.schedule_log_path_for_removal("unittest", path)
+        self.assertTrue(path in self._get_manager_log_pending_removal())
+
         self.fake_scan()
         self.fake_scan()
+
+        self.assertFalse(path in self._get_manager_log_pending_removal())
         matchers = self._manager.log_matchers
         self.assertEquals(0, len(matchers))
 
@@ -448,6 +488,11 @@ class DynamicLogPathTest(ScalyrTestCase):
             fp.write(l)
             fp.write("\n")
         fp.close()
+
+    def _get_manager_log_pending_removal(self):
+        # pylint: disable=no-member
+        return self._manager._CopyingManager__logs_pending_removal
+        # pylint: enable=no-member
 
 
 class CopyingParamsLegacyTest(ScalyrTestCase):
