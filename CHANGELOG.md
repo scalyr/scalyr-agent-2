@@ -10,6 +10,9 @@ Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
 Improvements:
 * Improve logging in the Kubernetes monitor.
 
+Bug fixes:
+* Fix ``docker_raw_logs: false`` functionality in the Docker monitor which has been broken for a while now.
+
 ## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
