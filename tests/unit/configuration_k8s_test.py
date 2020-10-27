@@ -63,7 +63,11 @@ class TestConfigurationK8s(TestConfigurationBase):
         # config_param_name: (custom_env_name, test_value)
         k8s_testmap = {
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
-            "first_time_old_container_window": (STANDARD_PREFIX, TEST_INT, int),
+            "initial_stopped_container_collection_window": (
+                STANDARD_PREFIX,
+                TEST_INT,
+                int,
+            ),
             "docker_max_parallel_stats": (STANDARD_PREFIX, TEST_INT, int),
             "docker_percpu_metrics": (STANDARD_PREFIX, True, bool),
             "container_globs": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),

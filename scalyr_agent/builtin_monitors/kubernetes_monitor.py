@@ -104,9 +104,10 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "first_time_old_container_window",
-    "Optional (defaults to 0). For the first container check, how old a dead container can be and still have its "
-    "logs read, in seconds.",
+    "initial_stopped_container_collection_window",
+    "By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. "
+    "To override this, set this parameter to the number of seconds the agent will look in the past (before it was "
+    "started). It will collect logs for any pods that was started and stopped during this window.",
     convert_to=int,
     default=0,
     env_aware=True,
@@ -2792,7 +2793,7 @@ class ContainerChecker(object):
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
         previous_time = time.time() - self._config.get(
-            "first_time_old_container_window"
+            "initial_stopped_container_collection_window"
         )
 
         while run_state.is_running():
