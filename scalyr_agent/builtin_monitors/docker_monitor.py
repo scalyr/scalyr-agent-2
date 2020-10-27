@@ -763,6 +763,20 @@ def _get_containers(
                                     info["LogPath"] if "LogPath" in info else None
                                 )
 
+                                if not log_path:
+                                    # NOTE: If docker_raw_logs is True and we hit this code path it
+                                    # really means we won't be ingesting any logs so this should
+                                    # really be treated as a fatal error.
+                                    logger.warning(
+                                        "LogPath value for container with cid=%s,name=%s "
+                                        "ie empty. This most likely indicates that the "
+                                        "docker daemon is configured to use some other "
+                                        "log-driver and not the json one."
+                                        % (cid, name),
+                                        limit_once_per_x_secs=300,
+                                        limit_key="docker-api-inspect",
+                                    )
+
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
