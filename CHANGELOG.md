@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.14 "TBD" - November 15, 2020
+
+<!---
+Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
+--->
+
+Bug fixes:
+* Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
+
 ## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
