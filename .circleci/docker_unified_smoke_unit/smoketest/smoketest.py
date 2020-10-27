@@ -303,9 +303,7 @@ class SmokeTestActor(object):
         # Add message
         if message:
             filter_frags.append(
-                "$message{0}".format(
-                    quote_plus(' contains "{0}"'.format(message))
-                )
+                "$message{0}".format(quote_plus(' contains "{0}"'.format(message)))
             )
 
         url += "&filter={0}".format("+and+".join(filter_frags))
@@ -704,6 +702,8 @@ class DockerSmokeTestActor(SmokeTestActor):
                     print(matches[0])
                     print("")
                     att = matches[0]["attributes"]
+                    print(self._verify_queried_attributes)
+                    print(self)
                     return self._verify_queried_attributes(
                         att, stream_name, process_name
                     )
@@ -746,6 +746,45 @@ class DockerJsonActor(DockerSmokeTestActor):
             return False
         if not all(
             [att.get("stream") in stream_name, att.get("monitor") == "agentDocker"]
+        ):
+            return False
+        return True
+
+
+class DockerAPIActor(DockerSmokeTestActor):
+    """
+    Verifier to be used when Docker monitor utilizes Docker API mode for ingesting log (aka
+    docker_raw_logs config option is False).
+    """
+
+    VERIFIER_TYPE = "Docker API (docker_raw_logs: false)"
+
+    def _get_uploader_stream_names(self):
+        return ["stdout"]
+
+    def _get_mapped_logfile_prefix(self):
+        return "/var/log/scalyr-agent-2"
+
+    def _serialize_row(self, obj):
+        return "Starting docker monitor (raw_logs=False)"
+
+    def _get_uploader_override_logfilename_regex(self, process_name):
+        # $logfile will look something like this:
+        # "/var/log/scalyr-agent-2/docker-ci-agent-docker-api-56640-agent-stdout.log"
+        # process name will contain a value similarto this one:
+        #  ci-agent-docker-api-56644-uploader
+        logname_suffix = process_name.replace("-uploader", "-agent-stdout")
+        return "{}/docker-{}.log".format(self._get_mapped_logfile_prefix(), logname_suffix)
+
+    def _get_extra_query_attributes(self, stream_name, process_name):
+        return {}
+
+    def _verify_queried_attributes(self, att, stream_name, process_name):
+        if not all(
+            [
+                att.get("serverHost") == self._agent_hostname,
+                att.get("monitor") == "agentDocker",
+            ]
         ):
             return False
         return True
@@ -912,6 +951,7 @@ class LogstashActor(DockerSmokeTestActor):
 CONTAINER_PREFIX_2_VERIFIER_CLASS = {
     "ci-agent-standalone": StandaloneSmokeTestActor,
     "ci-agent-docker-json": DockerJsonActor,
+    "ci-agent-docker-api": DockerAPIActor,
     "ci-agent-docker-syslog": DockerSyslogActor,
     "ci-agent-k8s": K8sActor,
     "ci-plugin-logstash": LogstashActor,
