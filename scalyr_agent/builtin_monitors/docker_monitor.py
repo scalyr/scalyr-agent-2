@@ -1629,8 +1629,10 @@ class DockerLogger(object):
             self.__last_request_lock.release()
 
         except Exception as e:
-            # TODO: We should also catch 404 and remove log matches since 404 likely indicates
-            # container has been stopped / killed
+            # TODO: We should also catch 404 and treat it as an error which indicates container has
+            # been removed / killed.
+            # Keep in mind that we will correctly recognize that on subsequent retry and schedule
+            # log for deletion then, but we should still more gracefully handle it here.
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
                 % (self.name, six.text_type(e), traceback.format_exc())
