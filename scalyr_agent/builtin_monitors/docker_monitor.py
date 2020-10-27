@@ -766,6 +766,19 @@ def _get_containers(
                                     info["LogPath"] if "LogPath" in info else None
                                 )
 
+                                if not log_path:
+                                    # If docker_raw_logs is True and we are unable to retrieve a
+                                    # log path here, this means we really won't be able to ingest
+                                    # logs so perhaps we should consider handling this differently.
+                                    # This could happen due to a bug or log driver not being set
+                                    # correctly, etc.
+                                    logger.warn(
+                                        "Unable to retrieve LogPath attribute for "
+                                        "container with cid=%s" % (cid),
+                                        limit_once_per_x_secs=300,
+                                        limit_key="docker-api-inspect-no-log-path",
+                                    )
+
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
