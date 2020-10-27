@@ -76,7 +76,7 @@ define_config_option(
     __monitor__,
     "container_check_interval",
     "Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.",
-    convert_to=int,
+    convert_to=float,
     default=5,
     env_aware=True,
 )
