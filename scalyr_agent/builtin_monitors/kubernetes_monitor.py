@@ -104,6 +104,17 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "initial_stopped_container_collection_window",
+    "By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. "
+    "To override this, set this parameter to the number of seconds the agent will look in the past (before it was "
+    "started). It will collect logs for any pods that was started and stopped during this window.",
+    convert_to=int,
+    default=0,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "api_socket",
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
@@ -2781,7 +2792,9 @@ class ContainerChecker(object):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
-        previous_time = time.time()
+        previous_time = time.time() - self._config.get(
+            "initial_stopped_container_collection_window"
+        )
 
         while run_state.is_running():
             try:
