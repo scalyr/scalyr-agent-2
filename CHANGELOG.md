@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.14 "TBD" - November 15, 2020
+
+<!---
+Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
+--->
+
+Improvements:
+* Improve logging in the Kubernetes monitor.
+
 ## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
