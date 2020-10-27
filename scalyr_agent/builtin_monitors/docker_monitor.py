@@ -1219,7 +1219,7 @@ class ContainerChecker(StoppableThread):
             if self.__log_watcher:
                 try:
                     log["log_config"] = self.__log_watcher.add_log_config(
-                        self.__module.module_name, log["log_config"]
+                        self.__module.module_name, log["log_config"], force_add=True
                     )
                 except Exception as e:
                     global_log.info(
