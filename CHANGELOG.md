@@ -10,6 +10,9 @@ Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
 Improvements:
 * Improve logging in the Kubernetes monitor.
 
+Features:
+* Add new ``initial_stopped_container_collection_window`` configuration option to the kubernetes monitor, which can be configured by setting the ``SCALY_INITIAL_STOPPED_CONTAINER_COLLECTION_WINDOW`` environment variable. By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. To override this, set this parameter to the number of seconds the agent will look in the past (before it was started). It will collect logs for any pods that was started and stopped during this window.
+
 ## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
