@@ -104,6 +104,16 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "first_time_old_container_window",
+    "Optional (defaults to 0). For the first container check, how old a dead container can be and still have its "
+    "logs read, in seconds.",
+    convert_to=int,
+    default=0,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "api_socket",
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
@@ -2781,7 +2791,9 @@ class ContainerChecker(object):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
-        previous_time = time.time()
+        previous_time = time.time() - self._config.get(
+            "first_time_old_container_window"
+        )
 
         while run_state.is_running():
             try:
