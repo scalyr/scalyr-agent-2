@@ -204,7 +204,7 @@ def wait_for_workflow(workflow_id, timeout_time):
                 )
             )
 
-        if datetime.datetime.now() >= timeout_time:
+        if datetime.datetime.utcnow() >= timeout_time:
             raise RuntimeError(
                 "Timeout. Can not wait more for workflow '{0}'.".format(workflow_name)
             )
@@ -241,7 +241,7 @@ def wait_for_pipeline(pipeline_number,):
     """
 
     # wait until the 'state' field of the pipeline is 'created'.
-    timeout_time = datetime.datetime.now() + datetime.timedelta(
+    timeout_time = datetime.datetime.utcnow() + datetime.timedelta(
         seconds=CIRCLE_WAIT_TIMEOUT
     )
     while True:
@@ -259,7 +259,7 @@ def wait_for_pipeline(pipeline_number,):
                 "Pipeline has a wrong state: {0}.".format(pipeline_state)
             )
 
-        if datetime.datetime.now() >= timeout_time:
+        if datetime.datetime.utcnow() >= timeout_time:
             raise RuntimeError(
                 "Timeout. Can not wait more for pipeline: '{0}'".format(pipeline_number)
             )
@@ -285,7 +285,7 @@ def wait_for_pipeline(pipeline_number,):
     for name, workflow in latest_workflows.items():
         # If any of the workflows is not successful 'wait_for_workflow' will raise error.
 
-        timeout_time = datetime.datetime.now() + datetime.timedelta(
+        timeout_time = datetime.datetime.utcnow() + datetime.timedelta(
             seconds=CIRCLE_WAIT_TIMEOUT
         )
         finished_workflows[name] = wait_for_workflow(

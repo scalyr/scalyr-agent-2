@@ -165,7 +165,7 @@ def uptime(start_time):
     """
     from datetime import datetime
 
-    return datetime.now() - datetime.fromtimestamp(start_time)
+    return datetime.utcnow() - datetime.utcfromtimestamp(start_time)
 
 
 try:

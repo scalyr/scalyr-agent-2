@@ -1245,7 +1245,7 @@ class ContainerChecker(StoppableThread):
                 )
 
     def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+        result = datetime.datetime.utcfromtimestamp(self.__start_time)
 
         try:
             full_path = os.path.join(self.__log_path, path)

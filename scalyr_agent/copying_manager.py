@@ -956,7 +956,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                     "%s%s"
                                     % (
                                         self.__config.copying_thread_profile_output_path,
-                                        datetime.datetime.now().strftime(
+                                        datetime.datetime.utcnow().strftime(
                                             "%H_%M_%S.out"
                                         ),
                                     )
