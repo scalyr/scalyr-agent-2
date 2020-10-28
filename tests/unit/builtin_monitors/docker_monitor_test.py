@@ -22,12 +22,16 @@ __author__ = "echee@scalyr.com"
 
 
 import os
+import shutil
+import tempfile
+import datetime
 import threading
 from io import open
 
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
+from scalyr_agent.builtin_monitors.docker_monitor import ContainerChecker
 from scalyr_agent.builtin_monitors.docker_monitor import _get_containers
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
@@ -36,6 +40,79 @@ from scalyr_agent.util import FakeClock, FakeClockCounter
 import mock
 from mock import patch
 from mock import Mock
+
+__all__ = ["DockerMonitorTest"]
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES_DIR = os.path.join(BASE_DIR, "../fixtures")
+CONTAINER_LOG_FIXTURE_PATH = os.path.join(
+    FIXTURES_DIR, "docker_container_logs/docker-printer-stdout.log"
+)
+
+
+class ContainerCheckerTestCase(ScalyrTestCase):
+    def setUp(self):
+        super(ContainerCheckerTestCase, self).setUp()
+
+        self._temp_data_dir = tempfile.mkdtemp()
+        self._temp_log_dir = tempfile.mkdtemp()
+
+        shutil.copy(CONTAINER_LOG_FIXTURE_PATH, self._temp_log_dir)
+
+    @mock.patch("scalyr_agent.builtin_monitors.docker_monitor.DockerClient")
+    def test_get_last_request_for_log(self, mock_docker_client):
+        mock_docker_client.containers.return_value = []
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.docker_monitor",
+            "log_mode": "syslog",
+            "readback_buffer_size": 5 * 1024,
+        }
+
+        container_checker = ContainerChecker(
+            config=monitor_config,
+            logger=mock.Mock(),
+            socket_file=None,
+            docker_api_version=None,
+            host_hostname=None,
+            data_path=self._temp_data_dir,
+            log_path=self._temp_log_dir,
+        )
+        # We mock start time which is used in the calculation to make tests more stable
+        mock_start_time = 12345
+        # TODO: Fix and use utcfromtimestamp when PR #647 is merged
+        mock_start_time_dt = datetime.datetime.fromtimestamp(mock_start_time)
+        container_checker._ContainerChecker__start_time = mock_start_time
+
+        # 1. Existing log file is not available, should use start_time timestamp
+        expected_result = scalyr_util.seconds_since_epoch(mock_start_time_dt)
+
+        result = container_checker._ContainerChecker__get_last_request_for_log(
+            path="not.exist.123"
+        )
+        self.assertEqual(result, expected_result)
+
+        # 2. Existing log file, but with no valid data / timestamp, should fall back to start_time
+        file_name = "test.1"
+        with open(os.path.join(self._temp_log_dir, file_name), "w") as fp:
+            fp.write("mock data\n")
+
+        expected_result = scalyr_util.seconds_since_epoch(mock_start_time_dt)
+        result = container_checker._ContainerChecker__get_last_request_for_log(
+            path=file_name
+        )
+        self.assertEqual(result, expected_result)
+
+        # 2. Existing log file is always, should use time stamp from the last log line
+        file_name = "docker-printer-stdout.log"
+        # Last log line in that log file looks like this: "2020-10-27T17:18:12.878281177Z Line 291"
+        start_time_dt = datetime.datetime(2020, 10, 27, 17, 18, 12, 878281)
+
+        expected_result = scalyr_util.seconds_since_epoch(start_time_dt)
+        result = container_checker._ContainerChecker__get_last_request_for_log(
+            path=file_name
+        )
+        self.assertEqual(result, expected_result)
 
 
 class DockerMonitorTest(ScalyrTestCase):
