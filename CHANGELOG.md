@@ -13,6 +13,9 @@ Improvements:
 Features:
 * Add new ``initial_stopped_container_collection_window`` configuration option to the Kubernetes monitor, which can be configured by setting the ``SCALY_INITIAL_STOPPED_CONTAINER_COLLECTION_WINDOW`` environment variable. By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. To override this, set this parameter to the number of seconds the agent will look in the past (before it was started). It will collect logs for any pods that was started and stopped during this window. This can be useful in autoscaling environments to ensure all pod logs are captured since node creation, even if the Scalyr Agent daemonset starts just after other pods.
 
+Bug fixes:
+* Update code for all the monitors to correctly use UTC timezone everywhere. Previously some of the code incorrectly used local server time instead of UTC. This means some of those monitors could exhibit incorrect / undefined behavior when running the agent on a server which has local time set to something else than UTC.
+
 ## 2.1.13 "Celaeno" - October 15, 2020
 
 <!---
