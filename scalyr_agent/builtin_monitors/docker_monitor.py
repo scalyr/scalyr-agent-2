@@ -55,6 +55,19 @@ __monitor__ = __name__
 
 DOCKER_LABEL_CONFIG_RE = re.compile(r"^(com\.scalyr\.config\.log\.)(.+)")
 
+# Error log message which is logged when Docker inspect API endpoint returns empty value for LogPath
+# attribute for a particular container.
+# Empty attribute usually indicates that the Docker daemon is not configured correctly and that some
+# other, non json-log log-driver is used.
+# If docker_raw_logs is False and LogPath is empty, it means no logs will be monitored / ingested
+# for that container.
+NO_LOG_PATH_ATTR_MSG = (
+    'LogPath attribute for container with id "%s" and name "%s" is empty. '
+    "Logs for this container will not be monitored / ingested. This likely "
+    "represents a misconfiguration on the Docker daemon side (e.g. docker "
+    "daemon is configured to use some other and not json-file log-driver)."
+)
+
 define_config_option(
     __monitor__,
     "module",
@@ -77,7 +90,7 @@ define_config_option(
     __monitor__,
     "container_check_interval",
     "Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.",
-    convert_to=int,
+    convert_to=float,
     default=5,
     env_aware=True,
 )
@@ -767,16 +780,13 @@ def _get_containers(
                                 )
 
                                 if not log_path:
-                                    # If docker_raw_logs is True and we are unable to retrieve a
-                                    # log path here, this means we really won't be able to ingest
-                                    # logs so perhaps we should consider handling this differently.
-                                    # This could happen due to a bug or log driver not being set
-                                    # correctly, etc.
-                                    logger.warn(
-                                        "Unable to retrieve LogPath attribute for "
-                                        "container with cid=%s" % (cid),
+                                    # NOTE: If docker_raw_logs is True and we hit this code path it
+                                    # really means we won't be ingesting any logs so this should
+                                    # really be treated as a fatal error.
+                                    logger.error(
+                                        NO_LOG_PATH_ATTR_MSG % (cid, name),
                                         limit_once_per_x_secs=300,
-                                        limit_key="docker-api-inspect-no-log-path",
+                                        limit_key="docker-api-inspect",
                                     )
 
                             if get_labels:
@@ -1235,7 +1245,7 @@ class ContainerChecker(StoppableThread):
             if self.__log_watcher:
                 try:
                     log["log_config"] = self.__log_watcher.add_log_config(
-                        self.__module.module_name, log["log_config"]
+                        self.__module.module_name, log["log_config"], force_add=True
                     )
                 except Exception as e:
                     global_log.info(
