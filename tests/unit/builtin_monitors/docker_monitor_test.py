@@ -45,8 +45,12 @@ __all__ = ["DockerMonitorTest"]
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(BASE_DIR, "../fixtures")
-CONTAINER_LOG_FIXTURE_PATH = os.path.join(
+
+CONTAINER_LOG_FIXTURE_PATH_1 = os.path.join(
     FIXTURES_DIR, "docker_container_logs/docker-printer-stdout.log"
+)
+CONTAINER_LOG_FIXTURE_PATH_2 = os.path.join(
+    FIXTURES_DIR, "docker_container_logs/docker-printer-stdout-invalid-ts.log"
 )
 
 
@@ -57,7 +61,8 @@ class ContainerCheckerTestCase(ScalyrTestCase):
         self._temp_data_dir = tempfile.mkdtemp()
         self._temp_log_dir = tempfile.mkdtemp()
 
-        shutil.copy(CONTAINER_LOG_FIXTURE_PATH, self._temp_log_dir)
+        shutil.copy(CONTAINER_LOG_FIXTURE_PATH_1, self._temp_log_dir)
+        shutil.copy(CONTAINER_LOG_FIXTURE_PATH_2, self._temp_log_dir)
 
     @mock.patch("scalyr_agent.builtin_monitors.docker_monitor.DockerClient")
     def test_get_last_request_for_log(self, mock_docker_client):
@@ -103,7 +108,16 @@ class ContainerCheckerTestCase(ScalyrTestCase):
         )
         self.assertEqual(result, expected_result)
 
-        # 2. Existing log file is always, should use time stamp from the last log line
+        # 3. File exists, but it contains invalid / corrupted timestamp
+        file_name = "docker-printer-stdout-invalid-ts.log"
+
+        expected_result = scalyr_util.seconds_since_epoch(mock_start_time_dt)
+        result = container_checker._ContainerChecker__get_last_request_for_log(
+            path=file_name
+        )
+        self.assertEqual(result, expected_result)
+
+        # 4. Existing log file is always, should use time stamp from the last log line
         file_name = "docker-printer-stdout.log"
         # Last log line in that log file looks like this: "2020-10-27T17:18:12.878281177Z Line 291"
         start_time_dt = datetime.datetime(2020, 10, 27, 17, 18, 12, 878281)
