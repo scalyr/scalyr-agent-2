@@ -2974,6 +2974,8 @@ class ContainerChecker(object):
     def __get_last_request_for_log(self, path):
         result = datetime.datetime.utcfromtimestamp(self.__start_time)
 
+        fp = None
+
         try:
             full_path = os.path.join(self.__log_path, path)
             fp = open(full_path, "r", self.__readback_buffer_size)
@@ -2997,9 +2999,11 @@ class ContainerChecker(object):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
-            fp.close()
         except Exception as e:
             global_log.info("%s", six.text_type(e))
+        finally:
+            if fp:
+                fp.close()
 
         return scalyr_util.seconds_since_epoch(result)
 
