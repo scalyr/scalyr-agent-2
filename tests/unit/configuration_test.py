@@ -2119,6 +2119,13 @@ class TestConvertConfigParam(TestConfigurationBase):
             IndexError, lambda: convert_config_param("dummy_field", "", JsonArray)
         )
 
+    def test_convert_to_float(self):
+        self.assertEqual(5.0, convert_config_param("dummy_field", "5.0", float))
+        self.assertEqual(5.0, convert_config_param("dummy_field", 5.0, float))
+        self.assertEqual(5.0, convert_config_param("dummy_field", 5, float))
+        self.assertEqual(2.1, convert_config_param("dummy_field", "2.1", float))
+        self.assertEqual(2.1, convert_config_param("dummy_field", 2.1, float))
+
 
 class TestGetConfigFromEnv(TestConfigurationBase):
     def test_get_empty_array_of_string(self):
