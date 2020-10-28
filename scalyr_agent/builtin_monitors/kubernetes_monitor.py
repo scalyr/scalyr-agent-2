@@ -2972,7 +2972,7 @@ class ContainerChecker(object):
             self.raw_logs.append(log)
 
     def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+        result = datetime.datetime.utcfromtimestamp(self.__start_time)
 
         fp = None
 

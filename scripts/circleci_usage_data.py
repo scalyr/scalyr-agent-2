@@ -68,8 +68,8 @@ def get_all_branches_for_repo(project_slug, limit=5):
     # 1. Retrieve all the PRs for last week
     url = GITHUB_API_SEARCH_URL.format(project_slug=project_slug)
 
-    now = datetime.datetime.now().strftime("%Y-%m-%d")
-    week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    week_ago = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).strftime(
         "%Y-%m-%d"
     )
 
@@ -217,8 +217,8 @@ def print_usage_data(
     value = buff.getvalue()
 
     if emails:
-        now = datetime.datetime.now().strftime("%Y-%m-%d")
-        week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(
+        now = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        week_ago = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).strftime(
             "%Y-%m-%d"
         )
 
