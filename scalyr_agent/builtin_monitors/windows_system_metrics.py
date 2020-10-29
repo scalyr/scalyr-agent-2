@@ -113,18 +113,6 @@ def _gather_metric(method, attribute=None, transform=None):
             if transform is not None:
                 value = transform(value)
             yield value, None
-        except AttributeError as e:
-            # The same issue this diskperf,
-            # but the exception catch below does not work on older windows versions.
-            message = getattr(e, "message", str(e))
-            if (
-                message == "'NoneType' object has no attribute 'read_bytes'"
-                and method == "disk_io_counters"
-            ):
-                no_diskperf = True
-            else:
-                raise e
-
         except RuntimeError as e:
             # Special case the expected exception we see if we call disk_io_counters without the
             # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
@@ -134,6 +122,17 @@ def _gather_metric(method, attribute=None, transform=None):
             message = getattr(e, "message", str(e))
             if (
                 message == "couldn't find any physical disk"
+                and method == "disk_io_counters"
+            ):
+                no_diskperf = True
+            else:
+                raise e
+        except AttributeError as e:
+            # The same issue with diskperf,
+            # but the exception catch above does not work on older windows versions.
+            message = getattr(e, "message", str(e))
+            if (
+                message == "'NoneType' object has no attribute 'read_bytes'"
                 and method == "disk_io_counters"
             ):
                 no_diskperf = True
