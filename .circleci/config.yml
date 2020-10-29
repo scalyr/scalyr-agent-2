@@ -2274,6 +2274,21 @@ workflows:
    jobs:
      - lint-checks:
          context: scalyr-agent
+ unit-tests:
+   <<: *skip_release_build_branch_push
+   # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+   # Python 3 versions
+   jobs:
+     - unittest-26:
+         context: scalyr-agent
+     - unittest-27:
+         context: scalyr-agent
+     - unittest-35:
+         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-35-windows:
+         context: scalyr-agent
  smoke-tests:
    <<: *skip_release_build_branch_push
    jobs:
