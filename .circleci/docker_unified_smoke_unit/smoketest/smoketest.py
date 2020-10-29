@@ -82,6 +82,7 @@ import requests
 import socket
 import sys
 import threading
+import shlex
 from io import open
 from copy import deepcopy
 
@@ -114,11 +115,9 @@ def _exit(code, show_agent_status=True, header="", message=""):
     file = sys.stdout if code == 0 else sys.stderr
     if show_agent_status:
         _pretty_print(header="BEGIN AGENT STATUS")
-        # TODO fix this to work under python 3
-        print("TODO: Scalyr agent status does not work under python 3 yet")
-        # agent_exec = '/usr/share/scalyr-agent-2/bin/scalyr-agent-2'
-        # if os.path.isfile(agent_exec):
-        #     os.system('{} status -v'.format(agent_exec))
+        agent_exec = "/usr/share/scalyr-agent-2/bin/scalyr-agent-2"
+        if os.path.isfile(agent_exec):
+            os.system("{} status -v".format(shlex.quote(agent_exec)))
         _pretty_print(header="END AGENT STATUS")
         _pretty_print(message=" ")
     _pretty_print(header, message, file=file)
