@@ -702,8 +702,6 @@ class DockerSmokeTestActor(SmokeTestActor):
                     print(matches[0])
                     print("")
                     att = matches[0]["attributes"]
-                    print(self._verify_queried_attributes)
-                    print(self)
                     return self._verify_queried_attributes(
                         att, stream_name, process_name
                     )
@@ -759,6 +757,93 @@ class DockerAPIActor(DockerSmokeTestActor):
 
     VERIFIER_TYPE = "Docker API (docker_raw_logs: false)"
 
+    def __init__(self, *args, **kwargs):
+        super(DockerAPIActor, self).__init__(*args, **kwargs)
+
+        # Stores a list of objects for matching lines we've seen
+        self._seen_matching_lines = set()
+        self._last_seen_timestamp = 0
+
+    def _get_base_query_params(self):
+        # NOTE: We can't really use last timestamp based querying since sometimes data appears to
+        # come in out of order so we miss messages that away
+        if self._last_seen_timestamp:
+            start_time = str(self._last_seen_timestamp)
+        else:
+            start_time = "10m"
+
+        params = {
+            "maxCount": 100,
+            "startTime": start_time,
+            "token": self._read_api_key,
+        }
+        return params
+
+    def verify_logs_uploaded(self):
+        """
+        Function which verifies container logs were indeed correctly ingested into Scalyr.
+        """
+
+        def _query_scalyr_for_monitored_log_upload(contname_suffix, stream_name):
+            def _func():
+                process_name = self._get_process_name_for_suffix(contname_suffix)
+                resp = requests.get(
+                    self._make_query_url(
+                        self._get_extra_query_attributes(stream_name, process_name),
+                        override_serverHost=self._agent_hostname,
+                        override_log="{}/{}.log".format(
+                            self._get_mapped_logfile_prefix(), process_name
+                        ),
+                        override_log_regex=self._get_uploader_override_logfilename_regex(
+                            stream_name=stream_name, process_name=process_name
+                        ),
+                        message=None,
+                    )
+                )
+
+                if resp.ok:
+                    data = json.loads(resp.content)
+
+                    if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
+                        return False
+
+                    matches = data["matches"]
+
+                    if len(matches) == 0:
+                        print("Found 0 matches")
+                        return False
+
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
+
+                    self._last_seen_timestamp = int(matches[0]["timestamp"])
+
+                    return self._verify_response_matches(
+                        matches=matches,
+                        stream_name=stream_name,
+                        process_name=process_name,
+                    )
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_code))
+                print("Response text: %s" % (resp.text))
+                return False  # Non-ok response
+
+            return _func
+
+        self.poll_until_max_wait(
+            _query_scalyr_for_monitored_log_upload("agent", "stdout"),
+            "Querying server to verify monitored logfile was uploaded.",
+            "Monitored logfile upload verified",
+            "Monitored logfile upload not verified",
+            exit_on_success=True,
+            exit_on_fail=True,
+        )
+
     def _get_uploader_stream_names(self):
         return ["stdout"]
 
@@ -766,28 +851,75 @@ class DockerAPIActor(DockerSmokeTestActor):
         return "/var/log/scalyr-agent-2"
 
     def _serialize_row(self, obj):
-        return "Starting docker monitor (raw_logs=False)"
+        return ""
 
-    def _get_uploader_override_logfilename_regex(self, process_name):
+    def _get_uploader_override_logfilename_regex(self, stream_name, process_name):
         # $logfile will look something like this:
         # "/var/log/scalyr-agent-2/docker-ci-agent-docker-api-56640-agent-stdout.log"
-        # process name will contain a value similarto this one:
-        #  ci-agent-docker-api-56644-uploader
-        logname_suffix = process_name.replace("-uploader", "-agent-stdout")
-        return "{}/docker-{}.log".format(self._get_mapped_logfile_prefix(), logname_suffix)
+        # process name will contain a value similar to this one:
+        #  ci-agent-docker-api-56644-agent
+        logname_suffix = process_name + "-" + stream_name
+        return "{}/docker-{}.log".format(
+            self._get_mapped_logfile_prefix(), logname_suffix
+        )
 
     def _get_extra_query_attributes(self, stream_name, process_name):
         return {}
 
-    def _verify_queried_attributes(self, att, stream_name, process_name):
-        if not all(
-            [
-                att.get("serverHost") == self._agent_hostname,
-                att.get("monitor") == "agentDocker",
-            ]
+    def _verify_response_matches(self, matches, stream_name, process_name):
+        for item in matches:
+            attributes = item["attributes"]
+            message = item.get("message", "") or ""
+
+            self._verify_queried_attributes(
+                att=attributes,
+                message=message,
+                stream_name=stream_name,
+                process_name=process_name,
+            )
+
+        success = len(self._seen_matching_lines) == 3
+        if success:
+            print(
+                "Found all the required log lines (%s)"
+                % (str(self._seen_matching_lines))
+            )
+
+        return success
+
+    def _verify_queried_attributes(self, att, message, stream_name, process_name):
+        log_path = self._get_uploader_override_logfilename_regex(
+            stream_name=stream_name, process_name=process_name
+        )
+
+        if "Docker API (docker_raw_logs: false)" in message:
+            self._seen_matching_lines.add(message)
+            return
+
+        log_path = self._get_uploader_override_logfilename_regex(
+            stream_name=stream_name, process_name=process_name
+        )
+
+        # Message should look something like this:
+        # INFO [core] [copying_manager.py:423] Adding new log file
+        # '/var/log/scalyr-agent-2/docker-ci-agent-docker-api-57068-agent-stdout.log' for monitor
+        # 'scalyr_agent.builtin_monitors.docker_monitor'
+        if "Adding new log file" in message and log_path in message:
+            self._seen_matching_lines.add(message)
+            return
+
+        # Message should look something like this:
+        # INFO [monitor:docker_monitor] [docker_monitor.py:1308] File
+        # /var/log/scalyr-agent-2/docker-ci-agent-docker-api-57087-verifier-stdout.log doesn't
+        # exist on disk. This likely means a new container has been started and no existing logs
+        # are available for it on disk. Original error: [Errno 2] No such file or directory:
+        # '/var/log/scalyr-agent-2/docker-ci-agent-docker-api-57087-verifier-stdout.log'
+        if (
+            "doesn't exist on disk. This likely means a new container has been started"
+            in message
         ):
-            return False
-        return True
+            self._seen_matching_lines.add(message)
+            return
 
 
 class DockerSyslogActor(DockerSmokeTestActor):
