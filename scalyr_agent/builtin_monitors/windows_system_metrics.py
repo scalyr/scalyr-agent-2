@@ -103,6 +103,7 @@ def _gather_metric(method, attribute=None, transform=None):
 
     def gather_metric():
         """Dynamically Generated """
+        no_diskperf = False
         try:
             metric = methodcaller(method)  # pylint: disable=redefined-outer-name
             value = metric(psutil)
@@ -112,6 +113,18 @@ def _gather_metric(method, attribute=None, transform=None):
             if transform is not None:
                 value = transform(value)
             yield value, None
+        except AttributeError as e:
+            # The same issue this diskperf,
+            # but the exception catch below does not work on older windows versions.
+            message = getattr(e, "message", str(e))
+            if (
+                message == "'NoneType' object has no attribute 'read_bytes'"
+                and method == "disk_io_counters"
+            ):
+                no_diskperf = True
+            else:
+                raise e
+
         except RuntimeError as e:
             # Special case the expected exception we see if we call disk_io_counters without the
             # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
@@ -123,9 +136,11 @@ def _gather_metric(method, attribute=None, transform=None):
                 message == "couldn't find any physical disk"
                 and method == "disk_io_counters"
             ):
-                yield __NO_DISK_PERF__, None
+                no_diskperf = True
             else:
                 raise e
+        if no_diskperf:
+            yield __NO_DISK_PERF__, None
 
     gather_metric.__doc__ = doc(method, attribute)
     return gather_metric
