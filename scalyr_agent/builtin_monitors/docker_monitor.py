@@ -1650,12 +1650,16 @@ class DockerLogger(object):
             self.__last_request += 0.01
 
             self.__last_request_lock.release()
-
+        except docker.errors.NotFound as e:
+            # This simply represents the container has been stopped / killed before the client has
+            # been able to cleanly close the connection. This error is non-fatal and simply means we
+            # will clean up / remove the log on next iteration.
+            global_log.info(
+                'Container with id "%s" and name "%s" has been removed or deleted. Log file '
+                "will be removed on next loop iteration. Original error: %s."
+                % (self.cid, self.name, str(e))
+            )
         except Exception as e:
-            # TODO: We should also catch 404 and treat it as an error which indicates container has
-            # been removed / killed.
-            # Keep in mind that we will correctly recognize that on subsequent retry and schedule
-            # log for deletion then, but we should still more gracefully handle it here.
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
                 % (self.name, six.text_type(e), traceback.format_exc())
