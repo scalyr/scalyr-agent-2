@@ -217,12 +217,26 @@ def get_json_implementation(lib_name):
                 # if there is an integer size error, fall back to native json
                 if str(e) == "Integer exceeds 64-bit range":
                     _, _json_dumps, _ = get_json_implementation("json")
-
+                    return _json_dumps(obj, fp)
+                if "surrogates not allowed" in str(e):
+                    # orjson also doesn't support non valid utf8-sequences so we fall back do standard
+                    # json implementation
+                    _, _json_dumps, _ = get_json_implementation("json")
                     return _json_dumps(obj, fp)
                 else:
                     raise
 
-        return lib_name, orjson_dumps_custom, orjson.loads
+        def orjson_loads_custom(data, *args, **kwargs):
+            try:
+                return orjson.loads(data, *args, **kwargs)
+            except Exception as e:
+                if "leading surrogate" in str(e):
+                    _, _, _json_loads = get_json_implementation("json")
+                    return _json_loads(data, *args, **kwargs)
+                else:
+                    raise
+
+        return lib_name, orjson_dumps_custom, orjson_loads_custom
 
     else:
         if lib_name != "json":
