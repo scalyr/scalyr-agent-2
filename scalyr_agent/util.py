@@ -30,6 +30,7 @@ if False:  # NOSONAR
 
 import codecs
 import sys
+import locale
 from io import open
 
 import six
@@ -2069,6 +2070,27 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
     return compress_func, decompress_func
+
+
+def get_language_code_coding_and_locale():
+    # type: () -> Tuple[str, str, str]
+    """
+    Return values for the currently set language code, coding and user-friendly locale string.
+    """
+    try:
+        language_code, encoding = locale.getdefaultlocale()
+        if language_code and encoding:
+            used_locale = ".".join([language_code, encoding])
+        else:
+            language_code = "unknown"
+            encoding = "unknown"
+            used_locale = "unable to retrieve locale"
+    except Exception as e:
+        language_code = "unknown"
+        encoding = "unknown"
+        used_locale = "unable to retrieve locale: %s" % (str(e))
+
+    return language_code, encoding, used_locale
 
 
 class RateLimiterToken(object):

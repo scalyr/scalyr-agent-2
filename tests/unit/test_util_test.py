@@ -20,11 +20,14 @@ from __future__ import absolute_import
 from io import open
 
 import os
+import locale
 
 import mock
 import six
 
+from scalyr_agent import util as scalyr_util
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+from scalyr_agent.test_base import ScalyrTestCase
 
 __all__ = ["LogCaptureClassTestCase"]
 
@@ -144,3 +147,37 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
 
         self.assertTrue(expected_msg_1 in print_message_1)
         self.assertTrue(expected_msg_2 in print_message_2)
+
+
+class MiscUtilsTestCase(ScalyrTestCase):
+    def tearDown(self):
+        super(MiscUtilsTestCase, self).tearDown()
+
+        if "LC_ALL" in os.environ:
+            del os.environ["LC_ALL"]
+
+    def test_get_language_code_coding_and_locale(self):
+        locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+        self.assertEqual(language_code, "en_US")
+        self.assertEqual(encoding, "UTF-8")
+        self.assertEqual(used_locale, "en_US.UTF-8")
+
+        # NOTE: To be able to test other locales we would need to install other locale packages
+        os.environ["LC_ALL"] = "invalid"
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+        self.assertEqual(language_code, "unknown")
+        self.assertEqual(encoding, "unknown")
+        self.assertEqual(
+            used_locale, "unable to retrieve locale: unknown locale: invalid"
+        )

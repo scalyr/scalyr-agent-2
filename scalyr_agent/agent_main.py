@@ -45,7 +45,6 @@ import sys
 import time
 import re
 import ssl
-import locale
 from io import open
 
 try:
@@ -1050,20 +1049,12 @@ class ScalyrAgent(object):
                 # easier for us to troubleshoot invalid locale related issues
                 lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
 
-                try:
-                    language_code, encoding = locale.getdefaultlocale()
-                    if language_code and encoding:
-                        used_locale = ".".join([language_code, encoding])
-                    else:
-                        language_code = "unknown"
-                        encoding = "unknown"
-                        used_locale = "unable to retrieve locale"
-                except Exception as e:
-                    language_code = "unknown"
-                    encoding = "unknown"
-                    used_locale = "unable to retrieve locale: %s" % (str(e))
+                (
+                    language_code,
+                    encoding,
+                    used_locale,
+                ) = scalyr_util.get_language_code_coding_and_locale()
 
-                # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
                     "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
                     "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
