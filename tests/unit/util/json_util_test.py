@@ -1,3 +1,4 @@
+#  -*- coding: utf-8 -*-
 # Copyright 2014 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +24,7 @@ __author__ = "echee@scalyr.com"
 import sys
 import unittest
 import importlib
+import locale
 
 import six
 import mock
@@ -154,6 +156,59 @@ class EncodeDecodeTest(ScalyrTestCase):
         # do the same check but now with binary string.
         if isinstance(text, six.text_type):
             self.__test_encode_decode(text.encode("utf-8"), obj)
+
+
+class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
+    def setUp(self):
+        super(UnicodeAndLocaleEncodingAndDecodingTestCase, self).setUp()
+
+        self.original_locale = locale.getlocale()
+
+    def tearDown(self):
+        super(UnicodeAndLocaleEncodingAndDecodingTestCase, self).tearDown()
+
+        locale.setlocale(locale.LC_ALL, self.original_locale)
+
+    def test_non_ascii_data_non_utf_locale_coding_default_json_lib(self):
+        util.set_json_lib("json")
+        original_data = "čććžšđ"
+
+        # Default (UTF-8) locale
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\u010d\\u0107\\u0107\\u017e\\u0161\\u0111"')
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+        # Non UTF-8 Locale
+        locale.setlocale(locale.LC_ALL, "C")
+
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\u010d\\u0107\\u0107\\u017e\\u0161\\u0111"')
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+    @skipIf(six.PY2, "Skipping under Python 2")
+    def test_non_ascii_data_non_utf_locale_coding_orjson(self):
+        util.set_json_lib("orjson")
+        original_data = "čććžšđ"
+
+        # Default (UTF-8) locale
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"%s"' % (original_data))
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+        # Non UTF-8 Locale
+        locale.setlocale(locale.LC_ALL, "C")
+
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"%s"' % (original_data))
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
 
 
 @pytest.mark.json_lib
