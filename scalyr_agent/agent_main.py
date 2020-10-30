@@ -45,6 +45,7 @@ import sys
 import time
 import re
 import ssl
+import locale
 from io import open
 
 try:
@@ -110,6 +111,16 @@ VALID_STATUS_FORMATS = ["text", "json"]
 AGENT_LOG_FILENAME = "agent.log"
 
 AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
+
+# Work around for a potential race which may happen when threads try to resolve a unicode hostname
+# or similar
+# See:
+# - https://bugs.python.org/issue29288
+# - https://github.com/aws/aws-cli/pull/4383/files#diff-45cb40c448cb3c90162a08a8d5c86559afb843a7678339500c3fb15933b5dcceR55
+try:
+    "".encode("idna")
+except Exception as e:
+    print("Failed to force idna encoding: %s" % (str(e)))
 
 
 def _update_disabled_until(config_value, current_time):
@@ -1034,10 +1045,18 @@ class ScalyrAgent(object):
                 build_revision = get_build_revision()
                 openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
 
+                try:
+                    language_code, encoding = locale.getdefaultlocale()
+                    used_locale = ".".join([language_code, encoding])
+                except Exception as e:
+                    language_code = "unknown"
+                    encoding = "unknown"
+                    used_locale = "unable to retrieve locale: %s" % (str(e))
+
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
                     "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s) (default fs encoding: %s)"
+                    "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
@@ -1045,11 +1064,25 @@ class ScalyrAgent(object):
                         python_version_str,
                         openssl_version,
                         sys.getfilesystemencoding(),
+                        used_locale,
                     )
                 )
 
                 log.info(msg)
                 log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
+
+                # Log warn message if non UTF-8 locale is used - this would cause issues when trying
+                # to monitor files with unicode characters inside the file names or inside the
+                # content
+                if encoding.lower() not in "utf-8":
+                    log.warn(
+                        "Detected a non UTF-8 locale (%s) being used. You are strongly "
+                        "encouraged to set the locale for the agent process to UTF-8."
+                        "Otherwise things won't work when trying to monitor files with "
+                        "non-ascii content or non-ascii characters in the log file names."
+                        "On Linux you can do that by setting LANG and LC_ALL environment "
+                        "variable: export LC_ALL=en_US.UTF-8" % (encoding)
+                    )
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
