@@ -20,7 +20,7 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-
+import os
 import sys
 import unittest
 import importlib
@@ -169,6 +169,9 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
 
         locale.setlocale(locale.LC_ALL, self.original_locale)
 
+        if "LC_ALL" in os.environ:
+            del os.environ["LC_ALL"]
+
     def test_non_ascii_data_non_utf_locale_coding_default_json_lib(self):
         util.set_json_lib("json")
         original_data = "čććžšđ"
@@ -181,7 +184,7 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
         self.assertEqual(loaded, original_data)
 
         # Non UTF-8 Locale
-        locale.setlocale(locale.LC_ALL, "C")
+        os.environ["LC_ALL"] = "invalid"
 
         result = util.json_encode(original_data)
         self.assertEqual(result, '"\\u010d\\u0107\\u0107\\u017e\\u0161\\u0111"')
@@ -202,7 +205,7 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
         self.assertEqual(loaded, original_data)
 
         # Non UTF-8 Locale
-        locale.setlocale(locale.LC_ALL, "C")
+        os.environ["LC_ALL"] = "invalid"
 
         result = util.json_encode(original_data)
         self.assertEqual(result, '"%s"' % (original_data))
