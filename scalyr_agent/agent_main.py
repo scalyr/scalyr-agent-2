@@ -101,6 +101,7 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent import compat
 
 
 STATUS_FILE = "last_status"
@@ -1045,9 +1046,18 @@ class ScalyrAgent(object):
                 build_revision = get_build_revision()
                 openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
 
+                # We also include used locale and LANG env variable values since this makes it
+                # easier for us to troubleshoot invalid locale related issues
+                lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
                 try:
                     language_code, encoding = locale.getdefaultlocale()
-                    used_locale = ".".join([language_code, encoding])
+                    if language_code and encoding:
+                        used_locale = ".".join([language_code, encoding])
+                    else:
+                        language_code = "unknown"
+                        encoding = "unknown"
+                        used_locale = "unable to retrieve locale"
                 except Exception as e:
                     language_code = "unknown"
                     encoding = "unknown"
@@ -1056,7 +1066,7 @@ class ScalyrAgent(object):
                 # TODO: Why do we log the same line under info and debug? Intentional?
                 msg = (
                     "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s)"
+                    "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
                     % (
                         SCALYR_VERSION,
                         build_revision,
@@ -1065,6 +1075,7 @@ class ScalyrAgent(object):
                         openssl_version,
                         sys.getfilesystemencoding(),
                         used_locale,
+                        lang_env_var,
                     )
                 )
 
@@ -1077,11 +1088,11 @@ class ScalyrAgent(object):
                 if encoding.lower() not in "utf-8":
                     log.warn(
                         "Detected a non UTF-8 locale (%s) being used. You are strongly "
-                        "encouraged to set the locale for the agent process to UTF-8."
+                        "encouraged to set the locale / coding for the agent process to UTF-8. "
                         "Otherwise things won't work when trying to monitor files with "
-                        "non-ascii content or non-ascii characters in the log file names."
+                        "non-ascii content or non-ascii characters in the log file names. "
                         "On Linux you can do that by setting LANG and LC_ALL environment "
-                        "variable: export LC_ALL=en_US.UTF-8" % (encoding)
+                        "variable: e.g. export LC_ALL=en_US.UTF-8." % (encoding)
                     )
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
