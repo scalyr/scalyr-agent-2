@@ -1236,6 +1236,58 @@ jobs:
           fail_only: true
           only_for_branches: master
 
+  smoke-docker-api-raw-logs-disabled:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7-jessie
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - checkout
+      - restore_cache:
+          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: "Install Python Dependencies"
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
+      - save_cache:
+          name: "Save Dependencies Cache"
+          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+            - "~/.cache/pip"
+      - run:
+          name: Run Tests (with coverage)
+          command: |
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 api 150
+      - run:
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
+          command: |
+            ls -la .coverage* || true
+
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            source venv/bin/activate
+
+            # Ensure consistent paths for all the code coverage reports
+            sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+            # Submit it to codecov.io
+            ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-docker-syslog:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2255,6 +2307,8 @@ workflows:
       # NOTE: smoke test jobs below still use old smoke tests framework
      - smoke-docker-json:
          context: scalyr-agent
+     - smoke-docker-api-raw-logs-disabled:
+         context: scalyr-agent
      - smoke-docker-syslog:
          context: scalyr-agent
      - smoke-k8s:
@@ -2267,6 +2321,7 @@ workflows:
            # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
            # slowest jobs
            - smoke-docker-json
+           - smoke-docker-api-raw-logs-disabled
            - smoke-docker-syslog
            - smoke-k8s
            - smoke-monitors-tests
