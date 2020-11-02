@@ -1058,7 +1058,7 @@ class ScalyrAgent(object):
                 # to monitor files with unicode characters inside the file names or inside the
                 # content
                 _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
-                if encoding.lower() not in "utf-8":
+                if encoding.lower() not in ["utf-8", "utf8"]:
                     log.warn(NON_UTF8_LOCALE_WARNING_MESSAGE % (encoding))
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
