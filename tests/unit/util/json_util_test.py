@@ -167,7 +167,12 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
     def tearDown(self):
         super(UnicodeAndLocaleEncodingAndDecodingTestCase, self).tearDown()
 
-        locale.setlocale(locale.LC_ALL, self.original_locale)
+        if self.original_locale:
+            try:
+                locale.setlocale(locale.LC_ALL, self.original_locale)
+            except locale.Error:
+                # unsupported localle setting error should not be fatal
+                pass
 
         if "LC_ALL" in os.environ:
             del os.environ["LC_ALL"]
