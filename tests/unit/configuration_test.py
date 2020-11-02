@@ -2694,7 +2694,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
 
         # only defaults are created.
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0")
+            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
         )
 
 
@@ -2713,14 +2713,14 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0")
+            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
         )
 
     def test_default_api_keys_entry_id(self):
         # check the custom id for workers entry.
         self._write_file_with_separator_conversion(
             """ {
-                api_key: "hi there"
+                api_key: "some key"
                 api_keys: [
                     {
                         id: "my_worker"
@@ -2733,7 +2733,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="my_worker")
+            JsonObject(workers=1, api_key=config.api_key, id="my_worker", type="thread")
         )
 
     def test_default_api_keys_with_no_api_key(self):
@@ -2755,7 +2755,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=3, api_key=config.api_key, id="0")
+            JsonObject(workers=3, api_key=config.api_key, id="0", type="thread")
         )
 
     def test_default_api_keys_entry_and_invalid_second(self):
@@ -2807,6 +2807,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
                 api_keys: [
                     {
                         "workers": 3
+                        "type": "process"
                     },
                     {
                         api_key: "key2"
@@ -2823,8 +2824,8 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert len(config.api_key_configs) == 2
-        assert config.api_key_configs[0] == JsonObject(workers=3, api_key=config.api_key, id="0")
-        assert config.api_key_configs[1] == JsonObject(workers=4, api_key="key2", id="second")
+        assert config.api_key_configs[0] == JsonObject(workers=3, api_key=config.api_key, id="0", type="process")
+        assert config.api_key_configs[1] == JsonObject(workers=4, api_key="key2", id="second", type="thread")
 
     def test_log_file_bind_to_api_keys_entries(self):
         self._write_file_with_separator_conversion(
@@ -2837,7 +2838,8 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
                     {
                         api_key: "key2"
                         "workers": 4,
-                        "id": "second"
+                        "id": "second",
+                        type: "process"
                     }
                 ],
                 
@@ -2858,8 +2860,8 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert len(config.api_key_configs) == 2
-        assert config.api_key_configs[0] == JsonObject(workers=3, api_key=config.api_key, id="0")
-        assert config.api_key_configs[1] == JsonObject(workers=4, api_key="key2", id="second")
+        assert config.api_key_configs[0] == JsonObject(workers=3, api_key=config.api_key, id="0", type="thread")
+        assert config.api_key_configs[1] == JsonObject(workers=4, api_key="key2", id="second", type="process")
 
     def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
         self._write_file_with_separator_conversion(
@@ -2879,7 +2881,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
                 logs: [
                     {
                         path: "/some/path.log",
-                        workers_pool_id: "there is no such worker pool."
+                        api_key_id: "there is no such worker pool."
                     },
                     {
                         path: "/some/path2.log",

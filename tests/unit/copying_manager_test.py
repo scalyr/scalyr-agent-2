@@ -37,6 +37,7 @@ import glob
 import threading
 from io import open
 import logging
+import platform
 
 import parametrized
 import pytest
@@ -74,9 +75,8 @@ from tests.unit.copying_manager.common import (
     extract_lines_from_request,
 )
 from tests.unit.copying_manager.common import TestableShardedCopyingManager
-from scalyr_agent.new_copying_manager.copying_manager_worker import CopyingParameters
 
-from scalyr_agent.copying_manager import ShardedCopyingManager as CopyingManager
+from scalyr_agent.copying_manager import ShardedCopyingManager as CopyingManager, CopyingParameters
 
 scalyr_init()
 
@@ -93,7 +93,8 @@ def pytest_addoption(parser):
     parser.addoption("--all", action="store_true", help="run all combinations")
 
 def pytest_generate_tests(metafunc):
-    raise
+    if "worker_type" in metafunc.fixturenames:
+        metafunc.parametrize("worker_type", ["process",])
 
 
 def _create_test_copying_manager(
@@ -120,9 +121,19 @@ def _create_test_copying_manager(
     return manager
 
 
-class DynamicLogPathTest(ScalyrTestCase):
-    def setUp(self):
-        super(DynamicLogPathTest, self).setUp()
+class BaseTest(object):
+    @pytest.fixture(autouse=True)
+    def setup(self, worker_type):
+        self._worker_type = worker_type
+
+    def assertEquals(self, expexted, actual):
+        assert expexted == actual
+
+
+class TestDynamicLogPathTest(BaseTest):
+    @pytest.fixture(autouse=True)
+    def setup(self, worker_type):
+        self._worker_type = worker_type
         self._temp_dir = tempfile.mkdtemp()
         self._data_dir = os.path.join(self._temp_dir, "data")
         self._log_dir = os.path.join(self._temp_dir, "log")
@@ -136,7 +147,7 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         self._controller = None
 
-    def tearDown(self):
+    def teardown(self):
         if self._controller is not None:
             self._controller.stop()
         shutil.rmtree(self._config_dir)
@@ -154,6 +165,10 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         if not monitor_agent_log:
             config["implicit_agent_log_collection"] = False
+
+        config["api_keys"] = [
+            {"type": self._worker_type}
+        ]
 
         f = open(self._config_file, "w")
         if f:
@@ -1354,49 +1369,6 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
         # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
         self.assertEquals(0, len(lines))
-
-    # @skipIf(platform.system() == "Windows", "Skipping failing test on Windows")
-    @skipIf(True, "")
-    def test_stale_request(self):
-        controller = self.__create_test_instance()
-        self.__append_log_lines("First line", "Second line")
-        (request, responder_callback) = controller.wait_for_rpc()
-
-        lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
-
-        from scalyr_agent.new_copying_manager import copying_manager
-
-        # backup original 'time' module
-        orig_time = copying_manager.time
-
-        class _time_mock(object):
-            # This dummy 'time()' should be called on new copying thread iteration
-            # to emulate huge gap between last request.
-            def time(_self):  # pylint: disable=no-self-argument
-                result = (
-                    orig_time.time()
-                    + self._manager._CopyingManager__config.max_retry_time  # pylint: disable=no-member
-                )
-                return result
-
-        # replace time module with dummy time object.
-        copying_manager.time = _time_mock()
-
-        try:
-
-            # Set response to force copying manager to retry request.
-            responder_callback("error")
-
-            # Because of mocked time,repeated request will be rejected as too old.
-            (request, responder_callback) = controller.wait_for_rpc()
-
-            lines = self.__extract_lines(request)
-            self.assertEquals(0, len(lines))
-        finally:
-            copying_manager.time = orig_time
 
     def test_generate_status(self):
         controller = self.__create_test_instance()

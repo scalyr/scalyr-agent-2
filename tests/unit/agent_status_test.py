@@ -194,7 +194,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.copying_manager_status = copying_status
         copying_status.last_attempt_size = 10000
         copying_status.last_attempt_time = self.time - 60
-        copying_status.last_response_status = "success"
+        copying_status.last_response_statuses = "success"
         copying_status.total_errors = 0
         copying_status.total_bytes_uploaded = 10000
         copying_status.last_success_time = self.time - 60

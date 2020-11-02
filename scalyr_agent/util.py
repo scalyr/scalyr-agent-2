@@ -456,9 +456,9 @@ def read_file_as_json(file_path, strict_utf8=False):
     def parse_standard_json(text):
         try:
             return json_decode(text)
-        except ValueError as e:
+        except Exception as err:
             raise JsonParseException(
-                "JSON parsing failed due to: %s" % six.text_type(e)
+                "JSON parsing failed due to: %s" % six.text_type(err)
             )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)

@@ -35,6 +35,9 @@ import os
 import copy
 import collections
 
+if False:
+    from typing import TextIO
+
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
 
@@ -317,7 +320,6 @@ class ConfigStatus(BaseAgentStatus):
 
 class CopyingManagerWorkerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying manager worker components."""
-
     def __init__(self):
         self.worker_id = None
         # The total number of bytes successfully uploaded.
@@ -333,7 +335,7 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
         # The last status from the last response (should be 'success').
         self.last_response_status = None
         # The total number of failed copy requests.
-        self.total_errors = None
+        self.total_errors = 0
         # The total time in seconds we were blocked by the rate limiter
         self.total_rate_limited_time = 0
         # The time in seconds we were blocked by the rate limiter since the last status
@@ -351,7 +353,90 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
         self.health_check_result = None
 
         # LogProcessorStatus objects for each of the log files being processed by worker.
-        self.log_processors = collections.OrderedDict()
+        self.log_processors = collections.OrderedDict() # type: Dict[six.text_type, LogProcessorStatus]
+
+
+class ApiKeyWorkerPoolStatus(BaseAgentStatus):
+    def __init__(self):
+
+        # The total number of bytes successfully uploaded.
+        self.total_bytes_uploaded = 0
+        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
+        self.last_success_time = None
+        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
+        self.last_attempt_time = None
+        # The size of the request for the last attempt.
+        self.last_attempt_size = None
+        # The last response from the Scalyr servers.
+        self.last_responses_size = None
+        # The last status from the last response from all workers.
+        # It has a value only if responses from all workers are the same.
+        # For example, if every response in successful, it should be "'success' on all".
+        self.last_failed_response_statuses = None  # type: Optonal[Dict[six.text_type, six.text_type]]
+        # this attribute stores responses which are not successful.
+        self.last_failed_response_statuses = collections.OrderedDict()  # type: Optional[Dict[six.text_type, Dict]]
+
+        self.failed_health_check_results = None
+
+        # The total number of failed copy requests.
+        self.total_errors = 0
+        # The total time in seconds we were blocked by the rate limiter
+        self.total_rate_limited_time = 0
+        # The time in seconds we were blocked by the rate limiter since the last status
+        self.rate_limited_time_since_last_status = 0
+
+        self.total_copy_iterations = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.avg_bytes_produced_rate = 0
+        self.avg_bytes_copied_rate = 0
+
+        self.workers = {} #  type: Dict[six.text_type, CopyingManagerWorkerStatus]
+
+
+class ShardedCopyingManagerStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying components."""
+
+    def __init__(self):
+        # The total number of bytes successfully uploaded.
+        self.total_bytes_uploaded = 0
+        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
+        self.last_success_time = None
+        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
+        self.last_attempt_time = None
+        # The size of the request for the last attempt.
+        self.last_attempt_size = None
+        # The last response from the Scalyr servers.
+        self.last_response = None
+        # The last status from the last response (should be 'success').
+        self.last_response_statuses = collections.OrderedDict()
+        # The total number of failed copy requests.
+        self.total_errors = 0
+        # The total time in seconds we were blocked by the rate limiter
+        self.total_rate_limited_time = 0
+        # The time in seconds we were blocked by the rate limiter since the last status
+        self.rate_limited_time_since_last_status = 0
+
+        self.total_copy_iterations = 0
+        self.total_scan_iterations = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.avg_bytes_produced_rate = 0
+        self.avg_bytes_copied_rate = 0
+
+        # LogMatcherStatus objects for each of the log paths being watched for copying.
+        self.log_matchers = []
+
+        self.health_check_result = None
+
+        self.workers_statuses = []
+        self.api_key_statuses = collections.OrderedDict()  # type: Dict[six.text_type, ApiKeyWorkerPoolStatus]
 
 
 class CopyingManagerStatus(BaseAgentStatus):
@@ -393,6 +478,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.health_check_result = None
 
         self.workers_statuses = []
+        self.api_key_worker_pools = {} #type: Dict[six.text_type, ]
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -596,6 +682,7 @@ def report_status(output, status, current_time):
 
 
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
+    # type: (TextIO, ShardedCopyingManagerStatus, six.text_type, float) -> None
     print("Log transmission:", file=output)
     print("=================", file=output)
     print("", file=output)
@@ -611,134 +698,86 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         % manager_status.total_bytes_uploaded,
         file=output,
     )
-    print(
-        "Last successful communication with Scalyr: %s"
-        % scalyr_util.format_time(manager_status.last_success_time),
-        file=output,
-    )
-    print(
-        "Last attempt:                              %s"
-        % scalyr_util.format_time(manager_status.last_attempt_time),
-        file=output,
-    )
-
-    # group last responses from workers with counter.
-    response_statuses_counter = collections.Counter(manager_status.last_response_status)
-    # if there is no response yet, do not show it.
-    response_statuses_counter.pop(None, None)
-    if len(response_statuses_counter) > 0:
-        if len(response_statuses_counter) == 1:
-            message = next(iter(response_statuses_counter))
-        else:
-            message = ",".join(
-                "%s(%s)" % (status, count)
-                for status, count in sorted(
-                    response_statuses_counter.items(), key=lambda s: s[0]
-                )
-            )
-        print(
-            "Last copy response statuses:               %s" % message, file=output,
-        )
-
-    if manager_status.total_errors > 0:
-        print(
-            "Total responses with errors:               %d (see '%s' for details)"
-            % (manager_status.total_errors, agent_log_file_path,),
-            file=output,
-        )
-    if manager_status.health_check_result:
-        print(
-            "Health check:                              %s"
-            % manager_status.health_check_result,
-            file=output,
-        )
     print("", file=output)
-
+    print("Api keys statistics", file=output)
     print("-------------------", file=output)
-    print("Api keys statistics:\n", file=output)
 
-    for worker_status in sorted(
-        manager_status.workers_statuses, key=lambda s: s.worker_id
-    ):
-
-        print("Worker #%s" % worker_status.worker_id, file=output)
-
+    print(six.text_type(len(manager_status.api_key_statuses)), file=output)
+    for api_key_id, worker_pool in manager_status.api_key_statuses.items():
+        print("Api key ID: %s" % api_key_id, file=output)
         print(
             "    Bytes uploaded successfully:               %ld"
-            % worker_status.total_bytes_uploaded,
+            % worker_pool.total_bytes_uploaded,
             file=output,
         )
-
         print(
             "    Last successful communication with Scalyr: %s"
-            % scalyr_util.format_time(worker_status.last_success_time),
+            % scalyr_util.format_time(worker_pool.last_success_time),
             file=output,
         )
         print(
             "    Last attempt:                              %s"
-            % scalyr_util.format_time(worker_status.last_attempt_time),
+            % scalyr_util.format_time(worker_pool.last_attempt_time),
             file=output,
         )
+        if worker_pool.last_attempt_size is not None:
+            print(
+                "    Last copy requests size:                   %ld"
+                % worker_pool.last_attempt_size,
+                file=output,
+            )
+        if worker_pool.last_responses_size is not None:
+            print(
+                "    Last copy responses size:                  %ld"
+                % worker_pool.last_responses_size,
+                file=output,
+            )
 
-        # =================
-        if worker_status.last_attempt_size is not None:
             print(
-                "    Last copy request size:                    %ld"
-                % worker_status.last_attempt_size,
-                file=output,
-            )
-        if worker_status.last_response is not None:
-            print(
-                "    Last copy response size:                   %ld"
-                % len(worker_status.last_response),
-                file=output,
-            )
-            print(
+                # if every response is successful just write 'success', in opposite, print detailed info.
                 "    Last copy response status:                 %s"
-                % worker_status.last_response_status,
+                % ("" if worker_pool.last_failed_response_statuses else "success"),
                 file=output,
             )
-            if worker_status.last_response_status != "success":
+            # print detailed information about failed responses
+            for worker_id, response_status in worker_pool.last_failed_response_statuses.items():
+                print("        %s: %s" % (worker_id, response_status), file=output)
+                worker_status = manager_status.workers_statuses[worker_id]
                 print(
-                    "    Last copy response:                        %s"
+                    "            Last copy response:                        %s"
                     % scalyr_util.remove_newlines_and_truncate(
                         worker_status.last_response, 1000
                     ),
                     file=output,
                 )
-        if worker_status.total_errors > 0:
+        if manager_status.total_errors > 0:
             print(
                 "    Total responses with errors:               %d (see '%s' for details)"
-                % (worker_status.total_errors, agent_log_file_path,),
+                % (manager_status.total_errors, agent_log_file_path,),
                 file=output,
             )
-        if worker_status.health_check_result:
+        # print health checks.
+        if worker_pool.failed_health_check_results is not None:
+            # if every health check is successful just write 'Good', in opposite, print detailed info.
             print(
                 "    Health check:                              %s"
-                % worker_status.health_check_result,
+                % "" if manager_status.health_check_result else "Good",
                 file=output,
             )
-        # ================
+            # print detailed information about failed health checks
+            for worker_id, worker_health_check_result in worker_pool.failed_health_check_results.items():
+                print("        %s: %s" % worker_id, worker_health_check_result, file=output)
 
-        # also show all files that are processed by this worker.
+
+
         print("    Files:", file=output)
+        for worker_status in worker_pool.workers.values():
+            for log_path in worker_status.log_processors:
+                print("        %s" % log_path, file=output)
 
-        # also sort files by their paths
-        for processor_status in sorted(
-            worker_status.log_processors.values(), key=lambda s: s.log_path
-        ):
-            output.write(
-                "        Path %s:, copied %ld bytes (%ld lines), %ld bytes pending, "
-                % (
-                    processor_status.log_path,
-                    processor_status.total_bytes_copied,
-                    processor_status.total_lines_copied,
-                    processor_status.total_bytes_pending,
-                )
-            )
-            output.write("\n")
+        print("", file=output)
 
-        print("\n-------------------\n", file=output)
+
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:
@@ -757,10 +796,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                 # entry, but we loop anyway.
                 for processor_status in matcher_status.log_processors_status:
                     output.write(
-                        "Path %s: worker %s, copied %ld bytes (%ld lines), %ld bytes pending, "
+                        "Path %s: copied %ld bytes (%ld lines), %ld bytes pending, "
                         % (
                             processor_status.log_path,
-                            processor_status.worker_id,
                             processor_status.total_bytes_copied,
                             processor_status.total_lines_copied,
                             processor_status.total_bytes_pending,
@@ -811,10 +849,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
 
             for processor_status in matcher_status.log_processors_status:
                 output.write(
-                    "  %s: worker %s, copied %ld bytes (%ld lines), %ld bytes pending, "
+                    "  %s: copied %ld bytes (%ld lines), %ld bytes pending, "
                     % (
                         processor_status.log_path,
-                        processor_status.worker_id,
                         processor_status.total_bytes_copied,
                         processor_status.total_lines_copied,
                         processor_status.total_bytes_pending,

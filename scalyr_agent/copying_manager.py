@@ -18,11 +18,13 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from abc import ABCMeta, abstractmethod
+from distutils.log import Log
+
 __author__ = "czerwin@scalyr.com"
 
 import copy
 import datetime
-import fnmatch
 import os
 import threading
 import time
@@ -31,19 +33,35 @@ import itertools
 import glob
 import re
 import operator
+from operator import attrgetter
 import collections
+from multiprocessing.managers import BaseProxy, BaseManager
+import multiprocessing.connection
 
-import six
+if False:
+    from typing import Dict
+    from typing import List
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
-from scalyr_agent.log_watcher import LogWatcher
 
 from scalyr_agent.util import StoppableThread, RateLimiter
-from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
+from scalyr_agent.log_processing import (
+    LogMatcher,
+    LogFileProcessor,
+    LogFileProcessorInterface,
+)
 from scalyr_agent.agent_status import CopyingManagerStatus
-from scalyr_agent.agent_status import CopyingManagerWorkerStatus
+from scalyr_agent.agent_status import (
+    CopyingManagerWorkerStatus,
+    ShardedCopyingManagerStatus,
+    ApiKeyWorkerPoolStatus,
+)
 from scalyr_agent.scalyr_client import create_client
+from scalyr_agent.configuration import Configuration
+
+import six
+
 
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
@@ -300,16 +318,33 @@ class ShardedCopyingManager(StoppableThread):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-        self.__workers = []
-        self.__worker_pools = dict()
-        self.__workers_global_pool = None
+        # mapping of the api keys to worker pools.
+        self.__api_keys_worker_pools = dict()  # type: Dict[six.text_type, ApiKeyWorkerPool]
+        self.__log_matchers_to_api_keys = dict()
+        self.__all_workers_pool = None  # type: Optional[ApiKeyWorkerPool]
+        self._processors_to_workers = dict()
+
+        # if some workers are in multiprocessing mode, we need to create memory manager for each of them.
+        self._shared_memory_managers = dict()
 
         self._current_worker = 0
 
-        self.__log_processor_factory = LogFileProcessor
+        # self.__log_processor_factory = log_file_processor_factory()
+
+        # create copying workers according to settings in the configuration.
+        self._create_worker_pools()
 
         # The list of LogMatcher objects that are watching for new files to appear.
         self.__log_matchers = self.__create_log_matches(configuration, monitors)
+
+    @property
+    def _all_workers_pool(self):
+        # type: () -> ApiKeyWorkerPool
+        """
+        Return all worker pool. Exposed only for testing purposes.
+        :return:
+        """
+        return self.__all_workers_pool
 
     def run(self):
         """Processes the log files as requested by the configuration, looking for matching log files, reading their
@@ -335,7 +370,6 @@ class ShardedCopyingManager(StoppableThread):
         #   - sleep
 
         # Make sure start_manager was invoked to start the thread and we have a scalyr client instance.
-        assert self.__scalyr_client is not None
 
         if self.__config.copying_thread_profile_interval > 0:
             import cProfile
@@ -355,20 +389,12 @@ class ShardedCopyingManager(StoppableThread):
 
                 log.info("Starting copying manager workers.")
 
-                # create copying workers according to settings in the configuration.
-                self._create_worker_pools()
-
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
                 checkpoints = self.__get_checkpoints(current_time)
 
                 # start all workers.
-                for worker in self.__workers:
-                    worker.start_worker()
-
-                # wait for workers started copying.
-                for worker in self.__workers:
-                    worker.wait_for_copying_to_begin()
+                self.__all_workers_pool.start_workers()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
@@ -426,7 +452,7 @@ class ShardedCopyingManager(StoppableThread):
                                     )
                                 )
                                 profiler.enable()
-                    except Exception:
+                    except Exception as e:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception(
                             "Failed while attempting to scan and transmit logs"
@@ -449,12 +475,11 @@ class ShardedCopyingManager(StoppableThread):
             except Exception as e:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
+                raise
                 sys.exit(1)
         finally:
             # stopping all workers.
-            for worker in self.__workers:
-                if worker.is_alive():
-                    worker.stop_worker()
+            self._all_workers_pool.stop_workers()
 
             log.info("Copying manager is finished.")
 
@@ -471,20 +496,30 @@ class ShardedCopyingManager(StoppableThread):
         """
         self.__copying_semaphore.acquire(True)
 
-    @property
-    def workers(self):
-        return self.__workers
-
     def _create_worker_pools(self):
-        for worker_config in self.__config.api_key_configs:
-            pool = CopyingManagerWorkerPool.create_pool_from_config(
-                self.__config, worker_config
-            )
-            self.__worker_pools[worker_config["id"]] = pool
+        all_workers = []
+        for api_key_config in self.__config.api_key_configs:
+            pool_id = api_key_config["id"]
+            workers = dict()
+            for i in range(api_key_config["workers"]):
+                # combine workers positional number in pool and poll id.
+                worker_id = "%s_%s" % (pool_id, i)
 
-        self.__workers = list(itertools.chain(*[wp.workers for wp in self.__worker_pools.values()]))
+                worker = CopyingManagerWorkerWrapper(
+                    self.__config, api_key_config, worker_id
+                )
+                workers[worker_id] = worker
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "CopyingManagerWorker #%s is created." % worker.worker_id,
+                )
+
+                all_workers.append(worker)
+
+            pool = ApiKeyWorkerPool(list(workers.values()))
+            self.__api_keys_worker_pools[api_key_config["id"]] = pool
         # create global workers pool with all workers.
-        self.__workers_global_pool = CopyingManagerWorkerPool(self.__workers)
+        self.__all_workers_pool = ApiKeyWorkerPool(all_workers)
 
     def _scan_for_new_logs_if_necessary(
         self,
@@ -559,8 +594,13 @@ class ShardedCopyingManager(StoppableThread):
         :param log_processor:
         :return:
         """
-        worker = self.find_best_worker_to_processor(log_processor, log_config_entry)
-        worker.schedule_new_log_processor(log_processor)
+        if type(log_processor) is not LogFileProcessor:
+            worker = self.__all_workers_pool.workers[log_processor.worker_id]
+            worker.schedule_new_log_processor(log_processor)
+        else:
+            pool = self.__api_keys_worker_pools[log_config_entry["api_key_id"]]
+            pool.add_log_processor(log_processor)
+
 
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
@@ -601,7 +641,9 @@ class ShardedCopyingManager(StoppableThread):
                 copy_at_index_zero=copy_at_index_zero,
             ):
 
-                self.__add_log_processor_to_workers(new_processor, dict(matcher.log_entry_config))
+                self.__add_log_processor_to_workers(
+                    new_processor, matcher.log_entry_config
+                )
                 self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
                 # if the log file pending removal, mark that it has now been processed
@@ -638,100 +680,13 @@ class ShardedCopyingManager(StoppableThread):
         finally:
             self.__lock.release()
 
-    def __read_checkpoint_state2(self):
-        """Reads the checkpoint state from disk and returns it.
-
-        The checkpoint state maps each file path to the offset within that log file where we left off copying it.
-
-        @return:  The checkpoint state
-        @rtype: dict
-        """
-        full_checkpoint_file_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints.json"
-        )
-
-        if not os.path.isfile(full_checkpoint_file_path):
-            log.info(
-                'The log copying checkpoint file "%s" does not exist, skipping.'
-                % full_checkpoint_file_path
-            )
-            return None
-
-        # noinspection PyBroadException
-        try:
-            full_checkpoints = scalyr_util.read_file_as_json(
-                full_checkpoint_file_path, strict_utf8=True
-            )
-            active_checkpoint_file_path = os.path.join(
-                self.__config.agent_data_path, "active-checkpoints.json"
-            )
-
-            if not os.path.isfile(active_checkpoint_file_path):
-                return full_checkpoints
-
-            # if the active checkpoint file is newer, overwrite any checkpoint values with the
-            # updated full checkpoint
-            active_checkpoints = scalyr_util.read_file_as_json(
-                active_checkpoint_file_path, strict_utf8=True
-            )
-
-            if active_checkpoints["time"] > full_checkpoints["time"]:
-                full_checkpoints["time"] = active_checkpoints["time"]
-                for path, checkpoint in six.iteritems(
-                    active_checkpoints["checkpoints"]
-                ):
-                    full_checkpoints[path] = checkpoint
-
-            return full_checkpoints
-
-        except Exception:
-            # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
-            log.exception(
-                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
-                error_code="failedCheckpointRead",
-            )
-            return None
-
-    def _read_worker_checkpoints(self):
-        """
-                Read for all checkpoint files that
-                :return:
-                """
-        checkpoints_dir_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints"
-        )
-
-        if not os.path.isdir(checkpoints_dir_path):
-            return None
-
-        glob_path = os.path.join(checkpoints_dir_path, "checkpoints-*.json")
-
-        for path in glob.glob(glob_path):
-            pass
-
     def __get_checkpoints(self, current_time):
         """Find and read worker checkpoints that were previously written."""
-        workers_checkpoints = self.__find_and_read_workers_checkpoints()
 
-        if not workers_checkpoints:
-            log.info(
-                "The checkpoints were not read.  All logs will be copied starting at their current end"
-            )
-            return {}
+        checkpoints = self.__find_and_read_workers_checkpoints(current_time)
 
-        # discard stale checkpoints.
-        non_stale_checkpoints = list()
-
-        for wc in workers_checkpoints:
-            if current_time - wc["time"] > self.__config.max_allowed_checkpoint_age:
-                log.warn(
-                    'The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
-                    "be copied starting at their current end.",
-                    scalyr_util.format_time(wc["time"]),
-                    error_code="staleCheckpointFile",
-                )
-            else:
-                non_stale_checkpoints.append(wc)
+        if not checkpoints:
+            log.info("No checkpoints were found. All logs will be copied starting at their current end")
 
         result = {}
 
@@ -739,14 +694,14 @@ class ShardedCopyingManager(StoppableThread):
 
         # checkpoints from different workers may contain checkpoint for the same file,
         # so we sort checkpoints by time and update resulting collection with the same order.
-        non_stale_checkpoints.sort(key=operator.itemgetter("time"))
+        checkpoints.sort(key=operator.itemgetter("time"))
 
-        for wc in non_stale_checkpoints:
+        for wc in checkpoints:
             result.update(wc["checkpoints"])
 
         return result
 
-    def __find_and_read_workers_checkpoints(self):
+    def __find_and_read_workers_checkpoints(self, current_time):
         """
         Read for all checkpoint files that
         :return:
@@ -775,7 +730,7 @@ class ShardedCopyingManager(StoppableThread):
                 active_checkpoints_path = None
 
             checkpoints = self.__read_worker_checkpoint_state(
-                full_checkpoints_path, active_checkpoints_path
+                full_checkpoints_path, active_checkpoints_path, current_time
             )
 
             if checkpoints:
@@ -784,7 +739,7 @@ class ShardedCopyingManager(StoppableThread):
         return workers_checkpoints
 
     def __read_worker_checkpoint_state(
-        self, full_checkpoint_file_path, active_checkpoint_file_path
+        self, full_checkpoint_file_path, active_checkpoint_file_path, current_time
     ):
         """Reads the checkpoint state from disk and returns it.
 
@@ -807,28 +762,45 @@ class ShardedCopyingManager(StoppableThread):
                 full_checkpoint_file_path, strict_utf8=True
             )
 
-            if active_checkpoint_file_path is None or not os.path.isfile(
+            if active_checkpoint_file_path is not None and os.path.isfile(
                 active_checkpoint_file_path
             ):
-                return full_checkpoints
 
-            # if the active checkpoint file is newer, overwrite any checkpoint values with the
-            # updated full checkpoint
-            active_checkpoints = scalyr_util.read_file_as_json(
-                active_checkpoint_file_path, strict_utf8=True
-            )
+                # if the active checkpoint file is newer, overwrite any checkpoint values with the
+                # updated full checkpoint
+                active_checkpoints = scalyr_util.read_file_as_json(
+                    active_checkpoint_file_path, strict_utf8=True
+                )
 
-            if active_checkpoints["time"] > full_checkpoints["time"]:
-                full_checkpoints["time"] = active_checkpoints["time"]
-                for path, checkpoint in six.iteritems(
-                    active_checkpoints["checkpoints"]
-                ):
-                    full_checkpoints[path] = checkpoint
+                if active_checkpoints["time"] > full_checkpoints["time"]:
+                    full_checkpoints["time"] = active_checkpoints["time"]
+                    for path, checkpoint in six.iteritems(
+                        active_checkpoints["checkpoints"]
+                    ):
+                        full_checkpoints[path] = checkpoint
+
+            if current_time - full_checkpoints["time"] > self.__config.max_allowed_checkpoint_age:
+                log.warn(
+                    "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  All log files will "
+                    "be copied starting at their current end.",
+                    full_checkpoint_file_path,
+                    scalyr_util.format_time(full_checkpoints["time"]),
+                    error_code="staleCheckpointFile",
+                )
+
+                # checkpoint files are stale, so remove them.
+                os.unlink(full_checkpoint_file_path)
+                try:
+                    # ignore if active checkpoints do not exist
+                    os.unlink(active_checkpoint_file_path)
+                except OSError as e:
+                    if e.errno != 2:
+                        raise
+                return None
 
             return full_checkpoints
 
-        except Exception:
-            # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
+        except scalyr_util.JsonParseException:
             log.exception(
                 "Could not read checkpoint file due to error. Ignoring checkpoint file.",
                 error_code="failedCheckpointRead",
@@ -875,11 +847,12 @@ class ShardedCopyingManager(StoppableThread):
         result = []
 
         for log_config in configs:
+            worker = self.find_best_worker_for_log_config(log_config)
             result.append(
                 LogMatcher(
                     configuration,
                     log_config,
-                    log_processor_cls=self.__log_processor_factory,
+                    log_processor_cls=worker.spawn_new_log_processor,
                 )
             )
 
@@ -1008,89 +981,59 @@ class ShardedCopyingManager(StoppableThread):
         try:
             self.__lock.acquire()
 
-            result = CopyingManagerStatus()
+            result = ShardedCopyingManagerStatus()
 
             result.total_scan_iterations = self.total_scan_iterations
 
-            worker_statuses = result.workers_statuses
-            for worker in self.__workers:
-                status = worker.generate_status()
-                worker_statuses.append(status)
+            for api_key_id in sorted(self.__api_keys_worker_pools):
+                worker_pool = self.__api_keys_worker_pools[api_key_id]
+                worker_pool_status = worker_pool.generate_status()
+                result.api_key_statuses[api_key_id] = worker_pool_status
 
-            # get the most recent time fields from workers.
-            result.last_success_time = max(
-                [status.last_success_time for status in worker_statuses]
-            )
-            result.last_attempt_time = max(
-                [status.last_attempt_time for status in worker_statuses]
-            )
+                result.total_errors += worker_pool_status.total_errors
 
-            # the next fields are a sum of the same fields from all workers.
-            result.total_bytes_uploaded = sum(
-                status.total_bytes_uploaded for status in worker_statuses
-            )
-            result.total_errors = sum(status.total_errors for status in worker_statuses)
-
-            # also add the errors of the copying manager itself.
-            result.total_errors += self.__total_errors
-
-            result.last_response_status = [
-                status.last_response_status for status in worker_statuses
-            ]
+            # # get the most recent time fields from workers.
+            # result.last_success_time = max(
+            #     [status.last_success_time for status in worker_statuses]
+            # )
+            # result.last_attempt_time = max(
+            #     [status.last_attempt_time for status in worker_statuses]
+            # )
+            #
+            # # the next fields are a sum of the same fields from all workers.
+            # result.total_bytes_uploaded = sum(
+            #     status.total_bytes_uploaded for status in worker_statuses
+            # )
+            #
+            # result.last_response_statuses = [
+            #     status.last_response_status for status in worker_statuses
+            # ]
 
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
-            # get the health check for copying manager.
-
-            if self.__last_attempt_time:
-                health_check_successful = False
-                # at first, check copying manager itself.
-                # If its own last attempt time is old enough, than we set  as failed.
-                if (
-                    time.time()
-                    > self.__last_attempt_time
-                    + self.__config.healthy_max_time_since_last_copy_attempt
-                ):
-                    result.health_check_result = (
-                        "Failed, max time since last copy attempt (%s seconds) exceeded"
-                        % self.__config.healthy_max_time_since_last_copy_attempt
-                    )
-                else:
-                    health_check_successful = True
-
-                # if the health of the copying manager is good then check the health of its workers.
-                if health_check_successful:
-                    if all(
-                        status.health_check_result == "Good"
-                        for status in worker_statuses
-                    ):
-                        result.health_check_result = "Good"
-                    else:
-                        result.health_check_result = "Failed, some of workers have reached their timeout since their last copy attempt."
-
             # TODO: for now we just get sum from all workers to get values below, but it may be wrong to just get sum for them.
-            result.total_rate_limited_time = sum(
-                status.total_rate_limited_time for status in worker_statuses
-            )
-            result.rate_limited_time_since_last_status = sum(
-                status.rate_limited_time_since_last_status for status in worker_statuses
-            )
-            result.total_read_time = sum(
-                status.total_read_time for status in worker_statuses
-            )
-            result.total_blocking_response_time = sum(
-                status.total_blocking_response_time for status in worker_statuses
-            )
-            result.total_request_time = sum(
-                status.total_request_time for status in worker_statuses
-            )
-            result.total_pipelined_requests = sum(
-                status.total_pipelined_requests for status in worker_statuses
-            )
-            result.total_copy_iterations = sum(
-                status.total_copy_iterations for status in worker_statuses
-            )
+            # result.total_rate_limited_time = sum(
+            #     status.total_rate_limited_time for status in worker_statuses
+            # )
+            # result.rate_limited_time_since_last_status = sum(
+            #     status.rate_limited_time_since_last_status for status in worker_statuses
+            # )
+            # result.total_read_time = sum(
+            #     status.total_read_time for status in worker_statuses
+            # )
+            # result.total_blocking_response_time = sum(
+            #     status.total_blocking_response_time for status in worker_statuses
+            # )
+            # result.total_request_time = sum(
+            #     status.total_request_time for status in worker_statuses
+            # )
+            # result.total_pipelined_requests = sum(
+            #     status.total_pipelined_requests for status in worker_statuses
+            # )
+            # result.total_copy_iterations = sum(
+            #     status.total_copy_iterations for status in worker_statuses
+            # )
 
         finally:
             self.__lock.release()
@@ -1130,17 +1073,6 @@ class ShardedCopyingManager(StoppableThread):
 
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-    def __handle_new_log_processor(self, processor):
-        # type: (LogFileProcessor) -> None
-
-        current_worker = list(self.__workers.values())[self._current_worker]
-        if self._current_worker == len(self.__workers) - 1:
-            self._current_worker = 0
-        else:
-            self._current_worker += 1
-
-        current_worker.schedule_new_log_processor(processor)
-
     def _sleep_but_awaken_if_stopped(self, seconds):
         """Makes the current thread (the copying manager thread) go to sleep for the specified number of seconds,
         or until the manager is stopped, whichever comes first.
@@ -1178,10 +1110,12 @@ class ShardedCopyingManager(StoppableThread):
                 return log_config
 
             # add the path and matcher
+            worker = self.find_best_worker_for_log_config(log_config)
+
             matcher = LogMatcher(
                 self.__config,
                 log_config,
-                log_processor_cls=self.__log_processor_factory,
+                log_processor_cls=worker.spawn_new_log_processor,
             )
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
@@ -1362,8 +1296,8 @@ class ShardedCopyingManager(StoppableThread):
         """
         return self.__log_matchers
 
-    def find_best_worker_to_processor(self, processor, log_config_entry):
-        # type: (LogFileProcessor) -> CopyingManagerWorker
+    def find_best_worker_for_log_config(self, log_config_entry):
+        # type: (Dict) -> CopyingManagerWorkerWrapper
         """
         Find the best worker for the given log processor with given conditions.
         For example log file handled by processor may be configured to be sent only by particular scalyr account and etc.
@@ -1372,13 +1306,11 @@ class ShardedCopyingManager(StoppableThread):
         :return:
         """
 
-        worker_pool_id = log_config_entry.get("worker_pool_id")
-        if worker_pool_id is not None:
-            worker_pool = self.__worker_pools[worker_pool_id]
+        api_key_id = log_config_entry.get("api_key_id", none_if_missing=True)
+        if api_key_id is not None:
+            worker_pool = self.__api_keys_worker_pools[api_key_id]
         else:
-            worker_pool = self.__workers_global_pool
-
-        worker_pool.find_next_worker()
+            worker_pool = self.__all_workers_pool
 
         return worker_pool.find_next_worker()
 
@@ -1390,7 +1322,7 @@ class ShardedCopyingManager(StoppableThread):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of six.text_type
         """
-        for worker in self.__workers:
+        for worker in self._all_workers_pool.workers.values():
             worker.augment_user_agent_for_client_session(fragments)
 
     def get_worker_session_statuses(self):
@@ -1400,58 +1332,190 @@ class ShardedCopyingManager(StoppableThread):
         :return: dict with worker_id -> ScalyrClientSessionStatus.
         """
         session_stats = {}
-        for worker in self.__workers:
-            session_stats[worker.worker_id] = worker.scalyr_client.generate_status()
+        for worker in self._all_workers_pool.workers.values():
+            session_stats[worker.worker_id] = worker.generate_scalyr_client_status()
 
         return session_stats
 
-class CopyingManagerWorkerPool(object):
+
+def _max(v1, v2):
+    values = [v for v in [v1, v2] if v is not None]
+    return max(values)
+
+
+class ApiKeyWorkerPool(object):
     def __init__(self, workers):
-        self.workers = workers
+        # type: (List[CopyingManagerWorker]) -> None
+
+        self.__workers_list = workers
+
+        # mapping worker_ids to workers
+        self.__workers = {w.worker_id: w for w in workers}  # type: Dict[six.text_type, CopyingManagerWorker]
+
         self.__current_worker = 0
 
+    @property
+    def workers(self):
+        return self.__workers
+
     def find_next_worker(self):
-        current_worker = self.workers[self.__current_worker]
-        if self.__current_worker == len(self.workers) - 1:
+        # type: () -> CopyingManagerWorker
+        """Get the next worker in the pool."""
+        current_worker = self.__workers_list[self.__current_worker]
+        if self.__current_worker == len(self.__workers_list) - 1:
             self.__current_worker = 0
         else:
             self.__current_worker += 1
 
         return current_worker
 
-    @classmethod
-    def create_pool_from_config(cls, config, worker_config):
-        pool_id = worker_config["id"]
+    def add_log_processor(self, log_processor):
+        # type: (LogFileProcessor) -> None
+        worker = self.find_next_worker()
+        worker.schedule_new_log_processor(log_processor)
 
-        workers = []
-        for i in range(worker_config["workers"]):
+    def start_workers(self):
+        for worker in self.__workers_list:
+            worker.start_worker()
 
-            # combine workers positional number in pool and poll id.
-            worker_id = "%s_%s" % (pool_id, i)
+        for worker in self.__workers_list:
+            worker.wait_for_copying_to_begin()
 
-            worker = CopyingManagerWorker(
-                config, worker_config, worker_id=worker_id
-            )
-            workers.append(worker)
-            log.log(
-                scalyr_logging.DEBUG_LEVEL_1,
-                "CopyingManagerWorker #%s is created." % worker.worker_id,
-            )
-        pool = cls(workers)
+    def stop_workers(self, wait_on_join=True, join_timeout=5):
+        for worker in self.__workers_list:
+            worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-        return pool
+    def generate_status(self):
+        # type: () -> ApiKeyWorkerPoolStatus
+        """Generate status of the worker"""
+        result = ApiKeyWorkerPoolStatus()
+
+        failed_worker_health_checks = []
+        health_checks = set()
+        last_responses = set()
+        result.workers_statuses = statuses = list()
+        last_failed_response_statuses = collections.OrderedDict()
+        failed_health_check_results = collections.OrderedDict()
+        last_responses_size = 0
+        last_attempt_time = 0
+
+        for worker in sorted(self.__workers_list, key=lambda w:w.worker_id):
+            status = worker.generate_status()
+            result.workers[worker.worker_id] = status
+
+            # get the most recent time fields from workers.
+            if status.last_success_time:
+                result.last_success_time = _max(
+                    result.last_success_time, status.last_success_time
+                )
+            if status.last_attempt_time:
+                result.last_attempt_time = _max(
+                    result.last_attempt_time, status.last_attempt_time
+                )
+
+            if status.last_attempt_size:
+                result.last_attempt_size = _max(
+                    result.last_attempt_size, status.last_attempt_size
+                )
+
+            if status.last_response is not None:
+                last_responses_size += len(status.last_response)
+
+            if status.last_response_status is not None and status.last_response_status != "success":
+                result.last_failed_response_statuses[worker.worker_id] = status.last_response_status
+
+            if status.health_check_result is not None and status.health_check_result != "Good":
+                failed_health_check_results[worker.worker_id] = status.health_check_result
+
+            # the next fields are a sum of the same fields from all workers.
+            result.total_bytes_uploaded += status.total_bytes_uploaded
+
+            result.total_errors += status.total_errors
+
+        if last_responses_size:
+            result.last_responses_size = last_responses_size
+
+        if failed_health_check_results:
+            result.failed_health_check_results = failed_health_check_results
 
 
-class CopyingManagerWorker2(StoppableThread):
-    def __init__(self, configuration, worker_config_entry, worker_id):
+        return result
+
+
+class CopyingManagerWorkerInterface:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def start_worker(self):
+        pass
+
+    @abstractmethod
+    def stop_worker(self, wait_on_join=True, join_timeout=5):
+        """Stops the worker.
+
+        @param wait_on_join: If True, will block on a join of the thread running the worker.
+        @param join_timeout: The maximum number of seconds to block for the join.
+        """
+        pass
+
+    @abstractmethod
+    def generate_status(self, warn_on_rate_limit=False):
+        """Generate the status for the copying manager worker to be reported.
+
+        This is used in such features as 'scalyr-agent-2 status -v'.
+
+        Note, this method is thread safe.  It needs to be since another thread will ask this object for its
+        status.
+
+        @return:  The status object containing the statistics for the copying manager.
+        @rtype: CopyingManagerStatus
+        """
+        pass
+
+    @abstractmethod
+    def wait_for_copying_to_begin(self):
+        """Block the current thread until this instance has finished its first scan and has begun copying.
+
+        It is good to wait for the first scan to finish before possibly creating new files to copy because
+        if the first scan has not completed, the copier will just begin copying at the end of the file when
+        it is first noticed.  However, if the first scan has completed, then the copier will know that the
+        new file was just newly created and should therefore have all of its bytes copied to Scalyr.
+
+        TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
+        we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
+        """
+        pass
+
+    @abstractmethod
+    def schedule_new_log_processor(self, log_processor):
+        """Schedules new log processor. It will be added to the main collection only on the next iteration,
+        so we don;t have to guard the main collection with lock."""
+        pass
+
+    @abstractmethod
+    def augment_user_agent_for_client_session(self, fragments):
+        """
+        Modifies User-Agent header of the session of the worker.
+
+        @param fragments String fragments to append (in order) to the standard user agent data
+        @type fragments: List of six.text_type
+        """
+        pass
+
+    @abstractmethod
+    def is_alive(self):
+        pass
+
+
+class CopyingManagerWorker(StoppableThread, CopyingManagerWorkerInterface):
+    def __init__(self, configuration, api_key_config_entry, worker_id):
         StoppableThread.__init__(
-            self,
-            name="copying manager worker thread #%s" % worker_id
+            self, name="copying manager worker thread #%s" % worker_id
         )
 
         self._id = six.text_type(worker_id)
         self.__config = configuration
-        self.__worker_config_entry = worker_config_entry
+        self.__api_key_config_entry = api_key_config_entry
 
         self.__rate_limiter = None
         if self.__config.parsed_max_send_rate_enforcement:
@@ -1521,21 +1585,26 @@ class CopyingManagerWorker2(StoppableThread):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-    @property
-    def log_processors(self):
-        # type: () -> Dict[six.text_type, LogFileProcessor]
+    def _get_log_processors(self):  # type: () -> Dict[six.text_type, LogFileProcessor]
         """
         List of log processors. Exposed only for test purposes.
         """
         return self.__log_processors.copy()
 
     @property
+    def log_processors(self):
+        # type: () -> Dict[six.text_type, LogFileProcessor]
+        """
+        List of log processors. Exposed only for test purposes.
+        """
+        return self._get_log_processors()
+
+    @property
     def worker_config_entry(self):
-        return self.__worker_config_entry
+        return self.__api_key_config_entry
 
     def start_worker(self):
         self.start()
-        log.info("Worker started.")
 
     def stop_worker(self, wait_on_join=True, join_timeout=5):
         """Stops the worker.
@@ -1607,7 +1676,7 @@ class CopyingManagerWorker2(StoppableThread):
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
-                log.info("Copying manager worker #%s started." % self._id)
+                log.info("Copying manager worker #%s started." % self.worker_id)
 
                 while self._run_state.is_running():
                     log.log(
@@ -1803,7 +1872,7 @@ class CopyingManagerWorker2(StoppableThread):
                                     )
                                 )
                                 profiler.enable()
-                    except Exception:
+                    except Exception as e:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception(
                             "Failed while attempting to scan and transmit logs"
@@ -1834,20 +1903,23 @@ class CopyingManagerWorker2(StoppableThread):
 
                     # End of the copy loop
                     self.total_copy_iterations += 1
-            except Exception:
+            except Exception as e:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
+
             self.__write_full_checkpoint_state(current_time)
             for processor in self.__log_processors.values():
                 processor.close()
+
+            self.__scalyr_client.close()
             if profiler is not None:
                 profiler.disable()
 
             log.log(
-                scalyr_logging.DEBUG_LEVEL_1,
-                "Copying manager worker #%s is finished." % self._id,
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Worker '%s' is finished." % self.worker_id,
             )
 
     def __get_next_add_events_task(self, bytes_allowed_to_send, for_pipelining=False):
@@ -1906,10 +1978,7 @@ class CopyingManagerWorker2(StoppableThread):
         while not buffer_filled and logs_processed < len(log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
             processor = log_processors[current_processor]
-
-            (callback, buffer_filled) = processor.perform_processing(
-                add_events_request
-            )
+            (callback, buffer_filled) = processor.perform_processing(add_events_request)
 
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
@@ -2149,8 +2218,8 @@ class CopyingManagerWorker2(StoppableThread):
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
                     result.health_check_result = (
-                        "Failed, max time since last copy attempt (%s seconds) exceeded"
-                        % self.__config.healthy_max_time_since_last_copy_attempt
+                        "Worker '%s' failed, max time since last copy attempt (%s seconds) exceeded"
+                        % (self.worker_id, self.__config.healthy_max_time_since_last_copy_attempt)
                     )
 
         finally:
@@ -2224,6 +2293,7 @@ class CopyingManagerWorker2(StoppableThread):
         # type: (LogFileProcessor) -> None
         """Schedules new log processor. It will be added to the main collection only on the next iteration,
         so we don;t have to guard the main collection with lock."""
+
         with self.__lock:
             self.__new_log_processors.append(log_processor)
 
@@ -2240,7 +2310,7 @@ class CopyingManagerWorker2(StoppableThread):
         """
 
         for path, log_processor in list(self.__log_processors.items()):
-            if log_processor.is_marked_to_be_closed:
+            if log_processor.is_closed():
                 log_processor.close()
                 self.__log_processors.pop(path)
                 log.log(
@@ -2260,7 +2330,8 @@ class CopyingManagerWorker2(StoppableThread):
         for new_log_processor in new_log_processors:
             self.__log_processors[new_log_processor.log_path] = new_log_processor
             log.log(
-                scalyr_logging.DEBUG_LEVEL_1, "Log processor for file '%s' is added." % new_log_processor.log_path
+                scalyr_logging.DEBUG_LEVEL_1,
+                "Log processor for file '%s' is added." % new_log_processor.log_path,
             )
 
     def augment_user_agent_for_client_session(self, fragments):
@@ -2274,6 +2345,8 @@ class CopyingManagerWorker2(StoppableThread):
         with self.__lock:
             self.__scalyr_client.augment_user_agent(fragments)
 
+    def generate_scalyr_client_status(self):
+        return self.__scalyr_client.generate_status()
 
     @property
     def scalyr_client(self):
@@ -2289,94 +2362,296 @@ class CopyingManagerWorker2(StoppableThread):
             key in the configuration file.
         @rtype: ScalyrClientSession
         """
-        return create_client(self.__config, quiet=quiet, api_key=self.worker_config_entry["api_key"])
+        return create_client(
+            self.__config, quiet=quiet, api_key=self.worker_config_entry["api_key"]
+        )
 
 
-import multiprocessing
-from multiprocessing.managers import BaseManager
+class LogFileProcessorWrapperProxy(BaseProxy):
+    _exposed_ = (
+        six.ensure_str("__getattribute__"),
+        "log_path",
+        "initialize",
+        "is_closed",
+        "close_at_eof",
+        "close",
+        "generate_status",
+        "add_missing_attributes",
+        "get_checkpoint"
+    )
+
+    @property
+    def log_path(self, *args, **kwargs):
+        return self._callmethod("__getattribute__", args=("log_path",))
+
+    def initialize(self, *args, **kwargs):
+        return self._callmethod("initialize", args=args, kwds=kwargs)
+
+    def generate_status(self, *args, **kwargs):
+        return self._callmethod("generate_status", args=args, kwds=kwargs)
+
+    # def perform_processing(self, *args, **kwargs):
+    #     return self._callmethod("perform_processing" ,args=args, kwds=kwargs)
+
+    def is_closed(self):
+        return self._callmethod("is_closed")
+
+    def close(self):
+        self._callmethod("close")
+
+    def close_at_eof(self, *args, **kwargs):
+        return self._callmethod("close_at_eof", args=args, kwds=kwargs)
+
+    def get_checkpoint(self, *args, **kwargs):
+        self._callmethod("get_checkpoint", args=args, kwds=kwargs)
+
+    def add_missing_attributes(self, *args, **kwargs):
+        self._callmethod("add_missing_attributes", args=args, kwds=kwargs)
 
 
-class CopyingManagerWorker(BaseManager):
-    def __init__(self, configuration, worker_config_entry, worker_id):
-        super(CopyingManagerWorker, self).__init__()
+class LogFileProcessorWrapper(LogFileProcessorInterface):
+    def __init__(self, *args, **kwargs):
+        self._real_processor = None  # type: Optional[LogFileProcessor]
+        self.__args = args
+        self.__kwargs = kwargs
 
-        self.__worker = CopyingManagerWorker2(configuration, worker_config_entry, worker_id)
+        self._marked_for_close = False
 
-        self.__stopped = multiprocessing.Event()
+        self.worker_id = None
 
-        # A semaphore that we increment when this object has begun copying files (after first scan).
-        self.__copying_semaphore = multiprocessing.Semaphore(0)
+    def initialize(self):
+        self._real_processor = LogFileProcessor(*self.__args, **self.__kwargs)
+        return self.__args, self.__kwargs
 
-        self.register(six.ensure_str("augment_user_agent_for_client_session"), callable=self._augment_user_agent_for_client_session)
-        self.register(six.ensure_str("is_alive"), self._is_alive)
-        self.register(six.ensure_str("generate_status"), callable=self._generate_status)
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_real_processor"]
+        return state
 
-    def initializer(self):
-        self.__worker.start_worker()
-        self.__worker.wait_for_copying_to_begin()
-        self.__copying_semaphore.release()
+    def get_checkpoint(self):
+        return self._real_processor.get_checkpoint()
 
-    def start_worker(self):
-        self.start(initializer=self.initializer)
+    def add_redacter(self, *args, **kwargs):
+        return self._real_processor.add_redacter(*args, **kwargs)
 
-    def stop_worker(self, wait_on_join=True, join_timeout=5):
-        self.__stopped.set()
-        if wait_on_join:
-            self.join(timeout=join_timeout)
+    def set_inactive(self):
+        return self._real_processor.set_inactive()
+
+    @property
+    def is_active(self):
+        if self._real_processor is not None:
+            return self._real_processor.is_active
+
+    def perform_processing(self, add_events_request, current_time=None):
+        return self._real_processor.perform_processing(add_events_request, current_time)
+
+    @property
+    def unique_id(self):
+        if self._real_processor is not None:
+            return self._real_processor.unique_id
+
+    def close(self):
+        self._marked_for_close = True
+
+    def close_at_eof(self):
+        self._real_processor.close_at_eof()
+
+    def is_closed(self):
+        if self._real_processor is not None:
+            if self._real_processor.is_closed():
+                return True
+            if self._marked_for_close:
+                self._real_processor.close()
+                return True
+            return False
+
+    @property
+    def is_marked_for_close(self):
+        return self._marked_for_close
+
+    def add_sampler(self, match_expression, sampling_rate):
+        return self._real_processor.add_sampler(match_expression, sampling_rate)
+
+    def generate_status(self):
+        if self._real_processor is not None:
+            return self._real_processor.generate_status()
+
+    def scan_for_new_bytes(self, current_time):
+        return self._real_processor.scan_for_new_bytes(current_time)
+
+    def add_missing_attributes(self, attributes):
+        return self._real_processor.add_missing_attributes(attributes)
+
+    def set_max_log_offset_size(self, max_log_offset_size):
+        return self._real_processor.set_max_log_offset_size(max_log_offset_size)
+
+    def skip_to_end(self, message, error_code, current_time):
+        return self._real_processor.skip_to_end(message, error_code, current_time)
+
+    @property
+    def log_path(self):
+        if self._real_processor is not None:
+            return self._real_processor.log_path
+
+
+class CopyingManagerWorkerProxy(BaseProxy, CopyingManagerWorkerInterface):
+    _exposed_ = (
+        six.ensure_str("__getattribute__"),
+        six.ensure_str("schedule_new_log_processor"),
+        six.ensure_str("start_worker"),
+        six.ensure_str("stop_worker"),
+        six.ensure_str("wait_for_copying_to_begin"),
+        six.ensure_str("is_alive"),
+        six.ensure_str("augment_user_agent_for_client_session"),
+        six.ensure_str("generate_status"),
+        six.ensure_str("generate_scalyr_client_status"),
+    )
+
+    def start_worker(self, *args, **kwargs):
+        return self._callmethod("start_worker", args=args, kwds=kwargs)
+
+    def stop_worker(self, *args, **kwargs):
+        return self._callmethod("stop_worker", args=args, kwds=kwargs)
 
     def wait_for_copying_to_begin(self):
-        """Block the current thread until this instance has finished its first scan and has begun copying.
+        return self._callmethod("wait_for_copying_to_begin")
 
-        It is good to wait for the first scan to finish before possibly creating new files to copy because
-        if the first scan has not completed, the copier will just begin copying at the end of the file when
-        it is first noticed.  However, if the first scan has completed, then the copier will know that the
-        new file was just newly created and should therefore have all of its bytes copied to Scalyr.
+    def augment_user_agent_for_client_session(self, fragments):
+        return self._callmethod(
+            "augment_user_agent_for_client_session", args=(fragments,)
+        )
 
-        TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
-        we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
-        """
-        self.__copying_semaphore.acquire(True)
+    def generate_scalyr_client_status(self):
+        return self._callmethod("generate_scalyr_client_status")
 
-
-
-
-    def run(self):
-
-        self.__worker.start_worker()
-        self.__worker.wait_for_copying_to_begin()
-        self.__copying_semaphore.release()
-
-
-        try:
-            while not self.__stopped.is_set():
-                pass
-
-        finally:
-            self.__worker.start_worker()
+    def generate_status(self, *args, **kwargs):
+        return self._callmethod("generate_status", args=args, kwds=kwargs)
 
     def schedule_new_log_processor(self, log_processor):
-        pass
+        return self._callmethod("schedule_new_log_processor", args=(log_processor,))
+
+    @property
+    def log_processors(self):
+        return self._callmethod("__getattribute__", args=("log_processors",))
 
     @property
     def worker_id(self):
-        return self.__worker.worker_id
+        return self._callmethod("__getattribute__", args=("worker_id",))
+
+    def is_alive(self):
+        return self._callmethod("is_alive")
 
 
-    #
-    def _augment_user_agent_for_client_session(self, fragments):
-        # type: (List[six.text_type]) -> None
-        """
-        Modifies User-Agent header of the session of the worker.
+class CopyingManagerWorkerWrapperInterface(object):
+    __metaclass__ = ABCMeta
 
-        @param fragments String fragments to append (in order) to the standard user agent data
-        @type fragments: List of six.text_type
-        """
-        self.__worker.augment_user_agent_for_client_session(fragments)
+    @property
+    @abstractmethod
+    def worker_type(self):
+        return self.__worker_type
 
-    def _is_alive(self):
-        return self.__worker.is_alive()
+    @property
+    @abstractmethod
+    def memory_manager(self):
+        pass
 
-    def _generate_status(self, warn_on_rate_limit=False):
-        return self.__worker.generate_status(warn_on_rate_limit=warn_on_rate_limit)
+    @abstractmethod
+    def spawn_new_log_processor(self, *args, **kwargs):
+        pass
 
 
+class CopyingManagerWorkerWrapper(
+    CopyingManagerWorkerWrapperInterface, CopyingManagerWorkerInterface
+):
+    def __init__(
+        self,
+        configuration,
+        api_key_config_entry,
+        worker_id,
+        real_worker_class=CopyingManagerWorker,
+        worker_proxy_class=CopyingManagerWorkerProxy,
+    ):
+        self._memory_manager = None
+        self.__worker_type = api_key_config_entry.get("type")
+
+        if self.__worker_type == "process":
+
+            class CopyingManagerMemoryManager(BaseManager):
+                pass
+
+            CopyingManagerMemoryManager.register(
+                six.ensure_str("CopyingManagerWorker"),
+                real_worker_class,
+                worker_proxy_class,
+            )
+            CopyingManagerMemoryManager.register(
+                six.ensure_str("LogFileProcessorWrapper"),
+                LogFileProcessorWrapper,
+                LogFileProcessorWrapperProxy,
+            )
+
+            self._memory_manager = CopyingManagerMemoryManager()
+
+            self._memory_manager.start()
+
+            self.real_worker = self.memory_manager.CopyingManagerWorker(
+                configuration, api_key_config_entry, worker_id
+            )  # type: CopyingManagerWorkerInterface
+        else:
+            self.real_worker = real_worker_class(
+                configuration, api_key_config_entry, worker_id
+            )
+
+    @property
+    def worker_type(self):
+        return self.__worker_type
+
+    def full_stop(self):
+        self.real_worker.stop_worker()
+        if self._memory_manager is not None:
+            self._memory_manager.shutdown()
+
+    @property
+    def memory_manager(self):
+        return self._memory_manager
+
+    def spawn_new_log_processor(self, *args, **kwargs):
+        if self.__worker_type == "process":
+            processor = self.memory_manager.LogFileProcessorWrapper(*args, **kwargs)
+            processor.initialize()
+            processor.worker_id = self.worker_id
+            return processor
+        else:
+            return LogFileProcessor(*args, **kwargs)
+
+    def stop_worker(self, wait_on_join=True, join_timeout=5):
+        self.real_worker.stop_worker(
+            wait_on_join=wait_on_join, join_timeout=join_timeout
+        )
+
+        self._memory_manager.shutdown()
+
+    def start_worker(self):
+        return self.real_worker.start_worker()
+
+    def wait_for_copying_to_begin(self):
+        return self.real_worker.wait_for_copying_to_begin()
+
+    def generate_status(self, warn_on_rate_limit=False):
+        return self.real_worker.generate_status(warn_on_rate_limit=warn_on_rate_limit)
+
+    def generate_scalyr_client_status(self):
+        return self.real_worker.generate_scalyr_client_status()
+
+    def augment_user_agent_for_client_session(self, fragments):
+        return self.real_worker.augment_user_agent_for_client_session(fragments)
+
+    def schedule_new_log_processor(self, log_processor):
+        return self.real_worker.schedule_new_log_processor(log_processor)
+
+    @property
+    def worker_id(self):
+        return self.real_worker.worker_id
+
+    def is_alive(self):
+        return self.real_worker.is_alive()

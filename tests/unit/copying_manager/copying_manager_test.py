@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import time
 import shutil
+import os
 
 if False:
     from typing import Dict
@@ -23,6 +24,11 @@ log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
 
 class CopyingManagerTest(CopyingManagerCommonTest):
+    def teardown(self):
+        if self._instance is not None:
+            self._instance.stop_manager()
+        super(CopyingManagerTest, self).teardown()
+
     def _create_manager_instanse(
         self,
         log_files_number=1,
@@ -50,7 +56,33 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 
 
 class Test(CopyingManagerTest):
-    def test_workers(self):
+    def test_multiple_workers(self):
+
+        config_data = {"api_keys": [{"workers": 3}]}
+
+        (test_file, test_file2), manager = self._create_manager_instanse(
+            2, config_data=config_data
+        )
+
+        assert len(manager.workers) == 3
+
+    def test_multiple_process_workers(self):
+
+        config_data = {"api_keys": [{"workers": 3, "type": "process"}]}
+
+        (test_file, test_file2), manager = self._create_manager_instanse(
+            2, config_data=config_data
+        )
+
+        assert len(manager.workers) == 3
+
+        worker_pids = {worker.get_pid() for worker in manager.workers}
+
+        assert len(worker_pids) == 3
+        assert os.getpid() not in worker_pids
+
+
+    def test_multiple_thread_workers(self):
 
         config_data = {"api_keys": [{"workers": 3}, {"workers": 2, "api_key": "key"}]}
 
@@ -60,6 +92,11 @@ class Test(CopyingManagerTest):
 
         assert len(manager.workers) == 5
 
+        worker_pids = {worker.get_pid() for worker in manager.workers}
+
+        assert len(worker_pids) == 1
+        assert os.getpid() in worker_pids
+
     def test_file_distribution(self):
         pass
 
@@ -68,7 +105,7 @@ class Test(CopyingManagerTest):
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert self._wait_for_rpc_and_respond() == ["line1", "line2"]
+        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
 
         status = manager.generate_status()
 
@@ -93,9 +130,9 @@ class Test(CopyingManagerTest):
     def test_health_check_status_worker_failed(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
 
-        # get the first worker and simulate its last attempt timeout.
-        worker = list(manager.workers)[0]
-        worker._CopyingManagerWorker__last_attempt_time = time.time() - (1000 * 65)
+        # get all workers and simulate their last attempt timeout.
+        for worker in manager.workers:
+            worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
         assert status.health_check_result == "Failed, some of workers have reached their timeout since their last copy attempt."
@@ -106,7 +143,7 @@ class Test(CopyingManagerTest):
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert self._wait_for_rpc_and_respond() == ["line1", "line2"]
+        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
 
         # stop the manager and write some lines.
         # When manager is stared, it should pick recent checkpoints and read those lines.
@@ -121,12 +158,12 @@ class Test(CopyingManagerTest):
         manager.start_manager()
 
         # make sure that the first lines are lines which were written before manager start
-        assert self._wait_for_rpc_and_respond() == ["Line3", "Line4"]
+        assert set(self._wait_for_rpc_and_respond()) == {"Line3", "Line4"}
 
         test_file.append_lines("Line5")
         test_file.append_lines("Line6")
 
-        assert self._wait_for_rpc_and_respond() == ["Line5", "Line6"]
+        assert set(self._wait_for_rpc_and_respond()) == {"Line5", "Line6"}
 
         manager.controller.stop()
 
@@ -146,20 +183,4 @@ class Test(CopyingManagerTest):
         test_file.append_lines("Line7")
         test_file.append_lines("Line8")
 
-        assert self._wait_for_rpc_and_respond() == ["Line7", "Line8"]
-
-
-
-from scalyr_agent.copying_manager import CopyingManagerWorker
-
-
-class TestProcess(CopyingManagerTest):
-    def test_2(self):
-        self._create_config()
-        worker = CopyingManagerWorker(self._config_builder.config, self._config_builder.config.api_key_configs[0], "0_0")
-
-
-        worker.start_worker()
-        worker.augment_user_agent_for_client_session('wewqeqw')
-        s = worker.generate_status()
-        return
+        assert set(self._wait_for_rpc_and_respond()) == {"Line7", "Line8"}

@@ -326,20 +326,7 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-            # group worker entries by id
-            api_keys_configs = {w["id"]: w for w in self.api_key_configs}
-            for log_config in self.log_configs:
-                api_key_id = log_config.get("api_key_id", none_if_missing=True)
-                if api_key_id is not None:
-
-                    api_key_id = six.text_type(api_key_id)
-                    if api_key_id not in api_keys_configs:
-                        raise BadConfiguration(
-                            "Log file config for '%s' has api key id '%s', but there is no such api key."
-                            % (log_config["path"], api_key_id),
-                            None,
-                            "noSuchApiKey"
-                        )
+            self.__api_keys_configs = list(self.__config.get_json_array("api_keys"))
 
 
         except BadConfiguration as e:
@@ -2746,6 +2733,19 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "monitors", description)
         self.__verify_or_set_optional_array(config, "api_keys", description)
 
+        # NOTE. Important to verify api_keys config entries before log config entries,
+        # because log configs may refer to some api_key entry by 'api_key_id' field.
+        api_keys = config.get_json_array("api_keys")
+        if not api_keys:
+            # Add first worker config entry. This entry acts like default.
+            # The default entry do not need to have "api_key" because it uses main "api_key"
+            api_keys.add(JsonObject())
+
+        for i, api_key_entry in enumerate(api_keys):
+            self.__verify_api_keys_entry_and_set_dafaults(
+                api_key_entry, entry_index=i, description=description
+            )
+
         i = 0
         for log_entry in config.get_json_array("logs"):
             self.__verify_log_entry_and_set_defaults(
@@ -2776,17 +2776,6 @@ class Configuration(object):
                 monitor_entry, file_path=file_path, entry_index=i
             )
             i += 1
-
-        api_keys = config.get_json_array("api_keys")
-        if not api_keys:
-            # Add first worker config entry. This entry acts like default.
-            # The default entry do not need to have "api_key" because it uses main "api_key"
-            api_keys.add(JsonObject())
-
-        for i, api_key_entry in enumerate(config.get_json_array("api_keys")):
-            self.__verify_api_keys_entry_and_set_dafaults(
-                api_key_entry, entry_index=i, description=description
-            )
 
     def __verify_k8s_log_entry_and_set_defaults(
         self, log_entry, description=None, config_file_path=None, entry_index=None,
@@ -2864,6 +2853,12 @@ class Configuration(object):
             config_file_path=config_file_path,
             entry_index=entry_index,
         )
+
+        # get first api_key entry as the default.
+        api_key_entries = self.__config.get_json_array("api_keys")
+        default_api_key_id = api_key_entries[0]["id"]
+        api_key_ids = {e["id"] for e in api_key_entries}
+        self.__verify_or_set_optional_string(log_entry, "api_key_id", default_api_key_id, description, valid_values=api_key_ids)
 
     def __verify_log_entry_with_key_and_set_defaults(
         self,
@@ -3081,27 +3076,24 @@ class Configuration(object):
         """
 
         if entry_index > 0:
-            # this is not default api_key entry, so it should have all fields below.
+            # this is not default api_key entry, so it should have api_key field.
             self.__verify_required_string(
                 api_key_entry, "api_key", config_description=description
             )
-            self.__verify_required_string(
-                api_key_entry, "workers", config_description=description
-            )
+
         else:
             # if there is a first(default) api_key entry, and there is no 'api_key',
             # so we use the 'api_key' from the 'root' scope.
             if "api_key" not in api_key_entry:
                 api_key_entry["api_key"] = self.api_key
 
-            # set default number of workers for the default  api_key entry.
-            if "workers" not in api_key_entry:
-                # TODO: move default number to constant or separate config entry.
-                api_key_entry["workers"] = 1
-
         # if the id for the api_key entry is not specified, just set the entry index as id.
         if "id" not in api_key_entry:
             api_key_entry["id"] = six.text_type(entry_index)
+
+        self.__verify_or_set_optional_string(api_key_entry, "type", "thread", description)
+
+        self.__verify_or_set_optional_int(api_key_entry, "workers", 1, description)
 
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
         """Merges the contents of the server attribute read from a configuration fragment to the main config object.
@@ -3650,6 +3642,11 @@ class Configuration(object):
             perform_object_substitution(
                 object_value=source_config, substitutions=substitutions
             )
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("_Configuration__logger", None)
+        return state
 
 
 """

@@ -26,6 +26,8 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import sys
+from abc import ABCMeta, abstractmethod
+
 import six
 
 __author__ = "czerwin@scalyr.com"
@@ -40,7 +42,6 @@ import string
 import threading
 import time
 import uuid
-import abc
 from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -1984,21 +1985,158 @@ class LogFileIterator(object):
             return self.__data_position
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractLogFileProcessor(object):
-    @abc.abstractmethod
-    def close(self):
+class LogFileProcessorInterface:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def log_path(self):
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def close_at_eof(self):
+        """
+        Tell the log processor to close itself once it catches up to the end of the file.
+
+        This allows us to keep log processors open long enough to read all of the remaining
+        data in the file.
+        """
         pass
 
+    @abstractmethod
+    def add_missing_attributes(self, attributes):
+        """ Adds items attributes to the base_event's attributes if the base_event doesn't
+        already have those attributes set
+        """
+        pass
+
+    @abstractmethod
+    def set_max_log_offset_size(self, max_log_offset_size):
+        """Sets the max_log_offset_size.
+
+        Used for testing
+        """
+        pass
+
+    @abstractmethod
+    def generate_status(self):
+        """Generates and returns a status object for this particular processor.
+
+        @return: The status object, including such fields as the total number of bytes copied, etc.
+        @rtype: LogProcessorStatus
+        """
+        pass
+
+    @abstractmethod
+    def is_closed(self):
+        """
+        @return: True if the processor has been closed.
+        @rtype: bool
+        """
+        pass
+
+    @abstractmethod
+    def set_inactive(self):
+        pass
+
+    @abstractmethod
+    def perform_processing(self, add_events_request, current_time):
+        """Scans the available lines from the log file, processes them using the configured redacters and samplers
+         and appends the lines that emerge to add_events_request.
+
+        @param add_events_request:  The request to add the resulting lines/events to.  This request will
+            eventually be sent to the server.
+        @param current_time:  If not None, the value to use as the current_time.  Used for testing.
+
+        @type add_events_request: scalyr_client.AddEventsRequest
+        @type current_time: float or None
+
+        @return A tuple containing two elements:  a callback function to invoke when the result of sending the
+            events to the server is known, and a bool indicating if the buffer has been filled and could not
+            accept new events.  The call function takes a single argument that is an int which can
+            only have values of SUCCESS, FAIL_AND_DROP, and FAIL_AND_RETRY.  If SUCCESS is passed in, then the
+            events are marked as successfully sent.  If FAIL_AND_DROP is passed in, then the events are
+            marked as consumed but not successfully processed.  If FAIL_AND_RETRY is passed in, then the processor
+            is rolled back and the events will be retried for processing later on.  The function, when invoked,
+            will return True if the log file should be considered closed and no further processing will be needed.
+            The caller should no longer use this processor instance in this case.
+        @rtype: (function(int) that returns a bool, bool)
+        """
+        pass
+
+    @abstractmethod
+    def skip_to_end(self, message, error_code, current_time):
+        """Advances the iterator to the end of the log file due to some error.
+
+        @param message: The error message to include in the log to explain why we had to skip to the end.
+        @param error_code: The error code to include
+        @param current_time: If not None, the value to use as the current time.  Used for testing.
+
+        @type message: str
+        @type error_code: str
+        @type current_time: float
+        """
+        pass
+
+    @abstractmethod
+    def add_sampler(self, match_expression, sampling_rate):
+        """Adds a new sampling rule that will be applied after all previously added sampling rules.
+
+        @param match_expression: The regular expression that must match any portion of a log line
+        @param sampling_rate: The rate to include any line that matches the expression in the results sent to the
+            server.
+        """
+        pass
+
+    @abstractmethod
+    def add_redacter(self, match_expression, replacement, hash_salt):
+        """Adds a new redaction rule that will be applied after all previously added redaction rules.
+
+        @param match_expression: The regular expression that must match the portion of the log line that will be
+            redacted.
+        @param replacement: The text to replace the matched expression with. You may use \1, \2, etc to use sub
+            expressions from the match regular expression.
+        @param hash_salt: The salt used for hashing, only if hashing group replacement is used
+
+        @type hash_salt: str
+        """
+        pass
+
+    @abstractmethod
+    def scan_for_new_bytes(self, current_time):
+        """Checks the underlying file to see if any new bytes are available or if the file has been rotated.
+
+        This does not perform any processing, but does update certain statistics like pending byte count, etc.
+
+        It is useful to be invoked now and then to sync up the file system state with the in-memory data tracked
+        about the file such as its current length.
+
+        @param current_time: If not None, the value to use as the current time.  Used for testing.
+        @type current_time: float
+        """
+        pass
+
+    @abstractmethod
+    def close(self):
+        """Closes the processor, closing all underlying file handles.
+
+        This does nothing if the processor is already closed.
+        """
+        pass
+
+    @abstractmethod
+    def get_checkpoint(self):
+        pass
+
+    @staticmethod
+    def create_checkpoint(initial_position):
+        """Returns a checkpoint object that will begin reading a log file from the specified position.
+
+        @param initial_position: The byte position in the file where copying should begin.
+        """
+        return LogFileIterator.create_checkpoint(initial_position)
 
 
-
-
-class LogFileProcessor(AbstractLogFileProcessor):
+class LogFileProcessor(LogFileProcessorInterface):
     """Performs all processing on a single log file (identified by a path) including returning which lines are ready
     to be sent to the server after applying any sampling and redaction rules.
     """
@@ -2222,24 +2360,24 @@ class LogFileProcessor(AbstractLogFileProcessor):
         self.__lock.release()
         return result
 
-    def mark_to_close(self):
-        """
-        Set special flag for the log file processor as "to be closed",
-        so other entities, which may be responsible for processors removal, can remove them in a deferred fashion,
-        so there is no need to worry about synchronization.
-        """
-        with self.__lock:
-            self.__is_marked_to_be_closed = True
+    # def mark_to_close(self):
+    #     """
+    #     Set special flag for the log file processor as "to be closed",
+    #     so other entities, which may be responsible for processors removal, can remove them in a deferred fashion,
+    #     so there is no need to worry about synchronization.
+    #     """
+    #     with self.__lock:
+    #         self.__is_marked_to_be_closed = True
 
-    @property
-    def is_marked_to_be_closed(self):
-        # type: () -> bool
-        """
-        Other related entities, which may be responsible for processors removal,
-        can use this property to remove the logprocessor.
-        """
-        with self.__lock:
-            return self.__is_marked_to_be_closed
+    # @property
+    # def is_marked_to_be_closed(self):
+    #     # type: () -> bool
+    #     """
+    #     Other related entities, which may be responsible for processors removal,
+    #     can use this property to remove the logprocessor.
+    #     """
+    #     with self.__lock:
+    #         return self.__is_marked_to_be_closed
 
     @property
     def unique_id(self):
@@ -2758,14 +2896,6 @@ class LogFileProcessor(AbstractLogFileProcessor):
     def get_checkpoint(self):
         return self.__log_file_iterator.get_mark_checkpoint()
 
-    @staticmethod
-    def create_checkpoint(initial_position):
-        """Returns a checkpoint object that will begin reading a log file from the specified position.
-
-        @param initial_position: The byte position in the file where copying should begin.
-        """
-        return LogFileIterator.create_checkpoint(initial_position)
-
     # Variables used to implement the static method ``generate_unique_id``.
     __unique_id_lock = threading.Lock()
     __unique_id_counter = 0
@@ -3192,7 +3322,7 @@ class LogMatcher(object):
             # get checkpoints and close all processors
             for p in self.__processors:
                 result[p.log_path] = p.get_checkpoint()
-                p.mark_to_close()
+                p.close()
 
             self.__processors = []
         finally:
@@ -3234,7 +3364,7 @@ class LogMatcher(object):
             # otherwise set them to close when they reach eof
             for processor in self.__processors:
                 if immediately:
-                    processor.mark_to_close()
+                    processor.close()
                 else:
                     processor.close_at_eof()
         finally:
@@ -3312,10 +3442,9 @@ class LogMatcher(object):
         @rtype: list of LogFileProcessor
         """
         if not self.__is_glob and self.log_path in existing_processors:
-            # TODO: adapt to sharded copying manager.
-            # existing_processors[self.log_path].add_missing_attributes(
-            #     self.__log_entry_config["attributes"]
-            # )
+            existing_processors[self.log_path].add_missing_attributes(
+                self.__log_entry_config["attributes"]
+            )
             return []
 
         self.__lock.acquire()
