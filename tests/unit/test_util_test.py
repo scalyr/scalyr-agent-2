@@ -20,16 +20,20 @@ from __future__ import absolute_import
 from io import open
 
 import os
+import ssl
+import sys
 import locale
 import platform
 
 import mock
 import six
 
+from scalyr_agent import compat
 from scalyr_agent import util as scalyr_util
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
+from scalyr_agent.build_info import get_build_revision
 
 __all__ = ["LogCaptureClassTestCase"]
 
@@ -199,3 +203,25 @@ class MiscUtilsTestCase(ScalyrTestCase):
         self.assertEqual(language_code, "unknown")
         self.assertEqual(encoding, "unknown")
         self.assertEqual(used_locale, "unable to retrieve locale")
+
+    def test_get_agent_start_up_message(self):
+        from scalyr_agent.agent_main import SCALYR_VERSION
+
+        msg = scalyr_util.get_agent_start_up_message()
+
+        python_version_str = sys.version.replace("\n", "")
+        build_revision = get_build_revision()
+        _, _, locale = scalyr_util.get_language_code_coding_and_locale()
+        openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+        lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
+        self.assertTrue("Starting scalyr agent..." in msg)
+        self.assertTrue("version=%s" % (SCALYR_VERSION) in msg)
+        self.assertTrue("Python version: %s" % (python_version_str) in msg)
+        self.assertTrue("OpenSSL version: %s" % (openssl_version) in msg)
+        self.assertTrue(
+            "default fs encoding: %s" % (sys.getfilesystemencoding()) in msg
+        )
+        self.assertTrue("revision=%s" % (build_revision) in msg)
+        self.assertTrue("locale: %s" % (locale) in msg)
+        self.assertTrue("LANG env variable: %s" % (lang_env_var) in msg)

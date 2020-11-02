@@ -30,6 +30,7 @@ if False:  # NOSONAR
 
 import codecs
 import sys
+import ssl
 import locale
 from io import open
 
@@ -53,6 +54,7 @@ import uuid
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
+from scalyr_agent.build_info import get_build_revision
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -2091,6 +2093,41 @@ def get_language_code_coding_and_locale():
         used_locale = "unable to retrieve locale: %s" % (str(e))
 
     return language_code, encoding, used_locale
+
+
+def get_agent_start_up_message():
+    # type: () -> str
+    """
+    Return a message which is logged on agent start up.
+    """
+    from scalyr_agent.agent_main import SCALYR_VERSION
+
+    python_version_str = sys.version.replace("\n", "")
+    build_revision = get_build_revision()
+    openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+
+    # We also include used locale and LANG env variable values since this makes it
+    # easier for us to troubleshoot invalid locale related issues
+    lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
+    (language_code, encoding, used_locale,) = get_language_code_coding_and_locale()
+
+    msg = (
+        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        % (
+            SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+        )
+    )
+
+    return msg
 
 
 class RateLimiterToken(object):

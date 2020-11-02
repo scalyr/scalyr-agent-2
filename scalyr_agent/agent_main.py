@@ -1040,42 +1040,14 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
-                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
-                python_version_str = sys.version.replace("\n", "")
-                build_revision = get_build_revision()
-                openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
-
-                # We also include used locale and LANG env variable values since this makes it
-                # easier for us to troubleshoot invalid locale related issues
-                lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
-
-                (
-                    language_code,
-                    encoding,
-                    used_locale,
-                ) = scalyr_util.get_language_code_coding_and_locale()
-
-                msg = (
-                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
-                    % (
-                        SCALYR_VERSION,
-                        build_revision,
-                        scalyr_util.get_pid_tid(),
-                        python_version_str,
-                        openssl_version,
-                        sys.getfilesystemencoding(),
-                        used_locale,
-                        lang_env_var,
-                    )
-                )
-
-                log.info(msg)
-                log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
+                start_up_msg = scalyr_util.get_agent_start_up_message()
+                log.info(start_up_msg)
+                log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
 
                 # Log warn message if non UTF-8 locale is used - this would cause issues when trying
                 # to monitor files with unicode characters inside the file names or inside the
                 # content
+                _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
                 if encoding.lower() not in "utf-8":
                     log.warn(
                         "Detected a non UTF-8 locale (%s) being used. You are strongly "
