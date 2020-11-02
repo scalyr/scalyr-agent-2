@@ -128,7 +128,6 @@ define_config_option(
     "Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD "
     "support messages up to 8192 bytes long.",
     default=8192,
-    min_value=2048,
     max_value=65536 * 1024,
     convert_to=int,
 )
