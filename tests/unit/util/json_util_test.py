@@ -218,6 +218,14 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
         loaded = util.json_decode(result)
         self.assertEqual(loaded, original_data)
 
+        # Invalid UTF-8, should fall back to standard json implementation
+        original_data = "\ud800"
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\ud800"')
+
+        loaded = util.json_decode('"\ud800"')
+        self.assertEqual(loaded, original_data)
+
 
 @pytest.mark.json_lib
 class TestDefaultJsonLibrary(ScalyrTestCase):

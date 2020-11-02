@@ -238,7 +238,7 @@ def get_json_implementation(lib_name):
             try:
                 return orjson.loads(data, *args, **kwargs)
             except Exception as e:
-                if "leading surrogate" in str(e):
+                if "leading surrogate" in str(e) or "surrogates not allowed" in str(e):
                     _, _, _json_loads = get_json_implementation("json")
                     return _json_loads(data, *args, **kwargs)
                 else:
