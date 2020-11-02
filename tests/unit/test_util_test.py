@@ -161,7 +161,7 @@ class MiscUtilsTestCase(ScalyrTestCase):
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_get_language_code_coding_and_locale(self):
-        locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
 
         (
             language_code,
@@ -170,9 +170,9 @@ class MiscUtilsTestCase(ScalyrTestCase):
         ) = scalyr_util.get_language_code_coding_and_locale()
 
         # NOTE: On some systems UTF-8 is normalized to UTF8 so we ignore "-" in the value
-        self.assertEqual(language_code, "en_US")
+        self.assertTrue(language_code in ["C", "en_US"])
         self.assertEqual(encoding.replace("-", ""), "UTF8")
-        self.assertEqual(used_locale.replace("-", ""), "en_US.UTF8")
+        self.assertTrue(used_locale.replace("-", "") in ["C.UTF8", "en_US.UTF8"])
 
         # NOTE: To be able to test other locales we would need to install other locale packages
         os.environ["LC_ALL"] = "invalid"
