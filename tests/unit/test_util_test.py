@@ -187,3 +187,15 @@ class MiscUtilsTestCase(ScalyrTestCase):
         self.assertEqual(
             used_locale, "unable to retrieve locale: unknown locale: invalid"
         )
+
+        # Empty coding
+        os.environ["LC_ALL"] = "C"
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+        self.assertEqual(language_code, "unknown")
+        self.assertEqual(encoding, "unknown")
+        self.assertEqual(used_locale, "unable to retrieve locale")
