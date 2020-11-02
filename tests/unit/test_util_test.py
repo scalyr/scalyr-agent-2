@@ -21,6 +21,7 @@ from io import open
 
 import os
 import locale
+import platform
 
 import mock
 import six
@@ -28,6 +29,7 @@ import six
 from scalyr_agent import util as scalyr_util
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 __all__ = ["LogCaptureClassTestCase"]
 
@@ -156,6 +158,8 @@ class MiscUtilsTestCase(ScalyrTestCase):
         if "LC_ALL" in os.environ:
             del os.environ["LC_ALL"]
 
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_get_language_code_coding_and_locale(self):
         locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
@@ -164,9 +168,11 @@ class MiscUtilsTestCase(ScalyrTestCase):
             encoding,
             used_locale,
         ) = scalyr_util.get_language_code_coding_and_locale()
+
+        # NOTE: On some systems UTF-8 is normalized to UTF8 so we ignore "-" in the value
         self.assertEqual(language_code, "en_US")
-        self.assertEqual(encoding, "UTF-8")
-        self.assertEqual(used_locale, "en_US.UTF-8")
+        self.assertEqual(encoding.replace("-", ""), "UTF8")
+        self.assertEqual(used_locale.replace("-", ""), "en_US.UTF8")
 
         # NOTE: To be able to test other locales we would need to install other locale packages
         os.environ["LC_ALL"] = "invalid"
