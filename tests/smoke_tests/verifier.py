@@ -146,7 +146,7 @@ class AgentLogVerifier(AgentVerifier):
         # This version check is done against a local agent.log file and status -v --format=json
         # output and not Scalyr API so we don't need to retry it and wait for logs to be shipped to
         # Scalyr API.
-        time.sleep(2)
+        time.sleep(4)
         self._verify_agent_version_string()
 
         # Now call the parent verify method which calls _verify()
