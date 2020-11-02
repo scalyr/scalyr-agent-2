@@ -51,6 +51,11 @@ import threading
 import time
 import uuid
 
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
@@ -2100,8 +2105,6 @@ def get_agent_start_up_message():
     """
     Return a message which is logged on agent start up.
     """
-    from scalyr_agent.agent_main import SCALYR_VERSION
-
     python_version_str = sys.version.replace("\n", "")
     build_revision = get_build_revision()
     openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
