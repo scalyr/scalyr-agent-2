@@ -14,6 +14,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
+import os
 import abc
 import datetime
 import json
@@ -166,7 +168,12 @@ class AgentLogVerifier(AgentVerifier):
 
         if not local_agent_log_data:
             raise ValueError(
-                ("No data in '{0}' file.".format(self._runner.agent_log_file_path))
+                (
+                    "No data in '{0}' file. Directory content: {1}".format(
+                        self._runner.agent_log_file_path,
+                        os.listdir(self._runner.agent_logs_dir_path),
+                    )
+                )
             )
 
         print("Check start line contains correct version and revision string")
