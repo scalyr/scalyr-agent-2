@@ -163,7 +163,13 @@ def _gather_metric(method, attribute=None, transform=None):
         if no_diskperf:
             yield __NO_DISK_PERF__, None
 
-    gather_metric.__doc__ = doc(method, attribute)
+    try:
+        gather_metric.__doc__ = doc(method, attribute)
+    except ValueError as e:
+        if "zero length field name in format" in str(e):
+            pass
+        else:
+            raise e
     return gather_metric
 
 
