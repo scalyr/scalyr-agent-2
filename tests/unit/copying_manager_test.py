@@ -94,7 +94,7 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     if "worker_type" in metafunc.fixturenames:
-        metafunc.parametrize("worker_type", ["process",])
+        metafunc.parametrize("worker_type", ["process", "thread"])
 
 
 def _create_test_copying_manager(
@@ -923,6 +923,9 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         if self._controller is not None:
             self._controller.stop()
 
+        if self._manager is not None:
+            self._manager.cleanup()
+
     def test_single_log_file(self):
         controller = self.__create_test_instance()
         self.__append_log_lines("First line", "Second line")
@@ -1303,6 +1306,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def test_start_with_bad_checkpoint(self):
         # Check totally mangled checkpoint file in the form of invalid JSON, should be treated as not having one at all
         controller = self.__create_test_instance()
+
         previous_root_dir = os.path.dirname(self.__test_log_file)
 
         self.__append_log_lines("First line", "Second line")

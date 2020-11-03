@@ -1989,7 +1989,7 @@ class LogFileProcessorInterface:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def log_path(self):
+    def get_log_path(self):
         pass
 
     @abstractmethod
@@ -2395,13 +2395,7 @@ class LogFileProcessor(LogFileProcessorInterface):
     def set_inactive(self):
         self.__is_active = False
 
-    @property
-    def log_path(self):
-        """
-        @return:  The log file path
-        @rtype: str
-        """
-        # TODO:  Change this to just a regular property?
+    def get_log_path(self):
         return self.__path
 
     # Success results for the callback returned by perform_processing.
@@ -3238,7 +3232,7 @@ class LogMatcher(object):
     log when sent to the server.
     """
 
-    def __init__(self, overall_config, log_entry_config, file_system=None, log_processor_cls=LogFileProcessor):
+    def __init__(self, overall_config, log_entry_config, file_system=None):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
             processed such as ``max_line_length``.
@@ -3256,8 +3250,6 @@ class LogMatcher(object):
         else:
             self.__file_system = file_system
         self.__overall_config = overall_config
-
-        self.__log_processor_cls = log_processor_cls
 
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
@@ -3321,7 +3313,7 @@ class LogMatcher(object):
         try:
             # get checkpoints and close all processors
             for p in self.__processors:
-                result[p.log_path] = p.get_checkpoint()
+                result[p.get_log_path()] = p.get_checkpoint()
                 p.close()
 
             self.__processors = []
@@ -3420,7 +3412,7 @@ class LogMatcher(object):
             self.__lock.release()
 
     def find_matches(
-        self, existing_processors, previous_state, copy_at_index_zero=False
+        self, existing_processors, previous_state, copy_at_index_zero=False, log_processor_creator=LogFileProcessor
     ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
@@ -3433,6 +3425,7 @@ class LogMatcher(object):
             then if copy_at_index_zero is True, the file will be processed from the first byte in the file.  Otherwise,
             the processing will skip over all bytes currently in the file and only process bytes added after this
             point.
+        @param log_processor_creator:
 
         @type existing_processors: dict of str to LogFileProcessor
         @type previous_state: dict of str to dict
@@ -3527,7 +3520,7 @@ class LogMatcher(object):
                             log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.
-                    new_processor = self.__log_processor_cls(
+                    new_processor = log_processor_creator(
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,

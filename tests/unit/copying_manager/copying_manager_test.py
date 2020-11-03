@@ -125,7 +125,7 @@ class Test(CopyingManagerTest):
         manager._ShardedCopyingManager__last_attempt_time = time.time() - (1000 * 65)
 
         status = manager.generate_status()
-        assert status.health_check_result == "Failed, max time since last copy attempt (60.0 seconds) exceeded"
+        assert status.health_check_result == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
 
     def test_health_check_status_worker_failed(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
@@ -135,7 +135,20 @@ class Test(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert status.health_check_result == "Failed, some of workers have reached their timeout since their last copy attempt."
+        assert status.health_check_result == "Failed, some copying workers failed."
+
+    def test_failed_health_check_status_and_failed_worker(self):
+        (test_file, test_file2), manager = self._create_manager_instanse(2)
+
+        manager._ShardedCopyingManager__last_attempt_time = time.time() - (1000 * 65)
+
+        # get all workers and simulate their last attempt timeout.
+        for worker in manager.workers:
+            worker.change_last_attempt_time(time.time() - (1000 * 65))
+
+        status = manager.generate_status()
+        assert status.health_check_result == "Failed, max time since last scan attempt (60.0 seconds) exceeded\n" \
+                                             "Failed, some copying workers failed."
 
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)

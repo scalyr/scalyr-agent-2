@@ -33,7 +33,7 @@ import six
 
 from scalyr_agent import test_util
 from tests.unit.copying_manager.config_builder import ConfigBuilder
-from scalyr_agent.copying_manager import ShardedCopyingManager, CopyingManagerWorkerWrapper, CopyingManagerWorkerWrapperInterface, CopyingManagerWorkerProxy
+from scalyr_agent.copying_manager import ShardedCopyingManager, CopyingManagerWorkerWrapper
 
 from scalyr_agent.scalyr_client import AddEventsRequest
 
@@ -688,20 +688,16 @@ class TestableCopyingManagerWorker(
         )
         request = self.captured_request()
 
-        def send_response(status_message):
-            self.set_response(status_message)
-            self.run_and_stop_at(
-                TestableCopyingManagerWorker.SLEEPING
-            )
         if with_callback:
-            return request, send_response
+            return request, self.send_current_response
 
-        self.__current_response_callback = send_response
         return request
 
-    def send_current_response(self, status):
-        self.__current_response_callback(status)
-        self.__current_response_callback = None
+    def send_current_response(self, status_message):
+        self.set_response(status_message)
+        self.run_and_stop_at(
+            TestableCopyingManagerWorker.SLEEPING
+        )
 
     def wait_for_full_iteration(self):
         self.run_and_stop_at(
@@ -727,18 +723,18 @@ class TestableCopyingManagerWorker(
         :type filepath: six.text_type
         """
         # noinspection PyProtectedMember
-        self.log_processors[filepath].close_at_eof()
+        self.get_log_processors()[filepath].close_at_eof()
 
     @property
     def checkpoints_path(self):
         checkpoints_dir_path = pathlib.Path(self.__config.agent_data_path, "checkpoints")
-        file_name = "checkpoints-%s.json" % self.worker_id
+        file_name = "checkpoints-%s.json" % self._id
         return checkpoints_dir_path / file_name
 
     @property
     def active_checkpoints_path(self):
         checkpoints_dir_path = pathlib.Path(self.__config.agent_data_path, "checkpoints")
-        file_name = "active-checkpoints-%s.json" % self.worker_id
+        file_name = "active-checkpoints-%s.json" % self._id
         return checkpoints_dir_path / file_name
 
     def get_checkpoints(self):
@@ -839,130 +835,130 @@ class TestableCopyingManagerWorker(
             :type filepath: six.text_type
             """
             # noinspection PyProtectedMember
-            self.__copying_worker.log_processors[filepath].close_at_eof()
+            self.__copying_worker.get_log_processors()[filepath].close_at_eof()
 
         def stop(self):
             self.__copying_worker.stop_worker()
 
 
-class TestableCopyingManagerWorkerProxy(CopyingManagerWorkerProxy, TestableCopyingManagerInterface):
-    _exposed_ = CopyingManagerWorkerProxy._exposed_ + (
-        six.ensure_str("run_and_stop_at"),
-        six.ensure_str("wait_for_rpc"),
-        six.ensure_str("send_current_response"),
-        six.ensure_str("perform_scan"),
-        six.ensure_str("wait_for_full_iteration"),
-        six.ensure_str("perform_pipeline_scan"),
-        six.ensure_str("close_at_eof"),
-        six.ensure_str("generate_status"),
-        six.ensure_str("change_last_attempt_time"),
-        six.ensure_str("is_alive"),
-        six.ensure_str("get_pid"),
+# class TestableCopyingManagerWorkerProxy(CopyingManagerWorkerProxy, TestableCopyingManagerInterface):
+#     _exposed_ = CopyingManagerWorkerProxy._exposed_ + (
+#         six.ensure_str("run_and_stop_at"),
+#         six.ensure_str("wait_for_rpc"),
+#         six.ensure_str("send_current_response"),
+#         six.ensure_str("perform_scan"),
+#         six.ensure_str("wait_for_full_iteration"),
+#         six.ensure_str("perform_pipeline_scan"),
+#         six.ensure_str("close_at_eof"),
+#         six.ensure_str("generate_status"),
+#         six.ensure_str("change_last_attempt_time"),
+#         six.ensure_str("is_alive"),
+#         six.ensure_str("get_pid"),
+#
+#
+#     )
+#
+#     def run_and_stop_at(self, *args, **kwargs):
+#         return self._callmethod("run_and_stop_at", args=args, kwds=kwargs)
+#
+#     def wait_for_rpc(self, *args, **kwargs):
+#         kwargs["with_callback"] = False
+#         request = self._callmethod("wait_for_rpc", args=args, kwds=kwargs)
+#         def send_request(status):
+#             return self._callmethod("send_current_response", args=(status,))
+#         return request, send_request
+#
+#     def perform_scan(self):
+#         return self._callmethod("perform_scan")
+#
+#     def wait_for_full_iteration(self):
+#         return self._callmethod("wait_for_full_iteration")
+#
+#     def perform_pipeline_scan(self):
+#         return self._callmethod("perform_pipeline_scan")
+#
+#     def close_at_eof(self, *args, **kwargs):
+#         return self._callmethod("close_at_eof", args=args, kwds=kwargs)
+#
+#     def generate_status(self, *args, **kwargs):
+#         return self._callmethod("generate_status", args=args, kwds=kwargs)
+#
+#     def is_alive(self):
+#         return self._callmethod("is_alive")
+#
+#     def change_last_attempt_time(self, *args, **kwargs):
+#         return self._callmethod("change_last_attempt_time", args=args, kwds=kwargs)
+#
+#     @property
+#     def last_attempt_time(self):
+#         return self._callmethod("__getattribute__", args=("last_attempt_time",))
+#
+#     def get_pid(self):
+#         return self._callmethod("get_pid")
 
 
-    )
-
-    def run_and_stop_at(self, *args, **kwargs):
-        return self._callmethod("run_and_stop_at", args=args, kwds=kwargs)
-
-    def wait_for_rpc(self, *args, **kwargs):
-        kwargs["with_callback"] = False
-        request = self._callmethod("wait_for_rpc", args=args, kwds=kwargs)
-        def send_request(status):
-            return self._callmethod("send_current_response", args=(status,))
-        return request, send_request
-
-    def perform_scan(self):
-        return self._callmethod("perform_scan")
-
-    def wait_for_full_iteration(self):
-        return self._callmethod("wait_for_full_iteration")
-
-    def perform_pipeline_scan(self):
-        return self._callmethod("perform_pipeline_scan")
-
-    def close_at_eof(self, *args, **kwargs):
-        return self._callmethod("close_at_eof", args=args, kwds=kwargs)
-
-    def generate_status(self, *args, **kwargs):
-        return self._callmethod("generate_status", args=args, kwds=kwargs)
-
-    def is_alive(self):
-        return self._callmethod("is_alive")
-
-    def change_last_attempt_time(self, *args, **kwargs):
-        return self._callmethod("change_last_attempt_time", args=args, kwds=kwargs)
-
-    @property
-    def last_attempt_time(self):
-        return self._callmethod("__getattribute__", args=("last_attempt_time",))
-
-    def get_pid(self):
-        return self._callmethod("get_pid")
-
-
-class TestableCopyingManagerWorkerWrapper(CopyingManagerWorkerWrapper, TestableCopyingManagerInterface):
-    def __init__(self,configuration, api_key_config_entry, worker_id,):
-        super(TestableCopyingManagerWorkerWrapper, self).__init__(
-            configuration,
-            api_key_config_entry,
-            worker_id,
-            real_worker_class=TestableCopyingManagerWorker,
-            worker_proxy_class=TestableCopyingManagerWorkerProxy
-        )
-        self.real_worker = self.real_worker # type: TestableCopyingManagerWorker
-
-    def start_worker(self, *args, **kwargs):
-        self.real_worker.start_worker(*args, **kwargs)
-
-    def run_and_stop_at(self, stopping_at, required_transition_state=None):
-        return self.real_worker.run_and_stop_at(stopping_at, required_transition_state=required_transition_state)
-
-    def wait_for_rpc(self):
-        return self.real_worker.wait_for_rpc()
-
-    @property
-    def log_processors(self):
-        return self.real_worker.log_processors
-
-    # def change_last_attempt_time(self, *args, **kwargs):
-    #     return self._real_worker.change_last_attempt_time(*args, **kwargs)
-
-    def get_pid(self):
-        return self.real_worker.get_pid()
-
-    def close_at_eof(self, *args, **kwargs):
-        return self.real_worker.close_at_eof(*args, **kwargs)
-
-    def change_last_attempt_time(self, *args, **kwargs):
-        return self.real_worker.change_last_attempt_time(*args, **kwargs)
-
-    @property
-    def memory_manager(self):
-        return self._memory_manager
-
-    def wait_for_full_iteration(self):
-        return self.real_worker.wait_for_full_iteration()
-
-    def perform_scan(self):
-        return self.real_worker.perform_scan()
-
-    def perform_pipeline_scan(self):
-        return self.real_worker.perform_pipeline_scan()
-
-    def get_checkpoints(self):
-        return self.real_worker.get_checkpoints()
-
-    def write_checkpoints(self, *args, **kwargs):
-        return self.real_worker.write_checkpoints(*args, **kwargs)
-
-    @property
-    def checkpoints_path(self):
-        return self.real_worker.checkpoints_path
-
-    @property
-    def active_checkpoints_path(self):
-        return self.real_worker.active_checkpoints_path
+# class TestableCopyingManagerWorkerWrapper(CopyingManagerWorkerWrapper, TestableCopyingManagerInterface):
+#     def __init__(self,configuration, api_key_config_entry, worker_id,):
+#         super(TestableCopyingManagerWorkerWrapper, self).__init__(
+#             configuration,
+#             api_key_config_entry,
+#             worker_id,
+#             real_worker_class=TestableCopyingManagerWorker,
+#             worker_proxy_class=TestableCopyingManagerWorkerProxy
+#         )
+#         self.real_worker = self.real_worker # type: TestableCopyingManagerWorker
+#
+#     def start_worker(self, *args, **kwargs):
+#         self.real_worker.start_worker(*args, **kwargs)
+#
+#     def run_and_stop_at(self, stopping_at, required_transition_state=None):
+#         return self.real_worker.run_and_stop_at(stopping_at, required_transition_state=required_transition_state)
+#
+#     def wait_for_rpc(self):
+#         return self.real_worker.wait_for_rpc()
+#
+#     @property
+#     def log_processors(self):
+#         return self.real_worker.log_processors
+#
+#     # def change_last_attempt_time(self, *args, **kwargs):
+#     #     return self._real_worker.change_last_attempt_time(*args, **kwargs)
+#
+#     def get_pid(self):
+#         return self.real_worker.get_pid()
+#
+#     def close_at_eof(self, *args, **kwargs):
+#         return self.real_worker.close_at_eof(*args, **kwargs)
+#
+#     def change_last_attempt_time(self, *args, **kwargs):
+#         return self.real_worker.change_last_attempt_time(*args, **kwargs)
+#
+#     @property
+#     def memory_manager(self):
+#         return self._memory_manager
+#
+#     def wait_for_full_iteration(self):
+#         return self.real_worker.wait_for_full_iteration()
+#
+#     def perform_scan(self):
+#         return self.real_worker.perform_scan()
+#
+#     def perform_pipeline_scan(self):
+#         return self.real_worker.perform_pipeline_scan()
+#
+#     def get_checkpoints(self):
+#         return self.real_worker.get_checkpoints()
+#
+#     def write_checkpoints(self, *args, **kwargs):
+#         return self.real_worker.write_checkpoints(*args, **kwargs)
+#
+#     @property
+#     def checkpoints_path(self):
+#         return self.real_worker.checkpoints_path
+#
+#     @property
+#     def active_checkpoints_path(self):
+#         return self.real_worker.active_checkpoints_path
 
 
 
@@ -1206,3 +1202,68 @@ class TestableShardedCopyingManager(ShardedCopyingManager, TestableCopyingManage
 
         def stop(self):
             self.__copying_manager.stop_manager()
+
+
+# def create_testable_multiprocessing_worker(
+#         configuration,
+#         api_key_config_entry,
+#         worker_id,
+# ):
+#     return create_multiprocessing_worker(
+#         configuration,
+#         api_key_config_entry,
+#         worker_id,
+#         real_worker_class=TestableCopyingManagerWorker,
+#         additional_exposed=[
+#         six.ensure_str("run_and_stop_at"),
+#         six.ensure_str("wait_for_rpc"),
+#         six.ensure_str("send_current_response"),
+#         six.ensure_str("perform_scan"),
+#         six.ensure_str("wait_for_full_iteration"),
+#         six.ensure_str("perform_pipeline_scan"),
+#         six.ensure_str("close_at_eof"),
+#         six.ensure_str("generate_status"),
+#         six.ensure_str("change_last_attempt_time"),
+#         six.ensure_str("is_alive"),
+#         six.ensure_str("get_pid"),
+#     ]
+#     )
+
+
+class TestableCopyingManagerWorkerWrapper(CopyingManagerWorkerWrapper):
+    EXPOSED = CopyingManagerWorkerWrapper.EXPOSED + [
+        six.ensure_str("run_and_stop_at"),
+        six.ensure_str("wait_for_rpc"),
+        six.ensure_str("send_current_response"),
+        six.ensure_str("perform_scan"),
+        six.ensure_str("wait_for_full_iteration"),
+        six.ensure_str("perform_pipeline_scan"),
+        six.ensure_str("close_at_eof"),
+        six.ensure_str("generate_status"),
+        six.ensure_str("change_last_attempt_time"),
+        six.ensure_str("is_alive"),
+        six.ensure_str("get_pid"),
+    ]
+    COPYING_MANAGER_CLASS = TestableCopyingManagerWorker
+
+    def start_worker(self, *args, **kwargs):
+        return self._real_worker.start_worker(*args, **kwargs)
+
+    @property
+    def log_processors(self):
+        return self._real_worker.get_log_processors()
+
+    @property
+    def worker_id(self):
+        return self._real_worker.get_id()
+
+    def wait_for_rpc(self, *args, **kwargs):
+        request = self._real_worker.wait_for_rpc(*args, with_callback=False, **kwargs)
+
+        def send_response(status_message):
+            self._real_worker.send_current_response(status_message)
+
+        return request, send_response
+
+    def __getattr__(self, item):
+        return getattr(self._real_worker, item)

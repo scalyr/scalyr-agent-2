@@ -19,7 +19,6 @@ from scalyr_agent.test_base import skipIf
 from tests.unit.copying_manager.common import CopyingManagerCommonTest
 from tests.unit.copying_manager.common import (
     TestableCopyingManagerWorker,
-    TestableCopyingManagerWorkerProxy,
     TestableCopyingManagerWorkerWrapper
 )
 from tests.unit.copying_manager.config_builder import TestableLogFile
@@ -120,7 +119,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         # log_processor_cls = log_file_processor_factory(self.worker_type, self._instance)
 
         matcher = LogMatcher(
-            self._config_builder.config, log_config, log_processor_cls=self._instance.spawn_new_log_processor
+            self._config_builder.config, log_config
         )
         if checkpoints is None:
             checkpoints = {}
@@ -129,6 +128,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             existing_processors=[],
             previous_state=checkpoints,
             copy_at_index_zero=copy_at_index_zero,
+            log_processor_creator=self._instance.spawn_new_log_processor
         )
 
         return processors[0]
@@ -142,7 +142,7 @@ class Tests(CopyingManagerWorkerTest):
 
         _, worker = self._create_worker_instance(1, auto_start=False)
 
-        original_run = worker.real_worker.run
+        original_run = worker._real_worker.run
 
         # create mock run method that can wait for signal to start
         def delayed_run():
@@ -150,7 +150,7 @@ class Tests(CopyingManagerWorkerTest):
             run_released.wait()
             return original_run()
 
-        with mock.patch.object(worker.real_worker, "run", wraps=delayed_run):
+        with mock.patch.object(worker._real_worker, "run", wraps=delayed_run):
             executor = ThreadPoolExecutor()
 
             worker.start_worker(stop_at=None)

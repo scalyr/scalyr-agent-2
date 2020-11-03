@@ -6,7 +6,7 @@ from scalyr_agent import scalyr_monitor
 from scalyr_agent import scalyr_logging
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
 from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
-from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.copying_manager import ShardedCopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
@@ -151,7 +151,7 @@ class TestConfigurationDocker(TestConfiguration):
             limit_key="config_conflict_scalyr_agent.builtin_monitors.docker_monitor_docker_raw_logs_SCALYR_DOCKER_RAW_LOGS",
         )
 
-        CopyingManager(config, monitors_manager.monitors)
+        ShardedCopyingManager(config, monitors_manager.monitors)
         # Override Agent Logger to prevent writing to disk
         for monitor in monitors_manager.monitors:
             monitor._logger = FakeAgentLogger("fake_agent_logger")

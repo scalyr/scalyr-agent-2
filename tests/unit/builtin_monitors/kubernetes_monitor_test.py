@@ -44,7 +44,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     ControlledCacheWarmer,
     _ignore_old_dead_container,
 )
-from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.copying_manager import ShardedCopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
@@ -590,7 +590,7 @@ class TestExtraServerAttributes(ScalyrTestCase):
             self.__monitor_fake_instances.append(FakeMonitor(monitor_log_config))
 
         # noinspection PyTypeChecker
-        return CopyingManager(config, self.__monitor_fake_instances)
+        return ShardedCopyingManager(config, self.__monitor_fake_instances)
 
     def test_no_extra_server_attributes(self):
         copying_manager = self._create_test_instance([], [])
@@ -622,9 +622,9 @@ class TestExtraServerAttributes(ScalyrTestCase):
                 null_logger=True,
                 fake_clock=fake_clock,
             )
-            copying_manager = CopyingManager(config, monitors_manager.monitors)
+            copying_manager = ShardedCopyingManager(config, monitors_manager.monitors)
             self.assertEquals(
-                copying_manager._CopyingManager__expanded_server_attributes.get(
+                copying_manager._ShardedCopyingManager__expanded_server_attributes.get(
                     "_k8s_ver"
                 ),
                 "star",

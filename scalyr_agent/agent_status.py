@@ -393,6 +393,7 @@ class ApiKeyWorkerPoolStatus(BaseAgentStatus):
         self.total_pipelined_requests = 0
         self.avg_bytes_produced_rate = 0
         self.avg_bytes_copied_rate = 0
+        self.health_check_result = None
 
         self.workers = {} #  type: Dict[six.text_type, CopyingManagerWorkerStatus]
 
