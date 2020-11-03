@@ -37,6 +37,7 @@ import six
 from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
     ProtocolError,
 )
+from docker.types.daemon import CancellableStream
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
@@ -610,7 +611,7 @@ define_metric(
 )
 
 
-class WrappedStreamResponse(object):
+class WrappedStreamResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
@@ -621,31 +622,32 @@ class WrappedStreamResponse(object):
         self.response = response
         self.decode = decode
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(DockerClient, self.client)._stream_helper(
-            self.response, self.decode
-        ):
-            yield item
+        stream = super(DockerClient, self.client)._stream_helper(
+            response=self.response, decode=decode
+        )
+        super(WrappedStreamResponse, self).__init__(stream=stream, response=response)
 
 
-class WrappedRawResponse(object):
+class WrappedRawResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._stream_raw_result
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
     """
 
-    def __init__(self, client, response):
+    def __init__(self, client, response, chunk_size=8096):
         self.client = client
         self.response = response
+        self.chunk_size = chunk_size
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
-            yield item
+        stream = super(DockerClient, self.client)._stream_raw_result(
+            response=self.response, chunk_size=self.chunk_size
+        )
+        super(WrappedRawResponse, self).__init__(stream=stream, response=response)
 
 
-class WrappedMultiplexedStreamResponse(object):
+class WrappedMultiplexedStreamResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
@@ -655,12 +657,13 @@ class WrappedMultiplexedStreamResponse(object):
         self.client = client
         self.response = response
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(
-            DockerClient, self.client
-        )._multiplexed_response_stream_helper(self.response):
-            yield item
+        stream = super(DockerClient, self.client)._multiplexed_response_stream_helper(
+            response=self.response
+        )
+        super(WrappedMultiplexedStreamResponse, self).__init__(
+            stream=stream, response=response
+        )
 
 
 class DockerClient(docker.APIClient):  # pylint: disable=no-member
@@ -1295,6 +1298,17 @@ class ContainerChecker(StoppableThread):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
+        except IOError as e:
+            # If file doesn't exist, this simple means that the new container has been started and
+            # the log file doesn't exist on disk yet.
+            if e.errno == 2:
+                global_log.info(
+                    "File %s doesn't exist on disk. This likely means a new container "
+                    "has been started and no existing logs are available for it on "
+                    "disk. Original error: %s" % (full_path, six.text_type(e))
+                )
+            else:
+                global_log.info("%s", six.text_type(e))
         except Exception as e:
             global_log.info("%s", six.text_type(e))
         finally:
@@ -1476,6 +1490,13 @@ class DockerLogger(object):
         if last_request:
             self.__last_request = last_request
 
+        last_request_dt = datetime.datetime.utcfromtimestamp(self.__last_request)
+
+        global_log.debug(
+            'Using last_request value of "%s" for log_path "%s" and cid "%s", name "%s"'
+            % (last_request_dt, self.log_path, self.cid, self.name)
+        )
+
         self.__logger = logging.Logger(cid + "." + stream)
 
         self.__log_handler = logging.handlers.RotatingFileHandler(
@@ -1498,10 +1519,23 @@ class DockerLogger(object):
         self.__thread.start()
 
     def stop(self, wait_on_join=True, join_timeout=5):
-        if self.__client and self.__logs and self.__logs.response:
-            sock = self.__client._get_raw_response_socket(self.__logs.response)
+        # NOTE: Depending on the class used, attribute name may either be response or _response
+        if (
+            self.__client
+            and self.__logs
+            and getattr(self.__logs, "response", getattr(self.__logs, "_response"))
+        ):
+            sock = self.__client._get_raw_response_socket(
+                getattr(self.__logs, "response", getattr(self.__logs, "_response"))
+            )
+
             if sock:
-                sock.shutdown(socket.SHUT_RDWR)
+                # Under Python 3, SocketIO is used which case close() attribute and not shutdown
+                if hasattr(sock, "shutdown"):
+                    sock.shutdown(socket.SHUT_RDWR)
+                else:
+                    sock.close()
+
         self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
     def last_request(self):
@@ -1558,6 +1592,7 @@ class DockerLogger(object):
                 )
                 try:
                     for line in self.__logs:
+                        line = six.ensure_text(line)
                         # split the docker timestamp from the frest of the line
                         dt, log_line = _split_datetime_from_line(line)
                         if not dt:
@@ -1578,6 +1613,10 @@ class DockerLogger(object):
                                 self.__last_request_lock.acquire()
                                 self.__last_request = timestamp
                                 self.__last_request_lock.release()
+                            else:
+                                # TODO: We should probably log under debug level 5 here to make
+                                # troubleshooting easier.
+                                pass
 
                         if not run_state.is_running():
                             self.__logger.log(
@@ -1611,11 +1650,19 @@ class DockerLogger(object):
             self.__last_request += 0.01
 
             self.__last_request_lock.release()
-
+        except docker.errors.NotFound as e:
+            # This simply represents the container has been stopped / killed before the client has
+            # been able to cleanly close the connection. This error is non-fatal and simply means we
+            # will clean up / remove the log on next iteration.
+            global_log.info(
+                'Container with id "%s" and name "%s" has been removed or deleted. Log file '
+                "will be removed on next loop iteration. Original error: %s."
+                % (self.cid, self.name, str(e))
+            )
         except Exception as e:
             global_log.warn(
-                "Unhandled exception in DockerLogger.process_request for %s:\n\t%s"
-                % (self.name, six.text_type(e))
+                "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
+                % (self.name, six.text_type(e), traceback.format_exc())
             )
 
 
