@@ -39,7 +39,6 @@ from io import open
 import logging
 import platform
 
-import parametrized
 import pytest
 
 
