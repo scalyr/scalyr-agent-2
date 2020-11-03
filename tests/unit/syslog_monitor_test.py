@@ -41,6 +41,7 @@ from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.scalyr_monitor import MonitorInformation
+from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -141,7 +142,7 @@ class SyslogFrameParserTestCase(unittest.TestCase):
         )
 
 
-class SyslogMonitorTestCase(unittest.TestCase):
+class SyslogMonitorTestCase(ScalyrTestCase):
     def assertNoException(self, func):
         try:
             func()
