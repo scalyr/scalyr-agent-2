@@ -464,7 +464,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.connect(s, ("localhost", 8514))
 
         # Single line which is sent as part of a single TCP send call which exceeds the buffer size
-        self._reported_lines_count = 0
+        self.monitor._reported_lines_count = 0
         expected_line1 = "TCP line one without line break"
 
         expected_msg = r"Could not wait for written lines because the timeout \(2 seconds\) has occurred"
@@ -550,7 +550,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_run_tcp_server_small_tcp_buffer_size_with_unlimited_buffer_size(self):
+    @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
+    def test_run_tcp_server_small_tcp_buffer_size_with_unlimited_buffer_size(
+        self, mock_global_log
+    ):
         # When tcp_unlimited_buffer_size config option is set to True, we should support messages
         # which span multiple packets and are more than tcp_buffer_size in size
         config = {
@@ -573,14 +576,16 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.connect(s, ("localhost", 8514))
 
         # Single line which is sent as part of a single TCP send call which exceeds the buffer size
-        self._reported_lines_count = 0
+        self.monitor._reported_lines_count = 0
+
+        self.assertEqual(mock_global_log.warning.call_count, 0)
 
         expected_line1 = "TCP TestXX Foo bar baz"
         self.send_and_wait_for_lines(s, expected_line1 + "\n", expected_line_count=1)
 
-        # Single line which is split across multiple TCP packets
-        self._reported_lines_count = 0
+        self.assertEqual(mock_global_log.warning.call_count, 0)
 
+        # Single line which is split across multiple TCP packets
         expected_line2_partial_1 = "Hello "
         expected_line2_partial_2 = "Howdy "
         expected_line2_partial_3 = "stranger bar foo bar ponies"
@@ -601,10 +606,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         # Multiple lines which exceed tcp buffer size
         # NOTE: It's important we reset _reported_lines_count between each test scenario
-        self._reported_lines_count = 0
+        self.monitor._reported_lines_count = 0
 
         expected_line3 = "hello this is line one\nbut also line two\nand maybe also line three\nand so on and so on"
         self.send_and_wait_for_lines(s, expected_line3 + "\n", expected_line_count=4)
+
+        self.assertEqual(mock_global_log.warning.call_count, 0)
 
         # without close, the logger will interfere with other test cases.
         self.monitor.close_metric_log()
