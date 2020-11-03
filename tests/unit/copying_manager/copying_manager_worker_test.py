@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor
 import platform
 import mock
 import multiprocessing
