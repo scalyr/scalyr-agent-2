@@ -12,6 +12,7 @@ Features:
 
 Improvements:
 * Improve logging in the Kubernetes monitor.
+* On agent start up we now also log locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
 
 Bug fixes:
 * Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
