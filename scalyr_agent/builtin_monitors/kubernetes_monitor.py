@@ -104,6 +104,17 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "initial_stopped_container_collection_window",
+    "By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. "
+    "To override this, set this parameter to the number of seconds the agent will look in the past (before it was "
+    "started). It will collect logs for any pods that was started and stopped during this window.",
+    convert_to=int,
+    default=0,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "api_socket",
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
@@ -2781,7 +2792,9 @@ class ContainerChecker(object):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
-        previous_time = time.time()
+        previous_time = time.time() - self._config.get(
+            "initial_stopped_container_collection_window"
+        )
 
         while run_state.is_running():
             try:
@@ -2959,7 +2972,9 @@ class ContainerChecker(object):
             self.raw_logs.append(log)
 
     def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+        result = datetime.datetime.utcfromtimestamp(self.__start_time)
+
+        fp = None
 
         try:
             full_path = os.path.join(self.__log_path, path)
@@ -2984,9 +2999,11 @@ class ContainerChecker(object):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
-            fp.close()
         except Exception as e:
             global_log.info("%s", six.text_type(e))
+        finally:
+            if fp:
+                fp.close()
 
         return scalyr_util.seconds_since_epoch(result)
 
@@ -3458,6 +3475,7 @@ cluster.
         self.__glob_list = self._config.get("container_globs")
         self.__include_all = self._config.get("k8s_include_all_containers")
 
+        self.__log_mode = self._config.get("log_mode")
         self.__report_container_metrics = self._config.get("report_container_metrics")
         self.__report_k8s_metrics = (
             self._config.get("report_k8s_metrics") and self.__report_container_metrics
@@ -3501,7 +3519,7 @@ cluster.
         )
 
         self.__container_checker = None
-        if self._config.get("log_mode") != "syslog":
+        if self.__log_mode != "syslog":
             self.__container_checker = ContainerChecker(
                 self._config,
                 self._global_config,
@@ -4093,6 +4111,8 @@ cluster.
             "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
             "SCALYR_K8S_VERIFY_KUBELET_QUERIES",
             "SCALYR_K8S_KUBELET_CA_CERT",
+            "SCALYR_REPORT_K8S_METRICS",
+            "SCALYR_REPORT_CONTAINER_METRICS",
         ]
         for envar in envars_to_log:
             self._logger.info(
@@ -4111,7 +4131,7 @@ cluster.
                 is not None
             ):
                 self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
+                    scalyr_logging.DEBUG_LEVEL_0,  # INFO
                     "Cluster name detected, enabling k8s metric reporting and controller information",
                 )
                 self.__include_controller_info = True
@@ -4155,12 +4175,37 @@ cluster.
             )
             self.__report_k8s_metrics = False
 
+        log_mode = self._config.get("log_mode")
+        if log_mode != "syslog":
+            always_use_docker = self._config.get("k8s_always_use_docker")
+            always_use_cri = self._config.get("k8s_always_use_cri")
+
+            if self.__container_checker:
+                container_runtime = self.__container_checker._container_runtime
+            else:
+                container_runtime = "unknown"
+
+            if always_use_docker or (
+                container_runtime == "docker" and not always_use_cri
+            ):
+                container_list_mode = "docker"
+            else:
+                container_list_mode = "cri (fs)"
+        else:
+            container_list_mode = "none (in syslog mode)"
+
         global_log.info(
-            "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, report_metrics: %s"
+            (
+                "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, "
+                "report_metrics: %s, report_k8s_metrics: %s, log_mode: %s, container_list_mode: %s"
+            )
             % (
                 self.__namespaces_to_include,
                 self.__include_controller_info,
                 self.__report_container_metrics,
+                self.__report_k8s_metrics,
+                log_mode,
+                container_list_mode,
             )
         )
 

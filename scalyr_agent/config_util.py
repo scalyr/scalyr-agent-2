@@ -98,7 +98,7 @@ SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
 )
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
-    float: STRING_TYPES,
+    float: STRING_TYPES | set([int, float]),
     list: set(
         [
             six.text_type,

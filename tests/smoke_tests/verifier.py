@@ -301,7 +301,7 @@ class DataJsonVerifier(AgentVerifier):
         self._data_json_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "data.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
+        self._timestamp = datetime.datetime.utcnow().isoformat()
 
         self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
         self._request.add_filter(
@@ -373,7 +373,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._data_json_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "data.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
+        self._timestamp = datetime.datetime.utcnow().isoformat()
 
         self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
         self._request.add_filter(
