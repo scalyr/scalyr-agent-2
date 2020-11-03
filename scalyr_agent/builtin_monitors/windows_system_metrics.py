@@ -50,8 +50,11 @@ except ImportError:
 
 import six
 
+from scalyr_agent import scalyr_logging
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem
 from scalyr_agent import define_config_option, define_metric, define_log_field
+
+global_log = scalyr_logging.getLogger(__name__)
 
 
 #
@@ -103,6 +106,9 @@ def _gather_metric(method, attribute=None, transform=None):
 
     def gather_metric():
         """Dynamically Generated """
+        no_diskperf = False
+        is_diskio_counters_method = method == "disk_io_counters"
+
         try:
             metric = methodcaller(method)  # pylint: disable=redefined-outer-name
             value = metric(psutil)
@@ -120,14 +126,50 @@ def _gather_metric(method, attribute=None, transform=None):
             # the message changes.
             message = getattr(e, "message", str(e))
             if (
-                message == "couldn't find any physical disk"
-                and method == "disk_io_counters"
+                is_diskio_counters_method
+                and "couldn't find any physical disk" in message.lower()
             ):
-                yield __NO_DISK_PERF__, None
+                global_log.warn(
+                    "Unable to retrieve disk io metrics. This likely means diskperf -y "
+                    "needs to be run: %s" % (str(e)),
+                    exc_info=True,
+                    limit_once_per_x_secs=86400,
+                    limit_key="win_diskperf_error",
+                    error_code="win32DiskPerDisabledError",
+                )
+                no_diskperf = True
+            else:
+                raise e
+        except AttributeError as e:
+            # The same issue with diskperf,
+            # but the exception catch above does not work on older windows versions.
+            message = getattr(e, "message", str(e))
+            if (
+                is_diskio_counters_method
+                and "has no attribute 'read_bytes'" in message.lower()
+            ):
+                global_log.warn(
+                    "Unable to retrieve disk io metrics. This likely means diskperf -y "
+                    "needs to be run: %s" % (str(e)),
+                    exc_info=True,
+                    limit_once_per_x_secs=86400,
+                    limit_key="win_diskperf_error",
+                    error_code="win32DiskPerDisabledError",
+                )
+                no_diskperf = True
             else:
                 raise e
 
-    gather_metric.__doc__ = doc(method, attribute)
+        if no_diskperf:
+            yield __NO_DISK_PERF__, None
+
+    try:
+        gather_metric.__doc__ = doc(method, attribute)
+    except ValueError as e:
+        if "zero length field name in format" in str(e):
+            pass
+        else:
+            raise e
     return gather_metric
 
 
