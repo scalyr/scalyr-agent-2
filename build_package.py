@@ -74,6 +74,7 @@ PACKAGE_TYPES = [
     "win32",
     "docker_syslog_builder",
     "docker_json_builder",
+    "docker_api_builder",
     "k8s_builder",
 ]
 
@@ -139,6 +140,20 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "docker/docker-json-config",
                 "scalyr-docker-agent-json",
                 ["scalyr/scalyr-agent-docker-json"],
+                coverage_enabled=coverage_enabled,
+            )
+        elif package_type == "docker_api_builder":
+            # An image for running on Docker configured to fetch logs via the Docker API using
+            # docker_raw_logs: false configuration option.
+            artifact_file_name = build_container_builder(
+                variant,
+                version,
+                no_versioned_file_name,
+                "scalyr-docker-agent.tar.gz",
+                "docker/Dockerfile",
+                "docker/docker-api-config",
+                "scalyr-docker-agent-api",
+                ["scalyr/scalyr-agent-docker-api"],
                 coverage_enabled=coverage_enabled,
             )
         elif package_type == "k8s_builder":
