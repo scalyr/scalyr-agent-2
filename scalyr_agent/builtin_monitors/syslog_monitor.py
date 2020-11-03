@@ -452,7 +452,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
 
 class SyslogRequestParser(object):
-    def __init__(self, socket, max_buffer_size, unlimited_buffer_size):
+    def __init__(self, socket, max_buffer_size, unlimited_buffer_size=False):
         self._socket = socket
 
         if socket:
