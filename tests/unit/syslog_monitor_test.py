@@ -18,7 +18,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from __future__ import print_function
 
 if False:
     from typing import List
@@ -278,13 +277,19 @@ class TestSyslogMonitor(SyslogMonitor):
         super(TestSyslogMonitor, self).__init__(*args, **kwargs)
         # wakes up the main test thread when new line added, and line counter incremented.
         self._increment_line_cv = threading.Condition()
+
         # stores the total number of 'reported_lines'. Useful when multiple lines are sent at once.
         self._reported_lines_count = 0
+
+        # stores number of calls of the increment_counter / line_reporter function
+        self._increment_counter_call_count = 0
 
     def increment_counter(self, reported_lines=0, errors=0):
         super(TestSyslogMonitor, self).increment_counter(
             reported_lines=reported_lines, errors=errors
         )
+
+        self._increment_counter_call_count += 1
 
         with self._increment_line_cv:
             self._reported_lines_count += reported_lines
@@ -302,7 +307,8 @@ class TestSyslogMonitor(SyslogMonitor):
                 self._increment_line_cv.wait(timeout)
                 if time.time() - start_time >= timeout:
                     raise OSError(
-                        "Could not wait for written lines because the timeout has occurred."
+                        "Could not wait for written lines because the timeout (%s seconds) has occurred."
+                        % (timeout)
                     )
             self._reported_lines_count = 0
 
@@ -379,7 +385,6 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         sys.stdout = self.old
 
         # Print any accumulated stdout at the end for ease of debugging
-        print((self.dummy_stream.getvalue()))
         self.dummy_stream.close()
 
     def connect(self, socket, addr, max_tries=3):
@@ -396,7 +401,13 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         return connected
 
     def send_and_wait_for_lines(
-        self, sock, data, dest_addr=None, expected_line_count=1
+        self,
+        sock,
+        data,
+        dest_addr=None,
+        expected_line_count=1,
+        timeout=3,
+        wait_for_lines=True,
     ):
         """
         Send data through a 'sock' socket.
@@ -423,18 +434,131 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
                     chunk = chunk.encode("utf-8")
                 sock.sendto(chunk, dest_addr)
 
-        self.monitor.wait_for_new_lines(expected_line_number=expected_line_count)
+        if wait_for_lines:
+            self.monitor.wait_for_new_lines(
+                expected_line_number=expected_line_count, timeout=timeout
+            )
 
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_run_tcp_server_small_tcp_buffer_size(self):
+    def test_run_tcp_server_handle_frame_timeout(self):
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "tcp:8514",
+            "log_flush_delay": 0.0,
+            "tcp_buffer_size": 500,
+        }
+
+        # 1. non-framed message, we use \n as frame end maker
+        self.monitor = TestSyslogMonitor(config, self.logger)
+        self.monitor.open_metric_log()
+
+        self.monitor.start()
+        time.sleep(0.05)
+
+        s = socket.socket(socket.AF_INET)
+        self.sockets.append(s)
+
+        self.connect(s, ("localhost", 8514))
+
+        # Single line which is sent as part of a single TCP send call which exceeds the buffer size
+        self._reported_lines_count = 0
+        expected_line1 = "TCP line one without line break"
+
+        expected_msg = r"Could not wait for written lines because the timeout \(2 seconds\) has occurred"
+
+        self.assertRaisesRegexp(
+            OSError,
+            expected_msg,
+            self.send_and_wait_for_lines,
+            s,
+            expected_line1,
+            expected_line_count=1,
+            timeout=2,
+        )
+
+        self.assertEqual(self.monitor._increment_counter_call_count, 0)
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
+        self.monitor.stop(wait_on_join=False)
+        self.monitor = None
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
+    def test_run_tcp_server_small_tcp_buffer_size_without_unlimited_buffer_size(
+        self, mock_global_log
+    ):
+        # unlimited buffer size is False and tcp_buffer_size is False. Timeout should occur because
+        # partial data should be flushed before we receive a whole line
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
             "log_flush_delay": 0.0,
             "tcp_buffer_size": 5,
+            "tcp_unlimited_buffer_size": False,
+        }
+
+        self.monitor = TestSyslogMonitor(config, self.logger)
+        self.monitor.open_metric_log()
+
+        self.monitor.start()
+        time.sleep(0.05)
+
+        s = socket.socket(socket.AF_INET)
+        self.sockets.append(s)
+
+        self.connect(s, ("localhost", 8514))
+
+        expected_line1 = "TCP line one without line break"
+
+        self.assertEqual(mock_global_log.warning.call_count, 0)
+
+        self.send_and_wait_for_lines(
+            s, expected_line1, expected_line_count=0, wait_for_lines=False
+        )
+        time.sleep(2)
+
+        # Ensure we did actually call handle_frame for each of the small frames
+        self.assertEqual(
+            int(len(expected_line1) / 5), self.monitor._increment_counter_call_count
+        )
+
+        self.assertEqual(mock_global_log.warning.call_count, 6)
+        self.assertTrue(
+            "frame exceeded maximum buffer size of 5 bytes"
+            in mock_global_log.warning.call_args_list[0][0][0]
+        )
+        self.assertTrue(
+            "frame exceeded maximum buffer size of 5 bytes"
+            in mock_global_log.warning.call_args_list[5][0][0]
+        )
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
+        self.monitor.stop(wait_on_join=False)
+        self.monitor = None
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_run_tcp_server_small_tcp_buffer_size_with_unlimited_buffer_size(self):
+        # When tcp_unlimited_buffer_size config option is set to True, we should support messages
+        # which span multiple packets and are more than tcp_buffer_size in size
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "tcp:8514",
+            "log_flush_delay": 0.0,
+            "tcp_buffer_size": 5,
+            "tcp_unlimited_buffer_size": True,
         }
 
         self.monitor = TestSyslogMonitor(config, self.logger)
