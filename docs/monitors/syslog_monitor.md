@@ -96,6 +96,11 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                                               syslog message.  Note: RFC 5425 (syslog over TCP/TLS) says syslog \
                                               receivers MUST be able to support messages at least 2048 bytes long, and \
                                               recommends they SHOULD support messages up to 8192 bytes long.
+|||# ``tcp_unlimited_buffer_size``        ||| Optional (defaults to False).  True to support syslog messages of \
+                                              unlimited size. If not provided, we support messages of tcp_buffer_size \
+                                              bytes long. When this value is True, we will use tcp_buffer_size option \
+                                              as the amount of bytes we try to read from the socket in a single recv() \
+                                              call.
 |||# ``max_log_size``                     ||| Optional (defaults to None). How large the log file will grow before it \
                                               is rotated. If None, then the default value will be taken from the \
                                               monitor level or the global level log_rotation_max_bytes config option.  \
