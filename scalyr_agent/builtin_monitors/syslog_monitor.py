@@ -546,7 +546,7 @@ class SyslogRequestParser(object):
                     global_log.warning(
                         "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
                         'increase the value of "tcp_buffer_size" monitor config option or set '
-                        '"tcp_unlimited_buffer" monitor config option to True.'
+                        '"tcp_unlimited_buffer_size" monitor config option to True.'
                         % (self._max_buffer_size),
                         limit_once_per_x_secs=300,
                         limit_key="syslog-max-buffer-exceeded",
