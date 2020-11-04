@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.14 "TBD" - November 15, 2020
+## 2.1.14 "Hydrus" - November 4, 2020
 
 <!---
-Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 4, 2020 14:00 -0800
 --->
 
 Features:
@@ -12,12 +12,11 @@ Features:
 
 Improvements:
 * Improve logging in the Kubernetes monitor.
-* On agent start up we now also log locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
+* On agent start up we now also log the locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
 
 Bug fixes:
 * Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
 * Update code for all the monitors to correctly use UTC timezone everywhere. Previously some of the code incorrectly used local server time instead of UTC. This means some of those monitors could exhibit incorrect / undefined behavior when running the agent on a server which has local time set to something else than UTC.
-* Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 * Fix ``docker_raw_logs: false`` functionality in the Docker monitor which has been broken for a while now.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 
