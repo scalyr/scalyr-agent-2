@@ -1159,7 +1159,6 @@ class SyslogHandler(object):
         else:
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        print("innn")
         self.__line_reporter(data.count("\n") + 1)
 
 
