@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.14 "TBD" - November 15, 2020
+## 2.1.14 "Hydrus" - November 4, 2020
 
 <!---
-Packaged by Oliver Hsu <oliver@scalyr.com> on Nov 15, 2020 19:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 4, 2020 14:00 -0800
 --->
 
 Features:
@@ -12,12 +12,11 @@ Features:
 
 Improvements:
 * Improve logging in the Kubernetes monitor.
-* On agent start up we now also log locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
+* On agent start up we now also log the locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
 
 Bug fixes:
 * Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
 * Update code for all the monitors to correctly use UTC timezone everywhere. Previously some of the code incorrectly used local server time instead of UTC. This means some of those monitors could exhibit incorrect / undefined behavior when running the agent on a server which has local time set to something else than UTC.
-* Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 * Fix ``docker_raw_logs: false`` functionality in the Docker monitor which has been broken for a while now.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 
@@ -121,10 +120,6 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 4, 2020 13:30 -0800
 Features:
 * New configuration option `max_send_rate_enforcement` allows setting a limit on the rate at which the Agent will upload log bytes to Scalyr. You may wish to set this if you are worried about bursts of log data from problematic files and want to avoid getting charged for these bursts.
 * New default overrides for a number of configuration parameters that will result in a higher throughput for the Agent. If you were relying on the lower throughput as a makeshift rate limiter we recommend setting the new `max_send_rate_enforcement` configuration option to an acceptable rate or "legacy" to maintain the current behavior. See the [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md#216-rama---june-4-2020) for more details.
-
-Improvements:
-* Default value for ``tcp_buffer_size`` Syslog monitor config option has been increased from 2048 to 8192 bytes.
-* New ``tcp_unlimited_buffer_size`` config option has been added to Syslog monitor. When set to True, monitor will support messages of arbitrary / unlimited sizes and ``tcp_buffer_size`` config option will tell how much bytes we try to read from the socket at once. For backward compatibility reasons, it defaults to True.
 
 Minor updates:
 * Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.
