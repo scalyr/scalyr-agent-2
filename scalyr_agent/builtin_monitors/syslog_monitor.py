@@ -1,4 +1,3 @@
-# Copyright 2014 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +16,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
@@ -128,9 +128,18 @@ define_config_option(
     "Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD "
     "support messages up to 8192 bytes long.",
     default=8192,
-    min_value=2048,
     max_value=65536 * 1024,
     convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "tcp_unlimited_buffer_size",
+    "Optional (defaults to False).  True to support syslog messages of unlimited size. If not provided, we support "
+    "messages of tcp_buffer_size bytes long. When this value is True, we will use tcp_buffer_size option as the "
+    "amount of bytes we try to read from the socket in a single recv() call.",
+    default=False,
+    convert_to=bool,
 )
 
 define_config_option(
@@ -443,12 +452,16 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
 
 class SyslogRequestParser(object):
-    def __init__(self, socket, max_buffer_size):
+    def __init__(self, socket, max_buffer_size, unlimited_buffer_size=False):
         self._socket = socket
+
         if socket:
             self._socket.setblocking(False)
+
         self._remaining = None
         self._max_buffer_size = max_buffer_size
+        self._use_unlimited_buffer_size = unlimited_buffer_size
+
         self.is_closed = False
 
     def read(self):
@@ -502,7 +515,6 @@ class SyslogRequestParser(object):
         frames_handled = 0
 
         while self._offset < size:
-
             # get the first byte to determine if framed or not
             # 2->TODO use slicing to get bytes in both python versions.
             c = self._remaining[self._offset : self._offset + 1]
@@ -528,15 +540,18 @@ class SyslogRequestParser(object):
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data
             if frame_end == -1:
-
-                # if the remaining bytes exceed the maximum buffer size, issue a warning
-                # and dump existing contents to the handler
-                if size - self._offset >= self._max_buffer_size:
+                if not self._use_unlimited_buffer_size and (
+                    size - self._offset >= self._max_buffer_size
+                ):
                     global_log.warning(
-                        "Syslog frame exceeded maximum buffer size",
+                        "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
+                        'increase the value of "tcp_buffer_size" monitor config option or set '
+                        '"tcp_unlimited_buffer_size" monitor config option to True.'
+                        % (self._max_buffer_size),
                         limit_once_per_x_secs=300,
                         limit_key="syslog-max-buffer-exceeded",
                     )
+
                     # skip invalid bytes which can appear because of the buffer overflow.
                     frame_data = six.ensure_text(self._remaining, errors="ignore")
 
@@ -579,7 +594,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     def handle(self):
         try:
             request_stream = SyslogRequestParser(
-                self.request, self.server.tcp_buffer_size
+                socket=self.request,
+                max_buffer_size=self.server.tcp_buffer_size,
+                unlimited_buffer_size=self.server.unlimited_buffer_size,
             )
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1,
@@ -653,8 +670,9 @@ class SyslogTCPServer(
     """Class that creates a TCP SocketServer on a specified port
     """
 
-    def __init__(self, port, tcp_buffer_size, bind_address, verifier):
-
+    def __init__(
+        self, port, tcp_buffer_size, bind_address, verifier, unlimited_buffer_size=False
+    ):
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -665,6 +683,7 @@ class SyslogTCPServer(
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
+        self.unlimited_buffer_size = unlimited_buffer_size
         six.moves.socketserver.TCPServer.__init__(self, address, SyslogTCPHandler)
 
     def verify_request(self, request, client_address):
@@ -1215,12 +1234,19 @@ class SyslogServer(object):
                 docker_logging=docker_logging, accept_remote=accept_remote
             )
             if protocol == "tcp":
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting TCP Server")
+                tcp_buffer_size = config.get("tcp_buffer_size")
+                unlimited_buffer_size = config.get("tcp_unlimited_buffer_size")
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Starting TCP Server (tcp_buffer_size=%s, tcp_unlimited_buffer_size=%s)"
+                    % (tcp_buffer_size, unlimited_buffer_size),
+                )
                 server = SyslogTCPServer(
                     port,
-                    config.get("tcp_buffer_size"),
+                    tcp_buffer_size,
                     bind_address=bind_address,
                     verifier=verifier,
+                    unlimited_buffer_size=unlimited_buffer_size,
                 )
             elif protocol == "udp":
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
