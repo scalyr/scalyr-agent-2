@@ -135,9 +135,9 @@ define_config_option(
 define_config_option(
     __monitor__,
     "message_size_can_exceed_tcp_buffer",
-    "Optional (defaults to False).  True to support syslog messages which exceed value of the configured tcp buffer size. If not provided, we support "
+    "Optional (defaults to False).  True to support syslog messages which are larger than the configured tcp buffer size. If not provided, we support "
     "messages of tcp_buffer_size bytes long. When this value is True, we will use tcp_buffer_size option as the "
-    "amount of bytes we try to read from the socket in a single recv() call and a single syslog message will be able to span multiple TCP packets.",
+    "amount of bytes we try to read from the socket in a single recv() call and a single syslog message will be able to span multiple TCP packets / reads from the socket.",
     default=False,
     convert_to=bool,
 )
