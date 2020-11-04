@@ -124,7 +124,7 @@ Features:
 
 Improvements:
 * Default value for ``tcp_buffer_size`` Syslog monitor config option has been increased from 2048 to 8192 bytes.
-* New ``tcp_unlimited_buffer_size`` config option has been added to Syslog monitor. When set to True, monitor will support messages of arbitrary / unlimited sizes and ``tcp_buffer_size`` config option will tell how much bytes we try to read from the socket at once. For backward compatibility reasons, it defaults to True.
+* New ``message_size_can_exceed_tcp_buffer`` config option has been added to Syslog monitor. When set to True, monitor will support messages which are larger than ``tcp_buffer_size`` bytes in size and ``tcp_buffer_size`` config option will signal how many bytes we try to read from the socket at once. For backward compatibility reasons, it defaults to False.
 
 Minor updates:
 * Default value for `max_line_size` has been raised to 49900. If you have this value in your configuration you may wish to not set it anymore to use the new default.

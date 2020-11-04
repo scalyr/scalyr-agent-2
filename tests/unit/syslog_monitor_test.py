@@ -493,17 +493,17 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
-    def test_run_tcp_server_small_tcp_buffer_size_without_unlimited_buffer_size(
+    def test_run_tcp_server_small_tcp_buffer_size_message_size_can_exceed_tcp_buffer_false(
         self, mock_global_log
     ):
-        # unlimited buffer size is False and tcp_buffer_size is False. Timeout should occur because
-        # partial data should be flushed before we receive a whole line
+        # message_size_can_exceed_tcp_buffer size is False and tcp_buffer_size is 5 bytes. Timeout
+        # should occur because partial data should be flushed before we receive a whole line
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
             "log_flush_delay": 0.0,
             "tcp_buffer_size": 5,
-            "tcp_unlimited_buffer_size": False,
+            "message_size_can_exceed_tcp_buffer": False,
         }
 
         self.monitor = TestSyslogMonitor(config, self.logger)
@@ -552,17 +552,17 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
-    def test_run_tcp_server_small_tcp_buffer_size_with_unlimited_buffer_size(
+    def test_run_tcp_server_small_tcp_buffer_size__message_size_can_exceed_tcp_buffer_true(
         self, mock_global_log
     ):
-        # When tcp_unlimited_buffer_size config option is set to True, we should support messages
-        # which span multiple packets and are more than tcp_buffer_size in size
+        # When message_size_can_exceed_tcp_buffer config option is set to True, we should support
+        # messages which span multiple packets and are more than tcp_buffer_size in size
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
             "log_flush_delay": 0.0,
             "tcp_buffer_size": 5,
-            "tcp_unlimited_buffer_size": True,
+            "message_size_can_exceed_tcp_buffer": True,
         }
 
         self.monitor = TestSyslogMonitor(config, self.logger)

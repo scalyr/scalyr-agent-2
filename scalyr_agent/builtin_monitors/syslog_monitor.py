@@ -134,10 +134,10 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "tcp_unlimited_buffer_size",
-    "Optional (defaults to False).  True to support syslog messages of unlimited size. If not provided, we support "
+    "message_size_can_exceed_tcp_buffer",
+    "Optional (defaults to False).  True to support syslog messages which exceed value of the configured tcp buffer size. If not provided, we support "
     "messages of tcp_buffer_size bytes long. When this value is True, we will use tcp_buffer_size option as the "
-    "amount of bytes we try to read from the socket in a single recv() call.",
+    "amount of bytes we try to read from the socket in a single recv() call and a single syslog message will be able to span multiple TCP packets.",
     default=False,
     convert_to=bool,
 )
@@ -452,7 +452,9 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
 
 class SyslogRequestParser(object):
-    def __init__(self, socket, max_buffer_size, unlimited_buffer_size=False):
+    def __init__(
+        self, socket, max_buffer_size, message_size_can_exceed_tcp_buffer=False
+    ):
         self._socket = socket
 
         if socket:
@@ -460,7 +462,7 @@ class SyslogRequestParser(object):
 
         self._remaining = None
         self._max_buffer_size = max_buffer_size
-        self._use_unlimited_buffer_size = unlimited_buffer_size
+        self._message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
 
         self.is_closed = False
 
@@ -540,13 +542,13 @@ class SyslogRequestParser(object):
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data
             if frame_end == -1:
-                if not self._use_unlimited_buffer_size and (
+                if not self._message_size_can_exceed_tcp_buffer and (
                     size - self._offset >= self._max_buffer_size
                 ):
                     global_log.warning(
                         "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
                         'increase the value of "tcp_buffer_size" monitor config option or set '
-                        '"tcp_unlimited_buffer_size" monitor config option to True.'
+                        '"message_size_can_exceed_tcp_buffer" monitor config option to True.'
                         % (self._max_buffer_size),
                         limit_once_per_x_secs=300,
                         limit_key="syslog-max-buffer-exceeded",
@@ -596,7 +598,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             request_stream = SyslogRequestParser(
                 socket=self.request,
                 max_buffer_size=self.server.tcp_buffer_size,
-                unlimited_buffer_size=self.server.unlimited_buffer_size,
+                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
             )
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1,
@@ -671,7 +673,12 @@ class SyslogTCPServer(
     """
 
     def __init__(
-        self, port, tcp_buffer_size, bind_address, verifier, unlimited_buffer_size=False
+        self,
+        port,
+        tcp_buffer_size,
+        bind_address,
+        verifier,
+        message_size_can_exceed_tcp_buffer=False,
     ):
         self.__verifier = verifier
         address = (bind_address, port)
@@ -683,7 +690,7 @@ class SyslogTCPServer(
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
-        self.unlimited_buffer_size = unlimited_buffer_size
+        self.message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
         six.moves.socketserver.TCPServer.__init__(self, address, SyslogTCPHandler)
 
     def verify_request(self, request, client_address):
@@ -1235,18 +1242,20 @@ class SyslogServer(object):
             )
             if protocol == "tcp":
                 tcp_buffer_size = config.get("tcp_buffer_size")
-                unlimited_buffer_size = config.get("tcp_unlimited_buffer_size")
+                message_size_can_exceed_tcp_buffer = config.get(
+                    "message_size_can_exceed_tcp_buffer"
+                )
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_2,
-                    "Starting TCP Server (tcp_buffer_size=%s, tcp_unlimited_buffer_size=%s)"
-                    % (tcp_buffer_size, unlimited_buffer_size),
+                    "Starting TCP Server (tcp_buffer_size=%s, message_size_can_exceed_tcp_buffer=%s)"
+                    % (tcp_buffer_size, message_size_can_exceed_tcp_buffer),
                 )
                 server = SyslogTCPServer(
                     port,
                     tcp_buffer_size,
                     bind_address=bind_address,
                     verifier=verifier,
-                    unlimited_buffer_size=unlimited_buffer_size,
+                    message_size_can_exceed_tcp_buffer=message_size_can_exceed_tcp_buffer,
                 )
             elif protocol == "udp":
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
