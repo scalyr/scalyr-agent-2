@@ -100,6 +100,7 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent import compat
 
 
 STATUS_FILE = "last_status"
@@ -110,6 +111,26 @@ VALID_STATUS_FORMATS = ["text", "json"]
 AGENT_LOG_FILENAME = "agent.log"
 
 AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
+
+# Message which is logged when locale used for the scalyr agent process is not UTF-8
+NON_UTF8_LOCALE_WARNING_MESSAGE = """
+Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
+coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
+with non-ascii content or non-ascii characters in the log file names. On Linux you can do that by
+setting LANG and LC_ALL environment variable: e.g. export LC_ALL=en_US.UTF-8.
+""".strip().replace(
+    "\n", " "
+)
+
+# Work around for a potential race which may happen when threads try to resolve a unicode hostname
+# or similar
+# See:
+# - https://bugs.python.org/issue29288
+# - https://github.com/aws/aws-cli/pull/4383/files#diff-45cb40c448cb3c90162a08a8d5c86559afb843a7678339500c3fb15933b5dcceR55
+try:
+    "".encode("idna")
+except Exception as e:
+    print("Failed to force idna encoding: %s" % (str(e)))
 
 
 def _update_disabled_until(config_value, current_time):
@@ -1029,27 +1050,16 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
-                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
-                python_version_str = sys.version.replace("\n", "")
-                build_revision = get_build_revision()
-                openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+                start_up_msg = scalyr_util.get_agent_start_up_message()
+                log.info(start_up_msg)
+                log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
 
-                # TODO: Why do we log the same line under info and debug? Intentional?
-                msg = (
-                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s) (default fs encoding: %s)"
-                    % (
-                        SCALYR_VERSION,
-                        build_revision,
-                        scalyr_util.get_pid_tid(),
-                        python_version_str,
-                        openssl_version,
-                        sys.getfilesystemencoding(),
-                    )
-                )
-
-                log.info(msg)
-                log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
+                # Log warn message if non UTF-8 locale is used - this would cause issues when trying
+                # to monitor files with unicode characters inside the file names or inside the
+                # content
+                _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
+                if encoding.lower() not in ["utf-8", "utf8"]:
+                    log.warn(NON_UTF8_LOCALE_WARNING_MESSAGE % (encoding))
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 

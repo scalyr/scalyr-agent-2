@@ -30,6 +30,8 @@ if False:  # NOSONAR
 
 import codecs
 import sys
+import ssl
+import locale
 from io import open
 
 import six
@@ -49,9 +51,15 @@ import threading
 import time
 import uuid
 
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
+from scalyr_agent.build_info import get_build_revision
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -217,12 +225,26 @@ def get_json_implementation(lib_name):
                 # if there is an integer size error, fall back to native json
                 if str(e) == "Integer exceeds 64-bit range":
                     _, _json_dumps, _ = get_json_implementation("json")
-
+                    return _json_dumps(obj, fp)
+                if "surrogates not allowed" in str(e):
+                    # orjson also doesn't support non valid utf8-sequences so we fall back do standard
+                    # json implementation
+                    _, _json_dumps, _ = get_json_implementation("json")
                     return _json_dumps(obj, fp)
                 else:
                     raise
 
-        return lib_name, orjson_dumps_custom, orjson.loads
+        def orjson_loads_custom(data, *args, **kwargs):
+            try:
+                return orjson.loads(data, *args, **kwargs)
+            except Exception as e:
+                if "leading surrogate" in str(e) or "surrogates not allowed" in str(e):
+                    _, _, _json_loads = get_json_implementation("json")
+                    return _json_loads(data, *args, **kwargs)
+                else:
+                    raise
+
+        return lib_name, orjson_dumps_custom, orjson_loads_custom
 
     else:
         if lib_name != "json":
@@ -2055,6 +2077,60 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
     return compress_func, decompress_func
+
+
+def get_language_code_coding_and_locale():
+    # type: () -> Tuple[str, str, str]
+    """
+    Return values for the currently set language code, coding and user-friendly locale string.
+    """
+    try:
+        language_code, encoding = locale.getdefaultlocale()
+        if language_code and encoding:
+            used_locale = ".".join([language_code, encoding])
+        else:
+            language_code = "unknown"
+            encoding = "unknown"
+            used_locale = "unable to retrieve locale"
+    except Exception as e:
+        language_code = "unknown"
+        encoding = "unknown"
+        used_locale = "unable to retrieve locale: %s" % (str(e))
+
+    return language_code, encoding, used_locale
+
+
+def get_agent_start_up_message():
+    # type: () -> str
+    """
+    Return a message which is logged on agent start up.
+    """
+    python_version_str = sys.version.replace("\n", "")
+    build_revision = get_build_revision()
+    openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+
+    # We also include used locale and LANG env variable values since this makes it
+    # easier for us to troubleshoot invalid locale related issues
+    lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
+    (language_code, encoding, used_locale,) = get_language_code_coding_and_locale()
+
+    msg = (
+        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        % (
+            SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+        )
+    )
+
+    return msg
 
 
 class RateLimiterToken(object):

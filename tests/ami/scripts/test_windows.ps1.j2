@@ -196,6 +196,11 @@ if ("$event_log_output" -notmatch "ScalyrAgentTest")   { Throw "Matching event n
 if ("$event_log_output" -notmatch "Scalyr automated tests event")   { Throw "Matching event not found in event log" };
 
 #
+# Verify agent start up line
+#
+Select-String -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Pattern "Starting scalyr agent"
+
+#
 # Ensure CA validation is not disabled with default install
 #
 
