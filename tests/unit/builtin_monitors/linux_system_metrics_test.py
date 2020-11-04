@@ -15,6 +15,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import os
 import sys
 import time
 import platform
@@ -30,6 +31,8 @@ from scalyr_agent.test_base import skipIf
 
 import mock
 import platform
+
+IS_FEDORA = os.path.exists("/etc/fedora-release")
 
 __all__ = ["LinuxSystemMetricsMonitorTest"]
 
@@ -75,6 +78,17 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
 
         for metric in monitor_info.metrics:
             metric_name = metric.metric_name
+
+            if (
+                IS_FEDORA
+                and metric_name.startswith("df.")
+                and metric_name not in seen_metrics
+            ):
+                # On some newer versions of fedora, retrieving disk metrics will fail with
+                # "operation not permitted" error if not running as root so this error should not
+                # be fatal here
+                continue
+
             self.assertTrue(
                 metric_name in seen_metrics, "metric %s not seen" % (metric_name)
             )
