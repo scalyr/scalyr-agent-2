@@ -13,6 +13,8 @@ Features:
 Improvements:
 * Improve logging in the Kubernetes monitor.
 * On agent start up we now also log the locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
+* Default value for ``tcp_buffer_size`` Syslog monitor config option has been increased from 2048 to 8192 bytes.
+* New ``message_size_can_exceed_tcp_buffer`` config option has been added to Syslog monitor. When set to True, monitor will support messages which are larger than ``tcp_buffer_size`` bytes in size and  ``tcp_buffer_size`` config option will tell how much bytes we try to read from the socket at once / in a single recv() call. For backward compatibility reasons, it defaults to False.
 
 Bug fixes:
 * Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
