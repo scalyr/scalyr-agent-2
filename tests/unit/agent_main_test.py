@@ -13,17 +13,21 @@
 # limitations under the License.
 
 from __future__ import absolute_import
-
 from __future__ import print_function
+from __future__ import unicode_literals
+
 import re
 from io import open
+import functools
 
 import mock
 
+from scalyr_agent import __scalyr__
 from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.__scalyr__ import MSI_INSTALL
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent import agent_main, agent_status
+from scalyr_agent.scalyr_client import create_client
 
 __all__ = ["AgentMainTestCase"]
 
@@ -41,7 +45,7 @@ CORRECT_INIT_PRAGMA = """
 
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
-    @mock.patch("scalyr_agent.agent_main.INSTALL_TYPE", 1)
+    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL)
     def test_create_client_ca_file_and_intermediate_certs_file_doesnt_exist(self):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
@@ -58,7 +62,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         agent = ScalyrAgent(PlatformController())
         agent._ScalyrAgent__config = config
 
-        self.assertTrue(agent._ScalyrAgent__create_client())
+        self.assertTrue(create_client(config))
 
         # ca_cert_path file doesn't exist
         config.verify_server_certificate = True
@@ -73,7 +77,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         )
 
         self.assertRaisesRegexp(
-            ValueError, expected_msg, agent._ScalyrAgent__create_client
+            ValueError, expected_msg, functools.partial(create_client, config)
         )
 
         # intermediate_certs_path file doesn't exist
@@ -90,7 +94,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         )
 
         self.assertRaisesRegexp(
-            ValueError, expected_msg, agent._ScalyrAgent__create_client
+            ValueError, expected_msg, functools.partial(create_client, config)
         )
 
     def test_ca_cert_files_checks_are_skipped_under_dev_and_msi_install(self):
@@ -102,58 +106,58 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.platform_controller import PlatformController
 
         # 1. Dev install (boths checks should be skipped)
-        scalyr_agent.agent_main.INSTALL_TYPE = DEV_INSTALL
+        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
 
-        # ca_cert_path file doesn't exist
-        config = mock.Mock()
-        config.scalyr_server = "foo.bar.com"
-        config.compression_level = 1
+            # ca_cert_path file doesn't exist
+            config = mock.Mock()
+            config.scalyr_server = "foo.bar.com"
+            config.compression_level = 1
 
-        config.verify_server_certificate = True
-        config.ca_cert_path = "/tmp/doesnt.exist"
-        config.use_new_ingestion = False
+            config.verify_server_certificate = True
+            config.ca_cert_path = "/tmp/doesnt.exist"
+            config.use_new_ingestion = False
 
-        agent = ScalyrAgent(PlatformController())
-        agent._ScalyrAgent__config = config
+            agent = ScalyrAgent(PlatformController())
+            agent._ScalyrAgent__config = config
 
-        self.assertTrue(agent._ScalyrAgent__create_client())
+            self.assertTrue(create_client(config=config))
 
-        # intermediate_certs_path file doesn't exist
-        config.verify_server_certificate = True
-        config.ca_cert_path = __file__
-        config.intermediate_certs_path = "/tmp/doesnt.exist"
+            # intermediate_certs_path file doesn't exist
+            config.verify_server_certificate = True
+            config.ca_cert_path = __file__
+            config.intermediate_certs_path = "/tmp/doesnt.exist"
 
-        self.assertTrue(agent._ScalyrAgent__create_client())
+            self.assertTrue(create_client(config=config))
 
         # 2. MSI install (only intermediate_certs_path check should be skipped)
-        scalyr_agent.agent_main.INSTALL_TYPE = MSI_INSTALL
+        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.MSI_INSTALL):
 
-        config = mock.Mock()
-        config.scalyr_server = "foo.bar.com"
-        config.compression_level = 1
+            config = mock.Mock()
+            config.scalyr_server = "foo.bar.com"
+            config.compression_level = 1
 
-        config.verify_server_certificate = True
-        config.ca_cert_path = "/tmp/doesnt.exist"
-        config.use_new_ingestion = False
+            config.verify_server_certificate = True
+            config.ca_cert_path = "/tmp/doesnt.exist"
+            config.use_new_ingestion = False
 
-        agent = ScalyrAgent(PlatformController())
-        agent._ScalyrAgent__config = config
+            agent = ScalyrAgent(PlatformController())
+            agent._ScalyrAgent__config = config
 
-        expected_msg = (
-            r'Invalid path "/tmp/doesnt.exist" specified for the "ca_cert_path" config '
-            "option: file does not exist"
-        )
+            expected_msg = (
+                r'Invalid path "/tmp/doesnt.exist" specified for the "ca_cert_path" config '
+                "option: file does not exist"
+            )
 
-        self.assertRaisesRegexp(
-            ValueError, expected_msg, agent._ScalyrAgent__create_client
-        )
+            self.assertRaisesRegexp(
+                ValueError, expected_msg, functools.partial(create_client, config)
+            )
 
-        # intermediate_certs_path file doesn't exist
-        config.verify_server_certificate = True
-        config.ca_cert_path = __file__
-        config.intermediate_certs_path = "/tmp/doesnt.exist"
+            # intermediate_certs_path file doesn't exist
+            config.verify_server_certificate = True
+            config.ca_cert_path = __file__
+            config.intermediate_certs_path = "/tmp/doesnt.exist"
 
-        self.assertTrue(agent._ScalyrAgent__create_client())
+            self.assertTrue(create_client(config=config))
 
     def test_agent_main_file_contains_correct_init_pragma(self):
         """
@@ -182,68 +186,81 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
 
-        scalyr_agent.agent_main.INSTALL_TYPE = DEV_INSTALL
+        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
 
-        config = mock.Mock()
-        config.scalyr_server = "foo.bar.com"
-        config.server_attributes = {"serverHost": "test"}
-        config.additional_file_paths = []
-        config.compression_level = 1
-        config.copying_manager_stats_log_interval = 60
-        config.parsed_max_send_rate_enforcement = 12345
+            config = mock.Mock()
+            config.scalyr_server = "foo.bar.com"
+            config.server_attributes = {"serverHost": "test"}
+            config.additional_file_paths = []
+            config.compression_level = 1
+            config.copying_manager_stats_log_interval = 60
+            config.parsed_max_send_rate_enforcement = 12345
 
-        config.verify_server_certificate = True
-        config.ca_cert_path = "/tmp/doesnt.exist"
+            config.verify_server_certificate = True
+            config.ca_cert_path = "/tmp/doesnt.exist"
 
-        platform_controller = PlatformController()
-        platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
-        agent = ScalyrAgent(platform_controller)
-        agent._ScalyrAgent__config = config
-        agent._ScalyrAgent__scalyr_client = agent._ScalyrAgent__create_client()
+            platform_controller = PlatformController()
+            platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
+            agent = ScalyrAgent(platform_controller)
+            agent._ScalyrAgent__config = config
 
-        base_stats = agent_status.OverallStats()
-        base_stats.total_bytes_skipped = 500
-        test = agent._ScalyrAgent__calculate_overall_stats(
-            base_stats, copy_manager_warnings=True
-        )
-        self.assertIsNotNone(test)
-        self.assertLogFileContainsLineRegex(
-            ".*"
-            + re.escape(
-                "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes. This may be due to max_send_rate_enforcement. Log upload has been delayed 0.0 seconds in the last 1.0 minutes  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
-            )
-        )
+            client = create_client(config)
+            def get_worker_session_statuses_mock(*args, **kwargs):
+                return [client]
 
-        config = mock.Mock()
-        config.scalyr_server = "foo.bar.com"
-        config.server_attributes = {"serverHost": "test"}
-        config.additional_file_paths = []
-        config.compression_level = 1
-        config.copying_manager_stats_log_interval = 60
-        config.parsed_max_send_rate_enforcement = None
 
-        config.verify_server_certificate = True
-        config.ca_cert_path = "/tmp/doesnt.exist"
+            with mock.patch.object(agent, "_ScalyrAgent__copying_manager") as m:
 
-        platform_controller = PlatformController()
-        platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
-        agent = ScalyrAgent(platform_controller)
-        agent._ScalyrAgent__config = config
-        agent._ScalyrAgent__scalyr_client = agent._ScalyrAgent__create_client()
+                m.generate_status = mock.MagicMock(return_value=None)
+                m.get_worker_session_statuses = get_worker_session_statuses_mock
+                base_stats = agent_status.OverallStats()
+                base_stats.total_bytes_skipped = 500
+                test = agent._ScalyrAgent__calculate_overall_stats(
+                    base_stats, copy_manager_warnings=True
+                )
+                self.assertIsNotNone(test)
+                self.assertLogFileContainsLineRegex(
+                    ".*"
+                    + re.escape(
+                        "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes. This may be due to max_send_rate_enforcement. Log upload has been delayed 0.0 seconds in the last 1.0 minutes  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+                    )
+                )
 
-        base_stats.total_bytes_skipped = 1000
-        test = agent._ScalyrAgent__calculate_overall_stats(
-            base_stats, copy_manager_warnings=True
-        )
-        self.assertIsNotNone(test)
-        with open(self.agent_log_path, "r") as f:
-            print((f.read()))
-        self.assertLogFileContainsLineRegex(
-            ".*"
-            + re.escape(
-                "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
-            )
-        )
+            config = mock.Mock()
+            config.scalyr_server = "foo.bar.com"
+            config.server_attributes = {"serverHost": "test"}
+            config.additional_file_paths = []
+            config.compression_level = 1
+            config.copying_manager_stats_log_interval = 60
+            config.parsed_max_send_rate_enforcement = None
+
+            config.verify_server_certificate = True
+            config.ca_cert_path = "/tmp/doesnt.exist"
+
+            platform_controller = PlatformController()
+            platform_controller.get_usage_info = AgentMainTestCase.fake_get_useage_info
+            agent = ScalyrAgent(platform_controller)
+            agent._ScalyrAgent__config = config
+
+            client = create_client(config)
+
+            with mock.patch.object(agent, "_ScalyrAgent__copying_manager") as m:
+                m.generate_status = mock.MagicMock(return_value=None)
+                m.get_worker_session_statuses = get_worker_session_statuses_mock
+
+                base_stats.total_bytes_skipped = 1000
+                test = agent._ScalyrAgent__calculate_overall_stats(
+                    base_stats, copy_manager_warnings=True
+                )
+                self.assertIsNotNone(test)
+                with open(self.agent_log_path, "r") as f:
+                    print((f.read()))
+                self.assertLogFileContainsLineRegex(
+                    ".*"
+                    + re.escape(
+                        "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+                    )
+                )
 
     @staticmethod
     def fake_get_useage_info():

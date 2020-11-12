@@ -32,6 +32,7 @@ import codecs
 import sys
 import ssl
 import locale
+import collections
 from io import open
 
 import six
@@ -213,11 +214,17 @@ def get_json_implementation(lib_name):
             :return:
             """
 
+            def default(obj):
+                # orjson can not serialize OrderedDict, so convert it to a regular dict.
+                if isinstance(obj, collections.OrderedDict):
+                    return dict(obj)
+                raise TypeError
+
             def dump():
                 if fp is not None:
-                    return orjson.dump(obj, fp)
+                    return orjson.dump(obj, fp, default=default)
                 else:
-                    return orjson.dumps(obj)
+                    return orjson.dumps(obj, default= default)
 
             try:
                 return dump()
@@ -501,9 +508,9 @@ def read_file_as_json(file_path, strict_utf8=False):
     def parse_standard_json(text):
         try:
             return json_decode(text)
-        except ValueError as e:
+        except Exception as err:
             raise JsonParseException(
-                "JSON parsing failed due to: %s" % six.text_type(e)
+                "JSON parsing failed due to: %s" % six.text_type(err)
             )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)

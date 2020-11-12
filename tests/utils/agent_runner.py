@@ -72,7 +72,9 @@ class AgentRunner(object):
         enable_coverage=False,
         enable_debug_log=False,
         send_to_server=True,
-    ):  # type: (int, bool, bool, bool) -> None
+        workers_type="thread",
+        workers_count=1,
+    ):  # type: (int, bool, bool, bool, six.text_type) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")
@@ -110,6 +112,9 @@ class AgentRunner(object):
         self._init_agent_paths()
 
         self._agent_process = None
+
+        self._workers_type = workers_type
+        self._workers_count = workers_count
 
     def get_file_path_text(self, path):  # type: (Path) -> str
         return str(self._files[six.text_type(path)])
@@ -378,11 +383,27 @@ class AgentRunner(object):
         Build and return agent configuration.
         :return: dict with configuration.
         """
+
+        # do not include default log files.
+        files_to_exclude_from_config = [
+            str(Path(self.agent_logs_dir_path, name))
+            for name in ["linux_process_metrics.log", "linux_system_metrics.log", "agent.log"]
+        ]
+        config_log_files = list()
+        for log_file in self._log_files.values():
+            if log_file["path"] not in files_to_exclude_from_config:
+                config_log_files.append(log_file)
+
         config = {
             "api_key": compat.os_environ_unicode["SCALYR_API_KEY"],
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
-            "logs": list(self._log_files.values()),
+            "logs": config_log_files,
+            "api_keys": [
+                {
+                    "type": self._workers_type, "workers": self._workers_count
+                },
+            ],
             "monitors": [],
         }
 

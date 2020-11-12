@@ -25,8 +25,10 @@ import os
 import sys
 import tempfile
 from io import open
+import platform
 
 import mock
+import pytest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -2684,3 +2686,232 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(config.win32_max_open_fds, 1024)
+
+
+class TestShardedManagerConfiguration(TestConfigurationBase):
+    def test_no_api_keys_entry_(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # only defaults are created.
+        assert config.api_key_configs == JsonArray(
+            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
+        )
+
+    def test_empty_api_keys_entry(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there"
+                api_keys: [
+
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.api_key_configs == JsonArray(
+            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
+        )
+
+    def test_default_api_keys_entry_id(self):
+        # check the custom id for workers entry.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "some key"
+                api_keys: [
+                    {
+                        id: "my_worker"
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+        assert config.api_key_configs == JsonArray(
+            JsonObject(workers=1, api_key=config.api_key, id="my_worker", type="thread")
+        )
+
+    def test_default_api_keys_with_no_api_key(self):
+        # the first worker config entry is default so if api key is not specified, it uses main api_key.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.api_key_configs == JsonArray(
+            JsonObject(workers=3, api_key=config.api_key, id="0", type="thread")
+        )
+
+    def test_default_api_keys_entry_and_invalid_second(self):
+        # secong log entry is empty, this is not allowed.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                    },
+                    {
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration):
+            config.parse()
+
+        # second entry does not have api_key.
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                    },
+                    {
+                        "workers": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration):
+            config.parse()
+
+    def test_default_api_keys_entry_with_second(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                        "type": "process"
+                    },
+                    {
+                        api_key: "key2"
+                        "workers": 4,
+                        "id": "second"
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.api_key_configs) == 2
+        assert config.api_key_configs[0] == JsonObject(
+            workers=3,
+            api_key=config.api_key,
+            id="0",
+            type="process" if platform.system() != "Windows" else "thread",
+        )
+        assert config.api_key_configs[1] == JsonObject(
+            workers=4, api_key="key2", id="second", type="thread"
+        )
+
+    def test_log_file_bind_to_api_keys_entries(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                    },
+                    {
+                        api_key: "key2"
+                        "workers": 4,
+                        "id": "second",
+                        type: "process"
+                    }
+                ],
+                
+                logs: [
+                    {
+                        path: "/some/path.log",
+                        api_key_id: "second"
+                    },
+                    {
+                        path: "/some/path2.log",
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.api_key_configs) == 2
+        assert config.api_key_configs[0] == JsonObject(
+            workers=3, api_key=config.api_key, id="0", type="thread"
+        )
+        assert config.api_key_configs[1] == JsonObject(
+            workers=4,
+            api_key="key2",
+            id="second",
+            type="process" if platform.system() != "Windows" else "thread",
+        )
+
+    def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "workers": 3
+                    },
+                    {
+                        api_key: "key2"
+                        "workers": 4,
+                        "id": "second"
+                    }
+                ],
+
+                logs: [
+                    {
+                        path: "/some/path.log",
+                        api_key_id: "there is no such worker pool."
+                    },
+                    {
+                        path: "/some/path2.log",
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration):
+            config.parse()

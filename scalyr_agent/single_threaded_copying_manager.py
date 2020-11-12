@@ -370,14 +370,10 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return None
 
-    def add_log_config(self, monitor_name, log_config, force_add=False):
+    def add_log_config(self, monitor_name, log_config):
         """Add the log_config item to the list of paths being watched
         param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
-        param force_add: True or force add this file and cancel any removal which
-        may have been scheduled before hand.
-        We really just want to use this with Docker monitor where there is a small windows between
-        the container restart where the log file is not immediately removed.
         returns: an updated log_config object
         """
         log_config = self.__config.parse_log_config(
@@ -388,24 +384,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         ).copy()
 
         self.__lock.acquire()
-
         try:
-            path = log_config["path"]
-
-            # Make sure path is not already scheduled for removal. If it is and force_add is true,
-            # we cancel scheduled removal and continue to monitor it
-            if force_add and path in self.__logs_pending_removal:
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried to add new log file '%s' for monitor '%s', but it is already being monitored by '%s' "
-                    "and scheduled for removal. Canceling scheduled removal and ensuring log file is continue "
-                    "to be monitored."
-                    % (path, monitor_name, self.__dynamic_paths[path]),
-                )
-                del self.__logs_pending_removal[path]
-                return log_config
-
             # Make sure the path isn't already being dynamically monitored
+            path = log_config["path"]
             if path in self.__dynamic_paths:
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
@@ -975,7 +956,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                     "%s%s"
                                     % (
                                         self.__config.copying_thread_profile_output_path,
-                                        datetime.datetime.utcnow().strftime(
+                                        datetime.datetime.now().strftime(
                                             "%H_%M_%S.out"
                                         ),
                                     )
@@ -1056,7 +1037,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             result.last_attempt_time = self.__last_attempt_time
             result.last_attempt_size = self.__last_attempt_size
             result.last_response = self.__last_response
-            result.last_response_status = self.__last_response_status
+            result.last_response_statuses = self.__last_response_status
             result.total_errors = self.__total_errors
             result.total_rate_limited_time = self.__total_rate_limited_time
             result.rate_limited_time_since_last_status = (

@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import copy
 import datetime
 import fnmatch
@@ -5,18 +8,156 @@ import os
 import sys
 import threading
 import time
+import collections
+import operator
+import glob
+import re
 
-import six
+if False:
+    from typing import Dict
+    from typing import List
 
 from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread, util as scalyr_util
-from scalyr_agent.agent_status import CopyingManagerStatus
-from scalyr_agent.sharded_copying_manager.worker import CopyingParameters, AddEventsTask
+from scalyr_agent.agent_status import ShardedCopyingManagerStatus, ApiKeyWorkerPoolStatus
+from scalyr_agent.sharded_copying_manager.worker import CopyingManagerWorkerContainer
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import RateLimiter
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
+
+import six
 
 log = scalyr_logging.getLogger(__name__)
 SCHEDULED_DELETION = "scheduled-deletion"
+
+
+def _max(v1, v2):
+    """max function which ignores None values"""
+    values = [v for v in [v1, v2] if v is not None]
+    return max(values)
+
+
+class ApiKeyWorkerPool(object):
+    """
+    This abstraction is responsible for maintaining the workers
+    for a particular entry in the 'api_keys' list in the configuration.
+    It also creates worker instances according to the number in the "workers" field in each entry.
+    """
+    def __init__(self, config, api_key_config):
+        # type: (Configuration, Dict) -> None
+
+        self.__api_key_id = api_key_config["id"]
+        self.__config = config
+        self.__workers = []
+
+        for i in range(api_key_config["workers"]):
+            # combine workers positional number in pool and poll id.
+            worker_id = "%s_%s" % (self.__api_key_id, i)
+
+            worker = CopyingManagerWorkerContainer(
+                self.__config, api_key_config, worker_id
+            )
+            self.__workers.append(worker)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "CopyingManagerWorker #%s is created." % worker.get_id(),
+            )
+
+        self.__current_worker = 0
+
+    @property
+    def api_key_id(self):
+        return self.__api_key_id
+
+    @property
+    def workers(self):
+        return self.__workers
+
+
+    def find_next_worker(self):
+        # type: () -> CopyingManagerWorkerContainer
+        """Get the next worker in the pool. For now it is just a round robin."""
+        current_worker = self.__workers[self.__current_worker]
+        if self.__current_worker == len(self.__workers) - 1:
+            self.__current_worker = 0
+        else:
+            self.__current_worker += 1
+
+        return current_worker
+
+
+    def start_workers(self):
+        # type: () -> None
+        """
+        Start all workers in the pool.
+        """
+        for worker in self.__workers:
+            worker.start_worker()
+
+        for worker in self.__workers:
+            worker.wait_for_copying_to_begin()
+
+    def stop_workers(self, wait_on_join=True, join_timeout=5):
+        # type: (bool, int) -> None
+        for worker in self.__workers:
+            worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
+    def generate_status(self):
+        # type: () -> ApiKeyWorkerPoolStatus
+        """Generate status of the worker pool."""
+        result = ApiKeyWorkerPoolStatus()
+
+        result.api_key_id = self.__api_key_id
+
+        last_response_statuses = set()
+        health_checks = set()
+
+        for worker in sorted(self.__workers, key=lambda w: w.get_id()):
+            status = worker.generate_status()
+            result.workers.append(status)
+
+            # get the most recent time fields from workers.
+            if status.last_success_time:
+                result.last_success_time = _max(
+                    result.last_success_time, status.last_success_time
+                )
+            if status.last_attempt_time:
+                result.last_attempt_time = _max(
+                    result.last_attempt_time, status.last_attempt_time
+                )
+
+            if status.last_attempt_size:
+                result.last_attempt_size = _max(
+                    result.last_attempt_size, status.last_attempt_size
+                )
+
+            if status.last_response_status is not None:
+                last_response_statuses.add(status.last_response_status)
+
+            if (
+                status.health_check_result is not None
+            ):
+                health_checks.add(status.health_check_result)
+
+            # the next fields are a sum of the same fields from all workers.
+            result.total_bytes_uploaded += status.total_bytes_uploaded
+
+            result.total_errors += status.total_errors
+
+        if last_response_statuses:
+            if len(last_response_statuses) == 1 and "success" in last_response_statuses:
+                result.has_successful_last_response = True
+            else:
+                result.has_successful_last_response = False
+
+        if health_checks:
+            if len(health_checks) == 1 and "Good" in health_checks:
+                result.has_good_health_checks = True
+            else:
+                result.has_good_health_checks = False
+
+        return result
 
 
 class CopyingManager(StoppableThread, LogWatcher):
@@ -41,22 +182,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type configuration: configuration.Configuration
         @type monitors: list<ScalyrMonitor>
         """
-        StoppableThread.__init__(self, name="log copier thread")
+        StoppableThread.__init__(self, name="copying manager thread")
         self.__config = configuration
-
-        self._session = None
-        self._new_scalyr_client = None
-
-        # Rate limiter
-        self.__rate_limiter = None
-        if self.__config.parsed_max_send_rate_enforcement:
-            self.__rate_limiter = RateLimiter(
-                # Making the bucket size 4 times the bytes per second, it shouldn't affect the rate over a long time
-                # meaningfully but we don't have a rationale for this value.
-                # TODO: Make this configurable as part of the `max_send_rate_enforcement` configuration option
-                self.__config.parsed_max_send_rate_enforcement * 4.0,
-                self.__config.parsed_max_send_rate_enforcement,
-            )
 
         # Keep track of monitors
         self.__monitors = monitors
@@ -107,46 +234,25 @@ class CopyingManager(StoppableThread, LogWatcher):
         # a list of dynamically added log_matchers that have not been processed yet
         self.__pending_log_matchers = []
 
-        # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
-
-        # The list of LogFileProcessors that are processing the lines from matched log files.
-        self.__log_processors = []
-
         # A dict from file path to the LogFileProcessor that is processing it.
         self.__log_paths_being_processed = {}
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
 
-        # The current pending AddEventsTask.  We will retry the contained AddEventsRequest serveral times.
-        self.__pending_add_events_task = None
-
-        # The next LogFileProcessor that should have log lines read from it for transmission.
-        self.__current_processor = 0
-
-        # The client to use for sending the data.  Set in the start_manager call.
-        self.__scalyr_client = None
         # The last time we scanned for new files that match the __log_matchers.
         self.__last_new_file_scan_time = 0
 
         # Status variables that track statistics reported to the status page.
-        self.__last_attempt_time = None
-        self.__last_success_time = None
-        self.__last_attempt_size = None
-        self.__last_response = None
-        self.__last_response_status = None
-        self.__total_bytes_uploaded = 0
+        self.__last_scan_attempt_time = None
         self.__total_errors = 0
-        self.__total_rate_limited_time = 0
-        self.__rate_limited_time_since_last_status = 0
 
         # The positions to use for a given file if there is not already a checkpoint for that file.
         # Set in the start_manager call.
         self.__logs_initial_positions = None
 
         # A semaphore that we increment when this object has begun copying files (after first scan).
-        self.__copying_semaphore = threading.Semaphore()
+        self.__copying_semaphore = threading.Semaphore(0)
 
         # set the log watcher variable of all monitors.  Do this last so everything is set up
         # and configured when the monitor receives this call
@@ -159,12 +265,17 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__disable_copying_thread = configuration.disable_copying_thread
 
         # Statistics for copying_manager_status messages
-        self.total_copy_iterations = 0
-        self.total_read_time = 0
-        self.total_waiting_time = 0
-        self.total_blocking_response_time = 0
-        self.total_request_time = 0
-        self.total_pipelined_requests = 0
+        self.total_scan_iterations = 0
+
+        # A worker pools for each api key in the 'api_keys' list in the configuration.
+        self._api_keys_worker_pools = dict()  # type: Dict[six.text_type, ApiKeyWorkerPool]
+
+        # create copying workers according to settings in the configuration.
+        self._create_worker_pools()
+
+        # The list of LogMatcher objects that are watching for new files to appear.
+        # NOTE: log matchers must be created only after worker pools.
+        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
 
     @property
     def expanded_server_attributes(self):
@@ -227,7 +338,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher(self.__config, log_config, self._new_scalyr_client)
+            matcher = LogMatcher(self.__config, log_config)
             self.__dynamic_paths[path] = monitor_name
             self.__pending_log_matchers.append(matcher)
             log.log(
@@ -437,31 +548,23 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         for log_config in configs:
             result.append(
-                LogMatcher(configuration, log_config, self._new_scalyr_client)
+                LogMatcher(configuration, log_config)
             )
 
         return result
 
     def start_manager(
-        self, scalyr_client, new_scalyr_client, logs_initial_positions=None
+        self, logs_initial_positions=None
     ):
         """Starts the manager running and will not return until it has been stopped.
 
         This will start a new thread to run the manager.
 
-        @param scalyr_client: The client to use to send requests to Scalyr.
         @param logs_initial_positions: A dict mapping file paths to the offset with the file to begin copying
             if none can be found from the checkpoint files.  This can be used to override the default behavior of
             just reading from the current end of the file if there is no checkpoint for the file
-        @type scalyr_client: scalyr_client.ScalyrClientSession
-        @type new_scalyr_client: scalyr_client.NewScalyrClientSession
         @type logs_initial_positions: dict
-        @param scalyr_client:
         """
-        self.__scalyr_client = scalyr_client
-        self._new_scalyr_client = new_scalyr_client
-        for matcher in self.log_matchers:
-            matcher.set_new_scalyr_client(new_scalyr_client)
         self.__logs_initial_positions = logs_initial_positions
         self.start()
 
@@ -494,14 +597,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # So the scanning.. every scan:
         #   - See if any of the loggers have new files that are being matched
-        #   - Update the file length counts of all current scanners:
-        #   - Then pick up where you left off, getting X bytes as determined that abstraction
-        #   - Send it to the client
-        #   - determine success or not.. if success, update it.
         #   - sleep
-
-        # Make sure start_manager was invoked to start the thread and we have a scalyr client instance.
-        assert self.__scalyr_client is not None
 
         if self.__config.copying_thread_profile_interval > 0:
             import cProfile
@@ -518,276 +614,72 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             # noinspection PyBroadException
             try:
-                # Try to read the checkpoint state from disk.
-                checkpoints_state = self.__read_checkpoint_state()
-                if checkpoints_state is None:
-                    log.info(
-                        "The checkpoints were not read.  All logs will be copied starting at their current end"
-                    )
-                elif (
-                    current_time - checkpoints_state["time"]
-                ) > self.__config.max_allowed_checkpoint_age:
-                    log.warn(
-                        'The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
-                        "be copied starting at their current end.",
-                        scalyr_util.format_time(checkpoints_state["time"]),
-                        error_code="staleCheckpointFile",
-                    )
-                    checkpoints_state = None
 
-                if checkpoints_state is None:
-                    checkpoints = None
-                else:
-                    checkpoints = checkpoints_state["checkpoints"]
+                log.info("Starting copying manager workers.")
+
+                # gather and merge all checkpoints from all active workers( or workers from previous launch)
+                # into single checkpoints object.
+                checkpoints = self.__get_checkpoints(current_time)
+
+                # start all workers.
+                for worker_pool in self._api_keys_worker_pools.values():
+                    worker_pool.start_workers()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
-                self.__scan_for_new_logs_if_necessary(
+                self._scan_for_new_logs_if_necessary(
                     current_time=current_time,
                     checkpoints=checkpoints,
                     logs_initial_positions=self.__logs_initial_positions,
                 )
 
-                # The copying params that tell us how much we are allowed to send and how long we have to wait between
-                # attempts.
-                copying_params = CopyingParameters(self.__config)
-
-                current_time = time.time()
-
-                # Just initialize the last time we had a success to now.  Make the logic below easier.
-                # NOTE: We set this variable to current (start time) even if we never successfuly
-                # establish a connection because we want eventually drop __pending_add_events_task
-                # even if we can't establish a connection. If we didn't do that, that queue could
-                # grow unbounded.
-                # Because of that, we need to take this behavior into account when updating
-                # "__last_success_time" variable which is used for status reporting. We do that by
-                # utilizing another last_success_status variable which only gets updated when we
-                # successfuly send the request to the server.
-                last_success = current_time
-                last_success_status = None
-
-                # Force the agent to write a new full checkpoint as soon as it can
-                last_full_checkpoint_write = 0.0
-
-                pipeline_byte_threshold = self.__config.pipeline_threshold * float(
-                    self.__config.max_allowed_request_size
-                )
-
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
+
+                workers_count = 0
+                for worker_pool in self._api_keys_worker_pools.values():
+                    workers_count += len(worker_pool.workers)
+
+                log.info("Copying manager started. Total workers: %s, Pid: %s" % (workers_count,  os.getpid()))
 
                 while self._run_state.is_running():
                     log.log(
                         scalyr_logging.DEBUG_LEVEL_1, "At top of copy log files loop."
                     )
                     current_time = time.time()
-                    pipeline_time = 0.0
                     # noinspection PyBroadException
                     try:
-                        # If we have a pending request and it's been too taken too long to send it, just drop it
-                        # on the ground and advance.
-                        if current_time - last_success > self.__config.max_retry_time:
-                            if self.__pending_add_events_task is not None:
-                                self.__pending_add_events_task.completion_callback(
-                                    LogFileProcessor.FAIL_AND_DROP
-                                )
-                                self.__pending_add_events_task = None
-                            # Tell all of the processors to go to the end of the current log file.  We will start
-                            # copying
-                            # from there.
-                            for processor in self.__log_processors:
-                                processor.skip_to_end(
-                                    "Too long since last successful request to server.",
-                                    "skipNoServerSuccess",
-                                    current_time=current_time,
-                                )
 
                         # Check for new logs.  If we do detect some new log files, they must have been created since our
                         # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
-                        self.__scan_for_new_logs_if_necessary(
+                        self._scan_for_new_logs_if_necessary(
                             current_time=current_time, copy_at_index_zero=True
                         )
 
-                        # Collect log lines to send if we don't have one already.
-                        if self.__pending_add_events_task is None:
-                            self.__pending_add_events_task = self.__get_next_add_events_task(
-                                copying_params.current_bytes_allowed_to_send
-                            )
-                        else:
-                            log.log(
-                                scalyr_logging.DEBUG_LEVEL_1,
-                                "Have pending batch of events, retrying to send.",
-                            )
-                            # Take a look at the file system and see if there are any new bytes pending.  This updates
-                            # the statistics for each pending file.  This is important to do for status purposes if we
-                            # have not tried to invoke get_next_send_events_task in a while (since that already updates
-                            # the statistics).
-                            self.__scan_for_new_bytes(current_time=current_time)
-
-                        # Try to send the request if we have one.
-                        if self.__pending_add_events_task is not None:
-                            log.log(
-                                scalyr_logging.DEBUG_LEVEL_1,
-                                "Sending an add event request",
-                            )
-                            # Send the request, but don't block for the response yet.
-                            send_request_time_start = time.time()
-                            get_response = None
-                            if not self.__config.use_new_ingestion:
-                                get_response = self._send_events(
-                                    self.__pending_add_events_task
-                                )
-
-                            # Check to see if pipelining should be disabled
-                            disable_pipelining = self.__has_pending_log_changes()
-
-                            # If we are sending very large requests, we will try to optimize for future requests
-                            # by overlapping building the request with waiting for the response on the current request
-                            # (pipelining).
-                            if (
-                                self.__pending_add_events_task.add_events_request.current_size
-                                >= pipeline_byte_threshold
-                                and self.__pending_add_events_task.next_pipelined_task
-                                is None
-                                and not disable_pipelining
-                            ):
-
-                                # Time how long it takes us to build it because we will subtract it from how long we
-                                # have to wait before we send the next request.
-                                pipeline_time = time.time()
-                                self.total_pipelined_requests += 1
-                                self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
-                                    copying_params.current_bytes_allowed_to_send,
-                                    for_pipelining=True,
-                                )
-                            else:
-                                pipeline_time = 0.0
-
-                            # Now block for the response.
-                            blocking_response_time_start = time.time()
-                            if self.__config.use_new_ingestion:
-                                result = "success"
-                                bytes_sent = 0
-                                full_response = ""
-                            else:
-                                (result, bytes_sent, full_response) = get_response()
-                            blocking_response_time_end = time.time()
-                            self.total_blocking_response_time += (
-                                blocking_response_time_end
-                                - blocking_response_time_start
-                            )
-                            self.total_request_time += (
-                                blocking_response_time_end - send_request_time_start
-                            )
-
-                            if pipeline_time > 0:
-                                pipeline_time = time.time() - pipeline_time
-                            else:
-                                pipeline_time = 0.0
-
-                            log.log(
-                                scalyr_logging.DEBUG_LEVEL_1,
-                                'Sent %ld bytes and received response with status="%s".',
-                                bytes_sent,
-                                result,
-                            )
-
-                            if result != "success":
-                                # Log the whole response body in case server returns non-success
-                                # response so we can troubleshoot the error (aka is it bug in the
-                                # agent code or similar)
-                                log.log(
-                                    scalyr_logging.DEBUG_LEVEL_5,
-                                    'Received server response with status="%s" and body: %s',
-                                    result,
-                                    full_response,
-                                )
-
-                            log_bytes_sent = 0
-                            if (
-                                result == "success"
-                                or "discardBuffer" in result
-                                or "requestTooLarge" in result
-                            ):
-                                next_add_events_task = None
-                                try:
-                                    if result == "success":
-                                        log_bytes_sent = self.__pending_add_events_task.completion_callback(
-                                            LogFileProcessor.SUCCESS
-                                        )
-                                        next_add_events_task = (
-                                            self.__pending_add_events_task.next_pipelined_task
-                                        )
-                                    elif "discardBuffer" in result:
-                                        self.__pending_add_events_task.completion_callback(
-                                            LogFileProcessor.FAIL_AND_DROP
-                                        )
-                                    else:
-                                        self.__pending_add_events_task.completion_callback(
-                                            LogFileProcessor.FAIL_AND_RETRY
-                                        )
-                                finally:
-                                    # No matter what, we want to throw away the current event since the server said we
-                                    # could.  We have seen some bugs where we did not throw away the request because
-                                    # an exception was thrown during the callback.
-                                    self.__pending_add_events_task = (
-                                        next_add_events_task
-                                    )
-                                    self.__write_active_checkpoint_state(current_time)
-
-                            if result == "success":
-                                last_success = current_time
-                                last_success_status = current_time
-
-                            # Rate limit based on amount of copied log bytes in a successful request
-                            if self.__rate_limiter:
-                                time_slept = self.__rate_limiter.block_until_charge_succeeds(
-                                    log_bytes_sent
-                                )
-                                self.__total_rate_limited_time += time_slept
-                                self.__rate_limited_time_since_last_status += time_slept
-                                self.total_waiting_time += time_slept
-
-                        else:
-                            result = "failedReadingLogs"
-                            bytes_sent = 0
-                            full_response = ""
-
-                            log.error("Failed to read logs for copying.  Will re-try")
-
-                        # Update the statistics and our copying parameters.
-                        self.__lock.acquire()
-                        copying_params.update_params(result, bytes_sent)
-                        self.__last_attempt_time = current_time
-                        self.__last_success_time = last_success_status
-                        self.__last_attempt_size = bytes_sent
-                        self.__last_response = six.ensure_text(full_response)
-                        self.__last_response_status = result
-                        if result == "success":
-                            self.__total_bytes_uploaded += bytes_sent
-                        self.__lock.release()
+                        self.__scan_for_pending_log_files()
 
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Start removing finished log matchers",
                         )
-                        self.__scan_for_pending_log_files()
                         self.__remove_logs_scheduled_for_deletion()
                         self.__purge_finished_log_matchers()
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Done removing finished log matchers",
                         )
+                        self.__last_scan_attempt_time = current_time
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
                             if seconds_past_epoch % profile_dump_interval == 0:
                                 profiler.disable()
                                 profiler.dump_stats(
-                                    "%s%s"
+                                    "%s%s%s"
                                     % (
                                         self.__config.copying_thread_profile_output_path,
-                                        datetime.datetime.utcnow().strftime(
+                                        "copying_manager_",
+                                        datetime.datetime.now().strftime(
                                             "%H_%M_%S.out"
                                         ),
                                     )
@@ -803,37 +695,30 @@ class CopyingManager(StoppableThread, LogWatcher):
                             "Failed while attempting to scan and transmit logs",
                         )
                         self.__lock.acquire()
-                        self.__last_attempt_time = current_time
+                        self.__last_scan_attempt_time = current_time
                         self.__total_errors += 1
                         self.__lock.release()
 
-                    if (
-                        current_time - last_full_checkpoint_write
-                        > self.__config.full_checkpoint_interval
-                    ):
-                        self.__write_full_checkpoint_state(current_time)
-                        last_full_checkpoint_write = current_time
-
-                    if pipeline_time < copying_params.current_sleep_interval:
-                        self._sleep_but_awaken_if_stopped(
-                            copying_params.current_sleep_interval - pipeline_time
-                        )
-                        self.total_waiting_time += (
-                            copying_params.current_sleep_interval - pipeline_time
-                        )
+                    self._sleep_but_awaken_if_stopped(
+                        self.__config.max_request_spacing_interval
+                    )
 
                     # End of the copy loop
-                    self.total_copy_iterations += 1
+                    self.total_scan_iterations += 1
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
-            self.__write_full_checkpoint_state(current_time)
-            for processor in self.__log_processors:
-                processor.close()
+            # stopping all workers.
+            for worker_pool in self._api_keys_worker_pools.values():
+                worker_pool.stop_workers()
+
             if profiler is not None:
                 profiler.disable()
+
+            log.info("Copying manager is finished.")
+
 
     def wait_for_copying_to_begin(self):
         """Block the current thread until this instance has finished its first scan and has begun copying.
@@ -862,56 +747,67 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             self.__lock.acquire()
 
-            result = CopyingManagerStatus()
-            result.total_bytes_uploaded = self.__total_bytes_uploaded
-            result.last_success_time = self.__last_success_time
-            result.last_attempt_time = self.__last_attempt_time
-            result.last_attempt_size = self.__last_attempt_size
-            result.last_response = self.__last_response
-            result.last_response_status = self.__last_response_status
-            result.total_errors = self.__total_errors
-            result.total_rate_limited_time = self.__total_rate_limited_time
-            result.rate_limited_time_since_last_status = (
-                self.__rate_limited_time_since_last_status
-            )
-            result.total_copy_iterations = self.total_copy_iterations
-            result.total_read_time = self.total_read_time
-            result.total_waiting_time = self.total_waiting_time
-            result.total_blocking_response_time = self.total_blocking_response_time
-            result.total_request_time = self.total_request_time
-            result.total_pipelined_requests = self.total_pipelined_requests
+            result = ShardedCopyingManagerStatus()
+
+            result.total_scan_iterations = self.total_scan_iterations
+
+            last_response_statuses = set()
+            health_checks = set()
+
+            for api_key_id in sorted(self._api_keys_worker_pools):
+                worker_pool = self._api_keys_worker_pools[api_key_id]
+                worker_pool_status = worker_pool.generate_status()
+                result.api_key_statuses[api_key_id] = worker_pool_status
+
+                result.total_errors += worker_pool_status.total_errors
+
+                if worker_pool_status.has_successful_last_response is not None:
+                    last_response_statuses.add(worker_pool_status.has_successful_last_response)
+
+                if worker_pool_status.has_good_health_checks is not None:
+                    health_checks.add(worker_pool_status.has_good_health_checks)
+
+                result.total_bytes_uploaded += worker_pool_status.total_bytes_uploaded
+
+            if last_response_statuses:
+                if len(last_response_statuses) == 1 and True in last_response_statuses:
+                    result.has_successful_last_response = True
+                else:
+                    result.has_successful_last_response = False
 
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
-            if self.__last_attempt_time:
-                result.health_check_result = "Good"
+            all_health_check_error_messages = list()
+
+            if self.__last_scan_attempt_time:
                 if (
-                    time.time()
-                    > self.__last_attempt_time
-                    + self.__config.healthy_max_time_since_last_copy_attempt
+                        time.time()
+                        > self.__last_scan_attempt_time
+                        #TODO: create new config value for that.
+                        + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    result.health_check_result = (
-                        "Failed, max time since last copy attempt (%s seconds) exceeded"
-                        % self.__config.healthy_max_time_since_last_copy_attempt
-                    )
+                    all_health_check_error_messages.append((
+                            "Failed, max time since last scan attempt (%s seconds) exceeded"
+                            % self.__config.healthy_max_time_since_last_copy_attempt
+                    ))
+
+            if False in health_checks:
+                all_health_check_error_messages.append("Some workers has failed, see below for more info.")
+
+            if len(all_health_check_error_messages) > 0:
+                result.health_check_result = "\n".join(all_health_check_error_messages)
+            elif len(health_checks) > 0:
+                result.health_check_result = "Good"
+
+            if len(last_response_statuses) > 0:
+                if False in last_response_statuses:
+                    result.workers_last_responses_status = "Last requests on some workers is not successful, see below for more info."
+                else:
+                    result.workers_last_responses_status = "All successful"
 
         finally:
             self.__lock.release()
-        if warn_on_rate_limit:
-            if self.__rate_limited_time_since_last_status > 0:
-                log.warning(
-                    "Warning, the maximum send rate has been exceeded (configured through "
-                    "'max_send_rate_enforcement').  Log upload is being delayed and may result in skipped log "
-                    "lines.  Copying has been delayed %.1f seconds in the last %.1f minutes. This may be "
-                    "desired (due to excessive bytes from a problematic log file) or you may wish to adjust "
-                    "the allowed send rate."
-                    % (
-                        self.__rate_limited_time_since_last_status,
-                        self.__config.copying_manager_stats_log_interval / 60.0,
-                    )
-                )
-            self.__rate_limited_time_since_last_status = 0
 
         return result
 
@@ -1059,24 +955,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        # Try to read the checkpoint state from disk.
-        checkpoints_state = self.__read_checkpoint_state()
-        if checkpoints_state is None:
-            log.info("The checkpoints were not read from the filesystem.")
-        elif (
-            time.time() - checkpoints_state["time"]
-        ) > self.__config.max_allowed_checkpoint_age:
-            log.warn(
-                'The current checkpoint is too stale (written at "%s").  Ignoring it.',
-                scalyr_util.format_time(checkpoints_state["time"]),
-                error_code="staleCheckpointFile",
-            )
-            checkpoints_state = None
-
-        if checkpoints_state is None:
-            checkpoints = {}
-        else:
-            checkpoints = checkpoints_state["checkpoints"]
+        checkpoints = self.__get_checkpoints(time.time())
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -1098,8 +977,6 @@ class CopyingManager(StoppableThread, LogWatcher):
                 checkpoints[processor_path] = checkpoint
 
             reloaded.append(matcher)
-
-        self.__remove_closed_processors()
 
         self.__create_log_processors_for_log_matchers(
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=True
@@ -1148,19 +1025,22 @@ class CopyingManager(StoppableThread, LogWatcher):
             if path in self.__log_paths_being_processed:
                 pending_removal[path] = True
 
+
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
             for new_processor in matcher.find_matches(
                 self.__log_paths_being_processed,
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
+                get_log_processor_factory=self.__get_log_processor_factory,
             ):
-                self.__log_processors.append(new_processor)
-                self.__log_paths_being_processed[new_processor.log_path] = new_processor
+
+                log_path = new_processor.get_log_path()
+                self.__log_paths_being_processed[log_path] = new_processor
 
                 # if the log file pending removal, mark that it has now been processed
-                if new_processor.log_path in pending_removal:
-                    pending_removal[new_processor.log_path] = True
+                if log_path in pending_removal:
+                    pending_removal[log_path] = True
 
             # check to see if no matches were found for pending removal
             # if none were found, this is indicative that the log file has already been
@@ -1192,7 +1072,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def __scan_for_new_logs_if_necessary(
+    def _scan_for_new_logs_if_necessary(
         self,
         current_time=None,
         checkpoints=None,
@@ -1257,3 +1137,187 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__create_log_processors_for_log_matchers(
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
+
+
+    def __get_checkpoints(self, current_time):
+        """Find and read worker checkpoints that were previously written."""
+
+        checkpoints = self.__find_and_read_workers_checkpoints(current_time)
+
+        if not checkpoints:
+            log.info(
+                "No checkpoints were found. All logs will be copied starting at their current end"
+            )
+
+        result = {}
+
+        # merge checkpoints from  all workers to one checkpoint.
+
+        # checkpoints from different workers may contain checkpoint for the same file,
+        # so we sort checkpoints by time and update resulting collection with the same order.
+        checkpoints.sort(key=operator.itemgetter("time"))
+
+        for wc in checkpoints:
+            result.update(wc["checkpoints"])
+
+        return result
+
+    def __find_and_read_workers_checkpoints(self, current_time):
+        """
+        Read for all checkpoint files that
+        :return:
+        """
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+
+        if not os.path.isdir(checkpoints_dir_path):
+            return []
+
+        glob_path = os.path.join(checkpoints_dir_path, "checkpoints-*.json")
+
+        workers_checkpoints = list()
+
+        for full_checkpoints_path in glob.glob(glob_path):
+            m = re.search(
+                r".*/checkpoints-(?P<id>\d+_\d+)\.json", full_checkpoints_path
+            )
+            if m:
+                worker_id = m.group("id")
+                active_checkpoints_path = os.path.join(
+                    checkpoints_dir_path, "active-checkpoints-%s.json" % worker_id
+                )
+            else:
+                active_checkpoints_path = None
+
+            checkpoints = self.__read_worker_checkpoint_state(
+                full_checkpoints_path, active_checkpoints_path, current_time
+            )
+
+            if checkpoints:
+                workers_checkpoints.append(checkpoints)
+
+        return workers_checkpoints
+
+    def __read_worker_checkpoint_state(
+        self, full_checkpoint_file_path, active_checkpoint_file_path, current_time
+    ):
+        """Reads the checkpoint state from disk and returns it.
+
+        The checkpoint state maps each file path to the offset within that log file where we left off copying it.
+
+        @return:  The checkpoint state
+        @rtype: dict
+        """
+
+        if not os.path.isfile(full_checkpoint_file_path):
+            log.info(
+                'The log copying checkpoint file "%s" does not exist, skipping.'
+                % full_checkpoint_file_path
+            )
+            return None
+
+        # noinspection PyBroadException
+        try:
+            full_checkpoints = scalyr_util.read_file_as_json(
+                full_checkpoint_file_path, strict_utf8=True
+            )
+
+            if active_checkpoint_file_path is not None and os.path.isfile(
+                active_checkpoint_file_path
+            ):
+
+                # if the active checkpoint file is newer, overwrite any checkpoint values with the
+                # updated full checkpoint
+                active_checkpoints = scalyr_util.read_file_as_json(
+                    active_checkpoint_file_path, strict_utf8=True
+                )
+
+                if active_checkpoints["time"] > full_checkpoints["time"]:
+                    full_checkpoints["time"] = active_checkpoints["time"]
+                    for path, checkpoint in six.iteritems(
+                        active_checkpoints["checkpoints"]
+                    ):
+                        full_checkpoints[path] = checkpoint
+
+            if current_time - full_checkpoints["time"] > self.__config.max_allowed_checkpoint_age:
+                log.warn(
+                    "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  All log files will "
+                    "be copied starting at their current end.",
+                    full_checkpoint_file_path,
+                    scalyr_util.format_time(full_checkpoints["time"]),
+                    error_code="staleCheckpointFile",
+                )
+
+                # checkpoint files are stale, so remove them.
+                os.unlink(full_checkpoint_file_path)
+                try:
+                    # ignore if active checkpoints do not exist
+                    os.unlink(active_checkpoint_file_path)
+                except OSError as e:
+                    if e.errno != 2:
+                        raise
+                return None
+
+            return full_checkpoints
+
+        except Exception:
+            log.exception(
+                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
+                error_code="failedCheckpointRead",
+            )
+            return None
+
+    def _create_worker_pools(self):
+        """
+        Create a new worker pools for each entry in the 'api_keys' list in the configuration.
+        :return:
+        """
+        for api_key_config in self.__config.api_key_configs:
+            pool = ApiKeyWorkerPool(self.__config, api_key_config)
+            self._api_keys_worker_pools[api_key_config["id"]] = pool
+
+    def __get_log_processor_factory(self, log_config_entry):
+        """
+        This method creates a new instance of the LogFileProcessor.
+        :return:
+        """
+        worker = self.__find_best_worker_for_the_log_path(log_config_entry)
+
+        return worker.create_and_add_log_processor
+
+    def __find_best_worker_for_the_log_path(self, log_config_entry):
+        # type: (Dict) -> CopyingManagerWorkerContainer
+        """
+        Find the worker which is appororiate to the given log_config entry. For example if there is a 'api_key_id' field
+        in the log entry, we will only pick worker pools with the same api key id.
+        """
+
+        # get the workers pool which is responsible for the api key which is specified in the log config
+        pool = self._api_keys_worker_pools[log_config_entry["api_key_id"]]
+        return pool.find_next_worker()
+
+    def augment_user_agent_for_workers_sessions(self, fragments):
+        # type: (List[six.text_type]) -> None
+        """
+        Modifies User-Agent header of the sessions to all worker.
+
+        @param fragments String fragments to append (in order) to the standard user agent data
+        @type fragments: List of six.text_type
+        """
+        for worker_pool in self._api_keys_worker_pools.values():
+            for worker in worker_pool.workers:
+                worker.augment_user_agent_for_client_session(fragments)
+
+    def get_worker_session_statuses(self):
+        # type: () -> List[ScalyrClientSessionStatus]
+        """
+        Get session statuses from all workers.
+        :return: dict with worker_id -> ScalyrClientSessionStatus.
+        """
+        session_stats = []
+        for worker_pool in self._api_keys_worker_pools.values():
+            for worker in worker_pool.workers:
+                session_stats.append(worker.generate_scalyr_client_status())
+
+        return session_stats

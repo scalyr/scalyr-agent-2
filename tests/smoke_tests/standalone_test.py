@@ -26,3 +26,9 @@ from tests.smoke_tests.common import _test_standalone_smoke
 @pytest.mark.timeout(300)
 def test_standalone_smoke():
     _test_standalone_smoke(DEV_INSTALL)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@pytest.mark.timeout(300)
+def test_standalone_smoke_with_process_workers():
+    _test_standalone_smoke(DEV_INSTALL, workers_type="process", workers_count=2)

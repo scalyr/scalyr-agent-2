@@ -23,7 +23,11 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import print_function
+
 import sys
+from abc import ABCMeta, abstractmethod
+
 import six
 
 __author__ = "czerwin@scalyr.com"
@@ -2234,13 +2238,7 @@ class LogFileProcessor(object):
     def set_inactive(self):
         self.__is_active = False
 
-    @property
-    def log_path(self):
-        """
-        @return:  The log file path
-        @rtype: str
-        """
-        # TODO:  Change this to just a regular property?
+    def get_log_path(self):
         return self.__path
 
     # Success results for the callback returned by perform_processing.
@@ -3165,6 +3163,10 @@ class LogMatcher(object):
         for processor in self.__processors:
             processor.set_new_scalyr_client(new_scalyr_client)
 
+    @property
+    def log_entry_config(self):
+        return self.__log_entry_config
+
     def update_log_entry_config(self, log_entry_config):
         """
         Updates the log config for the log matcher and any of its processors.
@@ -3206,7 +3208,7 @@ class LogMatcher(object):
         try:
             # get checkpoints and close all processors
             for p in self.__processors:
-                result[p.log_path] = p.get_checkpoint()
+                result[p.get_log_path()] = p.get_checkpoint()
                 p.close()
 
             self.__processors = []
@@ -3305,7 +3307,7 @@ class LogMatcher(object):
             self.__lock.release()
 
     def find_matches(
-        self, existing_processors, previous_state, copy_at_index_zero=False
+        self, existing_processors, previous_state, copy_at_index_zero=False, get_log_processor_factory=None
     ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
@@ -3318,6 +3320,8 @@ class LogMatcher(object):
             then if copy_at_index_zero is True, the file will be processed from the first byte in the file.  Otherwise,
             the processing will skip over all bytes currently in the file and only process bytes added after this
             point.
+        @param get_log_processor_factory:  Callable which returns another callable which creates
+        a new LogFileProcessor instance. IF None, the LogFileProcessor class is used.
 
         @type existing_processors: dict of str to LogFileProcessor
         @type previous_state: dict of str to dict
@@ -3411,8 +3415,13 @@ class LogMatcher(object):
                         if "rename_no_original" not in self.__log_entry_config:
                             log_attributes["original_file"] = matched_file
 
+                    if get_log_processor_factory is None:
+                        log_processor_factory = LogFileProcessor
+                    else:
+                        log_processor_factory = get_log_processor_factory(self.__log_entry_config)
+                    
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(
+                    new_processor = log_processor_factory(
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,

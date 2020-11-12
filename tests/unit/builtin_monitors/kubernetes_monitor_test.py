@@ -44,7 +44,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     ControlledCacheWarmer,
     _ignore_old_dead_container,
 )
-from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.sharded_copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils

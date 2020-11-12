@@ -7,7 +7,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
 from scalyr_agent.monitor_utils.k8s import K8sNamespaceFilter
 from scalyr_agent.config_util import BadConfiguration
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.sharded_copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import QualifiedName
