@@ -219,6 +219,10 @@ class LineGrouper(LineMatcher):
     multiline should continue.
     """
 
+    # Value for the "errors" argument which is passed to the bytes.decode() function call.
+    # This should really only be set to something else than ignore inside the tests.
+    DECODE_ERRORS_VALUE = "ignore"
+
     def __init__(
         self,
         start_pattern,
@@ -260,7 +264,7 @@ class LineGrouper(LineMatcher):
         # This way we still ingest rest of the data even if part of it is malformed or corrupted.
 
         # check to see if this line starts a multiline
-        start_line_decoded = start_line.decode("utf-8", "ignore")
+        start_line_decoded = start_line.decode("utf-8", self.DECODE_ERRORS_VALUE)
         start = self._start_line(start_line_decoded)
         if start:
             max_length -= len(start_line)
@@ -274,7 +278,7 @@ class LineGrouper(LineMatcher):
             elif next_line:
 
                 # see if we are continuing the line
-                next_line_decoded = next_line.decode("utf-8", "ignore")
+                next_line_decoded = next_line.decode("utf-8", self.DECODE_ERRORS_VALUE)
                 cont = self._continue_line(next_line_decoded)
                 if cont:
                     line = start_line
@@ -291,7 +295,9 @@ class LineGrouper(LineMatcher):
                                 self, file_like, max_length
                             )
                             # Only check if this line is a continuation if we got the full line.
-                            next_line_decoded = next_line.decode("utf-8", "ignore")
+                            next_line_decoded = next_line.decode(
+                                "utf-8", self.DECODE_ERRORS_VALUE
+                            )
                             cont = not partial and self._continue_line(
                                 next_line_decoded
                             )
