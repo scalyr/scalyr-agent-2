@@ -347,8 +347,9 @@ class TestLogFileIterator(ScalyrTestCase):
             UnicodeDecodeError, expected_msg, lambda: self.readline().line
         )
 
-    def test_line_groupers_non_utf8_data_errors_ignore(self):
-        LineGrouper.DECODE_ERRORS_VALUE = "ignore"
+    def test_line_groupers_non_utf8_data_errors_replace(self):
+        # errors="replace"
+        LineGrouper.DECODE_ERRORS_VALUE = "replace"
 
         log_config = {
             "path": self.__path,
@@ -360,7 +361,6 @@ class TestLogFileIterator(ScalyrTestCase):
             ),
         }
 
-        # errors="ignore"
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
         matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
         self.log_file.set_line_matcher(matcher)

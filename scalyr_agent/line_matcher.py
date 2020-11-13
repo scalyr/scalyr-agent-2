@@ -220,8 +220,8 @@ class LineGrouper(LineMatcher):
     """
 
     # Value for the "errors" argument which is passed to the bytes.decode() function call.
-    # This should really only be set to something else than ignore inside the tests.
-    DECODE_ERRORS_VALUE = "ignore"
+    # This should really only be set to something else than ignore / replace inside the tests.
+    DECODE_ERRORS_VALUE = "replace"
 
     def __init__(
         self,
