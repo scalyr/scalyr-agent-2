@@ -256,8 +256,11 @@ class LineGrouper(LineMatcher):
         if partial:
             return start_line, partial
 
+        # NOTE: When decoding line data we simply ignore any invalid or partial unicode sequences
+        # This way we still ingest rest of the data even if part of it is malformed or corrupted.
+
         # check to see if this line starts a multiline
-        start_line_decoded = start_line.decode("utf-8")
+        start_line_decoded = start_line.decode("utf-8", "ignore")
         start = self._start_line(start_line_decoded)
         if start:
             max_length -= len(start_line)
@@ -271,7 +274,7 @@ class LineGrouper(LineMatcher):
             elif next_line:
 
                 # see if we are continuing the line
-                next_line_decoded = next_line.decode("utf-8")
+                next_line_decoded = next_line.decode("utf-8", "ignore")
                 cont = self._continue_line(next_line_decoded)
                 if cont:
                     line = start_line
@@ -288,7 +291,7 @@ class LineGrouper(LineMatcher):
                                 self, file_like, max_length
                             )
                             # Only check if this line is a continuation if we got the full line.
-                            next_line_decoded = next_line.decode("utf-8")
+                            next_line_decoded = next_line.decode("utf-8", "ignore")
                             cont = not partial and self._continue_line(
                                 next_line_decoded
                             )
