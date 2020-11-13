@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.15 "TBD" - November 20, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 20, 2020 14:00 -0800
+--->
+
+Bug fixes:
+* Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
+
 ## 2.1.14 "Hydrus" - November 4, 2020
 
 <!---
