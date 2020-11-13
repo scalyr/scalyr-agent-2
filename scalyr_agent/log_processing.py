@@ -703,7 +703,7 @@ class LogFileIterator(object):
         if self.__parse_format == "cri":
             # 2->TODO decode line to parse it.
             timestamp, stream, tags, message = _parse_cri_log(
-                result.line.decode("utf-8")
+                result.line.decode("utf-8", "replace")
             )
             if message is None:
                 log.warning(
@@ -724,7 +724,7 @@ class LogFileIterator(object):
             try:
                 # 2->TODO decode line to parse it.
                 # TODO: optimize
-                attrs = scalyr_util.json_decode(result.line.decode("utf-8"))
+                attrs = scalyr_util.json_decode(result.line.decode("utf-8", "replace"))
 
                 # NOTE: To speed things up we avoid iterating over the whole object but manipulate
                 # parsed object in place. That can be up to 10x faster, but it depends on the object

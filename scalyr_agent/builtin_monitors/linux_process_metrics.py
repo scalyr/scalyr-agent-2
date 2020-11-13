@@ -924,7 +924,7 @@ class ProcessList(object):
         regex = r"\s*(\d+)\s+(\d+)\s+(.*)"
         # 2->TODO stdout is binary in Python3
         sub_proc_output = sub_proc.stdout.read()
-        sub_proc_output = sub_proc_output.decode("utf-8")
+        sub_proc_output = sub_proc_output.decode("utf-8", "replace")
         for line in sub_proc_output.splitlines(True):
             match = re.search(regex, line)
             if match:

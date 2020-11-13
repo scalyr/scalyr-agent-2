@@ -121,7 +121,9 @@ if six.PY2:
             for element in iterable:
                 if type(element) is tuple:
                     yield tuple(
-                        v.decode("utf-8") if type(v) is six.binary_type else v
+                        v.decode("utf-8", "replace")
+                        if type(v) is six.binary_type
+                        else v
                         for v in element
                     )
                 else:
