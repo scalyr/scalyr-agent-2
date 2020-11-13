@@ -335,7 +335,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
 
         expected_msg = "invalid start byte"
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             UnicodeDecodeError, expected_msg, lambda: self.readline().line
         )
 
@@ -343,7 +343,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEqual(result, line_data[1])
 
         expected_msg = "invalid start byte"
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             UnicodeDecodeError, expected_msg, lambda: self.readline().line
         )
 
