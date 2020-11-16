@@ -190,7 +190,7 @@ def parse_scalyr_request(payload):
         length = compat.struct_unpack_unicode(">i", x.group(1))[0]
         # Grab the string content as raw bytes.
         raw_string = payload[x.end(1) : x.end(1) + length]
-        text_string = raw_string.decode("utf-8")
+        text_string = raw_string.decode("utf-8", "replace")
         rewritten_payload += scalyr_util.json_encode(text_string, binary=True)
         last_processed_index = x.end(1) + length - 1
     rewritten_payload += payload[last_processed_index + 1 : len(payload)]
@@ -205,4 +205,4 @@ def parse_scalyr_request(payload):
     # NOTE: Special case for Windows where path is C:\ which we don't want to convert
     rewritten_payload = rewritten_payload.replace(b'"C":\\', b"C:\\")
 
-    return scalyr_util.json_decode(rewritten_payload.decode("utf-8"))
+    return scalyr_util.json_decode(rewritten_payload.decode("utf-8", "replace"))

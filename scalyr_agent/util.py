@@ -553,7 +553,7 @@ def create_unique_id():
     """
     # 2->TODO this function should return unicode.
     base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
-    return base64_id.decode("utf-8")
+    return base64_id.decode("utf-8", "replace")
 
 
 def create_uuid3(namespace, name):
@@ -1811,7 +1811,7 @@ class RedirectorClient(StoppableThread):
                 bytes_to_read = code >> 1
                 stream_id = code % 2
 
-                content = self.__channel.read(bytes_to_read).decode("utf-8")
+                content = self.__channel.read(bytes_to_read).decode("utf-8", "replace")
 
                 if stream_id == RedirectorServer.STDOUT_STREAM_ID:
                     self.__stdout.write(content)

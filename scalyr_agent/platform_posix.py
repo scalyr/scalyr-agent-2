@@ -1283,7 +1283,7 @@ class StatusReporter(object):
                 message = self.__fp.read()
                 if len(message) == int(num_bytes):
                     # 2->TODO return unicode
-                    return message.decode("utf-8")
+                    return message.decode("utf-8", "replace")
             time.sleep(0.20)
 
     @property

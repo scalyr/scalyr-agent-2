@@ -40,6 +40,7 @@ from scalyr_agent.log_processing import (
     LogFileProcessor,
     LogMatcher,
 )
+from scalyr_agent.line_matcher import LineGrouper
 from scalyr_agent.log_processing import FileSystem
 from scalyr_agent.log_processing import _parse_cri_log as parse_cri_log
 from scalyr_agent.json_lib import JsonObject
@@ -299,6 +300,101 @@ class TestLogFileIterator(ScalyrTestCase):
 
         for line in expected:
             self.assertEqual(line, self.readline().line)
+
+    def test_line_groupers_non_utf8_data_errors_strict(self):
+        # If errors="strict", code should fail
+        LineGrouper.DECODE_ERRORS_VALUE = "strict"
+
+        log_config = {
+            "path": self.__path,
+            "lineGroupers": JsonArray(
+                DEFAULT_CONTINUE_THROUGH,
+                DEFAULT_CONTINUE_PAST,
+                DEFAULT_HALT_BEFORE,
+                DEFAULT_HALT_WITH,
+            ),
+        }
+
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(200, 200)
+
+        line_data = [
+            b"--multi\n--continue\n--\xBA\xDD\\xAT\xA0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xBA\xDD\\xAT\xA0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+
+        self.append_file(self.__path, b"".join(line_data))
+        self.log_file.scan_for_new_bytes()
+
+        expected_msg = "invalid start byte"
+        self.assertRaisesRegexp(
+            UnicodeDecodeError, expected_msg, lambda: self.readline().line
+        )
+
+        result = self.readline().line
+        self.assertEqual(result, line_data[1])
+
+        expected_msg = "invalid start byte"
+        self.assertRaisesRegexp(
+            UnicodeDecodeError, expected_msg, lambda: self.readline().line
+        )
+
+    def test_line_groupers_non_utf8_data_errors_replace(self):
+        # errors="replace"
+        LineGrouper.DECODE_ERRORS_VALUE = "replace"
+
+        log_config = {
+            "path": self.__path,
+            "lineGroupers": JsonArray(
+                DEFAULT_CONTINUE_THROUGH,
+                DEFAULT_CONTINUE_PAST,
+                DEFAULT_HALT_BEFORE,
+                DEFAULT_HALT_WITH,
+            ),
+        }
+
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(200, 200)
+
+        # Lines contains corrupted / bad utf8 sequence
+        # UnicodeDecodeError: 'utf-8' codec can't decode byte 0xba in position 2: invalid start byte
+        line_data = [
+            b"--multi\n--continue\n--\xBA\xDD\\xAT\xA0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xBA\xDD\\xAT\xA0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+        expected = [
+            b"--multi\n--continue\n--\xba\xdd\\xAT\xa0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xba\xdd\\xAT\xa0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+
+        self.append_file(self.__path, b"".join(line_data))
+        self.log_file.scan_for_new_bytes()
+
+        for line in expected:
+            actual_line = self.readline().line
+            self.assertEqual(line, actual_line)
 
     def test_multiple_line_grouper_options(self):
         log_config = {

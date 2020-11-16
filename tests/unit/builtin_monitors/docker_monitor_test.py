@@ -85,8 +85,7 @@ class ContainerCheckerTestCase(ScalyrTestCase):
         )
         # We mock start time which is used in the calculation to make tests more stable
         mock_start_time = 12345
-        # TODO: Fix and use utcfromtimestamp when PR #647 is merged
-        mock_start_time_dt = datetime.datetime.fromtimestamp(mock_start_time)
+        mock_start_time_dt = datetime.datetime.utcfromtimestamp(mock_start_time)
         container_checker._ContainerChecker__start_time = mock_start_time
 
         # 1. Existing log file is not available, should use start_time timestamp
