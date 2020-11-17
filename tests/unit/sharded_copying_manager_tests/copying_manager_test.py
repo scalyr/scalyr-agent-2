@@ -58,7 +58,7 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         return test_files, self._instance
 
 
-class Test(CopyingManagerTest):
+class TestBasic(CopyingManagerTest):
     def test_multiple_workers(self):
 
         config_data = {"api_keys": [{"workers": 3}]}
@@ -69,9 +69,13 @@ class Test(CopyingManagerTest):
 
         assert len(manager.workers) == 3
 
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skipping Linux only tests on Windows")
     def test_multiple_process_workers(self):
 
-        config_data = {"api_keys": [{"workers": 3, "type": "process"}]}
+        config_data = {
+            "api_keys": [{"workers": 3}],
+            "use_multiprocess_copying_workers": True
+        }
 
         (test_file, test_file2), manager = self._create_manager_instanse(
             2, config_data=config_data
@@ -79,17 +83,9 @@ class Test(CopyingManagerTest):
 
         assert len(manager.workers) == 3
 
-        if platform.system() == "Windows":
-            assert set(w.worker_type for w in manager.workers) == {"thread"}
-        else:
-            assert set(w.worker_type for w in manager.workers) == {"process"}
-            worker_pids = {worker.get_pid() for worker in manager.workers}
-            assert len(worker_pids) == 3
-            assert os.getpid() not in worker_pids
-
-
-
-
+        worker_pids = {worker.get_pid() for worker in manager.workers}
+        assert len(worker_pids) == 3
+        assert os.getpid() not in worker_pids
 
     def test_multiple_thread_workers(self):
 

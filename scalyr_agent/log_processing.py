@@ -3307,7 +3307,7 @@ class LogMatcher(object):
             self.__lock.release()
 
     def find_matches(
-        self, existing_processors, previous_state, copy_at_index_zero=False, get_log_processor_factory=None
+        self, existing_processors, previous_state, copy_at_index_zero=False, create_log_processor=LogFileProcessor
     ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
@@ -3320,8 +3320,7 @@ class LogMatcher(object):
             then if copy_at_index_zero is True, the file will be processed from the first byte in the file.  Otherwise,
             the processing will skip over all bytes currently in the file and only process bytes added after this
             point.
-        @param get_log_processor_factory:  Callable which returns another callable which creates
-        a new LogFileProcessor instance. IF None, the LogFileProcessor class is used.
+        @param create_log_processor:  Callable which creates and returns a new instance of the LogFileProcessor.
 
         @type existing_processors: dict of str to LogFileProcessor
         @type previous_state: dict of str to dict
@@ -3414,14 +3413,9 @@ class LogMatcher(object):
                         # log file name.  TODO: Clean this up.
                         if "rename_no_original" not in self.__log_entry_config:
                             log_attributes["original_file"] = matched_file
-
-                    if get_log_processor_factory is None:
-                        log_processor_factory = LogFileProcessor
-                    else:
-                        log_processor_factory = get_log_processor_factory(self.__log_entry_config)
                     
                     # Create the processor to handle this log.
-                    new_processor = log_processor_factory(
+                    new_processor = create_log_processor(
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,

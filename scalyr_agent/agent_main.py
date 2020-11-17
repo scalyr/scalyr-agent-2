@@ -85,7 +85,7 @@ from optparse import OptionParser
 
 from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
-from scalyr_agent.scalyr_client import create_client
+from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.sharded_copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
@@ -1072,6 +1072,9 @@ class ScalyrAgent(object):
                 config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
+                # verify server certificates.
+                verify_server_certificate(self.__config)
+
                 def start_worker_thread(config, logs_initial_positions=None):
                     wt = self.__create_worker_thread(config)
                     # attach callbacks before starting monitors
@@ -1690,7 +1693,7 @@ class ScalyrAgent(object):
         """Return a newly calculated overall stats for the agent.
 
         This will calculate the latest stats based on the running agent.  Since most stats only can be
-        calculated since the last time the configuration file changed and was read, we need to seperately
+        calculated since the last time the configuration file changed and was read, we need to separately
         track the accumulated stats that occurred before the last config change.
 
         @param base_overall_stats: The accummulated stats from before the last config change.
@@ -1713,30 +1716,30 @@ class ScalyrAgent(object):
             delta_stats.total_copy_requests_errors = (
                 current_status.copying_manager_status.total_errors
             )
-            delta_stats.total_rate_limited_time = (
-                current_status.copying_manager_status.total_rate_limited_time
-            )
-            delta_stats.total_copy_iterations = (
-                current_status.copying_manager_status.total_copy_iterations
-            )
-            delta_stats.total_read_time = (
-                current_status.copying_manager_status.total_read_time
-            )
-            delta_stats.total_waiting_time = (
-                current_status.copying_manager_status.total_waiting_time
-            )
-            delta_stats.total_blocking_response_time = (
-                current_status.copying_manager_status.total_blocking_response_time
-            )
-            delta_stats.total_request_time = (
-                current_status.copying_manager_status.total_request_time
-            )
-            delta_stats.total_pipelined_requests = (
-                current_status.copying_manager_status.total_pipelined_requests
-            )
-            delta_stats.rate_limited_time_since_last_status = (
-                current_status.copying_manager_status.rate_limited_time_since_last_status
-            )
+            # delta_stats.total_rate_limited_time = (
+            #     current_status.copying_manager_status.total_rate_limited_time
+            # )
+            # delta_stats.total_copy_iterations = (
+            #     current_status.copying_manager_status.total_scan_iterations
+            # )
+            # delta_stats.total_read_time = (
+            #     current_status.copying_manager_status.total_read_time
+            # )
+            # delta_stats.total_waiting_time = (
+            #     current_status.copying_manager_status.total_waiting_time
+            # )
+            # delta_stats.total_blocking_response_time = (
+            #     current_status.copying_manager_status.total_blocking_response_time
+            # )
+            # delta_stats.total_request_time = (
+            #     current_status.copying_manager_status.total_request_time
+            # )
+            # delta_stats.total_pipelined_requests = (
+            #     current_status.copying_manager_status.total_pipelined_requests
+            # )
+            # delta_stats.rate_limited_time_since_last_status = (
+            #     current_status.copying_manager_status.rate_limited_time_since_last_status
+            # )
             watched_paths = len(current_status.copying_manager_status.log_matchers)
             for matcher in current_status.copying_manager_status.log_matchers:
                 copying_paths += len(matcher.log_processors_status)
@@ -1779,7 +1782,7 @@ class ScalyrAgent(object):
                 )
                 delta_stats.total_monitor_errors += monitor_status.errors
 
-        # get client session states from all workers of the copying manager and sup up all their stats.
+        # get client session states from all workers of the copying manager and sum up all their stats.
         session_states = self.__copying_manager.get_worker_session_statuses()
         for session_state in session_states:
 

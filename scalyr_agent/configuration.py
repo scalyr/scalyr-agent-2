@@ -1359,6 +1359,13 @@ class Configuration(object):
     def api_key_configs(self):
         return self.__get_config().get_json_array("api_keys")
 
+    @property
+    def use_multiprocess_copying_workers(self):
+        """
+        Return whether or not copying manager workers are in the multiprocessing mode.
+        """
+        return self.__get_config().get_bool("use_multiprocess_copying_workers")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -2657,6 +2664,24 @@ class Configuration(object):
             apply_defaults,
         )
 
+        self.__verify_or_set_optional_bool(
+            config,
+            "use_multiprocess_copying_workers",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        # windows does not support copying manager backed with multiprocessing workers.
+        if config.get_bool("use_multiprocess_copying_workers", none_if_missing=True):
+            if platform.system() == "Windows":
+                raise BadConfiguration(
+                    "The 'use_multiprocess_copying_workers' option is not supported on windows machines.",
+                    "use_multiprocess_copying_workers",
+                    error_code="invalidValue",
+                )
+
     def __verify_compression_type(self, compression_type):
         """
         Verify that the library for the specified compression type (algorithm) is available.
@@ -3150,19 +3175,6 @@ class Configuration(object):
         # if the id for the api_key entry is not specified, just set the entry index as id.
         if "id" not in api_key_entry:
             api_key_entry["id"] = six.text_type(entry_index)
-
-        self.__verify_or_set_optional_string(
-            api_key_entry, "type", "thread", description
-        )
-
-        # windows does not support copying manager backed with multiprocessing workers. Change worker types to thread.
-        if api_key_entry.get("type") == "process" and platform.system() == "Windows":
-            api_key_entry["type"] = "thread"
-            if self.__logger is not None:
-                self.__logger.warning(
-                    "The worker type for the api key '%s' is specified as 'process', but the process workers are not supported by windows."
-                    % (api_key_entry.get("id"),)
-                )
 
         self.__verify_or_set_optional_int(api_key_entry, "workers", 1, description)
 
@@ -3715,6 +3727,11 @@ class Configuration(object):
             )
 
     def __getstate__(self):
+        """
+        Remove unpicklable fields from the configuration instance.
+        The configuration object need to be picklable because its instances may be passed
+        to the multiprocessing copying manager workers.
+        """
         state = self.__dict__.copy()
         state.pop("_Configuration__logger", None)
         return state

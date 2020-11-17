@@ -1347,6 +1347,7 @@ class TestConfiguration(TestConfigurationBase):
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
             "json_library": "auto",
+            "use_multiprocess_copying_workers": False
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
@@ -2688,7 +2689,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.win32_max_open_fds, 1024)
 
 
-class TestShardedManagerConfiguration(TestConfigurationBase):
+class TestApiKeysConfiguration(TestConfigurationBase):
     def test_no_api_keys_entry_(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2702,7 +2703,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
 
         # only defaults are created.
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
+            JsonObject(workers=1, api_key=config.api_key, id="0")
         )
 
     def test_empty_api_keys_entry(self):
@@ -2720,7 +2721,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0", type="thread")
+            JsonObject(workers=1, api_key=config.api_key, id="0")
         )
 
     def test_default_api_keys_entry_id(self):
@@ -2740,7 +2741,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="my_worker", type="thread")
+            JsonObject(workers=1, api_key=config.api_key, id="my_worker")
         )
 
     def test_default_api_keys_with_no_api_key(self):
@@ -2762,7 +2763,7 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=3, api_key=config.api_key, id="0", type="thread")
+            JsonObject(workers=3, api_key=config.api_key, id="0")
         )
 
     def test_default_api_keys_entry_and_invalid_second(self):
@@ -2814,7 +2815,6 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
                 api_keys: [
                     {
                         "workers": 3
-                        "type": "process"
                     },
                     {
                         api_key: "key2"
@@ -2835,10 +2835,9 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
             workers=3,
             api_key=config.api_key,
             id="0",
-            type="process" if platform.system() != "Windows" else "thread",
         )
         assert config.api_key_configs[1] == JsonObject(
-            workers=4, api_key="key2", id="second", type="thread"
+            workers=4, api_key="key2", id="second"
         )
 
     def test_log_file_bind_to_api_keys_entries(self):
@@ -2853,7 +2852,6 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
                         api_key: "key2"
                         "workers": 4,
                         "id": "second",
-                        type: "process"
                     }
                 ],
                 
@@ -2875,13 +2873,12 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 2
         assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="0", type="thread"
+            workers=3, api_key=config.api_key, id="0"
         )
         assert config.api_key_configs[1] == JsonObject(
             workers=4,
             api_key="key2",
             id="second",
-            type="process" if platform.system() != "Windows" else "thread",
         )
 
     def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
@@ -2915,3 +2912,48 @@ class TestShardedManagerConfiguration(TestConfigurationBase):
 
         with pytest.raises(BadConfiguration):
             config.parse()
+
+    def test_workers_type_default(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert not config.use_multiprocess_copying_workers
+
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    def test_workers_type_multiprocess(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            use_multiprocess_copying_workers: true
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.use_multiprocess_copying_workers
+
+    @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
+    def test_workers_type_multiprocess_windows(self):
+        # 'use_multiprocess_copying_workers' option should couse error on Windows.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            use_multiprocess_copying_workers: true
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        self.assertRaises(BadConfiguration, config.parse)

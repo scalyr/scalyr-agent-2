@@ -198,7 +198,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.copying_manager_status = copying_status
         copying_status.last_attempt_size = 10000
         copying_status.last_attempt_time = self.time - 60
-        copying_status.workers_last_responses_status = "All successful"
+        copying_status.last_responses_status_info = "All successful"
         copying_status.total_errors = 0
         copying_status.total_bytes_uploaded = 10000
         copying_status.last_success_time = self.time - 60
@@ -207,20 +207,20 @@ class TestReportStatus(ScalyrTestCase):
         self.api_key1 = api_key1 = ApiKeyWorkerPoolStatus()
         api_key1.api_key_id = "0"
         api_key1.total_bytes_uploaded = 6000
-        copying_status.api_key_statuses["0"] = api_key1
+        copying_status.api_key_worker_pools.append(api_key1)
         api_key1.last_success_time = self.time - 60
         api_key1.last_attempt_time = self.time - 60
 
         self.api_key2 = api_key2 = ApiKeyWorkerPoolStatus()
         api_key2.api_key_id = "1"
         api_key2.total_bytes_uploaded = 4000
-        copying_status.api_key_statuses["1"] = api_key2
+        copying_status.api_key_worker_pools.append(api_key2)
         api_key2.last_success_time = self.time - 60
         api_key2.last_attempt_time = self.time - 60
 
         # =========
 
-        api_key1.has_successful_last_response = True
+        api_key1.all_responses_successful = True
         api_key1.has_good_health_checks = True
         self.worker1_1 = worker1_1 = CopyingManagerWorkerStatus()
         worker1_1.worker_id = "worker1_1"
@@ -238,10 +238,10 @@ class TestReportStatus(ScalyrTestCase):
 
         # =
 
-        copying_status.has_successful_last_response = True
+        copying_status.all_responses_successful = True
         copying_status.has_good_health_checks = True
 
-        api_key2.has_successful_last_response = True
+        api_key2.all_responses_successful = True
         api_key2.has_good_health_checks = True
         self.worker2_1 = worker2_1 = CopyingManagerWorkerStatus()
         worker2_1.worker_id = "worker2_1"
@@ -558,12 +558,12 @@ Failed monitors:
         # Set the responses for all workers of the first api key as failed.
 
         manager_status = self.status.copying_manager_status
-        manager_status.workers_last_responses_status = "Last requests on some workers is not successful, see below for more info."
+        manager_status.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
 
         api_key1 = self.api_key1
         api_key1.total_errors = 5
 
-        api_key1.has_successful_last_response = False
+        api_key1.all_responses_successful = False
         api_key1.has_good_health_checks = True
         worker1_1 = self.worker1_1
         worker1_1.last_response = "Bad response on worker1"
@@ -786,10 +786,10 @@ Failed monitors:
     def test_last_success_is_none(self):
         manager_status = self.status.copying_manager_status
 
-        manager_status.workers_last_responses_status = "Last requests on some workers is not successful, see below for more info."
+        manager_status.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
 
         api_key1 = self.api_key1
-        api_key1.has_successful_last_response = False
+        api_key1.all_responses_successful = False
         worker1_1 = self.worker1_1
         worker1_1.last_response = "Some weird stuff"
         worker1_1.last_response_status = "error"

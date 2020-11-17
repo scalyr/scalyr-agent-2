@@ -16,8 +16,14 @@ from multiprocessing.managers import SyncManager
 
 if False:
     from typing import Dict
+    from typing import Tuple
+    from typing import Any
 
-from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread, util as scalyr_util
+from scalyr_agent import (
+    scalyr_logging as scalyr_logging,
+    StoppableThread,
+    util as scalyr_util,
+)
 from scalyr_agent.agent_status import CopyingManagerStatus, CopyingManagerWorkerStatus
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
@@ -190,6 +196,7 @@ class CopyingManagerWorker:
     """
     The interface for the Copying manager worker classes.
     """
+
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -234,9 +241,11 @@ class CopyingManagerWorker:
         pass
 
     @abstractmethod
-    def schedule_new_log_processor(self, log_processor):
-        """Schedules new log processor. It will be added to the main collection only on the next iteration,
-        so we don;t have to guard the main collection with lock."""
+    def create_and_schedule_new_log_processor(self, *args, **kwargs):
+        """
+        Creates and also schedules a new log processor. It will be added to the main collection only on the next iteration,
+        so we don't have to guard the main collection with lock.
+        """
         pass
 
     @abstractmethod
@@ -301,7 +310,9 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
 
         # The dict of LogFileProcessors that are processing the lines from matched log files.
-        self.__log_processors = collections.OrderedDict()  # type: Dict[six.text_type, LogFileProcessor]
+        self.__log_processors = (
+            collections.OrderedDict()
+        )  # type: Dict[six.text_type, LogFileProcessor]
 
         # Temporary collection of recently added log processors.
         # Every log processor which is added during the iteration of the worker is placed in here.
@@ -416,7 +427,10 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
-                log.info("Copying manager worker #%s started. Pid: '%s'" % (self._id, os.getpid()))
+                log.info(
+                    "Copying manager worker #%s started. Pid: '%s'"
+                    % (self._id, os.getpid())
+                )
 
                 while self._run_state.is_running():
                     log.log(
@@ -670,8 +684,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 profiler.disable()
 
             log.log(
-                scalyr_logging.DEBUG_LEVEL_0,
-                "Worker '%s' is finished." % self._id,
+                scalyr_logging.DEBUG_LEVEL_0, "Worker '%s' is finished." % self._id,
             )
 
     def wait_for_copying_to_begin(self):
@@ -1064,10 +1077,13 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         """
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-    def schedule_new_log_processor(self, log_processor):
-        # type: (LogFileProcessor) -> None
-        """Schedules new log processor. It will be added to the main collection only on the next iteration,
-        so we don;t have to guard the main collection with lock."""
+    def create_and_schedule_new_log_processor(self, *args, **kwargs):
+        # type: (*Any, **Any) -> LogFileProcessor
+        """
+        Creates and also schedules a new log processor. It will be added to the main collection only on the next iteration,
+        so we don't have to guard the main collection with lock.
+        """
+        log_processor = LogFileProcessor(*args, **kwargs)
 
         with self.__lock:
             self.__new_log_processors.append(log_processor)
@@ -1077,6 +1093,8 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             "Log processor for file '%s' is scheduled to be added"
             % log_processor.get_log_path(),
         )
+
+        return log_processor
 
     def __add_new_log_processors(self):
         """
@@ -1121,175 +1139,114 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         api_key = self.__api_key_config_entry["api_key"]
         if self.__config.use_new_ingestion:
             from scalyr_agent.scalyr_client import NewScalyrClientSession
+
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
         else:
-            self.__scalyr_client = create_client(self.__config, quiet=quiet, api_key=api_key)
+            self.__scalyr_client = create_client(
+                self.__config, quiet=quiet, api_key=api_key
+            )
 
 
 if sys.version_info >= (3, 6, 0):
+
     def FixedRebuildProxy(func, token, serializer, kwds):
-        '''
+        """
         Function used for unpickling proxy objects. There is a bug in version >=3.6, so we need to monkeypatch it.
-        '''
-        server = getattr(multiprocessing.process.current_process(), '_manager_server', None)
+        """
+        server = getattr(
+            multiprocessing.process.current_process(), "_manager_server", None
+        )
         if server and server.address == token.address:
-            multiprocessing.util.debug('Rebuild a proxy owned by manager, token=%r', token)
-            kwds['manager_owned'] = True
-            if token.id not in server.id_to_local_proxy_obj:
-                server.id_to_local_proxy_obj[token.id] = \
-                    server.id_to_obj[token.id]
-            return server.id_to_obj[token.id][0]
-        incref = (
-            kwds.pop('incref', True) and
-            not getattr(multiprocessing.process.current_process(), '_inheriting', False)
+            multiprocessing.util.debug(
+                "Rebuild a proxy owned by manager, token=%r", token
             )
+            kwds["manager_owned"] = True
+            if token.id not in server.id_to_local_proxy_obj:
+                server.id_to_local_proxy_obj[token.id] = server.id_to_obj[token.id]
+            return server.id_to_obj[token.id][0]
+        incref = kwds.pop("incref", True) and not getattr(
+            multiprocessing.process.current_process(), "_inheriting", False
+        )
         return func(token, serializer, incref=incref, **kwds)
 
     multiprocessing.managers.RebuildProxy = FixedRebuildProxy
 
 
-class CopyingManagerWorkerContainer(CopyingManagerWorker):
-    """
-    A container/wrapper class for the real CopyingManagerThreadedWorker class.
-    This container initializes the real worker according to the configuration.
-    If the type of the worker container is "thread", then a simple threaded worker is created.
-    If the type is "process" - still the same  CopyingManagerThreadedWorker is created, but inside a separate process.
-    The communication with the worker from the process if made by multiprocessing.SyncManager.
-    This shared memory manager starts its own process and will create worker instance within it.
-    It also provides a proxy object of the worker, so we can interact with it from the main process.
-    We also create proxy objects for LogFileProcessor instances, because log processors should be located incide worker,
-     but we still have to be able to interact with them
-    """
-    # methods of the CopyingManagerThreadedWorker which should be exposed through proxies.
-    EXPOSED = [
-        six.ensure_str("start_worker"),
-        six.ensure_str("stop_worker"),
-        six.ensure_str("wait_for_copying_to_begin"),
-        six.ensure_str("get_id"),
-        six.ensure_str("augment_user_agent_for_client_session"),
+# create base proxy class for the LogProcessor, here we also specify all its methods that may be called through proxy.
+_LogProcessorProxy = multiprocessing.managers.MakeProxyType(
+    six.ensure_str("LogFileProcessorProxy"),
+    [
+        six.ensure_str("is_closed"),
+        six.ensure_str("close_at_eof"),
+        six.ensure_str("close"),
+        six.ensure_str("add_missing_attributes"),
+        six.ensure_str("get_log_path"),
         six.ensure_str("generate_status"),
-        six.ensure_str("generate_scalyr_client_status"),
-        six.ensure_str("schedule_new_log_processor"),
-        six.ensure_str("generate_scalyr_client_status"),
-        six.ensure_str("get_log_processors")
-    ]
+    ],
+)
 
-    # Class of the worker that should be proxified.
-    # This class attribute is needed only to be able to replace this class by the testable one,
-    # just for the testing purposes.
-    COPYING_MANAGER_CLASS = CopyingManagerThreadedWorker
+# Create final proxy class for the LogFileProcessors by subclassing the base class.
+class LogProcessorProxy(_LogProcessorProxy):
+    def __init__(self, *args, **kwargs):
+        super(LogProcessorProxy, self).__init__(*args, **kwargs)
+        self.__cached_log_path = None
 
-    def __init__(self, configuration, api_key_config_entry, worker_id):
-
-        copying_manager_class = type(self)
-        self._worker_type = api_key_config_entry.get("type", none_if_missing=True)
-        if self._worker_type == "process":
-            # the type of the real worker is a process. Initialize shared memory manager and register proxy types.
-
-            # the proxy types are registered for the whole class, so we create a new subclass to avoid mixing.
-            class CopyingManagerMemoryManager(SyncManager):
-                pass
-
-
-            # register Proxy type for the worker
-            CopyingManagerMemoryManager.register(
-                six.ensure_str("CopyingManagerWorker"),
-                copying_manager_class.COPYING_MANAGER_CLASS,
-                exposed=copying_manager_class.EXPOSED,
-                method_to_typeid={six.ensure_str("get_log_processors"): six.ensure_str("list")}
-            )
-
-            # register proxy type for the LogFilePRocessor
-            CopyingManagerMemoryManager.register(
-                six.ensure_str("LogFileProcessorProxy"),
-                LogFileProcessor,
-                exposed=[
-                    six.ensure_str("get_log_path"),
-                    six.ensure_str("is_closed"),
-                    six.ensure_str("close_at_eof"),
-                    six.ensure_str("close"),
-                    six.ensure_str("generate_status"),
-                    six.ensure_str("add_missing_attributes"),
-                    six.ensure_str("get_checkpoint"),
-                ]
-            )
-
-            # create shared memory manager
-            self.__memory_manager = CopyingManagerMemoryManager()
-
-            # start memory manager.
-            # Important for the understanding. When the __memory_manager is started, it creates a new process.
-            # We use this process as a process for the worker.
-            self.__memory_manager.start()
-
-            # create proxy object of the worker. The real worker instance is created in the new process
-            # which was created when __mameory_manager started.
-            self._real_worker = self.__memory_manager.CopyingManagerWorker(
-                configuration, api_key_config_entry, worker_id
-            )  # type: CopyingManagerWorker
-
-        else:
-            # threaded mode. Just use CopyingManagerThreadedWorker directly.
-            self._real_worker = copying_manager_class.COPYING_MANAGER_CLASS(
-                configuration, api_key_config_entry, worker_id
-            )
-
-    def create_and_add_log_processor(self, *args, **kwargs):
+    def get_log_path(self):
         """
-        Create new log processor. If the core worker is in separate process,
-        the appropriate shared memory Manager will create the log processor inside this process.
-        In this process we only get a proxy object.
-
-        If this is threaded worker, a regular LogFileProcessor is created.
-        :param args:
-        :param kwargs:
-        :return:
+        The log path does not change so it's better to cache it to reduce the load to IPC channel.
         """
-        if self._worker_type == "process":
-            # this worker is in the separate process.
-            # Ask memory manager to create new log processor and get the proxy object.
-            processor = self.__memory_manager.LogFileProcessorProxy(*args, **kwargs)
-
-        else:
-            processor = LogFileProcessor(*args, **kwargs)
-
-        self._real_worker.schedule_new_log_processor(processor)
-
-        return processor
-
-    def stop_memory_manager(self):
-        """
-        Stop the memory manager. This should be called as a last step of the worker disposal.
-        NOTE: Afret the memory manager is stopped, the communication with proxyfied instances will be broken,
-        so only call this if you are sure that you do not need anything from the worker.
-        """
-        if self._worker_type == "process":
-            self.__memory_manager.shutdown()
-
-    # region Original methonds.
-    def augment_user_agent_for_client_session(self, fragments):
-        return self._real_worker.augment_user_agent_for_client_session(fragments)
-
-    def generate_status(self, warn_on_rate_limit=False):
-        return self._real_worker.generate_status(warn_on_rate_limit=warn_on_rate_limit)
-
-    def schedule_new_log_processor(self, log_processor):
-        return self._real_worker.schedule_new_log_processor(log_processor)
+        if self.__cached_log_path is None:
+            self.__cached_log_path = self._callmethod("get_log_path")
+        return self.__cached_log_path
 
 
-    def start_worker(self):
-        return self._real_worker.start_worker()
+WORKER_PROXY_EXPOSED_METHODS = [
+    six.ensure_str("start_worker"),
+    six.ensure_str("stop_worker"),
+    six.ensure_str("wait_for_copying_to_begin"),
+    six.ensure_str("get_id"),
+    six.ensure_str("augment_user_agent_for_client_session"),
+    six.ensure_str("generate_status"),
+    six.ensure_str("generate_scalyr_client_status"),
+    six.ensure_str("schedule_new_log_processor"),
+    six.ensure_str("generate_scalyr_client_status"),
+    six.ensure_str("get_log_processors"),
+    six.ensure_str("create_and_schedule_new_log_processor"),
+]
 
-    def stop_worker(self, wait_on_join=True, join_timeout=5):
-        self._real_worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
-        self.stop_memory_manager()
 
-    def wait_for_copying_to_begin(self):
-        return self._real_worker.wait_for_copying_to_begin()
+_CopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
+    six.ensure_str("CopyingManagerWorkerProxy"), WORKER_PROXY_EXPOSED_METHODS,
+)
 
-    def get_id(self):
-        return self._real_worker.get_id()
 
-    def generate_scalyr_client_status(self):
-        return self._real_worker.generate_scalyr_client_status()
-    # endregion
+class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):
+    pass
+
+
+def shared_memory_manager_factory(worker_class, worker_proxy_class):
+    class _MemoryManager(multiprocessing.managers.SyncManager):
+        pass
+
+    _MemoryManager.register(
+        six.ensure_str("LogFileProcessorProxy"), proxytype=LogProcessorProxy
+    )
+
+    _MemoryManager.register(
+        six.ensure_str("CopyingManagerWorkerProxy"),
+        worker_class,
+        proxytype=worker_proxy_class,
+        method_to_typeid={
+            six.ensure_str("get_log_processors"): six.ensure_str("list"),
+            six.ensure_str("create_and_schedule_new_log_processor"): six.ensure_str(
+                "LogFileProcessorProxy"
+            ),
+        },
+    )
+
+    return _MemoryManager
+
+
+CopyingManagerSharedMemory = shared_memory_manager_factory(
+    CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
+)

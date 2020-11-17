@@ -95,11 +95,11 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     if "worker_type" in metafunc.fixturenames:
-        worker_types = ["thread"]
+        test_params = ["thread"]
         if platform.system() != "Windows":
-            worker_types.append("process")
+            test_params.append("process")
 
-        metafunc.parametrize("worker_type", worker_types)
+        metafunc.parametrize("worker_type", test_params)
 
 
 def _create_test_copying_manager(
@@ -127,10 +127,6 @@ def _create_test_copying_manager(
 
 
 class BaseTest(object):
-    @pytest.fixture(autouse=True)
-    def setup(self, worker_type):
-        self._worker_type = worker_type
-
     def assertEquals(self, expexted, actual):
         assert expexted == actual
 
@@ -138,7 +134,7 @@ class BaseTest(object):
 class TestDynamicLogPathTest(BaseTest):
     @pytest.fixture(autouse=True)
     def setup(self, worker_type):
-        self._worker_type = worker_type
+        self.use_multiprocessing_workers = worker_type == "process"
         self._temp_dir = tempfile.mkdtemp()
         self._data_dir = os.path.join(self._temp_dir, "data")
         self._log_dir = os.path.join(self._temp_dir, "log")
@@ -171,9 +167,7 @@ class TestDynamicLogPathTest(BaseTest):
         if not monitor_agent_log:
             config["implicit_agent_log_collection"] = False
 
-        config["api_keys"] = [
-            {"type": self._worker_type}
-        ]
+        config["use_multiprocessing_workers"] = self.use_multiprocessing_workers
 
         f = open(self._config_file, "w")
         if f:

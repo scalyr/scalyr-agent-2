@@ -30,50 +30,22 @@ class LogWatcher(object):
         param: log_config - a log_config object containing at least a path
         returns: the log_config variable with updated path and default information
         """
-        self._add_log_config(log_config, monitor_name=monitor_name)
+        pass
 
     def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
         param: monitor - the monitor removing the path
         param: log_path - a string containing path of the log file to remove
         """
-        self._remove_log_path(log_path, monitor_name=monitor_name)
+        pass
 
     def update_log_config(self, monitor_name, log_config):
         """Update the config of any logs that match the
            path of the log_config param
         """
-        self._update_log_config(log_config, monitor_name=monitor_name)
+        pass
 
     def schedule_log_path_for_removal(self, monitor_name, log_path):
-        """
-            Schedules a log path for removal.  The logger will only
-            be removed once the number of pending bytes for that log reaches 0
-        """
-        self._schedule_log_path_for_removal(log_path, monitor_name=monitor_name)
-
-    def _add_log_config(self, log_config, monitor_name=None):
-        """Add the path specified by the log_config to the list of paths being watched
-        param: monitor_name - the name of the monitor adding the log_config
-        param: log_config - a log_config object containing at least a path
-        returns: the log_config variable with updated path and default information
-        """
-        pass
-
-    def _remove_log_path(self, log_path, monitor_name=None):
-        """Remove the log_path from the list of paths being watched
-        param: monitor - the monitor removing the path
-        param: log_path - a string containing path of the log file to remove
-        """
-        pass
-
-    def _update_log_config(self, log_config, monitor_name=None):
-        """Update the config of any logs that match the
-           path of the log_config param
-        """
-        pass
-
-    def _schedule_log_path_for_removal(self, log_path, monitor_name=None):
         """
             Schedules a log path for removal.  The logger will only
             be removed once the number of pending bytes for that log reaches 0

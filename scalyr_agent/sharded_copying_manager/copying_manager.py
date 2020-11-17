@@ -13,13 +13,18 @@ import operator
 import glob
 import re
 
+import multiprocessing
+import multiprocessing.managers
+
 if False:
     from typing import Dict
     from typing import List
+    from typing import Optional
+    from typing import Tuple
 
 from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread, util as scalyr_util
 from scalyr_agent.agent_status import ShardedCopyingManagerStatus, ApiKeyWorkerPoolStatus
-from scalyr_agent.sharded_copying_manager.worker import CopyingManagerWorkerContainer
+from scalyr_agent.sharded_copying_manager.worker import CopyingManagerThreadedWorker, CopyingManagerSharedMemory
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import RateLimiter
@@ -32,7 +37,7 @@ log = scalyr_logging.getLogger(__name__)
 SCHEDULED_DELETION = "scheduled-deletion"
 
 
-def _max(v1, v2):
+def _max_ignore_none(v1, v2):
     """max function which ignores None values"""
     values = [v for v in [v1, v2] if v is not None]
     return max(values)
@@ -49,15 +54,35 @@ class ApiKeyWorkerPool(object):
 
         self.__api_key_id = api_key_config["id"]
         self.__config = config
-        self.__workers = []
+
+        self.__workers = []  # type: List[CopyingManagerThreadedWorker]
+
+        # collection of shared memory managers. (Subclasses of the multiprocessing.BaseManager)
+        # Those managers allow to communicate with workers if they are in the multiprocessing mode.
+        self.__shared_memory_managers = dict()  # type: Dict[six.text_type, CopyingManagerSharedMemory]
 
         for i in range(api_key_config["workers"]):
-            # combine workers positional number in pool and poll id.
+            # combine workers positional number in pool and pool id.
             worker_id = "%s_%s" % (self.__api_key_id, i)
 
-            worker = CopyingManagerWorkerContainer(
-                self.__config, api_key_config, worker_id
-            )
+            if not self.__config.use_multiprocess_copying_workers:
+                worker = CopyingManagerThreadedWorker(self.__config, api_key_config, worker_id)
+            else:
+                memory_manager = CopyingManagerSharedMemory()
+
+                # Important for the understanding. When the memory_manager is started, it creates a new process.
+                # We use this process as a process for the worker.
+                memory_manager.start()
+
+                # create proxy object of the worker. The real worker instance is created in the new process
+                # which was created when memory_manager started.
+                worker = memory_manager.CopyingManagerWorkerProxy(
+                    self.__config, api_key_config, worker_id
+                )
+
+                # also save new shared memory manager.
+                self.__shared_memory_managers[worker.get_id()] = memory_manager
+
             self.__workers.append(worker)
             log.log(
                 scalyr_logging.DEBUG_LEVEL_1,
@@ -74,9 +99,8 @@ class ApiKeyWorkerPool(object):
     def workers(self):
         return self.__workers
 
-
-    def find_next_worker(self):
-        # type: () -> CopyingManagerWorkerContainer
+    def __find_next_worker(self):
+        # type: () -> CopyingManagerThreadedWorker
         """Get the next worker in the pool. For now it is just a round robin."""
         current_worker = self.__workers[self.__current_worker]
         if self.__current_worker == len(self.__workers) - 1:
@@ -86,6 +110,17 @@ class ApiKeyWorkerPool(object):
 
         return current_worker
 
+    def create_and_add_new_log_processor(self, *args, **kwargs):
+        # type: (Tuple, Dict) -> LogFileProcessor
+        """
+        Find the next worker in the pool and make it to create and schedule a log processor.
+        The signature is identical to the constructor of the 'LogFileProcessor' class
+        :return: New log processor
+        """
+        worker = self.__find_next_worker()
+        log_processor = worker.create_and_schedule_new_log_processor(*args, **kwargs)
+
+        return log_processor
 
     def start_workers(self):
         # type: () -> None
@@ -103,6 +138,10 @@ class ApiKeyWorkerPool(object):
         for worker in self.__workers:
             worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
+        # also stop all shared memory managers.
+        for memory_manager in self.__shared_memory_managers.values():
+            memory_manager.shutdown()
+
     def generate_status(self):
         # type: () -> ApiKeyWorkerPoolStatus
         """Generate status of the worker pool."""
@@ -113,24 +152,24 @@ class ApiKeyWorkerPool(object):
         last_response_statuses = set()
         health_checks = set()
 
+        last_attempt_requests_overall_size = 0
+
         for worker in sorted(self.__workers, key=lambda w: w.get_id()):
             status = worker.generate_status()
             result.workers.append(status)
 
             # get the most recent time fields from workers.
             if status.last_success_time:
-                result.last_success_time = _max(
+                result.last_success_time = _max_ignore_none(
                     result.last_success_time, status.last_success_time
                 )
             if status.last_attempt_time:
-                result.last_attempt_time = _max(
+                result.last_attempt_time = _max_ignore_none(
                     result.last_attempt_time, status.last_attempt_time
                 )
 
             if status.last_attempt_size:
-                result.last_attempt_size = _max(
-                    result.last_attempt_size, status.last_attempt_size
-                )
+                last_attempt_requests_overall_size += status.last_attempt_size
 
             if status.last_response_status is not None:
                 last_response_statuses.add(status.last_response_status)
@@ -145,14 +184,23 @@ class ApiKeyWorkerPool(object):
 
             result.total_errors += status.total_errors
 
-        if last_response_statuses:
-            if len(last_response_statuses) == 1 and "success" in last_response_statuses:
-                result.has_successful_last_response = True
-            else:
-                result.has_successful_last_response = False
+        if last_attempt_requests_overall_size:
+            result.last_attempt_requests_overall_size = last_attempt_requests_overall_size
 
+        # set the responses status result only if there are some statuses from workers.
+        # In other case we should keep it as None.
+        if last_response_statuses:
+            # if all worker statuses are good, so the result status is also True.
+            if last_response_statuses == {"success"}:
+                result.all_responses_successful = True
+            else:
+                result.all_responses_successful = False
+
+        # set the health check result only if there are some health checks from workers.
+        # In other case we should keep it as None.
         if health_checks:
-            if len(health_checks) == 1 and "Good" in health_checks:
+            # if all worker health checks are good, so the result health check is also True.
+            if health_checks == {"Good"}:
                 result.has_good_health_checks = True
             else:
                 result.has_good_health_checks = False
@@ -183,7 +231,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type monitors: list<ScalyrMonitor>
         """
         StoppableThread.__init__(self, name="copying manager thread")
-        self.__config = configuration
+        self.__config = configuration  # type: Configuration
 
         # Keep track of monitors
         self.__monitors = monitors
@@ -269,9 +317,6 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # A worker pools for each api key in the 'api_keys' list in the configuration.
         self._api_keys_worker_pools = dict()  # type: Dict[six.text_type, ApiKeyWorkerPool]
-
-        # create copying workers according to settings in the configuration.
-        self._create_worker_pools()
 
         # The list of LogMatcher objects that are watching for new files to appear.
         # NOTE: log matchers must be created only after worker pools.
@@ -617,6 +662,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 log.info("Starting copying manager workers.")
 
+                # create copying workers according to settings in the configuration.
+                self._create_worker_pools()
+
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
                 checkpoints = self.__get_checkpoints(current_time)
@@ -757,29 +805,31 @@ class CopyingManager(StoppableThread, LogWatcher):
             for api_key_id in sorted(self._api_keys_worker_pools):
                 worker_pool = self._api_keys_worker_pools[api_key_id]
                 worker_pool_status = worker_pool.generate_status()
-                result.api_key_statuses[api_key_id] = worker_pool_status
+                result.api_key_worker_pools.append(worker_pool_status)
 
                 result.total_errors += worker_pool_status.total_errors
 
-                if worker_pool_status.has_successful_last_response is not None:
-                    last_response_statuses.add(worker_pool_status.has_successful_last_response)
+                if worker_pool_status.all_responses_successful is not None:
+                    # collect response status information from the worker pools.
+                    last_response_statuses.add(worker_pool_status.all_responses_successful)
 
                 if worker_pool_status.has_good_health_checks is not None:
+                    # collect health check information from the worker pools
                     health_checks.add(worker_pool_status.has_good_health_checks)
 
                 result.total_bytes_uploaded += worker_pool_status.total_bytes_uploaded
 
             if last_response_statuses:
-                if len(last_response_statuses) == 1 and True in last_response_statuses:
-                    result.has_successful_last_response = True
+                # if all worker pools statuses are successful that the copying manager status is successful too.
+                if last_response_statuses == {True}:
+                    result.all_responses_successful = True
                 else:
-                    result.has_successful_last_response = False
+                    result.all_responses_successful = False
 
-            for entry in self.__log_matchers:
-                result.log_matchers.append(entry.generate_status())
-
+            # list with all possible health check error messages.
             all_health_check_error_messages = list()
 
+            # do the health check of the copying manager itself.
             if self.__last_scan_attempt_time:
                 if (
                         time.time()
@@ -792,19 +842,30 @@ class CopyingManager(StoppableThread, LogWatcher):
                             % self.__config.healthy_max_time_since_last_copy_attempt
                     ))
 
+            # now also check the health of the workers.
             if False in health_checks:
                 all_health_check_error_messages.append("Some workers has failed, see below for more info.")
 
+            # if there are error messages, concatenate them into one message
             if len(all_health_check_error_messages) > 0:
                 result.health_check_result = "\n".join(all_health_check_error_messages)
+            # the result message is "Good" if there are no error messages.
+            # NOTE: We do it only if the are some health checks from worker pools.
+            # In other case we should keep the result field as None.
             elif len(health_checks) > 0:
                 result.health_check_result = "Good"
 
+            # set the response status only if there are some statuses from worker pools.
             if len(last_response_statuses) > 0:
+                # set error message if not all statuses are successful.
                 if False in last_response_statuses:
-                    result.workers_last_responses_status = "Last requests on some workers is not successful, see below for more info."
+                    result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
                 else:
-                    result.workers_last_responses_status = "All successful"
+                    result.last_responses_status_info = "All successful"
+
+            # get statuses for the log matchers.
+            for entry in self.__log_matchers:
+                result.log_matchers.append(entry.generate_status())
 
         finally:
             self.__lock.release()
@@ -997,6 +1058,7 @@ class CopyingManager(StoppableThread, LogWatcher):
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
     ):
+        # type: (List[LogMatcher], Optional[Dict], bool) -> None
         """
         Creates log processors for any files on disk that match any file matching the
         passed in log_matchers
@@ -1028,11 +1090,15 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
+            # get the worker pool which is responsible for this log matcher.
+            worker_pool = self._api_keys_worker_pools[matcher.log_entry_config.get("api_key_id")]
             for new_processor in matcher.find_matches(
                 self.__log_paths_being_processed,
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
-                get_log_processor_factory=self.__get_log_processor_factory,
+                # this method of the worker pool will be called on every new match,
+                # to create and add new log processors to workers.
+                create_log_processor=worker_pool.create_and_add_new_log_processor,
             ):
 
                 log_path = new_processor.get_log_path()
@@ -1276,26 +1342,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         for api_key_config in self.__config.api_key_configs:
             pool = ApiKeyWorkerPool(self.__config, api_key_config)
             self._api_keys_worker_pools[api_key_config["id"]] = pool
-
-    def __get_log_processor_factory(self, log_config_entry):
-        """
-        This method creates a new instance of the LogFileProcessor.
-        :return:
-        """
-        worker = self.__find_best_worker_for_the_log_path(log_config_entry)
-
-        return worker.create_and_add_log_processor
-
-    def __find_best_worker_for_the_log_path(self, log_config_entry):
-        # type: (Dict) -> CopyingManagerWorkerContainer
-        """
-        Find the worker which is appororiate to the given log_config entry. For example if there is a 'api_key_id' field
-        in the log entry, we will only pick worker pools with the same api key id.
-        """
-
-        # get the workers pool which is responsible for the api key which is specified in the log config
-        pool = self._api_keys_worker_pools[log_config_entry["api_key_id"]]
-        return pool.find_next_worker()
 
     def augment_user_agent_for_workers_sessions(self, fragments):
         # type: (List[six.text_type]) -> None

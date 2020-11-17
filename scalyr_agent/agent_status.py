@@ -38,6 +38,8 @@ import operator
 
 if False:
     from typing import TextIO
+    from typing import List
+    from typing import Optional
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -113,7 +115,7 @@ class AgentStatus(BaseAgentStatus):
         # The CopyingManagerStatus object recording the status of the log copying manager (or none if CopyingManager
         # has not been started). This contains information about the different log paths being watched and the
         # progress of copying their bytes.
-        self.copying_manager_status = None # type: Optional[CopyingManagerStatus]
+        self.copying_manager_status = None  # type: Optional[ShardedCopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
@@ -321,6 +323,7 @@ class ConfigStatus(BaseAgentStatus):
 
 class CopyingManagerWorkerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying manager worker components."""
+
     def __init__(self):
         self.worker_id = None
         # The total number of bytes successfully uploaded.
@@ -348,56 +351,37 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
 
         self.health_check_result = None
 
         # LogProcessorStatus objects for each of the log files being processed by worker.
-        self.log_processors = [] # type: Dict[six.text_type, LogProcessorStatus]
+        self.log_processors = []  # type: Dict[six.text_type, LogProcessorStatus]
 
 
 class ApiKeyWorkerPoolStatus(BaseAgentStatus):
     def __init__(self):
 
         self.api_key_id = None
-        # The total number of bytes successfully uploaded.
-        self.total_bytes_uploaded = 0
-        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
-        self.last_success_time = None
-        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
-        self.last_attempt_time = None
-        # The size of the request for the last attempt.
-        self.last_attempt_size = None
-        # The last response from the Scalyr servers.
-        self.last_responses_size = None
-        self.last_response_status = None
+        # The total number of bytes successfully uploaded by all workers in this worker pool.
+        self.total_bytes_uploaded = 0  # type: int
+        # The most recent success time from all workers in this worker pool.
+        self.last_success_time = None  # type: Optional[float]
+        # The most recent request time from all workers in the worker pool.
+        self.last_attempt_time = None  # type: Optional[float]
+        # The overall size of the last requests from all workers in the worker pool.
+        self.last_attempt_requests_overall_size = None  # type: Optional[int]
 
-        self.has_successful_last_response = None
-        self.has_good_health_checks = None
+        # The flag indicates whether all last requests from all workers are successful.
+        self.all_responses_successful = None  # type: Optional[bool]
 
-        self.failed_health_check_results = None
+        # The flag indicates whether all workers has a good health check result.
+        self.has_good_health_checks = None  # type: Optional[bool]
 
         # The total number of failed copy requests.
-        self.total_errors = 0
-        # The total time in seconds we were blocked by the rate limiter
-        self.total_rate_limited_time = 0
-        # The time in seconds we were blocked by the rate limiter since the last status
-        self.rate_limited_time_since_last_status = 0
+        self.total_errors = 0  # type: int
 
-        self.total_copy_iterations = 0
-        self.total_read_time = 0
-        self.total_waiting_time = 0
-        self.total_blocking_response_time = 0
-        self.total_request_time = 0
-        self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
-        self.health_check_result = None
-
-        self.processed_files = {}
-
-        self.workers = [] #  type: Dict[six.text_type, CopyingManagerWorkerStatus]
+        # the status objects from all workers in the worker pool.
+        self.workers = []  # type: Dict[six.text_type, CopyingManagerWorkerStatus]
 
 
 class ShardedCopyingManagerStatus(BaseAgentStatus):
@@ -405,44 +389,28 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
 
     def __init__(self):
         # The total number of bytes successfully uploaded.
-        self.total_bytes_uploaded = 0
-        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
-        self.last_success_time = None
-        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
-        self.last_attempt_time = None
-        # The size of the request for the last attempt.
-        self.last_attempt_size = None
-        # The last response from the Scalyr servers.
-        self.last_response = None
-        # The last status from the last response (should be 'success').
-        self.workers_last_responses_status = collections.OrderedDict()
+        self.total_bytes_uploaded = 0  # type: int
+        # The overall text message with an information about recent responses in all workers.
+        # For example it equals to "All successful" in case if every request is successful
+        self.last_responses_status_info = None  # type: Optional[six.text_type]
         # The total number of failed copy requests.
-        self.total_errors = 0
-        # The total time in seconds we were blocked by the rate limiter
-        self.total_rate_limited_time = 0
-        # The time in seconds we were blocked by the rate limiter since the last status
-        self.rate_limited_time_since_last_status = 0
+        self.total_errors = 0  # type: int
+        #  The flag indicates whether all last requests from all workers are successful.
+        self.all_responses_successful = None  # type: Optional[bool]
+        # The flag indicates whether all workers has a good health check result.
+        self.has_good_health_checks = None  # type: Optional[bool]
 
-        self.has_successful_last_response = None
-        self.has_good_health_checks = None
+        # The overall text message with an information about the last health check.
+        # For example it equals to "Good" if everything is ok.
+        self.health_check_result = None  # type: Optional[six.text_type]
 
-        self.total_copy_iterations = 0
-        self.total_scan_iterations = 0
-        self.total_read_time = 0
-        self.total_waiting_time = 0
-        self.total_blocking_response_time = 0
-        self.total_request_time = 0
-        self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
+        # How many times the copying manager scanned the file system for new files.
+        self.total_scan_iterations = 0  # type: int
 
-        # LogMatcherStatus objects for each of the log paths being watched for copying.
-        self.log_matchers = []
+        # status objects for all log matchers.
+        self.log_matchers = []  # type: List[LogMatcherStatus]
 
-        self.health_check_result = None
-
-        self.workers_statuses = []
-        self.api_key_statuses = collections.OrderedDict()  # type: Dict[six.text_type, ApiKeyWorkerPoolStatus]
+        self.api_key_worker_pools = []  # type: List[ApiKeyWorkerPoolStatus]
 
 
 class CopyingManagerStatus(BaseAgentStatus):
@@ -484,7 +452,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.health_check_result = None
 
         self.workers_statuses = []
-        self.api_key_worker_pools = {} #type: Dict[six.text_type, ]
+        self.api_key_worker_pools = {}  # type: Dict[six.text_type, ]
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -704,15 +672,17 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         % manager_status.total_bytes_uploaded,
         file=output,
     )
-    if manager_status.workers_last_responses_status is not None:
+    if manager_status.last_responses_status_info is not None:
         print(
-            "Last requests:                             %s" % manager_status.workers_last_responses_status,
+            "Last requests:                             %s"
+            % manager_status.last_responses_status_info,
             file=output,
         )
 
     if manager_status.health_check_result is not None:
         print(
-            "Health check:                              %s" % manager_status.health_check_result,
+            "Health check:                              %s"
+            % manager_status.health_check_result,
             file=output,
         )
 
@@ -727,8 +697,8 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
     print("Api keys statistics", file=output)
     print("-------------------", file=output)
 
-    for api_key_id, worker_pool in manager_status.api_key_statuses.items():
-        print("Api key ID: %s" % api_key_id, file=output)
+    for worker_pool in manager_status.api_key_worker_pools:
+        print("Api key ID: %s" % worker_pool.api_key_id, file=output)
         print(
             "    Bytes uploaded successfully:               %ld"
             % worker_pool.total_bytes_uploaded,
@@ -744,16 +714,18 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
             % scalyr_util.format_time(worker_pool.last_attempt_time),
             file=output,
         )
-        if worker_pool.last_attempt_size is not None:
+        if worker_pool.last_attempt_requests_overall_size is not None:
             print(
                 "    Last copy requests size:                   %ld"
-                % worker_pool.last_attempt_size,
+                % worker_pool.last_attempt_requests_overall_size,
                 file=output,
             )
-        if worker_pool.has_successful_last_response is not None and not worker_pool.has_successful_last_response:
+        if (
+            worker_pool.all_responses_successful is not None
+            and not worker_pool.all_responses_successful
+        ):
             print(
-                "    Failed copy response statuses:",
-                file=output,
+                "    Failed copy response statuses:", file=output,
             )
             workers = list(
                 sorted(worker_pool.workers, key=operator.attrgetter("worker_id"))
@@ -763,10 +735,7 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                     # show only unsuccessful requests.
                     continue
 
-                print(
-                    "        %s:" % (worker_status.worker_id,),
-                    file=output
-                )
+                print("        %s:" % (worker_status.worker_id,), file=output)
                 print(
                     "            Last copy response status:         %s"
                     % worker_status.last_response_status,
@@ -781,20 +750,19 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                     file=output,
                 )
 
-        if worker_pool.has_good_health_checks is not None and not worker_pool.has_good_health_checks:
+        if (
+            worker_pool.has_good_health_checks is not None
+            and not worker_pool.has_good_health_checks
+        ):
             print(
-                "    Failed health checks:",
-                file=output,
+                "    Failed health checks:", file=output,
             )
 
             for worker_id, worker_status in worker_pool.workers.items():
                 if worker_status.health_check_result == "Good":
                     # show only unsuccessful requests.
                     continue
-                print(
-                    "        %s:" % (worker_id,),
-                    file=output
-                )
+                print("        %s:" % (worker_id,), file=output)
                 print(
                     "            Last copy response status:         %s"
                     % worker_status.health_check_result,
@@ -807,17 +775,6 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                 % (worker_pool.total_errors, agent_log_file_path,),
                 file=output,
             )
-        # print health checks.
-        if worker_pool.failed_health_check_results is not None:
-            # if every health check is successful just write 'Good', in opposite, print detailed info.
-            print(
-                "    Health check:                              %s"
-                % "" if manager_status.health_check_result else "Good",
-                file=output,
-            )
-            # print detailed information about failed health checks
-            for worker_id, worker_health_check_result in worker_pool.failed_health_check_results.items():
-                print("        %s: %s" % worker_id, worker_health_check_result, file=output)
 
         worker_pool_files = []
 

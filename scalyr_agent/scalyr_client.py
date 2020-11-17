@@ -82,6 +82,41 @@ def create_new_client(config, api_key=None):
     return result
 
 
+def verify_server_certificate(config):
+    """
+    Verify the Scalyr server certificates.
+    :param config:
+    :return:
+    """
+    is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
+    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
+        __scalyr__.DEV_INSTALL,
+        __scalyr__.MSI_INSTALL,
+    ]
+
+    ca_file = config.ca_cert_path
+    intermediate_certs_file = config.intermediate_certs_path
+
+    # Validate provided CA cert file and intermediate cert file exists. If they don't
+    # exist, throw and fail early and loudly
+    if not is_dev_install and not os.path.isfile(ca_file):
+        raise ValueError(
+            'Invalid path "%s" specified for the "ca_cert_path" config '
+            "option: file does not exist" % (ca_file)
+        )
+
+    # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+    # under the MSI / Windows install
+    if not is_dev_or_msi_install and not os.path.isfile(
+            intermediate_certs_file
+    ):
+        raise ValueError(
+            'Invalid path "%s" specified for the '
+            '"intermediate_certs_path" config '
+            "option: file does not exist" % (intermediate_certs_file)
+        )
+
+
 def create_client(config, quiet=False, api_key=None):
     """Creates and returns a new client to the Scalyr servers.
 
@@ -94,33 +129,9 @@ def create_client(config, quiet=False, api_key=None):
     @rtype: ScalyrClientSession
     """
     if config.verify_server_certificate:
-        is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
-        is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
-            __scalyr__.DEV_INSTALL,
-            __scalyr__.MSI_INSTALL,
-        ]
-
+        verify_server_certificate(config)
         ca_file = config.ca_cert_path
         intermediate_certs_file = config.intermediate_certs_path
-
-        # Validate provided CA cert file and intermediate cert file exists. If they don't
-        # exist, throw and fail early and loudly
-        if not is_dev_install and not os.path.isfile(ca_file):
-            raise ValueError(
-                'Invalid path "%s" specified for the "ca_cert_path" config '
-                "option: file does not exist" % (ca_file)
-            )
-
-        # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
-        # under the MSI / Windows install
-        if not is_dev_or_msi_install and not os.path.isfile(
-            intermediate_certs_file
-        ):
-            raise ValueError(
-                'Invalid path "%s" specified for the '
-                '"intermediate_certs_path" config '
-                "option: file does not exist" % (intermediate_certs_file)
-            )
     else:
         ca_file = None
         intermediate_certs_file = None
