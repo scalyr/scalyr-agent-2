@@ -592,7 +592,8 @@ class TestableCopyingManagerThreadedWorker(
         :type filepath: six.text_type
         """
         # noinspection PyProtectedMember
-        self.get_log_processors()[filepath].close_at_eof()
+        log_processor = next(p for p in self.get_log_processors() if p.get_log_path())
+        log_processor.close_at_eof()
 
     @property
     def checkpoints_path(self):

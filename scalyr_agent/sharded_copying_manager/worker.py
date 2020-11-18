@@ -18,6 +18,7 @@ if False:
     from typing import Dict
     from typing import Tuple
     from typing import Any
+    from typing import List
 
 from scalyr_agent import (
     scalyr_logging as scalyr_logging,
@@ -310,9 +311,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
 
         # The dict of LogFileProcessors that are processing the lines from matched log files.
-        self.__log_processors = (
-            collections.OrderedDict()
-        )  # type: Dict[six.text_type, LogFileProcessor]
+        self.__log_processors = []  # type: List[LogFileProcessor]
 
         # Temporary collection of recently added log processors.
         # Every log processor which is added during the iteration of the worker is placed in here.
@@ -453,7 +452,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                             # Tell all of the processors to go to the end of the current log file.  We will start
                             # copying
                             # from there.
-                            for processor in self.__log_processors.values():
+                            for processor in self.__log_processors:
                                 processor.skip_to_end(
                                     "Too long since last successful request to server.",
                                     "skipNoServerSuccess",
@@ -672,7 +671,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 sys.exit(1)
         finally:
             self.__write_full_checkpoint_state(current_time)
-            for processor in self.__log_processors.values():
+            for processor in self.__log_processors:
                 processor.close()
 
             if self.__scalyr_client is not None:
@@ -736,7 +735,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             result.total_request_time = self.total_request_time
             result.total_pipelined_requests = self.total_pipelined_requests
 
-            for path, processor in self.__log_processors.items():
+            for processor in self.__log_processors:
                 log_processor_status = processor.generate_status()
                 log_processor_status.worker_id = self._id
                 result.log_processors.append(log_processor_status)
@@ -859,12 +858,10 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         # Initialize the looping variable to the processor we last left off at on a previous run through this method.
         # This is an index into the __log_processors list.
-        log_processors = list(self.__log_processors.values())
-
         current_processor = self.__current_processor
 
         # The list could have shrunk since the last time we were in this loop, so adjust current_process if needed.
-        if current_processor >= len(log_processors):
+        if current_processor >= len(self.__log_processors):
             current_processor = 0
 
         # Track which processor we first look at in this method.
@@ -881,9 +878,9 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         if for_pipelining:
             add_events_request.increment_timing_data(**{"pipelined": 1.0})
 
-        while not buffer_filled and logs_processed < len(log_processors):
+        while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
-            processor = log_processors[current_processor]
+            processor = self.__log_processors[current_processor]
             (callback, buffer_filled) = processor.perform_processing(add_events_request)
 
             # A callback of None indicates there was some error reading the log.  Just retry again later.
@@ -903,7 +900,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             # This prevents us from getting stuck on one processor for too long.
             if not buffer_filled or current_processor == first_processor:
                 self.__current_processor += 1
-                if self.__current_processor >= len(log_processors):
+                if self.__current_processor >= len(self.__log_processors):
                     self.__current_processor = 0
                 current_processor = self.__current_processor
             else:
@@ -926,14 +923,14 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             # We could be susceptible to exceptions thrown in the middle of this method, though now should.
 
             # Copy the processor list because we may need to remove some processors if they are done.
-            processor_list = self.__log_processors
-            self.__log_processors = collections.OrderedDict()
+            processor_list = self.__log_processors[:]
+            self.__log_processors = []
 
             add_events_request.close()
 
             total_bytes_copied = 0
 
-            for path, processor in processor_list.items():
+            for processor in processor_list:
                 # Iterate over all the processors, seeing if we had a callback for that particular processor.
                 if processor.unique_id in all_callbacks:
                     # noinspection PyCallingNonCallable
@@ -947,7 +944,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                     keep_it = True
 
                 if keep_it:
-                    self.__log_processors[path] = processor
+                    self.__log_processors.append(processor)
                 else:
                     processor.close()
 
@@ -979,12 +976,13 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         if current_time is None:
             current_time = time.time()
-        for processor in self.__log_processors.values():
+        for processor in self.__log_processors:
             processor.scan_for_new_bytes(current_time)
 
     def __write_checkpoint_state(
         self, log_processors, base_file, current_time, full_checkpoint
     ):
+        # type: (List[LogFileProcessor], six.text_type, float, Dict) -> None
         """Writes the current checkpoint state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -993,14 +991,10 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
         checkpoints = {}
-        state = {
-            "time": current_time,
-            "checkpoints": checkpoints,
-        }
 
-        for path, processor in log_processors.items():
+        for processor in log_processors:
             if full_checkpoint or processor.is_active:
-                checkpoints[path] = processor.get_checkpoint()
+                checkpoints[processor.get_log_path()] = processor.get_checkpoint()
 
             if full_checkpoint:
                 processor.set_inactive()
@@ -1027,6 +1021,11 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         tmp_path = os.path.join(
             self.__config.agent_data_path, checkpoints_dir_path, base_file + "~"
         )
+
+        state = {
+            "time": current_time,
+            "checkpoints": checkpoints,
+        }
         scalyr_util.atomic_write_dict_as_json_file(file_path, tmp_path, state)
 
     def __write_full_checkpoint_state(self, current_time):
@@ -1060,11 +1059,11 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
     def get_id(self):
         return self._id
 
-    def get_log_processors(self):  # type: () -> Dict[six.text_type, LogFileProcessor]
+    def get_log_processors(self):  # type: () -> List[LogFileProcessor]
         """
         List of log processors. Exposed only for test purposes.
         """
-        return self.__log_processors.copy()
+        return self.__log_processors[:]
 
     def start_worker(self):
         self.start()
@@ -1107,7 +1106,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         for new_log_processor in new_log_processors:
             log_path = new_log_processor.get_log_path()
-            self.__log_processors[log_path] = new_log_processor
+            self.__log_processors.append(new_log_processor)
             log.log(
                 scalyr_logging.DEBUG_LEVEL_1,
                 "Log processor for file '%s' is added." % log_path,
