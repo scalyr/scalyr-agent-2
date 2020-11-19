@@ -19,17 +19,42 @@ from tests.unit.sharded_copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
     TestableCopyingManagerInterface,
-    TestableLogFile
+    TestableLogFile,
 )
+
+import six
 
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
 
+def pytest_generate_tests(metafunc):
+    """
+    Run all tests for each configuration.
+    """
+    if "worker_type" in metafunc.fixturenames:
+        test_params = ["thread"]
+        if platform.system() != "Windows":
+            test_params.append("process")
+
+        metafunc.parametrize(
+            "worker_type, api_keys_count, workers_count",
+            [["thread", 1, 1], ["process", 1, 1], ["thread", 2, 2], ["process", 2, 2]],
+        )
+
+
 class CopyingManagerTest(CopyingManagerCommonTest):
+    @pytest.fixture(autouse=True)
+    def setup(self, worker_type, api_keys_count, workers_count):
+        self.use_multiprocessing_workers = worker_type == "process"
+        self.api_keys_count = api_keys_count
+        self.workers_count = workers_count
+
     def teardown(self):
         if self._instance is not None:
             self._instance.stop_manager()
+
+            self._instance.cleanup()
         super(CopyingManagerTest, self).teardown()
 
     def _create_manager_instanse(
@@ -40,8 +65,18 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         config_data=None,
     ):  # type: (int, bool, bool, Dict) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
 
+        api_keys = []
+        for i in range(self.api_keys_count):
+            api_key_config = {"id": six.text_type(i), "workers": self.workers_count}
+            if i > 0:
+                api_key_config["api_key"] = "<key_%s>" % i
+            api_keys.append(api_key_config)
+
         if config_data is None:
-            config_data = {"api_keys": [{"workers": 2}, {"workers": 2, "api_key": "key"}]}
+            config_data = {
+                "api_keys": api_keys,
+                "use_multiprocess_copying_workers": self.use_multiprocessing_workers,
+            }
 
         self._create_config(
             log_files_number=log_files_number,
@@ -69,12 +104,14 @@ class TestBasic(CopyingManagerTest):
 
         assert len(manager.workers) == 3
 
-    @pytest.mark.skipif(platform.system() == "Windows", reason="Skipping Linux only tests on Windows")
+    @pytest.mark.skipif(
+        platform.system() == "Windows", reason="Skipping Linux only tests on Windows"
+    )
     def test_multiple_process_workers(self):
 
         config_data = {
             "api_keys": [{"workers": 3}],
-            "use_multiprocess_copying_workers": True
+            "use_multiprocess_copying_workers": True,
         }
 
         (test_file, test_file2), manager = self._create_manager_instanse(
@@ -102,9 +139,6 @@ class TestBasic(CopyingManagerTest):
         assert len(worker_pids) == 1
         assert os.getpid() in worker_pids
 
-    def test_file_distribution(self):
-        pass
-
     def test_generate_status(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
         test_file.append_lines("line1")
@@ -130,7 +164,10 @@ class TestBasic(CopyingManagerTest):
         manager._CopyingManager__last_scan_attempt_time = time.time() - (1000 * 65)
 
         status = manager.generate_status()
-        assert status.health_check_result == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+        assert (
+            status.health_check_result
+            == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+        )
 
     def test_health_check_status_worker_failed(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
@@ -140,7 +177,10 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert status.health_check_result == "Some workers has failed, see below for more info."
+        assert (
+            status.health_check_result
+            == "Some workers has failed, see below for more info."
+        )
 
     def test_failed_health_check_status_and_failed_worker(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
@@ -152,8 +192,11 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert status.health_check_result == "Failed, max time since last scan attempt (60.0 seconds) exceeded\n" \
-                                             "Some workers has failed, see below for more info."
+        assert (
+            status.health_check_result
+            == "Failed, max time since last scan attempt (60.0 seconds) exceeded\n"
+            "Some workers has failed, see below for more info."
+        )
 
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
@@ -198,7 +241,51 @@ class TestBasic(CopyingManagerTest):
 
         assert self._wait_for_rpc_and_respond() == []
 
-        test_file.append_lines("Line7")
-        test_file.append_lines("Line8")
+        test_file.append_lines("Line9")
+        test_file.append_lines("Line10")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"Line7", "Line8"}
+        assert set(self._wait_for_rpc_and_respond()) == {"Line9", "Line10"}
+
+    def test_old_version_checkpoints(self):
+        """
+        Test if the copying manager is able to pick checkpoint from the older versions of the agent.
+        """
+
+        (test_file, test_file2), manager = self._create_manager_instanse(2)
+
+        test_file.append_lines("line1")
+        test_file2.append_lines("line2")
+
+        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+
+        manager.controller.stop()
+
+        # write new lines, those lines should be send because of the checkpoints.
+        test_file.append_lines("line3")
+        test_file2.append_lines("line4")
+
+        # get any worker and copy its checkpoints to the "<agent_dir>/data.checkpoints.json".
+        #
+        worker = manager.workers[-1]
+
+        old_checkpoints_path = os.path.join(
+            self._config_builder.config.agent_data_path, "checkpoints.json"
+        )
+        old_active_checkpoints_path = os.path.join(
+            self._config_builder.config.agent_data_path, "active-checkpoints.json"
+        )
+
+        # move checkpoints files and rename tham as they were names in previous versions.
+        shutil.move(str(worker.get_checkpoints_path()), old_checkpoints_path)
+        shutil.move(str(worker.get_active_checkpoints_path()), old_active_checkpoints_path)
+
+        self._instance = manager = TestableCopyingManager(
+            self._config_builder.config, []
+        )
+        manager.start_manager()
+
+        # copying manager should read worker checkpoints from the new place.
+        assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
+
+
+

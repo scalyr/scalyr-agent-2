@@ -369,13 +369,13 @@ class ApiKeyWorkerPoolStatus(BaseAgentStatus):
         # The most recent request time from all workers in the worker pool.
         self.last_attempt_time = None  # type: Optional[float]
         # The overall size of the last requests from all workers in the worker pool.
-        self.last_attempt_requests_overall_size = None  # type: Optional[int]
+        self.last_attempt_requests_overall_size = 0  # type: int
 
         # The flag indicates whether all last requests from all workers are successful.
         self.all_responses_successful = None  # type: Optional[bool]
 
         # The flag indicates whether all workers has a good health check result.
-        self.has_good_health_checks = None  # type: Optional[bool]
+        self.all_health_checks_good = None  # type: Optional[bool]
 
         # The total number of failed copy requests.
         self.total_errors = 0  # type: int
@@ -398,7 +398,7 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
         #  The flag indicates whether all last requests from all workers are successful.
         self.all_responses_successful = None  # type: Optional[bool]
         # The flag indicates whether all workers has a good health check result.
-        self.has_good_health_checks = None  # type: Optional[bool]
+        self.all_health_checks_good = None  # type: Optional[bool]
 
         # The overall text message with an information about the last health check.
         # For example it equals to "Good" if everything is ok.
@@ -714,7 +714,7 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
             % scalyr_util.format_time(worker_pool.last_attempt_time),
             file=output,
         )
-        if worker_pool.last_attempt_requests_overall_size is not None:
+        if worker_pool.last_attempt_requests_overall_size:
             print(
                 "    Last copy requests size:                   %ld"
                 % worker_pool.last_attempt_requests_overall_size,
@@ -751,8 +751,8 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                 )
 
         if (
-            worker_pool.has_good_health_checks is not None
-            and not worker_pool.has_good_health_checks
+            worker_pool.all_health_checks_good is not None
+            and not worker_pool.all_health_checks_good
         ):
             print(
                 "    Failed health checks:", file=output,

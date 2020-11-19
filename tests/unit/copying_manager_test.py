@@ -1217,8 +1217,8 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             checkpoints, active_chp, = worker.get_checkpoints()
             checkpoints["time"] -= (self._config.max_allowed_checkpoint_age + 1)
             active_chp["time"] -= (self._config.max_allowed_checkpoint_age + 1)
-            worker.write_checkpoints(worker.checkpoints_path, checkpoints)
-            worker.write_checkpoints(worker.active_checkpoints_path, active_chp)
+            worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
+            worker.write_checkpoints(worker.get_active_checkpoints_path(), active_chp)
 
 
         # create and manager.
@@ -1255,7 +1255,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
             # ... and make bigger(fresher) time value for "active_checkpoints".
             active_checkpoints["time"] = checkpoints["time"] + 1
-            worker.write_checkpoints(worker.active_checkpoints_path, active_checkpoints)
+            worker.write_checkpoints(worker.get_active_checkpoints_path(), active_checkpoints)
 
         self.__append_log_lines("Third line", "Fourth line")
 
@@ -1288,7 +1288,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         for worker in self._manager.workers:
             os.remove(
-                str(worker.active_checkpoints_path)
+                str(worker.get_active_checkpoints_path())
             )
 
         controller = self.__create_test_instance(
@@ -1320,10 +1320,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         for worker in self._manager.workers:
             _write_bad_checkpoint_file(
-                str(worker.active_checkpoints_path)
+                str(worker.get_active_checkpoints_path())
             )
             _write_bad_checkpoint_file(
-                str(worker.checkpoints_path)
+                str(worker.get_checkpoints_path())
             )
 
         controller = self.__create_test_instance(
@@ -1355,10 +1355,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         for worker in self._manager.workers:
             _add_non_utf8_to_checkpoint_file(
-                str(worker.active_checkpoints_path)
+                str(worker.get_active_checkpoints_path())
             )
             _add_non_utf8_to_checkpoint_file(
-                str(worker.checkpoints_path)
+                str(worker.get_checkpoints_path())
             )
 
         controller = self.__create_test_instance(

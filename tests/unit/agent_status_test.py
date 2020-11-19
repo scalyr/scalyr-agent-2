@@ -221,7 +221,7 @@ class TestReportStatus(ScalyrTestCase):
         # =========
 
         api_key1.all_responses_successful = True
-        api_key1.has_good_health_checks = True
+        api_key1.all_health_checks_good = True
         self.worker1_1 = worker1_1 = CopyingManagerWorkerStatus()
         worker1_1.worker_id = "worker1_1"
         worker1_1.last_response = "Everything is good."
@@ -239,10 +239,10 @@ class TestReportStatus(ScalyrTestCase):
         # =
 
         copying_status.all_responses_successful = True
-        copying_status.has_good_health_checks = True
+        copying_status.all_health_checks_good = True
 
         api_key2.all_responses_successful = True
-        api_key2.has_good_health_checks = True
+        api_key2.all_health_checks_good = True
         self.worker2_1 = worker2_1 = CopyingManagerWorkerStatus()
         worker2_1.worker_id = "worker2_1"
         worker2_1.last_response = "Everything is good."
@@ -564,7 +564,7 @@ Failed monitors:
         api_key1.total_errors = 5
 
         api_key1.all_responses_successful = False
-        api_key1.has_good_health_checks = True
+        api_key1.all_health_checks_good = True
         worker1_1 = self.worker1_1
         worker1_1.last_response = "Bad response on worker1"
         worker1_1.last_response_status = "Bad"

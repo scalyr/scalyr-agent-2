@@ -3,18 +3,13 @@ from __future__ import absolute_import
 
 import copy
 import datetime
-import fnmatch
 import os
 import sys
 import threading
 import time
-import collections
 import operator
 import glob
 import re
-
-import multiprocessing
-import multiprocessing.managers
 
 if False:
     from typing import Dict
@@ -22,12 +17,22 @@ if False:
     from typing import Optional
     from typing import Tuple
 
-from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread, util as scalyr_util
-from scalyr_agent.agent_status import ShardedCopyingManagerStatus, ApiKeyWorkerPoolStatus
-from scalyr_agent.sharded_copying_manager.worker import CopyingManagerThreadedWorker, CopyingManagerSharedMemory
+from scalyr_agent import (
+    scalyr_logging as scalyr_logging,
+    StoppableThread,
+    util as scalyr_util,
+)
+from scalyr_agent.agent_status import (
+    ShardedCopyingManagerStatus,
+    ApiKeyWorkerPoolStatus,
+)
+from scalyr_agent.sharded_copying_manager.worker import (
+    CopyingManagerThreadedWorker,
+    CopyingManagerSharedMemory,
+)
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
-from scalyr_agent.util import RateLimiter
+from scalyr_agent.util import max_ignore_none
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
 
@@ -37,18 +42,13 @@ log = scalyr_logging.getLogger(__name__)
 SCHEDULED_DELETION = "scheduled-deletion"
 
 
-def _max_ignore_none(v1, v2):
-    """max function which ignores None values"""
-    values = [v for v in [v1, v2] if v is not None]
-    return max(values)
-
-
 class ApiKeyWorkerPool(object):
     """
     This abstraction is responsible for maintaining the workers
     for a particular entry in the 'api_keys' list in the configuration.
     It also creates worker instances according to the number in the "workers" field in each entry.
     """
+
     def __init__(self, config, api_key_config):
         # type: (Configuration, Dict) -> None
 
@@ -59,14 +59,18 @@ class ApiKeyWorkerPool(object):
 
         # collection of shared memory managers. (Subclasses of the multiprocessing.BaseManager)
         # Those managers allow to communicate with workers if they are in the multiprocessing mode.
-        self.__shared_memory_managers = dict()  # type: Dict[six.text_type, CopyingManagerSharedMemory]
+        self.__shared_memory_managers = (
+            dict()
+        )  # type: Dict[six.text_type, CopyingManagerSharedMemory]
 
         for i in range(api_key_config["workers"]):
             # combine workers positional number in pool and pool id.
             worker_id = "%s_%s" % (self.__api_key_id, i)
 
             if not self.__config.use_multiprocess_copying_workers:
-                worker = CopyingManagerThreadedWorker(self.__config, api_key_config, worker_id)
+                worker = CopyingManagerThreadedWorker(
+                    self.__config, api_key_config, worker_id
+                )
             else:
                 memory_manager = CopyingManagerSharedMemory()
 
@@ -89,6 +93,7 @@ class ApiKeyWorkerPool(object):
                 "CopyingManagerWorker #%s is created." % worker.get_id(),
             )
 
+        # The index of the next worker which will be used to handle the log processor.
         self.__current_worker = 0
 
     @property
@@ -122,10 +127,10 @@ class ApiKeyWorkerPool(object):
 
         return log_processor
 
-    def start_workers(self):
+    def start_workers_and_block_until_copying(self):
         # type: () -> None
         """
-        Start all workers in the pool.
+        Start all workers in the pool and wait until they started copying.
         """
         for worker in self.__workers:
             worker.start_worker()
@@ -138,6 +143,13 @@ class ApiKeyWorkerPool(object):
         for worker in self.__workers:
             worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
+    def _stop_memory_managers(self):
+        """
+        Stop all shared memory managers.
+        This is moved to the separate function to be able to override it for the testing purposes
+        because we may need to get data from workers even if copying manager and worker pools are stopped.
+        :return:
+        """
         # also stop all shared memory managers.
         for memory_manager in self.__shared_memory_managers.values():
             memory_manager.shutdown()
@@ -149,61 +161,37 @@ class ApiKeyWorkerPool(object):
 
         result.api_key_id = self.__api_key_id
 
-        last_response_statuses = set()
-        health_checks = set()
-
-        last_attempt_requests_overall_size = 0
-
         for worker in sorted(self.__workers, key=lambda w: w.get_id()):
             status = worker.generate_status()
             result.workers.append(status)
 
             # get the most recent time fields from workers.
             if status.last_success_time:
-                result.last_success_time = _max_ignore_none(
+                result.last_success_time = max_ignore_none(
                     result.last_success_time, status.last_success_time
                 )
             if status.last_attempt_time:
-                result.last_attempt_time = _max_ignore_none(
+                result.last_attempt_time = max_ignore_none(
                     result.last_attempt_time, status.last_attempt_time
                 )
 
             if status.last_attempt_size:
-                last_attempt_requests_overall_size += status.last_attempt_size
+                result.last_attempt_requests_overall_size += status.last_attempt_size
 
             if status.last_response_status is not None:
-                last_response_statuses.add(status.last_response_status)
+                # do not overwrite the result if we already have a bad response.
+                if result.all_responses_successful is not False:
+                    result.all_responses_successful = status.last_response_status == "success"
 
-            if (
-                status.health_check_result is not None
-            ):
-                health_checks.add(status.health_check_result)
+            if status.health_check_result is not None:
+                # do not overwrite the result if there is a bad health check.
+                if result.all_health_checks_good is not False:
+                    result.all_health_checks_good = status.health_check_result == "Good"
 
             # the next fields are a sum of the same fields from all workers.
             result.total_bytes_uploaded += status.total_bytes_uploaded
 
             result.total_errors += status.total_errors
-
-        if last_attempt_requests_overall_size:
-            result.last_attempt_requests_overall_size = last_attempt_requests_overall_size
-
-        # set the responses status result only if there are some statuses from workers.
-        # In other case we should keep it as None.
-        if last_response_statuses:
-            # if all worker statuses are good, so the result status is also True.
-            if last_response_statuses == {"success"}:
-                result.all_responses_successful = True
-            else:
-                result.all_responses_successful = False
-
-        # set the health check result only if there are some health checks from workers.
-        # In other case we should keep it as None.
-        if health_checks:
-            # if all worker health checks are good, so the result health check is also True.
-            if health_checks == {"Good"}:
-                result.has_good_health_checks = True
-            else:
-                result.has_good_health_checks = False
 
         return result
 
@@ -316,7 +304,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.total_scan_iterations = 0
 
         # A worker pools for each api key in the 'api_keys' list in the configuration.
-        self._api_keys_worker_pools = dict()  # type: Dict[six.text_type, ApiKeyWorkerPool]
+        self._api_keys_worker_pools = (
+            dict()
+        )  # type: Dict[six.text_type, ApiKeyWorkerPool]
 
         # The list of LogMatcher objects that are watching for new files to appear.
         # NOTE: log matchers must be created only after worker pools.
@@ -592,15 +582,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         result = []
 
         for log_config in configs:
-            result.append(
-                LogMatcher(configuration, log_config)
-            )
+            result.append(LogMatcher(configuration, log_config))
 
         return result
 
-    def start_manager(
-        self, logs_initial_positions=None
-    ):
+    def start_manager(self, logs_initial_positions=None):
         """Starts the manager running and will not return until it has been stopped.
 
         This will start a new thread to run the manager.
@@ -667,11 +653,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
-                checkpoints = self.__get_checkpoints(current_time)
+                checkpoints = self.__find_and_read_checkpoints()
 
                 # start all workers.
                 for worker_pool in self._api_keys_worker_pools.values():
-                    worker_pool.start_workers()
+                    worker_pool.start_workers_and_block_until_copying()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
@@ -688,7 +674,10 @@ class CopyingManager(StoppableThread, LogWatcher):
                 for worker_pool in self._api_keys_worker_pools.values():
                     workers_count += len(worker_pool.workers)
 
-                log.info("Copying manager started. Total workers: %s, Pid: %s" % (workers_count,  os.getpid()))
+                log.info(
+                    "Copying manager started. Total workers: %s, Pid: %s"
+                    % (workers_count, os.getpid())
+                )
 
                 while self._run_state.is_running():
                     log.log(
@@ -727,7 +716,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                     % (
                                         self.__config.copying_thread_profile_output_path,
                                         "copying_manager_",
-                                        datetime.datetime.now().strftime(
+                                        datetime.datetime.utcnow().strftime(
                                             "%H_%M_%S.out"
                                         ),
                                     )
@@ -767,7 +756,6 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             log.info("Copying manager is finished.")
 
-
     def wait_for_copying_to_begin(self):
         """Block the current thread until this instance has finished its first scan and has begun copying.
 
@@ -799,8 +787,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             result.total_scan_iterations = self.total_scan_iterations
 
-            last_response_statuses = set()
-            health_checks = set()
+            all_health_checks_good = None
+            all_responses_good = None
+
+            # list with all possible health check error messages.
+            all_health_check_error_messages = list()
 
             for api_key_id in sorted(self._api_keys_worker_pools):
                 worker_pool = self._api_keys_worker_pools[api_key_id]
@@ -808,60 +799,54 @@ class CopyingManager(StoppableThread, LogWatcher):
                 result.api_key_worker_pools.append(worker_pool_status)
 
                 result.total_errors += worker_pool_status.total_errors
-
-                if worker_pool_status.all_responses_successful is not None:
-                    # collect response status information from the worker pools.
-                    last_response_statuses.add(worker_pool_status.all_responses_successful)
-
-                if worker_pool_status.has_good_health_checks is not None:
-                    # collect health check information from the worker pools
-                    health_checks.add(worker_pool_status.has_good_health_checks)
-
                 result.total_bytes_uploaded += worker_pool_status.total_bytes_uploaded
 
-            if last_response_statuses:
-                # if all worker pools statuses are successful that the copying manager status is successful too.
-                if last_response_statuses == {True}:
-                    result.all_responses_successful = True
-                else:
-                    result.all_responses_successful = False
+                if worker_pool_status.all_responses_successful is not None:
+                    # do not overwrite the result if we already have a bad response.
+                    if all_responses_good is not False:
+                        all_responses_good = worker_pool_status.all_responses_successful
 
-            # list with all possible health check error messages.
-            all_health_check_error_messages = list()
+                if worker_pool_status.all_health_checks_good is not None:
+                    # do not overwrite the result if we already have a bad response.
+                    if all_health_checks_good is not False:
+                        all_health_checks_good = worker_pool_status.all_health_checks_good
+                        if not worker_pool_status.all_health_checks_good:
+                            all_health_checks_good = False
+
 
             # do the health check of the copying manager itself.
             if self.__last_scan_attempt_time:
                 if (
-                        time.time()
-                        > self.__last_scan_attempt_time
-                        #TODO: create new config value for that.
-                        + self.__config.healthy_max_time_since_last_copy_attempt
+                    time.time()
+                    > self.__last_scan_attempt_time
+                    # TODO: create new config value for that.
+                    + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    all_health_check_error_messages.append((
+                    all_health_check_error_messages.append(
+                        (
                             "Failed, max time since last scan attempt (%s seconds) exceeded"
                             % self.__config.healthy_max_time_since_last_copy_attempt
-                    ))
+                        )
+                    )
 
-            # now also check the health of the workers.
-            if False in health_checks:
-                all_health_check_error_messages.append("Some workers has failed, see below for more info.")
+            if all_health_checks_good is not None:
+                if not all_health_checks_good:
+                    all_health_check_error_messages.append(
+                        "Some workers has failed, see below for more info."
+                    )
 
             # if there are error messages, concatenate them into one message
             if len(all_health_check_error_messages) > 0:
                 result.health_check_result = "\n".join(all_health_check_error_messages)
-            # the result message is "Good" if there are no error messages.
-            # NOTE: We do it only if the are some health checks from worker pools.
-            # In other case we should keep the result field as None.
-            elif len(health_checks) > 0:
+            else:
                 result.health_check_result = "Good"
 
             # set the response status only if there are some statuses from worker pools.
-            if len(last_response_statuses) > 0:
-                # set error message if not all statuses are successful.
-                if False in last_response_statuses:
-                    result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
-                else:
+            if all_responses_good is not None:
+                if all_responses_good:
                     result.last_responses_status_info = "All successful"
+                else:
+                    result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
 
             # get statuses for the log matchers.
             for entry in self.__log_matchers:
@@ -882,59 +867,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type seconds: float
         """
         self._run_state.sleep_but_awaken_if_stopped(seconds)
-
-    def __read_checkpoint_state(self):
-        """Reads the checkpoint state from disk and returns it.
-
-        The checkpoint state maps each file path to the offset within that log file where we left off copying it.
-
-        @return:  The checkpoint state
-        @rtype: dict
-        """
-        full_checkpoint_file_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints.json"
-        )
-
-        if not os.path.isfile(full_checkpoint_file_path):
-            log.info(
-                'The log copying checkpoint file "%s" does not exist, skipping.'
-                % full_checkpoint_file_path
-            )
-            return None
-
-        # noinspection PyBroadException
-        try:
-            full_checkpoints = scalyr_util.read_file_as_json(
-                full_checkpoint_file_path, strict_utf8=True
-            )
-            active_checkpoint_file_path = os.path.join(
-                self.__config.agent_data_path, "active-checkpoints.json"
-            )
-
-            if not os.path.isfile(active_checkpoint_file_path):
-                return full_checkpoints
-
-            # if the active checkpoint file is newer, overwrite any checkpoint values with the
-            # updated full checkpoint
-            active_checkpoints = scalyr_util.read_file_as_json(
-                active_checkpoint_file_path, strict_utf8=True
-            )
-
-            if active_checkpoints["time"] > full_checkpoints["time"]:
-                full_checkpoints["time"] = active_checkpoints["time"]
-                full_checkpoints["checkpoints"].update(
-                    active_checkpoints["checkpoints"],
-                )
-
-            return full_checkpoints
-
-        except Exception:
-            # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
-            log.exception(
-                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
-                error_code="failedCheckpointRead",
-            )
-            return None
 
     def __has_pending_log_changes(self):
         """
@@ -1016,7 +948,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        checkpoints = self.__get_checkpoints(time.time())
+        checkpoints = self.__find_and_read_checkpoints()
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -1087,11 +1019,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             if path in self.__log_paths_being_processed:
                 pending_removal[path] = True
 
-
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
             # get the worker pool which is responsible for this log matcher.
-            worker_pool = self._api_keys_worker_pools[matcher.log_entry_config.get("api_key_id")]
+            worker_pool = self._api_keys_worker_pools[
+                matcher.log_entry_config.get("api_key_id")
+            ]
             for new_processor in matcher.find_matches(
                 self.__log_paths_being_processed,
                 checkpoints,
@@ -1204,71 +1137,64 @@ class CopyingManager(StoppableThread, LogWatcher):
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
 
+    def __find_and_read_checkpoints(self):
+        # type: () -> Dict
+        """
+        Find and read checkpoints that were previously written.
+        During its work, the worker writes its own checkpoint files. The copying manager, before the beginning,
+        reads them and combines into one checkpoints dict.
+        :return:
+        """
 
-    def __get_checkpoints(self, current_time):
-        """Find and read worker checkpoints that were previously written."""
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+        # get checkpoint file names from the 'checkpoints' folder. All previous worker checkpoints are stored there.
+        checkpoints_file_paths = list(glob.glob(os.path.join(checkpoints_dir_path, "checkpoints*.json")))
 
-        checkpoints = self.__find_and_read_workers_checkpoints(current_time)
+        # we also add path for the checkpoint file that was used in the previous version of the Copying manager.
+        # This is needed to be able to get checkpoints after the upgrade of the agent.
+        checkpoints_file_paths.append(
+            os.path.join(self.__config.agent_data_path, "checkpoints.json")
+        )
 
-        if not checkpoints:
+        found_checkpoints = []
+
+        current_time = time.time()
+
+        for checkpoints_path in checkpoints_file_paths:
+
+            checkpoints = self.__read_checkpoint_state(
+                checkpoints_path, current_time
+            )
+
+            if checkpoints:
+                found_checkpoints.append(checkpoints)
+
+        if len(found_checkpoints) == 0:
             log.info(
                 "No checkpoints were found. All logs will be copied starting at their current end"
             )
 
-        result = {}
+            return {}
 
+        result = {}
         # merge checkpoints from  all workers to one checkpoint.
 
         # checkpoints from different workers may contain checkpoint for the same file,
         # so we sort checkpoints by time and update resulting collection with the same order.
-        checkpoints.sort(key=operator.itemgetter("time"))
+        found_checkpoints.sort(key=operator.itemgetter("time"))
 
-        for wc in checkpoints:
+        for wc in found_checkpoints:
             result.update(wc["checkpoints"])
 
         return result
 
-    def __find_and_read_workers_checkpoints(self, current_time):
-        """
-        Read for all checkpoint files that
-        :return:
-        """
-        checkpoints_dir_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints"
-        )
-
-        if not os.path.isdir(checkpoints_dir_path):
-            return []
-
-        glob_path = os.path.join(checkpoints_dir_path, "checkpoints-*.json")
-
-        workers_checkpoints = list()
-
-        for full_checkpoints_path in glob.glob(glob_path):
-            m = re.search(
-                r".*/checkpoints-(?P<id>\d+_\d+)\.json", full_checkpoints_path
-            )
-            if m:
-                worker_id = m.group("id")
-                active_checkpoints_path = os.path.join(
-                    checkpoints_dir_path, "active-checkpoints-%s.json" % worker_id
-                )
-            else:
-                active_checkpoints_path = None
-
-            checkpoints = self.__read_worker_checkpoint_state(
-                full_checkpoints_path, active_checkpoints_path, current_time
-            )
-
-            if checkpoints:
-                workers_checkpoints.append(checkpoints)
-
-        return workers_checkpoints
-
-    def __read_worker_checkpoint_state(
-        self, full_checkpoint_file_path, active_checkpoint_file_path, current_time
+    def __read_checkpoint_state(
+        self, full_checkpoints_path, current_time
     ):
-        """Reads the checkpoint state from disk and returns it.
+        # type: (six.text_type, float) -> Optional[Dict]
+        """Reads a single checkpoint state from the file on the disk and returns it.
 
         The checkpoint state maps each file path to the offset within that log file where we left off copying it.
 
@@ -1276,27 +1202,29 @@ class CopyingManager(StoppableThread, LogWatcher):
         @rtype: dict
         """
 
-        if not os.path.isfile(full_checkpoint_file_path):
+        if not os.path.isfile(full_checkpoints_path):
             log.info(
                 'The log copying checkpoint file "%s" does not exist, skipping.'
-                % full_checkpoint_file_path
+                % full_checkpoints_path
             )
             return None
 
         # noinspection PyBroadException
         try:
             full_checkpoints = scalyr_util.read_file_as_json(
-                full_checkpoint_file_path, strict_utf8=True
+                full_checkpoints_path, strict_utf8=True
             )
 
-            if active_checkpoint_file_path is not None and os.path.isfile(
-                active_checkpoint_file_path
-            ):
+            # get the path for the active checkpoints file
+            parent_dir, filename = os.path.split(full_checkpoints_path)
+            active_checkpoints_filename = "active-%s" % os.path.basename(filename)
+            active_checkpoints_path = os.path.join(parent_dir, active_checkpoints_filename)
 
+            if os.path.isfile(active_checkpoints_path):
                 # if the active checkpoint file is newer, overwrite any checkpoint values with the
                 # updated full checkpoint
                 active_checkpoints = scalyr_util.read_file_as_json(
-                    active_checkpoint_file_path, strict_utf8=True
+                    active_checkpoints_path, strict_utf8=True
                 )
 
                 if active_checkpoints["time"] > full_checkpoints["time"]:
@@ -1306,20 +1234,23 @@ class CopyingManager(StoppableThread, LogWatcher):
                     ):
                         full_checkpoints[path] = checkpoint
 
-            if current_time - full_checkpoints["time"] > self.__config.max_allowed_checkpoint_age:
+            if (
+                current_time - full_checkpoints["time"]
+                > self.__config.max_allowed_checkpoint_age
+            ):
                 log.warn(
                     "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  All log files will "
                     "be copied starting at their current end.",
-                    full_checkpoint_file_path,
+                    full_checkpoints_path,
                     scalyr_util.format_time(full_checkpoints["time"]),
                     error_code="staleCheckpointFile",
                 )
 
                 # checkpoint files are stale, so remove them.
-                os.unlink(full_checkpoint_file_path)
+                os.unlink(full_checkpoints_path)
                 try:
                     # ignore if active checkpoints do not exist
-                    os.unlink(active_checkpoint_file_path)
+                    os.unlink(active_checkpoints_path)
                 except OSError as e:
                     if e.errno != 2:
                         raise

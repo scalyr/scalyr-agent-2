@@ -36,6 +36,7 @@ from tests.unit.sharded_copying_manager_tests.config_builder import (
 )
 from scalyr_agent.sharded_copying_manager import (
     CopyingManager,
+    ApiKeyWorkerPool,
     CopyingManagerThreadedWorker,
 )
 from scalyr_agent.sharded_copying_manager.worker import (
@@ -571,7 +572,7 @@ class TestableCopyingManagerThreadedWorker(
         self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
 
     def wait_for_full_iteration(self):
-        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING, )
+        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING,)
 
         self.run_and_stop_at(
             TestableCopyingManagerThreadedWorker.SENDING,
@@ -595,16 +596,14 @@ class TestableCopyingManagerThreadedWorker(
         log_processor = next(p for p in self.get_log_processors() if p.get_log_path())
         log_processor.close_at_eof()
 
-    @property
-    def checkpoints_path(self):
+    def get_checkpoints_path(self):
         checkpoints_dir_path = pathlib.Path(
             self.__config.agent_data_path, "checkpoints"
         )
         file_name = "checkpoints-%s.json" % self._id
         return checkpoints_dir_path / file_name
 
-    @property
-    def active_checkpoints_path(self):
+    def get_active_checkpoints_path(self):
         checkpoints_dir_path = pathlib.Path(
             self.__config.agent_data_path, "checkpoints"
         )
@@ -612,8 +611,8 @@ class TestableCopyingManagerThreadedWorker(
         return checkpoints_dir_path / file_name
 
     def get_checkpoints(self):
-        checkpoints = json.loads(self.checkpoints_path.read_text())
-        active_checkpoints = json.loads(self.active_checkpoints_path.read_text())
+        checkpoints = json.loads(self.get_checkpoints_path().read_text())
+        active_checkpoints = json.loads(self.get_active_checkpoints_path().read_text())
 
         return checkpoints, active_checkpoints
 
@@ -632,6 +631,18 @@ class TestableCopyingManagerThreadedWorker(
         return os.getpid()
 
 
+class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
+    def _stop_memory_managers(self):
+        """
+        We may need to interact with workers even after manager is stopped,
+         so do not stop the shared memory managers.
+        """
+        pass
+
+    def really_stop_memory_workers(self):
+        return super(TestableApiKeyWorkerPool, self)._stop_memory_managers()
+
+
 class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
     """
     Since the real copying happens in the workers of the CopyingManager, this abstraction
@@ -643,6 +654,10 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         TestableCopyingManagerInterface.__init__(self)
 
         self.controller = TestableCopyingManager.TestController(self)
+
+        self._api_keys_worker_pools = (
+            self._api_keys_worker_pools
+        )  # type: Dict[six.text_type, TestableApiKeyWorkerPool]
 
     @property
     def workers(self):
@@ -660,11 +675,12 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         # We are going to control the flow of our
         # workers by using 'TestableCopyingManagerWorker' subclass of the 'CopyingManagerWorker'
         # that's why we need change original worker class by testable class.
+        # We also do the same thing with 'ApiKeyWorkerPool' and the shared memory manager class
         from scalyr_agent.sharded_copying_manager import copying_manager
 
         # save original class of the CopyingManager from 'copying_manager' module
-        original = copying_manager.CopyingManagerThreadedWorker
-
+        original_worker = copying_manager.CopyingManagerThreadedWorker
+        original_worker_pool = copying_manager.ApiKeyWorkerPool
         original_memory_manager_class = copying_manager.CopyingManagerSharedMemory
 
         # replace original class by testable.
@@ -672,13 +688,15 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         copying_manager.CopyingManagerThreadedWorker = (
             TestableCopyingManagerThreadedWorker
         )
+        copying_manager.ApiKeyWorkerPool = TestableApiKeyWorkerPool
 
         try:
             super(TestableCopyingManager, self)._create_worker_pools()
         finally:
             # return back original worker class.
-            copying_manager.CopyingManagerThreadedWorker = original
+            copying_manager.CopyingManagerThreadedWorker = original_worker
             copying_manager.CopyingManagerSharedMemory = original_memory_manager_class
+            copying_manager.ApiKeyWorkerPool = original_worker_pool
 
     def start_manager(
         self, logs_initial_positions=None,
@@ -763,6 +781,13 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         CopyingManager.stop_manager(
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
+
+    def cleanup(self):
+        """
+        Stopping the shared memory managers from api worker pools.
+        """
+        for worker_pool in self._api_keys_worker_pools.values():
+            worker_pool.really_stop_memory_workers()
 
     def perform_scan(self):
         """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
@@ -890,6 +915,8 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
         six.ensure_str("change_last_attempt_time"),
         six.ensure_str("is_alive"),
         six.ensure_str("get_pid"),
+        six.ensure_str("get_active_checkpoints_path"),
+        six.ensure_str("get_checkpoints_path"),
     ],
 )
 
@@ -903,7 +930,6 @@ class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):
             self._callmethod("send_current_response", args=(status_message,))
 
         return request, send_response
-
 
 
 TestableSharedMemory = shared_memory_manager_factory(

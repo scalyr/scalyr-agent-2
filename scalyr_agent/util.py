@@ -27,6 +27,7 @@ if False:  # NOSONAR
     from typing import Tuple
     from typing import Callable
     from typing import Optional
+    from typing import Any
 
 import codecs
 import sys
@@ -427,6 +428,7 @@ def value_to_bool(value):
 
 
 def _read_file_as_json(file_path, json_parser, strict_utf8=False):
+    # type: (six.text_type, Callable, bool) -> Any
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
@@ -488,6 +490,7 @@ def read_config_file_as_json(file_path):
 
 
 def read_file_as_json(file_path, strict_utf8=False):
+    # type: (six.text_type, bool) -> Any
     """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
     `dict`s, `list`s and primitive types.
 
@@ -2357,3 +2360,19 @@ class HistogramTracker(object):
             self.max(),
             self.estimate_median(),
         )
+
+
+def max_ignore_none(*args, **kwargs):
+    """max function which ignores None values"""
+    key =kwargs.get("key")
+
+    if len(args) == 1:
+        values = args[0]
+    else:
+        values = args
+    values = [v for v in values if v is not None]
+
+    if key:
+        return max(values, key=key)
+    else:
+        return max(values)
