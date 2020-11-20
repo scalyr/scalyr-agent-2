@@ -6,6 +6,10 @@ scalyr-agent-2 stop;
 Start-Sleep 2
 
 Remove-Item -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Force -ErrorAction SilentlyContinue
+dir "C:\Program Files (x86)\Scalyr\"
+dir "C:\Program Files (x86)\Scalyr\data"
+Remove-Item -Path "C:\Program Files (x86)\Scalyr\data\checkpoints.json" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "C:\Program Files (x86)\Scalyr\data\active-checkpoints.json" -Force -ErrorAction SilentlyContinue
 
 scalyr-agent-2 start;
 Start-Sleep 5
