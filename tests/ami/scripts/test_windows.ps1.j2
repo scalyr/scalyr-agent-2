@@ -258,6 +258,10 @@ Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.
 
 Start-Sleep 5
 
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+Log-Message "LOGS"
+echo $log_output
+
 Log-Message ""
 Log-Message "Verifying agent status output"
 Log-Message ""
@@ -266,6 +270,7 @@ $status_output=scalyr-agent-2 status -v;
 echo $status_output
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+Log-Message "LOGS"
 echo $log_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
