@@ -627,7 +627,7 @@ class SystemMonitor(ScalyrMonitor):
                     if metric_value == __NO_DISK_PERF__:
                         self._logger.warn(
                             'disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
-                            "to enable IO counters",
+                            " to enable IO counters",
                             limit_once_per_x_secs=3600,
                             limit_key="win_diskperf",
                             error_code="win32DiskPerDisabled",
