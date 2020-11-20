@@ -107,9 +107,7 @@ def verify_server_certificate(config):
 
     # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
     # under the MSI / Windows install
-    if not is_dev_or_msi_install and not os.path.isfile(
-            intermediate_certs_file
-    ):
+    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
         raise ValueError(
             'Invalid path "%s" specified for the '
             '"intermediate_certs_path" config '
@@ -371,7 +369,9 @@ class ScalyrClientSession(object):
         result.total_requests_sent = self.total_requests_sent
         result.total_requests_failed = self.total_requests_failed
         result.total_request_bytes_sent = self.total_request_bytes_sent
-        result.total_compressed_request_bytes_sent = self.total_compressed_request_bytes_sent
+        result.total_compressed_request_bytes_sent = (
+            self.total_compressed_request_bytes_sent
+        )
         result.total_response_bytes_received = self.total_response_bytes_received
         result.total_request_latency_secs = self.total_request_latency_secs
         result.total_connections_created = self.total_connections_created

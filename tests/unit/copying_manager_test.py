@@ -58,7 +58,6 @@ Those tests are copy of original copying manager tests but with new, sharded cop
 """
 
 
-from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import ScalyrTestCase
@@ -72,7 +71,8 @@ from scalyr_agent import scalyr_init
 from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManager,
     extract_lines_from_request,
-    TestableCopyingManager
+    TestableCopyingManager,
+    TestingConfiguration,
 )
 
 from scalyr_agent.sharded_copying_manager import CopyingManager
@@ -102,9 +102,7 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("worker_type", test_params)
 
 
-def _create_test_copying_manager(
-    configuration, monitors, auto_start=True
-):
+def _create_test_copying_manager(configuration, monitors, auto_start=True):
     # type: (Configuration, List, bool) -> TestableCopyingManager
     """
     :param configuration:
@@ -147,17 +145,15 @@ class TestDynamicLogPathTest(BaseTest):
         os.makedirs(self._data_dir)
         os.makedirs(self._log_dir)
 
-        self._controller = None
-
     def teardown(self):
-        if self._controller is not None:
-            self._controller.stop()
+        if self._manager is not None:
+            self._manager.stop_manager()
         shutil.rmtree(self._config_dir)
 
     def fake_scan(self, response="success"):
-        if self._controller is not None:
-            self._controller.perform_scan()
-            _, responder_callback = self._controller.wait_for_rpc()
+        if self._manager is not None:
+            self._manager.perform_scan()
+            _, responder_callback = self._manager.wait_for_rpc()
             responder_callback(response)
 
     def create_copying_manager(self, config, monitor_agent_log=False):
@@ -178,10 +174,9 @@ class TestDynamicLogPathTest(BaseTest):
 
         default_paths = DefaultPaths(self._log_dir, self._config_file, self._data_dir)
 
-        configuration = Configuration(self._config_file, default_paths, None)
+        configuration = TestingConfiguration(self._config_file, default_paths, None)
         configuration.parse()
         self._manager = _create_test_copying_manager(configuration, [])
-        self._controller = self._manager.controller
 
     def test_add_path(self):
         config = {}
@@ -606,7 +601,7 @@ class CopyingParamsLegacyTest(ScalyrTestCase):
             "/etc/scalyr-agent-2/agent.json",
             "/var/lib/scalyr-agent-2",
         )
-        return Configuration(self.__config_file, default_paths, None)
+        return TestingConfiguration(self.__config_file, default_paths, None)
 
 
 class CopyingParamsTest(ScalyrTestCase):
@@ -728,7 +723,7 @@ class CopyingParamsTest(ScalyrTestCase):
             "/etc/scalyr-agent-2/agent.json",
             "/var/lib/scalyr-agent-2",
         )
-        return Configuration(self.__config_file, default_paths, None)
+        return TestingConfiguration(self.__config_file, default_paths, None)
 
 
 class CopyingManagerInitializationTest(ScalyrTestCase):
@@ -915,16 +910,15 @@ def _write_bad_checkpoint_file(path):
 class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
-        self._controller = None
         self._config = None
 
     def tearDown(self):
         super(CopyingManagerEnd2EndTest, self).tearDown()
-        if self._controller is not None:
-            self._controller.stop()
+        if self._manager is not None:
+            self._manager.stop_manager()
 
-        #if self._manager is not None:
-            #self._manager.cleanup()
+        if self._manager is not None:
+            self._manager.cleanup()
 
     def test_single_log_file(self):
         controller = self.__create_test_instance()
@@ -1046,7 +1040,8 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         responder_callback("success")
 
-    @skipIf(True, "This test is moved to ")
+    # TODO: confirm that this test only makes sense in the context of the single worker, and then remove.
+    @skipIf(True, "This test is moved to worker tests.")
     def test_pipelined_requests_with_processor_closes(self):
         # Tests bug related to duplicate log upload (CT-107, AGENT-425, CT-114)
         # The problem was related to mixing up the callbacks between two different log processors
@@ -1186,7 +1181,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals("Second line", lines[1])
 
         # stop thread on manager to write checkouts to file.
-        controller.stop()
+        controller.stop_manager()
 
         # write some new lines to log.
         self.__append_log_lines("Third line", "Fourth line")
@@ -1208,7 +1203,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals("Fourth line", lines[1])
 
         # stopping one more time, but now emulating that checkpoint files are stale.
-        controller.stop()
+        controller.stop_manager()
 
         # This lines should be skipped by  copying manager.
         self.__append_log_lines("Fifth line", "Sixth line")
@@ -1216,14 +1211,14 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
         for worker in self._manager.workers:
             checkpoints, active_chp, = worker.get_checkpoints()
-            checkpoints["time"] -= (self._config.max_allowed_checkpoint_age + 1)
-            active_chp["time"] -= (self._config.max_allowed_checkpoint_age + 1)
+            checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
+            active_chp["time"] -= self._config.max_allowed_checkpoint_age + 1
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
             worker.write_checkpoints(worker.get_active_checkpoints_path(), active_chp)
 
         # also shift time in the master checkpoint file.
         master_checkpoints = self._manager.master_checkpoints
-        master_checkpoints["time"] -= (self._config.max_allowed_checkpoint_age + 1)
+        master_checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
         self._manager.write_master_checkpoints(master_checkpoints)
 
         # create and manager.
@@ -1250,7 +1245,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
 
-        controller.stop()
+        controller.stop_manager()
 
         # "active_checkpoints" file is used if it is newer than "full_checkpoints",
         # so we read "full_checkpoints" ...
@@ -1260,7 +1255,9 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
             # ... and make bigger(fresher) time value for "active_checkpoints".
             active_checkpoints["time"] = checkpoints["time"] + 1
-            worker.write_checkpoints(worker.get_active_checkpoints_path(), active_checkpoints)
+            worker.write_checkpoints(
+                worker.get_active_checkpoints_path(), active_checkpoints
+            )
 
         self.__append_log_lines("Third line", "Fourth line")
 
@@ -1287,14 +1284,12 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
-        controller.stop()
+        controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
 
         for worker in self._manager.workers:
-            os.remove(
-                str(worker.get_active_checkpoints_path())
-            )
+            os.remove(str(worker.get_active_checkpoints_path()))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1319,17 +1314,13 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
-        controller.stop()
+        controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
 
         for worker in self._manager.workers:
-            _write_bad_checkpoint_file(
-                str(worker.get_active_checkpoints_path())
-            )
-            _write_bad_checkpoint_file(
-                str(worker.get_checkpoints_path())
-            )
+            _write_bad_checkpoint_file(str(worker.get_active_checkpoints_path()))
+            _write_bad_checkpoint_file(str(worker.get_checkpoints_path()))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1354,17 +1345,13 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
-        controller.stop()
+        controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
 
         for worker in self._manager.workers:
-            _add_non_utf8_to_checkpoint_file(
-                str(worker.get_active_checkpoints_path())
-            )
-            _add_non_utf8_to_checkpoint_file(
-                str(worker.get_checkpoints_path())
-            )
+            _add_non_utf8_to_checkpoint_file(str(worker.get_active_checkpoints_path()))
+            _add_non_utf8_to_checkpoint_file(str(worker.get_checkpoints_path()))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1443,7 +1430,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
                 )
             finally:
                 if controller:
-                    controller.stop()
+                    controller.stop_manager()
 
     def __extract_lines(self, request):
         return extract_lines_from_request(request)
@@ -1523,14 +1510,13 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         default_paths = DefaultPaths(log_dir, config_file, data_dir)
 
-        config = Configuration(config_file, default_paths, None)
+        config = TestingConfiguration(config_file, default_paths, None)
         config.parse()
 
         self._config = config
 
         self._manager = _create_test_copying_manager(config, [], auto_start=auto_start)
-        self._controller = self._manager.controller
-        return self._controller
+        return self._manager
 
     @staticmethod
     def __create_test_file(root_dir, filename):

@@ -49,7 +49,7 @@ from scalyr_agent.agent_status import (
     LogMatcherStatus,
     report_status,
     ApiKeyWorkerPoolStatus,
-    CopyingManagerWorkerStatus
+    CopyingManagerWorkerStatus,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -164,6 +164,7 @@ class TestOverallStats(ScalyrTestCase):
 
 class TestReportStatus(ScalyrTestCase):
     maxDiff = None
+
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self.saved_env)
@@ -255,8 +256,6 @@ class TestReportStatus(ScalyrTestCase):
         worker2_2.last_response_status = "success"
         worker2_2.health_check_result = "Good"
         api_key2.workers.extend([worker2_1, worker2_2])
-
-
 
         # =========
 
@@ -558,7 +557,9 @@ Failed monitors:
         # Set the responses for all workers of the first api key as failed.
 
         manager_status = self.status.copying_manager_status
-        manager_status.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
+        manager_status.last_responses_status_info = (
+            "Last requests on some workers is not successful, see below for more info."
+        )
 
         api_key1 = self.api_key1
         api_key1.total_errors = 5
@@ -786,7 +787,9 @@ Failed monitors:
     def test_last_success_is_none(self):
         manager_status = self.status.copying_manager_status
 
-        manager_status.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
+        manager_status.last_responses_status_info = (
+            "Last requests on some workers is not successful, see below for more info."
+        )
 
         api_key1 = self.api_key1
         api_key1.all_responses_successful = False
@@ -939,12 +942,12 @@ Failed monitors:
         self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
-        self.status.copying_manager_status.health_check_result = "Some workers has failed, see below for more info."
+        self.status.copying_manager_status.health_check_result = (
+            "Some workers has failed, see below for more info."
+        )
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = (
-            "Health check:                              Some workers has failed, see below for more info.\n"
-        )
+        expected_output = "Health check:                              Some workers has failed, see below for more info.\n"
         self.assertTrue(expected_output in output.getvalue())
 
 

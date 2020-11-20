@@ -144,6 +144,19 @@ def before_initialize(f):
     return wrapper
 
 
+class TestingConfiguration(Configuration):
+    """
+    A subclass of the original configuration class, that allow to assign additional options
+    which will be useful for testing.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(TestingConfiguration, self).__init__(*args, **kwargs)
+
+        # Configure the ability of the testable copying manager to manually control its execution flow.
+        self.disable_flow_control = False  # type: bool
+
+
 class ConfigBuilder(object):
     """
     Builder for tor the configuration object and agent essential environment.
@@ -154,7 +167,7 @@ class ConfigBuilder(object):
 
         self._config_initial_data = config_data
 
-        self._config = None
+        self._config = None  # type: Optional[TestingConfiguration]
         self._cleared = None
 
         self._root_path = None
@@ -167,7 +180,6 @@ class ConfigBuilder(object):
         self._log_files = collections.OrderedDict()  # type: Dict[str, TestableLogFile]
 
         self.__use_pipelining = None
-
 
     def __del__(self):
         self.clear()
@@ -233,7 +245,7 @@ class ConfigBuilder(object):
 
         self._agent_config_path.write_text(six.text_type(json.dumps(config_data)))
 
-        config = Configuration(
+        config = TestingConfiguration(
             six.text_type(self._agent_config_path), default_paths, None
         )
 
@@ -283,9 +295,7 @@ class ConfigBuilder(object):
         if name is None:
             name = "test_file_{0}".format(len(self._log_files))
 
-        file_obj = TestableLogFile(
-            config_builder=self, name=name
-        )
+        file_obj = TestableLogFile(config_builder=self, name=name)
 
         self._log_files[name] = file_obj
 

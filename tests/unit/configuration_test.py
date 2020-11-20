@@ -1347,7 +1347,7 @@ class TestConfiguration(TestConfigurationBase):
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
             "json_library": "auto",
-            "use_multiprocess_copying_workers": False
+            "use_multiprocess_copying_workers": False,
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
@@ -2832,9 +2832,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 2
         assert config.api_key_configs[0] == JsonObject(
-            workers=3,
-            api_key=config.api_key,
-            id="0",
+            workers=3, api_key=config.api_key, id="0",
         )
         assert config.api_key_configs[1] == JsonObject(
             workers=4, api_key="key2", id="second"
@@ -2876,9 +2874,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             workers=3, api_key=config.api_key, id="0"
         )
         assert config.api_key_configs[1] == JsonObject(
-            workers=4,
-            api_key="key2",
-            id="second",
+            workers=4, api_key="key2", id="second",
         )
 
     def test_log_file_bind_to_worker_entries_with_non_existing_id(self):

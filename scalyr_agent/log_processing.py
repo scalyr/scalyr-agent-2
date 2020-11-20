@@ -3307,7 +3307,11 @@ class LogMatcher(object):
             self.__lock.release()
 
     def find_matches(
-        self, existing_processors, previous_state, copy_at_index_zero=False, create_log_processor=LogFileProcessor
+        self,
+        existing_processors,
+        previous_state,
+        copy_at_index_zero=False,
+        create_log_processor=LogFileProcessor,
     ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
@@ -3413,7 +3417,7 @@ class LogMatcher(object):
                         # log file name.  TODO: Clean this up.
                         if "rename_no_original" not in self.__log_entry_config:
                             log_attributes["original_file"] = matched_file
-                    
+
                     # Create the processor to handle this log.
                     new_processor = create_log_processor(
                         matched_file,

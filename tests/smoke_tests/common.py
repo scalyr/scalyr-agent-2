@@ -57,7 +57,7 @@ def _test_standalone_smoke(
     python_version=None,
     rate_limited=False,
     workers_type="thread",
-    workers_count=1
+    workers_count=1,
 ):
     """
     Agent standalone test to run within the same machine.
@@ -68,7 +68,10 @@ def _test_standalone_smoke(
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
     runner = AgentRunner(
-        agent_installation_type, enable_debug_log=True, workers_type=workers_type, workers_count=workers_count
+        agent_installation_type,
+        enable_debug_log=True,
+        workers_type=workers_type,
+        workers_count=workers_count,
     )
 
     if python_version:

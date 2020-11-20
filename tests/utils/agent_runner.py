@@ -387,7 +387,11 @@ class AgentRunner(object):
         # do not include default log files.
         files_to_exclude_from_config = [
             str(Path(self.agent_logs_dir_path, name))
-            for name in ["linux_process_metrics.log", "linux_system_metrics.log", "agent.log"]
+            for name in [
+                "linux_process_metrics.log",
+                "linux_system_metrics.log",
+                "agent.log",
+            ]
         ]
         config_log_files = list()
         for log_file in self._log_files.values():
@@ -399,11 +403,7 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": config_log_files,
-            "api_keys": [
-                {
-                    "type": self._workers_type, "workers": self._workers_count
-                },
-            ],
+            "api_keys": [{"type": self._workers_type, "workers": self._workers_count},],
             "monitors": [],
         }
 

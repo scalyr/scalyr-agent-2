@@ -166,6 +166,8 @@ class ApiKeyWorkerPool(object):
         for worker in self.__workers:
             worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
+        self._stop_shared_object_managers()
+
     def _stop_shared_object_managers(self):
         """
         Stop all shared object managers.
@@ -184,10 +186,14 @@ class ApiKeyWorkerPool(object):
 
         result.api_key_id = self.__api_key_id
 
-        for worker in sorted(self.__workers, key=lambda w: w.get_id()):
-            status = worker.generate_status(warn_on_rate_limit=warn_on_rate_limit)
-            result.workers.append(status)
+        worker_statuses = [
+            ws.generate_status(warn_on_rate_limit=warn_on_rate_limit)
+            for ws in sorted(self.__workers, key=lambda w: w.get_id())
+        ]
 
+        result.workers = worker_statuses
+
+        for status in worker_statuses:
             # get the most recent time fields from workers.
             if status.last_success_time:
                 result.last_success_time = max_ignore_none(
@@ -198,29 +204,47 @@ class ApiKeyWorkerPool(object):
                     result.last_attempt_time, status.last_attempt_time
                 )
 
+            # the next fields are a sum of the same fields from all workers.
             if status.last_attempt_size:
                 result.last_attempt_requests_overall_size += status.last_attempt_size
 
-            # Get the overall status about last responses from all workers.
-            # If at least one response is not successful then the result is not successful too.
-            if status.last_response_status is not None:
-                # do not overwrite the result if we already have a bad response.
-                if result.all_responses_successful is not False:
-                    result.all_responses_successful = (
-                        status.last_response_status == "success"
-                    )
-
-            # Get the overall status about the health checks from all workers.
-            # If at least one check is not successful then the result is not successful too.
-            if status.health_check_result is not None:
-                # do not overwrite the result if there is a bad health check.
-                if result.all_health_checks_good is not False:
-                    result.all_health_checks_good = status.health_check_result == "Good"
-
-            # the next fields are a sum of the same fields from all workers.
             result.total_bytes_uploaded += status.total_bytes_uploaded
 
             result.total_errors += status.total_errors
+
+        # get overall information about last responses of all workers in the worker pool.
+        # making this as a set should help in further decision making process.
+        responses = {
+            # compare each response status for "success" and store the boolean result.
+            # NOTE: we do not compare None values, they are stored as are.
+            None
+            if s.last_response_status is None
+            else s.last_response_status == "success"
+            for s in worker_statuses
+        }
+
+        if False in responses:
+            # First of all we check for failed responses. If there is at least one, the whole result in failed too.
+            result.all_responses_successful = False
+            # Only if there are no failed responses.
+            # If there is at least one unknown response. the whole result in unknown too.
+        elif None in responses:
+            result.all_responses_successful = None
+        else:
+            # all responses are successful
+            result.all_responses_successful = True
+
+        # do the same thing with health checks as we did with responses
+        health_checks = {
+            None if s.health_check_result is None else s.health_check_result == "Good"
+            for s in worker_statuses
+        }
+        if False in health_checks:
+            result.all_health_checks_good = False
+        elif None in health_checks:
+            result.all_health_checks_good = None
+        else:
+            result.all_health_checks_good = True
 
         return result
 
@@ -795,6 +819,10 @@ class CopyingManager(StoppableThread, LogWatcher):
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
+                # there may a rare case where an unrecoverable error
+                # is occurred before the  semaphore is released
+                # and the original thread is still waiting for it.
+                self.__copying_semaphore.release()
                 sys.exit(1)
         finally:
             # stopping all workers.
@@ -837,37 +865,45 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             result.total_scan_iterations = self.__total_scan_iterations
 
-            all_health_checks_good = None
-            all_responses_good = None
-
             # list with all possible health check error messages.
             all_health_check_error_messages = list()
 
-            for api_key_id in sorted(self.__api_keys_worker_pools):
-                worker_pool = self.__api_keys_worker_pools[api_key_id]
-                worker_pool_status = worker_pool.generate_status(
+            api_key_statuses = [
+                self.__api_keys_worker_pools[api_key_id].generate_status(
                     warn_on_rate_limit=warn_on_rate_limit
                 )
-                result.api_key_worker_pools.append(worker_pool_status)
+                for api_key_id in sorted(self.__api_keys_worker_pools)
+            ]
 
-                result.total_errors += worker_pool_status.total_errors
-                result.total_bytes_uploaded += worker_pool_status.total_bytes_uploaded
+            result.api_key_worker_pools = api_key_statuses
 
-                # if at least one if failed, the result is failed too.
-                if worker_pool_status.all_responses_successful is not None:
-                    # do not overwrite the result if we already have a bad response.
-                    if all_responses_good is not False:
-                        all_responses_good = worker_pool_status.all_responses_successful
+            for status in api_key_statuses:
 
-                # if at least one if failed, the result is failed too.
-                if worker_pool_status.all_health_checks_good is not None:
-                    # do not overwrite the result if we already have a bad response.
-                    if all_health_checks_good is not False:
-                        all_health_checks_good = (
-                            worker_pool_status.all_health_checks_good
-                        )
-                        if not worker_pool_status.all_health_checks_good:
-                            all_health_checks_good = False
+                result.total_errors += status.total_errors
+                result.total_bytes_uploaded += status.total_bytes_uploaded
+
+            # get responses information from worker pools
+            responses = {s.all_responses_successful for s in api_key_statuses}
+            if False in responses:
+                # if there is at least one failed response - a whole result is failed too.
+                result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
+            elif None in responses:
+                # if there is at least one unknown response - a whole result is unknown too.
+                # NOTE: As the above condition implies, the result will be unknown unly if there is no failed responses.
+                result.last_responses_status_info = None
+            else:
+                result.last_responses_status_info = "All successful"
+
+            # Get health checks the same way as with responses.
+            health_checks = {s.all_health_checks_good for s in api_key_statuses}
+            if False in health_checks:
+                all_health_check_error_messages.append(
+                    "Some workers has failed, see below for more info."
+                )
+            elif None in health_checks:
+                result.health_check_result = None
+            else:
+                result.health_check_result = "Good"
 
             # do the health check of the copying manager itself.
             if self.__last_scan_attempt_time:
@@ -877,31 +913,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                     # TODO: create new config value for that.
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    all_health_check_error_messages.append(
-                        (
-                            "Failed, max time since last scan attempt (%s seconds) exceeded"
-                            % self.__config.healthy_max_time_since_last_copy_attempt
-                        )
-                    )
-
-            if all_health_checks_good is not None:
-                if not all_health_checks_good:
-                    all_health_check_error_messages.append(
-                        "Some workers has failed, see below for more info."
+                    # if there is a bad health check if the copying manager itself, show it first.
+                    all_health_check_error_messages.insert(
+                        0,
+                        "Failed, max time since last scan attempt (%s seconds) exceeded"
+                        % self.__config.healthy_max_time_since_last_copy_attempt,
                     )
 
             # if there are error messages, concatenate them into one message
             if len(all_health_check_error_messages) > 0:
                 result.health_check_result = "\n".join(all_health_check_error_messages)
-            else:
-                result.health_check_result = "Good"
-
-            # set the response status only if there are some statuses from worker pools.
-            if all_responses_good is not None:
-                if all_responses_good:
-                    result.last_responses_status_info = "All successful"
-                else:
-                    result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
 
             # get statuses for the log matchers.
             for entry in self.__log_matchers:

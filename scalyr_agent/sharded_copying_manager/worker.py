@@ -382,9 +382,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         #   - determine success or not.. if success, update it.
         #   - sleep
 
-        # Create new client for the worker
-        self._init_scalyr_client()
-
         if self.__config.copying_thread_profile_interval > 0:
             import cProfile
 
@@ -425,6 +422,9 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 pipeline_byte_threshold = self.__config.pipeline_threshold * float(
                     self.__config.max_allowed_request_size
                 )
+
+                # Create new client for the worker
+                self._init_scalyr_client()
 
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
@@ -669,8 +669,13 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                     # End of the copy loop
                     self.total_copy_iterations += 1
             except Exception:
-                # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
+                # If we got an exception here, it is caused by a bug in the program.
                 log.exception("Log copying failed due to exception")
+                # if error has occurred earlier than this semaphore is released,
+                # than we need to release it to be sure that the copying manager won't stuck in deadlock.
+                self.__copying_semaphore.release()
+
+                # stop worker's thread.
                 sys.exit(1)
         finally:
             self.__write_full_checkpoint_state(current_time)
@@ -1213,6 +1218,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
     :param worker_proxy_class:
     :return:
     """
+
     class _SharedObjectManager(multiprocessing.managers.SyncManager):
         pass
 

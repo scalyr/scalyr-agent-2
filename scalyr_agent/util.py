@@ -2364,7 +2364,7 @@ class HistogramTracker(object):
 
 def max_ignore_none(*args, **kwargs):
     """max function which ignores None values"""
-    key =kwargs.get("key")
+    key = kwargs.get("key")
 
     if len(args) == 1:
         values = args[0]

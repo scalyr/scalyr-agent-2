@@ -115,7 +115,9 @@ class AgentStatus(BaseAgentStatus):
         # The CopyingManagerStatus object recording the status of the log copying manager (or none if CopyingManager
         # has not been started). This contains information about the different log paths being watched and the
         # progress of copying their bytes.
-        self.copying_manager_status = None  # type: Optional[ShardedCopyingManagerStatus]
+        self.copying_manager_status = (
+            None
+        )  # type: Optional[ShardedCopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
@@ -395,13 +397,11 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
         self.last_responses_status_info = None  # type: Optional[six.text_type]
         # The total number of failed copy requests.
         self.total_errors = 0  # type: int
-        #  The flag indicates whether all last requests from all workers are successful.
-        self.all_responses_successful = None  # type: Optional[bool]
-        # The flag indicates whether all workers has a good health check result.
-        self.all_health_checks_good = None  # type: Optional[bool]
-
-        # The overall text message with an information about the last health check.
+        # The overall text message with an information about the health check.
         # For example it equals to "Good" if everything is ok.
+        # NOTE: this variable will have a value only if all health checks from all workers
+        # and the health check of the copying manager itself are determined.
+        # In other case this variable is None.
         self.health_check_result = None  # type: Optional[six.text_type]
 
         # How many times the copying manager scanned the file system for new files.
@@ -789,8 +789,6 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                 print("        %s" % log_path, file=output)
 
         print("", file=output)
-
-
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

@@ -38,8 +38,9 @@ from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
     TestableCopyingManagerWorkerProxy,
     CopyingManagerCommonTest,
-    TestableSharedObjectManager
+    TestableSharedObjectManager,
 )
+from scalyr_agent.configuration import Configuration
 from tests.unit.sharded_copying_manager_tests.config_builder import TestableLogFile
 
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
@@ -87,7 +88,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             self._shared_object_manager.start()
 
     def teardown(self):
-        if self._instance is not None:
+        if self._instance is not None and self._instance.is_alive():
             self._instance.stop_worker()
 
         if self.use_multiprocessing_workers:
@@ -95,9 +96,20 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
         super(CopyingManagerWorkerTest, self).teardown()
 
+    def _recreate_shared_object_manager(self):
+        """
+        Recreate and restart shared object manager to be able to fork and inherit changes done by the test cases.
+        """
+        if self.use_multiprocessing_workers:
+            self._shared_object_manager.shutdown()
+            self._shared_object_manager = TestableSharedObjectManager()
+            self._shared_object_manager.start()
+
     def _create_worker(self, *args, **kwargs):
         if self.use_multiprocessing_workers:
-            worker = self._shared_object_manager.CopyingManagerWorkerProxy(*args, **kwargs)
+            worker = self._shared_object_manager.CopyingManagerWorkerProxy(
+                *args, **kwargs
+            )
         else:
             worker = TestableCopyingManagerThreadedWorker(*args, **kwargs)
 
@@ -109,11 +121,13 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         auto_start=True,
         add_processors=True,
         use_pipelining=False,
-    ):  # type: (int, bool, bool, bool) -> Tuple[Tuple[TestableLogFile, ...], CopyingManagerWorker]
+        disable_flow_control=False,
+    ):  # type: (int, bool, bool, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManagerThreadedWorker]
 
         config_data = {
             "api_keys": [{"workers": 1}],
-            "use_multiprocessing_workers": self.use_multiprocessing_workers
+            "use_multiprocessing_workers": self.use_multiprocessing_workers,
+            "disable_send_requests": True,
         }
 
         self._create_config(
@@ -121,6 +135,9 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             use_pipelining=use_pipelining,
             config_data=config_data,
         )
+
+        self._config_builder.config.disable_flow_control = disable_flow_control
+
         self._instance = self._create_worker(
             self._config_builder.config,
             self._config_builder.config.api_key_configs[0],
@@ -139,17 +156,12 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         return test_files, self._instance
 
     def _spawn_single_log_processor(
-        self,
-        log_file,
-        checkpoints=None,
-        copy_at_index_zero=False,
+        self, log_file, checkpoints=None, copy_at_index_zero=False,
     ):
         # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
         log_config = self._config_builder.get_log_config(log_file)
 
-        matcher = LogMatcher(
-            self._config_builder.config, log_config
-        )
+        matcher = LogMatcher(self._config_builder.config, log_config)
         if checkpoints is None:
             checkpoints = {}
 
@@ -157,13 +169,13 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             existing_processors=[],
             previous_state=checkpoints,
             copy_at_index_zero=copy_at_index_zero,
-            create_log_processor=self._instance.create_and_schedule_new_log_processor
+            create_log_processor=self._instance.create_and_schedule_new_log_processor,
         )
 
         return processors[0]
 
 
-class Tests(CopyingManagerWorkerTest):
+class TestsRunning(CopyingManagerWorkerTest):
     @skip_on_multiprocess_workers
     def test_wait_copying(self):
 
@@ -199,8 +211,46 @@ class Tests(CopyingManagerWorkerTest):
             wait_future.result(timeout=3)
             assert wait_future.done()
 
-    def test_without_log_processors(self):
-        (file1, file2, file3), worker = self._init_worker_instance(3)
+    def test_health_check_after_error(self):
+
+        # mock the function which is called before the worker starts copying.
+
+        def failing_init_scalyr_client(*args, **kwargs):
+            raise RuntimeError("Expected error. Do not worry.")
+
+        # mock class function with the failing one.
+        # NOTE: in order to be able to mock function in multiprocess worker, we mock a class not an instance.
+        with mock.patch.object(
+            TestableCopyingManagerThreadedWorker,
+            "_init_scalyr_client",
+            failing_init_scalyr_client,
+        ), mock.patch.object(
+            Configuration,
+            "healthy_max_time_since_last_copy_attempt",
+            new_callable=mock.PropertyMock,
+        ) as config_max_time_mock:
+
+            # reduce the 'healthy_max_time_since_last_copy_attempt' option in the config to save the time
+            config_max_time_mock.return_value = 0.01
+            # recreate and start a new shared object manager to fork a process at the moment where functions are mocked.
+            self._recreate_shared_object_manager()
+
+            # NOTE: we have to disable flow control on worker
+            # because it will just be deadlocked on the exception which we are raising.
+            _, worker = self._init_worker_instance(
+                2, auto_start=False, disable_flow_control=True
+            )
+
+            worker.start_worker()
+            worker.wait_for_copying_to_begin()
+
+            # wait until worker is crashed.
+            while worker.is_alive():
+                time.sleep(0.1)
+
+            status = worker.generate_status()
+
+            assert status.health_check_result != "Good"
 
 
 class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
@@ -607,9 +657,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
             self._config_builder.config.api_key_configs[0],
             "1",
         )
-        self._spawn_single_log_processor(
-            test_file, copy_at_index_zero=True
-        )
+        self._spawn_single_log_processor(test_file, copy_at_index_zero=True)
 
         worker.start_worker(stop_at=TestableCopyingManagerThreadedWorker.SENDING)
         worker.wait_for_copying_to_begin()

@@ -21,6 +21,9 @@ import time
 import shutil
 import os
 import platform
+import multiprocessing.managers
+import threading
+
 
 if False:
     from typing import Dict
@@ -29,13 +32,18 @@ if False:
 import pytest
 
 from scalyr_agent import scalyr_logging
+from scalyr_agent.configuration import Configuration
 
 from tests.unit.sharded_copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
-    TestableCopyingManagerInterface,
+    TestableCopyingManagerFlowController,
+    TestableCopyingManagerThreadedWorker,
     TestableLogFile,
+    TestingConfiguration,
 )
+
+import mock
 
 import six
 
@@ -79,7 +87,8 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         auto_start=True,
         use_pipelining=False,
         config_data=None,
-    ):  # type: (int, bool, bool, Dict) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
+        disable_flow_control=False,
+    ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
 
         api_keys = []
         for i in range(self.api_keys_count):
@@ -99,11 +108,16 @@ class CopyingManagerTest(CopyingManagerCommonTest):
             use_pipelining=use_pipelining,
             config_data=config_data,
         )
+
+        self._config_builder.config.disable_flow_control = disable_flow_control
+
         self._instance = TestableCopyingManager(self._config_builder.config, [])
 
         if auto_start:
             self._instance.start_manager()
-            self._instance.run_and_stop_at(TestableCopyingManagerInterface.SLEEPING)
+            self._instance.run_and_stop_at(
+                TestableCopyingManagerFlowController.SLEEPING
+            )
 
         test_files = tuple(self._config_builder.log_files.values())
         return test_files, self._instance
@@ -224,7 +238,7 @@ class TestBasic(CopyingManagerTest):
 
         # stop the manager and write some lines.
         # When manager is stared, it should pick recent checkpoints and read those lines.
-        manager.controller.stop()
+        manager.stop_manager()
         test_file.append_lines("Line3")
         test_file.append_lines("Line4")
 
@@ -242,7 +256,7 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == {"Line5", "Line6"}
 
-        manager.controller.stop()
+        manager.stop_manager()
 
         test_file.append_lines("Line7")
         test_file.append_lines("Line8")
@@ -274,7 +288,7 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
 
-        manager.controller.stop()
+        manager.stop_manager()
 
         # write new lines, those lines should be send because of the checkpoints.
         test_file.append_lines("line3")
@@ -293,7 +307,9 @@ class TestBasic(CopyingManagerTest):
 
         # move checkpoints files and rename tham as they were names in previous versions.
         shutil.move(str(worker.get_checkpoints_path()), old_checkpoints_path)
-        shutil.move(str(worker.get_active_checkpoints_path()), old_active_checkpoints_path)
+        shutil.move(
+            str(worker.get_active_checkpoints_path()), old_active_checkpoints_path
+        )
 
         self._instance = manager = TestableCopyingManager(
             self._config_builder.config, []
@@ -319,7 +335,7 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
 
-        manager.controller.stop()
+        manager.stop_manager()
 
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(
@@ -349,8 +365,3 @@ class TestBasic(CopyingManagerTest):
         manager.start_manager()
 
         assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
-
-
-
-
-

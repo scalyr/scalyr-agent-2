@@ -205,9 +205,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             agent._ScalyrAgent__config = config
 
             client = create_client(config)
+
             def get_worker_session_statuses_mock(*args, **kwargs):
                 return [client]
-
 
             with mock.patch.object(agent, "_ScalyrAgent__copying_manager") as m:
 

@@ -1353,7 +1353,6 @@ class ScalyrAgent(object):
 
                     prev_server = scalyr_server
 
-
                     log.info("Starting new copying and metrics threads")
                     (
                         worker_thread,
