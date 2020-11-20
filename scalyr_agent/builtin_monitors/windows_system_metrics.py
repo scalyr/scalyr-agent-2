@@ -144,9 +144,9 @@ def _gather_metric(method, attribute=None, transform=None):
             # The same issue with diskperf,
             # but the exception catch above does not work on older windows versions.
             message = getattr(e, "message", str(e))
-            if (
-                is_diskio_counters_method
-                and "has no attribute 'read_bytes'" in message.lower()
+            if is_diskio_counters_method and (
+                "has no attribute 'read_bytes'" in message.lower()
+                or "has no attribute 'write_bytes'" in message.lower()
             ):
                 global_log.warn(
                     "Unable to retrieve disk io metrics. This likely means diskperf -y "
