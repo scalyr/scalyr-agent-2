@@ -209,7 +209,7 @@ To deploy your Monitor Plugin, you simply have to install it into a location whe
 then add appropriate entries to the “monitors” section of your configuration file.
 
 You may place your module in `/usr/share/scalyr-agent-2/py/monitors/local` or `/usr/share/scalyr-agent-2/py/monitors/contrib`.
-Those paths is always included in the Python search path when locating plugins.
+Those paths are always included in the Python search path when locating plugins.
 
 Alternatively, you may make your own directory to hold your custom plugins, and then include the path to your directory
 in the `additional_monitor_module_paths` in your configuration file.  This is a string that specifies additional paths
