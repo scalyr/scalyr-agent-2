@@ -47,3 +47,11 @@ class WindowsSystemMetricsMonitorTestCase(ScalyrTestCase):
         result = list(_gather_metric(method="disk_io_counters")())
 
         self.assertEqual(result[0][0], __NO_DISK_PERF__)
+
+        # 3. read_count method
+        mock_methodcaller.side_effect = AttributeError(
+            "'NoneType' object has no attribute 'read_count'"
+        )
+        result = list(_gather_metric(method="disk_io_counters")())
+
+        self.assertEqual(result[0][0], __NO_DISK_PERF__)
