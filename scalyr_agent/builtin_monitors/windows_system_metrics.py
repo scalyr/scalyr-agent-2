@@ -144,10 +144,7 @@ def _gather_metric(method, attribute=None, transform=None):
             # The same issue with diskperf,
             # but the exception catch above does not work on older windows versions.
             message = getattr(e, "message", str(e))
-            if (
-                is_diskio_counters_method
-                and "has no attribute 'read_bytes'" in message.lower()
-            ):
+            if is_diskio_counters_method and ("has no attribute" in message.lower()):
                 global_log.warn(
                     "Unable to retrieve disk io metrics. This likely means diskperf -y "
                     "needs to be run: %s" % (str(e)),
@@ -630,7 +627,7 @@ class SystemMonitor(ScalyrMonitor):
                     if metric_value == __NO_DISK_PERF__:
                         self._logger.warn(
                             'disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
-                            "to enable IO counters",
+                            " to enable IO counters",
                             limit_once_per_x_secs=3600,
                             limit_key="win_diskperf",
                             error_code="win32DiskPerDisabled",
