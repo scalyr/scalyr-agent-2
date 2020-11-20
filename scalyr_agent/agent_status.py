@@ -720,10 +720,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                 % worker_pool.last_attempt_requests_overall_size,
                 file=output,
             )
-        if (
-            worker_pool.all_responses_successful is not None
-            and not worker_pool.all_responses_successful
-        ):
+
+        # NOTE: this should be exactly False, we skip if in case of None.
+        if worker_pool.all_responses_successful is False:
             print(
                 "    Failed copy response statuses:", file=output,
             )
@@ -750,10 +749,8 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
                     file=output,
                 )
 
-        if (
-            worker_pool.all_health_checks_good is not None
-            and not worker_pool.all_health_checks_good
-        ):
+        # NOTE: this should be exactly False, we skip if in case of None.
+        if worker_pool.all_health_checks_good is False:
             print(
                 "    Failed health checks:", file=output,
             )

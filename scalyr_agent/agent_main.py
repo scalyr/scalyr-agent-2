@@ -1715,6 +1715,8 @@ class ScalyrAgent(object):
             delta_stats.total_copy_requests_errors = (
                 current_status.copying_manager_status.total_errors
             )
+
+            # TODO: refactor this to be able to work with multi-worker copying manager.
             # delta_stats.total_rate_limited_time = (
             #     current_status.copying_manager_status.total_rate_limited_time
             # )

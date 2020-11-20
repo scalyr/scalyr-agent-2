@@ -697,9 +697,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
     def wait_for_copying_to_begin(self):
         """
         Block the current thread until worker's instance has begun copying.
-
-        TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
-        we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
         """
         self.__copying_semaphore.acquire(True)
         return
