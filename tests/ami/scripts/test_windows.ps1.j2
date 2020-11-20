@@ -256,6 +256,8 @@ Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
+Start-Sleep 5
+
 Log-Message ""
 Log-Message "Verifying agent status output"
 Log-Message ""
