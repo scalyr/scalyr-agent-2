@@ -256,7 +256,7 @@ Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-Start-Sleep 5
+Start-Sleep 20
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 Log-Message "LOGS"
