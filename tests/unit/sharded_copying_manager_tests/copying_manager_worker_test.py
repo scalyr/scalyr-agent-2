@@ -1,3 +1,18 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -12,6 +27,8 @@ import platform
 
 if False:
     from typing import Tuple
+    from typing import Optional
+    from typing import Dict
 
 
 import pytest
@@ -21,15 +38,13 @@ from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
     TestableCopyingManagerWorkerProxy,
     CopyingManagerCommonTest,
-    TestableSharedMemory
+    TestableSharedObjectManager
 )
 from tests.unit.sharded_copying_manager_tests.config_builder import TestableLogFile
 
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 
 from scalyr_agent import scalyr_logging
-
-from scalyr_agent.sharded_copying_manager.copying_manager import CopyingManagerSharedMemory
 
 
 import six
@@ -68,20 +83,21 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         super(CopyingManagerWorkerTest, self).setup()
 
         if self.use_multiprocessing_workers:
-            self._shared_memory_manager = TestableSharedMemory()
-            self._shared_memory_manager.start()
+            self._shared_object_manager = TestableSharedObjectManager()
+            self._shared_object_manager.start()
 
     def teardown(self):
         if self._instance is not None:
             self._instance.stop_worker()
-        super(CopyingManagerWorkerTest, self).teardown()
 
         if self.use_multiprocessing_workers:
-            self._shared_memory_manager.shutdown()
+            self._shared_object_manager.shutdown()
+
+        super(CopyingManagerWorkerTest, self).teardown()
 
     def _create_worker(self, *args, **kwargs):
         if self.use_multiprocessing_workers:
-            worker = self._shared_memory_manager.CopyingManagerWorkerProxy(*args, **kwargs)
+            worker = self._shared_object_manager.CopyingManagerWorkerProxy(*args, **kwargs)
         else:
             worker = TestableCopyingManagerThreadedWorker(*args, **kwargs)
 
@@ -113,9 +129,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
         if add_processors:
             for test_file in self._config_builder.log_files.values():
-                processor = self._spawn_single_log_processor(test_file)
-                a=10
-                #self._instance.schedule_new_log_processor(processor)
+                self._spawn_single_log_processor(test_file)
 
         if auto_start:
             self._instance.start_worker()
@@ -130,10 +144,8 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         checkpoints=None,
         copy_at_index_zero=False,
     ):
-        # type: ()-> LogFileProcessor
+        # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
         log_config = self._config_builder.get_log_config(log_file)
-
-        # log_processor_cls = log_file_processor_factory(self.worker_type, self._instance)
 
         matcher = LogMatcher(
             self._config_builder.config, log_config

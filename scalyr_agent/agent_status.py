@@ -388,7 +388,7 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying components."""
 
     def __init__(self):
-        # The total number of bytes successfully uploaded.
+        # The total number of bytes successfully uploaded by all workers.
         self.total_bytes_uploaded = 0  # type: int
         # The overall text message with an information about recent responses in all workers.
         # For example it equals to "All successful" in case if every request is successful

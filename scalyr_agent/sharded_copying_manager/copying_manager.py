@@ -1,3 +1,18 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
@@ -28,18 +43,21 @@ from scalyr_agent.agent_status import (
 )
 from scalyr_agent.sharded_copying_manager.worker import (
     CopyingManagerThreadedWorker,
-    CopyingManagerSharedMemory,
+    SharedObjectManager,
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import max_ignore_none
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
+from scalyr_agent.sharded_copying_manager.common import write_checkpoint_state_to_file
 
 import six
 
 log = scalyr_logging.getLogger(__name__)
+
 SCHEDULED_DELETION = "scheduled-deletion"
+CHECKPOINTS_MASTER_FILE_NAME = "checkpoints-master.json"
 
 
 class ApiKeyWorkerPool(object):
@@ -47,6 +65,11 @@ class ApiKeyWorkerPool(object):
     This abstraction is responsible for maintaining the workers
     for a particular entry in the 'api_keys' list in the configuration.
     It also creates worker instances according to the number in the "workers" field in each entry.
+    Depending on workers type (multiprocess or not), it will operate with
+    instances of the CopyingManagerWorker or their proxy objects.
+
+    The instances if this class itself live only in the original process,
+    controlled by the copying manager and do not have any proxy versions.
     """
 
     def __init__(self, config, api_key_config):
@@ -57,14 +80,14 @@ class ApiKeyWorkerPool(object):
 
         self.__workers = []  # type: List[CopyingManagerThreadedWorker]
 
-        # collection of shared memory managers. (Subclasses of the multiprocessing.BaseManager)
+        # collection of shared object managers. (Subclasses of the multiprocessing.BaseManager)
         # Those managers allow to communicate with workers if they are in the multiprocessing mode.
-        self.__shared_memory_managers = (
+        self.__shared_object_managers = (
             dict()
-        )  # type: Dict[six.text_type, CopyingManagerSharedMemory]
+        )  # type: Dict[six.text_type, SharedObjectManager]
 
         for i in range(api_key_config["workers"]):
-            # combine workers positional number in pool and pool id.
+            # combine the id of the api key and worker's position in the list to get a workers id.
             worker_id = "%s_%s" % (self.__api_key_id, i)
 
             if not self.__config.use_multiprocess_copying_workers:
@@ -72,20 +95,20 @@ class ApiKeyWorkerPool(object):
                     self.__config, api_key_config, worker_id
                 )
             else:
-                memory_manager = CopyingManagerSharedMemory()
+                shared_object_manager = SharedObjectManager()
 
-                # Important for the understanding. When the memory_manager is started, it creates a new process.
+                # Important for the understanding. When the shared_object_manager is started, it creates a new process.
                 # We use this process as a process for the worker.
-                memory_manager.start()
+                shared_object_manager.start()
 
                 # create proxy object of the worker. The real worker instance is created in the new process
-                # which was created when memory_manager started.
-                worker = memory_manager.CopyingManagerWorkerProxy(
+                # which was created when shared_object_manager started.
+                worker = shared_object_manager.CopyingManagerWorkerProxy(
                     self.__config, api_key_config, worker_id
                 )
 
-                # also save new shared memory manager.
-                self.__shared_memory_managers[worker.get_id()] = memory_manager
+                # also save new shared object manager.
+                self.__shared_object_managers[worker.get_id()] = shared_object_manager
 
             self.__workers.append(worker)
             log.log(
@@ -119,7 +142,7 @@ class ApiKeyWorkerPool(object):
         # type: (Tuple, Dict) -> LogFileProcessor
         """
         Find the next worker in the pool and make it to create and schedule a log processor.
-        The signature is identical to the constructor of the 'LogFileProcessor' class
+        The the arguments will be eventually passed to the LogProcessor's constructor.
         :return: New log processor
         """
         worker = self.__find_next_worker()
@@ -143,26 +166,26 @@ class ApiKeyWorkerPool(object):
         for worker in self.__workers:
             worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-    def _stop_memory_managers(self):
+    def _stop_shared_object_managers(self):
         """
-        Stop all shared memory managers.
+        Stop all shared object managers.
         This is moved to the separate function to be able to override it for the testing purposes
         because we may need to get data from workers even if copying manager and worker pools are stopped.
         :return:
         """
-        # also stop all shared memory managers.
-        for memory_manager in self.__shared_memory_managers.values():
+        # also stop all shared object managers.
+        for memory_manager in self.__shared_object_managers.values():
             memory_manager.shutdown()
 
-    def generate_status(self):
-        # type: () -> ApiKeyWorkerPoolStatus
+    def generate_status(self, warn_on_rate_limit=False):
+        # type: (bool) -> ApiKeyWorkerPoolStatus
         """Generate status of the worker pool."""
         result = ApiKeyWorkerPoolStatus()
 
         result.api_key_id = self.__api_key_id
 
         for worker in sorted(self.__workers, key=lambda w: w.get_id()):
-            status = worker.generate_status()
+            status = worker.generate_status(warn_on_rate_limit=warn_on_rate_limit)
             result.workers.append(status)
 
             # get the most recent time fields from workers.
@@ -178,11 +201,17 @@ class ApiKeyWorkerPool(object):
             if status.last_attempt_size:
                 result.last_attempt_requests_overall_size += status.last_attempt_size
 
+            # Get the overall status about last responses from all workers.
+            # If at least one response is not successful then the result is not successful too.
             if status.last_response_status is not None:
                 # do not overwrite the result if we already have a bad response.
                 if result.all_responses_successful is not False:
-                    result.all_responses_successful = status.last_response_status == "success"
+                    result.all_responses_successful = (
+                        status.last_response_status == "success"
+                    )
 
+            # Get the overall status about the health checks from all workers.
+            # If at least one check is not successful then the result is not successful too.
             if status.health_check_result is not None:
                 # do not overwrite the result if there is a bad health check.
                 if result.all_health_checks_good is not False:
@@ -301,10 +330,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__disable_copying_thread = configuration.disable_copying_thread
 
         # Statistics for copying_manager_status messages
-        self.total_scan_iterations = 0
+        self.__total_scan_iterations = 0
 
         # A worker pools for each api key in the 'api_keys' list in the configuration.
-        self._api_keys_worker_pools = (
+        self.__api_keys_worker_pools = (
             dict()
         )  # type: Dict[six.text_type, ApiKeyWorkerPool]
 
@@ -317,6 +346,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         """Return deepcopy of expanded server attributes"""
         return copy.deepcopy(self.__expanded_server_attributes)
 
+    # region The following methods are only exposed for the test purposes.
     @property
     def log_matchers(self):
         """Returns the list of log matchers that were created based on the configuration and passed in monitors.
@@ -327,6 +357,24 @@ class CopyingManager(StoppableThread, LogWatcher):
         @rtype: list<LogMatcher>
         """
         return self.__log_matchers
+
+    @property
+    def api_keys_worker_pools(self):
+        # type: () -> Dict
+        """
+        Get dict with api key worker pools. Only exposed for testing purposes.
+        """
+        return self.__api_keys_worker_pools
+
+    @property
+    def config(self):
+        # type: () -> Configuration
+        """
+        Only exposed for testing purposes.
+        """
+        return self.__config
+
+    # endregion
 
     def add_log_config(self, monitor_name, log_config, force_add=False):
         """Add the log_config item to the list of paths being watched
@@ -645,6 +693,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             # noinspection PyBroadException
             try:
+                # prepare and read checkpoints.
+                self.__prepare_checkpoints()
+                checkpoints = self.__find_and_read_checkpoints()
 
                 log.info("Starting copying manager workers.")
 
@@ -653,10 +704,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
-                checkpoints = self.__find_and_read_checkpoints()
 
                 # start all workers.
-                for worker_pool in self._api_keys_worker_pools.values():
+                for worker_pool in self.__api_keys_worker_pools.values():
                     worker_pool.start_workers_and_block_until_copying()
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
@@ -671,7 +721,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.__copying_semaphore.release()
 
                 workers_count = 0
-                for worker_pool in self._api_keys_worker_pools.values():
+                for worker_pool in self.__api_keys_worker_pools.values():
                     workers_count += len(worker_pool.workers)
 
                 log.info(
@@ -741,14 +791,14 @@ class CopyingManager(StoppableThread, LogWatcher):
                     )
 
                     # End of the copy loop
-                    self.total_scan_iterations += 1
+                    self.__total_scan_iterations += 1
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
             # stopping all workers.
-            for worker_pool in self._api_keys_worker_pools.values():
+            for worker_pool in self.__api_keys_worker_pools.values():
                 worker_pool.stop_workers()
 
             if profiler is not None:
@@ -785,7 +835,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             result = ShardedCopyingManagerStatus()
 
-            result.total_scan_iterations = self.total_scan_iterations
+            result.total_scan_iterations = self.__total_scan_iterations
 
             all_health_checks_good = None
             all_responses_good = None
@@ -793,26 +843,31 @@ class CopyingManager(StoppableThread, LogWatcher):
             # list with all possible health check error messages.
             all_health_check_error_messages = list()
 
-            for api_key_id in sorted(self._api_keys_worker_pools):
-                worker_pool = self._api_keys_worker_pools[api_key_id]
-                worker_pool_status = worker_pool.generate_status()
+            for api_key_id in sorted(self.__api_keys_worker_pools):
+                worker_pool = self.__api_keys_worker_pools[api_key_id]
+                worker_pool_status = worker_pool.generate_status(
+                    warn_on_rate_limit=warn_on_rate_limit
+                )
                 result.api_key_worker_pools.append(worker_pool_status)
 
                 result.total_errors += worker_pool_status.total_errors
                 result.total_bytes_uploaded += worker_pool_status.total_bytes_uploaded
 
+                # if at least one if failed, the result is failed too.
                 if worker_pool_status.all_responses_successful is not None:
                     # do not overwrite the result if we already have a bad response.
                     if all_responses_good is not False:
                         all_responses_good = worker_pool_status.all_responses_successful
 
+                # if at least one if failed, the result is failed too.
                 if worker_pool_status.all_health_checks_good is not None:
                     # do not overwrite the result if we already have a bad response.
                     if all_health_checks_good is not False:
-                        all_health_checks_good = worker_pool_status.all_health_checks_good
+                        all_health_checks_good = (
+                            worker_pool_status.all_health_checks_good
+                        )
                         if not worker_pool_status.all_health_checks_good:
                             all_health_checks_good = False
-
 
             # do the health check of the copying manager itself.
             if self.__last_scan_attempt_time:
@@ -1022,7 +1077,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
             # get the worker pool which is responsible for this log matcher.
-            worker_pool = self._api_keys_worker_pools[
+            worker_pool = self.__api_keys_worker_pools[
                 matcher.log_entry_config.get("api_key_id")
             ]
             for new_processor in matcher.find_matches(
@@ -1137,20 +1192,66 @@ class CopyingManager(StoppableThread, LogWatcher):
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
 
+    def __prepare_checkpoints(self):
+        """
+        Combines all worker checkpoints that were left from the previous agent run.
+        It combines checkpoint files into one single file in order to
+        allow workers to rewrite the content of this files without losing any data.
+        """
+
+        checkpoints_dir_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints"
+        )
+
+        # if there is a file called as the checkpoints folder, remove it
+        if os.path.isfile(checkpoints_dir_path):
+            os.unlink(checkpoints_dir_path)
+
+        # create new checkpoint folder if does not exist.
+        if not os.path.exists(checkpoints_dir_path):
+            os.mkdir(checkpoints_dir_path)
+
+        # read all checkpoints from the manager's previous run and combine them into one mater file.
+        checkpoints = self.__find_and_read_checkpoints()
+
+        master_checkpoints_path = os.path.join(
+            checkpoints_dir_path, CHECKPOINTS_MASTER_FILE_NAME,
+        )
+        write_checkpoint_state_to_file(
+            checkpoints, master_checkpoints_path, time.time()
+        )
+
+        # clear the checkpoints folder by removing all worker checkpoint files.
+        checkpoints_glob = os.path.join(checkpoints_dir_path, "*checkpoints*.json")
+
+        # also remove old version checkpoints
+        for path in glob.glob(
+            os.path.join(self.__config.agent_data_path, "*checkpoints.json")
+        ):
+            os.unlink(path)
+
+        for path in glob.glob(checkpoints_glob):
+            # do not delete master checkpoint file
+            if path == master_checkpoints_path:
+                continue
+            os.unlink(path)
+
     def __find_and_read_checkpoints(self):
         # type: () -> Dict
         """
         Find and read checkpoints that were previously written.
-        During its work, the worker writes its own checkpoint files. The copying manager, before the beginning,
-        reads them and combines into one checkpoints dict.
-        :return:
+        During its work, the worker writes its own checkpoint files,
+        the copying manager reads them and combines into one checkpoints dict.
+        :return: Checkpoint state stored in dict.
         """
 
         checkpoints_dir_path = os.path.join(
             self.__config.agent_data_path, "checkpoints"
         )
         # get checkpoint file names from the 'checkpoints' folder. All previous worker checkpoints are stored there.
-        checkpoints_file_paths = list(glob.glob(os.path.join(checkpoints_dir_path, "checkpoints*.json")))
+        checkpoints_file_paths = list(
+            glob.glob(os.path.join(checkpoints_dir_path, "checkpoints*.json"))
+        )
 
         # we also add path for the checkpoint file that was used in the previous version of the Copying manager.
         # This is needed to be able to get checkpoints after the upgrade of the agent.
@@ -1164,9 +1265,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         for checkpoints_path in checkpoints_file_paths:
 
-            checkpoints = self.__read_checkpoint_state(
-                checkpoints_path, current_time
-            )
+            checkpoints = self.__read_checkpoint_state(checkpoints_path, current_time)
 
             if checkpoints:
                 found_checkpoints.append(checkpoints)
@@ -1190,9 +1289,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return result
 
-    def __read_checkpoint_state(
-        self, full_checkpoints_path, current_time
-    ):
+    def __read_checkpoint_state(self, full_checkpoints_path, current_time):
         # type: (six.text_type, float) -> Optional[Dict]
         """Reads a single checkpoint state from the file on the disk and returns it.
 
@@ -1218,7 +1315,9 @@ class CopyingManager(StoppableThread, LogWatcher):
             # get the path for the active checkpoints file
             parent_dir, filename = os.path.split(full_checkpoints_path)
             active_checkpoints_filename = "active-%s" % os.path.basename(filename)
-            active_checkpoints_path = os.path.join(parent_dir, active_checkpoints_filename)
+            active_checkpoints_path = os.path.join(
+                parent_dir, active_checkpoints_filename
+            )
 
             if os.path.isfile(active_checkpoints_path):
                 # if the active checkpoint file is newer, overwrite any checkpoint values with the
@@ -1239,21 +1338,13 @@ class CopyingManager(StoppableThread, LogWatcher):
                 > self.__config.max_allowed_checkpoint_age
             ):
                 log.warn(
-                    "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  All log files will "
+                    "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  The log files will "
                     "be copied starting at their current end.",
                     full_checkpoints_path,
                     scalyr_util.format_time(full_checkpoints["time"]),
                     error_code="staleCheckpointFile",
                 )
 
-                # checkpoint files are stale, so remove them.
-                os.unlink(full_checkpoints_path)
-                try:
-                    # ignore if active checkpoints do not exist
-                    os.unlink(active_checkpoints_path)
-                except OSError as e:
-                    if e.errno != 2:
-                        raise
                 return None
 
             return full_checkpoints
@@ -1272,7 +1363,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         for api_key_config in self.__config.api_key_configs:
             pool = ApiKeyWorkerPool(self.__config, api_key_config)
-            self._api_keys_worker_pools[api_key_config["id"]] = pool
+            self.__api_keys_worker_pools[api_key_config["id"]] = pool
 
     def augment_user_agent_for_workers_sessions(self, fragments):
         # type: (List[six.text_type]) -> None
@@ -1282,7 +1373,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of six.text_type
         """
-        for worker_pool in self._api_keys_worker_pools.values():
+        for worker_pool in self.__api_keys_worker_pools.values():
             for worker in worker_pool.workers:
                 worker.augment_user_agent_for_client_session(fragments)
 
@@ -1293,7 +1384,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         :return: dict with worker_id -> ScalyrClientSessionStatus.
         """
         session_stats = []
-        for worker_pool in self._api_keys_worker_pools.values():
+        for worker_pool in self.__api_keys_worker_pools.values():
             for worker in worker_pool.workers:
                 session_stats.append(worker.generate_scalyr_client_status())
 

@@ -105,6 +105,7 @@ def pytest_generate_tests(metafunc):
 def _create_test_copying_manager(
     configuration, monitors, auto_start=True
 ):
+    # type: (Configuration, List, bool) -> TestableCopyingManager
     """
     :param configuration:
     :param monitors:
@@ -1220,6 +1221,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
             worker.write_checkpoints(worker.get_active_checkpoints_path(), active_chp)
 
+        # also shift time in the master checkpoint file.
+        master_checkpoints = self._manager.master_checkpoints
+        master_checkpoints["time"] -= (self._config.max_allowed_checkpoint_age + 1)
+        self._manager.write_master_checkpoints(master_checkpoints)
 
         # create and manager.
         controller = self.__create_test_instance(

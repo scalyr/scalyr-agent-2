@@ -1,3 +1,18 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
@@ -29,15 +44,19 @@ from six.moves import range
 class TestableLogFile(object):
     __test__ = False
 
-    def __init__(self, config_builder, name, path, create=True):
-        # type: (ConfigBuilder, str, Union[str, pathlib.Path], bool) -> None
+    def __init__(self, config_builder, name, create=True):
+        # type: (ConfigBuilder, Union[str, pathlib.Path], bool) -> None
 
         self._config_builder = config_builder
         self.name = name
-        self.path = pathlib.Path(path)
+        self.path = None
 
-        if create:
-            self.path.touch()
+    def create(self, root_path):
+        """
+        Create file in the root path.
+        """
+        self.path = pathlib.Path(root_path, self.name)
+        self.path.touch()
 
     def append_lines(self, *lines):  # type: (six.text_type) -> None
         with self.path.open("a") as file:
@@ -149,7 +168,6 @@ class ConfigBuilder(object):
 
         self.__use_pipelining = None
 
-        self._create_agent_root_dir()
 
     def __del__(self):
         self.clear()
@@ -161,22 +179,28 @@ class ConfigBuilder(object):
         :return:
         """
 
-        self._create_config(self._config_initial_data)
-
-        self._initialized = True
-
-    def _create_agent_root_dir(self):  # type: () -> None
         self._root_path = root_path = pathlib.Path(
             tempfile.mkdtemp(prefix="scalyr_testing")
         )
-
         self._data_dir_path = root_path / "data"
         self._data_dir_path.mkdir()
+
+        # Workers do not create checkpoint directory,
+        # so we need to create them manually if we want to test workers separately
+        checkpoints_path = self._data_dir_path / "checkpoints"
+        checkpoints_path.mkdir()
 
         self._logs_dir_path = root_path / "logs"
         self._logs_dir_path.mkdir()
 
         self._agent_config_path = root_path / "agent.json"
+
+        for log_file in self._log_files.values():
+            log_file.create(self._root_path)
+
+        self._create_config(self._config_initial_data)
+
+        self._initialized = True
 
     def _create_config(self, config_data=None):  # type: (Optional[Dict]) -> None
         """
@@ -184,7 +208,6 @@ class ConfigBuilder(object):
         :param config_data:
         :return:
         """
-        self._create_agent_root_dir()
 
         default_paths = DefaultPaths(
             six.text_type(self._logs_dir_path),
@@ -260,10 +283,8 @@ class ConfigBuilder(object):
         if name is None:
             name = "test_file_{0}".format(len(self._log_files))
 
-        abs_path = self._root_path / name
-
         file_obj = TestableLogFile(
-            config_builder=self, name=name, path=abs_path, create=create
+            config_builder=self, name=name
         )
 
         self._log_files[name] = file_obj

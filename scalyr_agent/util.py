@@ -225,7 +225,7 @@ def get_json_implementation(lib_name):
                 if fp is not None:
                     return orjson.dump(obj, fp, default=default)
                 else:
-                    return orjson.dumps(obj, default= default)
+                    return orjson.dumps(obj, default=default)
 
             try:
                 return dump()

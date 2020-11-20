@@ -1,22 +1,32 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import copy
 import datetime
-import fnmatch
 import os
 import sys
 import threading
 import time
-import collections
-import glob
 from abc import ABCMeta, abstractmethod
 import multiprocessing.managers
-from multiprocessing.managers import SyncManager
 
 if False:
     from typing import Dict
-    from typing import Tuple
     from typing import Any
     from typing import List
 
@@ -26,11 +36,11 @@ from scalyr_agent import (
     util as scalyr_util,
 )
 from scalyr_agent.agent_status import CopyingManagerStatus, CopyingManagerWorkerStatus
-from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
-from scalyr_agent.log_watcher import LogWatcher
+from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import create_client, create_new_client
+from scalyr_agent.sharded_copying_manager.common import write_checkpoint_state_to_file
 
 import six
 
@@ -229,15 +239,8 @@ class CopyingManagerWorker:
 
     @abstractmethod
     def wait_for_copying_to_begin(self):
-        """Block the current thread until this instance has finished its first scan and has begun copying.
-
-        It is good to wait for the first scan to finish before possibly creating new files to copy because
-        if the first scan has not completed, the copier will just begin copying at the end of the file when
-        it is first noticed.  However, if the first scan has completed, then the copier will know that the
-        new file was just newly created and should therefore have all of its bytes copied to Scalyr.
-
-        TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
-        we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
+        """
+        Block the current thread until worker's instance has begun copying.
         """
         pass
 
@@ -687,12 +690,8 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             )
 
     def wait_for_copying_to_begin(self):
-        """Block the current thread until this instance has finished its first scan and has begun copying.
-
-        It is good to wait for the first scan to finish before possibly creating new files to copy because
-        if the first scan has not completed, the copier will just begin copying at the end of the file when
-        it is first noticed.  However, if the first scan has completed, then the copier will know that the
-        new file was just newly created and should therefore have all of its bytes copied to Scalyr.
+        """
+        Block the current thread until worker's instance has begun copying.
 
         TODO:  Make it so that this thread does not block indefinitely if the copying never starts.  However,
         we do not do this now because the CopyManager's run method will sys.exit if the copying fails to start.
@@ -982,7 +981,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
     def __write_checkpoint_state(
         self, log_processors, base_file, current_time, full_checkpoint
     ):
-        # type: (List[LogFileProcessor], six.text_type, float, Dict) -> None
+        # type: (List[LogFileProcessor], six.text_type, float, bool) -> None
         """Writes the current checkpoint state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -1003,30 +1002,11 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             self.__config.agent_data_path, "checkpoints"
         )
 
-        try:
-            os.mkdir(checkpoints_dir_path)
-        except OSError as e:
-            # re-raise if there is no 'already exists' error.
-            if e.errno != 17:
-                raise
-            if os.path.isfile(checkpoints_dir_path):
-                # if there is a file, remove it.
-                os.unlink(checkpoints_dir_path)
-
-        # We write to a temporary file and then rename it to the real file name to make the write more atomic.
-        # We have had problems in the past with corrupted checkpoint files due to failures during the write.
         file_path = os.path.join(
             self.__config.agent_data_path, checkpoints_dir_path, base_file
         )
-        tmp_path = os.path.join(
-            self.__config.agent_data_path, checkpoints_dir_path, base_file + "~"
-        )
 
-        state = {
-            "time": current_time,
-            "checkpoints": checkpoints,
-        }
-        scalyr_util.atomic_write_dict_as_json_file(file_path, tmp_path, state)
+        write_checkpoint_state_to_file(checkpoints, file_path, current_time)
 
     def __write_full_checkpoint_state(self, current_time):
         """Writes the full checkpont state to disk.
@@ -1137,7 +1117,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         """
         api_key = self.__api_key_config_entry["api_key"]
         if self.__config.use_new_ingestion:
-            from scalyr_agent.scalyr_client import NewScalyrClientSession
 
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
         else:
@@ -1171,7 +1150,7 @@ if sys.version_info >= (3, 6, 0):
     multiprocessing.managers.RebuildProxy = FixedRebuildProxy
 
 
-# create base proxy class for the LogProcessor, here we also specify all its methods that may be called through proxy.
+# create base proxy class for the LogFileProcessor, here we also specify all its methods that may be called through proxy.
 _LogProcessorProxy = multiprocessing.managers.MakeProxyType(
     six.ensure_str("LogFileProcessorProxy"),
     [
@@ -1199,6 +1178,7 @@ class LogProcessorProxy(_LogProcessorProxy):
         return self.__cached_log_path
 
 
+# methods of the worker class that should be exposed through proxy object.
 WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("start_worker"),
     six.ensure_str("stop_worker"),
@@ -1213,25 +1193,35 @@ WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("create_and_schedule_new_log_processor"),
 ]
 
-
+# create base proxy class for the worker, here we also specify all its methods that may be called through proxy.
 _CopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
     six.ensure_str("CopyingManagerWorkerProxy"), WORKER_PROXY_EXPOSED_METHODS,
 )
 
 
+# Create final proxy class for the worker class by subclassing the base class.
 class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):
     pass
 
 
-def shared_memory_manager_factory(worker_class, worker_proxy_class):
-    class _MemoryManager(multiprocessing.managers.SyncManager):
+def create_shared_object_manager(worker_class, worker_proxy_class):
+    """
+    Creates and returns a subclass of the SyncManager and also registers all proxy types
+    that will be needed for the multiprocess worker.
+    This is done in function, only to be reusable by the tests.
+    :param worker_class:
+    :param worker_proxy_class:
+    :return:
+    """
+    class _SharedObjectManager(multiprocessing.managers.SyncManager):
         pass
 
-    _MemoryManager.register(
+    # register LogFileProcessor proxy.
+    _SharedObjectManager.register(
         six.ensure_str("LogFileProcessorProxy"), proxytype=LogProcessorProxy
     )
 
-    _MemoryManager.register(
+    _SharedObjectManager.register(
         six.ensure_str("CopyingManagerWorkerProxy"),
         worker_class,
         proxytype=worker_proxy_class,
@@ -1243,9 +1233,10 @@ def shared_memory_manager_factory(worker_class, worker_proxy_class):
         },
     )
 
-    return _MemoryManager
+    return _SharedObjectManager
 
 
-CopyingManagerSharedMemory = shared_memory_manager_factory(
+# Create shared object manager class.
+SharedObjectManager = create_shared_object_manager(
     CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
 )

@@ -1,3 +1,18 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
@@ -41,8 +56,8 @@ from scalyr_agent.sharded_copying_manager import (
 )
 from scalyr_agent.sharded_copying_manager.worker import (
     WORKER_PROXY_EXPOSED_METHODS,
-    CopyingManagerSharedMemory,
-    shared_memory_manager_factory,
+    SharedObjectManager,
+    create_shared_object_manager,
 )
 
 from scalyr_agent.scalyr_client import AddEventsRequest
@@ -632,15 +647,15 @@ class TestableCopyingManagerThreadedWorker(
 
 
 class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
-    def _stop_memory_managers(self):
+    def _stop_shared_object_managers(self):
         """
         We may need to interact with workers even after manager is stopped,
-         so do not stop the shared memory managers.
+         so do not stop the shared object managers.
         """
         pass
 
-    def really_stop_memory_workers(self):
-        return super(TestableApiKeyWorkerPool, self)._stop_memory_managers()
+    def really_stop_shared_object_managers(self):
+        return super(TestableApiKeyWorkerPool, self)._stop_shared_object_managers()
 
 
 class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
@@ -655,9 +670,6 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
 
         self.controller = TestableCopyingManager.TestController(self)
 
-        self._api_keys_worker_pools = (
-            self._api_keys_worker_pools
-        )  # type: Dict[six.text_type, TestableApiKeyWorkerPool]
 
     @property
     def workers(self):
@@ -667,7 +679,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         :return:
         """
         result = []
-        for api_key_pool in self._api_keys_worker_pools.values():
+        for api_key_pool in self.api_keys_worker_pools.values():
             result.extend(api_key_pool.workers)
         return result
 
@@ -675,16 +687,16 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         # We are going to control the flow of our
         # workers by using 'TestableCopyingManagerWorker' subclass of the 'CopyingManagerWorker'
         # that's why we need change original worker class by testable class.
-        # We also do the same thing with 'ApiKeyWorkerPool' and the shared memory manager class
+        # We also do the same thing with 'ApiKeyWorkerPool' and the shared object manager class
         from scalyr_agent.sharded_copying_manager import copying_manager
 
         # save original class of the CopyingManager from 'copying_manager' module
         original_worker = copying_manager.CopyingManagerThreadedWorker
         original_worker_pool = copying_manager.ApiKeyWorkerPool
-        original_memory_manager_class = copying_manager.CopyingManagerSharedMemory
+        original_shared_object_manager_class = copying_manager.SharedObjectManager
 
         # replace original class by testable.
-        copying_manager.CopyingManagerSharedMemory = TestableSharedMemory
+        copying_manager.SharedObjectManager = TestableSharedObjectManager
         copying_manager.CopyingManagerThreadedWorker = (
             TestableCopyingManagerThreadedWorker
         )
@@ -695,7 +707,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         finally:
             # return back original worker class.
             copying_manager.CopyingManagerThreadedWorker = original_worker
-            copying_manager.CopyingManagerSharedMemory = original_memory_manager_class
+            copying_manager.SharedObjectManager = original_shared_object_manager_class
             copying_manager.ApiKeyWorkerPool = original_worker_pool
 
     def start_manager(
@@ -784,10 +796,10 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
 
     def cleanup(self):
         """
-        Stopping the shared memory managers from api worker pools.
+        Stopping the shared object managers from api worker pools.
         """
-        for worker_pool in self._api_keys_worker_pools.values():
-            worker_pool.really_stop_memory_workers()
+        for worker_pool in self.api_keys_worker_pools.values():
+            worker_pool.really_stop_shared_object_managers()
 
     def perform_scan(self):
         """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
@@ -835,12 +847,21 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerInterface):
         return requests, send_response
 
     @property
-    def main_checkpoints_path(self):
-        return srt(
-            pathlib.Path(
-                self.__config.agent_data_path, "checkpoints", "main-checkpoints.json"
-            )
+    def master_checkpoints_path(self):
+        # type: () -> pathlib.Path
+        return pathlib.Path(
+                self.config.agent_data_path, "checkpoints", "checkpoints-master.json"
         )
+
+    @property
+    def master_checkpoints(self):
+        # type: () -> Dict
+        return json.loads(self.master_checkpoints_path.read_text())
+
+    def write_master_checkpoints(self, checkpoints):
+        # type: (Dict) -> None
+        self.master_checkpoints_path.write_text(six.text_type(json.dumps(checkpoints)))
+
 
     class TestController(object):
         """Used to control the TestableCopyingManager.
@@ -932,6 +953,6 @@ class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):
         return request, send_response
 
 
-TestableSharedMemory = shared_memory_manager_factory(
+TestableSharedObjectManager = create_shared_object_manager(
     TestableCopyingManagerThreadedWorker, TestableCopyingManagerWorkerProxy
 )

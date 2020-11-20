@@ -1,3 +1,18 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
@@ -46,6 +61,7 @@ def pytest_generate_tests(metafunc):
 class CopyingManagerTest(CopyingManagerCommonTest):
     @pytest.fixture(autouse=True)
     def setup(self, worker_type, api_keys_count, workers_count):
+        super(CopyingManagerTest, self).setup()
         self.use_multiprocessing_workers = worker_type == "process"
         self.api_keys_count = api_keys_count
         self.workers_count = workers_count
@@ -286,6 +302,55 @@ class TestBasic(CopyingManagerTest):
 
         # copying manager should read worker checkpoints from the new place.
         assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
+
+        # the checkpoint files from older versions of the agent have to be removed.
+        assert not os.path.exists(old_checkpoints_path)
+        assert not os.path.exists(old_active_checkpoints_path)
+
+    def test_checkpoints_master_checkpoints(self):
+        if self.workers_count == 1 and self.api_keys_count == 1:
+            pytest.skip("This test is only for multi-worker copying manager.")
+
+        (test_file, test_file2), manager = self._create_manager_instanse(2)
+
+        # write something and stop in order to create checkpoint files.
+        test_file.append_lines("line1")
+        test_file2.append_lines("line2")
+
+        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+
+        manager.controller.stop()
+
+        # recreate the manager, in order to simulate a new start.
+        self._instance = manager = TestableCopyingManager(
+            self._config_builder.config, []
+        )
+
+        # start manager, it has to create master checkpoint file when starts.
+        manager.start_manager()
+
+        manager.stop()
+
+        # add some new lines
+        test_file.append_lines("line3")
+        test_file2.append_lines("line4")
+
+        # remove worker checkpoints, but files must not be skipped because of the
+        for worker in manager.workers:
+            os.unlink(str(worker.get_checkpoints_path()))
+            os.unlink(str(worker.get_active_checkpoints_path()))
+
+        # recreate the manager, in order to simulate a new start.
+        self._instance = manager = TestableCopyingManager(
+            self._config_builder.config, []
+        )
+
+        # start manager, it has to create master checkpoint file when starts.
+        manager.start_manager()
+
+        assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
+
+
 
 
 
