@@ -117,6 +117,12 @@ echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
 
 echo_with_date ""
+echo_with_date "Verifying agent.json permissions"
+echo_with_date ""
+
+ls -la /etc/scalyr-agent-2/agent.json
+
+echo_with_date ""
 echo_with_date "Verifying agent.log"
 echo_with_date ""
 
