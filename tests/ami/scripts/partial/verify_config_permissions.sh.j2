@@ -15,6 +15,13 @@ if [ "${AGENT_JSON_PERMISSIONS}" != "640" ]; then
     exit 2
 fi
 
+AGENT_D_PERMISSIONS=$(stat -c %a "/etc/scalyr-agent-2/agent.d")
+
+if [ "${AGENT_JSON_PERMISSIONS}" != "740" ]; then
+    echo "Expected 740 permissions for agent.d, got ${AGENT_D_PERMISSIONS}."
+    exit 2
+fi
+
 echo_with_date ""
 echo_with_date "agent.json and agent.d permissions verified"
 echo_with_date ""
