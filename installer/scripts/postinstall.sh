@@ -78,13 +78,12 @@ check_python_version() {
   echo "Warning, no valid Python interpreter found."
 }
 
-# Function which ensures that the provided file path is not readable by "other" users aka has
-# "0" value for permission in the octet notation. If permissions don't match, we update them
-# and ensure value for the user part is "0".
+# Function which ensures that the provided file path permissions for "other" users match the
+# provided permission bit in octal notation.
 # This function can operate on a file or on a directory.
-ensure_path_not_readable_by_others() {
+ensure_path_other_permissions() {
   file_path=$1
-  wanted_permissions_other="0"
+  wanted_permissions_other=$2
 
   # Will output permissions on octal mode - xyz, e.g. 644
   file_permissions=$(stat -c %a "${file_path}")
@@ -96,9 +95,19 @@ ensure_path_not_readable_by_others() {
   # NOTE: We re-use existing fs permissions for owner and group
   if [ "${file_permissions_others}" -ne "${wanted_permissions_other}" ]; then
     new_permissions="${file_permissions_owner_group}${wanted_permissions_other}"
-    echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\" to make sure it's not readable by others."
+    echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
   fi
+
+}
+
+# Function which ensures that the provided file path is not readable by "other" users aka has
+# "0" value for permission in the octal notation. If permissions don't match, we update them
+# and ensure value for the user part is "0".
+# This function can operate on a file or on a directory.
+ensure_path_not_readable_by_others() {
+  file_path=$1
+  ensure_path_other_permissions "${file_path}" "0"
 }
 
 check_python_version
@@ -119,7 +128,8 @@ fi
 ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json" "0"
 
 # Ensure agent.d/*.json files are note readable by others
-ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.d" "0"
+# NOTE: Most software gives +x bit on *.d directories so we do the same
+ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.d" "1"
 
 if [ -d "/etc/scalyr-agent-2/agent.d" ]; then
   # NOTE: find + -print0 correctly handles whitespaces in  filenames and it's more robust than for,
