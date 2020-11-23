@@ -83,6 +83,11 @@ if ($msi_version -eq $null) {
 # install scalyr agent and wait until it is done.
 Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
+# Verify agent.json permissions
+# NOTE: This needs to be done before copying over test config immediately after fresh install
+dir "C:\Program Files (x86)\Scalyr\config"
+dir "C:\Program Files (x86)\Scalyr\config\agent.json" | % {Get-Permissions -path $_.fullname}
+
 # Copy over agent.json with the API key set up
 Copy-Item ".\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
