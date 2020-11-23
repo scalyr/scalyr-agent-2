@@ -88,22 +88,8 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
-# Verify agent.json is not readable by others
-echo_with_date ""
-echo_with_date "Verifying agent.json permissions"
-echo_with_date ""
-
-# NOTE: This check needs to be performed as early as possible after fresh installation before
-# other tools modify the config
-ls -la /etc/scalyr-agent-2/
-ls -la /etc/scalyr-agent-2/agent.d/
-
-AGENT_JSON_PERMISSIONS=$(stat --printf "%A\n" "/etc/scalyr-agent-2/agent.json")
-
-if [ "${AGENT_JSON_PERMISSIONS}" != "-rw-r-----" ]; then
-    echo "Expected 640 permissions for agent.json, got ${AGENT_JSON_PERMISSIONS}."
-    exit 2
-fi
+# TODO: Also perform agent.json and agent.d permission checks here when fix is
+# merged in stable, until then, it will fail with stable.
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
@@ -173,6 +159,10 @@ export UPGRADE_PACKAGE_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{
 sudo yum install -y "scalyr-agent-2-{{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
       {% endif -%}
+{% endif -%}
+
+{% if test_type == "upgrade" -%}
+{% include "partial/verify_config_permissions.sh.j2" %}
 {% endif -%}
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
