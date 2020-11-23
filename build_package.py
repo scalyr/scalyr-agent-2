@@ -294,11 +294,11 @@ def build_win32_installer_package(variant, version):
     )
 
     # Copy the config file.
+    agent_json_path = make_path(agent_source_root, "config/agent.json")
     cat_files(
-        [make_path(agent_source_root, "config/agent.json")],
-        "agent_config.tmpl",
-        convert_newlines=True,
+        [agent_json_path], "agent_config.tmpl", convert_newlines=True,
     )
+    os.chmod(agent_json_path, int("640", 8))
 
     os.chdir("..")
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
@@ -338,6 +338,8 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
+    os.chmod("root/etc/scalyr-agent-2/agent.d", int("740", 8))
+
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
@@ -585,6 +587,7 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
 
     # Make sure there is an agent.d directory regardless of the config directory we used.
     make_directory("root/etc/scalyr-agent-2/agent.d")
+    os.chmod("root/etc/scalyr-agent-2/agent.d", int("740", 8))
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
@@ -997,7 +1000,11 @@ def build_base_files(base_configs="config"):
         config_path = base_configs
     else:
         config_path = "config"
+
     shutil.copytree(make_path(agent_source_root, config_path), "config")
+
+    # Make sure config file has 640 permissions
+    os.chmod("config/agent.json", int("640", 8))
 
     # Create the trusted CA root list.
     os.chdir("certs")
