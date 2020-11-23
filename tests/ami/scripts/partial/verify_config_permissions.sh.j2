@@ -18,7 +18,7 @@ fi
 AGENT_D_PERMISSIONS=$(sudo stat -c %a "/etc/scalyr-agent-2/agent.d")
 
 if [ "${AGENT_D_PERMISSIONS}" != "741" ] && [ "${AGENT_D_PERMISSIONS}" != "751" ]; then
-    echo "Expected 740/750 permissions for agent.d, got ${AGENT_D_PERMISSIONS}."
+    echo "Expected 741/751 permissions for agent.d, got ${AGENT_D_PERMISSIONS}."
     exit 2
 fi
 

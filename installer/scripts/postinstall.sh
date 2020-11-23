@@ -129,7 +129,7 @@ ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json" "0"
 
 # Ensure agent.d/*.json files are note readable by others
 # NOTE: Most software gives +x bit on *.d directories so we do the same
-ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.d" "1"
+ensure_path_other_permissions "/etc/scalyr-agent-2/agent.d" "1"
 
 if [ -d "/etc/scalyr-agent-2/agent.d" ]; then
   # NOTE: find + -print0 correctly handles whitespaces in  filenames and it's more robust than for,
