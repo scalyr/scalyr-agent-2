@@ -87,7 +87,7 @@ ensure_path_not_readable_by_others() {
   wanted_permissions_other="0"
 
   # Will output permissions on octal mode - xyz, e.g. 644
-  file_permissions=$(stat -c %a /etc/scalyr-agent-2/agent.json)
+  file_permissions=$(stat -c %a "${file_path}")
   # Permissions for owner and group - e.g. 644
   file_permissions_owner_group=$(echo -n "$file_permissions" | head -c 2)
   # Permissions for other - e.g. 4
