@@ -78,13 +78,35 @@ check_python_version() {
   echo "Warning, no valid Python interpreter found."
 }
 
+# Function which ensures that the provided file path has specified permission for the "other"
+# users. If permissions don't match, we update them.
+# This function can operate on a file or on a directory.
+ensure_path_other_permissions() {
+  file_path=$1
+  wanted_permissions=$2
+
+  # Will output permissions on octal mode - xyz, e.g. 644
+  file_permissions=$(stat -c %a /etc/scalyr-agent-2/agent.json)
+  # Permissions for owner and group - e.g. 644
+  file_permissions_owner_group=$(echo -n "$file_permissions" | head -c 2)
+  # Permissions for other - e.g. 4
+  file_permissions_others=$(echo -n "$file_permissions" | tail -c 1)
+
+  # NOTE: We re-use existing fs permissions for owner and group
+  if [ "${file_permissions_others}" -ne "${wanted_permissions}" ]; then
+    new_permissions="${file_permissions_owner_group}0"
+    echo "Changing permissions for file ${file_path} to ${new_permissions} to make sure it's not readable by others."
+    chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
+  fi
+}
+
 check_python_version
 
-config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
-script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
+config_owner=$(stat -c %U /etc/scalyr-agent-2/agent.json)
+script_owner=$(stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2)
 
 # Determine if the agent had been previously configured to run as a
-# different user than root.  We can determine this if agentConfig.json
+# different user than root.  We can determine this if agent.json
 # has a different user.  If so, then make sure the newly installed files
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
@@ -93,19 +115,19 @@ if [ "$config_owner" != "$script_owner" ]; then
 fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
-# Will output permissions on octal mode - xyz, e.g. 644
-config_permissions=`stat -c %a /etc/scalyr-agent-2/agent.json`
-config_permissions_others=`echo -n "$config_permissions" | tail -c 1`
-
-if [ "${config_permissions_others}" -ne 0 ]; then
-    # TODO: Should we just re-use existing file permissions for owner and group?
-    echo "Changing permissions for /etc/scalyr-agent-2/agent.json to 640 to make sure it's not readable by others"
-    chmod 640 /etc/scalyr-agent-2/agent.json > /dev/null 2>&1;
-fi
+ensure_path_other_permissions "/etc/scalyr-agent-2/agent.json" "0"
 
 # Ensure agent.d/*.json files are note readable by others
-chmod 740 /etc/scalyr-agent-2/agent.d > /dev/null 2>&1;
-chmod 640 /etc/scalyr-agent-2/agent.d/*.json > /dev/null 2>&1;
+ensure_path_other_permissions "/etc/scalyr-agent-2/agent.d" " 0"
+
+if [ -d "$/etc/scalyr-agent-2/agent.d" ]; then
+  # NOTE: find + -print0 correctly handles whitespaces in  filenames and it's more robust than for,
+  # but it may have cross platform issues. In that case we may need to revert to for.
+  #for config_fragment_path in /etc/scalyr-agent-2/agent.d/*.json; do
+  find /etc/scalyr-agent-2/agent.d/ -name "*.json" -print0 | while read -r -d $'\0' config_fragment_path; do
+    ensure_path_other_permissions "${config_fragment_path}" " 0"
+  done
+fi
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
 # to stop and start the service at boot time.
