@@ -78,12 +78,13 @@ check_python_version() {
   echo "Warning, no valid Python interpreter found."
 }
 
-# Function which ensures that the provided file path has specified permission for the "other"
-# users. If permissions don't match, we update them.
+# Function which ensures that the provided file path is not readable by "other" users aka has
+# "0" value for permission in the octet notation. If permissions don't match, we update them
+# and ensure value for the user part is "0".
 # This function can operate on a file or on a directory.
-ensure_path_other_permissions() {
+ensure_path_not_readable_by_others() {
   file_path=$1
-  wanted_permissions=$2
+  wanted_permissions_other="0"
 
   # Will output permissions on octal mode - xyz, e.g. 644
   file_permissions=$(stat -c %a /etc/scalyr-agent-2/agent.json)
@@ -93,9 +94,9 @@ ensure_path_other_permissions() {
   file_permissions_others=$(echo -n "$file_permissions" | tail -c 1)
 
   # NOTE: We re-use existing fs permissions for owner and group
-  if [ "${file_permissions_others}" -ne "${wanted_permissions}" ]; then
-    new_permissions="${file_permissions_owner_group}0"
-    echo "Changing permissions for file ${file_path} to ${new_permissions} to make sure it's not readable by others."
+  if [ "${file_permissions_others}" -ne "${wanted_permissions_other}" ]; then
+    new_permissions="${file_permissions_owner_group}${wanted_permissions_other}"
+    echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\" to make sure it's not readable by others."
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
   fi
 }
@@ -115,17 +116,17 @@ if [ "$config_owner" != "$script_owner" ]; then
 fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
-ensure_path_other_permissions "/etc/scalyr-agent-2/agent.json" "0"
+ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json" "0"
 
 # Ensure agent.d/*.json files are note readable by others
-ensure_path_other_permissions "/etc/scalyr-agent-2/agent.d" " 0"
+ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.d" "0"
 
-if [ -d "$/etc/scalyr-agent-2/agent.d" ]; then
+if [ -d "/etc/scalyr-agent-2/agent.d" ]; then
   # NOTE: find + -print0 correctly handles whitespaces in  filenames and it's more robust than for,
   # but it may have cross platform issues. In that case we may need to revert to for.
   #for config_fragment_path in /etc/scalyr-agent-2/agent.d/*.json; do
   find /etc/scalyr-agent-2/agent.d/ -name "*.json" -print0 | while read -r -d $'\0' config_fragment_path; do
-    ensure_path_other_permissions "${config_fragment_path}" " 0"
+    ensure_path_not_readable_by_others "${config_fragment_path}" " 0"
   done
 fi
 

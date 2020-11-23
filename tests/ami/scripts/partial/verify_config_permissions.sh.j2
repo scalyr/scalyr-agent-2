@@ -17,8 +17,8 @@ fi
 
 AGENT_D_PERMISSIONS=$(stat -c %a "/etc/scalyr-agent-2/agent.d")
 
-if [ "${AGENT_JSON_PERMISSIONS}" != "740" ]; then
-    echo "Expected 740 permissions for agent.d, got ${AGENT_D_PERMISSIONS}."
+if [ "${AGENT_D_PERMISSIONS}" != "740" ] && [ "${AGENT_D_PERMISSIONS}" != "750" ]; then
+    echo "Expected 740/750 permissions for agent.d, got ${AGENT_D_PERMISSIONS}."
     exit 2
 fi
 
