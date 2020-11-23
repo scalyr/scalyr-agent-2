@@ -96,6 +96,8 @@ echo_with_date ""
 # NOTE: This check needs to be performed as early as possible after fresh installation before
 # other tools modify the config
 ls -la /etc/scalyr-agent-2/
+ls -la /etc/scalyr-agent-2/agent.d/
+
 AGENT_JSON_PERMISSIONS=$(stat --printf "%A\n" "/etc/scalyr-agent-2/agent.json")
 
 if [ "${AGENT_JSON_PERMISSIONS}" != "-rw-r-----" ]; then
