@@ -118,7 +118,7 @@ echo_with_date "Verifying agent.json permissions"
 echo_with_date ""
 
 ls -la /etc/scalyr-agent-2/
-AGENT_JSON_PERMISSIONS=$("stat --printf "%A\n" config/agent.json")
+AGENT_JSON_PERMISSIONS=$("stat --printf "%A\n" /etc/scalyr-agent-2/agent.json")
 
 if [ "${AGENT_JSON_PERMISSIONS}" != "-rw-r-----" ]; then
     echo "Expected 640 permissions for agent.json, got ${AGENT_JSON_PERMISSIONS}"
