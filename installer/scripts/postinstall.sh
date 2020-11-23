@@ -104,6 +104,8 @@ if [ "${config_permissions_others}" -ne 0 ]; then
 fi
 
 # Ensure agent.d/*.json files are note readable by others
+chmod 740 /etc/scalyr-agent-2/agent.d > /dev/null 2>&1;
+chmod 640 /etc/scalyr-agent-2/agent.d/*.json > /dev/null 2>&1;
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
 # to stop and start the service at boot time.
