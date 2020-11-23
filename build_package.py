@@ -338,7 +338,7 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
-    os.chmod("root/etc/scalyr-agent-2/agent.d", int("740", 8))
+    os.chmod("Scalyr/config/agent.d", int("740", 8))
 
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
