@@ -88,11 +88,11 @@ script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 # has a different user.  If so, then make sure the newly installed files
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
+  echo "Changing owner for /etc/scalyr-agent-2/agent.json file from $script_owner to $config_owner"
   /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
 fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
-
 # Will output permissions on octal mode - xyz, e.g. 644
 config_permissions=`stat -c %a /etc/scalyr-agent-2/agent.json`
 config_permissions_others=`echo -n "$config_permissions" | tail -c 1`
@@ -102,6 +102,8 @@ if [ "${config_permissions_others}" -ne 0 ]; then
     echo "Changing permissions for /etc/scalyr-agent-2/agent.json to 640 to make sure it's not readable by others"
     chmod 640 /etc/scalyr-agent-2/agent.json > /dev/null 2>&1;
 fi
+
+# Ensure agent.d/*.json files are note readable by others
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
 # to stop and start the service at boot time.
