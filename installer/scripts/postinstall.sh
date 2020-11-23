@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 # Used below to execute a command to retrieve the Python interpreter version.
 run_and_check_persion_version() {
   command=$1
@@ -91,6 +89,18 @@ script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
   /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
+fi
+
+# Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
+
+# Will output permissions on octal mode - xyz, e.g. 644
+config_permissions=`stat -c %a /etc/scalyr-agent-2/agent.json`
+config_permissions_others=`echo -n "$config_permissions" | tail -c 1`
+
+if [ "${config_permissions_others}" -ne 0 ]; then
+    # TODO: Should we just re-use existing file permissions for owner and group?
+    echo "Changing permissions for /etc/scalyr-agent-2/agent.json to 640 to make sure it's not readable by others"
+    chmod 640 /etc/scalyr-agent-2/agent.json > /dev/null 2>&1;
 fi
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
