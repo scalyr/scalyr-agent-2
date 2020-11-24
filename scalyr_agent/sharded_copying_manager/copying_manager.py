@@ -31,6 +31,8 @@ if False:
     from typing import List
     from typing import Optional
     from typing import Tuple
+    from types import Set
+    from types import Any
 
 from scalyr_agent import (
     scalyr_logging as scalyr_logging,
@@ -58,6 +60,28 @@ log = scalyr_logging.getLogger(__name__)
 
 SCHEDULED_DELETION = "scheduled-deletion"
 CHECKPOINTS_MASTER_FILE_NAME = "checkpoints-master.json"
+
+
+def _accumulate_worker_stats(
+    stats, result_on_at_least_one_fail=False, result_on_all_succeed=True
+):
+    # type: (Set, Optional[Any], Optional[Any]) -> Optional[bool]
+    """
+    Gets a set of elements, where each element may be True, False or None and verifies them following the next logic:
+        - If there is at least one 'False' then the whole result is 'result_on_at_least_one_fail'.
+        - If there is at least one 'None' and no any 'False' then the whole result is 'None'.
+        - If all elements are 'True' then the result is 'result_on_all_succeed'
+    """
+    if False in stats:
+        # First of all we check for failed stats. If there is at least one, the whole result in failed too.
+        return result_on_at_least_one_fail
+    elif None in stats:
+        # Only if there are no failed stats...
+        # If there is at least one unknown response. the whole result in unknown too.
+        return None
+    else:
+        # all successful, the result is successful too.
+        return result_on_all_succeed
 
 
 class ApiKeyWorkerPool(object):
@@ -142,7 +166,7 @@ class ApiKeyWorkerPool(object):
         # type: (Tuple, Dict) -> LogFileProcessor
         """
         Find the next worker in the pool and make it to create and schedule a log processor.
-        The the arguments will be eventually passed to the LogProcessor's constructor.
+        The the arguments will be eventually passed to the LogFileProcessor's constructor.
         :return: New log processor
         """
         worker = self.__find_next_worker()
@@ -214,37 +238,34 @@ class ApiKeyWorkerPool(object):
 
         # get overall information about last responses of all workers in the worker pool.
         # making this as a set should help in further decision making process.
-        responses = {
-            # compare each response status for "success" and store the boolean result.
-            # NOTE: we do not compare None values, they are stored as are.
-            None
-            if s.last_response_status is None
-            else s.last_response_status == "success"
-            for s in worker_statuses
-        }
+        # we follow the next algorithm:
+        #   - if all request are successful, then the result is successful too.
+        #   - if at least one response status is still None, and other are successful, then the result is None too.
+        # In other words, we wait until all workers has gotten their first responses.
+        #   - if at least one response status is unsuccessful, then the result is unsuccessful too,
+        # and it does not matter if there are any unknown (None) values.
 
-        if False in responses:
-            # First of all we check for failed responses. If there is at least one, the whole result in failed too.
-            result.all_responses_successful = False
-            # Only if there are no failed responses.
-            # If there is at least one unknown response. the whole result in unknown too.
-        elif None in responses:
-            result.all_responses_successful = None
-        else:
-            # all responses are successful
-            result.all_responses_successful = True
+        responses = set()
+        for s in worker_statuses:
+            if s.last_response_status is not None:
+                # compare each response status for "success" and store the boolean result.
+                responses.add(s.last_response_status == "success")
+            else:
+                #  we do not compare None values, they are stored as are.
+                # The None value says that not all workers have worked enough to get their first responses,
+                responses.add(None)
+
+        result.all_responses_successful = _accumulate_worker_stats(responses)
 
         # do the same thing with health checks as we did with responses
-        health_checks = {
-            None if s.health_check_result is None else s.health_check_result == "Good"
-            for s in worker_statuses
-        }
-        if False in health_checks:
-            result.all_health_checks_good = False
-        elif None in health_checks:
-            result.all_health_checks_good = None
-        else:
-            result.all_health_checks_good = True
+        health_checks = set()
+        for s in worker_statuses:
+            if s.health_check_result is not None:
+                health_checks.add(s.health_check_result == "Good")
+            else:
+                health_checks.add(None)
+
+        result.all_health_checks_good = _accumulate_worker_stats(health_checks)
 
         return result
 
@@ -363,7 +384,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # The list of LogMatcher objects that are watching for new files to appear.
         # NOTE: log matchers must be created only after worker pools.
-        self.__log_matchers = self.__create_log_matches(self.__config, self.__monitors)
+        self.__log_matchers = self.__create_log_matches(
+            self.__config, self.__monitors
+        )  # type: List[LogMatcher]
 
     @property
     def expanded_server_attributes(self):
@@ -718,7 +741,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # noinspection PyBroadException
             try:
                 # prepare and read checkpoints.
-                self.__prepare_checkpoints()
+                self.__consolidate_checkpoints()
                 checkpoints = self.__find_and_read_checkpoints()
 
                 log.info("Starting copying manager workers.")
@@ -884,28 +907,26 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             # get responses information from worker pools
             responses = {s.all_responses_successful for s in api_key_statuses}
-            if False in responses:
-                # if there is at least one failed response - a whole result is failed too.
-                result.last_responses_status_info = "Last requests on some workers is not successful, see below for more info."
-            elif None in responses:
-                # if there is at least one unknown response - a whole result is unknown too.
-                # NOTE: As the above condition implies, the result will be unknown unly if there is no failed responses.
-                result.last_responses_status_info = None
-            else:
-                result.last_responses_status_info = "All successful"
 
-            # Get health checks the same way as with responses.
-            health_checks = {s.all_health_checks_good for s in api_key_statuses}
-            if False in health_checks:
-                all_health_check_error_messages.append(
-                    "Some workers has failed, see below for more info."
-                )
-            elif None in health_checks:
-                result.health_check_result = None
-            else:
-                result.health_check_result = "Good"
+            result.last_responses_status_info = _accumulate_worker_stats(
+                responses,
+                result_on_at_least_one_fail="Last requests on some workers is not successful, see below for more info.",
+                result_on_all_succeed="All successful",
+            )
+
+            # Get the workers health checks the same way as responses.
+            worker_health_checks = {s.all_health_checks_good for s in api_key_statuses}
+
+            workers_health_check_successful = _accumulate_worker_stats(
+                worker_health_checks,
+            )
+
+            # if the workers health check is failed, then we add the error message about that.
+            if workers_health_check_successful is False:
+                all_health_check_error_messages.append("Some workers has failed, see below for more info.",)
 
             # do the health check of the copying manager itself.
+            copying_manager_health_check_successful = None
             if self.__last_scan_attempt_time:
                 if (
                     time.time()
@@ -913,16 +934,22 @@ class CopyingManager(StoppableThread, LogWatcher):
                     # TODO: create new config value for that.
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    # if there is a bad health check if the copying manager itself, show it first.
+                    copying_manager_health_check_successful = False
+                    # if there is a bad health check if the copying manager itself, add the error message about that.
+                    # Note: the information about the copying manager itself should be shown first.
                     all_health_check_error_messages.insert(
                         0,
-                        "Failed, max time since last scan attempt (%s seconds) exceeded"
-                        % self.__config.healthy_max_time_since_last_copy_attempt,
+                        "Failed, max time since last scan attempt (%s seconds) exceeded" % self.__config.healthy_max_time_since_last_copy_attempt,
                     )
+                else:
+                    copying_manager_health_check_successful = True
 
-            # if there are error messages, concatenate them into one message
-            if len(all_health_check_error_messages) > 0:
-                result.health_check_result = "\n".join(all_health_check_error_messages)
+            # get the final health check result from the workers health check and copying manager health check.
+            result.health_check_result = _accumulate_worker_stats(
+                {copying_manager_health_check_successful, workers_health_check_successful},
+                result_on_at_least_one_fail="\n".join(all_health_check_error_messages),
+                result_on_all_succeed="Good"
+            )
 
             # get statuses for the log matchers.
             for entry in self.__log_matchers:
@@ -1213,7 +1240,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
 
-    def __prepare_checkpoints(self):
+    def __consolidate_checkpoints(self):
         """
         Combines all worker checkpoints that were left from the previous agent run.
         It combines checkpoint files into one single file in order to
@@ -1223,14 +1250,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         checkpoints_dir_path = os.path.join(
             self.__config.agent_data_path, "checkpoints"
         )
-
-        # if there is a file called as the checkpoints folder, remove it
-        if os.path.isfile(checkpoints_dir_path):
-            os.unlink(checkpoints_dir_path)
-
-        # create new checkpoint folder if does not exist.
-        if not os.path.exists(checkpoints_dir_path):
-            os.mkdir(checkpoints_dir_path)
 
         # read all checkpoints from the manager's previous run and combine them into one mater file.
         checkpoints = self.__find_and_read_checkpoints()
@@ -1243,15 +1262,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         )
 
         # clear the checkpoints folder by removing all worker checkpoint files.
-        checkpoints_glob = os.path.join(checkpoints_dir_path, "*checkpoints*.json")
+        # NOTE: we also look at the parent directory
+        # in case if there are checkpoint files from an older version of the agent.
+        checkpoints_glob = os.path.join(self.__config.agent_data_path, "**/*checkpoints*.json")
 
-        # also remove old version checkpoints
-        for path in glob.glob(
-            os.path.join(self.__config.agent_data_path, "*checkpoints.json")
-        ):
-            os.unlink(path)
-
-        for path in glob.glob(checkpoints_glob):
+        for path in scalyr_util.match_glob(checkpoints_glob):
             # do not delete master checkpoint file
             if path == master_checkpoints_path:
                 continue
@@ -1266,25 +1281,14 @@ class CopyingManager(StoppableThread, LogWatcher):
         :return: Checkpoint state stored in dict.
         """
 
-        checkpoints_dir_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints"
-        )
-        # get checkpoint file names from the 'checkpoints' folder. All previous worker checkpoints are stored there.
-        checkpoints_file_paths = list(
-            glob.glob(os.path.join(checkpoints_dir_path, "checkpoints*.json"))
-        )
-
-        # we also add path for the checkpoint file that was used in the previous version of the Copying manager.
-        # This is needed to be able to get checkpoints after the upgrade of the agent.
-        checkpoints_file_paths.append(
-            os.path.join(self.__config.agent_data_path, "checkpoints.json")
-        )
-
         found_checkpoints = []
 
         current_time = time.time()
 
-        for checkpoints_path in checkpoints_file_paths:
+        # also search in the parent directory in case if there are checkpoint files from older versions.
+        glob_path = os.path.join(self.__config.agent_data_path, "**/*checkpoints*.json")
+
+        for checkpoints_path in scalyr_util.match_glob(glob_path):
 
             checkpoints = self.__read_checkpoint_state(checkpoints_path, current_time)
 
@@ -1321,10 +1325,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
 
         if not os.path.isfile(full_checkpoints_path):
-            log.info(
-                'The log copying checkpoint file "%s" does not exist, skipping.'
-                % full_checkpoints_path
-            )
             return None
 
         # noinspection PyBroadException

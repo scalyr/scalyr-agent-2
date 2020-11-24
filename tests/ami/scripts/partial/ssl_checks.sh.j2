@@ -18,11 +18,7 @@ echo_with_date ""
 echo_with_date "Verifying agent status output"
 echo_with_date ""
 
-echo "888"
-
 set +e
-
-echo "OUTPUT1"
 STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
 EXIT_CODE=$?
 set -e
@@ -40,8 +36,6 @@ echo -e "${STATUS_OUTPUT}" | grep "The agent does not appear to be running"
 echo_with_date ""
 echo_with_date "Verifying agent.log"
 echo_with_date ""
-
-echo "999"
 
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "ca_cert_path: /tmp/invalid/ca_certs.crt"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "failedAgentMain"
@@ -66,8 +60,6 @@ else
     exit 1
 fi
 
-echo "999"
-
 # NOTE: We create a symlink so we can re-use config with a fixed value for ca_cert_path
 sudo ln -s ${SYSTEM_CA_BUNDLE_PATH} /etc/ssl/system-ca-bundle.crt
 
@@ -88,8 +80,6 @@ echo_with_date ""
 STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
 echo -e "${STATUS_OUTPUT}"
 echo_with_date ""
-
-echo "10"
 
 echo -e "${STATUS_OUTPUT}" | grep -v "Last successful communication with Scalyr: Never"
 echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 success"
@@ -121,8 +111,6 @@ echo_with_date ""
 STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
 echo -e "${STATUS_OUTPUT}"
 echo_with_date ""
-
-echo "11"
 
 echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
 echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
@@ -163,8 +151,6 @@ sudo cp agent.json_invalid_bad_cert /etc/scalyr-agent-2/agent.json
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
-echo "12"
-
 echo_with_date ""
 echo_with_date "Verifying agent status output"
 echo_with_date ""
@@ -185,8 +171,6 @@ echo_with_date ""
 echo_with_date ""
 echo_with_date "Verifying agent logs"
 echo_with_date ""
-
-echo "13"
 
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "Failed to connect to \"https://example.com:443\""

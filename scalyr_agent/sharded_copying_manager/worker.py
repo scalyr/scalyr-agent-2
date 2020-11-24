@@ -46,7 +46,6 @@ import six
 
 log = scalyr_logging.getLogger(__name__)
 
-
 class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
@@ -428,11 +427,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
-
-                log.info(
-                    "Copying manager worker #%s started. Pid: '%s'"
-                    % (self._id, os.getpid())
-                )
 
                 while self._run_state.is_running():
                     log.log(
@@ -963,7 +957,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         return AddEventsTask(add_events_request, handle_completed_callback)
 
     def __scan_for_new_bytes(self, current_time=None):
-        """For any existing LogProcessors, have them scan the file system to see if their underlying files have
+        """For any existing LogFileProcessors, have them scan the file system to see if their underlying files have
         grown.
 
         This does not perform any processing on the file nor advances the file's position.
@@ -1153,7 +1147,7 @@ if sys.version_info >= (3, 6, 0):
 
 
 # create base proxy class for the LogFileProcessor, here we also specify all its methods that may be called through proxy.
-_LogProcessorProxy = multiprocessing.managers.MakeProxyType(
+_LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(
     six.ensure_str("LogFileProcessorProxy"),
     [
         six.ensure_str("is_closed"),
@@ -1166,9 +1160,9 @@ _LogProcessorProxy = multiprocessing.managers.MakeProxyType(
 )
 
 # Create final proxy class for the LogFileProcessors by subclassing the base class.
-class LogProcessorProxy(_LogProcessorProxy):
+class LogFileProcessorProxy(_LogFileProcessorProxy):
     def __init__(self, *args, **kwargs):
-        super(LogProcessorProxy, self).__init__(*args, **kwargs)
+        super(LogFileProcessorProxy, self).__init__(*args, **kwargs)
         self.__cached_log_path = None
 
     def get_log_path(self):
@@ -1221,7 +1215,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
 
     # register LogFileProcessor proxy.
     _SharedObjectManager.register(
-        six.ensure_str("LogFileProcessorProxy"), proxytype=LogProcessorProxy
+        six.ensure_str("LogFileProcessorProxy"), proxytype=LogFileProcessorProxy
     )
 
     _SharedObjectManager.register(

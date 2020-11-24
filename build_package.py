@@ -337,6 +337,7 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
+    make_directory("Scalyr/data/checkpoints")
     make_directory("Scalyr/config/agent.d")
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
@@ -871,12 +872,13 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     # Build the rest of the directories required for the tarball install.  Mainly, the log and data directories
     # in the tarball itself where the running process will store its state.
     make_directory("scalyr-agent-2/data")
+    make_directory("scalyr-agent-2/data/checkpoints")
     make_directory("scalyr-agent-2/log")
     make_directory("scalyr-agent-2/config/agent.d")
 
     # Create a file named packageless.  This signals to the agent that
     # this a tarball install instead of an RPM/Debian install, which changes
-    # the default paths for th econfig, logs, data, etc directories.  See
+    # the default paths for the config, logs, data, etc directories.  See
     # configuration.py.
     write_to_file("1", "scalyr-agent-2/packageless")
 

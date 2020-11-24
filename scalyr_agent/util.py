@@ -28,6 +28,7 @@ if False:  # NOSONAR
     from typing import Callable
     from typing import Optional
     from typing import Any
+    from types import List
 
 import codecs
 import sys
@@ -35,6 +36,13 @@ import ssl
 import locale
 import collections
 from io import open
+
+if sys.version_info < (3, 5):
+    # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
+    import glob2  # pylint: disable=import-error
+else:
+    # Python 3.5 and higher supports `**`
+    import glob
 
 import six
 import functools
@@ -2383,3 +2391,21 @@ def max_ignore_none(*args, **kwargs):
         return max(values, key=key)
     else:
         return max(values)
+
+
+def match_glob(pathname):
+    # type: (six.text_type) -> List[six.text_type]
+    """
+    Performs a glob match for the given pathname glob pattern, returning the list of matching
+    files. This is mostly done for the compatibility reason
+    because of the standard glob library on python <3.5, which does not support recursive globs
+
+    :param pathname: The glob pattern
+    :return: The list of matching paths
+    """
+    if sys.version_info >= (3, 5):
+        result = glob.glob(pathname, recursive=True)
+    else:
+        # use the third party glob library to handle a recursive glob.
+        result = glob2.glob(pathname)
+    return result

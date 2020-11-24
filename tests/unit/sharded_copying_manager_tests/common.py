@@ -608,7 +608,7 @@ class TestableCopyingManagerThreadedWorker(
         )
 
     def close_at_eof(self, filepath):
-        """Tells the CopyingManagerWorker to mark the LogProcessor copying the specified path to close itself
+        """Tells the CopyingManagerWorker to mark the LogFileProcessor copying the specified path to close itself
         once all bytes have been copied up to Scalyr.  This can be used to remove LogProcessors for
         testing purposes.
 

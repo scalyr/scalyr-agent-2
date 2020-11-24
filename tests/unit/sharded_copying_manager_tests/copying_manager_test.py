@@ -90,18 +90,34 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         disable_flow_control=False,
     ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
 
-        api_keys = []
-        for i in range(self.api_keys_count):
-            api_key_config = {"id": six.text_type(i), "workers": self.workers_count}
-            if i > 0:
-                api_key_config["api_key"] = "<key_%s>" % i
-            api_keys.append(api_key_config)
+        pipeline_threshold = 1.1
+        if use_pipelining:
+            pipeline_threshold = 0.0
+
+        initial_config_data = {
+            "debug_level": 5,
+            "disable_max_send_rate_enforcement_overrides": True,
+            "pipeline_threshold": pipeline_threshold,
+        }
 
         if config_data is None:
-            config_data = {
-                "api_keys": api_keys,
-                "use_multiprocess_copying_workers": self.use_multiprocessing_workers,
-            }
+            config_data = {}
+
+        for k, v in initial_config_data.items():
+            if k not in config_data:
+                config_data[k] = v
+
+        if "api_keys" not in config_data:
+            api_keys = []
+            for i in range(self.api_keys_count):
+                api_key_config = {"id": six.text_type(i), "workers": self.workers_count}
+                if i > 0:
+                    api_key_config["api_key"] = "<key_%s>" % i
+                api_keys.append(api_key_config)
+            config_data["api_keys"] = api_keys
+
+        config_data["use_multiprocess_copying_workers"] = self.use_multiprocessing_workers
+
 
         self._create_config(
             log_files_number=log_files_number,
@@ -126,48 +142,18 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 class TestBasic(CopyingManagerTest):
     def test_multiple_workers(self):
 
-        config_data = {"api_keys": [{"workers": 3}]}
+        _, manager = self._create_manager_instanse(2)
 
-        (test_file, test_file2), manager = self._create_manager_instanse(
-            2, config_data=config_data
-        )
-
-        assert len(manager.workers) == 3
-
-    @pytest.mark.skipif(
-        platform.system() == "Windows", reason="Skipping Linux only tests on Windows"
-    )
-    def test_multiple_process_workers(self):
-
-        config_data = {
-            "api_keys": [{"workers": 3}],
-            "use_multiprocess_copying_workers": True,
-        }
-
-        (test_file, test_file2), manager = self._create_manager_instanse(
-            2, config_data=config_data
-        )
-
-        assert len(manager.workers) == 3
-
-        worker_pids = {worker.get_pid() for worker in manager.workers}
-        assert len(worker_pids) == 3
-        assert os.getpid() not in worker_pids
-
-    def test_multiple_thread_workers(self):
-
-        config_data = {"api_keys": [{"workers": 3}, {"workers": 2, "api_key": "key"}]}
-
-        (test_file, test_file2), manager = self._create_manager_instanse(
-            2, config_data=config_data
-        )
-
-        assert len(manager.workers) == 5
+        assert len(manager.workers) == self.workers_count * self.api_keys_count
 
         worker_pids = {worker.get_pid() for worker in manager.workers}
 
-        assert len(worker_pids) == 1
-        assert os.getpid() in worker_pids
+        if self.use_multiprocessing_workers:
+            assert len(worker_pids) == self.workers_count * self.api_keys_count
+            assert os.getpid() not in worker_pids
+        else:
+            # in case of non multiprocess workers, all workers has the same process id as the main process.
+            assert worker_pids == {os.getpid()}
 
     def test_generate_status(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
@@ -183,7 +169,7 @@ class TestBasic(CopyingManagerTest):
     def test_health_check_status(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
 
-        manager._CopyingManager__last_attempt_time = time.time()
+        manager._CopyingManager__last_scan_attempt_time = time.time()
 
         status = manager.generate_status()
         assert status.health_check_result == "Good"

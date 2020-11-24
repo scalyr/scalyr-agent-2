@@ -90,8 +90,6 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
-echo "111"
-
 # Run some basic sanity checks
 echo_with_date ""
 echo_with_date "Verifying agent status output"
@@ -109,8 +107,6 @@ echo_with_date ""
 echo_with_date "Verifying build_info file exists"
 cat /usr/share/scalyr-agent-2/build_info || (echo_with_date "build_info file is missing" ; exit 1)
 echo_with_date ""
-
-echo "222"
 
 # Verify rc*.d symlinks are in place
 echo_with_date ""
@@ -131,8 +127,6 @@ sudo cat /var/log/scalyr-agent-2/agent.log | grep "Starting scalyr agent"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
 echo_with_date ""
-
-echo "333"
 
 {% if test_type == "upgrade" -%}
 # Upgrade to new version
@@ -164,8 +158,6 @@ export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
       {% endif -%}
 {% endif -%}
 
-echo "444"
-
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Verify status works and symlinks are in place
@@ -180,9 +172,6 @@ sudo scalyr-agent-2 status -v | grep agent.log
 sudo scalyr-agent-2 status -v | grep linux_system_metrics
 sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
-
-echo "555"
-
 # Verify rc*.d symlinks are in place
 echo_with_date ""
 echo_with_date "Verifying rc.d symlinks exist"
@@ -190,8 +179,6 @@ echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent
 echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7
-
-echo "666"
 
 echo_with_date ""
 echo_with_date "Verifying agent.log"
@@ -202,7 +189,5 @@ sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
 echo_with_date ""
 {% endif -%}
-
-echo "777"
 
 {% include "partial/ssl_checks.sh.j2" %}
