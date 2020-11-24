@@ -568,6 +568,7 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     make_directory("root/etc/init.d")
     make_directory("root/var/log/scalyr-agent-2")
     make_directory("root/var/lib/scalyr-agent-2")
+    make_directory("root/var/lib/scalyr-agent-2/checkpoints")
     make_directory("root/usr/share")
     make_directory("root/usr/sbin")
 

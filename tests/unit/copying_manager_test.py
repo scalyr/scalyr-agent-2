@@ -1469,8 +1469,14 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         data_dir = os.path.join(root_dir, "data")
         log_dir = os.path.join(root_dir, "log")
 
+        checkpoints_path = os.path.join(data_dir, "checkpoints")
+
         if not os.path.exists(data_dir):
             os.mkdir(data_dir)
+
+        if not os.path.exists(checkpoints_path):
+            os.mkdir(checkpoints_path)
+
         if not os.path.exists(config_dir):
             os.mkdir(config_dir)
         if not os.path.exists(log_dir):
