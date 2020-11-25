@@ -843,6 +843,14 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
+        # NOTE: By default fpm won't preserve all the permissions we set on the files so we need
+        # to use those flags.
+        # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
+        # "group"
+        " --rpm-auto-add-directories "
+        " --rpm-use-file-permissions "
+        " --rpm-defattrfile 640"
+        " --rpm-defattrdir 751"
         "  -C root usr etc var" % (package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
