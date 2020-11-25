@@ -882,6 +882,9 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     make_directory("scalyr-agent-2/data")
     make_directory("scalyr-agent-2/log")
     make_directory("scalyr-agent-2/config/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("scalyr-agent-2/config/agent.d", int("741", 8))
 
     # Create a file named packageless.  This signals to the agent that
     # this a tarball install instead of an RPM/Debian install, which changes
