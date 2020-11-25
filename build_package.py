@@ -847,10 +847,12 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         # to use those flags.
         # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
         # "group"
-        " --rpm-auto-add-directories "
-        " --rpm-use-file-permissions "
-        " --rpm-defattrfile 640"
-        " --rpm-defattrdir 751"
+        # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+        # directories such as /etc/init.d and we need to handle that in postinst :/
+        # " --rpm-auto-add-directories "
+        # " --rpm-use-file-permissions "
+        # " --rpm-defattrfile 640"
+        # " --rpm-defattrdir 751"
         "  -C root usr etc var" % (package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
