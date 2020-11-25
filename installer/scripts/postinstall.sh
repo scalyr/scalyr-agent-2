@@ -85,6 +85,11 @@ ensure_path_other_permissions() {
   file_path=$1
   wanted_permissions_other=$2
 
+  if [ "${wanted_permissions_other}" -lt 0 ] || [ "${wanted_permissions_other}" -gt 7 ]; then
+    echo "wanted_permissions_other value needs to be between 0 and 7"
+    return 1
+  fi
+
   # Will output permissions on octal mode - xyz, e.g. 644
   file_permissions=$(stat -c %a "${file_path}")
   # Permissions for owner and group - e.g. 644
@@ -125,7 +130,7 @@ if [ "$config_owner" != "$script_owner" ]; then
 fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
-ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json" "0"
+ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json"
 
 # Ensure agent.d/*.json files are note readable by others
 # NOTE: Most software gives +x bit on *.d directories so we do the same
@@ -136,7 +141,7 @@ if [ -d "/etc/scalyr-agent-2/agent.d" ]; then
   # but it may have cross platform issues. In that case we may need to revert to for.
   #for config_fragment_path in /etc/scalyr-agent-2/agent.d/*.json; do
   find /etc/scalyr-agent-2/agent.d/ -name "*.json" -print0 | while read -r -d $'\0' config_fragment_path; do
-    ensure_path_not_readable_by_others "${config_fragment_path}" " 0"
+    ensure_path_not_readable_by_others "${config_fragment_path}"
   done
 fi
 
