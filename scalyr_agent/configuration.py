@@ -57,6 +57,14 @@ from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
 
+FILE_WRONG_OWNER_ERROR_MSG = """
+File \"%s\" is not readable the current user (%s).
+
+You need to make sure that the file is owned by the same account which is used to run the agent.
+
+Original error: %s
+""".strip()
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -140,6 +148,21 @@ class Configuration(object):
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException as e:
+                # Special case - file is not readable, likely means a permission issue so return a
+                # more user-friendly error
+                if "file is not readable" in str(e).lower():
+                    from scalyr_agent.platform_controller import PlatformController
+
+                    platform_controller = PlatformController.new_platform()
+                    current_user = platform_controller.get_current_user()
+
+                    msg = FILE_WRONG_OWNER_ERROR_MSG % (
+                        self.__file_path,
+                        current_user,
+                        six.text_type(e),
+                    )
+                    raise BadConfiguration(msg, None, "fileParseError")
+
                 raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
