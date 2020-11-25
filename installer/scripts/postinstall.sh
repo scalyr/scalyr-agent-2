@@ -78,6 +78,35 @@ check_python_version() {
   echo "Warning, no valid Python interpreter found."
 }
 
+# Function which ensures that the provided file path permissions for "group" match the
+# provided permission bit in octal notation.
+# This function can operate on a file or on a directory.
+ensure_path_group_permissions() {
+  file_path=$1
+  wanted_permissions_group=$2
+
+  if [ "${wanted_permissions_group}" -lt 0 ] || [ "${wanted_permissions_group}" -gt 7 ]; then
+    echo "wanted_permissions_group value needs to be between 0 and 7"
+    return 1
+  fi
+
+  # Will output permissions on octal mode - xyz, e.g. 644
+  file_permissions=$(stat -c %a "${file_path}")
+  # Permissions for owner - e.g. 6
+  file_permissions_owner=$(echo -n "$file_permissions" | head -c 1)
+  # Permissions for group - e.g. 4
+  file_permissions_group=$(echo -n "$file_permissions" | head -c 2 | tail -c 1)
+  # Permissions for other - e.g. 4
+  file_permissions_others=$(echo -n "$file_permissions" | tail -c 1)
+
+  # NOTE: We re-use existing fs permissions for owner and other
+  if [ "${file_permissions_group}" -ne "${wanted_permissions_group}" ]; then
+    new_permissions="${file_permissions_owner}${wanted_permissions_group}${file_permissions_others}"
+    echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
+    chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
+  fi
+}
+
 # Function which ensures that the provided file path permissions for "other" users match the
 # provided permission bit in octal notation.
 # This function can operate on a file or on a directory.
@@ -103,7 +132,6 @@ ensure_path_other_permissions() {
     echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
   fi
-
 }
 
 # Function which ensures that the provided file path is not readable by "other" users aka has
@@ -131,6 +159,9 @@ fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
 ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json"
+
+# We also change agent.d group permissions to 751 since it used to be 771 due to fpm behavior
+ensure_path_group_permissions "/etc/scalyr-agent-2/agent.d" "5"
 
 # Ensure agent.d/*.json files are note readable by others
 # NOTE: Most software gives +x bit on *.d directories so we do the same
