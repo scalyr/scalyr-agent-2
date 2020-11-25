@@ -48,6 +48,7 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
     JournaldLogFormatter,
 )
+from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
@@ -644,6 +645,28 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
+
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_incorrect_file_permissions_or_owner(
+        self, mock_read_config_file_as_json
+    ):
+        mock_read_config_file_as_json.side_effect = JsonReadFileException(
+            self._config_file, "The file is not readable"
+        )
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ { path:"/var/log/tomcat6/access.log"} ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        expected_msg = r'File "%s" is not readable the current user (.*?).' % (
+            self._config_file
+        )
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     def test_sampling_rules(self):
         self._write_file_with_separator_conversion(
