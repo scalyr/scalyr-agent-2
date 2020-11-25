@@ -298,6 +298,8 @@ def build_win32_installer_package(variant, version):
     cat_files(
         [agent_json_path], "agent_config.tmpl", convert_newlines=True,
     )
+    # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
+    # readable by others.
     os.chmod(agent_json_path, int("640", 8))
 
     os.chdir("..")
@@ -338,7 +340,9 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
-    os.chmod("Scalyr/config/agent.d", int("740", 8))
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("Scalyr/config/agent.d", int("741", 8))
 
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
@@ -587,7 +591,9 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
 
     # Make sure there is an agent.d directory regardless of the config directory we used.
     make_directory("root/etc/scalyr-agent-2/agent.d")
-    os.chmod("root/etc/scalyr-agent-2/agent.d", int("740", 8))
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("root/etc/scalyr-agent-2/agent.d", int("741", 8))
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
