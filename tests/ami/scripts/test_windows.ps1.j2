@@ -97,7 +97,19 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
 # NOTE: This check needs to be performed as early as possible after fresh installation before
 # other tools modify the config
 dir "C:\Program Files (x86)\Scalyr\config"
-Get-Permissions "C:\Program Files (x86)\Scalyr\config\agent.json"
+
+icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.json"
+icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
+
+Log-Message ""
+Log-Message "test.json"
+Log-Message ""
+
+type "C:\Program Files (x86)\Scalyr\config\test.json"
+
+Log-Message ""
+Log-Message "test.json"
+Log-Message ""
 
 # Copy over agent.json with the API key set up
 Copy-Item ".\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"

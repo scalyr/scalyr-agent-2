@@ -1427,7 +1427,22 @@ if __name__ == "__main__":
             default=False,
             help="Starts the agent if the conditional restart file marker exists.",
         )
-
+        # Special flag which is used by the Windows installer. We use it to indicate to this binary
+        # to fix up permissions for agent.json file and agent.d/ directory. This file is also used
+        # to create initial config by the install which means we can't correctly set those
+        # permissions inside the .wxs wix spec file.
+        # Right now it can only be used with "--init-config" flag on Windows.
+        parser.add_option(
+            "",
+            "--fix-config-permissions",
+            dest="fix_config_permissions",
+            action="store_true",
+            default=False,
+            help=(
+                "Fix permissions for agent.json file and agent.d/ directory and make sure it's. "
+                "not readable by others."
+            ),
+        )
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print("Could not parse commandline arguments.", file=sys.stderr)
@@ -1519,6 +1534,69 @@ if __name__ == "__main__":
         sys.exit(1)
 
     controller.consume_config(config_file, options.config_filename)
+
+    if sys.platform.startswith("win") and options.fix_config_permissions:
+        # current_config_permissions = os.stat(options.config_filename).st_mode
+        print("Changing permissions for agent.json")
+
+        # NOTE: Sadly we can't use os.chmod on Windows
+        test_path = "C:\\Program Files (x86)\\Scalyr\\config\\test.json"
+        with open(test_path, "wb") as fp:
+            fp.write(b"file content")
+
+            users_to_remove_permissions_from = [
+                "Users",
+                # "BUILTIN\\Users",
+            ]
+
+            # 1. First we need to disable inheritance for this file and the directory
+            args = [
+                "icacls.exe",
+                "C:\\Program Files (x86)\\Scalyr\\config\\agent.json",
+                "/inheritance:d",
+                "/T",
+            ]
+            output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+            fp.write("error: " + output + b"\n")
+
+            args = [
+                "icacls.exe",
+                "C:\\Program Files (x86)\\Scalyr\\config\\agent.d",
+                "/inheritance:d",
+                "/T",
+            ]
+            output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+            fp.write("error: " + output + b"\n")
+
+            # Then we remove the permissions
+            try:
+                for username in users_to_remove_permissions_from:
+                    args = [
+                        "icacls.exe",
+                        "C:\\Program Files (x86)\\Scalyr\\config\\agent.json",
+                        # "/remove:g",
+                        "/remove",
+                        # username + ":(I)(RX)",
+                        username,
+                        "/T",
+                    ]
+                    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                    fp.write("error: " + output + b"\n")
+                    # icacls  D:\website\mysite\*.*  /remove:d everyone /T
+
+                    args = [
+                        "icacls.exe",
+                        "C:\\Program Files (x86)\\Scalyr\\config\\agent.d",
+                        # "/remove:g",
+                        "/remove",
+                        # username + ":(I)(RX)",
+                        username,
+                        "/T",
+                    ]
+                    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                    fp.write("error: " + output + b"\n")
+            except Exception as e:
+                fp.write(str(e).decode("utf-8") + b"\n")
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
     if sys.platform.startswith("win") and options.mark_conditional_restart:

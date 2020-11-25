@@ -61,7 +61,7 @@
             <Directory Id='DEFAULTAPPAGENTD' Name='agent.d'>
                 <Component Id='config_d_dir' Guid='7f375f4b-cc38-4d4a-af26-e60154f05392' SharedDllRefCount='no'
                            KeyPath='no' NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
-                    <CreateFolder/>
+                <CreateFolder />
                 </Component>
             </Directory>
         </DirectoryRef>
@@ -272,7 +272,6 @@
             ExeCommand='"[SystemFolder]notepad.exe" "[DEFAULTAPPCONFIG]agent.json"'
             Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
 
-
         <!-- We this elaborate custom action to execute the config tool to initialize the configuration. -->
         <!-- We must execute this using the SYSTEM/INSTALLER account rather than the impersonating as the -->
         <!-- user running the installation.  Because of this, we have defer execution and set impersonate to no. -->
@@ -284,7 +283,7 @@
             Return="ignore" Impersonate="no"/>
 
         <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
-            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
+            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart --fix-config-permissions'/>
         <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
             Return="ignore" Impersonate="no"/>
 
