@@ -160,7 +160,7 @@ fi
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
 ensure_path_not_readable_by_others "/etc/scalyr-agent-2/agent.json"
 
-# We also change agent.d group permissions to 751 since it used to be 771 due to fpm behavior
+# We also change agent.d group permissions to 751 since it used to be 771 due to default fpm behavior
 ensure_path_group_permissions "/etc/scalyr-agent-2/agent.d" "5"
 
 # Ensure agent.d/*.json files are note readable by others
