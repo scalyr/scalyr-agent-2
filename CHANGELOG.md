@@ -12,6 +12,9 @@ Bug fixes:
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 
+Security fixes and improvments:
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+
 ## 2.1.14 "Hydrus" - November 4, 2020
 
 <!---
