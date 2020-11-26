@@ -367,7 +367,7 @@ class Configuration(object):
         """
         Check config file permissions and log a warning is it's readable or writable by "others".
         """
-        if not os.path.isfile(file_path):
+        if not os.path.isfile(file_path) or not self.__logger:
             return None
 
         st_mode = os.stat(file_path).st_mode

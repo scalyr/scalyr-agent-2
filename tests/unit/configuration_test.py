@@ -152,6 +152,9 @@ class TestConfigurationBase(ScalyrTestCase):
             self.convert_path("/var/lib/scalyr-agent-2"),
         )
 
+        if os.path.isfile(self._config_file):
+            os.chmod(self._config_file, int("640", 8))
+
         return Configuration(
             self._config_file, default_paths, logger, extra_config_dir=extra_config_dir
         )
@@ -1306,6 +1309,34 @@ class TestConfiguration(TestConfigurationBase):
             limit_key="config_conflict_global_api_key_SCALYR_API_KEY",
         )
         mock_logger.debug.assert_not_called()
+
+    def test_config_readable_by_others_warning_on_parse(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            logs: []
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        os.chmod(self._config_file, int("644", 8))
+        config.parse()
+
+        expected_msg = (
+            "Config file %s is readable or writable by others "
+            "(permissions=0644). Config files can contain secrets so you are strongly "
+            "encouraged to change the config file permissions so it's not "
+            "readable by others." % (self._config_file)
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="config-permissions-warn-%s" % (self._config_file),
+        )
 
     def test_api_key_use_env(self):
         self._write_file_with_separator_conversion(
