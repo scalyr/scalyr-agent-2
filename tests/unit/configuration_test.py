@@ -16,6 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import print_function
 
 from scalyr_agent import scalyr_logging
 
@@ -49,6 +50,7 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     JournaldLogFormatter,
 )
 from scalyr_agent.util import JsonReadFileException
+from scalyr_agent.util import run_command_popen
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
@@ -154,6 +156,18 @@ class TestConfigurationBase(ScalyrTestCase):
 
         if os.path.isfile(self._config_file):
             os.chmod(self._config_file, int("640", 8))
+
+            # On Windows we can't set permissions for others via os.chmod so we need this workaround
+            if sys.platform.startswith("win"):
+                args = ["icacls.exe", self._config_file, "/inheritance:d", "/T"]
+                run_command_popen(
+                    args=args, shell=False, log_errors=True, logger_func=print
+                )
+
+                args = ["icacls.exe", self._config_file, "/remove", "Users", "/T"]
+                run_command_popen(
+                    args=args, shell=False, log_errors=True, logger_func=print
+                )
 
         return Configuration(
             self._config_file, default_paths, logger, extra_config_dir=extra_config_dir
@@ -1326,11 +1340,16 @@ class TestConfiguration(TestConfigurationBase):
         os.chmod(self._config_file, int("644", 8))
         config.parse()
 
+        if sys.platform.startswith("win"):
+            expected_permissions = "666"
+        else:
+            expected_permissions = "644"
+
         expected_msg = (
             "Config file %s is readable or writable by others "
-            "(permissions=0644). Config files can contain secrets so you are strongly "
+            "(permissions=%s). Config files can contain secrets so you are strongly "
             "encouraged to change the config file permissions so it's not "
-            "readable by others." % (self._config_file)
+            "readable by others." % (self._config_file, expected_permissions)
         )
         mock_logger.warn.assert_called_with(
             expected_msg,

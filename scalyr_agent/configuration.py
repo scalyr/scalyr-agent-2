@@ -373,7 +373,11 @@ class Configuration(object):
         st_mode = os.stat(file_path).st_mode
 
         if bool(st_mode & stat.S_IROTH) or bool(st_mode & stat.S_IWOTH):
-            file_permissions = oct(st_mode)[4:]
+            file_permissions = str(oct(st_mode)[4:])
+
+            if file_permissions.startswith("0") and len(file_permissions) == 4:
+                file_permissions = file_permissions[1:]
+
             limit_key = "config-permissions-warn-%s" % (file_path)
             self.__logger.warn(
                 "Config file %s is readable or writable by others (permissions=%s). Config "
