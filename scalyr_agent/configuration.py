@@ -367,6 +367,9 @@ class Configuration(object):
         """
         Check config file permissions and log a warning is it's readable or writable by "others".
         """
+        if not self.__log_warnings:
+            return None
+
         if not os.path.isfile(file_path) or not self.__logger:
             return None
 
