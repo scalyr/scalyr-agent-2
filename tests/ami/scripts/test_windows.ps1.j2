@@ -71,16 +71,6 @@ function GetMSIVersion {
     }
 }
 
-function Get-Permissions ($folder) {
-  (get-acl $folder).access | select `
-        @{Label="Identity";Expression={$_.IdentityReference}}, `
-        @{Label="Right";Expression={$_.FileSystemRights}}, `
-        @{Label="Access";Expression={$_.AccessControlType}}, `
-        @{Label="Inherited";Expression={$_.IsInherited}}, `
-        @{Label="Inheritance Flags";Expression={$_.InheritanceFlags}}, `
-        @{Label="Propagation Flags";Expression={$_.PropagationFlags}} | ft -auto
-}
-
 $msi_version=GetMSIVersion -MSI .\install_package.msi
 # Method returns an object so we need to cast it to a String
 $msi_version="$msi_version".Trim()
@@ -96,19 +86,30 @@ Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.
 # Verify agent.json permissions
 # NOTE: This check needs to be performed as early as possible after fresh installation before
 # other tools modify the config
+Log-Message ""
+Log-Message "agent.json and agent.d/ config files permissions checks"
+Log-Message ""
+
 dir "C:\Program Files (x86)\Scalyr\config"
+dir "C:\Program Files (x86)\Scalyr\config\agent.d"
+dir "C:\Program Files (x86)\Scalyr\config\templates"
 
-icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.json"
-icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
+$permissions_agent_json=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.json"
+$permissions_agent_d=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
+
+echo $permissions_agent_json
+echo $permissions_agent_d
+
+if ("$permissions_agent_json" -match "User") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_json" -match "Users") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_d" -match "User") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+if ("$permissions_agent_d" -match "Users") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+
+if ("$permissions_agent_json" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.json!" };
+if ("$permissions_agent_d" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.d!" };
 
 Log-Message ""
-Log-Message "test.json"
-Log-Message ""
-
-type "C:\Program Files (x86)\Scalyr\config\test.json"
-
-Log-Message ""
-Log-Message "test.json"
+Log-Message "agent.json and agent.d/ config files permissions completed successfuly"
 Log-Message ""
 
 # Copy over agent.json with the API key set up
