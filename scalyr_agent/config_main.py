@@ -78,6 +78,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
 
+from scalyr_agent.util import run_command_popen
 import scalyr_agent.util as scalyr_util
 
 
@@ -1537,66 +1538,32 @@ if __name__ == "__main__":
 
     if sys.platform.startswith("win") and options.fix_config_permissions:
         # current_config_permissions = os.stat(options.config_filename).st_mode
-        print("Changing permissions for agent.json")
+        print(
+            "Changing permissions for agent.json and agent.d and making sure it's not readable "
+            "by Users"
+        )
 
-        # NOTE: Sadly we can't use os.chmod on Windows
-        test_path = "C:\\Program Files (x86)\\Scalyr\\config\\test.json"
-        with open(test_path, "wb") as fp:
-            fp.write(b"file content")
+        configs_directory = os.path.dirname(config_path)
+        agent_json_path = os.path.join(configs_directory, "agent.json")
+        agent_d_path = os.path.join(configs_directory, "agent.d")
 
-            users_to_remove_permissions_from = [
-                "Users",
-                # "BUILTIN\\Users",
-            ]
+        # 1. First we need to disable inheritance for this file and the directory
+        # /T means traverse the sub-directories
+        args = ["icacls.exe", agent_json_path, "/inheritance:d", "/T"]
+        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
-            # 1. First we need to disable inheritance for this file and the directory
-            args = [
-                "icacls.exe",
-                "C:\\Program Files (x86)\\Scalyr\\config\\agent.json",
-                "/inheritance:d",
-                "/T",
-            ]
-            output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-            fp.write("error: " + output + b"\n")
+        args = ["icacls.exe", agent_d_path, "/inheritance:d", "/T"]
+        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
-            args = [
-                "icacls.exe",
-                "C:\\Program Files (x86)\\Scalyr\\config\\agent.d",
-                "/inheritance:d",
-                "/T",
-            ]
-            output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-            fp.write("error: " + output + b"\n")
+        # 2. Then we remove the permissions for the Users so only admin has permission to read
+        # +write those files
+        args = ["icacls.exe", agent_json_path, "/remove", "Users", "/T"]
+        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
-            # Then we remove the permissions
-            try:
-                for username in users_to_remove_permissions_from:
-                    args = [
-                        "icacls.exe",
-                        "C:\\Program Files (x86)\\Scalyr\\config\\agent.json",
-                        # "/remove:g",
-                        "/remove",
-                        # username + ":(I)(RX)",
-                        username,
-                        "/T",
-                    ]
-                    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-                    fp.write("error: " + output + b"\n")
-                    # icacls  D:\website\mysite\*.*  /remove:d everyone /T
+        args = ["icacls.exe", agent_d_path, "/remove", "Users", "/T"]
+        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
-                    args = [
-                        "icacls.exe",
-                        "C:\\Program Files (x86)\\Scalyr\\config\\agent.d",
-                        # "/remove:g",
-                        "/remove",
-                        # username + ":(I)(RX)",
-                        username,
-                        "/T",
-                    ]
-                    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-                    fp.write("error: " + output + b"\n")
-            except Exception as e:
-                fp.write(str(e).decode("utf-8") + b"\n")
+        print("Permissions updated.")
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
     if sys.platform.startswith("win") and options.mark_conditional_restart:

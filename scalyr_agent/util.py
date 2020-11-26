@@ -27,11 +27,13 @@ if False:  # NOSONAR
     from typing import Tuple
     from typing import Callable
     from typing import Optional
+    from typing import List
 
 import codecs
 import sys
 import ssl
 import locale
+import subprocess
 from io import open
 
 import six
@@ -2131,6 +2133,29 @@ def get_agent_start_up_message():
     )
 
     return msg
+
+
+def run_command_popen(args, shell=False, log_errors=False, logger_func=None):
+    # type: (List[str], bool, bool, Callable) -> Tuple[int, str, str]
+    """
+    Run the provided command using subprocess.Popen and return exit code, stdout and stderr.
+    """
+    logger_func = logger_func if logger_func else print
+
+    process = subprocess.Popen(
+        args, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE  # nosec
+    )
+    stdout, stderr = process.communicate()
+
+    if process.returncode != 0 and log_errors:
+        command = " ".join(args)
+        logger_func(
+            'Command "%s" returned exit code %s.' % (command, process.returncode)
+        )
+        logger_func("Stdout: %s" % (stdout.decode("utf-8")))
+        logger_func("Stderr: %s" % (stderr.decode("utf-8")))
+
+    return (process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8"))
 
 
 class RateLimiterToken(object):
