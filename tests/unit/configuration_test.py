@@ -23,6 +23,7 @@ from scalyr_agent import scalyr_logging
 __author__ = "czerwin@scalyr.com"
 
 import os
+import re
 import sys
 import tempfile
 from io import open
@@ -681,7 +682,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
 
         expected_msg = r'File "%s" is not readable the current user (.*?).' % (
-            self._config_file
+            re.escape(self._config_file)
         )
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
@@ -1367,6 +1368,7 @@ class TestConfiguration(TestConfigurationBase):
         os.environ["SCALYR_API_KEY"] = "xyz"
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
+        config._check_config_file_permissions_and_warn = lambda x: x
         config.parse()
 
         self.assertEquals(config.api_key, "xyz")
