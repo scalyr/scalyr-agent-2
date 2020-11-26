@@ -2158,6 +2158,29 @@ def run_command_popen(args, shell=False, log_errors=False, logger_func=None):
     return (process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8"))
 
 
+def win_remove_user_file_path_permissions(file_path, username):
+    # type: (str, str) -> None
+    """
+    Function which removes all the permissions for a user for a specified path.
+
+    This function uses icacls.exe underneath and should only be used on Windows.
+
+    NOTE: This function intentionally doesn't live in platform_windows.py since that module
+    also imports other Windows related modules which may not be available when we want to
+    call this function.
+    """
+    if not sys.platform.startswith("win"):
+        return None
+
+    # 1. First we need to disable inheritance for this file and the directory
+    args = ["icacls.exe", file_path, "/inheritance:d", "/T"]
+    run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
+
+    # 2. Then we remove the permissions for the user so only admin has permission to read
+    args = ["icacls.exe", file_path, "/remove", username, "/T"]
+    run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
+
+
 class RateLimiterToken(object):
     def __init__(self, token_id):
         self._token_id = token_id

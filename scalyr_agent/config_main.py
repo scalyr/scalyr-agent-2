@@ -78,7 +78,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
 
-from scalyr_agent.util import run_command_popen
+from scalyr_agent.util import win_remove_user_file_path_permissions
 import scalyr_agent.util as scalyr_util
 
 
@@ -1537,7 +1537,6 @@ if __name__ == "__main__":
     controller.consume_config(config_file, options.config_filename)
 
     if sys.platform.startswith("win") and options.fix_config_permissions:
-        # current_config_permissions = os.stat(options.config_filename).st_mode
         print(
             "Changing permissions for agent.json and agent.d and making sure it's not readable "
             "by Users"
@@ -1547,21 +1546,10 @@ if __name__ == "__main__":
         agent_json_path = os.path.join(configs_directory, "agent.json")
         agent_d_path = os.path.join(configs_directory, "agent.d")
 
-        # 1. First we need to disable inheritance for this file and the directory
-        # /T means traverse the sub-directories
-        args = ["icacls.exe", agent_json_path, "/inheritance:d", "/T"]
-        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
-
-        args = ["icacls.exe", agent_d_path, "/inheritance:d", "/T"]
-        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
-
-        # 2. Then we remove the permissions for the Users so only admin has permission to read
-        # +write those files
-        args = ["icacls.exe", agent_json_path, "/remove", "Users", "/T"]
-        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
-
-        args = ["icacls.exe", agent_d_path, "/remove", "Users", "/T"]
-        run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
+        win_remove_user_file_path_permissions(
+            file_path=agent_json_path, username="Users"
+        )
+        win_remove_user_file_path_permissions(file_path=agent_d_path, username="Users")
 
         print("Permissions updated.")
 
