@@ -100,8 +100,8 @@ $permissions_agent_d=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
 echo $permissions_agent_json
 echo $permissions_agent_d
 
-if ("$permissions_agent_json" -match "User") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
-if ("$permissions_agent_json" -match "Users") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_json" -notmatch "User") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_json" -notmatch "Users") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
 if ("$permissions_agent_d" -match "User") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
 if ("$permissions_agent_d" -match "Users") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
 
