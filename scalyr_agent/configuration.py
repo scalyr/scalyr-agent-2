@@ -29,6 +29,7 @@ import time
 import logging
 import copy
 import json
+import stat
 
 import six
 import six.moves.urllib.parse
@@ -168,6 +169,8 @@ class Configuration(object):
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
 
+            self._check_config_file_permissions_and_warn(self.__file_path)
+
             # get initial list of already seen config keys (we need to do this before
             # defaults have been applied)
             already_seen = {}
@@ -220,6 +223,8 @@ class Configuration(object):
                             raise self.__last_error
                         else:
                             already_seen[k] = fp
+
+                self._check_config_file_permissions_and_warn(fp)
 
                 self.__perform_substitutions(content)
                 self.__verify_main_config(content, self.__file_path)
@@ -356,6 +361,29 @@ class Configuration(object):
         except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def _check_config_file_permissions_and_warn(self, file_path):
+        # type: (str) -> None
+        """
+        Check config file permissions and log a warning is it's readable or writable by "others".
+        """
+        if not os.path.isfile(file_path):
+            return None
+
+        st_mode = os.stat(file_path).st_mode
+
+        if bool(st_mode & stat.S_IROTH) or bool(st_mode & stat.S_IWOTH):
+            file_permissions = oct(st_mode)[4:]
+            limit_key = "config-permissions-warn-%s" % (file_path)
+            self.__logger.warn(
+                "Config file %s is readable or writable by others (permissions=%s). Config "
+                "files can "
+                "contain secrets so you are strongly encouraged to change the config "
+                "file permissions so it's not readable by others."
+                % (file_path, file_permissions),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
 
     def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
         if self.__log_warnings and self.__config[config_option] != default:
