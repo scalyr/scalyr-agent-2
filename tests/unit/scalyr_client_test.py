@@ -40,7 +40,7 @@ from scalyr_agent.scalyr_client import (
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
-
+from scalyr_agent.test_base import skipIf
 
 import scalyr_agent.test_util as test_util
 
@@ -1039,6 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         self.assertEqual(split[-3], "ssllib")
         self.assertTrue(split[1].startswith("python-"))
 
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
     @mock.patch("scalyr_agent.platform_controller.PlatformController.new_platform")
     def test_get_user_agent_string_run_as_admin(self, mock_new_platform):
         mock_platform = mock.Mock()
