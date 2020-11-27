@@ -45,8 +45,8 @@
   In this case, user can manually run ``scalyr-agent-2-config.exe`` as administrator to revoke
   permissions for "Users" group for the agent config.
 
-  ```bash
-  C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe --fix-config-permissions
+  ```powershell
+  & "C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
   ```
 
   Keep in mind that after running this script you need to use Administrator account to grant read

@@ -91,7 +91,7 @@ Log-Message "agent.json and agent.d/ config files permissions checks"
 Log-Message ""
 
 # NOTE: At this point fix doesn't run automatically post install so we manually invoke the scrupt and verify it works
-"C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
+& "C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
 
 dir "C:\Program Files (x86)\Scalyr\config"
 dir "C:\Program Files (x86)\Scalyr\config\agent.d"
