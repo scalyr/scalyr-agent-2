@@ -799,7 +799,12 @@ class ScalyrClientSession(object):
         from scalyr_agent.platform_controller import PlatformController
 
         platform_controller = PlatformController.new_platform()
-        current_user = platform_controller.get_current_user()
+
+        try:
+            current_user = platform_controller.get_current_user()
+        except Exception:
+            # In some tests on Windows this can throw inside the tests so we ignore the error
+            current_user = "unknown"
 
         if current_user in ["root", "Administrator"] or current_user.endswith(
             "\\Administrators"
