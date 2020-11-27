@@ -38,6 +38,21 @@
   installation. If you manually removed that file and created a new one, that is out of the agent
   scope and domain of ``umask`` on Linux.
 
+  On Windows, permissions are not rectified automatically because some users run the agent under a
+  custom non-Administrator user account so automatically fixing the permissions would break this
+  scenario.
+
+  In this case, user can manually run ``scalyr-agent-2-config.exe`` as administrator to revoke
+  permissions for "Users" group for the agent config.
+
+  ```bash
+  C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe --fix-config-permissions
+  ```
+
+  Keep in mind that after running this script you need to use Administrator account to grant read
+  permissions to user account which is used to run the agent in case this user is not Administrator
+  or not a member of Administrators group.
+
 ## 2.1.8 "Titan" - August 3, 2020
 
 * The `status -v` and the new `status -H` command contain health check information and will have a return code
