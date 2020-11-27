@@ -7,6 +7,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 20, 2020 14:00 -0800
 --->
 
+Improvements:
+* Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
+
 Bug fixes:
 * Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
