@@ -795,11 +795,25 @@ class ScalyrClientSession(object):
         # whether or not the client is doing server certificate verification.
         ssl_str = "ssllib"
 
+        # Include a string which indicates if the agent is running admin / root user
+        from scalyr_agent.platform_controller import PlatformController
+
+        platform_controller = PlatformController.new_platform()
+        current_user = platform_controller.get_current_user()
+
+        if current_user in ["root", "Administrator"] or current_user.endswith(
+            "\\Administrators"
+        ):
+            user_string = "runs_as_admin"
+        else:
+            user_string = ""
+
         parts = [
             platform_value,
             python_version_str,
             "agent-%s" % agent_version,
             ssl_str,
+            user_string,
         ]
 
         if self.__use_requests:

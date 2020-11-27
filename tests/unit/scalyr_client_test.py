@@ -1022,7 +1022,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "ssllib")
+        self.assertEqual(split[-2], "ssllib")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1036,8 +1036,58 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-2], "ssllib")
+        self.assertEqual(split[-3], "ssllib")
         self.assertTrue(split[1].startswith("python-"))
+
+    @mock.patch("scalyr_agent.platform_controller.PlatformController.new_platform")
+    def test_get_user_agent_string_run_as_admin(self, mock_new_platform):
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "nobody"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertFalse("runs_as_admin" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "User"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertFalse("runs_as_admin" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "root"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("runs_as_admin" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "MyDomain\\Administrators"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("runs_as_admin" in split)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
