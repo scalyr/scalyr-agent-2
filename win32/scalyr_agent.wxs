@@ -282,10 +282,10 @@
         <CustomAction Id="CheckForCondRestart" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
             Return="ignore" Impersonate="no"/>
 
-        <!-- NOTE: At this point we don't automatically run --fix-config-permissions post install since it may break
+        <!-- NOTE: At this point we don't automatically run \-\-fix-config-permissions post install since it may break
         installations where the agent runs as a non Administrator account -->
-        <!-- <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
-            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart --fix-config-permissions'/>-->
+        <!-- <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate' -->
+        <!--     Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" \-\-init-config \-\-no-error-if-config-exists \-\-conditional-restart \-\-fix-config-permissions'/> -->
 
         <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
             Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
