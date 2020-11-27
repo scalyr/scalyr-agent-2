@@ -1542,6 +1542,7 @@ if __name__ == "__main__":
             "by Users"
         )
 
+        config_path = options.config_filename
         configs_directory = os.path.dirname(config_path)
         agent_json_path = os.path.join(configs_directory, "agent.json")
         agent_d_path = os.path.join(configs_directory, "agent.d")
