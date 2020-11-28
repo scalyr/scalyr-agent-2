@@ -33,6 +33,7 @@ import inspect
 import os
 import sys
 import time
+import random
 from threading import Lock
 
 import six
@@ -270,24 +271,32 @@ class ScalyrMonitor(StoppableThread):
         # noinspection PyBroadException
         try:
             while not self._is_thread_stopped():
+                sample_interval = self._sample_interval_secs
+                if self._adjust_sleep_by_gather_time:
+                    random_jitter = 0
+                elif self._global_config.global_monitor_sample_interval_enable_jitter:
+                    # min jitter is 1/10 of the sample interval and max is 2/10
+                    min_jitter_ms = round(sample_interval / 10) * 1000
+                    max_jitter_ms = round((sample_interval / 10) * 2) * 1000
+                    random_jitter = random.randint(min_jitter_ms, max_jitter_ms)
+                    sample_interval = sample_interval + (random_jitter / 1000)
+                else:
+                    random_jitter = 0
+
                 # noinspection PyBroadException
                 adjustment = 0
                 try:
                     start_time = time.time()
                     self.gather_sample()
                     if self._adjust_sleep_by_gather_time:
-                        adjustment = min(
-                            time.time() - start_time, self._sample_interval_secs
-                        )
+                        adjustment = min(time.time() - start_time, sample_interval)
                 except Exception:
                     self._logger.exception(
                         "Failed to gather sample due to the following exception"
                     )
                     self.increment_counter(errors=1)
 
-                self._sleep_but_awaken_if_stopped(
-                    self._sample_interval_secs - adjustment
-                )
+                self._sleep_but_awaken_if_stopped(sample_interval - adjustment)
 
             self._logger.info("Monitor has finished")
         except Exception:
