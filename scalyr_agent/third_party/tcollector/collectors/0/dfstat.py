@@ -39,10 +39,13 @@ import os
 import subprocess
 import sys
 import time
+import fnmatch
 
 
 COLLECTION_INTERVAL = 30  # seconds
 LOCAL_DISKS_ONLY = True
+# List of patterns for mounts to ignore - e.g. ["/run/*", "/sys/fs/*"]
+IGNORE_MOUNTS = []
 
 # Scalyr edit:  Check environment variable for collection interval and local disks only.  TODO:  See if we can
 # centralize code, but difficult without requiring collectors including common module which is goes against tcollector
@@ -53,6 +56,8 @@ try:
         COLLECTION_INTERVAL = float(os.environ["TCOLLECTOR_SAMPLE_INTERVAL"])
     if "TCOLLECTOR_LOCAL_DISKS_ONLY" in os.environ:
         LOCAL_DISKS_ONLY = os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"].lower() == "true"
+    if "TCOLLECTOR_IGNORE_MOUNTS" in os.environ:
+        IGNORE_MOUNTS = os.environ["TCOLLECTOR_IGNORE_MOUNTS"].split(",") or []
 except ValueError:
     pass
 
@@ -72,6 +77,18 @@ def main():
         else:
             df_options = "-PTk"
             df_inodes_options = "-PTi"
+
+        # Scalyr edit.
+        def is_mount_ignored(mount):
+            # type: (str) -> bool
+            if not IGNORE_MOUNTS:
+                return False
+
+            for ignored_mount in IGNORE_MOUNTS:
+                if fnmatch.fnmatch(mount, ignored_mount):
+                    return True
+
+            return False
 
         ts = int(time.time())
         # 1kblocks
@@ -103,6 +120,10 @@ def main():
                     continue
 
                 mount = fields[6]
+
+                # Scalyr edit.
+                if is_mount_ignored(mount):
+                    continue
 
                 # Scalyr edit.
                 if mount in reported_mounts:
@@ -144,6 +165,11 @@ def main():
                 # Scalyr edit.
                 if mount in reported_mounts:
                     continue
+
+                # Scalyr edit.
+                if is_mount_ignored(mount):
+                    continue
+
                 reported_mounts[mount] = True
 
                 print(
