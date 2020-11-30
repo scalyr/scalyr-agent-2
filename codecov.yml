@@ -21,6 +21,9 @@ coverage:
         threshold: 2%
         base: auto
 
+github_checks:
+    annotations: false
+
 # Code coverage data needs to be relative to the repo root, but in out reports it's
 # relative to /home/circleci/scalyr-agent-2/ so we need to fix the paths so it works
 # correctly on codecov.io
