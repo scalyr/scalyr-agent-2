@@ -7,6 +7,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 
+Improvements:
+* Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
+
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if file is readable by others.
 
@@ -16,7 +19,7 @@ Bug fixes:
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 
 Security fixes and improvments:
-* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 
 ## 2.1.14 "Hydrus" - November 4, 2020
 
