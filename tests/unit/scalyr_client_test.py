@@ -43,6 +43,7 @@ from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import skipIf
 
 import scalyr_agent.test_util as test_util
+import scalyr_agent.scalyr_client
 
 
 class AddEventsRequestTest(ScalyrTestCase):
@@ -1014,10 +1015,9 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
-    @mock.patch(
-        "scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO", (1, 0, 2, 15, 15)
-    )
     def test_get_user_agent_includes_requests_version(self):
+        scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
+
         # without requests
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -1025,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-2], "openssl-1.0.2-15")
+        self.assertEqual(split[-2], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1039,7 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-3], "openssl-1.0.2-15")
+        self.assertEqual(split[-3], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
