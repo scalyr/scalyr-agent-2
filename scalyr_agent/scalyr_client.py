@@ -805,6 +805,8 @@ class ScalyrClientSession(object):
                 openssl_version_string = "openssl-%s" % (openssl_version_string)
             except Exception:
                 openssl_version_string = None
+        else:
+            openssl_version_string = None
 
         # Include a string which indicates if the agent is running admin / root user
         from scalyr_agent.platform_controller import PlatformController
