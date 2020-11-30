@@ -2313,16 +2313,16 @@ workflows:
          context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
-     - sonarcloud-scan:
-         requires:
-           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           # slowest jobs
-           - smoke-docker-json
-           - smoke-docker-api-raw-logs-disabled
-           - smoke-docker-syslog
-           - smoke-k8s
-           - smoke-monitors-tests
+           # - sonarcloud-scan:
+           #     requires:
+           #       # NOTE: This is not ideal, but Circle CI doesn't support cross
+           #       # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+           #       # slowest jobs
+           #       - smoke-docker-json
+           #       - smoke-docker-api-raw-logs-disabled
+           #       - smoke-docker-syslog
+           #       - smoke-k8s
+           #       - smoke-monitors-tests
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
