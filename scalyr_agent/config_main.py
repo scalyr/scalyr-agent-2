@@ -50,7 +50,7 @@ from __scalyr__ import (
     get_install_root,
     TARBALL_INSTALL,
     MSI_INSTALL,
-    SCALYR_VERSION,
+    SCALYR_VERSION,  # pylint: disable=import-error
     PACKAGE_INSTALL,
 )
 
