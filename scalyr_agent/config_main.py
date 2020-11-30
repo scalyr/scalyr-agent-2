@@ -45,14 +45,17 @@ from optparse import OptionParser
 if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
+# pylint: disable=import-error
 from __scalyr__ import (
     scalyr_init,
     get_install_root,
     TARBALL_INSTALL,
     MSI_INSTALL,
-    SCALYR_VERSION,  # pylint: disable=import-error
+    SCALYR_VERSION,
     PACKAGE_INSTALL,
 )
+
+# pylint: enable=import-error
 
 scalyr_init()
 
