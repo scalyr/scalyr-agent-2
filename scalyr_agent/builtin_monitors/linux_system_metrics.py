@@ -557,7 +557,7 @@ define_config_option(
     "ignore_mounts",
     "List of glob patterns for mounts to ignore",
     convert_to=ArrayOfStrings,
-    default=[],
+    default=["/sys/*", "/dev/*", "/run*"],
 )
 
 

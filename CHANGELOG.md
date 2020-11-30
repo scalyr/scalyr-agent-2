@@ -7,6 +7,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 
+Improvements:
+* Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/run*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if file is readable by others.
 
