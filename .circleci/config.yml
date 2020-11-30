@@ -2304,8 +2304,8 @@ workflows:
       # NOTE: smoke test jobs below still use old smoke tests framework
      - smoke-docker-json:
          context: scalyr-agent
-           # - smoke-docker-api-raw-logs-disabled:
-           #     context: scalyr-agent
+     - smoke-docker-api-raw-logs-disabled:
+         context: scalyr-agent
      - smoke-docker-syslog:
          context: scalyr-agent
      - smoke-k8s:
@@ -2353,11 +2353,11 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-           # - ami-tests-development:
-           #      context: scalyr-agent
-           #      requires:
-           #        - build-windows-package
-           #        - build-linux-packages-and-installer-script
+     - ami-tests-development:
+          context: scalyr-agent
+          requires:
+            - build-windows-package
+            - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
           <<: *master_and_release_only
