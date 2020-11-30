@@ -819,9 +819,11 @@ class ScalyrClientSession(object):
         if current_user in ["root", "Administrator"] or current_user.endswith(
             "\\Administrators"
         ):
-            user_string = "runs_as_admin"
+            # Indicates agent running as a privileged / admin user
+            user_string = "admin-1"
         else:
-            user_string = ""
+            # Indicates agent running as a regular user
+            user_string = "admin-0"
 
         parts = [
             platform_value,

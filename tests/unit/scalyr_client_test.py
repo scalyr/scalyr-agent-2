@@ -1025,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "openssl-1.0.2-15")
+        self.assertEqual(split[-2], "openssl-1.0.2-15")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1039,7 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-2], "openssl-1.0.2-15")
+        self.assertEqual(split[-3], "openssl-1.0.2-15")
         self.assertTrue(split[1].startswith("python-"))
 
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
@@ -1055,7 +1055,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertFalse("runs_as_admin" in split)
+        self.assertTrue("admin-0" in split)
 
         mock_platform = mock.Mock()
         mock_platform.get_current_user.return_value = "User"
@@ -1067,7 +1067,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertFalse("runs_as_admin" in split)
+        self.assertFalse("" in split)
 
         mock_platform = mock.Mock()
         mock_platform.get_current_user.return_value = "root"
@@ -1079,7 +1079,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertTrue("runs_as_admin" in split)
+        self.assertTrue("admin-1" in split)
 
         mock_platform = mock.Mock()
         mock_platform.get_current_user.return_value = "MyDomain\\Administrators"
@@ -1091,7 +1091,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertTrue("runs_as_admin" in split)
+        self.assertTrue("admin-1" in split)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
