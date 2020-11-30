@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.15 "TBD" - November 20, 2020
+## 2.1.15 "Endora" - December 2, 2020
 
 <!---
-Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 20, 2020 14:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 
 Misc:

@@ -1,6 +1,6 @@
 # Release Notes
 
-## 2.1.15 "TBD"
+## 2.1.15 "Endora" - December 2, 2020
 
 * This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
   and ``*.json`` files inside that directory and makes sure those files are not readable by
@@ -26,7 +26,7 @@
   as part of the post install step for the existing files and installations.
 
   If you intentionally changed "other" permission bits for any of those files to something else than
-  ``0``, you will need to change it again after upgrading the agent.
+  ``0``, you will need to change it again after installing / upgrading the agent.
 
   If you believe you may be affected, we recommend revoking the old write API key used to send logs
   and generating a new one.
