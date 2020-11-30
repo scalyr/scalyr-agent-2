@@ -1,16 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.15 "TBD" - November 20, 2020
+## 2.1.15 "Endora" - December 2, 2020
 
 <!---
-Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 20, 2020 14:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
+
+Misc:
+* On startup and when parsing a config file, agent now emits a warning if file is readable by others.
 
 Bug fixes:
 * Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
+
+Security fixes and improvments:
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 
 ## 2.1.14 "Hydrus" - November 4, 2020
 

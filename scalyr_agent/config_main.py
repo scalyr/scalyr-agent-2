@@ -78,6 +78,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
 
+from scalyr_agent.util import win_remove_user_file_path_permissions
 import scalyr_agent.util as scalyr_util
 
 
@@ -1427,7 +1428,22 @@ if __name__ == "__main__":
             default=False,
             help="Starts the agent if the conditional restart file marker exists.",
         )
-
+        # Special flag which is used by the Windows installer. We use it to indicate to this binary
+        # to fix up permissions for agent.json file and agent.d/ directory. This file is also used
+        # to create initial config by the install which means we can't correctly set those
+        # permissions inside the .wxs wix spec file.
+        # Right now it can only be used with "--init-config" flag on Windows.
+        parser.add_option(
+            "",
+            "--fix-config-permissions",
+            dest="fix_config_permissions",
+            action="store_true",
+            default=False,
+            help=(
+                "Fix permissions for agent.json file and agent.d/ directory and make sure it's. "
+                "not readable by others."
+            ),
+        )
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print("Could not parse commandline arguments.", file=sys.stderr)
@@ -1519,6 +1535,24 @@ if __name__ == "__main__":
         sys.exit(1)
 
     controller.consume_config(config_file, options.config_filename)
+
+    if sys.platform.startswith("win") and options.fix_config_permissions:
+        print(
+            "Changing permissions for agent.json and agent.d and making sure it's not readable "
+            "by Users"
+        )
+
+        config_path = options.config_filename
+        configs_directory = os.path.dirname(config_path)
+        agent_json_path = os.path.join(configs_directory, "agent.json")
+        agent_d_path = os.path.join(configs_directory, "agent.d")
+
+        win_remove_user_file_path_permissions(
+            file_path=agent_json_path, username="Users"
+        )
+        win_remove_user_file_path_permissions(file_path=agent_d_path, username="Users")
+
+        print("Permissions updated.")
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
     if sys.platform.startswith("win") and options.mark_conditional_restart:
