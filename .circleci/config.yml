@@ -2096,8 +2096,6 @@ jobs:
 
                   echo "$(cat VERSION).1" > VERSION
                   cat VERSION
-
-
       - run:
           name: Build MSI package
           command: |
@@ -2107,6 +2105,7 @@ jobs:
               # copy patched win32evtlog.pyd.
               cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
 
+              # TODO: This step doesn't correctly exit with non zero on failure
               c:\Python27\python.exe build_package.py win32
 
               mkdir package
@@ -2266,7 +2265,6 @@ jobs:
       - ami-tests:
           test_type: "development"
 
-
 workflows:
  version: 2
  static-analysis:
@@ -2398,7 +2396,6 @@ workflows:
            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
            - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
          <<: *benchmarks_master_and_release_only
-
  weekly-circle-ci-usage-report:
    triggers:
      - schedule:
