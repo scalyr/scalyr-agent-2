@@ -125,6 +125,14 @@ class ApiKeyWorkerPool(object):
                 # We use this process as a process for the worker.
                 shared_object_manager.start()
 
+                # change agent log path for the new worker.
+                self._change_worker_process_agent_log_path(
+                    shared_object_manager,
+                    os.path.join(
+                        self.__config.agent_log_path, "agent-%s.log" % worker_id
+                    ),
+                )
+
                 # create proxy object of the worker. The real worker instance is created in the new process
                 # which was created when shared_object_manager started.
                 worker = shared_object_manager.CopyingManagerWorkerProxy(
@@ -142,6 +150,18 @@ class ApiKeyWorkerPool(object):
 
         # The index of the next worker which will be used to handle the log processor.
         self.__current_worker = 0
+
+    def _change_worker_process_agent_log_path(
+        self, shared_object_manager, path
+    ):
+        # type: (SharedObjectManager, six.text_type) -> None
+        """
+        Change Scalyr logger path in to process provided by the shared object manager,
+        so the worker, which will run inside this process will write its logs to the separate file.
+        :param  shared_object_manager: Shared object manager/
+        :param path: new path for the agent.log file in the shared object manager proces.
+        """
+        shared_object_manager.change_agent_log(path)
 
     @property
     def api_key_id(self):
@@ -207,7 +227,10 @@ class ApiKeyWorkerPool(object):
             try:
                 memory_manager.shutdown()
             except:
-                log.exception("Can not stop shared object manager for the worker '%s'." % worker_id)
+                log.exception(
+                    "Can not stop shared object manager for the worker '%s'."
+                    % worker_id
+                )
 
     def generate_status(self, warn_on_rate_limit=False):
         # type: (bool) -> ApiKeyWorkerPoolStatus
@@ -755,12 +778,6 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # create copying workers according to settings in the configuration.
                 self._create_worker_pools()
 
-                # if the copying manager is configured to work with multiprocess workers. We need to change the
-                # path for the agent log file for them.
-                if self.__config.use_multiprocess_copying_workers:
-                    for worker_pool in self.__api_keys_worker_pools.values():
-                        for worker in worker_pool.workers:
-                            worker.change_agent_log()
 
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
@@ -936,7 +953,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             # if the workers health check is failed, then we add the error message about that.
             if workers_health_check_successful is False:
-                all_health_check_error_messages.append("Some workers has failed, see below for more info.",)
+                all_health_check_error_messages.append(
+                    "Some workers has failed, see below for more info.",
+                )
 
             # do the health check of the copying manager itself.
             copying_manager_health_check_successful = None
@@ -952,16 +971,20 @@ class CopyingManager(StoppableThread, LogWatcher):
                     # Note: the information about the copying manager itself should be shown first.
                     all_health_check_error_messages.insert(
                         0,
-                        "Failed, max time since last scan attempt (%s seconds) exceeded" % self.__config.healthy_max_time_since_last_copy_attempt,
+                        "Failed, max time since last scan attempt (%s seconds) exceeded"
+                        % self.__config.healthy_max_time_since_last_copy_attempt,
                     )
                 else:
                     copying_manager_health_check_successful = True
 
             # get the final health check result from the workers health check and copying manager health check.
             result.health_check_result = _accumulate_worker_stats(
-                {copying_manager_health_check_successful, workers_health_check_successful},
+                {
+                    copying_manager_health_check_successful,
+                    workers_health_check_successful,
+                },
                 result_on_at_least_one_fail="\n".join(all_health_check_error_messages),
-                result_on_all_succeed="Good"
+                result_on_all_succeed="Good",
             )
 
             # get statuses for the log matchers.
@@ -1273,7 +1296,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         # clear the checkpoints folder by removing all worker checkpoint files.
         # NOTE: we also look at the parent directory
         # in case if there are checkpoint files from an older version of the agent.
-        checkpoints_glob = os.path.join(self.__config.agent_data_path, "*checkpoints*.json")
+        checkpoints_glob = os.path.join(
+            self.__config.agent_data_path, "*checkpoints*.json"
+        )
 
         for path in scalyr_util.match_glob(checkpoints_glob):
             # do not delete master checkpoint file

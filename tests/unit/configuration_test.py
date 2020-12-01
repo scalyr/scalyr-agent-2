@@ -322,7 +322,7 @@ class TestConfiguration(TestConfigurationBase):
         )
         self.assertPathEquals(
             config.log_configs[1].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
         self.assertFalse(config.log_configs[0].get_bool("ignore_stale_files"))
         self.assertEquals(
@@ -349,7 +349,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
 
     def test_overriding_basic_settings(self):
@@ -1058,7 +1058,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
 
     def test_parse_log_config(self):

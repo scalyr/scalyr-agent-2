@@ -818,7 +818,6 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
             file=output,
         )
 
-
     is_single_api_key = len(manager_status.api_key_worker_pools) == 1
 
     if not is_single_api_key:
@@ -831,94 +830,6 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         if not is_single_api_key:
             print("Api key ID: %s" % worker_pool.api_key_id, file=output)
         __print_api_key_stats(worker_pool, agent_log_file_path, is_single_api_key, output)
-        # print("Api key ID: %s" % worker_pool.api_key_id, file=output)
-        # print(
-        #     "    Bytes uploaded successfully:               %ld"
-        #     % worker_pool.total_bytes_uploaded,
-        #     file=output,
-        # )
-        # print(
-        #     "    Last successful communication with Scalyr: %s"
-        #     % scalyr_util.format_time(worker_pool.last_success_time),
-        #     file=output,
-        # )
-        # print(
-        #     "    Last attempt:                              %s"
-        #     % scalyr_util.format_time(worker_pool.last_attempt_time),
-        #     file=output,
-        # )
-        # if worker_pool.last_attempt_requests_overall_size:
-        #     print(
-        #         "    Last copy requests size:                   %ld"
-        #         % worker_pool.last_attempt_requests_overall_size,
-        #         file=output,
-        #     )
-        #
-        # # NOTE: this should be exactly False, we skip if in case of None.
-        # if worker_pool.all_responses_successful is False:
-        #     print(
-        #         "    Failed copy response statuses:", file=output,
-        #     )
-        #     workers = list(
-        #         sorted(worker_pool.workers, key=operator.attrgetter("worker_id"))
-        #     )
-        #     for worker_status in workers:
-        #         if worker_status.last_response_status == "success":
-        #             # show only unsuccessful requests.
-        #             continue
-        #
-        #         print("        %s:" % (worker_status.worker_id,), file=output)
-        #         print(
-        #             "            Last copy response status:         %s"
-        #             % worker_status.last_response_status,
-        #             file=output,
-        #         )
-        #
-        #         print(
-        #             "            Last copy response:                %s"
-        #             % scalyr_util.remove_newlines_and_truncate(
-        #                 worker_status.last_response, 1000
-        #             ),
-        #             file=output,
-        #         )
-        #
-        # # NOTE: this should be exactly False, we skip if in case of None.
-        # if worker_pool.all_health_checks_good is False:
-        #     print(
-        #         "    Failed health checks:", file=output,
-        #     )
-        #
-        #     for worker_id, worker_status in worker_pool.workers.items():
-        #         if worker_status.health_check_result == "Good":
-        #             # show only unsuccessful requests.
-        #             continue
-        #         print("        %s:" % (worker_id,), file=output)
-        #         print(
-        #             "            Last copy response status:         %s"
-        #             % worker_status.health_check_result,
-        #             file=output,
-        #         )
-        #
-        # if worker_pool.total_errors > 0:
-        #     print(
-        #         "    Total responses with errors:               %d (see '%s' for details)"
-        #         % (worker_pool.total_errors, agent_log_file_path,),
-        #         file=output,
-        #     )
-        #
-        # worker_pool_files = []
-        #
-        # for worker_status in worker_pool.workers:
-        #     for log_processor in worker_status.log_processors:
-        #         worker_pool_files.append(log_processor.log_path)
-        #
-        # if worker_pool_files:
-        #     print("    Files:", file=output)
-        #     worker_pool_files.sort()
-        #     for log_path in worker_pool_files:
-        #         print("        %s" % log_path, file=output)
-        #
-        # print("", file=output)
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

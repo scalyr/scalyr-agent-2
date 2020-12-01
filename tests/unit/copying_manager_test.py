@@ -773,7 +773,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(test_manager.log_matchers[0].config["path"], "/tmp/hi.log")
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
         )
 
     def test_from_monitors(self):
@@ -781,7 +781,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
@@ -802,7 +802,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 3)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
@@ -822,7 +822,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
         )
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],

@@ -696,17 +696,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 scalyr_logging.DEBUG_LEVEL_0, "Worker '%s' is finished." % self._id,
             )
 
-    def change_agent_log(self):
-        """
-        Reconfigure the agent logger, mainly, to change to path of the agent.log file
-        for the worker when it is running in the separate thread.
-        Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
-        to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
-        :return:
-        """
-        path = os.path.join(self.__config.agent_log_path, "agent-%s.log" % self._id)
-        scalyr_logging.set_log_destination(agent_log_file_path=path, use_disk=True)
-
     def wait_for_copying_to_begin(self):
         """
         Block the current thread until worker's instance has begun copying.
@@ -1189,6 +1178,15 @@ class LogFileProcessorProxy(_LogFileProcessorProxy):
         return self.__cached_log_path
 
 
+def change_agent_log(new_path):
+    """
+    Reconfigure the agent logger, mainly, to change to path of the agent.log file
+    for the worker when it is running in the separate thread.
+    Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
+    to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
+    """
+    scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
+
 # methods of the worker class that should be exposed through proxy object.
 WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("start_worker"),
@@ -1202,7 +1200,6 @@ WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("generate_scalyr_client_status"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
-    six.ensure_str("change_agent_log")
 ]
 
 # create base proxy class for the worker, here we also specify all its methods that may be called through proxy.
@@ -1244,6 +1241,12 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                 "LogFileProcessorProxy"
             ),
         },
+    )
+
+    # also register a standalone function which has to change the agent log file path for the worker before it starts.
+    _SharedObjectManager.register(
+        six.ensure_str("change_agent_log"),
+        change_agent_log
     )
 
     return _SharedObjectManager

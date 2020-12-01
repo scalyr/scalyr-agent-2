@@ -108,25 +108,6 @@ class CopyingManagerCommonTest(object):
     def _extract_lines(self, request):
         return extract_lines_from_request(request)
 
-    # def _create_config(
-    #     self, log_files_number=1, use_pipelining=False, config_data=None
-    # ):
-    #     pipeline_threshold = 1.1
-    #     if use_pipelining:
-    #         pipeline_threshold = 0.0
-    #
-    #     config_initial_data = {
-    #         "disable_max_send_rate_enforcement_overrides": True,
-    #         "pipeline_threshold": pipeline_threshold,
-    #     }
-    #
-    #     if config_data is not None:
-    #         config_initial_data.update(config_data)
-    #
-    #     test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
-    #         log_files_number, config_data=config_initial_data
-    #     )
-
     def _append_lines(self, lines, log_file=None):
         # type: (List[six.text_type], Optional[TestableLogFile]) -> None
         if log_file is None:
@@ -220,7 +201,7 @@ class TestableCopyingManagerFlowController:
     RESPONDING = "RESPONDING"
 
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
-    WAIT_TIMEOUT = 50000.0
+    WAIT_TIMEOUT = 5.0
 
     def __init__(self, configuration):
         # type: (TestingConfiguration) -> None
@@ -417,9 +398,6 @@ class TestableCopyingManagerThreadedWorker(
     """
 
     __test__ = False
-
-    # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
-    WAIT_TIMEOUT = 500.0
 
     def __init__(self, configuration, api_key_config_entry, worker_id):
         # Approach:  We will override key methods of CopyingManagerWorker, blocking them from returning until we tell
@@ -636,6 +614,24 @@ class TestableCopyingManagerThreadedWorker(
 
 
 class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
+    def __init__(self, config, api_key_config):
+        # type: (TestingConfiguration, Dict) -> None
+        self._skip_agent_log_change = config.skip_agent_log_change
+        super(TestableApiKeyWorkerPool, self).__init__(config, api_key_config)
+
+
+    def _change_worker_process_agent_log_path(
+
+        self, shared_object_manager, path
+    ):
+        """
+        If there ia an appropriate configuration value,
+        we do not say change agent log path for workers,
+        because some of the test cases do not create agent log files at all.
+        """
+        if not self._skip_agent_log_change:
+            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(shared_object_manager, path)
+
     def _stop_shared_object_managers(self):
         """
         We may need to interact with workers even after manager is stopped,

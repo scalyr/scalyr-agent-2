@@ -385,12 +385,6 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
                 ["This line is OK too now.", "This line is still OK."]
             )
 
-    def test(self):
-        if not self.use_multiprocessing_workers:
-            pytest.skip("This test is only for multiprocess workers.")
-        (test_file, test_file2), worker = self._init_worker_instance(2)
-        worker.change_agent_log()
-
 
 class TestCopyingManagerWorkerStatus(CopyingManagerWorkerTest):
     def test_generate_status(self):
