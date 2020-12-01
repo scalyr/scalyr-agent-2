@@ -6,6 +6,14 @@ echo ""
 # assertions / checks we are performed are performed against the latest version of the logs and not
 # against old logs from previous start.
 sudo /etc/init.d/scalyr-agent-2 stop || true
+
+if [ -f "/var/log/scalyr-agent-2/agent.log" ]; then
+    echo "Tailling last 50 lines of log"
+    echo "-----------------------------"
+    sudo tail -50 /var/log/scalyr-agent-2/agent.log
+    echo "-----------------------------"
+fi
+
 sudo rm -f /var/log/scalyr-agent-2/agent.log
 
 sudo /etc/init.d/scalyr-agent-2 start
