@@ -85,7 +85,7 @@ echo -e "${STATUS_OUTPUT}" | grep -v "Last successful communication with Scalyr:
 echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 success"
 
 #
-# 3. Mimic MITM attack by pointing a random domain oo agent.scalyr.com and verify hostname
+# 3. Mimic MITM attack by pointing a random domain to agent.scalyr.com and verify hostname
 # check post SSL handshake and cert validation fails
 #
 echo_with_date ""
@@ -140,14 +140,16 @@ sudo sed -i -n "/${AGENT_SCALYR_COM_IP}/!p" /etc/hosts
 sudo sed -i -n "/${MOCK_HOST}/!p" /etc/scalyr-agent-2/agent.json
 
 #
-# 4. Vertify that CA cerification fail if we connection to a server with certificate issues by CA
-# which we don't trust
+# 4. Verify that CA validation fail if we connection to a server with certificate issues by CA
+# which we don't trust (or vice versa)
 #
 echo_with_date ""
 echo_with_date "Performing cert signed by CA we dont trust checks"
 echo_with_date ""
 
 sudo cp agent.json_invalid_bad_cert /etc/scalyr-agent-2/agent.json
+# NOTE: This test relies on this ca_certs.crt file which contains CA cert for Scalyr cert ca which
+# is not used by example.com
 sudo curl -o /tmp/ca_certs.crt https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/tests/unit/fixtures/certs/ca_certs.crt
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
