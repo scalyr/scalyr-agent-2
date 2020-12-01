@@ -7,7 +7,7 @@ Start-Sleep 2
 
 echo "Tailling last 50 lines of log"
 echo "-----------------------------"
-Get-Content C:\Program Files (x86)\Scalyr\log\agent.log -Tail 50 -ErrorAction SilentlyContinue
+Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Tail 50 -ErrorAction SilentlyContinue
 echo "-----------------------------"
 
 Remove-Item -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Force -ErrorAction SilentlyContinue
