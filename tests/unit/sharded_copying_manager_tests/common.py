@@ -613,8 +613,7 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
 
 
     def _change_worker_process_agent_log_path(
-
-        self, shared_object_manager, path
+        self, path
     ):
         """
         If there ia an appropriate configuration value,
@@ -622,7 +621,7 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
         because some of the test cases do not create agent log files at all.
         """
         if not self._skip_agent_log_change:
-            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(shared_object_manager, path)
+            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(path)
 
     def _stop_shared_object_managers(self):
         """

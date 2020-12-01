@@ -84,17 +84,6 @@ def _accumulate_worker_stats(
         return result_on_all_succeed
 
 
-def _change_agent_log(new_path):
-    # type: (six.text_type) -> None
-    """
-    Reconfigure the agent logger, mainly, to change to path of the agent.log file
-    for the worker when it is running in the separate thread.
-    Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
-    to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
-    """
-    scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
-
-
 class ApiKeyWorkerPool(object):
     """
     This abstraction is responsible for maintaining the workers
@@ -142,7 +131,7 @@ class ApiKeyWorkerPool(object):
                 # change agent log path for the new worker.
                 # this initializer function will be invoked in the worker's process.
                 def initializer():
-                    _change_agent_log(worker_agent_log_path)
+                    self._change_worker_process_agent_log_path(worker_agent_log_path)
 
                 shared_object_manager.start(initializer=initializer)
 
@@ -165,16 +154,15 @@ class ApiKeyWorkerPool(object):
         self.__current_worker = 0
 
     def _change_worker_process_agent_log_path(
-        self, shared_object_manager, path
+        self, path
     ):
-        # type: (SharedObjectManager, six.text_type) -> None
         """
-        Change Scalyr logger path in to process provided by the shared object manager,
-        so the worker, which will run inside this process will write its logs to the separate file.
-        :param  shared_object_manager: Shared object manager/
-        :param path: new path for the agent.log file in the shared object manager proces.
+        Reconfigure the agent logger, mainly, to change to path of the agent.log file
+        for the worker when it is running in the separate thread.
+        Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
+        to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
         """
-        shared_object_manager.change_agent_log(path)
+        scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
 
     @property
     def api_key_id(self):
