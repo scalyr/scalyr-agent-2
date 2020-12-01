@@ -8,10 +8,11 @@ echo ""
 sudo /etc/init.d/scalyr-agent-2 stop || true
 
 if [ -f "/var/log/scalyr-agent-2/agent.log" ]; then
-    echo "Tailling last 50 lines of log"
+    echo "Tailling last 50 lines of log after stop before log removal"
     echo "-----------------------------"
     sudo tail -50 /var/log/scalyr-agent-2/agent.log
     echo "-----------------------------"
+    echo ""
 fi
 
 sudo rm -f /var/log/scalyr-agent-2/agent.log
@@ -19,3 +20,15 @@ sudo rm -f /var/log/scalyr-agent-2/agent.log
 sudo /etc/init.d/scalyr-agent-2 start
 
 sleep 5
+
+if [ -f "/var/log/scalyr-agent-2/agent.log" ]; then
+    echo "Tailling last 50 lines of log after start with fresh logs"
+    echo "-----------------------------"
+    sudo tail -50 /var/log/scalyr-agent-2/agent.log
+    echo "-----------------------------"
+    echo ""
+fi
+
+echo ""
+echo "Agent restarted"
+echo ""

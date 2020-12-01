@@ -91,9 +91,7 @@ do
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
     TEST_TYPE=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "type=" '{print $2}' | awk '{print $1}')
 
-    if [ ! -n "${DISTRO_NAME}" ]; then
-        JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
-    fi
+    JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
 done
 
 echo ""
