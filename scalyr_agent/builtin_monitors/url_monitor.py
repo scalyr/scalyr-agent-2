@@ -27,6 +27,11 @@ import six.moves.urllib.parse
 import six.moves.http_cookiejar
 import six.moves.http_client
 
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib.objects import JsonArray
 
@@ -184,6 +189,10 @@ class UrlMonitor(ScalyrMonitor):
         else:
             self.extractor = None
 
+        self._base_headers = {
+            "User-Agent": "scalyr-agent-%s;monitor=url_monitor" % (SCALYR_VERSION)
+        }
+
     def build_request(self):
         """
         Builds the HTTP request based on the request URL, HTTP headers and method
@@ -191,6 +200,10 @@ class UrlMonitor(ScalyrMonitor):
         """
 
         request = six.moves.urllib.request.Request(self.url, data=self.request_data)
+
+        for header_key, header_value in six.iteritems(self._base_headers):
+            request.add_header(header_key, header_value)
+
         if self.request_headers:
             for header in self.request_headers:
                 request.add_header(header["header"], header["value"])
@@ -201,7 +214,6 @@ class UrlMonitor(ScalyrMonitor):
         return request
 
     def gather_sample(self):
-
         # Query the URL
         try:
             opener = six.moves.urllib.request.build_opener(

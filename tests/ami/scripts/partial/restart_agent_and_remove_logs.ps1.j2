@@ -5,6 +5,11 @@ echo ""
 scalyr-agent-2 stop;
 Start-Sleep 2
 
+echo "Tailling last 50 lines of log"
+echo "-----------------------------"
+Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Tail 50 -ErrorAction SilentlyContinue
+echo "-----------------------------"
+
 Remove-Item -Path "C:\Program Files (x86)\Scalyr\log\agent.log" -Force -ErrorAction SilentlyContinue
 Remove-Item -Path "C:\Program Files (x86)\Scalyr\data\checkpoints.json" -Force -ErrorAction SilentlyContinue
 Remove-Item -Path "C:\Program Files (x86)\Scalyr\data\active-checkpoints.json" -Force -ErrorAction SilentlyContinue

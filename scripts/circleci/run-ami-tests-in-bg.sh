@@ -109,7 +109,7 @@ do
     echo ""
 
     if wait "${job_pid}"; then
-        echo "Job finished successfuly: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Job finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 

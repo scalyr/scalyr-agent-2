@@ -328,7 +328,8 @@ Log-Message ""
 Log-Message "Performing cert signed by CA we dont trust checks"
 Log-Message ""
 
-Copy-Item ".\agent.json_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+Copy-Item ".\agent.json_win32_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+Copy-Item ".\ca_certs.crt" -Destination "C:\Program Files (x86)\Scalyr\config\ca_certs.crt"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 

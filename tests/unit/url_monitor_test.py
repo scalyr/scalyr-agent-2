@@ -19,13 +19,23 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "saurabh@scalyr.com"
+
 import unittest
+
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.scalyr_monitor import MonitorConfig
 from scalyr_agent.json_lib.objects import JsonArray, JsonObject
 
 import mock
+
+EXPECTED_BASE_HEADERS = list(
+    {"User-agent": "scalyr-agent-%s;monitor=url_monitor" % (SCALYR_VERSION)}.items()
+)
 
 
 class UrlMonitorTestRequest(unittest.TestCase):
@@ -58,7 +68,7 @@ class UrlMonitorTestRequest(unittest.TestCase):
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "GET")
         self.assertFalse(actual_request.data is not None)
-        self.assertEqual(actual_request.header_items(), [])
+        self.assertEqual(actual_request.header_items(), EXPECTED_BASE_HEADERS)
 
     def test_get_request_with_headers(self):
         mock_logger = mock.MagicMock()
@@ -76,7 +86,9 @@ class UrlMonitorTestRequest(unittest.TestCase):
         self.assertFalse(actual_request.data is not None)
         self.assertEqual(
             sorted(actual_request.header_items()),
-            sorted([("Header_foo", "foo"), ("Header_bar", "bar")]),
+            sorted(
+                [("Header_foo", "foo"), ("Header_bar", "bar")] + EXPECTED_BASE_HEADERS
+            ),
         )
 
     def test_post_request_with_data(self):
@@ -96,7 +108,9 @@ class UrlMonitorTestRequest(unittest.TestCase):
         self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
         self.assertEqual(
             sorted(actual_request.header_items()),
-            sorted([("Header_foo", "foo"), ("Header_bar", "bar")]),
+            sorted(
+                [("Header_foo", "foo"), ("Header_bar", "bar")] + EXPECTED_BASE_HEADERS
+            ),
         )
 
     def test_malformed_headers(self):

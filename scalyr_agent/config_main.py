@@ -45,6 +45,7 @@ from optparse import OptionParser
 if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
+# pylint: disable=import-error
 from __scalyr__ import (
     scalyr_init,
     get_install_root,
@@ -53,6 +54,8 @@ from __scalyr__ import (
     SCALYR_VERSION,
     PACKAGE_INSTALL,
 )
+
+# pylint: enable=import-error
 
 scalyr_init()
 
@@ -1428,22 +1431,24 @@ if __name__ == "__main__":
             default=False,
             help="Starts the agent if the conditional restart file marker exists.",
         )
-        # Special flag which is used by the Windows installer. We use it to indicate to this binary
-        # to fix up permissions for agent.json file and agent.d/ directory. This file is also used
-        # to create initial config by the install which means we can't correctly set those
-        # permissions inside the .wxs wix spec file.
-        # Right now it can only be used with "--init-config" flag on Windows.
-        parser.add_option(
-            "",
-            "--fix-config-permissions",
-            dest="fix_config_permissions",
-            action="store_true",
-            default=False,
-            help=(
-                "Fix permissions for agent.json file and agent.d/ directory and make sure it's. "
-                "not readable by others."
-            ),
-        )
+
+        if sys.platform.startswith("win"):
+            # Special flag which is used by the Windows installer. We use it to indicate to this binary
+            # to fix up permissions for agent.json file and agent.d/ directory. This file is also used
+            # to create initial config by the install which means we can't correctly set those
+            # permissions inside the .wxs wix spec file.
+            # Right now it can only be used with "--init-config" flag on Windows.
+            parser.add_option(
+                "",
+                "--fix-config-permissions",
+                dest="fix_config_permissions",
+                action="store_true",
+                default=False,
+                help=(
+                    "Fix permissions for agent.json file and agent.d/ directory and make sure it's. "
+                    "not readable by others. Applies to Windows only."
+                ),
+            )
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print("Could not parse commandline arguments.", file=sys.stderr)
