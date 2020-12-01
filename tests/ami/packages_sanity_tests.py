@@ -445,8 +445,8 @@ def main(
     )
 
     if "windows" in distro.lower():
-        deploy_step_timeout = 340
-        deploy_overall_timeout = 360
+        deploy_step_timeout = 360
+        deploy_overall_timeout = 380
         cat_step_timeout = 10
         max_tries = 3
     else:
