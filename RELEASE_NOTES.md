@@ -2,6 +2,31 @@
 
 ## 2.1.15 "Endora" - December 2, 2020
 
+* Linux system metrics monitor now ignores the following special mounts points by default:
+``/sys/*``, ``/run*``, ``/run*``.
+
+  In most cases users just want to monitor block and inodes usage for actual data partitions
+  and not other special partitions.
+
+ If you want to preserve the old behavior and capture ``df.*`` metrics for those mounts points,
+ you can configure ``ignore_mounts`` monitor option like this:
+
+ ```javascript
+    ...
+    monitors: [
+        {
+            module: "scalyr_agent.builtin_monitors.linux_system_metrics",
+            ignore_mounts: [],
+        }
+    ],
+    implicit_metric_monitor: false,
+    ...
+ ```
+
+   Keep in mind that ``linux_system_metrics`` monitor is special since it's enabled automatically
+   by default so if you want to specify custom options for it, you need to add
+   ``implicit_metric_monitor: false,`` option to the config as well.
+
 * This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
   and ``*.json`` files inside that directory and makes sure those files are not readable by
   others by default (aka "other" permission bit in octal notation for that file is ``0`` in case
