@@ -61,6 +61,7 @@ else
 fi
 
 # NOTE: We create a symlink so we can re-use config with a fixed value for ca_cert_path
+echo "Using system ca bundle: ${SYSTEM_CA_BUNDLE_PATH}"
 sudo ln -s ${SYSTEM_CA_BUNDLE_PATH} /etc/ssl/system-ca-bundle.crt
 
 sudo cp agent.json_system_ca_bundle /etc/scalyr-agent-2/agent.json
