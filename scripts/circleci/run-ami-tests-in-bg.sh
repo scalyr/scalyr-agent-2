@@ -91,7 +91,9 @@ do
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
     TEST_TYPE=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "type=" '{print $2}' | awk '{print $1}')
 
-    JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
+    if [ ! -n "${DISTRO_NAME}" ]; then
+        JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
+    fi
 done
 
 echo ""
@@ -109,7 +111,7 @@ do
     echo ""
 
     if wait "${job_pid}"; then
-        echo "Job finished successfuly: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Job finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 
