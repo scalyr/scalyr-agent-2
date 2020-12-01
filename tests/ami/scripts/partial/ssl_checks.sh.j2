@@ -132,7 +132,7 @@ sudo cat /var/log/scalyr-agent-2/agent.log | grep "because of server certificate
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "This likely indicates a MITM attack"
 
 echo_with_date ""
-echo_with_date "agent.log output successfuly verified"
+echo_with_date "agent.log output successfully verified"
 echo_with_date ""
 
 # Clean up at the end and remove all the refernces to the mock host and IP
@@ -148,6 +148,7 @@ echo_with_date "Performing cert signed by CA we dont trust checks"
 echo_with_date ""
 
 sudo cp agent.json_invalid_bad_cert /etc/scalyr-agent-2/agent.json
+sudo curl -o /tmp/ca_certs.crt https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/tests/unit/fixtures/certs/ca_certs.crt
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
@@ -165,7 +166,7 @@ echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
 echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedSSLError"
 
 echo_with_date ""
-echo_with_date "Status output successfuly verified."
+echo_with_date "Status output successlfully verified."
 echo_with_date ""
 
 echo_with_date ""
@@ -178,5 +179,5 @@ sudo cat /var/log/scalyr-agent-2/agent.log | grep "due to some SSL error"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep "certificate verify failed"
 
 echo_with_date ""
-echo_with_date "agent.log output successfuly verified"
+echo_with_date "agent.log output successfully verified"
 echo_with_date ""
