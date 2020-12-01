@@ -444,6 +444,9 @@ def main(
         verbose=verbose,
     )
 
+    # TODO: Lower those timeouts when upstream yum related issues or similar start to stabilize.
+    # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
+    # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
         deploy_step_timeout = 360
         deploy_overall_timeout = 380
