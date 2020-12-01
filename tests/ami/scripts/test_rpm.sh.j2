@@ -15,7 +15,9 @@
 
 set -e
 
+{% if verbose -%}
 set -x
+{% endif -%}
 
 echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
