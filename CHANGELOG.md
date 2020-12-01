@@ -8,7 +8,7 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 
 Improvements:
-* Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/run*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+* Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/dev*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 * Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
 
 Misc:

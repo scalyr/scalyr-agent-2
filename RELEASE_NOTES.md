@@ -3,7 +3,7 @@
 ## 2.1.15 "Endora" - December 2, 2020
 
 * Linux system metrics monitor now ignores the following special mounts points by default:
-``/sys/*``, ``/run*``, ``/run*``.
+``/sys/*``, ``/dev*``, ``/run*``.
 
   In most cases users just want to monitor block and inodes usage for actual data partitions
   and not other special partitions.
