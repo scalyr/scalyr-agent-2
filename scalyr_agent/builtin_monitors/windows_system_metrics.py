@@ -130,8 +130,8 @@ def _gather_metric(method, attribute=None, transform=None):
                 and "couldn't find any physical disk" in message.lower()
             ):
                 global_log.warn(
-                    "Unable to retrieve disk io metrics. This likely means diskperf -y "
-                    "needs to be run: %s" % (str(e)),
+                    "Unable to retrieve disk io metrics (method %s). This likely means diskperf -y "
+                    "needs to be run: %s" % (method, str(e)),
                     exc_info=True,
                     limit_once_per_x_secs=86400,
                     limit_key="win_diskperf_error",
@@ -146,8 +146,8 @@ def _gather_metric(method, attribute=None, transform=None):
             message = getattr(e, "message", str(e))
             if is_diskio_counters_method and ("has no attribute" in message.lower()):
                 global_log.warn(
-                    "Unable to retrieve disk io metrics. This likely means diskperf -y "
-                    "needs to be run: %s" % (str(e)),
+                    "Unable to retrieve disk io metrics (method %s). This likely means diskperf -y "
+                    "needs to be run: %s" % (method, str(e)),
                     exc_info=True,
                     limit_once_per_x_secs=86400,
                     limit_key="win_diskperf_error",
