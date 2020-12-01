@@ -114,7 +114,13 @@ from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
+
+# Directory which contains config files used by the tests which are uploaded to the server
 MOCK_CONFIGS_DIRECTORY = os.path.join(BASE_DIR, "configs/")
+
+# Directory which contains additional files which are used by the test and are uploaded to the
+# server
+TEST_FILES_DIRECTORY = os.path.join(BASE_DIR, "files/")
 
 
 EC2_DISTRO_DETAILS_MAP = {
@@ -337,6 +343,13 @@ def main(
     for file_name in file_names:
         config_file_path = os.path.join(MOCK_CONFIGS_DIRECTORY, file_name)
         file_upload_step = _create_config_file_deployment_step(config_file_path)
+        file_upload_steps.append(file_upload_step)
+
+    # Upload auxiliary files from tests/ami/files/
+    file_names = os.listdir(TEST_FILES_DIRECTORY)
+    for file_name in file_names:
+        file_path = os.path.join(TEST_FILES_DIRECTORY, file_name)
+        file_upload_step = _create_file_deployment_step(file_path, "ca_certs")
         file_upload_steps.append(file_upload_step)
 
     if test_type == "install":
