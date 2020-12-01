@@ -84,6 +84,17 @@ def _accumulate_worker_stats(
         return result_on_all_succeed
 
 
+def _change_agent_log(new_path):
+    # type: (six.text_type) -> None
+    """
+    Reconfigure the agent logger, mainly, to change to path of the agent.log file
+    for the worker when it is running in the separate thread.
+    Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
+    to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
+    """
+    scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
+
+
 class ApiKeyWorkerPool(object):
     """
     This abstraction is responsible for maintaining the workers
@@ -123,15 +134,17 @@ class ApiKeyWorkerPool(object):
 
                 # Important for the understanding. When the shared_object_manager is started, it creates a new process.
                 # We use this process as a process for the worker.
-                shared_object_manager.start()
+
+                worker_agent_log_path = os.path.join(
+                        self.__config.agent_log_path, "agent-%s.log" % worker_id
+                    )
 
                 # change agent log path for the new worker.
-                self._change_worker_process_agent_log_path(
-                    shared_object_manager,
-                    os.path.join(
-                        self.__config.agent_log_path, "agent-%s.log" % worker_id
-                    ),
-                )
+                # this initializer function will be invoked in the worker's process.
+                def initializer():
+                    _change_agent_log(worker_agent_log_path)
+
+                shared_object_manager.start(initializer=initializer)
 
                 # create proxy object of the worker. The real worker instance is created in the new process
                 # which was created when shared_object_manager started.
@@ -990,6 +1003,17 @@ class CopyingManager(StoppableThread, LogWatcher):
             # get statuses for the log matchers.
             for entry in self.__log_matchers:
                 result.log_matchers.append(entry.generate_status())
+
+            # sum up some worker stats to overall stats.
+            for api_key_status in api_key_statuses:
+                for worker_status in api_key_status.workers:
+                    result.total_rate_limited_time = worker_status.total_rate_limited_time
+                    result.total_read_time = worker_status.total_read_time
+                    result.total_waiting_time=worker_status.total_waiting_time
+                    result.total_blocking_response_time = worker_status.total_blocking_response_time
+                    result.total_request_time = worker_status.total_request_time
+                    result.total_pipelined_requests = worker_status.total_pipelined_requests
+                    result.rate_limited_time_since_last_status = worker_status.rate_limited_time_since_last_status
 
         finally:
             self.__lock.release()

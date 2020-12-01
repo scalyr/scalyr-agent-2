@@ -115,11 +115,11 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         config_data["disable_max_send_rate_enforcement_overrides"] = True
         config_data["pipeline_threshold"] = pipeline_threshold
 
-        test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
+        test_files, self._env_builder = TestEnvironBuilder.build_config_with_n_files(
             log_files_number, config_data=config_data
         )
 
-        self._config_builder.config.disable_flow_control = disable_flow_control
+        self._env_builder.config.disable_flow_control = disable_flow_control
 
     def _create_manager_instanse(
         self,
@@ -136,14 +136,14 @@ class CopyingManagerTest(CopyingManagerCommonTest):
             config_data=config_data,
         )
 
-        if self._config_builder is None:
+        if self._env_builder is None:
             self._init_test_environment(
                 log_files_number=log_files_number,
                 config_data=config_data,
                 disable_flow_control=disable_flow_control,
             )
 
-        self._instance = TestableCopyingManager(self._config_builder.config, [])
+        self._instance = TestableCopyingManager(self._env_builder.config, [])
 
         if auto_start:
             self._instance.start_manager()
@@ -151,7 +151,7 @@ class CopyingManagerTest(CopyingManagerCommonTest):
                 TestableCopyingManagerFlowController.SLEEPING
             )
 
-        test_files = tuple(self._config_builder.log_files.values())
+        test_files = tuple(self._env_builder.log_files.values())
         return test_files, self._instance
 
 
@@ -245,7 +245,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line4")
 
         self._instance = manager = TestableCopyingManager(
-            self._config_builder.config, []
+            self._env_builder.config, []
         )
 
         manager.start_manager()
@@ -264,12 +264,12 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line8")
 
         for checkpoint_path in pathlib.Path(
-            self._config_builder.config.agent_data_path
+            self._env_builder.config.agent_data_path
         ).glob("*checkpoints*.json"):
             checkpoint_path.unlink()
 
         self._instance = manager = TestableCopyingManager(
-            self._config_builder.config, []
+            self._env_builder.config, []
         )
 
         manager.start_manager()
@@ -304,10 +304,10 @@ class TestBasic(CopyingManagerTest):
         worker = manager.workers[-1]
 
         old_checkpoints_path = os.path.join(
-            self._config_builder.config.agent_data_path, "checkpoints.json"
+            self._env_builder.config.agent_data_path, "checkpoints.json"
         )
         old_active_checkpoints_path = os.path.join(
-            self._config_builder.config.agent_data_path, "active-checkpoints.json"
+            self._env_builder.config.agent_data_path, "active-checkpoints.json"
         )
 
         # move checkpoints files and rename tham as they were names in previous versions.
@@ -317,7 +317,7 @@ class TestBasic(CopyingManagerTest):
         )
 
         self._instance = manager = TestableCopyingManager(
-            self._config_builder.config, []
+            self._env_builder.config, []
         )
         manager.start_manager()
 
@@ -344,7 +344,7 @@ class TestBasic(CopyingManagerTest):
 
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(
-            self._config_builder.config, []
+            self._env_builder.config, []
         )
 
         # start manager, it has to create master checkpoint file when starts.
@@ -363,7 +363,7 @@ class TestBasic(CopyingManagerTest):
 
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(
-            self._config_builder.config, []
+            self._env_builder.config, []
         )
 
         # start manager, it has to create master checkpoint file when starts.

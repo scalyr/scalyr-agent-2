@@ -412,6 +412,15 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
 
         self.api_key_worker_pools = []  # type: List[ApiKeyWorkerPoolStatus]
 
+        # overall stat from workers.
+        self.total_rate_limited_time = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.rate_limited_time_since_last_status = 0
+
 
 class CopyingManagerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying components."""

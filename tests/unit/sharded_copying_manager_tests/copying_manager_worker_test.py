@@ -108,8 +108,8 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
     def _create_worker(self):
 
-        config = self._config_builder.config
-        api_key_config = self._config_builder.config.api_key_configs[0]
+        config = self._env_builder.config
+        api_key_config = self._env_builder.config.api_key_configs[0]
         worker_id = "0"
 
         if self.use_multiprocessing_workers:
@@ -143,11 +143,11 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         if config_data is not None:
             config_initial_data.update(config_data)
 
-        test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
+        test_files, self._env_builder = TestEnvironBuilder.build_config_with_n_files(
             log_files_number, config_data=config_initial_data
         )
 
-        self._config_builder.config.disable_flow_control = disable_flow_control
+        self._env_builder.config.disable_flow_control = disable_flow_control
 
         # if config is None:
         #     self._create_config(
@@ -165,19 +165,19 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         disable_flow_control=False,
     ):  # type: (int, bool, bool, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManagerThreadedWorker]
 
-        if self._config_builder is None:
+        if self._env_builder is None:
             self._init_test_environment(log_files_number=log_files_number, use_pipelining=use_pipelining, disable_flow_control=disable_flow_control)
 
         self._instance = self._create_worker()
 
         if add_processors:
-            for test_file in self._config_builder.log_files.values():
+            for test_file in self._env_builder.log_files.values():
                 self._spawn_single_log_processor(test_file)
 
         if auto_start:
             self._instance.start_worker()
 
-        test_files = tuple(self._config_builder.log_files.values())
+        test_files = tuple(self._env_builder.log_files.values())
 
         return test_files, self._instance
 
@@ -185,9 +185,9 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         self, log_file, checkpoints=None, copy_at_index_zero=False,
     ):
         # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
-        log_config = self._config_builder.get_log_config(log_file)
+        log_config = self._env_builder.get_log_config(log_file)
 
-        matcher = LogMatcher(self._config_builder.config, log_config)
+        matcher = LogMatcher(self._env_builder.config, log_config)
         if checkpoints is None:
             checkpoints = {}
 
@@ -429,7 +429,7 @@ class TestCopyingManagerWorkerResponses(CopyingManagerWorkerTest):
 
         assert lines == ["First line", "Second line"]
 
-        with mock.patch.object(self._config_builder.config, "max_retry_time", 0):
+        with mock.patch.object(self._env_builder.config, "max_retry_time", 0):
 
             # Set response to force copying manager to retry request.
             responder_callback("error")
@@ -651,7 +651,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         worker.stop_worker()
 
-        checkpoints = self._config_builder.get_checkpoints(worker.get_id())[
+        checkpoints = self._env_builder.get_checkpoints(worker.get_id())[
             "checkpoints"
         ]
 
@@ -673,7 +673,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         worker.stop_worker()
 
-        checkpoints = self._config_builder.get_checkpoints(worker.get_id())[
+        checkpoints = self._env_builder.get_checkpoints(worker.get_id())[
             "checkpoints"
         ]
         assert test_file.str_path in checkpoints

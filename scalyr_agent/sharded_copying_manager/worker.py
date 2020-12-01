@@ -1178,15 +1178,6 @@ class LogFileProcessorProxy(_LogFileProcessorProxy):
         return self.__cached_log_path
 
 
-def change_agent_log(new_path):
-    """
-    Reconfigure the agent logger, mainly, to change to path of the agent.log file
-    for the worker when it is running in the separate thread.
-    Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
-    to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
-    """
-    scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
-
 # methods of the worker class that should be exposed through proxy object.
 WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("start_worker"),
@@ -1241,12 +1232,6 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                 "LogFileProcessorProxy"
             ),
         },
-    )
-
-    # also register a standalone function which has to change the agent log file path for the worker before it starts.
-    _SharedObjectManager.register(
-        six.ensure_str("change_agent_log"),
-        change_agent_log
     )
 
     return _SharedObjectManager

@@ -98,12 +98,12 @@ class CopyingManagerCommonTest(object):
     """
 
     def setup(self):
-        self._config_builder = None  # type: Optional[TestEnvironBuilder]
+        self._env_builder = None  # type: Optional[TestEnvironBuilder]
         self._instance = None
 
     def teardown(self):
-        if self._config_builder is not None:
-            self._config_builder.clear()
+        if self._env_builder is not None:
+            self._env_builder.clear()
 
     def _extract_lines(self, request):
         return extract_lines_from_request(request)
@@ -138,14 +138,6 @@ class CopyingManagerCommonTest(object):
         responder_callback(response)
 
         return request_lines
-
-    def _append_lines_with_callback(self, *lines, **kwargs):
-        # type: (*str, **Dict[str, Union[str, TestableLogFile]]) -> Tuple[List[str], Callable]
-
-        self._append_lines(*lines, **kwargs)
-        (request, responder_callback) = self._instance.controller.wait_for_rpc()
-        request_lines = self._extract_lines(request)
-        return request_lines, responder_callback
 
     def _append_lines_and_wait_for_rpc(self, lines, log_file=None, response="success"):
         # type: (List[six.text_type], Optional[TestableLogFile], six.text_type) -> List[str]

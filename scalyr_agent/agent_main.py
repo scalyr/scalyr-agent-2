@@ -1710,38 +1710,32 @@ class ScalyrAgent(object):
         watched_paths = 0
         copying_paths = 0
 
-        # Accumulate all the stats from the running processors that are copying log files.
+        # Accumulate all the stats from the running processors in all workers that are copying log files.
         if current_status.copying_manager_status is not None:
             delta_stats.total_copy_requests_errors = (
                 current_status.copying_manager_status.total_errors
             )
-
-            # TODO: refactor this to be able to work with multi-worker copying manager.
-            # Those stats are now part of the CopyingManagerThreadedWorker's
-            # status and they do not make too much sense outside if it.
-            # Caw we just sum them? Maybe avarege? Or just remove them?
-
-            # delta_stats.total_rate_limited_time = (
-            #     current_status.copying_manager_status.total_rate_limited_time
-            # )
-            # delta_stats.total_read_time = (
-            #     current_status.copying_manager_status.total_read_time
-            # )
-            # delta_stats.total_waiting_time = (
-            #     current_status.copying_manager_status.total_waiting_time
-            # )
-            # delta_stats.total_blocking_response_time = (
-            #     current_status.copying_manager_status.total_blocking_response_time
-            # )
-            # delta_stats.total_request_time = (
-            #     current_status.copying_manager_status.total_request_time
-            # )
-            # delta_stats.total_pipelined_requests = (
-            #     current_status.copying_manager_status.total_pipelined_requests
-            # )
-            # delta_stats.rate_limited_time_since_last_status = (
-            #     current_status.copying_manager_status.rate_limited_time_since_last_status
-            # )
+            delta_stats.total_rate_limited_time = (
+                current_status.copying_manager_status.total_rate_limited_time
+            )
+            delta_stats.total_read_time = (
+                current_status.copying_manager_status.total_read_time
+            )
+            delta_stats.total_waiting_time = (
+                current_status.copying_manager_status.total_waiting_time
+            )
+            delta_stats.total_blocking_response_time = (
+                current_status.copying_manager_status.total_blocking_response_time
+            )
+            delta_stats.total_request_time = (
+                current_status.copying_manager_status.total_request_time
+            )
+            delta_stats.total_pipelined_requests = (
+                current_status.copying_manager_status.total_pipelined_requests
+            )
+            delta_stats.rate_limited_time_since_last_status = (
+                current_status.copying_manager_status.rate_limited_time_since_last_status
+            )
 
             delta_stats.total_scan_iterations = (
                 current_status.copying_manager_status.total_scan_iterations
