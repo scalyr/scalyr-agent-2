@@ -16,6 +16,8 @@ if [ -f "/var/log/scalyr-agent-2/agent.log" ]; then
 fi
 
 sudo rm -f /var/log/scalyr-agent-2/agent.log
+sudo rm -f /var/lib/scalyr-agent-2/checkpoints.json
+sudo rm -f /var/lib/scalyr-agent-2/active-checkpoints.json
 
 sudo /etc/init.d/scalyr-agent-2 start
 
