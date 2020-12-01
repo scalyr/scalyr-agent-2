@@ -337,7 +337,6 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
-    make_directory("Scalyr/data/checkpoints")
     make_directory("Scalyr/config/agent.d")
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
@@ -568,7 +567,6 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     make_directory("root/etc/init.d")
     make_directory("root/var/log/scalyr-agent-2")
     make_directory("root/var/lib/scalyr-agent-2")
-    make_directory("root/var/lib/scalyr-agent-2/checkpoints")
     make_directory("root/usr/share")
     make_directory("root/usr/sbin")
 
@@ -873,7 +871,6 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     # Build the rest of the directories required for the tarball install.  Mainly, the log and data directories
     # in the tarball itself where the running process will store its state.
     make_directory("scalyr-agent-2/data")
-    make_directory("scalyr-agent-2/data/checkpoints")
     make_directory("scalyr-agent-2/log")
     make_directory("scalyr-agent-2/config/agent.d")
 

@@ -1671,10 +1671,10 @@ class ScalyrAgent(object):
         stats = overall_stats
 
         log.info(
-            "copy_manager_status total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
+            "copy_manager_status total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
             "total_request_time=%lf total_pipelined_requests=%ld avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
             % (
-                stats.total_copy_iterations,
+                stats.total_scan_iterations,
                 stats.total_read_time,
                 stats.total_compression_time,
                 stats.total_waiting_time,
@@ -1717,11 +1717,12 @@ class ScalyrAgent(object):
             )
 
             # TODO: refactor this to be able to work with multi-worker copying manager.
+            # Those stats are now part of the CopyingManagerThreadedWorker's
+            # status and they do not make too much sense outside if it.
+            # Caw we just sum them? Maybe avarege? Or just remove them?
+
             # delta_stats.total_rate_limited_time = (
             #     current_status.copying_manager_status.total_rate_limited_time
-            # )
-            # delta_stats.total_copy_iterations = (
-            #     current_status.copying_manager_status.total_scan_iterations
             # )
             # delta_stats.total_read_time = (
             #     current_status.copying_manager_status.total_read_time
@@ -1741,6 +1742,11 @@ class ScalyrAgent(object):
             # delta_stats.rate_limited_time_since_last_status = (
             #     current_status.copying_manager_status.rate_limited_time_since_last_status
             # )
+
+            delta_stats.total_scan_iterations = (
+                current_status.copying_manager_status.total_scan_iterations
+            )
+
             watched_paths = len(current_status.copying_manager_status.log_matchers)
             for matcher in current_status.copying_manager_status.log_matchers:
                 copying_paths += len(matcher.log_processors_status)

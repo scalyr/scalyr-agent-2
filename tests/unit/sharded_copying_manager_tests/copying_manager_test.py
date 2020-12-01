@@ -29,6 +29,10 @@ if False:
     from typing import Dict
     from typing import Tuple
 
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
 import pytest
 
 from scalyr_agent import scalyr_logging
@@ -41,6 +45,7 @@ from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
     TestableLogFile,
     TestingConfiguration,
+    TestEnvironBuilder,
 )
 
 import mock
@@ -81,31 +86,19 @@ class CopyingManagerTest(CopyingManagerCommonTest):
             self._instance.cleanup()
         super(CopyingManagerTest, self).teardown()
 
-    def _create_manager_instanse(
+    def _init_test_environment(
         self,
         log_files_number=1,
-        auto_start=True,
         use_pipelining=False,
         config_data=None,
         disable_flow_control=False,
-    ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
-
+    ):
         pipeline_threshold = 1.1
         if use_pipelining:
             pipeline_threshold = 0.0
 
-        initial_config_data = {
-            "debug_level": 5,
-            "disable_max_send_rate_enforcement_overrides": True,
-            "pipeline_threshold": pipeline_threshold,
-        }
-
         if config_data is None:
             config_data = {}
-
-        for k, v in initial_config_data.items():
-            if k not in config_data:
-                config_data[k] = v
 
         if "api_keys" not in config_data:
             api_keys = []
@@ -116,16 +109,39 @@ class CopyingManagerTest(CopyingManagerCommonTest):
                 api_keys.append(api_key_config)
             config_data["api_keys"] = api_keys
 
-        config_data["use_multiprocess_copying_workers"] = self.use_multiprocessing_workers
+        config_data[
+            "use_multiprocess_copying_workers"
+        ] = self.use_multiprocessing_workers
+        config_data["disable_max_send_rate_enforcement_overrides"] = True
+        config_data["pipeline_threshold"] = pipeline_threshold
 
+        test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
+            log_files_number, config_data=config_data
+        )
 
-        self._create_config(
+        self._config_builder.config.disable_flow_control = disable_flow_control
+
+    def _create_manager_instanse(
+        self,
+        log_files_number=1,
+        auto_start=True,
+        use_pipelining=False,
+        config_data=None,
+        disable_flow_control=False,
+    ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
+
+        self._init_test_environment(
             log_files_number=log_files_number,
             use_pipelining=use_pipelining,
             config_data=config_data,
         )
 
-        self._config_builder.config.disable_flow_control = disable_flow_control
+        if self._config_builder is None:
+            self._init_test_environment(
+                log_files_number=log_files_number,
+                config_data=config_data,
+                disable_flow_control=disable_flow_control,
+            )
 
         self._instance = TestableCopyingManager(self._config_builder.config, [])
 
@@ -247,7 +263,10 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line7")
         test_file.append_lines("Line8")
 
-        shutil.rmtree(str(self._config_builder.checkpoints_dir_path))
+        for checkpoint_path in pathlib.Path(
+            self._config_builder.config.agent_data_path
+        ).glob("*checkpoints*.json"):
+            checkpoint_path.unlink()
 
         self._instance = manager = TestableCopyingManager(
             self._config_builder.config, []

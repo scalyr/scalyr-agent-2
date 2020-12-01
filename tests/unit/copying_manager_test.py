@@ -289,6 +289,41 @@ class TestDynamicLogPathTest(BaseTest):
         matchers = self._manager.log_matchers
         self.assertEquals(0, len(matchers))
 
+    def test_schedule_log_path_for_removal_and_re_add_before_actual_removal(self):
+        config = {}
+        self.create_copying_manager(config)
+        self.fake_scan()
+
+        path = os.path.join(self._log_dir, "newlog.log")
+        self.append_log_lines(path, "line1\n")
+
+        log_config = {"path": path}
+
+        self._manager.add_log_config("unittest", log_config)
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals(1, len(matchers))
+        self.assertEquals(path, matchers[0].log_path)
+
+        assert path not in self._get_manager_log_pending_removal()
+
+        self._manager.schedule_log_path_for_removal("unittest", path)
+        assert path in self._get_manager_log_pending_removal()
+
+        # We use force_add=True when adding the log file which means scheduled removal should be
+        # canceled / removed
+        self._manager.add_log_config("unittest", log_config, force_add=True)
+        assert path not in self._get_manager_log_pending_removal()
+
+        self.fake_scan()
+        self.fake_scan()
+
+        assert not path in self._get_manager_log_pending_removal()
+
+        # Matcher should still be there since removal should have been canceled
+        matchers = self._manager.log_matchers
+        assert len(matchers) == 1
+
     def test_schedule_log_path_for_removal(self):
         config = {}
         self.create_copying_manager(config)
@@ -482,6 +517,11 @@ class TestDynamicLogPathTest(BaseTest):
             fp.write(l)
             fp.write("\n")
         fp.close()
+
+    def _get_manager_log_pending_removal(self):
+        # pylint: disable=no-member
+        return self._manager._CopyingManager__logs_pending_removal
+        # pylint: enable=no-member
 
 
 class CopyingParamsLegacyTest(ScalyrTestCase):
@@ -1040,63 +1080,6 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         responder_callback("success")
 
-    # TODO: confirm that this test only makes sense in the context of the single worker, and then remove.
-    @skipIf(True, "This test is moved to worker tests.")
-    def test_pipelined_requests_with_processor_closes(self):
-        # Tests bug related to duplicate log upload (CT-107, AGENT-425, CT-114)
-        # The problem was related to mixing up the callbacks between two different log processors
-        # during pipeline execution and one of the log processors had been closed.
-        #
-        # To replicate, we need to upload to two log files.
-        controller = self.__create_test_instance(use_pipelining=True, test_files=2)
-        self.__append_log_lines("p_First line", "p_Second line")
-        self.__append_log_lines_to_beta("s_First line", "s_Second line")
-        # Mark the primary log file to be closed (remove its log processor) once all current bytes have
-        # been uploaded.
-        controller.close_at_eof(self.__test_log_file)
-
-        controller.perform_scan()
-        # Set up for the pipeline scan.  Just add a few more lines to the secondary file.
-        self.__append_log_lines_to_beta("s_Third line")
-        controller.perform_pipeline_scan()
-
-        (request, responder_callback) = controller.wait_for_rpc()
-        self.assertFalse(self.__was_pipelined(request))
-
-        lines = self.__extract_lines(request)
-        self.assertEquals(4, len(lines))
-        self.assertEquals("p_First line", lines[0])
-        self.assertEquals("p_Second line", lines[1])
-        self.assertEquals("s_First line", lines[2])
-        self.assertEquals("s_Second line", lines[3])
-
-        responder_callback("success")
-
-        # With the bug, at this point, the processor for the secondary log file has been removed.
-        # We can tell this by adding more log lines to it and see they aren't copied up.  However,
-        # we first have to read the request that was already created via pipelining.
-        (request, responder_callback) = controller.wait_for_rpc()
-        self.assertTrue(self.__was_pipelined(request))
-
-        lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals("s_Third line", lines[0])
-
-        responder_callback("success")
-
-        # Now add in more lines to the secondary.  If the bug was present, these would not be copied up.
-        self.__append_log_lines_to_beta("s_Fourth line")
-        controller.perform_scan()
-
-        (request, responder_callback) = controller.wait_for_rpc()
-
-        self.assertFalse(self.__was_pipelined(request))
-        lines = self.__extract_lines(request)
-
-        self.assertEquals(1, len(lines))
-        self.assertEquals("s_Fourth line", lines[0])
-        responder_callback("success")
-
     def test_pipelined_requests_with_normal_error(self):
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
@@ -1407,6 +1390,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
                 expected_body, file_path=self.agent_debug_log_path
             )
 
+            controller = None
             try:
                 controller = self.__create_test_instance()
 
@@ -1434,18 +1418,6 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
     def __extract_lines(self, request):
         return extract_lines_from_request(request)
-        # parsed_request = test_util.parse_scalyr_request(request.get_payload())
-        #
-        # lines = []
-        #
-        # if "events" in parsed_request:
-        #     for event in parsed_request["events"]:
-        #         if "attrs" in event:
-        #             attrs = event["attrs"]
-        #             if "message" in attrs:
-        #                 lines.append(attrs["message"].strip())
-        #
-        # return lines
 
     def __was_pipelined(self, request):
         return "pipelined=1.0" in request[0].get_timing_data()
@@ -1469,13 +1441,8 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         data_dir = os.path.join(root_dir, "data")
         log_dir = os.path.join(root_dir, "log")
 
-        checkpoints_path = os.path.join(data_dir, "checkpoints")
-
         if not os.path.exists(data_dir):
             os.mkdir(data_dir)
-
-        if not os.path.exists(checkpoints_path):
-            os.mkdir(checkpoints_path)
 
         if not os.path.exists(config_dir):
             os.mkdir(config_dir)

@@ -39,6 +39,7 @@ from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerWorkerProxy,
     CopyingManagerCommonTest,
     TestableSharedObjectManager,
+    TestEnvironBuilder
 )
 from scalyr_agent.configuration import Configuration
 from tests.unit.sharded_copying_manager_tests.config_builder import TestableLogFile
@@ -105,15 +106,55 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             self._shared_object_manager = TestableSharedObjectManager()
             self._shared_object_manager.start()
 
-    def _create_worker(self, *args, **kwargs):
+    def _create_worker(self):
+
+        config = self._config_builder.config
+        api_key_config = self._config_builder.config.api_key_configs[0]
+        worker_id = "0"
+
         if self.use_multiprocessing_workers:
             worker = self._shared_object_manager.CopyingManagerWorkerProxy(
-                *args, **kwargs
+                config, api_key_config, worker_id
             )
         else:
-            worker = TestableCopyingManagerThreadedWorker(*args, **kwargs)
+            worker = TestableCopyingManagerThreadedWorker(
+                config, api_key_config, worker_id
+            )
 
         return worker
+
+    def _init_test_environment(
+        self, log_files_number=1, use_pipelining=False, config_data=None, disable_flow_control=False,
+
+    ):
+
+        pipeline_threshold = 1.1
+        if use_pipelining:
+            pipeline_threshold = 0.0
+
+        config_initial_data = {
+            "api_keys": [{"workers": 1}],
+            "use_multiprocessing_workers": self.use_multiprocessing_workers,
+            "disable_send_requests": True,
+            "disable_max_send_rate_enforcement_overrides": True,
+            "pipeline_threshold": pipeline_threshold,
+        }
+
+        if config_data is not None:
+            config_initial_data.update(config_data)
+
+        test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
+            log_files_number, config_data=config_initial_data
+        )
+
+        self._config_builder.config.disable_flow_control = disable_flow_control
+
+        # if config is None:
+        #     self._create_config(
+        #         log_files_number=log_files_number,
+        #         use_pipelining=use_pipelining,
+        #         config_data=config_data,
+        #     )
 
     def _init_worker_instance(
         self,
@@ -124,25 +165,10 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         disable_flow_control=False,
     ):  # type: (int, bool, bool, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManagerThreadedWorker]
 
-        config_data = {
-            "api_keys": [{"workers": 1}],
-            "use_multiprocessing_workers": self.use_multiprocessing_workers,
-            "disable_send_requests": True,
-        }
+        if self._config_builder is None:
+            self._init_test_environment(log_files_number=log_files_number, use_pipelining=use_pipelining, disable_flow_control=disable_flow_control)
 
-        self._create_config(
-            log_files_number=log_files_number,
-            use_pipelining=use_pipelining,
-            config_data=config_data,
-        )
-
-        self._config_builder.config.disable_flow_control = disable_flow_control
-
-        self._instance = self._create_worker(
-            self._config_builder.config,
-            self._config_builder.config.api_key_configs[0],
-            "1",
-        )
+        self._instance = self._create_worker()
 
         if add_processors:
             for test_file in self._config_builder.log_files.values():
@@ -202,8 +228,6 @@ class TestsRunning(CopyingManagerWorkerTest):
 
             # check for waiting is finished, it must not be finished until event is not set.
             assert not wait_future.done()
-            time.sleep(0.1)
-            assert not wait_future.done()
 
             run_released.set()
 
@@ -211,6 +235,7 @@ class TestsRunning(CopyingManagerWorkerTest):
             wait_future.result(timeout=3)
             assert wait_future.done()
 
+    @pytest.mark.timeout(10)
     def test_health_check_after_error(self):
 
         # mock the function which is called before the worker starts copying.
@@ -275,13 +300,13 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
 
         assert len(worker.get_log_processors()) == 2
 
-        self._append_lines_and_check("Hello", log_file=test_file)
-        self._append_lines_and_check("Hello friend!", log_file=test_file)
-        self._append_lines_and_check("Line1", "Line2", "Line3", log_file=test_file)
+        self._append_lines_and_check(["Hello"], log_file=test_file)
+        self._append_lines_and_check(["Hello friend!"], log_file=test_file)
+        self._append_lines_and_check(["Line1", "Line2", "Line3"], log_file=test_file)
 
-        self._append_lines_and_check("Hello", log_file=test_file2)
-        self._append_lines_and_check("Hello friend!", log_file=test_file2)
-        self._append_lines_and_check("Line1", "Line2", "Line3", log_file=test_file2)
+        self._append_lines_and_check(["Hello"], log_file=test_file2)
+        self._append_lines_and_check(["Hello friend!"], log_file=test_file2)
+        self._append_lines_and_check(["Line1", "Line2", "Line3"], log_file=test_file2)
 
     def test_add_log_processors_after_start(self):
         (test_file, test_file2), worker = self._init_worker_instance(
@@ -301,14 +326,14 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
         assert len(worker.get_log_processors()) == 2
 
         with self.current_log_file(test_file):
-            self._append_lines_and_check("Hello")
-            self._append_lines_and_check("Hello friend!")
-            self._append_lines_and_check("Line1", "Line2", "Line3")
+            self._append_lines_and_check(["Hello"])
+            self._append_lines_and_check(["Hello friend!"])
+            self._append_lines_and_check(["Line1", "Line2", "Line3"])
 
         with self.current_log_file(test_file2):
-            self._append_lines_and_check("Hello")
-            self._append_lines_and_check("Hello friend!")
-            self._append_lines_and_check("Line1", "Line2", "Line3")
+            self._append_lines_and_check(["Hello"])
+            self._append_lines_and_check(["Hello friend!"])
+            self._append_lines_and_check(["Line1", "Line2", "Line3"])
 
     def test_add_and_remove_multiple_log_processors(self):
         (test_file, test_file2, test_file3), worker = self._init_worker_instance(
@@ -326,18 +351,18 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
         assert len(worker.get_log_processors()) == 3
 
         with self.current_log_file(test_file):
-            self._append_lines_and_check("Hello")
-            self._append_lines_and_check("Hello friend!")
-            self._append_lines_and_check("Line1", "Line2", "Line3")
+            self._append_lines_and_check(["Hello"])
+            self._append_lines_and_check(["Hello friend!"])
+            self._append_lines_and_check(["Line1", "Line2", "Line3"])
         with self.current_log_file(test_file2):
-            self._append_lines_and_check("Hello")
-            self._append_lines_and_check("Hello friend!")
-            self._append_lines_and_check("Line1", "Line2", "Line3")
+            self._append_lines_and_check(["Hello"])
+            self._append_lines_and_check(["Hello friend!"])
+            self._append_lines_and_check(["Line1", "Line2", "Line3"])
 
         with self.current_log_file(test_file3):
-            self._append_lines_and_check("Hello")
-            self._append_lines_and_check("Hello friend!")
-            self._append_lines_and_check("Line1", "Line2", "Line3")
+            self._append_lines_and_check(["Hello"])
+            self._append_lines_and_check(["Hello friend!"])
+            self._append_lines_and_check(["Line1", "Line2", "Line3"])
 
         processor.close()
 
@@ -357,15 +382,21 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
 
         with self.current_log_file(test_file):
             self._append_lines_and_check(
-                "This line is OK too now.", "This line is still OK."
+                ["This line is OK too now.", "This line is still OK."]
             )
+
+    def test(self):
+        if not self.use_multiprocessing_workers:
+            pytest.skip("This test is only for multiprocess workers.")
+        (test_file, test_file2), worker = self._init_worker_instance(2)
+        worker.change_agent_log()
 
 
 class TestCopyingManagerWorkerStatus(CopyingManagerWorkerTest):
     def test_generate_status(self):
         (test_file,), worker = self._init_worker_instance()
 
-        self._append_lines_and_check("First line", "Second line", log_file=test_file)
+        self._append_lines_and_check(["First line", "Second line"], log_file=test_file)
 
         status = worker.generate_status()
 
@@ -388,7 +419,7 @@ class TestCopyingManagerWorkerStatus(CopyingManagerWorkerTest):
         status = worker.generate_status()
         assert (
             status.health_check_result
-            == "Worker '1' failed, max time since last copy attempt (60.0 seconds) exceeded"
+            == "Worker '0' failed, max time since last copy attempt (60.0 seconds) exceeded"
         )
 
 
@@ -396,6 +427,7 @@ class TestCopyingManagerWorkerResponses(CopyingManagerWorkerTest):
     @skipIf(platform.system() == "Windows", "Skipping failing test on Windows")
     @skip_on_multiprocess_workers
     def test_stale_request(self):
+
         (test_file,), worker = self._init_worker_instance()
 
         test_file.append_lines("First line", "Second line")
@@ -403,25 +435,7 @@ class TestCopyingManagerWorkerResponses(CopyingManagerWorkerTest):
 
         assert lines == ["First line", "Second line"]
 
-        from scalyr_agent.sharded_copying_manager import worker
-
-        # backup original 'time' module
-        orig_time = worker.time
-
-        class _time_mock(object):
-            # This dummy 'time()' should be called on new copying thread iteration
-            # to emulate huge gap between last request.
-            def time(_self):  # pylint: disable=no-self-argument
-                result = (
-                    orig_time.time()
-                    + self._config_builder.config.max_retry_time  # pylint: disable=no-member
-                )
-                return result
-
-        # replace time module with dummy time object.
-        worker.time = _time_mock()
-
-        try:
+        with mock.patch.object(self._config_builder.config, "max_retry_time", 0):
 
             # Set response to force copying manager to retry request.
             responder_callback("error")
@@ -430,8 +444,6 @@ class TestCopyingManagerWorkerResponses(CopyingManagerWorkerTest):
             (lines, responder_callback) = self._wait_for_rpc()
 
             assert lines == []
-        finally:
-            worker.time = orig_time
 
     def test_normal_error(self):
         (test_file,), worker = self._init_worker_instance()
@@ -641,7 +653,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
     def test_checkpoints(self):
         (test_file,), worker = self._init_worker_instance()
 
-        self._append_lines_and_check("First line", log_file=test_file)
+        self._append_lines_and_check(["First line"], log_file=test_file)
 
         worker.stop_worker()
 
@@ -652,11 +664,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         assert test_file.str_path in checkpoints
 
         # create new worker. Imitate second launch. Worker must start from beginning of the file.
-        self._instance = worker = self._create_worker(
-            self._config_builder.config,
-            self._config_builder.config.api_key_configs[0],
-            "1",
-        )
+        self._instance = worker = self._create_worker()
         self._spawn_single_log_processor(test_file, copy_at_index_zero=True)
 
         worker.start_worker(stop_at=TestableCopyingManagerThreadedWorker.SENDING)
@@ -678,11 +686,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         # create new worker. Imitate third launch.
         # Now we also provide checkpoints from previous run, so it have to ignore "copy_at_index_zero".
-        self._instance = worker = self._create_worker(
-            self._config_builder.config,
-            self._config_builder.config.api_key_configs[0],
-            "1",
-        )
+        self._instance = worker = self._create_worker()
         self._spawn_single_log_processor(
             test_file, checkpoints=checkpoints, copy_at_index_zero=True
         )

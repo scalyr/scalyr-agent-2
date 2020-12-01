@@ -188,7 +188,10 @@ class ApiKeyWorkerPool(object):
     def stop_workers(self, wait_on_join=True, join_timeout=5):
         # type: (bool, int) -> None
         for worker in self.__workers:
-            worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
+            try:
+                worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
+            except:
+                log.exception("Can not stop the worker '%s'." % worker.get_id())
 
         self._stop_shared_object_managers()
 
@@ -200,8 +203,11 @@ class ApiKeyWorkerPool(object):
         :return:
         """
         # also stop all shared object managers.
-        for memory_manager in self.__shared_object_managers.values():
-            memory_manager.shutdown()
+        for worker_id, memory_manager in self.__shared_object_managers.items():
+            try:
+                memory_manager.shutdown()
+            except:
+                log.exception("Can not stop shared object manager for the worker '%s'." % worker_id)
 
     def generate_status(self, warn_on_rate_limit=False):
         # type: (bool) -> ApiKeyWorkerPoolStatus
@@ -749,6 +755,13 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # create copying workers according to settings in the configuration.
                 self._create_worker_pools()
 
+                # if the copying manager is configured to work with multiprocess workers. We need to change the
+                # path for the agent log file for them.
+                if self.__config.use_multiprocess_copying_workers:
+                    for worker_pool in self.__api_keys_worker_pools.values():
+                        for worker in worker_pool.workers:
+                            worker.change_agent_log()
+
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
 
@@ -1247,15 +1260,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         allow workers to rewrite the content of this files without losing any data.
         """
 
-        checkpoints_dir_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints"
-        )
-
         # read all checkpoints from the manager's previous run and combine them into one mater file.
         checkpoints = self.__find_and_read_checkpoints()
 
         master_checkpoints_path = os.path.join(
-            checkpoints_dir_path, CHECKPOINTS_MASTER_FILE_NAME,
+            self.__config.agent_data_path, CHECKPOINTS_MASTER_FILE_NAME,
         )
         write_checkpoint_state_to_file(
             checkpoints, master_checkpoints_path, time.time()
@@ -1264,7 +1273,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # clear the checkpoints folder by removing all worker checkpoint files.
         # NOTE: we also look at the parent directory
         # in case if there are checkpoint files from an older version of the agent.
-        checkpoints_glob = os.path.join(self.__config.agent_data_path, "**/*checkpoints*.json")
+        checkpoints_glob = os.path.join(self.__config.agent_data_path, "*checkpoints*.json")
 
         for path in scalyr_util.match_glob(checkpoints_glob):
             # do not delete master checkpoint file
@@ -1286,7 +1295,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         current_time = time.time()
 
         # also search in the parent directory in case if there are checkpoint files from older versions.
-        glob_path = os.path.join(self.__config.agent_data_path, "**/*checkpoints*.json")
+        glob_path = os.path.join(self.__config.agent_data_path, "checkpoints*.json")
 
         for checkpoints_path in scalyr_util.match_glob(glob_path):
 
@@ -1349,10 +1358,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 if active_checkpoints["time"] > full_checkpoints["time"]:
                     full_checkpoints["time"] = active_checkpoints["time"]
-                    for path, checkpoint in six.iteritems(
+                    full_checkpoints["checkpoints"].update(
                         active_checkpoints["checkpoints"]
-                    ):
-                        full_checkpoints[path] = checkpoint
+                    )
 
             if (
                 current_time - full_checkpoints["time"]

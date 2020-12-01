@@ -46,7 +46,7 @@ import six
 
 from scalyr_agent import test_util
 from tests.unit.sharded_copying_manager_tests.config_builder import (
-    ConfigBuilder,
+    TestEnvironBuilder,
     TestableLogFile,
     TestingConfiguration,
 )
@@ -98,7 +98,7 @@ class CopyingManagerCommonTest(object):
     """
 
     def setup(self):
-        self._config_builder = None  # type: Optional[ConfigBuilder]
+        self._config_builder = None  # type: Optional[TestEnvironBuilder]
         self._instance = None
 
     def teardown(self):
@@ -108,29 +108,27 @@ class CopyingManagerCommonTest(object):
     def _extract_lines(self, request):
         return extract_lines_from_request(request)
 
-    def _create_config(
-        self, log_files_number=1, use_pipelining=False, config_data=None
-    ):
-        pipeline_threshold = 1.1
-        if use_pipelining:
-            pipeline_threshold = 0.0
+    # def _create_config(
+    #     self, log_files_number=1, use_pipelining=False, config_data=None
+    # ):
+    #     pipeline_threshold = 1.1
+    #     if use_pipelining:
+    #         pipeline_threshold = 0.0
+    #
+    #     config_initial_data = {
+    #         "disable_max_send_rate_enforcement_overrides": True,
+    #         "pipeline_threshold": pipeline_threshold,
+    #     }
+    #
+    #     if config_data is not None:
+    #         config_initial_data.update(config_data)
+    #
+    #     test_files, self._config_builder = TestEnvironBuilder.build_config_with_n_files(
+    #         log_files_number, config_data=config_initial_data
+    #     )
 
-        config_initial_data = {
-            "debug_level": 5,
-            "disable_max_send_rate_enforcement_overrides": True,
-            "pipeline_threshold": pipeline_threshold,
-        }
-
-        if config_data is not None:
-            config_initial_data.update(config_data)
-
-        test_files, self._config_builder = ConfigBuilder.build_config_with_n_files(
-            log_files_number, config_data=config_initial_data
-        )
-
-    def _append_lines(self, *lines, **kwargs):
-        # type: (*str, **TestableLogFile) -> None
-        log_file = kwargs.get(six.ensure_str("log_file"))
+    def _append_lines(self, lines, log_file=None):
+        # type: (List[six.text_type], Optional[TestableLogFile]) -> None
         if log_file is None:
             if self._current_log_file is not None:
                 log_file = self._current_log_file
@@ -149,6 +147,7 @@ class CopyingManagerCommonTest(object):
         return request_lines, responder_callback
 
     def _wait_for_rpc_and_respond(self, response="success"):
+        # type: (six.text_type) -> List
         """
         Wraps the next 'self._manager.controller.wait_for_rpc(), returns lines instead' of requests alongside with
         response  callback.
@@ -167,31 +166,30 @@ class CopyingManagerCommonTest(object):
         request_lines = self._extract_lines(request)
         return request_lines, responder_callback
 
-    def _append_lines_and_wait_for_rpc(self, *lines, **kwargs):
-        # type: (*str, **Union[str, TestableLogFile]) -> List[str]
+    def _append_lines_and_wait_for_rpc(self, lines, log_file=None, response="success"):
+        # type: (List[six.text_type], Optional[TestableLogFile], six.text_type) -> List[str]
         """
         Append some lines to log file, wait for response and set response.
         :param lines: Previously appended lines fetched from request.
         :param kwargs:
         :return:
         """
-        response = kwargs.pop("response", "success")
 
         # set worker into sleeping state, so it can process new lines and send them.
         self._instance.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
 
-        self._append_lines(*lines, **kwargs)
+        self._append_lines(lines, log_file=log_file)
         request_lines = self._wait_for_rpc_and_respond(response)
         return request_lines
 
-    def _append_lines_and_check(self, *lines, **kwargs):
-        # type: (*six.text_type, **Union[six.text_type, TestableLogFile]) -> None
+    def _append_lines_and_check(self, lines, log_file=None):
+        # type: (List[six.text_type], Optional[TestableLogFile]) -> None
         """
         Appends line and waits for next rpc request
         and also verifies that lines from request are equal to input lines.
         """
 
-        request_lines = self._append_lines_and_wait_for_rpc(*lines, **kwargs)
+        request_lines = self._append_lines_and_wait_for_rpc(lines, log_file=log_file)
         assert list(lines) == request_lines
 
     @contextmanager
@@ -216,7 +214,7 @@ class TestableCopyingManagerFlowController:
 
     __test__ = False
 
-    # The different points at which the CopyingManager can be stopped.  See below.
+    # The different points at which the CopyingManagerWorker can be stopped.  See below.
     SLEEPING = "SLEEPING"
     SENDING = "SENDING"
     RESPONDING = "RESPONDING"
@@ -226,19 +224,7 @@ class TestableCopyingManagerFlowController:
 
     def __init__(self, configuration):
         # type: (TestingConfiguration) -> None
-        # CopyingManager.__init__(self, configuration, monitors, mode=mode)
-        # Approach:  We will override key methods of CopyingManager, blocking them from returning until the controller
-        # tells it to proceed.  This allows us to then do things like write new log lines while the CopyingManager is
-        # blocked.   Coordinating the communication between the two threads is done using one condition variable.
-        # We changed the CopyingManager to block in three places: while it is sleeping before it starts a new loop,
-        # when it invokes `_send_events` to send a new request, and when it blocks to receive the response.
-        # These three states are referred to as 'sleeping', 'sending', 'responding'.
-        #
-        # The CopyingManager will have state to record where it should next block (i.e., if it should block at
-        # 'sleeping' when it attempts to sleep).  The test controller will manipulate this state, notifying changes on
-        # the condition variable. The CopyingManager will block in this state (and indicate it is blocked) until the
-        # test controller sets a new state to block at.
-        #
+
         # This cv protects all of the variables written by the CopyingManager thread.
         self._test_state_cv = threading.Condition()
         # Which state the CopyingManager or Worker should block in -- "sleeping", "sending", "responding"
@@ -427,18 +413,13 @@ class TestableCopyingManagerThreadedWorker(
     Doing this right is a bit complicated because the CopyingManagerWorker runs in its own thread.
 
     Many members of this class are common with the TestableCopyingManager class
-    and mare oved to the base class - TestableCopyingManagerFlowController
+    and moved to the base class - TestableCopyingManagerFlowController
     """
 
     __test__ = False
 
-    # The different points at which the CopyingManager can be stopped.  See below.
-    SLEEPING = "SLEEPING"
-    SENDING = "SENDING"
-    RESPONDING = "RESPONDING"
-
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
-    WAIT_TIMEOUT = 5.0
+    WAIT_TIMEOUT = 500.0
 
     def __init__(self, configuration, api_key_config_entry, worker_id):
         # Approach:  We will override key methods of CopyingManagerWorker, blocking them from returning until we tell
@@ -494,10 +475,10 @@ class TestableCopyingManagerThreadedWorker(
         # First, block even returning from this method until the controller advances us.
 
         if self._disable_flow_control:
-            # frow control is disabled, just return a dummy response callback.
+            # flow control is disabled, just return a dummy response callback.
             def get_response():
                 """"""
-                return "success", 4, "body"
+                return "success", 0, "fake"
 
             return get_response
 
@@ -531,7 +512,7 @@ class TestableCopyingManagerThreadedWorker(
 
         return emit_response
 
-    def start_worker(self, stop_at=SLEEPING):
+    def start_worker(self, stop_at=TestableCopyingManagerFlowController.SLEEPING):
         """
         Overrides base class method, to initialize "scalyr_client" by default.
         """
@@ -621,18 +602,16 @@ class TestableCopyingManagerThreadedWorker(
 
     # region Utility funtions
     def get_checkpoints_path(self):
-        checkpoints_dir_path = pathlib.Path(
-            self.__config.agent_data_path, "checkpoints"
+        result = pathlib.Path(
+            self.__config.agent_data_path,  "checkpoints-%s.json" % self._id
         )
-        file_name = "checkpoints-%s.json" % self._id
-        return checkpoints_dir_path / file_name
+        return result
 
     def get_active_checkpoints_path(self):
-        checkpoints_dir_path = pathlib.Path(
-            self.__config.agent_data_path, "checkpoints"
+        result = pathlib.Path(
+            self.__config.agent_data_path, "active-checkpoints-%s.json" % self._id
         )
-        file_name = "active-checkpoints-%s.json" % self._id
-        return checkpoints_dir_path / file_name
+        return result
 
     def get_checkpoints(self):
         checkpoints = json.loads(self.get_checkpoints_path().read_text())
@@ -664,7 +643,11 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
         """
         pass
 
-    def really_stop_shared_object_managers(self):
+    def stop_shared_object_managers(self):
+        """
+         Because the '_stop_shared_object_managers' is stubbed,
+        we need to have another method to stop the sharded object managers when it is really time.
+        """
         return super(TestableApiKeyWorkerPool, self)._stop_shared_object_managers()
 
 
@@ -809,7 +792,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         Stopping the shared object managers from api worker pools.
         """
         for worker_pool in self.api_keys_worker_pools.values():
-            worker_pool.really_stop_shared_object_managers()
+            worker_pool.stop_shared_object_managers()
 
     def perform_scan(self):
         """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
@@ -858,7 +841,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     def master_checkpoints_path(self):
         # type: () -> pathlib.Path
         return pathlib.Path(
-            self.config.agent_data_path, "checkpoints", "checkpoints-master.json"
+            self.config.agent_data_path, "checkpoints-master.json"
         )
 
     @property
@@ -871,7 +854,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         self.master_checkpoints_path.write_text(six.text_type(json.dumps(checkpoints)))
     # endregion
 
-# create proxy class for the testable worker. The testable worker has it's own methods that also have to be exposed
+# create proxy class for the testable worker. The testable worker has its own methods that also have to be exposed
 # by proxies.
 _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
     six.ensure_str("CopyingManagerWorkerProxy"),
@@ -891,6 +874,8 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
         six.ensure_str("get_active_checkpoints_path"),
         six.ensure_str("get_checkpoints_path"),
         six.ensure_str("_init_scalyr_client"),
+        six.ensure_str("change_agent_log"),
+
     ],
 )
 

@@ -396,7 +396,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         try:
             # noinspection PyBroadException
             try:
-
                 # The copying params that tell us how much we are allowed to send and how long we have to wait between
                 # attempts.
                 copying_params = CopyingParameters(self.__config)
@@ -420,6 +419,11 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
                 pipeline_byte_threshold = self.__config.pipeline_threshold * float(
                     self.__config.max_allowed_request_size
+                )
+
+                log.info(
+                    "Copying manager worker #%s started. Pid: '%s'"
+                    % (self._id, os.getpid())
                 )
 
                 # Create new client for the worker
@@ -494,11 +498,15 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                             # If we are sending very large requests, we will try to optimize for future requests
                             # by overlapping building the request with waiting for the response on the current request
                             # (pipelining).
+
                             if (
                                 self.__pending_add_events_task.add_events_request.current_size
                                 >= pipeline_byte_threshold
                                 and self.__pending_add_events_task.next_pipelined_task
                                 is None
+                                # TODO: pipelining is temporarily disabled and should be enabled back after
+                                #  other issues related to the transitioning to the sharded copying manager are solved..
+                                # and not disable_pipelining
                             ):
 
                                 # Time how long it takes us to build it because we will subtract it from how long we
@@ -687,6 +695,17 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             log.log(
                 scalyr_logging.DEBUG_LEVEL_0, "Worker '%s' is finished." % self._id,
             )
+
+    def change_agent_log(self):
+        """
+        Reconfigure the agent logger, mainly, to change to path of the agent.log file
+        for the worker when it is running in the separate thread.
+        Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
+        to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
+        :return:
+        """
+        path = os.path.join(self.__config.agent_log_path, "agent-%s.log" % self._id)
+        scalyr_logging.set_log_destination(agent_log_file_path=path, use_disk=True)
 
     def wait_for_copying_to_begin(self):
         """
@@ -994,12 +1013,8 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             if full_checkpoint:
                 processor.set_inactive()
 
-        checkpoints_dir_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints"
-        )
-
         file_path = os.path.join(
-            self.__config.agent_data_path, checkpoints_dir_path, base_file
+            self.__config.agent_data_path, base_file
         )
 
         write_checkpoint_state_to_file(checkpoints, file_path, current_time)
@@ -1187,6 +1202,7 @@ WORKER_PROXY_EXPOSED_METHODS = [
     six.ensure_str("generate_scalyr_client_status"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
+    six.ensure_str("change_agent_log")
 ]
 
 # create base proxy class for the worker, here we also specify all its methods that may be called through proxy.

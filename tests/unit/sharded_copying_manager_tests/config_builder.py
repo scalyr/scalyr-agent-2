@@ -42,13 +42,18 @@ from six.moves import range
 
 
 class TestableLogFile(object):
+    """
+    A testing purpose class that can perform useful operations on file.
+    """
     __test__ = False
 
-    def __init__(self, config_builder, name, create=True):
-        # type: (ConfigBuilder, Union[str, pathlib.Path], bool) -> None
+    def __init__(self, config, name):
+        # type: (Configuration, Union[str, pathlib.Path]) -> None
 
-        self._config_builder = config_builder
+        self._config = config
         self.name = name
+
+        # the path of the file, it is unknown until the file is created by the 'create' function
         self.path = None
 
     def create(self, root_path):
@@ -59,48 +64,47 @@ class TestableLogFile(object):
         self.path.touch()
 
     def append_lines(self, *lines):  # type: (six.text_type) -> None
+        """
+        Append lines to the file.
+        """
         with self.path.open("a") as file:
             for line in lines:
                 file.write(line)
                 file.write("\n")
 
-    def spawn_log_matcher_for_log_file(self):  # type: () -> LogMatcher
-        log_config = self._config_builder.get_log_config(self)
+    def _create_log_matcher_for_log_file(self):  # type: () -> LogMatcher
+        """
+        Create log matcher from the appropriate log config from the configuration.
+        """
 
-        return LogMatcher(self._config_builder.config, log_config)
+        log_config = next(iter(
+            lc for lc in self._config.log_configs if lc["path" == self.path]
+        ))
 
-    def spawn_log_processors(
+        return LogMatcher(self._config, log_config)
+
+    def create_single_log_processor(
         self, checkpoints=None, copy_at_index_zero=False
-    ):  # type: (Dict, bool) -> Dict[str, LogFileProcessor]
-        matcher = self.spawn_log_matcher_for_log_file()
+    ):  # type: (Dict, bool) -> LogFileProcessor
+        """
+        Create log file processor by the log matcher.
+        :return:
+        """
+
+        matcher = self._create_log_matcher_for_log_file()
 
         if checkpoints is None:
             checkpoints = {}
 
-        return {
-            processor.log_path: processor
-            for processor in matcher.find_matches(
+        processors = []
+        for processor in matcher.find_matches(
                 existing_processors=[],
                 previous_state=checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
-            )
-        }
+        ):
+            processors.append(processor)
 
-    def spawn_single_log_processor(self, checkpoints=None, copy_at_index_zero=False):
-
-        processors = self.spawn_log_processors(
-            checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
-        )
-        if len(processors) > 1:
-            raise RuntimeError(
-                "Log matcher created more than one log processors for path '{0}'".format(
-                    self.path
-                )
-            )
-        elif len(processors) == 0:
-            raise RuntimeError("No matches for path: '{0}'".format(self.path))
-
-        return list(processors.values())[0]
+        return processors[0]
 
     @property
     def str_path(self):
@@ -157,7 +161,7 @@ class TestingConfiguration(Configuration):
         self.disable_flow_control = False  # type: bool
 
 
-class ConfigBuilder(object):
+class TestEnvironBuilder(object):
     """
     Builder for tor the configuration object and agent essential environment.
     It allows to make additions which will be included to the resulting config file.
@@ -196,11 +200,6 @@ class ConfigBuilder(object):
         )
         self._data_dir_path = root_path / "data"
         self._data_dir_path.mkdir()
-
-        # Workers do not create checkpoint directory,
-        # so we need to create them manually if we want to test workers separately
-        checkpoints_path = self._data_dir_path / "checkpoints"
-        checkpoints_path.mkdir()
 
         self._logs_dir_path = root_path / "logs"
         self._logs_dir_path.mkdir()
@@ -295,7 +294,7 @@ class ConfigBuilder(object):
         if name is None:
             name = "test_file_{0}".format(len(self._log_files))
 
-        file_obj = TestableLogFile(config_builder=self, name=name)
+        file_obj = TestableLogFile(config=self._config, name=name)
 
         self._log_files[name] = file_obj
 
@@ -320,6 +319,7 @@ class ConfigBuilder(object):
 
         return pathlib.Path(log_file.path)
 
+    @after_initialize
     def append_lines_to_log_file(self, name, *lines):
         path = self.get_log_file_path(name)
         with path.open("a") as file:
@@ -329,7 +329,7 @@ class ConfigBuilder(object):
 
     @classmethod
     def build_config_with_n_files(cls, n, config_data=None):
-        # type: (int, Dict) -> Tuple[Tuple[TestableLogFile, ...], ConfigBuilder]
+        # type: (int, Dict) -> Tuple[Tuple[TestableLogFile, ...], TestEnvironBuilder]
         """
         Convenient config factory which creates config builder with n log_files.
         """
@@ -340,32 +340,20 @@ class ConfigBuilder(object):
         config_builder.initialize()
         return log_files, config_builder
 
-    @classmethod
-    def build_config_with_single_file(cls, config_data=None):
-        # type: (Dict) -> Tuple[TestableLogFile, ConfigBuilder]
-        """
-        Convenient config factory which creates config builder with one log_files.
-        :return: Tuple with log file object and config builder itself.
-        """
-        (log_file,), config_builder = cls.build_config_with_n_files(1, config_data)
-
-        return log_file, config_builder
-
     @property
-    def checkpoints_dir_path(self):
-        return self._data_dir_path / "checkpoints"
+    @after_initialize
+    def agent_data_path(self):
+        return self._data_dir_path
 
+    @after_initialize
     def get_checkpoints_path(self, worker_id):  # type: (six.text_type) -> pathlib.Path
-        return self._data_dir_path / "checkpoints" / ("checkpoints-%s.json" % worker_id)
+        return self._data_dir_path / ("checkpoints-%s.json" % worker_id)
 
+    @after_initialize
     def get_active_checkpoints_path(
         self, worker_id
     ):  # type: (six.text_type) -> pathlib.Path
-        return (
-            self._data_dir_path
-            / "checkpoints"
-            / ("active-checkpoints-%s.json" % worker_id)
-        )
+        return self._data_dir_path / "active-checkpoints-%s.json" % worker_id
 
     @after_initialize
     def get_checkpoints(self, worker_id):

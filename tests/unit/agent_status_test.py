@@ -84,7 +84,7 @@ class TestOverallStats(ScalyrTestCase):
         a.skipped_new_bytes = 2
         a.skipped_preexisting_bytes = 3
 
-        a.total_copy_iterations = 1
+        a.total_scan_iterations = 1
         a.total_read_time = 2
         a.total_compression_time = 3
         a.total_waiting_time = 4
@@ -116,7 +116,7 @@ class TestOverallStats(ScalyrTestCase):
         b.skipped_new_bytes = 2
         b.skipped_preexisting_bytes = 3
 
-        b.total_copy_iterations = 1
+        b.total_scan_iterations = 1
         b.total_read_time = 2
         b.total_compression_time = 3
         b.total_waiting_time = 4
@@ -421,7 +421,7 @@ Bytes uploaded successfully:               10000
 Last requests:                             All successful
 Health check:                              Good
 
-Api keys statistics
+Uploads statistics by API key:
 -------------------
 Api key ID: 0
     Bytes uploaded successfully:               6000
@@ -468,9 +468,97 @@ Failed monitors:
 
         self.assertEquals(expected_output, output.getvalue())
 
-    def test_bad_config(self):
-        self.status.config_status.last_error = "Bad stuff"
+        def test_bad_config(self):
+            self.status.config_status.last_error = "Bad stuff"
 
+            output = io.StringIO()
+            report_status(output, self.status, self.time)
+
+            expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+    Current time:            Fri Sep  5 23:14:13 2014 UTC
+    Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+    Version:                 2.0.0.beta.7
+    VCS revision:            git revision
+    Python version:          3.6.8
+    Agent running as:        root
+    Agent log:               /var/logs/scalyr-agent/agent.log
+    ServerHost:              test_machine
+    Compression algorithm:   deflate
+    Compression level:       9
+
+    View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+    Agent configuration:
+    ====================
+
+    Configuration files:   /etc/scalyr-agent-2/agent.json
+                           /etc/scalyr-agent-2/agent.d/server.json
+    Status:                Bad (could not parse, using last good version)
+    Last checked:          Fri Sep  5 23:14:13 2014 UTC
+    Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+    Parsing error:         Bad stuff
+
+    Environment variables: SCALYR_API_KEY = <Missing>
+                           SCALYR_SERVER = <Missing>
+
+
+    Log transmission:
+    =================
+
+    (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+    Bytes uploaded successfully:               10000
+    Last requests:                             All successful
+    Health check:                              Good
+
+    Uploads statistics by API key:
+    -------------------
+    Api key ID: 0
+        Bytes uploaded successfully:               6000
+        Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+        Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+        Files:
+            /var/logs/cron/logrotate.log
+            /var/logs/tomcat6/catalina.log
+
+    Api key ID: 1
+        Bytes uploaded successfully:               4000
+        Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+        Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+        Files:
+            /var/logs/cron/ohno.log
+
+    Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+    Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+    Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+      /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+      /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+    Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+    Monitors:
+    =========
+
+    (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+    Running monitors:
+      linux_process_metrics(agent): 50 lines emitted, 2 errors
+      linux_system_metrics(): 20 lines emitted, 0 errors
+
+    Failed monitors:
+      bad_monitor() 20 lines emitted, 40 errors
+    """
+            self.assertEquals(expected_output, output.getvalue())
+
+    def test_single_api_key_config(self):
+        """
+        Do not show listed api key statistics if there is only one api key.
+        """
+
+        del self.status.copying_manager_status.api_key_worker_pools[-1]
         output = io.StringIO()
         report_status(output, self.status, self.time)
 
@@ -495,10 +583,9 @@ Agent configuration:
 
 Configuration files:   /etc/scalyr-agent-2/agent.json
                        /etc/scalyr-agent-2/agent.d/server.json
-Status:                Bad (could not parse, using last good version)
+Status:                Good (files parsed successfully)
 Last checked:          Fri Sep  5 23:14:13 2014 UTC
 Last changed observed: Fri Sep  5 11:14:13 2014 UTC
-Parsing error:         Bad stuff
 
 Environment variables: SCALYR_API_KEY = <Missing>
                        SCALYR_SERVER = <Missing>
@@ -512,23 +599,8 @@ Log transmission:
 Bytes uploaded successfully:               10000
 Last requests:                             All successful
 Health check:                              Good
-
-Api keys statistics
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
+Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -620,7 +692,7 @@ Last requests:                             Last requests on some workers is not 
 Health check:                              Good
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
 
-Api keys statistics
+Uploads statistics by API key:
 -------------------
 Api key ID: 0
     Bytes uploaded successfully:               6000
@@ -737,7 +809,7 @@ Log transmission:
 Bytes uploaded successfully:               10000
 Last requests:                             All successful
 
-Api keys statistics
+Uploads statistics by API key:
 -------------------
 Api key ID: 0
     Bytes uploaded successfully:               6000
@@ -851,7 +923,7 @@ Last requests:                             Last requests on some workers is not 
 Health check:                              Good
 Total responses with errors:               10 (see '/var/logs/scalyr-agent/agent.log' for details)
 
-Api keys statistics
+Uploads statistics by API key:
 -------------------
 Api key ID: 0
     Bytes uploaded successfully:               6000
