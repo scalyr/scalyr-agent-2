@@ -25,7 +25,6 @@ import json
 import os
 import multiprocessing.managers
 
-import unittest
 from contextlib import contextmanager
 
 try:
@@ -41,11 +40,12 @@ if False:
     from typing import Callable
     from typing import Generator
     from typing import List
+    from typing import Set
 
 import six
 
 from scalyr_agent import test_util
-from tests.unit.sharded_copying_manager_tests.config_builder import (
+from tests.unit.sharded_copying_manager_tests.test_environment import (
     TestEnvironBuilder,
     TestableLogFile,
     TestingConfiguration,
@@ -57,7 +57,6 @@ from scalyr_agent.sharded_copying_manager import (
 )
 from scalyr_agent.sharded_copying_manager.worker import (
     WORKER_PROXY_EXPOSED_METHODS,
-    SharedObjectManager,
     create_shared_object_manager,
 )
 
@@ -203,7 +202,7 @@ class TestableCopyingManagerFlowController:
         # Which state the CopyingManager or Worker should block in -- "sleeping", "sending", "responding"
         # We initialize it to a special value "all" so that it stops as soon the CopyingManager starts up.
         self._test_stop_state = "all"
-        
+
         # If not none, a state the test must pass through before it tries to stop at `__test_stop_state`.
         # If this transition is not observed by the time it does get to the stop state, an assertion is thrown.
         self._test_required_transition = None
@@ -567,13 +566,15 @@ class TestableCopyingManagerThreadedWorker(
         :type filepath: six.text_type
         """
         # noinspection PyProtectedMember
-        log_processor = next(p for p in self.get_log_processors() if p.get_log_path() == filepath)
+        log_processor = next(
+            p for p in self.get_log_processors() if p.get_log_path() == filepath
+        )
         log_processor.close_at_eof()
 
     # region Utility funtions
     def get_checkpoints_path(self):
         result = pathlib.Path(
-            self.__config.agent_data_path,  "checkpoints-%s.json" % self._id
+            self.__config.agent_data_path, "checkpoints-%s.json" % self._id
         )
         return result
 
@@ -602,6 +603,7 @@ class TestableCopyingManagerThreadedWorker(
 
     def get_pid(self):
         return os.getpid()
+
     # endregion
 
 
@@ -611,17 +613,16 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
         self._skip_agent_log_change = config.skip_agent_log_change
         super(TestableApiKeyWorkerPool, self).__init__(config, api_key_config)
 
-
-    def _change_worker_process_agent_log_path(
-        self, path
-    ):
+    def _change_worker_process_agent_log_path(self, path):
         """
         If there ia an appropriate configuration value,
         we do not say change agent log path for workers,
         because some of the test cases do not create agent log files at all.
         """
         if not self._skip_agent_log_change:
-            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(path)
+            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(
+                path
+            )
 
     def _stop_shared_object_managers(self):
         """
@@ -827,9 +828,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     @property
     def master_checkpoints_path(self):
         # type: () -> pathlib.Path
-        return pathlib.Path(
-            self.config.agent_data_path, "checkpoints-master.json"
-        )
+        return pathlib.Path(self.config.agent_data_path, "checkpoints-master.json")
 
     @property
     def master_checkpoints(self):
@@ -839,7 +838,9 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     def write_master_checkpoints(self, checkpoints):
         # type: (Dict) -> None
         self.master_checkpoints_path.write_text(six.text_type(json.dumps(checkpoints)))
+
     # endregion
+
 
 # create proxy class for the testable worker. The testable worker has its own methods that also have to be exposed
 # by proxies.
@@ -862,7 +863,6 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
         six.ensure_str("get_checkpoints_path"),
         six.ensure_str("_init_scalyr_client"),
         six.ensure_str("change_agent_log"),
-
     ],
 )
 

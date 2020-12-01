@@ -307,7 +307,7 @@ class Configuration(object):
                 config = JsonObject(
                     path="agent*.log",
                     exclude=JsonArray("*_debug.log"),
-                    parser="scalyrAgentLog"
+                    parser="scalyrAgentLog",
                 )
                 self.__verify_log_entry_and_set_defaults(
                     config, description="implicit rule"

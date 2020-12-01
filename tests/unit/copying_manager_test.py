@@ -15,9 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-###
-### Those test just the same test from previos copying manager, but adapted to the new copying manager.
-###
+#
+# Those test just the same test from previos copying manager, but adapted to the new copying manager.
+#
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -28,21 +28,16 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-
-# import logging
 import shutil
 import sys
-import time
-import glob
-import threading
 from io import open
 import logging
 import platform
 
+if False:
+    from typing import List
+
 import pytest
-
-
-from six.moves import range
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -59,17 +54,14 @@ Those tests are copy of original copying manager tests but with new, sharded cop
 
 
 from scalyr_agent.platform_controller import DefaultPaths
-from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 import scalyr_agent.util as scalyr_util
-from scalyr_agent.test_base import skipIf
 
 from scalyr_agent import scalyr_init
 
 from tests.unit.sharded_copying_manager_tests.common import (
-    TestableCopyingManager,
     extract_lines_from_request,
     TestableCopyingManager,
     TestingConfiguration,
@@ -77,10 +69,13 @@ from tests.unit.sharded_copying_manager_tests.common import (
 
 from scalyr_agent.sharded_copying_manager import CopyingManager
 from scalyr_agent.sharded_copying_manager.worker import CopyingParameters
+from scalyr_agent.configuration import Configuration
 
 scalyr_init()
 
 from scalyr_agent import scalyr_logging
+
+from six.moves import range
 
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
@@ -318,7 +313,7 @@ class TestDynamicLogPathTest(BaseTest):
         self.fake_scan()
         self.fake_scan()
 
-        assert not path in self._get_manager_log_pending_removal()
+        assert path not in self._get_manager_log_pending_removal()
 
         # Matcher should still be there since removal should have been canceled
         matchers = self._manager.log_matchers
@@ -897,22 +892,6 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
 
         # noinspection PyTypeChecker
         return CopyingManager(config, self.__monitor_fake_instances)
-
-
-def _shift_time_in_checkpoint_file(checkpoints_path, delta):
-    """
-    Modify time in checkpoints by "delta" stored in file located in "path"
-    """
-
-    fp = open(path, "r")
-    data = scalyr_util.json_decode(fp.read())
-    fp.close()
-
-    data["time"] += delta
-
-    fp = open(path, "w")
-    fp.write(scalyr_util.json_encode(data))
-    fp.close()
 
 
 def _add_non_utf8_to_checkpoint_file(path):

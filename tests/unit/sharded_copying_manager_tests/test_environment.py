@@ -45,6 +45,7 @@ class TestableLogFile(object):
     """
     A testing purpose class that can perform useful operations on file.
     """
+
     __test__ = False
 
     def __init__(self, config, name):
@@ -77,9 +78,9 @@ class TestableLogFile(object):
         Create log matcher from the appropriate log config from the configuration.
         """
 
-        log_config = next(iter(
-            lc for lc in self._config.log_configs if lc["path" == self.path]
-        ))
+        log_config = next(
+            iter(lc for lc in self._config.log_configs if lc["path" == self.path])
+        )
 
         return LogMatcher(self._config, log_config)
 
@@ -98,9 +99,9 @@ class TestableLogFile(object):
 
         processors = []
         for processor in matcher.find_matches(
-                existing_processors=[],
-                previous_state=checkpoints,
-                copy_at_index_zero=copy_at_index_zero,
+            existing_processors=[],
+            previous_state=checkpoints,
+            copy_at_index_zero=copy_at_index_zero,
         ):
             processors.append(processor)
 
@@ -331,17 +332,17 @@ class TestEnvironBuilder(object):
                 file.write("\n")
 
     @classmethod
-    def build_config_with_n_files(cls, n, config_data=None):
+    def create_with_n_files(cls, n, config_data=None):
         # type: (int, Dict) -> Tuple[Tuple[TestableLogFile, ...], TestEnvironBuilder]
         """
         Convenient config factory which creates config builder with n log_files.
         """
-        config_builder = cls(config_data=config_data)
+        test_environment = cls(config_data=config_data)
 
-        log_files = tuple(config_builder.add_log_file(create=True) for _ in range(n))
+        log_files = tuple(test_environment.add_log_file(create=True) for _ in range(n))
 
-        config_builder.initialize()
-        return log_files, config_builder
+        test_environment.initialize()
+        return log_files, test_environment
 
     @property
     @after_initialize

@@ -74,7 +74,7 @@ class AgentRunner(object):
         send_to_server=True,
         workers_type="thread",
         workers_count=1,
-    ):  # type: (int, bool, bool, bool, six.text_type) -> None
+    ):  # type: (int, bool, bool, bool, six.text_type, int) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")
@@ -403,7 +403,7 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": config_log_files,
-            "api_keys": [{"type": self._workers_type, "workers": self._workers_count},],
+            "api_keys": [{"type": self._workers_type, "workers": self._workers_count}],
             "monitors": [],
         }
 

@@ -23,16 +23,15 @@ import sys
 import threading
 import time
 import operator
-import glob
-import re
+from six.moves import range
 
 if False:
     from typing import Dict
     from typing import List
     from typing import Optional
     from typing import Tuple
-    from types import Set
-    from types import Any
+    from typing import Set
+    from typing import Any
 
 from scalyr_agent import (
     scalyr_logging as scalyr_logging,
@@ -125,8 +124,8 @@ class ApiKeyWorkerPool(object):
                 # We use this process as a process for the worker.
 
                 worker_agent_log_path = os.path.join(
-                        self.__config.agent_log_path, "agent-%s.log" % worker_id
-                    )
+                    self.__config.agent_log_path, "agent-%s.log" % worker_id
+                )
 
                 # change agent log path for the new worker.
                 # this initializer function will be invoked in the worker's process.
@@ -137,9 +136,11 @@ class ApiKeyWorkerPool(object):
 
                 # create proxy object of the worker. The real worker instance is created in the new process
                 # which was created when shared_object_manager started.
+                # pylint: disable=E1101
                 worker = shared_object_manager.CopyingManagerWorkerProxy(
                     self.__config, api_key_config, worker_id
                 )
+                # pylint: enable=E1101
 
                 # also save new shared object manager.
                 self.__shared_object_managers[worker.get_id()] = shared_object_manager
@@ -153,16 +154,14 @@ class ApiKeyWorkerPool(object):
         # The index of the next worker which will be used to handle the log processor.
         self.__current_worker = 0
 
-    def _change_worker_process_agent_log_path(
-        self, path
-    ):
+    def _change_worker_process_agent_log_path(self, path):
         """
         Reconfigure the agent logger, mainly, to change to path of the agent.log file
         for the worker when it is running in the separate thread.
         Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
         to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
         """
-        scalyr_logging.set_log_destination(agent_log_file_path=new_path, use_disk=True)
+        scalyr_logging.set_log_destination(agent_log_file_path=path, use_disk=True)
 
     @property
     def api_key_id(self):
@@ -779,7 +778,6 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # create copying workers according to settings in the configuration.
                 self._create_worker_pools()
 
-
                 # gather and merge all checkpoints from all active workers( or workers from previous launch)
                 # into single checkpoints object.
 
@@ -995,13 +993,21 @@ class CopyingManager(StoppableThread, LogWatcher):
             # sum up some worker stats to overall stats.
             for api_key_status in api_key_statuses:
                 for worker_status in api_key_status.workers:
-                    result.total_rate_limited_time = worker_status.total_rate_limited_time
+                    result.total_rate_limited_time = (
+                        worker_status.total_rate_limited_time
+                    )
                     result.total_read_time = worker_status.total_read_time
-                    result.total_waiting_time=worker_status.total_waiting_time
-                    result.total_blocking_response_time = worker_status.total_blocking_response_time
+                    result.total_waiting_time = worker_status.total_waiting_time
+                    result.total_blocking_response_time = (
+                        worker_status.total_blocking_response_time
+                    )
                     result.total_request_time = worker_status.total_request_time
-                    result.total_pipelined_requests = worker_status.total_pipelined_requests
-                    result.rate_limited_time_since_last_status = worker_status.rate_limited_time_since_last_status
+                    result.total_pipelined_requests = (
+                        worker_status.total_pipelined_requests
+                    )
+                    result.rate_limited_time_since_last_status = (
+                        worker_status.rate_limited_time_since_last_status
+                    )
 
         finally:
             self.__lock.release()

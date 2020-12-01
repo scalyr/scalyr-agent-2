@@ -2852,7 +2852,6 @@ class TestApiKeysConfiguration(TestConfigurationBase):
                         "id": "second",
                     }
                 ],
-                
                 logs: [
                     {
                         path: "/some/path.log",

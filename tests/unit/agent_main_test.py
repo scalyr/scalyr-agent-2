@@ -23,8 +23,6 @@ import functools
 import mock
 
 from scalyr_agent import __scalyr__
-from scalyr_agent.__scalyr__ import DEV_INSTALL
-from scalyr_agent.__scalyr__ import MSI_INSTALL
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent import agent_main, agent_status
 from scalyr_agent.scalyr_client import create_client
@@ -100,7 +98,6 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     def test_ca_cert_files_checks_are_skipped_under_dev_and_msi_install(self):
         # Skip those checks under dev and msi install because those final generated certs files
         # are not present under dev install
-        import scalyr_agent.agent_main
 
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
@@ -181,8 +178,6 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         self.assertTrue(CORRECT_INIT_PRAGMA in content, msg)
 
     def test_skipped_bytes_warnings(self):
-        import scalyr_agent.agent_main
-
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
 

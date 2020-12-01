@@ -21,8 +21,7 @@ import time
 import shutil
 import os
 import platform
-import multiprocessing.managers
-import threading
+from six.moves import range
 
 
 if False:
@@ -36,19 +35,14 @@ except ImportError:
 import pytest
 
 from scalyr_agent import scalyr_logging
-from scalyr_agent.configuration import Configuration
 
 from tests.unit.sharded_copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
     TestableCopyingManagerFlowController,
-    TestableCopyingManagerThreadedWorker,
     TestableLogFile,
-    TestingConfiguration,
     TestEnvironBuilder,
 )
-
-import mock
 
 import six
 
@@ -115,7 +109,7 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         config_data["disable_max_send_rate_enforcement_overrides"] = True
         config_data["pipeline_threshold"] = pipeline_threshold
 
-        test_files, self._env_builder = TestEnvironBuilder.build_config_with_n_files(
+        test_files, self._env_builder = TestEnvironBuilder.create_with_n_files(
             log_files_number, config_data=config_data
         )
 
@@ -180,6 +174,7 @@ class TestBasic(CopyingManagerTest):
 
         status = manager.generate_status()
 
+        assert status.health_check_result == "Good"
         return
 
     def test_health_check_status(self):
@@ -244,9 +239,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line3")
         test_file.append_lines("Line4")
 
-        self._instance = manager = TestableCopyingManager(
-            self._env_builder.config, []
-        )
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
         manager.start_manager()
 
@@ -268,9 +261,7 @@ class TestBasic(CopyingManagerTest):
         ).glob("*checkpoints*.json"):
             checkpoint_path.unlink()
 
-        self._instance = manager = TestableCopyingManager(
-            self._env_builder.config, []
-        )
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
         manager.start_manager()
 
@@ -316,9 +307,7 @@ class TestBasic(CopyingManagerTest):
             str(worker.get_active_checkpoints_path()), old_active_checkpoints_path
         )
 
-        self._instance = manager = TestableCopyingManager(
-            self._env_builder.config, []
-        )
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
         manager.start_manager()
 
         # copying manager should read worker checkpoints from the new place.
@@ -343,9 +332,7 @@ class TestBasic(CopyingManagerTest):
         manager.stop_manager()
 
         # recreate the manager, in order to simulate a new start.
-        self._instance = manager = TestableCopyingManager(
-            self._env_builder.config, []
-        )
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
         # start manager, it has to create master checkpoint file when starts.
         manager.start_manager()
@@ -362,9 +349,7 @@ class TestBasic(CopyingManagerTest):
             os.unlink(str(worker.get_active_checkpoints_path()))
 
         # recreate the manager, in order to simulate a new start.
-        self._instance = manager = TestableCopyingManager(
-            self._env_builder.config, []
-        )
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
         # start manager, it has to create master checkpoint file when starts.
         manager.start_manager()

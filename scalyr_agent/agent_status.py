@@ -33,13 +33,13 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
-import collections
 import operator
 
 if False:
     from typing import TextIO
     from typing import List
     from typing import Optional
+    from typing import Dict
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -272,7 +272,7 @@ class OverallStats(AgentStatus):
             self.total_connections_created + other.total_connections_created
         )
         result.total_scan_iterations = (
-                self.total_scan_iterations + other.total_scan_iterations
+            self.total_scan_iterations + other.total_scan_iterations
         )
         result.total_read_time = self.total_read_time + other.total_read_time
         result.total_compression_time = (
@@ -665,7 +665,7 @@ def report_status(output, status, current_time):
 
 
 def _indent_print(str, file, indent=4):
-    # type: (six.text_type, TextIO, int)
+    # type: (six.text_type, TextIO, int) -> None
     """
     Helper function to print with indents.
     :param str: Original string.
@@ -700,20 +700,20 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
         "Last successful communication with Scalyr: %s"
         % scalyr_util.format_time(api_key_stats.last_success_time),
         file=output,
-        indent=indent
+        indent=indent,
     )
     _indent_print(
         "Last attempt:                              %s"
         % scalyr_util.format_time(api_key_stats.last_attempt_time),
         file=output,
-        indent=indent
+        indent=indent,
     )
     if api_key_stats.last_attempt_requests_overall_size:
         _indent_print(
             "Last copy requests size:                   %ld"
             % api_key_stats.last_attempt_requests_overall_size,
             file=output,
-            indent=indent
+            indent=indent,
         )
 
     # NOTE: this should be exactly False, we skip if in case of None.
@@ -734,7 +734,7 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
                 "Last copy response status:         %s"
                 % worker_status.last_response_status,
                 file=output,
-                indent=indent+8
+                indent=indent + 8,
             )
 
             _indent_print(
@@ -743,14 +743,12 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
                     worker_status.last_response, 1000
                 ),
                 file=output,
-                indent=indent+8
+                indent=indent + 8,
             )
 
     # NOTE: this should be exactly False, we skip if in case of None.
     if api_key_stats.all_health_checks_good is False:
-        _indent_print(
-            "Failed health checks:", file=output, indent=indent
-        )
+        _indent_print("Failed health checks:", file=output, indent=indent)
 
         for worker_id, worker_status in api_key_stats.workers.items():
             if worker_status.health_check_result == "Good":
@@ -761,7 +759,7 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
                 "Last copy response status:         %s"
                 % worker_status.health_check_result,
                 file=output,
-                indent=indent
+                indent=indent,
             )
 
     if not is_single:
@@ -770,8 +768,8 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
                 "Total responses with errors:               %d (see '%s' for details)"
                 % (api_key_stats.total_errors, agent_log_file_path,),
                 file=output,
-                indent=indent
-        )
+                indent=indent,
+            )
 
     worker_pool_files = []
 
@@ -784,7 +782,7 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
             _indent_print("Files:", file=output, indent=indent)
             worker_pool_files.sort()
             for log_path in worker_pool_files:
-                _indent_print("%s" % log_path, file=output, indent=indent+4)
+                _indent_print("%s" % log_path, file=output, indent=indent + 4)
 
     print("", file=output)
 
@@ -838,7 +836,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
     for worker_pool in manager_status.api_key_worker_pools:
         if not is_single_api_key:
             print("Api key ID: %s" % worker_pool.api_key_id, file=output)
-        __print_api_key_stats(worker_pool, agent_log_file_path, is_single_api_key, output)
+        __print_api_key_stats(
+            worker_pool, agent_log_file_path, is_single_api_key, output
+        )
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

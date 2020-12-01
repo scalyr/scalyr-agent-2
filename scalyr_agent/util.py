@@ -28,7 +28,7 @@ if False:  # NOSONAR
     from typing import Callable
     from typing import Optional
     from typing import Any
-    from types import List
+    from typing import List
 
 import codecs
 import sys

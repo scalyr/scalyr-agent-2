@@ -46,7 +46,6 @@ from scalyr_agent import __scalyr__
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
-from scalyr_agent.configuration import Configuration
 
 # Maximum request body size (in characters / bytes) we log under DEBUG 5 log level. If the body is
 # larger than this value, we truncate it. This way we prevent debug log file from growing too large
@@ -75,7 +74,7 @@ def _set_last_timestamp(val):
 
 def create_new_client(config, api_key=None):
     result = None
-    if self.__config.use_new_ingestion:
+    if config.use_new_ingestion:
         from scalyr_agent.scalyr_client import NewScalyrClientSession
 
         result = NewScalyrClientSession(config, api_key=api_key)

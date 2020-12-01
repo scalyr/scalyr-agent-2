@@ -30,12 +30,8 @@ if False:
     from typing import Any
     from typing import List
 
-from scalyr_agent import (
-    scalyr_logging as scalyr_logging,
-    StoppableThread,
-    util as scalyr_util,
-)
-from scalyr_agent.agent_status import CopyingManagerStatus, CopyingManagerWorkerStatus
+from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread
+from scalyr_agent.agent_status import CopyingManagerWorkerStatus
 from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
 from scalyr_agent.configuration import Configuration
@@ -45,6 +41,7 @@ from scalyr_agent.sharded_copying_manager.common import write_checkpoint_state_t
 import six
 
 log = scalyr_logging.getLogger(__name__)
+
 
 class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
@@ -202,12 +199,10 @@ class AddEventsTask(object):
         self.next_pipelined_task = None
 
 
-class CopyingManagerWorker:
+class CopyingManagerWorker(six.with_metaclass(ABCMeta)):
     """
     The interface for the Copying manager worker classes.
     """
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def start_worker(self):
@@ -493,7 +488,10 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                                 )
 
                             # Check to see if pipelining should be disabled
-                            disable_pipelining = self.__has_pending_log_changes()
+
+                            # disable_pipelining = (
+                            #     self.__has_pending_log_changes()
+                            # )
 
                             # If we are sending very large requests, we will try to optimize for future requests
                             # by overlapping building the request with waiting for the response on the current request
@@ -1002,9 +1000,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             if full_checkpoint:
                 processor.set_inactive()
 
-        file_path = os.path.join(
-            self.__config.agent_data_path, base_file
-        )
+        file_path = os.path.join(self.__config.agent_data_path, base_file)
 
         write_checkpoint_state_to_file(checkpoints, file_path, current_time)
 
@@ -1163,6 +1159,7 @@ _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(
     ],
 )
 
+
 # Create final proxy class for the LogFileProcessors by subclassing the base class.
 class LogFileProcessorProxy(_LogFileProcessorProxy):
     def __init__(self, *args, **kwargs):
@@ -1218,6 +1215,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
         pass
 
     # register LogFileProcessor proxy.
+    # pylint: disable=E1101
     _SharedObjectManager.register(
         six.ensure_str("LogFileProcessorProxy"), proxytype=LogFileProcessorProxy
     )
@@ -1233,6 +1231,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             ),
         },
     )
+    # pylint: enable=E1101
 
     return _SharedObjectManager
 

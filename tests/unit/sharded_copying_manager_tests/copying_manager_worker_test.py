@@ -20,10 +20,7 @@ import time
 import threading
 import platform
 import mock
-import multiprocessing
-import multiprocessing.managers
 from concurrent.futures import ThreadPoolExecutor
-import platform
 
 if False:
     from typing import Tuple
@@ -36,13 +33,12 @@ import pytest
 from scalyr_agent.test_base import skipIf
 from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
-    TestableCopyingManagerWorkerProxy,
     CopyingManagerCommonTest,
     TestableSharedObjectManager,
-    TestEnvironBuilder
+    TestEnvironBuilder,
 )
 from scalyr_agent.configuration import Configuration
-from tests.unit.sharded_copying_manager_tests.config_builder import TestableLogFile
+from tests.unit.sharded_copying_manager_tests.test_environment import TestableLogFile
 
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 
@@ -113,9 +109,11 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         worker_id = "0"
 
         if self.use_multiprocessing_workers:
+            # pylint: disable=E1101
             worker = self._shared_object_manager.CopyingManagerWorkerProxy(
                 config, api_key_config, worker_id
             )
+            # pylint: enable=E1101
         else:
             worker = TestableCopyingManagerThreadedWorker(
                 config, api_key_config, worker_id
@@ -124,8 +122,11 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         return worker
 
     def _init_test_environment(
-        self, log_files_number=1, use_pipelining=False, config_data=None, disable_flow_control=False,
-
+        self,
+        log_files_number=1,
+        use_pipelining=False,
+        config_data=None,
+        disable_flow_control=False,
     ):
 
         pipeline_threshold = 1.1
@@ -143,7 +144,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         if config_data is not None:
             config_initial_data.update(config_data)
 
-        test_files, self._env_builder = TestEnvironBuilder.build_config_with_n_files(
+        test_files, self._env_builder = TestEnvironBuilder.create_with_n_files(
             log_files_number, config_data=config_initial_data
         )
 
@@ -163,10 +164,14 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         add_processors=True,
         use_pipelining=False,
         disable_flow_control=False,
-    ):  # type: (int, bool, bool, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManagerThreadedWorker]
+    ):  # type: (int, bool, bool, bool, bool) -> Tuple[Tuple[TestableLogFile], TestableCopyingManagerThreadedWorker]
 
         if self._env_builder is None:
-            self._init_test_environment(log_files_number=log_files_number, use_pipelining=use_pipelining, disable_flow_control=disable_flow_control)
+            self._init_test_environment(
+                log_files_number=log_files_number,
+                use_pipelining=use_pipelining,
+                disable_flow_control=disable_flow_control,
+            )
 
         self._instance = self._create_worker()
 
@@ -651,9 +656,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         worker.stop_worker()
 
-        checkpoints = self._env_builder.get_checkpoints(worker.get_id())[
-            "checkpoints"
-        ]
+        checkpoints = self._env_builder.get_checkpoints(worker.get_id())["checkpoints"]
 
         assert test_file.str_path in checkpoints
 
@@ -673,9 +676,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         worker.stop_worker()
 
-        checkpoints = self._env_builder.get_checkpoints(worker.get_id())[
-            "checkpoints"
-        ]
+        checkpoints = self._env_builder.get_checkpoints(worker.get_id())["checkpoints"]
         assert test_file.str_path in checkpoints
 
         # create new worker. Imitate third launch.
