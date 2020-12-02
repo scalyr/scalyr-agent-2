@@ -935,7 +935,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 result.total_bytes_uploaded += status.total_bytes_uploaded
 
             # get responses information from worker pools
-            responses = {s.all_responses_successful for s in api_key_statuses}
+            responses = set(s.all_responses_successful for s in api_key_statuses)
 
             result.last_responses_status_info = _accumulate_worker_stats(
                 responses,
@@ -944,7 +944,9 @@ class CopyingManager(StoppableThread, LogWatcher):
             )
 
             # Get the workers health checks the same way as responses.
-            worker_health_checks = {s.all_health_checks_good for s in api_key_statuses}
+            worker_health_checks = set(
+                s.all_health_checks_good for s in api_key_statuses
+            )
 
             workers_health_check_successful = _accumulate_worker_stats(
                 worker_health_checks,
@@ -978,10 +980,12 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             # get the final health check result from the workers health check and copying manager health check.
             result.health_check_result = _accumulate_worker_stats(
-                {
-                    copying_manager_health_check_successful,
-                    workers_health_check_successful,
-                },
+                set(
+                    [
+                        copying_manager_health_check_successful,
+                        workers_health_check_successful,
+                    ]
+                ),
                 result_on_at_least_one_fail="\n".join(all_health_check_error_messages),
                 result_on_all_succeed="Good",
             )

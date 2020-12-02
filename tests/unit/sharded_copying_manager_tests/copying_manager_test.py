@@ -59,10 +59,7 @@ def pytest_generate_tests(metafunc):
         if platform.system() != "Windows":
             test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
-        metafunc.parametrize(
-            "worker_type, api_keys_count, workers_count",
-            test_params
-        )
+        metafunc.parametrize("worker_type, api_keys_count, workers_count", test_params)
 
 
 class CopyingManagerTest(CopyingManagerCommonTest):
@@ -163,14 +160,14 @@ class TestBasic(CopyingManagerTest):
             assert os.getpid() not in worker_pids
         else:
             # in case of non multiprocess workers, all workers has the same process id as the main process.
-            assert worker_pids == {os.getpid()}
+            assert worker_pids == set([os.getpid()])
 
     def test_generate_status(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
 
         status = manager.generate_status()
 
@@ -231,7 +228,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
 
         # stop the manager and write some lines.
         # When manager is stared, it should pick recent checkpoints and read those lines.
@@ -244,12 +241,12 @@ class TestBasic(CopyingManagerTest):
         manager.start_manager()
 
         # make sure that the first lines are lines which were written before manager start
-        assert set(self._wait_for_rpc_and_respond()) == {"Line3", "Line4"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["Line3", "Line4"])
 
         test_file.append_lines("Line5")
         test_file.append_lines("Line6")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"Line5", "Line6"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["Line5", "Line6"])
 
         manager.stop_manager()
 
@@ -270,7 +267,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line9")
         test_file.append_lines("Line10")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"Line9", "Line10"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["Line9", "Line10"])
 
     def test_old_version_checkpoints(self):
         """
@@ -282,7 +279,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
 
         manager.stop_manager()
 
@@ -311,7 +308,7 @@ class TestBasic(CopyingManagerTest):
         manager.start_manager()
 
         # copying manager should read worker checkpoints from the new place.
-        assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
 
         # the checkpoint files from older versions of the agent have to be removed.
         assert not os.path.exists(old_checkpoints_path)
@@ -327,7 +324,7 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
-        assert set(self._wait_for_rpc_and_respond()) == {"line1", "line2"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
 
         manager.stop_manager()
 
@@ -354,4 +351,4 @@ class TestBasic(CopyingManagerTest):
         # start manager, it has to create master checkpoint file when starts.
         manager.start_manager()
 
-        assert set(self._wait_for_rpc_and_respond()) == {"line3", "line4"}
+        assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
