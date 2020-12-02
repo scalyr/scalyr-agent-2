@@ -277,11 +277,11 @@ class ScalyrMonitor(StoppableThread):
             random_jitter = min(
                 random.randint(min_jitter_ms, max_jitter_ms), MAX_JITTER_MS
             )
-        else:
-            random_jitter = 0
 
-        sample_interval = round(sample_interval + int(random_jitter / 1000))
-        return sample_interval
+            sample_interval = round(sample_interval + int(random_jitter / 1000))
+            return sample_interval
+        else:
+            return sample_interval
 
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
