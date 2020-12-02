@@ -39,10 +39,10 @@ from scalyr_agent import (
     util as scalyr_util,
 )
 from scalyr_agent.agent_status import (
-    ShardedCopyingManagerStatus,
+    CopyingManagerStatus,
     ApiKeyWorkerPoolStatus,
 )
-from scalyr_agent.sharded_copying_manager.worker import (
+from scalyr_agent.copying_manager.worker import (
     CopyingManagerThreadedWorker,
     SharedObjectManager,
 )
@@ -51,7 +51,7 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import max_ignore_none
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
-from scalyr_agent.sharded_copying_manager.common import write_checkpoint_state_to_file
+from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
 
 import six
 
@@ -913,7 +913,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             self.__lock.acquire()
 
-            result = ShardedCopyingManagerStatus()
+            result = CopyingManagerStatus()
 
             result.total_scan_iterations = self.__total_scan_iterations
 

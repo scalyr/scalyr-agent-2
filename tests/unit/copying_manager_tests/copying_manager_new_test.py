@@ -37,7 +37,7 @@ import pytest
 
 from scalyr_agent import scalyr_logging
 
-from tests.unit.sharded_copying_manager_tests.common import (
+from tests.unit.copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
     TestableCopyingManagerFlowController,

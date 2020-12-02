@@ -86,7 +86,7 @@ from optparse import OptionParser
 from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.scalyr_client import create_client, verify_server_certificate
-from scalyr_agent.sharded_copying_manager import CopyingManager
+from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus

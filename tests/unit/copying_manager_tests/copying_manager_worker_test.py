@@ -31,14 +31,14 @@ if False:
 import pytest
 
 from scalyr_agent.test_base import skipIf
-from tests.unit.sharded_copying_manager_tests.common import (
+from tests.unit.copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
     CopyingManagerCommonTest,
     TestableSharedObjectManager,
     TestEnvironBuilder,
 )
 from scalyr_agent.configuration import Configuration
-from tests.unit.sharded_copying_manager_tests.test_environment import TestableLogFile
+from tests.unit.copying_manager_tests.test_environment import TestableLogFile
 
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 

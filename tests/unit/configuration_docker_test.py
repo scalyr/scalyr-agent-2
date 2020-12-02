@@ -6,7 +6,7 @@ from scalyr_agent import scalyr_monitor
 from scalyr_agent import scalyr_logging
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
 from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
-from scalyr_agent.sharded_copying_manager import CopyingManager
+from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform

@@ -48,10 +48,6 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 
-"""
-Those tests are copy of original copying manager tests but with new, sharded copying manager.
-"""
-
 
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.test_base import ScalyrTestCase
@@ -61,14 +57,14 @@ import scalyr_agent.util as scalyr_util
 
 from scalyr_agent import scalyr_init
 
-from tests.unit.sharded_copying_manager_tests.common import (
+from tests.unit.copying_manager_tests.common import (
     extract_lines_from_request,
     TestableCopyingManager,
     TestingConfiguration,
 )
 
-from scalyr_agent.sharded_copying_manager import CopyingManager
-from scalyr_agent.sharded_copying_manager.worker import CopyingParameters
+from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.copying_manager.worker import CopyingParameters
 from scalyr_agent.configuration import Configuration
 
 scalyr_init()

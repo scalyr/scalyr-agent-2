@@ -117,7 +117,7 @@ class AgentStatus(BaseAgentStatus):
         # progress of copying their bytes.
         self.copying_manager_status = (
             None
-        )  # type: Optional[ShardedCopyingManagerStatus]
+        )  # type: Optional[CopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
@@ -386,7 +386,7 @@ class ApiKeyWorkerPoolStatus(BaseAgentStatus):
         self.workers = []  # type: List[CopyingManagerWorkerStatus]
 
 
-class ShardedCopyingManagerStatus(BaseAgentStatus):
+class CopyingManagerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying components."""
 
     def __init__(self):
@@ -420,48 +420,6 @@ class ShardedCopyingManagerStatus(BaseAgentStatus):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
         self.rate_limited_time_since_last_status = 0
-
-
-class CopyingManagerStatus(BaseAgentStatus):
-    """The status object containing information about the agent's copying components."""
-
-    def __init__(self):
-        # The total number of bytes successfully uploaded.
-        self.total_bytes_uploaded = 0
-        # The last time the agent successfully copied bytes from log files to the Scalyr servers.
-        self.last_success_time = None
-        # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
-        self.last_attempt_time = None
-        # The size of the request for the last attempt.
-        self.last_attempt_size = None
-        # The last response from the Scalyr servers.
-        self.last_response = None
-        # The last status from the last response (should be 'success').
-        self.last_response_status = None
-        # The total number of failed copy requests.
-        self.total_errors = None
-        # The total time in seconds we were blocked by the rate limiter
-        self.total_rate_limited_time = 0
-        # The time in seconds we were blocked by the rate limiter since the last status
-        self.rate_limited_time_since_last_status = 0
-
-        self.total_copy_iterations = 0
-        self.total_scan_iterations = 0
-        self.total_read_time = 0
-        self.total_waiting_time = 0
-        self.total_blocking_response_time = 0
-        self.total_request_time = 0
-        self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
-
-        # LogMatcherStatus objects for each of the log paths being watched for copying.
-        self.log_matchers = []
-
-        self.health_check_result = None
-
-        self.workers_statuses = []
-        self.api_key_worker_pools = {}  # type: Dict[six.text_type, ]
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -793,7 +751,7 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
 
 
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
-    # type: (TextIO, ShardedCopyingManagerStatus, six.text_type, float) -> None
+    # type: (TextIO, CopyingManagerStatus, six.text_type, float) -> None
     print("Log transmission:", file=output)
     print("=================", file=output)
     print("", file=output)

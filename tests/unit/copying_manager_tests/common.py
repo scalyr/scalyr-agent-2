@@ -45,19 +45,19 @@ if False:
 import mock
 
 from scalyr_agent import test_util
-from tests.unit.sharded_copying_manager_tests.test_environment import (
+from tests.unit.copying_manager_tests.test_environment import (
     TestEnvironBuilder,
     TestableLogFile,
     TestingConfiguration,
 )
 
-from scalyr_agent.sharded_copying_manager import copying_manager
-from scalyr_agent.sharded_copying_manager import (
+from scalyr_agent.copying_manager import copying_manager
+from scalyr_agent.copying_manager import (
     CopyingManager,
     ApiKeyWorkerPool,
     CopyingManagerThreadedWorker,
 )
-from scalyr_agent.sharded_copying_manager.worker import (
+from scalyr_agent.copying_manager.worker import (
     WORKER_PROXY_EXPOSED_METHODS,
     create_shared_object_manager,
 )
@@ -639,7 +639,7 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
     def stop_shared_object_managers(self):
         """
          Because the '_stop_shared_object_managers' is stubbed,
-        we need to have another method to stop the sharded object managers when it is really time.
+        we need to have another method to stop the shaded object managers when it is really time.
         """
         return super(TestableApiKeyWorkerPool, self)._stop_shared_object_managers()
 
@@ -678,7 +678,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         # workers by using 'TestableCopyingManagerWorker' subclass of the 'CopyingManagerWorker'
         # that's why we need change original worker class by testable class.
         # We also do the same thing with 'ApiKeyWorkerPool' and the shared object manager class
-        from scalyr_agent.sharded_copying_manager import copying_manager
+        from scalyr_agent.copying_manager import copying_manager
 
         # save original class of the CopyingManager from 'copying_manager' module
         original_worker = copying_manager.CopyingManagerThreadedWorker

@@ -44,7 +44,6 @@ from scalyr_agent.agent_status import (
 )
 from scalyr_agent.agent_status import (
     CopyingManagerStatus,
-    ShardedCopyingManagerStatus,
     MonitorManagerStatus,
     LogMatcherStatus,
     report_status,
@@ -195,7 +194,7 @@ class TestReportStatus(ScalyrTestCase):
         config_status.status = "Good"
         config_status.additional_paths = ["/etc/scalyr-agent-2/agent.d/server.json"]
 
-        copying_status = ShardedCopyingManagerStatus()
+        copying_status = CopyingManagerStatus()
         self.status.copying_manager_status = copying_status
         copying_status.last_attempt_size = 10000
         copying_status.last_attempt_time = self.time - 60
@@ -1141,7 +1140,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
     def test__find_health_result_in_status_data_text_format_good(self):
         def mock_generate_status(*args, **kwargs):
             result = self.original_generate_status(*args, **kwargs)
-            result.copying_manager_status = ShardedCopyingManagerStatus()
+            result.copying_manager_status = CopyingManagerStatus()
             result.copying_manager_status.total_errors = 0
             result.copying_manager_status.health_check_result = "Good"
             return result
@@ -1161,7 +1160,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         def mock_generate_status_wrapper(health_check_result):
             def mock_generate_status(*args, **kwargs):
                 result = self.original_generate_status(*args, **kwargs)
-                result.copying_manager_status = ShardedCopyingManagerStatus()
+                result.copying_manager_status = CopyingManagerStatus()
                 result.copying_manager_status.total_errors = 0
                 result.copying_manager_status.health_check_result = health_check_result
                 return result

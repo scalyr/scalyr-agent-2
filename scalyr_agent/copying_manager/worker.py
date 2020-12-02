@@ -36,7 +36,7 @@ from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import create_client, create_new_client
-from scalyr_agent.sharded_copying_manager.common import write_checkpoint_state_to_file
+from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
 
 import six
 
