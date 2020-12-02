@@ -52,6 +52,12 @@ import mock
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
+# mock library does not have PropertyMock in python 2.6, so we just keep it None.
+if sys.version_info > (2, 6):
+    PropertyMock = mock.PropertyMock
+else:
+    PropertyMock = None
+
 
 def pytest_generate_tests(metafunc):
     """
@@ -355,13 +361,15 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
 
-    @mock.patch.object(
-        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    @pytest.mark.skipif(
+        sys.version_info < (2, 7),
+        reason="This test case can not be run on python < 2.7",
     )
     @mock.patch.object(
-        TestingConfiguration,
-        "max_new_log_detection_time",
-        new_callable=mock.PropertyMock,
+        TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle(
         self, log_deletion_delay, max_new_log_detection_time
@@ -403,13 +411,15 @@ class TestBasic(CopyingManagerTest):
         assert manager.workers_log_processors_count == len(test_files)
         assert manager.matchers_log_processor_count == len(test_files)
 
-    @mock.patch.object(
-        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    @pytest.mark.skipif(
+        sys.version_info < (2, 7),
+        reason="This test case can not be run on python < 2.7",
     )
     @mock.patch.object(
-        TestingConfiguration,
-        "max_new_log_detection_time",
-        new_callable=mock.PropertyMock,
+        TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle_with_glob(
         self, log_deletion_delay, max_new_log_detection_time
@@ -471,13 +481,15 @@ class TestBasic(CopyingManagerTest):
         assert manager.workers_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
-    @mock.patch.object(
-        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    @pytest.mark.skipif(
+        sys.version_info < (2, 7),
+        reason="This test case can not be run on python < 2.7",
     )
     @mock.patch.object(
-        TestingConfiguration,
-        "max_new_log_detection_time",
-        new_callable=mock.PropertyMock,
+        TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle_with_dynamic_matchers(
         self, log_deletion_delay, max_new_log_detection_time
