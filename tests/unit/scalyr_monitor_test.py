@@ -42,7 +42,9 @@ from six.moves import range
 class MonitorConfigTest(ScalyrTestCase):
     @classmethod
     def setUpClass(cls):
-        super(MonitorConfigTest, cls).setUpClass()
+        if not six.PY2:
+            super(MonitorConfigTest, cls).setUpClass()
+
         ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS = 30
 
     def test_base(self):
