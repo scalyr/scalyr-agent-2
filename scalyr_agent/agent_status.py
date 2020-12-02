@@ -383,7 +383,7 @@ class ApiKeyWorkerPoolStatus(BaseAgentStatus):
         self.total_errors = 0  # type: int
 
         # the status objects from all workers in the worker pool.
-        self.workers = []  # type: Dict[six.text_type, CopyingManagerWorkerStatus]
+        self.workers = []  # type: List[CopyingManagerWorkerStatus]
 
 
 class ShardedCopyingManagerStatus(BaseAgentStatus):
@@ -716,11 +716,9 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
             indent=indent,
         )
 
-    # NOTE: this should be exactly False, we skip if in case of None.
+    # NOTE: this should be exactly False, we skip it in case of None.
     if api_key_stats.all_responses_successful is False:
-        _indent_print(
-            "Failed copy response statuses:", file=output,
-        )
+        _indent_print("Failed copy response statuses:", file=output, indent=indent)
         workers = list(
             sorted(api_key_stats.workers, key=operator.attrgetter("worker_id"))
         )
@@ -728,8 +726,11 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
             if worker_status.last_response_status == "success":
                 # show only unsuccessful requests.
                 continue
-
-            _indent_print("    %s:" % (worker_status.worker_id,), file=output)
+            _indent_print(
+                "Worker %s:" % (worker_status.worker_id,),
+                file=output,
+                indent=indent + 4,
+            )
             _indent_print(
                 "Last copy response status:         %s"
                 % worker_status.last_response_status,
@@ -750,16 +751,20 @@ def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output)
     if api_key_stats.all_health_checks_good is False:
         _indent_print("Failed health checks:", file=output, indent=indent)
 
-        for worker_id, worker_status in api_key_stats.workers.items():
+        for worker_status in api_key_stats.workers:
             if worker_status.health_check_result == "Good":
                 # show only unsuccessful requests.
                 continue
-            _indent_print("%s:" % (worker_id,), file=output, indent=indent)
+            _indent_print(
+                "Worker %s:" % (worker_status.worker_id,),
+                file=output,
+                indent=indent + 4,
+            )
             _indent_print(
                 "Last copy response status:         %s"
                 % worker_status.health_check_result,
                 file=output,
-                indent=indent,
+                indent=indent + 8,
             )
 
     if not is_single:

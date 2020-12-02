@@ -559,6 +559,20 @@ Failed monitors:
         """
 
         del self.status.copying_manager_status.api_key_worker_pools[-1]
+
+        api_key1 = self.api_key1
+        api_key1.total_errors = 5
+
+        self.status.copying_manager_status.health_check_result = "Bad"
+
+        api_key1.all_responses_successful = False
+        api_key1.all_health_checks_good = False
+        worker1_1 = self.worker1_1
+        worker1_1.last_response = "Bad response on worker1"
+        worker1_1.health_check_result = "Bad"
+        worker1_1.last_response_status = "Bad"
+        worker1_1.health_check_result = "Bad"
+
         output = io.StringIO()
         report_status(output, self.status, self.time)
 
@@ -598,9 +612,16 @@ Log transmission:
 
 Bytes uploaded successfully:               10000
 Last requests:                             All successful
-Health check:                              Good
+Health check:                              Bad
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Failed copy response statuses:
+    Worker worker1_1:
+        Last copy response status:         Bad
+        Last copy response:                Bad response on worker1
+Failed health checks:
+    Worker worker1_1:
+        Last copy response status:         Bad
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -699,10 +720,10 @@ Api key ID: 0
     Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
     Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
     Failed copy response statuses:
-        worker1_1:
+        Worker worker1_1:
             Last copy response status:         Bad
             Last copy response:                Bad response on worker1
-        worker1_2:
+        Worker worker1_2:
             Last copy response status:         Bad
             Last copy response:                Bad response on worker2
     Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
@@ -930,10 +951,10 @@ Api key ID: 0
     Last successful communication with Scalyr: Never
     Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
     Failed copy response statuses:
-        worker1_1:
+        Worker worker1_1:
             Last copy response status:         error
             Last copy response:                Some weird stuff
-        worker1_2:
+        Worker worker1_2:
             Last copy response status:         error
             Last copy response:                Some weird stuff
     Total responses with errors:               10 (see '/var/logs/scalyr-agent/agent.log' for details)
