@@ -18,6 +18,12 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from flask import request
+
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.test_base import ScalyrMockHttpServerTestCase
@@ -27,19 +33,29 @@ import mock
 __all__ = ["UrLMonitorTest"]
 
 
+def assert_user_agent_header():
+    headers = dict(request.headers)
+    expected_header = "scalyr-agent-%s;monitor=url_monitor" % (SCALYR_VERSION)
+    assert headers["User-Agent"] == expected_header, "User-Agent header doesn't match!"
+
+
 def mock_view_func_200():
+    assert_user_agent_header()
     return "yay, success!"
 
 
 def mock_view_func_200_multiline():
+    assert_user_agent_header()
     return "line 1\nline 2\nline 3"
 
 
 def mock_view_func_200_long_response():
+    assert_user_agent_header()
     return "a" * 1000
 
 
 def mock_view_func_non200():
+    assert_user_agent_header()
     return "error", 500
 
 

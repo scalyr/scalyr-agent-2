@@ -29,7 +29,7 @@ import sys
 import random
 import os
 
-if sys.platform != "win32":
+if not sys.platform.startswith("win"):
     raise Exception(
         "Attempting to load platform_windows module on a non-Windows machine"
     )

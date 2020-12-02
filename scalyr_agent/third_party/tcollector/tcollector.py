@@ -980,6 +980,8 @@ def main_loop(
     os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
     # Scalyr edit: Set the environment variable for dfstat.py
     os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = six.text_type(options.local_disks_only)
+    # Scayr edit: Support for ignore mounts options
+    os.environ["TCOLLECTOR_IGNORE_MOUNTS"] = ",".join(options.ignore_mounts or [])
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():
@@ -1016,7 +1018,6 @@ def load_etc_dir(options, tags):
 
     Returns: A dict of path -> (module, timestamp).
     """
-
     etcdir = os.path.join(options.cdir, "etc")
     # Save the path so we can restore it later.
     original_path = sys.path

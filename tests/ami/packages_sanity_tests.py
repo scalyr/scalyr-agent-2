@@ -114,7 +114,13 @@ from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
+
+# Directory which contains config files used by the tests which are uploaded to the server
 MOCK_CONFIGS_DIRECTORY = os.path.join(BASE_DIR, "configs/")
+
+# Directory which contains additional files which are used by the test and are uploaded to the
+# server
+TEST_FILES_DIRECTORY = os.path.join(BASE_DIR, "files/")
 
 
 EC2_DISTRO_DETAILS_MAP = {
@@ -339,6 +345,13 @@ def main(
         file_upload_step = _create_config_file_deployment_step(config_file_path)
         file_upload_steps.append(file_upload_step)
 
+    # Upload auxiliary files from tests/ami/files/
+    file_names = os.listdir(TEST_FILES_DIRECTORY)
+    for file_name in file_names:
+        file_path = os.path.join(TEST_FILES_DIRECTORY, file_name)
+        file_upload_step = _create_file_deployment_step(file_path, "ca_certs")
+        file_upload_steps.append(file_upload_step)
+
     if test_type == "install":
         install_package_source = to_version
     else:
@@ -431,14 +444,17 @@ def main(
         verbose=verbose,
     )
 
+    # TODO: Lower those timeouts when upstream yum related issues or similar start to stabilize.
+    # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
+    # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
-        deploy_step_timeout = 320
-        deploy_overall_timeout = 320
+        deploy_step_timeout = 380  # 320
+        deploy_overall_timeout = 400  # 320
         cat_step_timeout = 10
         max_tries = 3
     else:
-        deploy_step_timeout = 260
-        deploy_overall_timeout = 280
+        deploy_step_timeout = 300  # 260
+        deploy_overall_timeout = 320  # 280
         max_tries = 3
         cat_step_timeout = 5
 
