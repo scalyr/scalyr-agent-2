@@ -39,7 +39,6 @@ if False:
     from typing import TextIO
     from typing import List
     from typing import Optional
-    from typing import Dict
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -115,9 +114,7 @@ class AgentStatus(BaseAgentStatus):
         # The CopyingManagerStatus object recording the status of the log copying manager (or none if CopyingManager
         # has not been started). This contains information about the different log paths being watched and the
         # progress of copying their bytes.
-        self.copying_manager_status = (
-            None
-        )  # type: Optional[CopyingManagerStatus]
+        self.copying_manager_status = None  # type: Optional[CopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None

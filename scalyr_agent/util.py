@@ -29,6 +29,7 @@ if False:  # NOSONAR
     from typing import Optional
     from typing import Any
     from typing import List
+    from typing import IO
 
 import codecs
 import sys
@@ -450,7 +451,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
-    f = None
+    f = None  # type: Optional[IO]
     try:
         try:
             if not os.path.isfile(file_path):
