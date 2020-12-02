@@ -405,7 +405,7 @@ class AgentRunner(object):
             "logs": config_log_files,
             "api_keys": [{"workers": self._workers_count}],
             "monitors": [],
-            "use_multiprocess_copying_workers": self._workers_type == "process"
+            "use_multiprocess_copying_workers": self._workers_type == "process",
         }
 
         if self._enable_debug_log:

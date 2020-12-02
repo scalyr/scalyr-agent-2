@@ -2923,6 +2923,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert not config.use_multiprocess_copying_workers
 
     @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
     def test_workers_type_multiprocess(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2939,6 +2942,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert config.use_multiprocess_copying_workers
 
     @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
     def test_workers_type_multiprocess_windows(self):
         # 'use_multiprocess_copying_workers' option should couse error on Windows.
         self._write_file_with_separator_conversion(

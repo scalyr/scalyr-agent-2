@@ -2686,6 +2686,12 @@ class Configuration(object):
                     "use_multiprocess_copying_workers",
                     error_code="invalidValue",
                 )
+            elif sys.version_info < (2, 7):
+                raise BadConfiguration(
+                    "The 'use_multiprocess_copying_workers' option is supported only for Python version higher than 2.6.",
+                    "use_multiprocess_copying_workers",
+                    error_code="invalidValue",
+                )
 
     def __verify_compression_type(self, compression_type):
         """
