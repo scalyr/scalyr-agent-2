@@ -82,7 +82,7 @@ echo -e "${STATUS_OUTPUT}"
 echo_with_date ""
 
 echo -e "${STATUS_OUTPUT}" | grep -v "Last successful communication with Scalyr: Never"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 success"
+echo -e "${STATUS_OUTPUT}" | grep "Last requests:                             All successful"
 
 #
 # 3. Mimic MITM attack by pointing a random domain oo agent.scalyr.com and verify hostname
@@ -114,9 +114,7 @@ echo_with_date ""
 
 echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
 echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy request size:                    0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:         client/connectionFailedCertHostnameValidationFailed"
 
 echo_with_date ""
 echo_with_date "Status output successfuly verified."
@@ -160,9 +158,7 @@ echo_with_date ""
 
 echo -e "${STATUS_OUTPUT}" | grep "Last successful communication with Scalyr: Never"
 echo -e "${STATUS_OUTPUT}" | grep "Bytes uploaded successfully:               0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy request size:                    0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy response size:                   0"
-echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:                 client/connectionFailedSSLError"
+echo -e "${STATUS_OUTPUT}" | grep "Last copy response status:         client/connectionFailedSSLError"
 
 echo_with_date ""
 echo_with_date "Status output successfuly verified."

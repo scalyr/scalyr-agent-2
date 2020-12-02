@@ -252,7 +252,7 @@ Log-Message "Performing MITM and hostname verification checks"
 Log-Message ""
 
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-Add-Content "c:\windows\system32\drivers\etc\hosts" "3.226.192.129 invalid.mitm.should.fail.test.agent.scalyr.com"
+Add-Content "c:\windows\system32\drivers\etc\hosts" "52.44.148.105 invalid.mitm.should.fail.test.agent.scalyr.com"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -265,9 +265,7 @@ echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:         client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
 
 Log-Message ""
 Log-Message "Status output successfuly verified."
@@ -304,9 +302,7 @@ echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedSSLError") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:         client/connectionFailedSSLError") { Throw "Invalid line found." };
 
 Log-Message ""
 Log-Message "Status output successfuly verified."
