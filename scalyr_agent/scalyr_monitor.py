@@ -50,6 +50,11 @@ from scalyr_agent.util import StoppableThread
 
 log = scalyr_logging.getLogger(__name__)
 
+# Maximum value we will use for random jitter which is added to the check gather sample interval.
+# This way we guard against potentially large jitter which may get added to gather sample intervals
+# for monitors which have a very large gather sample interval defined.
+MAX_JITTER_MS = 30 * 1000
+
 
 class ScalyrMonitor(StoppableThread):
     """The default number of seconds between gathering a sample.  This is the global default, which should
@@ -251,6 +256,33 @@ class ScalyrMonitor(StoppableThread):
         """
         pass
 
+    def _get_sleep_delay(self):
+        # type: () -> int
+        """
+        Return sleep interval for this monitor. This interval is based on based on the configured
+        monitor sample interval.
+
+        To spread the load more evenly when running multiple monitors on lower powered devices we
+        also support adding random jitter to each monitor sample interval
+        """
+        sample_interval = self._sample_interval_secs
+
+        if (
+            self._global_config.global_monitor_sample_interval_enable_jitter
+            and not self._adjust_sleep_by_gather_time
+        ):
+            # min jitter is 1/10 of the sample interval and max is 5/10
+            min_jitter_ms = round(sample_interval / 10) * 1000
+            max_jitter_ms = round((sample_interval / 10) * 5) * 1000
+            random_jitter = min(
+                random.randint(min_jitter_ms, max_jitter_ms), MAX_JITTER_MS
+            )
+        else:
+            random_jitter = 0
+
+        sample_interval = round(sample_interval + int(random_jitter / 1000))
+        return sample_interval
+
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
 
@@ -271,17 +303,7 @@ class ScalyrMonitor(StoppableThread):
         # noinspection PyBroadException
         try:
             while not self._is_thread_stopped():
-                sample_interval = self._sample_interval_secs
-                if self._adjust_sleep_by_gather_time:
-                    random_jitter = 0
-                elif self._global_config.global_monitor_sample_interval_enable_jitter:
-                    # min jitter is 1/10 of the sample interval and max is 2/10
-                    min_jitter_ms = round(sample_interval / 10) * 1000
-                    max_jitter_ms = round((sample_interval / 10) * 2) * 1000
-                    random_jitter = random.randint(min_jitter_ms, max_jitter_ms)
-                    sample_interval = sample_interval + (random_jitter / 1000)
-                else:
-                    random_jitter = 0
+                sample_interval = self._get_sleep_delay()
 
                 # noinspection PyBroadException
                 adjustment = 0
