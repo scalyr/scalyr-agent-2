@@ -53,7 +53,7 @@ log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
 
 # mock library does not have PropertyMock in python 2.6, so we just keep it None.
-if sys.version_info > (2, 6):
+if sys.version_info >= (2, 7):
     PropertyMock = mock.PropertyMock
 else:
     PropertyMock = None
