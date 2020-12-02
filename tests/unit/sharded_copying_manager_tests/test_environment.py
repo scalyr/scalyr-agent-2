@@ -19,7 +19,6 @@ from __future__ import absolute_import
 import json
 import shutil
 import tempfile
-import collections
 
 try:
     import pathlib
@@ -185,7 +184,7 @@ class TestEnvironBuilder(object):
         self._initialized = False
 
         # additional log files that should be reflected in the "logs" section of the configuration.
-        self._log_files = collections.OrderedDict()  # type: Dict[str, TestableLogFile]
+        self._log_files = {}  # type: Dict[str, TestableLogFile]
 
         self.__use_pipelining = None
 
