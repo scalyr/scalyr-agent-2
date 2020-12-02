@@ -488,7 +488,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                                 )
 
                             # Check to see if pipelining should be disabled
-
+                            # TODO: uncomment this when the pipelining is enabled again.
                             # disable_pipelining = (
                             #     self.__has_pending_log_changes()
                             # )
