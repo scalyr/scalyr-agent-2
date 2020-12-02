@@ -935,7 +935,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 result.total_bytes_uploaded += status.total_bytes_uploaded
 
             # get responses information from worker pools
-            responses = {s.all_responses_successful for s in api_key_statuses}
+            responses = set(s.all_responses_successful for s in api_key_statuses)
 
             result.last_responses_status_info = _accumulate_worker_stats(
                 responses,

@@ -163,7 +163,7 @@ class TestBasic(CopyingManagerTest):
             assert os.getpid() not in worker_pids
         else:
             # in case of non multiprocess workers, all workers has the same process id as the main process.
-            assert worker_pids == {os.getpid()}
+            assert worker_pids == set([os.getpid()])
 
     def test_generate_status(self):
         (test_file, test_file2), manager = self._create_manager_instanse(2)

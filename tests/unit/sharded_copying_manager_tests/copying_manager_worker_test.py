@@ -20,7 +20,7 @@ import time
 import threading
 import platform
 import mock
-from concurrent.futures import ThreadPoolExecutor
+import sys
 
 if False:
     from typing import Tuple
@@ -207,8 +207,10 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
 
 class TestsRunning(CopyingManagerWorkerTest):
+    @pytest.mark.skipif(sys.version_info < (2, 7))
     @skip_on_multiprocess_workers
     def test_wait_copying(self):
+        from concurrent.futures import ThreadPoolExecutor
 
         run_released = threading.Event()
 
