@@ -413,7 +413,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # The list of LogMatcher objects that are watching for new files to appear.
         # NOTE: log matchers must be created only after worker pools.
-        self.__log_matchers = self.__create_log_matches(
+        self._log_matchers = self._create_log_matchers(
             self.__config, self.__monitors
         )  # type: List[LogMatcher]
 
@@ -432,7 +432,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: The log matchers.
         @rtype: list<LogMatcher>
         """
-        return self.__log_matchers
+        return self._log_matchers
 
     @property
     def api_keys_worker_pools(self):
@@ -592,7 +592,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             )
             # do the removals
             matchers = []
-            for m in self.__log_matchers:
+            for m in self._log_matchers:
                 if m.log_path == log_path:
                     # Make sure the matcher is always finished if called from a non scheduled deletion (e.g. on shutdown/config reload).
                     # This ensures that the __dynamic_matchers dict on the main thread will also clean
@@ -603,7 +603,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 else:
                     matchers.append(m)
 
-            self.__log_matchers[:] = matchers
+            self._log_matchers[:] = matchers
             self.__logs_pending_removal.pop(log_path, None)
             self.__logs_pending_reload.pop(log_path, None)
             self.__dynamic_paths.pop(log_path, None)
@@ -666,7 +666,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def __create_log_matches(self, configuration, monitors):
+    def _create_log_matchers(self, configuration, monitors):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
         @param configuration: The Configuration object.
@@ -991,7 +991,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             )
 
             # get statuses for the log matchers.
-            for entry in self.__log_matchers:
+            for entry in self._log_matchers:
                 result.log_matchers.append(entry.generate_status())
 
             # sum up some worker stats to overall stats.
@@ -1132,6 +1132,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             reloaded.append(matcher)
 
+        # remove close log processor.
+        self.__remove_closed_processors()
+
         self.__create_log_processors_for_log_matchers(
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=True
         )
@@ -1141,12 +1144,27 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         self.__lock.acquire()
         try:
-            self.__log_matchers.extend(log_matchers)
+            self._log_matchers.extend(log_matchers)
             self.__pending_log_matchers = [
                 lm for lm in self.__pending_log_matchers if lm not in log_matchers
             ]
         finally:
             self.__lock.release()
+
+    def __remove_closed_processors(self):
+        """
+        Removes any closed log processors from the __log_paths_being_processed collection.
+        """
+        # shallow copy the processor dict for iteration
+        processors = self.__log_paths_being_processed.copy()
+
+        # set processors to empty
+        self.__log_paths_being_processed = {}
+
+        # add back any processors that haven't been closed
+        for path, p in processors.items():
+            if not p.is_closed():
+                self.__log_paths_being_processed[path] = p
 
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
@@ -1290,7 +1308,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         log_matchers = []
         self.__lock.acquire()
         try:
-            log_matchers = self.__log_matchers[:]
+            log_matchers = self._log_matchers[:]
         finally:
             self.__lock.release()
 

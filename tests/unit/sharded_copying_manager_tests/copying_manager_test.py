@@ -43,9 +43,11 @@ from tests.unit.sharded_copying_manager_tests.common import (
     TestableCopyingManagerFlowController,
     TestableLogFile,
     TestEnvironBuilder,
+    TestingConfiguration,
 )
 
 import six
+import mock
 
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_0)
@@ -114,28 +116,7 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 
         self._env_builder.config.disable_flow_control = disable_flow_control
 
-    def _create_manager_instanse(
-        self,
-        log_files_number=1,
-        auto_start=True,
-        use_pipelining=False,
-        config_data=None,
-        disable_flow_control=False,
-    ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
-
-        self._init_test_environment(
-            log_files_number=log_files_number,
-            use_pipelining=use_pipelining,
-            config_data=config_data,
-        )
-
-        if self._env_builder is None:
-            self._init_test_environment(
-                log_files_number=log_files_number,
-                config_data=config_data,
-                disable_flow_control=disable_flow_control,
-            )
-
+    def _create_manager_instance(self, auto_start=True):
         self._instance = TestableCopyingManager(self._env_builder.config, [])
 
         if auto_start:
@@ -147,11 +128,30 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         test_files = tuple(self._env_builder.log_files.values())
         return test_files, self._instance
 
+    def _init_manager(
+        self,
+        log_files_number=1,
+        auto_start=True,
+        use_pipelining=False,
+        config_data=None,
+        disable_flow_control=False,
+    ):  # type: (int, bool, bool, Dict, bool) -> Tuple[Tuple[TestableLogFile, ...], TestableCopyingManager]
+
+        if self._env_builder is None:
+            self._init_test_environment(
+                log_files_number=log_files_number,
+                use_pipelining=use_pipelining,
+                config_data=config_data,
+                disable_flow_control=disable_flow_control,
+            )
+
+        return self._create_manager_instance(auto_start=auto_start)
+
 
 class TestBasic(CopyingManagerTest):
     def test_multiple_workers(self):
 
-        _, manager = self._create_manager_instanse(2)
+        _, manager = self._init_manager(2)
 
         assert len(manager.workers) == self.workers_count * self.api_keys_count
 
@@ -165,7 +165,7 @@ class TestBasic(CopyingManagerTest):
             assert worker_pids == set([os.getpid()])
 
     def test_generate_status(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
 
@@ -177,7 +177,7 @@ class TestBasic(CopyingManagerTest):
         return
 
     def test_health_check_status(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         manager._CopyingManager__last_scan_attempt_time = time.time()
 
@@ -185,7 +185,7 @@ class TestBasic(CopyingManagerTest):
         assert status.health_check_result == "Good"
 
     def test_health_check_status_failed(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         manager._CopyingManager__last_scan_attempt_time = time.time() - (1000 * 65)
 
@@ -196,7 +196,7 @@ class TestBasic(CopyingManagerTest):
         )
 
     def test_health_check_status_worker_failed(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         # get all workers and simulate their last attempt timeout.
         for worker in manager.workers:
@@ -209,7 +209,7 @@ class TestBasic(CopyingManagerTest):
         )
 
     def test_failed_health_check_status_and_failed_worker(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         manager._CopyingManager__last_scan_attempt_time = time.time() - (1000 * 65)
 
@@ -225,7 +225,7 @@ class TestBasic(CopyingManagerTest):
         )
 
     def test_checkpoints(self):
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
@@ -276,7 +276,7 @@ class TestBasic(CopyingManagerTest):
         Test if the copying manager is able to pick checkpoint from the older versions of the agent.
         """
 
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
@@ -320,7 +320,7 @@ class TestBasic(CopyingManagerTest):
         if self.workers_count == 1 and self.api_keys_count == 1:
             pytest.skip("This test is only for multi-worker copying manager.")
 
-        (test_file, test_file2), manager = self._create_manager_instanse(2)
+        (test_file, test_file2), manager = self._init_manager(2)
 
         # write something and stop in order to create checkpoint files.
         test_file.append_lines("line1")
@@ -354,3 +354,183 @@ class TestBasic(CopyingManagerTest):
         manager.start_manager()
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
+
+    @mock.patch.object(
+        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=mock.PropertyMock,
+    )
+    def test_log_processors_lifecycle(
+        self, log_deletion_delay, max_new_log_detection_time
+    ):
+
+        # mock config values so we do not  need to wait for the next file scan.
+        log_deletion_delay.return_value = -1
+        # do the same to not wait when copying manager decides that file is deleted.
+        max_new_log_detection_time.return_value = -1
+
+        test_files, manager = self._init_manager(10)
+
+        for i, test_file in enumerate(test_files):
+            self._append_lines(["file_{}_line1".format(i)], log_file=test_file)
+
+        assert manager.workers_log_processors_count == len(test_files)
+        assert manager.matchers_log_processor_count == len(test_files)
+
+        for log_file in test_files:
+            log_file.remove()
+
+        # 1) log processors perform file processing and close deleted files.
+        manager.wait_for_full_iteration()
+        # 2) Copying manager removes closed processors from its collection.
+        manager.wait_for_full_iteration()
+        # 3) Log matchers remove their log processors.
+        manager.wait_for_full_iteration()
+
+        # check if there are no log processors remaining inside workers and log matchers.
+        assert manager.workers_log_processors_count == 0
+        assert manager.matchers_log_processor_count == 0
+
+        # crete log file back and see if log processors are created back too.
+        for log_file in test_files:
+            log_file.create()
+
+        manager.wait_for_full_iteration()
+
+        assert manager.workers_log_processors_count == len(test_files)
+        assert manager.matchers_log_processor_count == len(test_files)
+
+    @mock.patch.object(
+        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=mock.PropertyMock,
+    )
+    def test_log_processors_lifecycle_with_glob(
+        self, log_deletion_delay, max_new_log_detection_time
+    ):
+
+        # mock config values so we do not need to wait for the next file scan.
+        log_deletion_delay.return_value = -1
+        # do the same to not wait when copying manager decides that file is deleted.
+        max_new_log_detection_time.return_value = -1
+
+        _, manager = self._init_manager(0)
+
+        # create log config with the glob path.
+        glob_path = self._env_builder.root_path / "file_*"
+        log_config = self._env_builder.config.parse_log_config(
+            {"path": six.text_type(glob_path)}
+        )
+        manager.add_log_config("scheduled-deletion", log_config)
+
+        files = []
+
+        # create some matching files.
+        for i in range(10):
+            file = TestableLogFile(self._env_builder.config, "file_{0}".format(i))
+            file.initialize(self._env_builder.root_path)
+
+            files.append(file)
+
+        assert manager.workers_log_processors_count == 0
+        assert manager.matchers_log_processor_count == 0
+
+        # wait for copying manager adds log processors.
+        manager.wait_for_full_iteration()
+
+        # both workers and log log matches should contain new log processors.
+        assert manager.workers_log_processors_count == len(files)
+        assert manager.matchers_log_processor_count == len(files)
+
+        for log_file in files:
+            log_file.remove()
+
+        # 1) log processors perform file processing and close deleted files.
+        manager.wait_for_full_iteration()
+        # 2) Copying manager removes closed processors from its collection.
+        manager.wait_for_full_iteration()
+        # 3) Log matchers remove their log processors.
+        manager.wait_for_full_iteration()
+
+        # check if there are no log processors remaining inside workers and log matchers.
+        assert manager.workers_log_processors_count == 0
+        assert manager.matchers_log_processor_count == 0
+
+        # crete log file back and see if log processors are created back too.
+        for log_file in files:
+            log_file.create()
+
+        manager.wait_for_full_iteration()
+
+        assert manager.workers_log_processors_count == len(files)
+        assert manager.matchers_log_processor_count == len(files)
+
+    @mock.patch.object(
+        TestingConfiguration, "log_deletion_delay", new_callable=mock.PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=mock.PropertyMock,
+    )
+    def test_log_processors_lifecycle_with_dynamic_matchers(
+        self, log_deletion_delay, max_new_log_detection_time
+    ):
+
+        # mock config values so we do not need to wait for the next file scan.
+        log_deletion_delay.return_value = -1
+        # do the same to not wait when copying manager decides that file is deleted.
+        max_new_log_detection_time.return_value = -1
+
+        files = []
+
+        _, manager = self._init_manager(0)
+
+        for i in range(10):
+            file = TestableLogFile(self._env_builder.config, "file_{0}".format(i))
+            file.initialize(self._env_builder.root_path)
+
+            log_config = self._env_builder.config.parse_log_config(
+                {"path": file.str_path}
+            )
+            manager.add_log_config("scheduled-deletion", log_config)
+
+            files.append(file)
+
+        assert manager.workers_log_processors_count == 0
+        assert manager.matchers_log_processor_count == 0
+
+        # wait for copying manager adds log processors.
+        manager.wait_for_full_iteration()
+
+        assert manager.workers_log_processors_count == len(files)
+        assert manager.matchers_log_processor_count == len(files)
+
+        for log_file in files:
+            log_file.remove()
+
+        # 1) log processors perform file processing and close deleted files.
+        manager.wait_for_full_iteration()
+        # 2) Copying manager removes closed processors from its collection.
+        manager.wait_for_full_iteration()
+        # 3) Log matchers remove their log processors.
+        manager.wait_for_full_iteration()
+
+        # check if there are no log processors remaining inside workers and log matchers.
+        assert manager.workers_log_processors_count == 0
+        assert manager.matchers_log_processor_count == 0
+
+        # crete log file back and see if log processors are created back too.
+        for log_file in files:
+            log_file.create()
+
+        manager.wait_for_full_iteration()
+
+        assert manager.workers_log_processors_count == len(files)
+        assert manager.matchers_log_processor_count == len(files)

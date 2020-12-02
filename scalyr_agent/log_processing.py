@@ -3124,7 +3124,7 @@ class LogMatcher(object):
 
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
-        self.__processors = []
+        self._processors = []
         # The lock that protects the __processor, __is_finishing and __last_check vars.
         self.__lock = threading.Lock()
 
@@ -3141,7 +3141,7 @@ class LogMatcher(object):
 
     def set_new_scalyr_client(self, new_scalyr_client):
         self.__new_scalyr_client = new_scalyr_client
-        for processor in self.__processors:
+        for processor in self._processors:
             processor.set_new_scalyr_client(new_scalyr_client)
 
     @property
@@ -3188,11 +3188,11 @@ class LogMatcher(object):
         self.__lock.acquire()
         try:
             # get checkpoints and close all processors
-            for p in self.__processors:
+            for p in self._processors:
                 result[p.get_log_path()] = p.get_checkpoint()
                 p.close()
 
-            self.__processors = []
+            self._processors = []
         finally:
             self.__lock.release()
 
@@ -3230,7 +3230,7 @@ class LogMatcher(object):
 
             # set any existing processors to close immediately if immediately is True,
             # otherwise set them to close when they reach eof
-            for processor in self.__processors:
+            for processor in self._processors:
                 if immediately:
                     processor.close()
                 else:
@@ -3257,7 +3257,7 @@ class LogMatcher(object):
                 return False
 
             # check if all the processors are closed
-            for processor in self.__processors:
+            for processor in self._processors:
                 # the log matcher is not finished if any processors are still open
                 if not processor.is_closed():
                     return False
@@ -3280,7 +3280,7 @@ class LogMatcher(object):
             result.is_glob = self.__is_glob
             result.last_check_time = self.__last_check
 
-            for processor in self.__processors:
+            for processor in self._processors:
                 result.log_processors_status.append(processor.generate_status())
 
             return result
@@ -3424,7 +3424,7 @@ class LogMatcher(object):
 
             self.__lock.acquire()
             for new_processor in result:
-                self.__processors.append(new_processor)
+                self._processors.append(new_processor)
                 # If the log matcher is finishing, then any new processors should be set to close when
                 # they reach their eof.  This catches the situation where `finish` was called on the log matcher
                 # but the log matcher didn't have any processors yet, because `find_matches` hadn't been called
@@ -3552,10 +3552,10 @@ class LogMatcher(object):
         You can only call this if you hold self.__lock.
         """
         new_list = []
-        for processor in self.__processors:
+        for processor in self._processors:
             if not processor.is_closed():
                 new_list.append(processor)
-        self.__processors = new_list
+        self._processors = new_list
 
 
 class FileSystem(object):

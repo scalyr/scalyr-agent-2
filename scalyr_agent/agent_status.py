@@ -357,7 +357,7 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
         self.health_check_result = None
 
         # LogProcessorStatus objects for each of the log files being processed by worker.
-        self.log_processors = []  # type: Dict[six.text_type, LogProcessorStatus]
+        self.log_processors = []  # type: List[LogProcessorStatus]
 
 
 class ApiKeyWorkerPoolStatus(BaseAgentStatus):

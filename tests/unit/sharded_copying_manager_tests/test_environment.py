@@ -54,14 +54,20 @@ class TestableLogFile(object):
         self.name = name
 
         # the path of the file, it is unknown until the file is created by the 'create' function
-        self.path = None
+        self.path = None  # type: pathlib.Path
 
-    def create(self, root_path):
+    def initialize(self, root_path):
         """
-        Create file in the root path.
+        Determine the path of the file and Create file in the root path.
         """
         self.path = pathlib.Path(root_path, self.name)
+        self.create()
+
+    def create(self):
         self.path.touch()
+
+    def remove(self):
+        self.path.unlink()
 
     def append_lines(self, *lines):  # type: (six.text_type) -> None
         """
@@ -210,7 +216,7 @@ class TestEnvironBuilder(object):
         self._agent_config_path = root_path / "agent.json"
 
         for log_file in self._log_files.values():
-            log_file.create(self._root_path)
+            log_file.initialize(self._root_path)
 
         self._create_config(self._config_initial_data)
 
@@ -348,6 +354,11 @@ class TestEnvironBuilder(object):
     def agent_data_path(self):
         return self._data_dir_path
 
+    @property
+    @after_initialize
+    def agent_log_path(self):
+        return self._logs_dir_path
+
     @after_initialize
     def get_checkpoints_path(self, worker_id):  # type: (six.text_type) -> pathlib.Path
         return self._data_dir_path / ("checkpoints-%s.json" % worker_id)
@@ -365,3 +376,8 @@ class TestEnvironBuilder(object):
     @after_initialize
     def get_active_checkpoints(self, worker_id):
         return json.loads(self.get_active_checkpoints_path(worker_id).read_text())
+
+    @property
+    @after_initialize
+    def root_path(self):
+        return self._root_path

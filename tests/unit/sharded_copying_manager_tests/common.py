@@ -42,7 +42,7 @@ if False:
     from typing import List
     from typing import Set
 
-import six
+import mock
 
 from scalyr_agent import test_util
 from tests.unit.sharded_copying_manager_tests.test_environment import (
@@ -50,6 +50,8 @@ from tests.unit.sharded_copying_manager_tests.test_environment import (
     TestableLogFile,
     TestingConfiguration,
 )
+
+from scalyr_agent.sharded_copying_manager import copying_manager
 from scalyr_agent.sharded_copying_manager import (
     CopyingManager,
     ApiKeyWorkerPool,
@@ -61,6 +63,9 @@ from scalyr_agent.sharded_copying_manager.worker import (
 )
 
 from scalyr_agent.scalyr_client import AddEventsRequest
+from scalyr_agent.log_processing import LogMatcher
+
+import six
 
 
 def extract_lines_from_request(request):
@@ -263,6 +268,19 @@ class TestableCopyingManagerFlowController:
         self.run_and_stop_at(
             TestableCopyingManagerFlowController.RESPONDING,
             required_transition_state=TestableCopyingManagerFlowController.SENDING,
+        )
+
+    def wait_for_full_iteration(self):
+        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING,)
+
+        self.run_and_stop_at(
+            TestableCopyingManagerThreadedWorker.SENDING,
+            required_transition_state=TestableCopyingManagerThreadedWorker.SLEEPING,
+        )
+
+        self.run_and_stop_at(
+            TestableCopyingManagerThreadedWorker.SLEEPING,
+            required_transition_state=TestableCopyingManagerThreadedWorker.SENDING,
         )
 
     def _block_if_should_stop_at(self, current_point):
@@ -544,19 +562,6 @@ class TestableCopyingManagerThreadedWorker(
         self._set_response(status_message)
         self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
 
-    def wait_for_full_iteration(self):
-        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING,)
-
-        self.run_and_stop_at(
-            TestableCopyingManagerThreadedWorker.SENDING,
-            required_transition_state=TestableCopyingManagerThreadedWorker.SLEEPING,
-        )
-
-        self.run_and_stop_at(
-            TestableCopyingManagerThreadedWorker.SLEEPING,
-            required_transition_state=TestableCopyingManagerThreadedWorker.SENDING,
-        )
-
     def close_at_eof(self, filepath):
         """Tells the CopyingManagerWorker to mark the LogFileProcessor copying the specified path to close itself
         once all bytes have been copied up to Scalyr.  This can be used to remove LogProcessors for
@@ -639,6 +644,18 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
         return super(TestableApiKeyWorkerPool, self)._stop_shared_object_managers()
 
 
+class TestableLogMatcher(LogMatcher):
+    """
+        The subclass of the LogMatcher class with helper functions.
+        This is used in the TestableCopying manager
+        instead of the regular LogMatcher.
+    """
+
+    @property
+    def log_processors(self):
+        return self._processors
+
+
 class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowController):
     """
     Since the real copying happens in the workers of the CopyingManager, this abstraction
@@ -652,6 +669,9 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     def __init__(self, configuration, monitors):
         CopyingManager.__init__(self, configuration, monitors)
         TestableCopyingManagerFlowController.__init__(self, configuration)
+
+        # do this just to tell static analyzer that this is a testable instances.
+        self._log_matchers = self._log_matchers  # type: List[TestableLogMatcher]
 
     def _create_worker_pools(self):
         # We are going to control the flow of our
@@ -679,6 +699,20 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
             copying_manager.CopyingManagerThreadedWorker = original_worker
             copying_manager.SharedObjectManager = original_shared_object_manager_class
             copying_manager.ApiKeyWorkerPool = original_worker_pool
+
+    def _create_log_matchers(self, configuration, monitors):
+        # override this to mock regular log matchers with testable ones.
+        with mock.patch.object(copying_manager, "LogMatcher", TestableLogMatcher):
+            return super(TestableCopyingManager, self)._create_log_matchers(
+                configuration, monitors
+            )
+
+    def add_log_config(self, monitor_name, log_config, force_add=False):
+        # override this to mock regular log matchers with testable ones.
+        with mock.patch.object(copying_manager, "LogMatcher", TestableLogMatcher):
+            return super(TestableCopyingManager, self).add_log_config(
+                monitor_name, log_config, force_add=force_add
+            )
 
     def start_manager(
         self, logs_initial_positions=None,
@@ -838,6 +872,14 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     def write_master_checkpoints(self, checkpoints):
         # type: (Dict) -> None
         self.master_checkpoints_path.write_text(six.text_type(json.dumps(checkpoints)))
+
+    @property
+    def matchers_log_processor_count(self):
+        return sum(len(m.log_processors) for m in self.log_matchers)
+
+    @property
+    def workers_log_processors_count(self):
+        return sum(len(w.get_log_processors()) for w in self.workers)
 
     # endregion
 
