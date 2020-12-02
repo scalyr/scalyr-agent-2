@@ -55,13 +55,13 @@ def pytest_generate_tests(metafunc):
     Run all tests for each configuration.
     """
     if "worker_type" in metafunc.fixturenames:
-        test_params = ["thread"]
+        test_params = [["thread", 1, 1], ["thread", 2, 2]]
         if platform.system() != "Windows":
-            test_params.append("process")
+            test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
         metafunc.parametrize(
             "worker_type, api_keys_count, workers_count",
-            [["thread", 1, 1], ["process", 1, 1], ["thread", 2, 2], ["process", 2, 2]],
+            test_params
         )
 
 
@@ -156,7 +156,7 @@ class TestBasic(CopyingManagerTest):
 
         assert len(manager.workers) == self.workers_count * self.api_keys_count
 
-        worker_pids = {worker.get_pid() for worker in manager.workers}
+        worker_pids = set(worker.get_pid() for worker in manager.workers)
 
         if self.use_multiprocessing_workers:
             assert len(worker_pids) == self.workers_count * self.api_keys_count

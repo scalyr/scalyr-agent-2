@@ -254,33 +254,33 @@ class TestsRunning(CopyingManagerWorkerTest):
             TestableCopyingManagerThreadedWorker,
             "_init_scalyr_client",
             failing_init_scalyr_client,
-        ), mock.patch.object(
-            Configuration,
-            "healthy_max_time_since_last_copy_attempt",
-            new_callable=mock.PropertyMock,
-        ) as config_max_time_mock:
+        ):
+            with mock.patch.object(
+                Configuration,
+                "healthy_max_time_since_last_copy_attempt",
+                new_callable=mock.PropertyMock,
+            ) as config_max_time_mock:
+                # reduce the 'healthy_max_time_since_last_copy_attempt' option in the config to save the time
+                config_max_time_mock.return_value = 0.01
+                # recreate and start a new shared object manager to fork a process at the moment where functions are mocked.
+                self._recreate_shared_object_manager()
 
-            # reduce the 'healthy_max_time_since_last_copy_attempt' option in the config to save the time
-            config_max_time_mock.return_value = 0.01
-            # recreate and start a new shared object manager to fork a process at the moment where functions are mocked.
-            self._recreate_shared_object_manager()
+                # NOTE: we have to disable flow control on worker
+                # because it will just be deadlocked on the exception which we are raising.
+                _, worker = self._init_worker_instance(
+                    2, auto_start=False, disable_flow_control=True
+                )
 
-            # NOTE: we have to disable flow control on worker
-            # because it will just be deadlocked on the exception which we are raising.
-            _, worker = self._init_worker_instance(
-                2, auto_start=False, disable_flow_control=True
-            )
+                worker.start_worker()
+                worker.wait_for_copying_to_begin()
 
-            worker.start_worker()
-            worker.wait_for_copying_to_begin()
+                # wait until worker is crashed.
+                while worker.is_alive():
+                    time.sleep(0.1)
 
-            # wait until worker is crashed.
-            while worker.is_alive():
-                time.sleep(0.1)
+                status = worker.generate_status()
 
-            status = worker.generate_status()
-
-            assert status.health_check_result != "Good"
+                assert status.health_check_result != "Good"
 
 
 class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):

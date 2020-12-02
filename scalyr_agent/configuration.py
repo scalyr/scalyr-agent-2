@@ -2941,7 +2941,7 @@ class Configuration(object):
         # get first api_key entry as the default.
         api_key_entries = self.__config.get_json_array("api_keys")
         default_api_key_id = api_key_entries[0]["id"]
-        api_key_ids = {e["id"] for e in api_key_entries}
+        api_key_ids = set(e["id"] for e in api_key_entries)
         self.__verify_or_set_optional_string(
             log_entry,
             "api_key_id",
