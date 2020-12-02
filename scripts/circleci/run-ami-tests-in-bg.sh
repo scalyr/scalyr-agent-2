@@ -41,13 +41,11 @@ echo ""
 if [ "${TEST_TYPE}" == "stable" ]; then
   echo "Run sanity tests for the stable package versions."
   # For Windows tests we need to download latest stable version from the repo and use that
-  # TODO: Change back once this fix is released and included in a stable release,
-  # until then, those tests will fail
-  #curl -o VERSION -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
-  #LATEST_VERSION=$(cat VERSION)
-  #curl -o /tmp/workspace/ScalyrAgentInstaller.msi -L -f "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
-  curl -o /tmp/workspace/ScalyrAgentInstaller.msi -L -f "https://scalyr-repo.s3.amazonaws.com/4adfas/internal/latest/ScalyrAgentInstaller-2.1.9.1.msi"
+  curl -o VERSION -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
+  LATEST_VERSION=$(cat VERSION)
+  curl -o /tmp/workspace/ScalyrAgentInstaller.msi -L -f "https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-${LATEST_VERSION}.msi"
 
+  # TOCO: Uncomment when v2.1.15 is released
   #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
   #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
   #python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
@@ -111,7 +109,7 @@ do
     echo ""
 
     if wait "${job_pid}"; then
-        echo "Job finished successfuly: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Job finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 

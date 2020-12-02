@@ -38,6 +38,7 @@ You can see an overview of this data in the System dashboard. Click the {{menuRe
                                        row.  This is appended to each of the network_interface_prefixes to create the \
                                        full interface name when interating over network interfaces in /dev
 |||# ``local_disks_only``          ||| (defaults to true) Limits the metrics to only locally mounted filesystems
+|||# ``ignore_mounts``             ||| List of glob patterns for mounts to ignore
 
 ## Log reference
 

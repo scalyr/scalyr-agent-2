@@ -19,7 +19,7 @@
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
 
-echo "Checking Python version." >&2
+echo "Checking Python version."
 
 is_python_valid() {
   command=$1

@@ -92,3 +92,73 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
             self.assertTrue(
                 metric_name in seen_metrics, "metric %s not seen" % (metric_name)
             )
+
+    @skipIf(IS_FEDORA, "Skipping test on Fedora")
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
+    def test_gather_sample_ignore_mounts(self):
+        monitor_config = {
+            "module": "linux_system_metrics",
+        }
+        mock_logger = mock.Mock()
+        monitor = SystemMetricsMonitor(monitor_config, mock_logger)
+
+        monitor.setDaemon(True)
+        monitor.start()
+
+        # Give it some time to spawn collectors and collect metrics
+        time.sleep(2)
+        monitor.stop()
+
+        self.assertEqual(mock_logger.error.call_count, 0)
+
+        seen_mount_points_without_filters = self._get_mount_point_names_from_mock_logger(
+            mock_logger.info
+        )
+        ignore_mounts = list(seen_mount_points_without_filters)[:3]
+
+        monitor_config = {
+            "module": "linux_system_metrics",
+            "ignore_mounts": ignore_mounts,
+        }
+        mock_logger = mock.Mock()
+        monitor = SystemMetricsMonitor(monitor_config, mock_logger)
+
+        monitor.setDaemon(True)
+        monitor.start()
+
+        # Give it some time to spawn collectors and collect metrics
+        time.sleep(2)
+        monitor.stop()
+
+        self.assertEqual(mock_logger.error.call_count, 0)
+
+        seen_mount_points_with_filters = self._get_mount_point_names_from_mock_logger(
+            mock_logger.info
+        )
+
+        self.assertTrue(
+            len(seen_mount_points_with_filters) < len(seen_mount_points_without_filters)
+        )
+
+        for mount_point in list(seen_mount_points_without_filters)[:3]:
+            self.assertFalse(mount_point in seen_mount_points_with_filters)
+
+    def _get_mount_point_names_from_mock_logger(self, mock_logger):
+        mount_points = set([])
+
+        for call_args in mock_logger.call_args_list:
+            line = call_args[0][0]
+            split = line.split(" ")
+            metric_name = split[0]
+
+            if "." not in metric_name:
+                # Not a metric
+                continue
+
+            if metric_name.startswith("df."):
+                mount_point = split[2].replace("mount=", "").replace('"', "")
+                mount_points.add(mount_point)
+
+        return mount_points

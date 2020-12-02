@@ -33,6 +33,7 @@ import socket
 import sys
 import time
 import io
+import ssl
 import os
 
 import six
@@ -899,16 +900,52 @@ class ScalyrClientSession(object):
         if platform_value is None:
             platform_value = platform.platform(terse=1)
 
-        # Include a string to indicate if python has a true ssl library available to record
-        # whether or not the client is doing server certificate verification.
-        ssl_str = "ssllib"
+        # Include openssl version if available
+        # Returns a tuple like this: (1, 1, 1, 8, 15)
+        openssl_version = getattr(ssl, "OPENSSL_VERSION_INFO", None)
+        if openssl_version:
+            try:
+                openssl_version_string = (
+                    ".".join([str(v) for v in openssl_version[:3]])
+                    + "-"
+                    + str(openssl_version[3])
+                )
+                openssl_version_string = "openssl-%s" % (openssl_version_string)
+            except Exception:
+                openssl_version_string = None
+        else:
+            openssl_version_string = None
+
+        # Include a string which indicates if the agent is running admin / root user
+        from scalyr_agent.platform_controller import PlatformController
+
+        try:
+            platform_controller = PlatformController.new_platform()
+            current_user = platform_controller.get_current_user()
+        except Exception:
+            # In some tests on Windows this can throw inside the tests so we ignore the error
+            current_user = "unknown"
+
+        if current_user in ["root", "Administrator"] or current_user.endswith(
+            "\\Administrators"
+        ):
+            # Indicates agent running as a privileged / admin user
+            user_string = "admin-1"
+        else:
+            # Indicates agent running as a regular user
+            user_string = "admin-0"
 
         parts = [
             platform_value,
             python_version_str,
             "agent-%s" % agent_version,
-            ssl_str,
         ]
+
+        if openssl_version_string:
+            parts.append(openssl_version_string)
+
+        if user_string:
+            parts.append(user_string)
 
         if self.__use_requests:
             import scalyr_agent.third_party.requests as requests

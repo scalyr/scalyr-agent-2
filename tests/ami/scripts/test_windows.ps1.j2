@@ -83,6 +83,38 @@ if ($msi_version -eq $null) {
 # install scalyr agent and wait until it is done.
 Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
+# Verify agent.json permissions
+# NOTE: This check needs to be performed as early as possible after fresh installation before
+# other tools modify the config
+Log-Message ""
+Log-Message "agent.json and agent.d/ config files permissions checks"
+Log-Message ""
+
+# NOTE: At this point fix doesn't run automatically post install so we manually invoke the scrupt and verify it works
+& "C:\Program Files (x86)\Scalyr\bin\scalyr-agent-2-config.exe" "--fix-config-permissions"
+
+dir "C:\Program Files (x86)\Scalyr\config"
+dir "C:\Program Files (x86)\Scalyr\config\agent.d"
+dir "C:\Program Files (x86)\Scalyr\config\templates"
+
+$permissions_agent_json=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.json"
+$permissions_agent_d=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
+
+echo $permissions_agent_json
+echo $permissions_agent_d
+
+if ("$permissions_agent_json" -match "User") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_json" -match "Users") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_d" -match "User") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+if ("$permissions_agent_d" -match "Users") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+
+if ("$permissions_agent_json" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.json!" };
+if ("$permissions_agent_d" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.d!" };
+
+Log-Message ""
+Log-Message "agent.json and agent.d/ config files permissions completed successfuly"
+Log-Message ""
+
 # Copy over agent.json with the API key set up
 Copy-Item ".\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
@@ -251,10 +283,15 @@ Log-Message ""
 Log-Message "Performing MITM and hostname verification checks"
 Log-Message ""
 
+# NOTE: If scalyr.com IP changes, we need to update this here. Sadly querying
+# for IP here inside the power shell script is a bit of a PITA...
+# dig A agent.scalyr.com
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-Add-Content "c:\windows\system32\drivers\etc\hosts" "52.44.148.105 invalid.mitm.should.fail.test.agent.scalyr.com"
+Add-Content "c:\windows\system32\drivers\etc\hosts" "34.240.110.238 invalid.mitm.should.fail.test.agent.scalyr.com"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+Start-Sleep 20
 
 Log-Message ""
 Log-Message "Verifying agent status output"
@@ -289,7 +326,8 @@ Log-Message ""
 Log-Message "Performing cert signed by CA we dont trust checks"
 Log-Message ""
 
-Copy-Item ".\agent.json_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+Copy-Item ".\agent.json_win32_invalid_bad_cert" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
+Copy-Item ".\ca_certs.crt" -Destination "C:\Program Files (x86)\Scalyr\config\ca_certs.crt"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 

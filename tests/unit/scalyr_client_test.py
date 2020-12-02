@@ -40,9 +40,10 @@ from scalyr_agent.scalyr_client import (
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
-
+from scalyr_agent.test_base import skipIf
 
 import scalyr_agent.test_util as test_util
+import scalyr_agent.scalyr_client
 
 
 class AddEventsRequestTest(ScalyrTestCase):
@@ -1015,6 +1016,8 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
     def test_get_user_agent_includes_requests_version(self):
+        scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
+
         # without requests
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -1022,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "ssllib")
+        self.assertEqual(split[-2], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1036,8 +1039,59 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-2], "ssllib")
+        self.assertEqual(split[-3], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    @mock.patch("scalyr_agent.platform_controller.PlatformController.new_platform")
+    def test_get_user_agent_string_run_as_admin(self, mock_new_platform):
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "nobody"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("admin-0" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "User"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertFalse("" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "root"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("admin-1" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "MyDomain\\Administrators"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("admin-1" in split)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):

@@ -6,7 +6,7 @@
   // doesn't trust that cert.
   // Long term we could spawn test HTTP server locally and use that, but that's more
   // involved.
-  ca_cert_path: "/tmp/ca_certs.crt",
+  ca_cert_path: "C:\\Program Files (x86)\\Scalyr\\config\\ca_certs.crt",
 
   logs: [
   ],
