@@ -88,9 +88,6 @@ def pytest_addoption(parser):
     parser.addoption("--all", action="store_true", help="run all combinations")
 
 
-sys.version_info = (2, 6, 0)
-
-
 def pytest_generate_tests(metafunc):
     if "worker_type" in metafunc.fixturenames:
         test_params = ["thread"]
