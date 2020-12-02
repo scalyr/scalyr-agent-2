@@ -58,7 +58,7 @@ def pytest_generate_tests(metafunc):
     if "worker_type" in metafunc.fixturenames:
         test_params = [["thread", 1, 1], ["thread", 2, 2]]
         # if the OS is not Windows and python version > 2.7 then also do the multiprocess workers testing.
-        if platform.system() != "Windows" and sys.version_info > (2, 6):
+        if platform.system() != "Windows" and sys.version_info >= (2, 7):
             test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
         metafunc.parametrize("worker_type, api_keys_count, workers_count", test_params)
