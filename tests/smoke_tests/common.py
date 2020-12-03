@@ -53,7 +53,11 @@ def _create_data_json_file(runner, data_json_verifier):
 
 
 def _test_standalone_smoke(
-    agent_installation_type, python_version=None, rate_limited=False
+    agent_installation_type,
+    python_version=None,
+    rate_limited=False,
+    workers_type="thread",
+    workers_count=1,
 ):
     """
     Agent standalone test to run within the same machine.
@@ -63,7 +67,12 @@ def _test_standalone_smoke(
 
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
-    runner = AgentRunner(agent_installation_type, enable_debug_log=True)
+    runner = AgentRunner(
+        agent_installation_type,
+        enable_debug_log=True,
+        workers_type=workers_type,
+        workers_count=workers_count,
+    )
 
     if python_version:
         runner.switch_version(python_version)

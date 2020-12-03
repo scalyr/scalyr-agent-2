@@ -171,7 +171,7 @@ EC2_DISTRO_DETAILS_MAP = {
         "default_python_package_name": "python",
     },
     "centos8": {
-        "image_id": "ami-0e7ad70170b787201",
+        "image_id": "ami-01ca03df4a6012157",
         "image_name": "CentOS 8 (x86_64) - with Updates HVM",
         "size_id": "t2.micro",
         "ssh_username": "centos",

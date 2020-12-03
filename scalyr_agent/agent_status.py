@@ -33,6 +33,12 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
+import operator
+
+if False:
+    from typing import TextIO
+    from typing import List
+    from typing import Optional
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -108,7 +114,7 @@ class AgentStatus(BaseAgentStatus):
         # The CopyingManagerStatus object recording the status of the log copying manager (or none if CopyingManager
         # has not been started). This contains information about the different log paths being watched and the
         # progress of copying their bytes.
-        self.copying_manager_status = None
+        self.copying_manager_status = None  # type: Optional[CopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
@@ -198,7 +204,7 @@ class OverallStats(AgentStatus):
         self.total_connections_created = 0
 
         # Fields needed for copying manager status
-        self.total_copy_iterations = 0
+        self.total_scan_iterations = 0
         self.total_read_time = 0
         self.total_compression_time = 0
         self.total_waiting_time = 0
@@ -262,8 +268,8 @@ class OverallStats(AgentStatus):
         result.total_connections_created = (
             self.total_connections_created + other.total_connections_created
         )
-        result.total_copy_iterations = (
-            self.total_copy_iterations + other.total_copy_iterations
+        result.total_scan_iterations = (
+            self.total_scan_iterations + other.total_scan_iterations
         )
         result.total_read_time = self.total_read_time + other.total_read_time
         result.total_compression_time = (
@@ -314,10 +320,11 @@ class ConfigStatus(BaseAgentStatus):
         return self.__dict__
 
 
-class CopyingManagerStatus(BaseAgentStatus):
-    """The status object containing information about the agent's copying components."""
+class CopyingManagerWorkerStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying manager worker components."""
 
     def __init__(self):
+        self.worker_id = None
         # The total number of bytes successfully uploaded.
         self.total_bytes_uploaded = 0
         # The last time the agent successfully copied bytes from log files to the Scalyr servers.
@@ -331,7 +338,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         # The last status from the last response (should be 'success').
         self.last_response_status = None
         # The total number of failed copy requests.
-        self.total_errors = None
+        self.total_errors = 0
         # The total time in seconds we were blocked by the rate limiter
         self.total_rate_limited_time = 0
         # The time in seconds we were blocked by the rate limiter since the last status
@@ -343,13 +350,73 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
-
-        # LogMatcherStatus objects for each of the log paths being watched for copying.
-        self.log_matchers = []
 
         self.health_check_result = None
+
+        # LogProcessorStatus objects for each of the log files being processed by worker.
+        self.log_processors = []  # type: List[LogProcessorStatus]
+
+
+class ApiKeyWorkerPoolStatus(BaseAgentStatus):
+    def __init__(self):
+
+        self.api_key_id = None
+        # The total number of bytes successfully uploaded by all workers in this worker pool.
+        self.total_bytes_uploaded = 0  # type: int
+        # The most recent success time from all workers in this worker pool.
+        self.last_success_time = None  # type: Optional[float]
+        # The most recent request time from all workers in the worker pool.
+        self.last_attempt_time = None  # type: Optional[float]
+        # The overall size of the last requests from all workers in the worker pool.
+        self.last_attempt_requests_overall_size = 0  # type: int
+
+        # The flag indicates whether all last requests from all workers are successful.
+        self.all_responses_successful = None  # type: Optional[bool]
+
+        # The flag indicates whether all workers has a good health check result.
+        self.all_health_checks_good = None  # type: Optional[bool]
+
+        # The total number of failed copy requests.
+        self.total_errors = 0  # type: int
+
+        # the status objects from all workers in the worker pool.
+        self.workers = []  # type: List[CopyingManagerWorkerStatus]
+
+
+class CopyingManagerStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying components."""
+
+    def __init__(self):
+        # The total number of bytes successfully uploaded by all workers.
+        self.total_bytes_uploaded = 0  # type: int
+        # The overall text message with an information about recent responses in all workers.
+        # For example it equals to "All successful" in case if every request is successful
+        self.last_responses_status_info = None  # type: Optional[six.text_type]
+        # The total number of failed copy requests.
+        self.total_errors = 0  # type: int
+        # The overall text message with an information about the health check.
+        # For example it equals to "Good" if everything is ok.
+        # NOTE: this variable will have a value only if all health checks from all workers
+        # and the health check of the copying manager itself are determined.
+        # In other case this variable is None.
+        self.health_check_result = None  # type: Optional[six.text_type]
+
+        # How many times the copying manager scanned the file system for new files.
+        self.total_scan_iterations = 0  # type: int
+
+        # status objects for all log matchers.
+        self.log_matchers = []  # type: List[LogMatcherStatus]
+
+        self.api_key_worker_pools = []  # type: List[ApiKeyWorkerPoolStatus]
+
+        # overall stat from workers.
+        self.total_rate_limited_time = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+        self.rate_limited_time_since_last_status = 0
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -396,6 +463,9 @@ class LogProcessorStatus(BaseAgentStatus):
         self.total_lines_dropped_by_sampling = 0
         # The total number of redactions applied to the log lines copied to the server.
         self.total_redactions = 0
+
+        # the id  of the instance of the CopyingManagerWorker class.
+        self.worker_id = None
 
 
 class MonitorManagerStatus(BaseAgentStatus):
@@ -549,7 +619,136 @@ def report_status(output, status, current_time):
         )
 
 
+def _indent_print(str, file, indent=4):
+    # type: (six.text_type, TextIO, int) -> None
+    """
+    Helper function to print with indents.
+    :param str: Original string.
+    :param file: Output file.
+    :param indent: Spaces to indent.
+    """
+    file.write(" " * indent)
+    print(str, file=file)
+
+
+def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output):
+    """
+    Print statistics of the api key worker pool..
+    :param api_key_stats: Statistics object.
+    :param agent_log_file_path: Pth to the agent log file.
+    :param is_single: If True, then it meant that this statistics object is only one,
+     so we do not show some unneeded elements.
+    :param output: Output file-like object.
+    :return:
+    """
+    if is_single:
+        indent = 0
+    else:
+        indent = 4
+    if not is_single:
+        _indent_print(
+            "Bytes uploaded successfully:               %ld"
+            % api_key_stats.total_bytes_uploaded,
+            file=output,
+        )
+    _indent_print(
+        "Last successful communication with Scalyr: %s"
+        % scalyr_util.format_time(api_key_stats.last_success_time),
+        file=output,
+        indent=indent,
+    )
+    _indent_print(
+        "Last attempt:                              %s"
+        % scalyr_util.format_time(api_key_stats.last_attempt_time),
+        file=output,
+        indent=indent,
+    )
+    if api_key_stats.last_attempt_requests_overall_size:
+        _indent_print(
+            "Last copy requests size:                   %ld"
+            % api_key_stats.last_attempt_requests_overall_size,
+            file=output,
+            indent=indent,
+        )
+
+    # NOTE: this should be exactly False, we skip it in case of None.
+    if api_key_stats.all_responses_successful is False:
+        _indent_print("Failed copy response statuses:", file=output, indent=indent)
+        workers = list(
+            sorted(api_key_stats.workers, key=operator.attrgetter("worker_id"))
+        )
+        for worker_status in workers:
+            if worker_status.last_response_status == "success":
+                # show only unsuccessful requests.
+                continue
+            _indent_print(
+                "Worker %s:" % (worker_status.worker_id,),
+                file=output,
+                indent=indent + 4,
+            )
+            _indent_print(
+                "Last copy response status:         %s"
+                % worker_status.last_response_status,
+                file=output,
+                indent=indent + 8,
+            )
+
+            _indent_print(
+                "Last copy response:                %s"
+                % scalyr_util.remove_newlines_and_truncate(
+                    worker_status.last_response, 1000
+                ),
+                file=output,
+                indent=indent + 8,
+            )
+
+    # NOTE: this should be exactly False, we skip if in case of None.
+    if api_key_stats.all_health_checks_good is False:
+        _indent_print("Failed health checks:", file=output, indent=indent)
+
+        for worker_status in api_key_stats.workers:
+            if worker_status.health_check_result == "Good":
+                # show only unsuccessful requests.
+                continue
+            _indent_print(
+                "Worker %s:" % (worker_status.worker_id,),
+                file=output,
+                indent=indent + 4,
+            )
+            _indent_print(
+                "Last copy response status:         %s"
+                % worker_status.health_check_result,
+                file=output,
+                indent=indent + 8,
+            )
+
+    if not is_single:
+        if api_key_stats.total_errors > 0:
+            _indent_print(
+                "Total responses with errors:               %d (see '%s' for details)"
+                % (api_key_stats.total_errors, agent_log_file_path,),
+                file=output,
+                indent=indent,
+            )
+
+    worker_pool_files = []
+
+    for worker_status in api_key_stats.workers:
+        for log_processor in worker_status.log_processors:
+            worker_pool_files.append(log_processor.log_path)
+
+    if not is_single:
+        if worker_pool_files:
+            _indent_print("Files:", file=output, indent=indent)
+            worker_pool_files.sort()
+            for log_path in worker_pool_files:
+                _indent_print("%s" % log_path, file=output, indent=indent + 4)
+
+    print("", file=output)
+
+
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
+    # type: (TextIO, CopyingManagerStatus, six.text_type, float) -> None
     print("Log transmission:", file=output)
     print("=================", file=output)
     print("", file=output)
@@ -565,54 +764,41 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         % manager_status.total_bytes_uploaded,
         file=output,
     )
-    print(
-        "Last successful communication with Scalyr: %s"
-        % scalyr_util.format_time(manager_status.last_success_time),
-        file=output,
-    )
-    print(
-        "Last attempt:                              %s"
-        % scalyr_util.format_time(manager_status.last_attempt_time),
-        file=output,
-    )
-    if manager_status.last_attempt_size is not None:
+    if manager_status.last_responses_status_info is not None:
         print(
-            "Last copy request size:                    %ld"
-            % manager_status.last_attempt_size,
+            "Last requests:                             %s"
+            % manager_status.last_responses_status_info,
             file=output,
         )
-    if manager_status.last_response is not None:
-        print(
-            "Last copy response size:                   %ld"
-            % len(manager_status.last_response),
-            file=output,
-        )
-        print(
-            "Last copy response status:                 %s"
-            % manager_status.last_response_status,
-            file=output,
-        )
-        if manager_status.last_response_status != "success":
-            print(
-                "Last copy response:                        %s"
-                % scalyr_util.remove_newlines_and_truncate(
-                    manager_status.last_response, 1000
-                ),
-                file=output,
-            )
-    if manager_status.total_errors > 0:
-        print(
-            "Total responses with errors:               %d (see '%s' for details)"
-            % (manager_status.total_errors, agent_log_file_path,),
-            file=output,
-        )
-    if manager_status.health_check_result:
+
+    if manager_status.health_check_result is not None:
         print(
             "Health check:                              %s"
             % manager_status.health_check_result,
             file=output,
         )
-    print("", file=output)
+
+    if manager_status.total_errors:
+        print(
+            "Total responses with errors:               %d (see '%s' for details)"
+            % (manager_status.total_errors, agent_log_file_path,),
+            file=output,
+        )
+
+    is_single_api_key = len(manager_status.api_key_worker_pools) == 1
+
+    if not is_single_api_key:
+        print("", file=output)
+
+        print("Uploads statistics by API key:", file=output)
+        print("-------------------", file=output)
+
+    for worker_pool in manager_status.api_key_worker_pools:
+        if not is_single_api_key:
+            print("Api key ID: %s" % worker_pool.api_key_id, file=output)
+        __print_api_key_stats(
+            worker_pool, agent_log_file_path, is_single_api_key, output
+        )
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

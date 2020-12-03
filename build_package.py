@@ -898,7 +898,7 @@ def build_tarball_package(variant, version, no_versioned_file_name):
 
     # Create a file named packageless.  This signals to the agent that
     # this a tarball install instead of an RPM/Debian install, which changes
-    # the default paths for th econfig, logs, data, etc directories.  See
+    # the default paths for the config, logs, data, etc directories.  See
     # configuration.py.
     write_to_file("1", "scalyr-agent-2/packageless")
 

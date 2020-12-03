@@ -23,8 +23,13 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import print_function
+
 import sys
+
 import six
+
+from scalyr_agent.util import match_glob
 
 __author__ = "czerwin@scalyr.com"
 
@@ -56,12 +61,6 @@ from io import BytesIO
 from os import listdir
 from os.path import isfile, join
 
-if sys.version_info < (3, 5):
-    # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
-    import glob2  # pylint: disable=import-error
-else:
-    # Python 3.5 and higher supports `**`
-    import glob
 
 # The maximum allowed size for a line when reading from a log file.
 # We do not strictly enforce this -- some lines returned by LogFileIterator may be
@@ -125,20 +124,6 @@ def _parse_cri_log(line):
     line = line[index + 1 :]
 
     return timestamp, stream, tags, line
-
-
-def _match_glob(pathname):
-    """Performs a glob match for the given pathname glob pattern, returning the list of matching
-    files.
-
-    :param pathname: The glob pattern
-    :return: The list of matching paths
-    """
-    if sys.version_info >= (3, 5):
-        result = glob.glob(pathname, recursive=True)
-    else:
-        result = glob2.glob(pathname)
-    return result
 
 
 class LogLine(object):
@@ -2234,13 +2219,7 @@ class LogFileProcessor(object):
     def set_inactive(self):
         self.__is_active = False
 
-    @property
-    def log_path(self):
-        """
-        @return:  The log file path
-        @rtype: str
-        """
-        # TODO:  Change this to just a regular property?
+    def get_log_path(self):
         return self.__path
 
     # Success results for the callback returned by perform_processing.
@@ -3145,7 +3124,7 @@ class LogMatcher(object):
 
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
-        self.__processors = []
+        self._processors = []
         # The lock that protects the __processor, __is_finishing and __last_check vars.
         self.__lock = threading.Lock()
 
@@ -3162,8 +3141,12 @@ class LogMatcher(object):
 
     def set_new_scalyr_client(self, new_scalyr_client):
         self.__new_scalyr_client = new_scalyr_client
-        for processor in self.__processors:
+        for processor in self._processors:
             processor.set_new_scalyr_client(new_scalyr_client)
+
+    @property
+    def log_entry_config(self):
+        return self.__log_entry_config
 
     def update_log_entry_config(self, log_entry_config):
         """
@@ -3205,11 +3188,11 @@ class LogMatcher(object):
         self.__lock.acquire()
         try:
             # get checkpoints and close all processors
-            for p in self.__processors:
-                result[p.log_path] = p.get_checkpoint()
+            for p in self._processors:
+                result[p.get_log_path()] = p.get_checkpoint()
                 p.close()
 
-            self.__processors = []
+            self._processors = []
         finally:
             self.__lock.release()
 
@@ -3247,7 +3230,7 @@ class LogMatcher(object):
 
             # set any existing processors to close immediately if immediately is True,
             # otherwise set them to close when they reach eof
-            for processor in self.__processors:
+            for processor in self._processors:
                 if immediately:
                     processor.close()
                 else:
@@ -3274,7 +3257,7 @@ class LogMatcher(object):
                 return False
 
             # check if all the processors are closed
-            for processor in self.__processors:
+            for processor in self._processors:
                 # the log matcher is not finished if any processors are still open
                 if not processor.is_closed():
                     return False
@@ -3297,7 +3280,7 @@ class LogMatcher(object):
             result.is_glob = self.__is_glob
             result.last_check_time = self.__last_check
 
-            for processor in self.__processors:
+            for processor in self._processors:
                 result.log_processors_status.append(processor.generate_status())
 
             return result
@@ -3305,7 +3288,11 @@ class LogMatcher(object):
             self.__lock.release()
 
     def find_matches(
-        self, existing_processors, previous_state, copy_at_index_zero=False
+        self,
+        existing_processors,
+        previous_state,
+        copy_at_index_zero=False,
+        create_log_processor=LogFileProcessor,
     ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
@@ -3318,6 +3305,7 @@ class LogMatcher(object):
             then if copy_at_index_zero is True, the file will be processed from the first byte in the file.  Otherwise,
             the processing will skip over all bytes currently in the file and only process bytes added after this
             point.
+        @param create_log_processor:  Callable which creates and returns a new instance of the LogFileProcessor.
 
         @type existing_processors: dict of str to LogFileProcessor
         @type previous_state: dict of str to dict
@@ -3358,7 +3346,7 @@ class LogMatcher(object):
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
             # match_glob is sorted here because otherwise it returns non-deterministic results
-            for matched_file in sorted(_match_glob(self.__log_entry_config["path"])):
+            for matched_file in sorted(match_glob(self.__log_entry_config["path"])):
                 skip = False
                 # check to see if this file matches any of the exclude globs
                 for exclude_glob in self.__log_entry_config["exclude"]:
@@ -3412,7 +3400,7 @@ class LogMatcher(object):
                             log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(
+                    new_processor = create_log_processor(
                         matched_file,
                         self.__overall_config,
                         self.__log_entry_config,
@@ -3436,7 +3424,7 @@ class LogMatcher(object):
 
             self.__lock.acquire()
             for new_processor in result:
-                self.__processors.append(new_processor)
+                self._processors.append(new_processor)
                 # If the log matcher is finishing, then any new processors should be set to close when
                 # they reach their eof.  This catches the situation where `finish` was called on the log matcher
                 # but the log matcher didn't have any processors yet, because `find_matches` hadn't been called
@@ -3564,10 +3552,10 @@ class LogMatcher(object):
         You can only call this if you hold self.__lock.
         """
         new_list = []
-        for processor in self.__processors:
+        for processor in self._processors:
             if not processor.is_closed():
                 new_list.append(processor)
-        self.__processors = new_list
+        self._processors = new_list
 
 
 class FileSystem(object):

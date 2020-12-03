@@ -34,6 +34,7 @@ import sys
 import time
 import io
 import ssl
+import os
 
 import six
 from six.moves import map
@@ -42,6 +43,7 @@ import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
 
+from scalyr_agent import __scalyr__
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
@@ -71,8 +73,99 @@ def _set_last_timestamp(val):
     __last_time_stamp__ = val
 
 
+def create_new_client(config, api_key=None):
+    result = None
+    if config.use_new_ingestion:
+        from scalyr_agent.scalyr_client import NewScalyrClientSession
+
+        result = NewScalyrClientSession(config, api_key=api_key)
+    return result
+
+
+def verify_server_certificate(config):
+    """
+    Verify the Scalyr server certificates.
+    :param config:
+    :return:
+    """
+    is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
+    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
+        __scalyr__.DEV_INSTALL,
+        __scalyr__.MSI_INSTALL,
+    ]
+
+    ca_file = config.ca_cert_path
+    intermediate_certs_file = config.intermediate_certs_path
+
+    # Validate provided CA cert file and intermediate cert file exists. If they don't
+    # exist, throw and fail early and loudly
+    if not is_dev_install and not os.path.isfile(ca_file):
+        raise ValueError(
+            'Invalid path "%s" specified for the "ca_cert_path" config '
+            "option: file does not exist" % (ca_file)
+        )
+
+    # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+    # under the MSI / Windows install
+    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
+        raise ValueError(
+            'Invalid path "%s" specified for the '
+            '"intermediate_certs_path" config '
+            "option: file does not exist" % (intermediate_certs_file)
+        )
+
+
+def create_client(config, quiet=False, api_key=None):
+    """Creates and returns a new client to the Scalyr servers.
+
+    @param quiet: If true, only errors should be written to stdout.
+    @:param api_key: The Scalyr API key. If None, use default api_key from config
+    @type quiet: bool
+
+    @return: The client to use for sending requests to Scalyr, using the server address and API write logs
+        key in the configuration file.
+    @rtype: ScalyrClientSession
+    """
+    if config.verify_server_certificate:
+        verify_server_certificate(config)
+        ca_file = config.ca_cert_path
+        intermediate_certs_file = config.intermediate_certs_path
+    else:
+        ca_file = None
+        intermediate_certs_file = None
+    use_requests_lib = config.use_requests_lib
+    return ScalyrClientSession(
+        config.scalyr_server,
+        api_key or config.api_key,
+        __scalyr__.SCALYR_VERSION,
+        quiet=quiet,
+        request_deadline=config.request_deadline,
+        ca_file=ca_file,
+        intermediate_certs_file=intermediate_certs_file,
+        use_requests_lib=use_requests_lib,
+        compression_type=config.compression_type,
+        compression_level=config.compression_level,
+        proxies=config.network_proxies,
+        disable_send_requests=config.disable_send_requests,
+        disable_logfile_addevents_format=config.disable_logfile_addevents_format,
+        enforce_monotonic_timestamps=config.enforce_monotonic_timestamps,
+    )
+
+
+class ScalyrClientSessionStatus(object):
+    def __init__(self):
+        self.total_requests_sent = None
+        self.total_requests_failed = None
+        self.total_request_bytes_sent = None
+        self.total_compressed_request_bytes_sent = None
+        self.total_response_bytes_received = None
+        self.total_request_latency_secs = None
+        self.total_connections_created = None
+        self.total_compression_time = None
+
+
 class NewScalyrClientSession(object):
-    def __init__(self, configuration):
+    def __init__(self, configuration, api_key=None):
         if configuration.use_new_ingestion:
             from scalyr_ingestion_client.session import (  # pylint: disable=import-error
                 Session,
@@ -88,7 +181,7 @@ class NewScalyrClientSession(object):
                 service_address=configuration.new_ingestion_bootstrap_address.split(
                     ":"
                 ),
-                api_token=str(configuration.api_key),
+                api_token=str(api_key or configuration.api_key),
                 cert_path=str(configuration.ca_cert_path),
                 use_tls=configuration.new_ingestion_use_tls,
             )
@@ -269,6 +362,21 @@ class ScalyrClientSession(object):
 
         # whether or not to monotonically increase event timestamps within the same session
         self.__enforce_monotonic_timestamps = enforce_monotonic_timestamps
+
+    def generate_status(self):
+        # type: () -> ScalyrClientSessionStatus
+        result = ScalyrClientSessionStatus()
+        result.total_requests_sent = self.total_requests_sent
+        result.total_requests_failed = self.total_requests_failed
+        result.total_request_bytes_sent = self.total_request_bytes_sent
+        result.total_compressed_request_bytes_sent = (
+            self.total_compressed_request_bytes_sent
+        )
+        result.total_response_bytes_received = self.total_response_bytes_received
+        result.total_request_latency_secs = self.total_request_latency_secs
+        result.total_connections_created = self.total_connections_created
+        result.total_compression_time = self.total_compression_time
+        return result
 
     def augment_user_agent(self, fragments):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
