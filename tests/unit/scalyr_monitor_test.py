@@ -27,7 +27,8 @@ from scalyr_agent.scalyr_monitor import (
     BadMonitorConfiguration,
     define_config_option,
     ScalyrMonitor,
-    MAX_JITTER_MS,
+    MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS,
+    MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS,
 )
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -393,7 +394,7 @@ class MonitorConfigTest(ScalyrTestCase):
             ArrayOfStrings(),
         )
 
-    def test_get_sleep_delay_jitter_disabled(self):
+    def test_get_initial_sleep_delay_jitter_disabled(self):
         logger = mock.Mock()
 
         # 1. Default value is used
@@ -409,8 +410,8 @@ class MonitorConfigTest(ScalyrTestCase):
             global_config=global_config,
         )
 
-        sleep_delay = monitor._get_sleep_delay()
-        self.assertEqual(sleep_delay, ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS)
+        sleep_delay = monitor._get_initial_sleep_delay()
+        self.assertEqual(sleep_delay, 0)
 
         # 2. Value is overridden on per monitor basis
         monitor_config = MonitorConfig(
@@ -426,49 +427,10 @@ class MonitorConfigTest(ScalyrTestCase):
             global_config=global_config,
         )
 
-        sleep_delay = monitor._get_sleep_delay()
-        self.assertEqual(sleep_delay, 10)
+        sleep_delay = monitor._get_initial_sleep_delay()
+        self.assertEqual(sleep_delay, 0)
 
-    def test_get_sleep_delay_with_adjust_sleep_by_gather_time(self):
-        # Even if jitter is enabled, it should not be used if _adjust_sleep_by_gather_time is True
-        logger = mock.Mock()
-
-        # 1. Default value is used
-        monitor_config = MonitorConfig(
-            {"module": "test_module"}, monitor_module="test_monitor"
-        )
-        global_config = mock.Mock()
-        global_config.global_monitor_sample_interval_enable_jitter = True
-        monitor = ScalyrMonitor(
-            monitor_config=monitor_config,
-            logger=logger,
-            sample_interval_secs=None,
-            global_config=global_config,
-        )
-        monitor._adjust_sleep_by_gather_time = True
-
-        sleep_delay = monitor._get_sleep_delay()
-        self.assertEqual(sleep_delay, ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS)
-
-        # 2. Value is overridden on per monitor basis
-        monitor_config = MonitorConfig(
-            {"module": "test_module", "sample_interval": 10},
-            monitor_module="test_monitor",
-        )
-        global_config = mock.Mock()
-        global_config.global_monitor_sample_interval_enable_jitter = True
-        monitor = ScalyrMonitor(
-            monitor_config=monitor_config,
-            logger=logger,
-            sample_interval_secs=None,
-            global_config=global_config,
-        )
-        monitor._adjust_sleep_by_gather_time = True
-
-        sleep_delay = monitor._get_sleep_delay()
-        self.assertEqual(sleep_delay, 10)
-
-    def test_get_sleep_delay_with_random_jitter_enabled(self):
+    def test_get_initial_sleep_delay_with_random_jitter_enabled(self):
         logger = mock.Mock()
 
         # 1. Default value is used
@@ -486,16 +448,13 @@ class MonitorConfigTest(ScalyrTestCase):
         )
 
         for i in range(0, 100):
-            sleep_delay = monitor._get_sleep_delay()
+            sleep_delay = monitor._get_initial_sleep_delay()
 
-            min_jitter = round(monitor_sample_interval / 10)
-            max_jitter = round(monitor_sample_interval / 10) * 5
+            min_jitter = round(monitor_sample_interval / 10) * 2
+            max_jitter = round(monitor_sample_interval / 10) * 8
 
             self.assertFalse(sleep_delay == monitor_sample_interval)
-            self.assertTrue(
-                sleep_delay >= monitor_sample_interval + min_jitter
-                and sleep_delay <= monitor_sample_interval + max_jitter
-            )
+            self.assertTrue(sleep_delay >= min_jitter and sleep_delay <= max_jitter)
 
         # 2. Value is overridden on per monitor basis
         monitor_sample_interval = 10
@@ -513,21 +472,18 @@ class MonitorConfigTest(ScalyrTestCase):
         )
 
         for i in range(0, 100):
-            sleep_delay = monitor._get_sleep_delay()
+            sleep_delay = monitor._get_initial_sleep_delay()
 
-            min_jitter = round(monitor_sample_interval / 10)
-            max_jitter = round(monitor_sample_interval / 10) * 5
+            min_jitter = round(monitor_sample_interval / 10) * 2
+            max_jitter = round(monitor_sample_interval / 10) * 8
 
             self.assertFalse(sleep_delay == monitor_sample_interval)
-            self.assertTrue(
-                sleep_delay >= monitor_sample_interval + min_jitter
-                and sleep_delay <= monitor_sample_interval + max_jitter
-            )
+            self.assertTrue(sleep_delay >= min_jitter and sleep_delay <= max_jitter)
 
-        # 3. Verify there is an upper bound of jitter of 30 seconds
-        monitor_sample_interval = 100
+        # 3. Verify there is an upper bound of 40 seconds
+        monitor_sample_interval = 1000
         monitor_config = MonitorConfig(
-            {"module": "test_module", "sample_interval": 100},
+            {"module": "test_module", "sample_interval": 1000},
             monitor_module="test_monitor",
         )
         global_config = mock.Mock()
@@ -540,14 +496,11 @@ class MonitorConfigTest(ScalyrTestCase):
         )
 
         for i in range(0, 100):
-            sleep_delay = monitor._get_sleep_delay()
-            min_jitter = round(monitor_sample_interval / 10)
-            max_jitter = round(MAX_JITTER_MS / 1000)
+            sleep_delay = monitor._get_initial_sleep_delay()
+            min_jitter = MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS
+            max_jitter = MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS
 
-            self.assertTrue(
-                sleep_delay >= monitor_sample_interval + min_jitter
-                and sleep_delay <= monitor_sample_interval + max_jitter
-            )
+            self.assertTrue(sleep_delay >= min_jitter and sleep_delay <= max_jitter)
 
     def get(
         self,

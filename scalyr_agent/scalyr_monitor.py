@@ -50,10 +50,14 @@ from scalyr_agent.util import StoppableThread
 
 log = scalyr_logging.getLogger(__name__)
 
-# Maximum value we will use for random jitter which is added to the check gather sample interval.
-# This way we guard against potentially large jitter which may get added to gather sample intervals
-# for monitors which have a very large gather sample interval defined.
-MAX_JITTER_MS = 30 * 1000
+# Maximum value we will use for random sleep before first sample gathering.
+# This way we guard against a potentially very large sleep which would be used for monitors
+# configured with very large sample intervals.
+MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS = 40
+
+# Minimum value for initial sample gather sleep for monitors which use very large sample gather
+# interval.
+MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS = 15
 
 
 class ScalyrMonitor(StoppableThread):
@@ -256,32 +260,39 @@ class ScalyrMonitor(StoppableThread):
         """
         pass
 
-    def _get_sleep_delay(self):
+    def _get_initial_sleep_delay(self):
         # type: () -> int
         """
-        Return sleep interval for this monitor. This interval is based on based on the configured
-        monitor sample interval.
+        Return initial sleep delay for this monitor.
 
-        To spread the load more evenly when running multiple monitors on lower powered devices we
-        also support adding random jitter to each monitor sample interval
+        We sleep this number of seconds before first sample gathering.
+
+        By default (on agent start up and when reloading the config and restarting the monitors),
+        all the monitors are started at the same time, which means that all the monitors with the
+        same sample gather interval will run at the same time.
+
+        To avoid this and potential larger load spike when running many monitors on lower powered
+        devices, we sleep random number of seconds before first sample gather interval for each
+        monitor.
+
+        This way we spread a potential short load spike during sample gathering across a longer time
+        frame.
         """
-        sample_interval = self._sample_interval_secs
+        if not self._global_config.global_monitor_sample_interval_enable_jitter:
+            return 0
 
-        if (
-            self._global_config.global_monitor_sample_interval_enable_jitter
-            and not self._adjust_sleep_by_gather_time
-        ):
-            # min jitter is 1/10 of the sample interval and max is 5/10
-            min_jitter_ms = round(sample_interval / 10) * 1000
-            max_jitter_ms = round((sample_interval / 10) * 5) * 1000
-            random_jitter = min(
-                random.randint(min_jitter_ms, max_jitter_ms), MAX_JITTER_MS
-            )
+        sample_interval_secs = self._sample_interval_secs
 
-            sample_interval = round(sample_interval + int(random_jitter / 1000))
-            return sample_interval
+        if sample_interval_secs >= MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS:
+            min_jitter_secs = MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS
+            max_jitter_secs = MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS
         else:
-            return sample_interval
+            # min sleep time is 2/10 of the sample interval and max is 8/10
+            min_jitter_secs = round((sample_interval_secs / 10) * 2)
+            max_jitter_secs = round((sample_interval_secs / 10) * 8)
+
+        random_jitter_secs = random.randint(min_jitter_secs, max_jitter_secs)
+        return random_jitter_secs
 
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
@@ -303,7 +314,12 @@ class ScalyrMonitor(StoppableThread):
         # noinspection PyBroadException
         try:
             while not self._is_thread_stopped():
-                sample_interval = self._get_sleep_delay()
+                # To avoid all the monitors with the same sample interval running at the same time,
+                # we add random sleep delay before the first same gathering.
+                initial_sleep_delay = self._get_initial_sleep_delay()
+                self._sleep_but_awaken_if_stopped(initial_sleep_delay)
+
+                sample_interval = self._sample_interval_secs
 
                 # noinspection PyBroadException
                 adjustment = 0
