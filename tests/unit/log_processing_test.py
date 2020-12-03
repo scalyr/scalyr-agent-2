@@ -2688,8 +2688,8 @@ class TestLogMatcher(ScalyrTestCase):
             )
             processors = matcher.find_matches(dict(), dict())
             self.assertEqual(len(processors), 2)
-            self.assertEqual(processors[0].log_path, self.__path_three)
-            self.assertEqual(processors[1].log_path, self.__path_four)
+            self.assertEqual(processors[0].get_log_path(), self.__path_three)
+            self.assertEqual(processors[1].get_log_path(), self.__path_four)
 
             self._close_processors(processors)
 

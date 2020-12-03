@@ -27,14 +27,24 @@ if False:  # NOSONAR
     from typing import Tuple
     from typing import Callable
     from typing import Optional
+    from typing import Any
     from typing import List
+    from typing import IO
 
 import codecs
 import sys
 import ssl
 import locale
+import collections
 import subprocess
 from io import open
+
+if sys.version_info < (3, 5):
+    # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
+    import glob2  # pylint: disable=import-error
+else:
+    # Python 3.5 and higher supports `**`
+    import glob
 
 import six
 import functools
@@ -215,11 +225,17 @@ def get_json_implementation(lib_name):
             :return:
             """
 
+            def default(obj):
+                # orjson can not serialize OrderedDict, so convert it to a regular dict.
+                if isinstance(obj, collections.OrderedDict):
+                    return dict(obj)
+                raise TypeError
+
             def dump():
                 if fp is not None:
-                    return orjson.dump(obj, fp)
+                    return orjson.dump(obj, fp, default=default)
                 else:
-                    return orjson.dumps(obj)
+                    return orjson.dumps(obj, default=default)
 
             try:
                 return dump()
@@ -422,6 +438,7 @@ def value_to_bool(value):
 
 
 def _read_file_as_json(file_path, json_parser, strict_utf8=False):
+    # type: (six.text_type, Callable, bool) -> Any
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
@@ -434,7 +451,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
-    f = None
+    f = None  # type: Optional[IO]
     try:
         try:
             if not os.path.isfile(file_path):
@@ -483,6 +500,7 @@ def read_config_file_as_json(file_path):
 
 
 def read_file_as_json(file_path, strict_utf8=False):
+    # type: (six.text_type, bool) -> Any
     """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
     `dict`s, `list`s and primitive types.
 
@@ -503,9 +521,9 @@ def read_file_as_json(file_path, strict_utf8=False):
     def parse_standard_json(text):
         try:
             return json_decode(text)
-        except ValueError as e:
+        except Exception as err:
             raise JsonParseException(
-                "JSON parsing failed due to: %s" % six.text_type(e)
+                "JSON parsing failed due to: %s" % six.text_type(err)
             )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
@@ -2398,3 +2416,44 @@ class HistogramTracker(object):
             self.max(),
             self.estimate_median(),
         )
+
+
+def max_ignore_none(*args, **kwargs):
+    """
+    The 'max' function which ignores None values.
+    All arguments directly passed to the original 'max' function.
+    """
+
+    # get the parameter 'key'
+    # python2 does not allow keyword arguments after '*args'
+    key = kwargs.get("key")
+
+    if len(args) == 1:
+        values = args[0]
+    else:
+        values = args
+    values = [v for v in values if v is not None]
+
+    # max function does not accept key as 'None', so we must not pass it in this case.
+    if key:
+        return max(values, key=key)
+    else:
+        return max(values)
+
+
+def match_glob(pathname):
+    # type: (six.text_type) -> List[six.text_type]
+    """
+    Performs a glob match for the given pathname glob pattern, returning the list of matching
+    files. This is mostly done for the compatibility reason
+    because of the standard glob library on python <3.5, which does not support recursive globs
+
+    :param pathname: The glob pattern
+    :return: The list of matching paths
+    """
+    if sys.version_info >= (3, 5):
+        result = glob.glob(pathname, recursive=True)
+    else:
+        # use the third party glob library to handle a recursive glob.
+        result = glob2.glob(pathname)
+    return result
