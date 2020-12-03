@@ -324,7 +324,7 @@ class AgentRunner(object):
             process.wait()
             self._agent_process.wait()
 
-            # Print any output produced by the agent before working which may not end up in the logs
+            # Print any output produced by the agent before forking which may not end up in the logs
             if self._agent_process.stdout and self._agent_process.stderr:
                 stdout = self._agent_process.stdout.read().decode("utf-8")
                 stderr = self._agent_process.stderr.read().decode("utf-8")
@@ -406,6 +406,9 @@ class AgentRunner(object):
             "api_keys": [{"workers": self._workers_count}],
             "monitors": [],
             "use_multiprocess_copying_workers": self._workers_type == "process",
+            # NOTE: We disable this functionality so tests finish faster and we can use lower
+            # timeout
+            "global_monitor_sample_interval_enable_jitter": False,
         }
 
         if self._enable_debug_log:
