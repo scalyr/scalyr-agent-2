@@ -1298,6 +1298,13 @@ class Configuration(object):
         return self.__get_config().get_float("global_monitor_sample_interval")
 
     @property
+    def global_monitor_sample_interval_enable_jitter(self):
+        """Returns the configuration value for 'global_monitor_sample_interval_enable_jitter'."""
+        return self.__get_config().get_bool(
+            "global_monitor_sample_interval_enable_jitter"
+        )
+
+    @property
     def full_checkpoint_interval(self):
         """Returns the configuration value for 'full_checkpoint_interval_in_seconds'."""
         return self.__get_config().get_int("full_checkpoint_interval_in_seconds")
@@ -1785,6 +1792,14 @@ class Configuration(object):
             config,
             "global_monitor_sample_interval",
             30.0,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "global_monitor_sample_interval_enable_jitter",
+            True,
             description,
             apply_defaults,
             env_aware=True,
