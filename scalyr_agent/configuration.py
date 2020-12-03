@@ -1799,7 +1799,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "global_monitor_sample_interval_enable_jitter",
-            True,
+            False,
             description,
             apply_defaults,
             env_aware=True,
