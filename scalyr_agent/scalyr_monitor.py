@@ -313,12 +313,18 @@ class ScalyrMonitor(StoppableThread):
         """
         # noinspection PyBroadException
         try:
-            while not self._is_thread_stopped():
-                # To avoid all the monitors with the same sample interval running at the same time,
-                # we add random sleep delay before the first same gathering.
-                initial_sleep_delay = self._get_initial_sleep_delay()
-                self._sleep_but_awaken_if_stopped(initial_sleep_delay)
+            # To avoid all the monitors with the same sample interval running at the same time,
+            # we add random sleep delay before the first same gathering.
+            initial_sleep_delay = self._get_initial_sleep_delay()
 
+            if initial_sleep_delay >= 1:
+                self._sleep_but_awaken_if_stopped(initial_sleep_delay)
+                self._logger.debug(
+                    "Sleeping %s seconds before first sample gather interval"
+                    % (initial_sleep_delay)
+                )
+
+            while not self._is_thread_stopped():
                 sample_interval = self._sample_interval_secs
 
                 # noinspection PyBroadException

@@ -502,6 +502,88 @@ class MonitorConfigTest(ScalyrTestCase):
 
             self.assertTrue(sleep_delay >= min_jitter and sleep_delay <= max_jitter)
 
+    def test_monitor_run_random_initial_sleep_delay_disabled(self):
+        def make_mock_thread_is_stopped(monitor):
+            def mock_is_thread_stopped(*args, **kwargs):
+                if monitor.counter >= 3:
+                    return True
+
+                monitor.counter += 1
+                return False
+
+            return mock_is_thread_stopped
+
+        mock_sleep_but_awaken_if_stopped = mock.Mock()
+
+        mock_logger = mock.Mock()
+        mock_gather_sample = mock.Mock()
+        monitor_config = MonitorConfig(
+            {"module": "test_module", "sample_interval": 10},
+            monitor_module="test_monitor",
+        )
+        global_config = mock.Mock()
+        global_config.global_monitor_sample_interval_enable_jitter = False
+        monitor = ScalyrMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            sample_interval_secs=None,
+            global_config=global_config,
+        )
+        monitor.counter = 0
+        monitor._sleep_but_awaken_if_stopped = mock_sleep_but_awaken_if_stopped
+        monitor._is_thread_stopped = make_mock_thread_is_stopped(monitor)
+        monitor.gather_sample = mock_gather_sample
+
+        monitor.run()
+        self.assertEqual(monitor.counter, 3)
+        self.assertEqual(mock_sleep_but_awaken_if_stopped.call_count, 3)
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        # 1 call is for monitor has finished message
+        self.assertEqual(mock_logger.info.call_count, 1)
+        self.assertEqual(mock_logger.exception.call_count, 0)
+
+    def test_monitor_run_random_initial_sleep_delay_enabled(self):
+        def make_mock_thread_is_stopped(monitor):
+            def mock_is_thread_stopped(*args, **kwargs):
+                if monitor.counter >= 3:
+                    return True
+
+                monitor.counter += 1
+                return False
+
+            return mock_is_thread_stopped
+
+        mock_sleep_but_awaken_if_stopped = mock.Mock()
+
+        mock_logger = mock.Mock()
+        mock_gather_sample = mock.Mock()
+        monitor_config = MonitorConfig(
+            {"module": "test_module", "sample_interval": 10},
+            monitor_module="test_monitor",
+        )
+        global_config = mock.Mock()
+        global_config.global_monitor_sample_interval_enable_jitter = True
+        monitor = ScalyrMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            sample_interval_secs=None,
+            global_config=global_config,
+        )
+        monitor.counter = 0
+        monitor._sleep_but_awaken_if_stopped = mock_sleep_but_awaken_if_stopped
+        monitor._is_thread_stopped = make_mock_thread_is_stopped(monitor)
+        monitor.gather_sample = mock_gather_sample
+
+        monitor.run()
+        self.assertEqual(monitor.counter, 3)
+        # + 1 is for initial sleep delay before first sample gather interval
+        self.assertEqual(mock_sleep_but_awaken_if_stopped.call_count, 1 + 3)
+        # 1 call is to debug function when we are initially sleeping before the gather
+        self.assertEqual(mock_logger.debug.call_count, 1)
+        # 1 call is for monitor has finished message
+        self.assertEqual(mock_logger.info.call_count, 1)
+        self.assertEqual(mock_logger.exception.call_count, 0)
+
     def get(
         self,
         original_value,
