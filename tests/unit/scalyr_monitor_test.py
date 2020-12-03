@@ -538,6 +538,7 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEqual(monitor.counter, 3)
         self.assertEqual(mock_sleep_but_awaken_if_stopped.call_count, 3)
         self.assertEqual(mock_logger.debug.call_count, 0)
+        # 1 call is for monitor has finished message
         self.assertEqual(mock_logger.info.call_count, 1)
         self.assertEqual(mock_logger.exception.call_count, 0)
 
@@ -577,7 +578,9 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEqual(monitor.counter, 3)
         # + 1 is for initial sleep delay before first sample gather interval
         self.assertEqual(mock_sleep_but_awaken_if_stopped.call_count, 1 + 3)
+        # 1 call is to debug function when we are initially sleeping before the gather
         self.assertEqual(mock_logger.debug.call_count, 1)
+        # 1 call is for monitor has finished message
         self.assertEqual(mock_logger.info.call_count, 1)
         self.assertEqual(mock_logger.exception.call_count, 0)
 

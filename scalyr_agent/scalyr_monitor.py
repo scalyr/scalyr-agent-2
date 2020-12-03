@@ -317,7 +317,7 @@ class ScalyrMonitor(StoppableThread):
             # we add random sleep delay before the first same gathering.
             initial_sleep_delay = self._get_initial_sleep_delay()
 
-            if initial_sleep_delay > 0:
+            if initial_sleep_delay >= 1:
                 self._sleep_but_awaken_if_stopped(initial_sleep_delay)
                 self._logger.debug(
                     "Sleeping %s seconds before first sample gather interval"
