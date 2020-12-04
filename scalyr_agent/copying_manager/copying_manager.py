@@ -58,7 +58,7 @@ import six
 log = scalyr_logging.getLogger(__name__)
 
 SCHEDULED_DELETION = "scheduled-deletion"
-CHECKPOINTS_MASTER_FILE_NAME = "checkpoints-master.json"
+CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
 
 
 def _accumulate_worker_stats(
@@ -770,8 +770,14 @@ class CopyingManager(StoppableThread, LogWatcher):
             # noinspection PyBroadException
             try:
                 # prepare and read checkpoints.
-                self.__consolidate_checkpoints()
-                checkpoints = self.__find_and_read_checkpoints()
+                # read all checkpoints from the manager's previous run and combine them into one mater file.
+                checkpoints = self.__find_and_read_checkpoints(warn_on_stale=True)
+                if checkpoints:
+                    self.__consolidate_checkpoints(checkpoints)
+                else:
+                    log.info(
+                        "No checkpoints were found. All logs will be copied starting at their current end"
+                    )
 
                 log.info("Starting copying manager workers.")
 
@@ -880,6 +886,17 @@ class CopyingManager(StoppableThread, LogWatcher):
             # stopping all workers.
             for worker_pool in self.__api_keys_worker_pools.values():
                 worker_pool.stop_workers()
+
+            checkpoints = self.__find_and_read_checkpoints()
+            if checkpoints:
+                log.info(
+                    "Save consolidated checkpoints into file %s"
+                    % os.path.join(
+                        self.__config.agent_data_path,
+                        CONSOLIDATED_CHECKPOINTS_FILE_NAME,
+                    )
+                )
+                self.__consolidate_checkpoints(checkpoints)
 
             if profiler is not None:
                 profiler.disable()
@@ -1316,42 +1333,40 @@ class CopyingManager(StoppableThread, LogWatcher):
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
 
-    def __consolidate_checkpoints(self):
+    def __consolidate_checkpoints(self, checkpoints):
+        # type: (Dict) -> None
         """
-        Combines all worker checkpoints that were left from the previous agent run.
-        It combines checkpoint files into one single file in order to
-        allow workers to rewrite the content of this files without losing any data.
+        Write the checkpoint state from all workers to a single consolidated file.
+        :param checkpoints: Dict with checkpoints.
         """
 
-        # read all checkpoints from the manager's previous run and combine them into one mater file.
-        checkpoints = self.__find_and_read_checkpoints()
-
-        master_checkpoints_path = os.path.join(
-            self.__config.agent_data_path, CHECKPOINTS_MASTER_FILE_NAME,
+        consolidated_checkpoints_path = os.path.join(
+            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
         write_checkpoint_state_to_file(
-            checkpoints, master_checkpoints_path, time.time()
+            checkpoints, consolidated_checkpoints_path, time.time()
         )
 
-        # clear the checkpoints folder by removing all worker checkpoint files.
-        # NOTE: we also look at the parent directory
-        # in case if there are checkpoint files from an older version of the agent.
+        # clear data folder by removing all worker checkpoint files.
         checkpoints_glob = os.path.join(
             self.__config.agent_data_path, "*checkpoints*.json"
         )
 
         for path in scalyr_util.match_glob(checkpoints_glob):
-            # do not delete master checkpoint file
-            if path == master_checkpoints_path:
+            # do not delete consolidated checkpoint file
+            if path == consolidated_checkpoints_path:
                 continue
             os.unlink(path)
 
-    def __find_and_read_checkpoints(self):
-        # type: () -> Dict
+    def __find_and_read_checkpoints(self, warn_on_stale=False):
+        # type: (bool) -> Dict
         """
+        # WARNING: Because this function is called on each iteration,
+          put the logging statements very carefully there, to prevent spamming.
         Find and read checkpoints that were previously written.
         During its work, the worker writes its own checkpoint files,
         the copying manager reads them and combines into one checkpoints dict.
+        : param warn_on_stale: If False do not log warning in case of stale checkpoint files.
         :return: Checkpoint state stored in dict.
         """
 
@@ -1364,17 +1379,26 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         for checkpoints_path in scalyr_util.match_glob(glob_path):
 
-            checkpoints = self.__read_checkpoint_state(checkpoints_path, current_time)
+            checkpoints = self.__read_checkpoint_state(checkpoints_path)
 
-            if checkpoints:
-                found_checkpoints.append(checkpoints)
+            if not checkpoints:
+                continue
+            if (
+                current_time - checkpoints["time"]
+                > self.__config.max_allowed_checkpoint_age
+            ):
+                # The checkpoint file is too stale. Skip it.
+                if warn_on_stale:
+                    log.warn(
+                        "The checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  The log files will "
+                        "be copied starting at their current end.",
+                        checkpoints_path,
+                        scalyr_util.format_time(checkpoints["time"]),
+                        error_code="staleCheckpointFile",
+                    )
+                continue
 
-        if len(found_checkpoints) == 0:
-            log.info(
-                "No checkpoints were found. All logs will be copied starting at their current end"
-            )
-
-            return {}
+            found_checkpoints.append(checkpoints)
 
         result = {}
         # merge checkpoints from  all workers to one checkpoint.
@@ -1388,8 +1412,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return result
 
-    def __read_checkpoint_state(self, full_checkpoints_path, current_time):
-        # type: (six.text_type, float) -> Optional[Dict]
+    def __read_checkpoint_state(self, full_checkpoints_path):
+        # type: (six.text_type) -> Optional[Dict]
         """Reads a single checkpoint state from the file on the disk and returns it.
 
         The checkpoint state maps each file path to the offset within that log file where we left off copying it.
@@ -1406,6 +1430,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             full_checkpoints = scalyr_util.read_file_as_json(
                 full_checkpoints_path, strict_utf8=True
             )
+
+            # the data in the file was somehow corrupted so it can not be read as dict.
+            if not isinstance(full_checkpoints, dict):
+                raise ValueError(
+                    "The checkpoint file data has to be de-serialized into dict."
+                )
 
             # get the path for the active checkpoints file
             parent_dir, filename = os.path.split(full_checkpoints_path)
@@ -1426,20 +1456,6 @@ class CopyingManager(StoppableThread, LogWatcher):
                     full_checkpoints["checkpoints"].update(
                         active_checkpoints["checkpoints"]
                     )
-
-            if (
-                current_time - full_checkpoints["time"]
-                > self.__config.max_allowed_checkpoint_age
-            ):
-                log.warn(
-                    "The worker checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  The log files will "
-                    "be copied starting at their current end.",
-                    full_checkpoints_path,
-                    scalyr_util.format_time(full_checkpoints["time"]),
-                    error_code="staleCheckpointFile",
-                )
-
-                return None
 
             return full_checkpoints
 

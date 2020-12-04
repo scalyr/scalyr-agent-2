@@ -430,6 +430,11 @@ class TestableCopyingManagerThreadedWorker(
         TestableCopyingManagerFlowController.__init__(self, configuration)
         self.__config = configuration
 
+        # the copying manager deletes worker checkpoint files when it stops.
+        # This variable preserves the content of thos files for testing.
+        self._saved_checkpoints = None
+        self.saved_active_checkpoints = None
+
     def _sleep_but_awaken_if_stopped(self, seconds):
         """Blocks the CopyingManagerWorker thread until the controller tells it to proceed.
         """
@@ -576,6 +581,19 @@ class TestableCopyingManagerThreadedWorker(
         )
         log_processor.close_at_eof()
 
+    def _write_full_checkpoint_state(self, current_time):
+        """
+        Override this method to preserve the data of the checkpoint files in case
+        if this function has been invoked before stop. (Copying manager removes
+        worker files when stops)
+        :param current_time:
+        :return:
+        """
+        super(TestableCopyingManagerThreadedWorker, self)._write_full_checkpoint_state(
+            current_time
+        )
+        self._saved_checkpoints, self.saved_active_checkpoints = self.get_checkpoints()
+
     # region Utility funtions
     def get_checkpoints_path(self):
         result = pathlib.Path(
@@ -590,8 +608,20 @@ class TestableCopyingManagerThreadedWorker(
         return result
 
     def get_checkpoints(self):
-        checkpoints = json.loads(self.get_checkpoints_path().read_text())
-        active_checkpoints = json.loads(self.get_active_checkpoints_path().read_text())
+        """
+        Get checkpoint states of the worker.
+        :return:
+        """
+        if self.get_checkpoints_path().exists():
+            checkpoints = json.loads(self.get_checkpoints_path().read_text())
+        else:
+            checkpoints = self._saved_checkpoints
+        if self.get_active_checkpoints_path().exists():
+            active_checkpoints = json.loads(
+                self.get_active_checkpoints_path().read_text()
+            )
+        else:
+            active_checkpoints = self.saved_active_checkpoints
 
         return checkpoints, active_checkpoints
 
@@ -860,18 +890,20 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         return result
 
     @property
-    def master_checkpoints_path(self):
+    def consolidated_checkpoints_path(self):
         # type: () -> pathlib.Path
-        return pathlib.Path(self.config.agent_data_path, "checkpoints-master.json")
+        return pathlib.Path(self.config.agent_data_path, "checkpoints.json")
 
     @property
-    def master_checkpoints(self):
+    def consolidated_checkpoints(self):
         # type: () -> Dict
-        return json.loads(self.master_checkpoints_path.read_text())
+        return json.loads(self.consolidated_checkpoints_path.read_text())
 
-    def write_master_checkpoints(self, checkpoints):
+    def write_consolidated_checkpoints(self, checkpoints):
         # type: (Dict) -> None
-        self.master_checkpoints_path.write_text(six.text_type(json.dumps(checkpoints)))
+        self.consolidated_checkpoints_path.write_text(
+            six.text_type(json.dumps(checkpoints))
+        )
 
     @property
     def matchers_log_processor_count(self):

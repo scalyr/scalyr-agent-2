@@ -655,7 +655,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                         current_time - last_full_checkpoint_write
                         > self.__config.full_checkpoint_interval
                     ):
-                        self.__write_full_checkpoint_state(current_time)
+                        self._write_full_checkpoint_state(current_time)
                         last_full_checkpoint_write = current_time
 
                     if pipeline_time < copying_params.current_sleep_interval:
@@ -678,7 +678,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 # stop worker's thread.
                 sys.exit(1)
         finally:
-            self.__write_full_checkpoint_state(current_time)
+            self._write_full_checkpoint_state(current_time)
             for processor in self.__log_processors:
                 processor.close()
 
@@ -1004,7 +1004,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         write_checkpoint_state_to_file(checkpoints, file_path, current_time)
 
-    def __write_full_checkpoint_state(self, current_time):
+    def _write_full_checkpoint_state(self, current_time):
         """Writes the full checkpont state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
