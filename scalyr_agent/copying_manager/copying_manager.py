@@ -30,8 +30,6 @@ if False:
     from typing import List
     from typing import Optional
     from typing import Tuple
-    from typing import Set
-    from typing import Any
 
 from scalyr_agent import (
     scalyr_logging as scalyr_logging,
@@ -48,7 +46,6 @@ from scalyr_agent.copying_manager.worker import (
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
-from scalyr_agent.util import max_ignore_none
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
@@ -59,28 +56,6 @@ log = scalyr_logging.getLogger(__name__)
 
 SCHEDULED_DELETION = "scheduled-deletion"
 CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
-
-
-def _accumulate_worker_stats(
-    stats, result_on_at_least_one_fail=False, result_on_all_succeed=True
-):
-    # type: (Set, Optional[Any], Optional[Any]) -> Optional[bool]
-    """
-    Gets a set of elements, where each element may be True, False or None and verifies them following the next logic:
-        - If there is at least one 'False' then the whole result is 'result_on_at_least_one_fail'.
-        - If there is at least one 'None' and no any 'False' then the whole result is 'None'.
-        - If all elements are 'True' then the result is 'result_on_all_succeed'
-    """
-    if False in stats:
-        # First of all we check for failed stats. If there is at least one, the whole result in failed too.
-        return result_on_at_least_one_fail
-    elif None in stats:
-        # Only if there are no failed stats...
-        # If there is at least one unknown response. the whole result in unknown too.
-        return None
-    else:
-        # all successful, the result is successful too.
-        return result_on_all_succeed
 
 
 class ApiKeyWorkerPool(object):
@@ -245,56 +220,6 @@ class ApiKeyWorkerPool(object):
         ]
 
         result.workers = worker_statuses
-
-        for status in worker_statuses:
-            # get the most recent time fields from workers.
-            if status.last_success_time:
-                result.last_success_time = max_ignore_none(
-                    result.last_success_time, status.last_success_time
-                )
-            if status.last_attempt_time:
-                result.last_attempt_time = max_ignore_none(
-                    result.last_attempt_time, status.last_attempt_time
-                )
-
-            # the next fields are a sum of the same fields from all workers.
-            if status.last_attempt_size:
-                result.last_attempt_requests_overall_size += status.last_attempt_size
-
-            result.total_bytes_uploaded += status.total_bytes_uploaded
-
-            result.total_errors += status.total_errors
-
-        # get overall information about last responses of all workers in the worker pool.
-        # making this as a set should help in further decision making process.
-        # we follow the next algorithm:
-        #   - if all request are successful, then the result is successful too.
-        #   - if at least one response status is still None, and other are successful, then the result is None too.
-        # In other words, we wait until all workers has gotten their first responses.
-        #   - if at least one response status is unsuccessful, then the result is unsuccessful too,
-        # and it does not matter if there are any unknown (None) values.
-
-        responses = set()
-        for s in worker_statuses:
-            if s.last_response_status is not None:
-                # compare each response status for "success" and store the boolean result.
-                responses.add(s.last_response_status == "success")
-            else:
-                #  we do not compare None values, they are stored as are.
-                # The None value says that not all workers have worked enough to get their first responses,
-                responses.add(None)
-
-        result.all_responses_successful = _accumulate_worker_stats(responses)
-
-        # do the same thing with health checks as we did with responses
-        health_checks = set()
-        for s in worker_statuses:
-            if s.health_check_result is not None:
-                health_checks.add(s.health_check_result == "Good")
-            else:
-                health_checks.add(None)
-
-        result.all_health_checks_good = _accumulate_worker_stats(health_checks)
 
         return result
 
@@ -934,101 +859,32 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             result.total_scan_iterations = self.__total_scan_iterations
 
-            # list with all possible health check error messages.
-            all_health_check_error_messages = list()
-
-            api_key_statuses = [
-                self.__api_keys_worker_pools[api_key_id].generate_status(
-                    warn_on_rate_limit=warn_on_rate_limit
-                )
-                for api_key_id in sorted(self.__api_keys_worker_pools)
-            ]
-
-            result.api_key_worker_pools = api_key_statuses
-
-            for status in api_key_statuses:
-
-                result.total_errors += status.total_errors
-                result.total_bytes_uploaded += status.total_bytes_uploaded
-
-            # get responses information from worker pools
-            responses = set(s.all_responses_successful for s in api_key_statuses)
-
-            result.last_responses_status_info = _accumulate_worker_stats(
-                responses,
-                result_on_at_least_one_fail="Last requests on some workers is not successful, see below for more info.",
-                result_on_all_succeed="All successful",
-            )
-
-            # Get the workers health checks the same way as responses.
-            worker_health_checks = set(
-                s.all_health_checks_good for s in api_key_statuses
-            )
-
-            workers_health_check_successful = _accumulate_worker_stats(
-                worker_health_checks,
-            )
-
-            # if the workers health check is failed, then we add the error message about that.
-            if workers_health_check_successful is False:
-                all_health_check_error_messages.append(
-                    "Some workers has failed, see below for more info.",
-                )
-
-            # do the health check of the copying manager itself.
-            copying_manager_health_check_successful = None
             if self.__last_scan_attempt_time:
+                result.health_check_result = "Good"
                 if (
                     time.time()
                     > self.__last_scan_attempt_time
                     # TODO: create new config value for that.
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    copying_manager_health_check_successful = False
                     # if there is a bad health check if the copying manager itself, add the error message about that.
-                    # Note: the information about the copying manager itself should be shown first.
-                    all_health_check_error_messages.insert(
-                        0,
+                    result.health_check_result = (
                         "Failed, max time since last scan attempt (%s seconds) exceeded"
-                        % self.__config.healthy_max_time_since_last_copy_attempt,
+                        % self.__config.healthy_max_time_since_last_copy_attempt
                     )
-                else:
-                    copying_manager_health_check_successful = True
 
-            # get the final health check result from the workers health check and copying manager health check.
-            result.health_check_result = _accumulate_worker_stats(
-                set(
-                    [
-                        copying_manager_health_check_successful,
-                        workers_health_check_successful,
-                    ]
-                ),
-                result_on_at_least_one_fail="\n".join(all_health_check_error_messages),
-                result_on_all_succeed="Good",
-            )
+            # collect api key statuses.
+            for api_key_id in sorted(self.__api_keys_worker_pools):
+                pool = self.__api_keys_worker_pools[api_key_id]
+                pool_status = pool.generate_status(warn_on_rate_limit)
+                result.api_key_worker_pools.append(pool_status)
+
+            # when workers are defined, calculate overall stats.
+            result.calculate_status()
 
             # get statuses for the log matchers.
             for entry in self._log_matchers:
                 result.log_matchers.append(entry.generate_status())
-
-            # sum up some worker stats to overall stats.
-            for api_key_status in api_key_statuses:
-                for worker_status in api_key_status.workers:
-                    result.total_rate_limited_time = (
-                        worker_status.total_rate_limited_time
-                    )
-                    result.total_read_time = worker_status.total_read_time
-                    result.total_waiting_time = worker_status.total_waiting_time
-                    result.total_blocking_response_time = (
-                        worker_status.total_blocking_response_time
-                    )
-                    result.total_request_time = worker_status.total_request_time
-                    result.total_pipelined_requests = (
-                        worker_status.total_pipelined_requests
-                    )
-                    result.rate_limited_time_since_last_status = (
-                        worker_status.rate_limited_time_since_last_status
-                    )
 
         finally:
             self.__lock.release()
@@ -1400,7 +1256,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             found_checkpoints.append(checkpoints)
 
-        result = {}
+        result = {}  # type: ignore
         # merge checkpoints from  all workers to one checkpoint.
 
         # checkpoints from different workers may contain checkpoint for the same file,

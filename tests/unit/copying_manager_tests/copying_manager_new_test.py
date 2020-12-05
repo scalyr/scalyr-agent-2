@@ -30,7 +30,8 @@ if False:
 try:
     import pathlib
 except ImportError:
-    import pathlib2 as pathlib
+    import pathlib2 as pathlib  # type: ignore
+
 import pytest
 
 from scalyr_agent import scalyr_logging
@@ -210,10 +211,16 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert (
-            status.health_check_result
-            == "Some workers has failed, see below for more info."
-        )
+
+        if self.workers_count > 1 or self.api_keys_count > 1:
+            assert status.workers_health_check == "Some workers have failed."
+            assert status.health_check_result == "Good"
+        else:
+            assert (
+                status.workers_health_check
+                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+            )
+            assert status.health_check_result == "Good"
 
     def test_failed_health_check_status_and_failed_worker(self):
         (test_file, test_file2), manager = self._init_manager(2)
@@ -225,11 +232,22 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert (
-            status.health_check_result
-            == "Failed, max time since last scan attempt (60.0 seconds) exceeded\n"
-            "Some workers has failed, see below for more info."
-        )
+
+        if self.workers_count > 1 or self.api_keys_count > 1:
+            assert status.workers_health_check == "Some workers have failed."
+            assert (
+                status.health_check_result
+                == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+            )
+        else:
+            assert (
+                status.workers_health_check
+                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+            )
+            assert (
+                status.health_check_result
+                == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+            )
 
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._init_manager(2)

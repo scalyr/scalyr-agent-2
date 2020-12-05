@@ -2418,29 +2418,6 @@ class HistogramTracker(object):
         )
 
 
-def max_ignore_none(*args, **kwargs):
-    """
-    The 'max' function which ignores None values.
-    All arguments directly passed to the original 'max' function.
-    """
-
-    # get the parameter 'key'
-    # python2 does not allow keyword arguments after '*args'
-    key = kwargs.get("key")
-
-    if len(args) == 1:
-        values = args[0]
-    else:
-        values = args
-    values = [v for v in values if v is not None]
-
-    # max function does not accept key as 'None', so we must not pass it in this case.
-    if key:
-        return max(values, key=key)
-    else:
-        return max(values)
-
-
 def match_glob(pathname):
     # type: (six.text_type) -> List[six.text_type]
     """
