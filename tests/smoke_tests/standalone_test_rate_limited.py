@@ -16,6 +16,8 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+import sys
+
 import pytest
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL
@@ -26,3 +28,14 @@ from tests.smoke_tests.common import _test_standalone_smoke
 @pytest.mark.timeout(300)
 def test_standalone_smoke():
     _test_standalone_smoke(DEV_INSTALL, rate_limited=True)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (2, 7), reason="Skip multiprocess configuration for python 2.6"
+)
+@pytest.mark.usefixtures("agent_environment")
+@pytest.mark.timeout(300)
+def test_standalone_smoke_with_process_workers():
+    _test_standalone_smoke(
+        DEV_INSTALL, workers_type="process", workers_count=2, rate_limited=True
+    )
