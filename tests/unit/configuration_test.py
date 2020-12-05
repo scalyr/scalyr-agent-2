@@ -2769,7 +2769,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert len(config.api_key_configs) == 1
         assert config.api_key_configs == JsonArray(
             JsonObject(
-                workers=config.workers_per_api_key, api_key=config.api_key, id="0"
+                workers=config.default_workers_per_api_key,
+                api_key=config.api_key,
+                id="0",
             )
         )
 
@@ -2793,7 +2795,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert config.api_key_configs == JsonArray(
             JsonObject(
-                workers=config.workers_per_api_key, api_key=config.api_key, id="0"
+                workers=config.default_workers_per_api_key,
+                api_key=config.api_key,
+                id="0",
             )
         )
 
@@ -2815,7 +2819,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config.parse()
         assert config.api_key_configs == JsonArray(
             JsonObject(
-                workers=config.workers_per_api_key,
+                workers=config.default_workers_per_api_key,
                 api_key=config.api_key,
                 id="my_worker",
             )
@@ -3063,7 +3067,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert config.api_key_configs[0]["api_key"] == config.api_key
         assert config.api_key_configs[1]["api_key"] == "another_key"
 
-    def test_workers_per_api_key_default(self):
+    def test_default_workers_per_api_key(self):
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
@@ -3082,8 +3086,12 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 3
         assert config.api_key_configs[0]["api_key"] == config.api_key
-        assert config.api_key_configs[0]["workers"] == config.workers_per_api_key
+        assert (
+            config.api_key_configs[0]["workers"] == config.default_workers_per_api_key
+        )
         assert config.api_key_configs[1]["api_key"] == "another_key"
-        assert config.api_key_configs[1]["workers"] == config.workers_per_api_key
+        assert (
+            config.api_key_configs[1]["workers"] == config.default_workers_per_api_key
+        )
         assert config.api_key_configs[2]["api_key"] == "another_key2"
         assert config.api_key_configs[2]["workers"] == 3

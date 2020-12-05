@@ -1430,11 +1430,11 @@ class Configuration(object):
         return self.__get_config().get_bool("use_multiprocess_copying_workers")
 
     @property
-    def workers_per_api_key(self):
+    def default_workers_per_api_key(self):
         """
-        The number of workers which should be created for each api key.
+        The default number of workers which should be created for each api key is no value is explicitly set
         """
-        return self.__get_config().get_int("workers_per_api_key")
+        return self.__get_config().get_int("default_workers_per_api_key")
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -2747,7 +2747,7 @@ class Configuration(object):
         # the default number of workers per api key.
         self.__verify_or_set_optional_int(
             config,
-            "workers_per_api_key",
+            "default_workers_per_api_key",
             1,
             description,
             apply_defaults,
@@ -3291,7 +3291,7 @@ class Configuration(object):
         if "id" not in api_key_entry:
             api_key_entry["id"] = six.text_type(entry_index)
 
-        workers_number = self.__config.get_int("workers_per_api_key")
+        workers_number = self.__config.get_int("default_workers_per_api_key")
         self.__verify_or_set_optional_int(
             api_key_entry, "workers", workers_number, description
         )

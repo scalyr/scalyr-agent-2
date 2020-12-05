@@ -411,7 +411,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
-    def is_default(self):
+    def is_single_worker(self):
         # type: () -> bool
         """
         Checks if the copying manager is in default configuration (1 api key, 1 worker)
@@ -435,7 +435,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         """
         Prepare the message string with an information about workers health check.
         """
-        if self.is_default():
+        if self.is_single_worker():
             worker = next(iter(self._workers()))
             # just copy the health check from the single worker.
             self.workers_health_check = worker.health_check_result
@@ -465,7 +465,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         self._verify_workers_health_check()
 
         # sum up all stats from workers if it is not a default config.
-        if not self.is_default():
+        if not self.is_single_worker():
             # sum up some worker stats to overall stats.
             for worker_status in self._workers():
                 self.total_errors += worker_status.total_errors
@@ -485,7 +485,7 @@ class CopyingManagerStatus(BaseAgentStatus):
 
     def to_dict(self):  # type: () -> dict
         result = super(CopyingManagerStatus, self).to_dict()
-        if self.is_default():
+        if self.is_single_worker():
             # In case of default configuration,
             # On previous versions, the copying manager has those stats in its own dict,
             # but now they are moved to workers.
@@ -805,7 +805,7 @@ def _report_worker(output, worker, manager_status, agent_log_file_path, indent):
             indent=indent,
         )
 
-    if manager_status.is_default():
+    if manager_status.is_single_worker():
         health_check_message = __get_overall_health_check(manager_status)
     else:
         health_check_message = worker.health_check_result
@@ -834,7 +834,7 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
     api_keys = manager_status.api_key_worker_pools
 
     # if it is a default configuration, then we just print the stats of the single worker.
-    if manager_status.is_default():
+    if manager_status.is_single_worker():
         worker = api_keys[-1].workers[-1]
         _report_worker(output, worker, manager_status, agent_log_file_path, indent=0)
     else:
