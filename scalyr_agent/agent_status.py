@@ -425,7 +425,7 @@ class CopyingManagerStatus(BaseAgentStatus):
     def _workers(self):
         # type: () -> Generator
         """
-        Generate that yields all workers from all api keys.
+        Generator that yields all workers from all api keys.
         """
         for api_key_status in self.api_key_worker_pools:
             for worker_status in api_key_status.workers:
