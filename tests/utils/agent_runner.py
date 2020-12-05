@@ -386,7 +386,7 @@ class AgentRunner(object):
 
         # do not include default log files.
         files_to_exclude_from_config = [
-            str(Path(self.agent_logs_dir_path, name))
+            str(Path(self.agent_logs_dir_path, name))  # type:ignore
             for name in [
                 "linux_process_metrics.log",
                 "linux_system_metrics.log",

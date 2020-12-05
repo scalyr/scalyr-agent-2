@@ -30,7 +30,7 @@ from contextlib import contextmanager
 try:
     import pathlib
 except ImportError:
-    import pathlib2 as pathlib
+    import pathlib2 as pathlib  # type: ignore
 
 if False:
     from typing import Optional
@@ -103,6 +103,7 @@ class CopyingManagerCommonTest(object):
 
     def setup(self):
         self._env_builder = None  # type: Optional[TestEnvironBuilder]
+        self._current_log_file = None  # type: Optional[TestableLogFile]
         self._instance = None
 
     def teardown(self):
@@ -171,12 +172,12 @@ class CopyingManagerCommonTest(object):
 
     @contextmanager
     def current_log_file(self, log_file):
-        # type: (TestableLogFile) -> Generator[TestableLogFile]
+        # type: (TestableLogFile) -> Generator
         """
         Context manager for fast access to the selected log file.
         """
 
-        self._current_log_file = log_file
+        self._current_log_file = log_file  # type: ignore
         yield self._current_log_file
 
         self._current_log_file = None
@@ -874,7 +875,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
             self._set_response(status_message)
             self.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
-        return requests, send_response
+        return requests, send_response  # type: ignore
 
     # region Utility functions
     @property
@@ -884,7 +885,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         Return all workers from all worker pools as a single list.
         :return:
         """
-        result = []
+        result = []  # type: ignore
         for api_key_pool in self.api_keys_worker_pools.values():
             result.extend(api_key_pool.workers)
         return result
@@ -918,7 +919,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
 
 # create proxy class for the testable worker. The testable worker has its own methods that also have to be exposed
 # by proxies.
-_TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
+_TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
     six.ensure_str("CopyingManagerWorkerProxy"),
     WORKER_PROXY_EXPOSED_METHODS
     + [
@@ -941,7 +942,7 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
 )
 
 
-class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):
+class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):  # type: ignore
     def wait_for_rpc(self, *args, **kwargs):
         """
         Override this method for proxy to be able to return the callable objects.

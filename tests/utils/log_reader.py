@@ -133,7 +133,7 @@ class LogReader(threading.Thread):
         for _ in self._line_generator():
             pass
 
-    def wait_for_matching_line(self, pattern, timeout=10):
+    def wait_for_matching_line(self, pattern, timeout=10):  # type: ignore
         # type: (six.text_type, int) -> Optional[six.text_type]
         """
         Wait for line which matches to provided pattern.
@@ -142,7 +142,7 @@ class LogReader(threading.Thread):
 
         for line in self._line_generator_blocking(timeout=timeout):
             if compiled_pattern.match(line):
-                return line  # type: ignore
+                return line
 
     def wait(self, seconds):
         # type: (float) -> None
@@ -216,7 +216,7 @@ class LogMetricReader(LogReader):
         name, value = self._parse_line(line)
         self.current_metrics[name] = value
 
-    def wait_for_metrics_exist(self, names, timeout=10):
+    def wait_for_metrics_exist(self, names, timeout=10):  # type: ignore
         # type: (List[six.text_type], int) -> Dict[six.text_type, six.text_type]
         """
         Waits until all needed metrics are presented in log file at least once.

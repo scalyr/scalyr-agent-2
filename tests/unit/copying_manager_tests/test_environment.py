@@ -20,11 +20,6 @@ import json
 import shutil
 import tempfile
 
-try:
-    import pathlib
-except ImportError:
-    import pathlib2 as pathlib
-
 if False:
     from typing import Union
     from typing import Dict
@@ -38,6 +33,11 @@ from scalyr_agent.platform_controller import DefaultPaths
 
 import six
 from six.moves import range
+
+if six.PY3:
+    import pathlib
+else:
+    import pathlib2 as pathlib  # pylint: disable=import-error
 
 
 class TestableLogFile(object):
@@ -54,7 +54,7 @@ class TestableLogFile(object):
         self.name = name
 
         # the path of the file, it is unknown until the file is created by the 'create' function
-        self.path = None  # type: pathlib.Path
+        self.path = None  # type: Optional[pathlib.Path]
 
     def initialize(self, root_path):
         """
@@ -73,7 +73,7 @@ class TestableLogFile(object):
         """
         Append lines to the file.
         """
-        with self.path.open("a") as file:
+        with self.path.open("a") as file:  # type: ignore
             for line in lines:
                 file.write(line)
                 file.write("\n")
@@ -261,12 +261,12 @@ class TestEnvironBuilder(object):
 
         self._config = config
 
-    @property
+    @property  # type: ignore
     @after_initialize
-    def config(self):  # type: () -> Configuration
+    def config(self):  # type: () -> Optional[Configuration]
         return self._config
 
-    @property
+    @property  # type: ignore
     @after_initialize
     def log_files(self):  # type: () -> Dict[str, TestableLogFile]
         return self._log_files
@@ -277,7 +277,7 @@ class TestEnvironBuilder(object):
         Get log config from existing config.
         """
 
-        for log_config in self._config.log_configs:
+        for log_config in self._config.log_configs:  # type: ignore
             if six.text_type(log_file.path) == log_config["path"]:
                 return log_config
 
@@ -303,7 +303,7 @@ class TestEnvironBuilder(object):
         if name is None:
             name = "test_file_{0}".format(len(self._log_files))
 
-        file_obj = TestableLogFile(config=self._config, name=name)
+        file_obj = TestableLogFile(config=self._config, name=name)  # type: ignore
 
         self._log_files[name] = file_obj
 
@@ -312,21 +312,21 @@ class TestEnvironBuilder(object):
     @after_initialize
     def get_log_file(self, name):  # type: (str) -> TestableLogFile
         log_file = self._log_files.get(name)
-        if name is None:
+        if log_file is None:
             raise RuntimeError(
-                "Can not find file '{0}' in config".format(log_file.path)
+                "Can not find file '{0}' in config".format(log_file.path)  # type: ignore
             )
 
-        return log_file
+        return log_file  # type: ignore
 
     @after_initialize
     def get_log_file_path(self, name):  # type: (str) -> pathlib.Path
 
         log_file = self._log_files.get(name)
-        if name is None:
+        if log_file is None:
             raise RuntimeError("Can not find file '{0}' in config")
 
-        return pathlib.Path(log_file.path)
+        return pathlib.Path(log_file.path)  # type: ignore
 
     @after_initialize
     def append_lines_to_log_file(self, name, *lines):
@@ -349,12 +349,12 @@ class TestEnvironBuilder(object):
         test_environment.initialize()
         return log_files, test_environment
 
-    @property
+    @property  # type: ignore
     @after_initialize
     def agent_data_path(self):
         return self._data_dir_path
 
-    @property
+    @property  # type: ignore
     @after_initialize
     def agent_log_path(self):
         return self._logs_dir_path
@@ -377,7 +377,7 @@ class TestEnvironBuilder(object):
     def get_active_checkpoints(self, worker_id):
         return json.loads(self.get_active_checkpoints_path(worker_id).read_text())
 
-    @property
+    @property  # type: ignore
     @after_initialize
     def root_path(self):
         return self._root_path
