@@ -315,7 +315,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         # All those log processors will be added to the main collection
         # on the beginning of the next iteration.
         # It stores all new log processors before they are added to the main log processors list.
-        self.__new_log_processors = []
+        self.__new_log_processors = []  # type: List[LogFileProcessor]
 
         # A lock that protects the status variables and the __log_processors variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
@@ -328,7 +328,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__current_processor = 0
 
         # The client to use for sending the data.  Set in the start_manager call.
-        self.__scalyr_client = None
+        self.__scalyr_client = None  # type: Any
         # The last time we scanned for new files that match the __log_matchers.
         self.__last_new_file_scan_time = 0
 
@@ -655,7 +655,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                         current_time - last_full_checkpoint_write
                         > self.__config.full_checkpoint_interval
                     ):
-                        self.__write_full_checkpoint_state(current_time)
+                        self._write_full_checkpoint_state(current_time)
                         last_full_checkpoint_write = current_time
 
                     if pipeline_time < copying_params.current_sleep_interval:
@@ -678,7 +678,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 # stop worker's thread.
                 sys.exit(1)
         finally:
-            self.__write_full_checkpoint_state(current_time)
+            self._write_full_checkpoint_state(current_time)
             for processor in self.__log_processors:
                 processor.close()
 
@@ -1004,7 +1004,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         write_checkpoint_state_to_file(checkpoints, file_path, current_time)
 
-    def __write_full_checkpoint_state(self, current_time):
+    def _write_full_checkpoint_state(self, current_time):
         """Writes the full checkpont state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -1143,11 +1143,11 @@ if sys.version_info >= (3, 6, 0):
         )
         return func(token, serializer, incref=incref, **kwds)
 
-    multiprocessing.managers.RebuildProxy = FixedRebuildProxy
+    multiprocessing.managers.RebuildProxy = FixedRebuildProxy  # type: ignore
 
 
 # create base proxy class for the LogFileProcessor, here we also specify all its methods that may be called through proxy.
-_LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(
+_LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
     six.ensure_str("LogFileProcessorProxy"),
     [
         six.ensure_str("is_closed"),
@@ -1161,7 +1161,7 @@ _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(
 
 
 # Create final proxy class for the LogFileProcessors by subclassing the base class.
-class LogFileProcessorProxy(_LogFileProcessorProxy):
+class LogFileProcessorProxy(_LogFileProcessorProxy):  # type: ignore
     def __init__(self, *args, **kwargs):
         super(LogFileProcessorProxy, self).__init__(*args, **kwargs)
         self.__cached_log_path = None
@@ -1191,13 +1191,13 @@ WORKER_PROXY_EXPOSED_METHODS = [
 ]
 
 # create base proxy class for the worker, here we also specify all its methods that may be called through proxy.
-_CopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(
+_CopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
     six.ensure_str("CopyingManagerWorkerProxy"), WORKER_PROXY_EXPOSED_METHODS,
 )
 
 
 # Create final proxy class for the worker class by subclassing the base class.
-class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):
+class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):  # type: ignore
     pass
 
 

@@ -177,23 +177,23 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         self._instance = self._create_worker()
 
         if add_processors:
-            for test_file in self._env_builder.log_files.values():
+            for test_file in self._env_builder.log_files.values():  # type: ignore
                 self._spawn_single_log_processor(test_file)
 
         if auto_start:
             self._instance.start_worker()
 
-        test_files = tuple(self._env_builder.log_files.values())
+        test_files = tuple(self._env_builder.log_files.values())  # type: ignore
 
-        return test_files, self._instance
+        return test_files, self._instance  # type: ignore
 
     def _spawn_single_log_processor(
         self, log_file, checkpoints=None, copy_at_index_zero=False,
     ):
         # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
-        log_config = self._env_builder.get_log_config(log_file)
+        log_config = self._env_builder.get_log_config(log_file)  # type: ignore
 
-        matcher = LogMatcher(self._env_builder.config, log_config)
+        matcher = LogMatcher(self._env_builder.config, log_config)  # type: ignore
         if checkpoints is None:
             checkpoints = {}
 

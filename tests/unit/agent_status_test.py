@@ -18,6 +18,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 from io import open
 
 __author__ = "czerwin@scalyr.com"
@@ -195,66 +196,59 @@ class TestReportStatus(ScalyrTestCase):
         config_status.additional_paths = ["/etc/scalyr-agent-2/agent.d/server.json"]
 
         copying_status = CopyingManagerStatus()
-        self.status.copying_manager_status = copying_status
-        copying_status.last_attempt_size = 10000
-        copying_status.last_attempt_time = self.time - 60
-        copying_status.last_responses_status_info = "All successful"
-        copying_status.total_errors = 0
-        copying_status.total_bytes_uploaded = 10000
-        copying_status.last_success_time = self.time - 60
         copying_status.health_check_result = "Good"
+        self.status.copying_manager_status = copying_status
 
         self.api_key1 = api_key1 = ApiKeyWorkerPoolStatus()
         api_key1.api_key_id = "0"
-        api_key1.total_bytes_uploaded = 6000
         copying_status.api_key_worker_pools.append(api_key1)
-        api_key1.last_success_time = self.time - 60
-        api_key1.last_attempt_time = self.time - 60
 
         self.api_key2 = api_key2 = ApiKeyWorkerPoolStatus()
         api_key2.api_key_id = "1"
-        api_key2.total_bytes_uploaded = 4000
         copying_status.api_key_worker_pools.append(api_key2)
-        api_key2.last_success_time = self.time - 60
-        api_key2.last_attempt_time = self.time - 60
 
-        # =========
-
-        api_key1.all_responses_successful = True
-        api_key1.all_health_checks_good = True
         self.worker1_1 = worker1_1 = CopyingManagerWorkerStatus()
         worker1_1.worker_id = "worker1_1"
-        worker1_1.last_response = "Everything is good."
+        worker1_1.total_bytes_uploaded = 10000
+        worker1_1.last_attempt_time = self.time - 60
+        worker1_1.last_success_time = self.time - 60
+        worker1_1.last_response = "This is a good response."
         worker1_1.last_response_status = "success"
         worker1_1.health_check_result = "Good"
+        worker1_1.last_attempt_size = 10000
 
         self.worker1_2 = worker1_2 = CopyingManagerWorkerStatus()
         worker1_2.worker_id = "worker1_2"
+        worker1_2.total_bytes_uploaded = 5000
+        worker1_2.last_attempt_time = self.time - 60
+        worker1_2.last_success_time = self.time - 60
         worker1_2.last_response = "Everything is good."
         worker1_2.last_response_status = "success"
         worker1_2.health_check_result = "Good"
-
+        worker1_2.last_attempt_size = 7000
         api_key1.workers.extend([worker1_1, worker1_2])
 
-        # =
-
-        copying_status.all_responses_successful = True
-        copying_status.all_health_checks_good = True
-
-        api_key2.all_responses_successful = True
-        api_key2.all_health_checks_good = True
         self.worker2_1 = worker2_1 = CopyingManagerWorkerStatus()
         worker2_1.worker_id = "worker2_1"
+        worker2_1.total_bytes_uploaded = 9000
+        worker2_1.last_attempt_time = self.time - 60
+        worker2_1.last_success_time = self.time - 60
         worker2_1.last_response = "Everything is good."
         worker2_1.last_response_status = "success"
+        worker2_1.last_attempt_size = 6000
         worker2_1.health_check_result = "Good"
+        api_key2.workers.append(worker2_1)
 
         self.worker2_2 = worker2_2 = CopyingManagerWorkerStatus()
         worker2_2.worker_id = "worker2_2"
+        worker2_2.total_bytes_uploaded = 3000
+        worker2_2.last_attempt_time = self.time - 60
+        worker2_2.last_success_time = self.time - 60
         worker2_2.last_response = "Everything is good."
         worker2_2.last_response_status = "success"
+        worker2_2.last_attempt_size = 2000
         worker2_2.health_check_result = "Good"
-        api_key2.workers.extend([worker2_1, worker2_2])
+        api_key2.workers.append(worker2_2)
 
         # =========
 
@@ -352,6 +346,14 @@ class TestReportStatus(ScalyrTestCase):
         monitor_status.reported_lines = 20
         monitor_status.errors = 40
 
+    def make_default(self):
+        """
+        Keep only one api key and 1 worker to reproduce the default config case.
+        """
+        self.status.copying_manager_status.api_key_worker_pools.remove(self.api_key2)
+
+        self.api_key1.workers.remove(self.worker1_2)
+
     def test_basic(self):
         output = io.StringIO()
 
@@ -373,6 +375,11 @@ class TestReportStatus(ScalyrTestCase):
             os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
 
         os.environ["SCALYR_ZZZ"] = "Should appear at the end"
+
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
+
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
@@ -417,25 +424,12 @@ Log transmission:
 (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
 
 Bytes uploaded successfully:               10000
-Last requests:                             All successful
+Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
 Health check:                              Good
-
-Uploads statistics by API key:
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -468,6 +462,10 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_config(self):
+
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
         self.status.config_status.last_error = "Bad stuff"
 
         output = io.StringIO()
@@ -509,118 +507,12 @@ Log transmission:
 (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
 
 Bytes uploaded successfully:               10000
-Last requests:                             All successful
-Health check:                              Good
-
-Uploads statistics by API key:
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
-
-Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
-Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
-
-Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
-  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
-  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
-Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
-
-
-Monitors:
-=========
-
-(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
-
-Running monitors:
-  linux_process_metrics(agent): 50 lines emitted, 2 errors
-  linux_system_metrics(): 20 lines emitted, 0 errors
-
-Failed monitors:
-  bad_monitor() 20 lines emitted, 40 errors
-"""
-        self.assertEquals(expected_output, output.getvalue())
-
-    def test_single_api_key_config(self):
-        """
-        Do not show listed api key statistics if there is only one api key.
-        """
-
-        del self.status.copying_manager_status.api_key_worker_pools[-1]
-
-        api_key1 = self.api_key1
-        api_key1.total_errors = 5
-
-        self.status.copying_manager_status.health_check_result = "Bad"
-
-        api_key1.all_responses_successful = False
-        api_key1.all_health_checks_good = False
-        worker1_1 = self.worker1_1
-        worker1_1.last_response = "Bad response on worker1"
-        worker1_1.health_check_result = "Bad"
-        worker1_1.last_response_status = "Bad"
-        worker1_1.health_check_result = "Bad"
-
-        output = io.StringIO()
-        report_status(output, self.status, self.time)
-
-        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
-
-Current time:            Fri Sep  5 23:14:13 2014 UTC
-Agent started at:        Thu Sep  4 23:14:13 2014 UTC
-Version:                 2.0.0.beta.7
-VCS revision:            git revision
-Python version:          3.6.8
-Agent running as:        root
-Agent log:               /var/logs/scalyr-agent/agent.log
-ServerHost:              test_machine
-Compression algorithm:   deflate
-Compression level:       9
-
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
-
-
-Agent configuration:
-====================
-
-Configuration files:   /etc/scalyr-agent-2/agent.json
-                       /etc/scalyr-agent-2/agent.d/server.json
-Status:                Good (files parsed successfully)
-Last checked:          Fri Sep  5 23:14:13 2014 UTC
-Last changed observed: Fri Sep  5 11:14:13 2014 UTC
-
-Environment variables: SCALYR_API_KEY = <Missing>
-                       SCALYR_SERVER = <Missing>
-
-
-Log transmission:
-=================
-
-(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
-
-Bytes uploaded successfully:               10000
-Last requests:                             All successful
-Health check:                              Bad
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-Failed copy response statuses:
-    Worker worker1_1:
-        Last copy response status:         Bad
-        Last copy response:                Bad response on worker1
-Failed health checks:
-    Worker worker1_1:
-        Last copy response status:         Bad
+Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -653,22 +545,13 @@ Failed monitors:
             "Last requests on some workers is not successful, see below for more info."
         )
 
-        api_key1 = self.api_key1
-        api_key1.total_errors = 5
+        self.make_default()
 
-        api_key1.all_responses_successful = False
-        api_key1.all_health_checks_good = True
-        worker1_1 = self.worker1_1
-        worker1_1.last_response = "Bad response on worker1"
-        worker1_1.last_response_status = "Bad"
-        worker1_1.health_check_result = "Good"
+        self.worker1_1.last_response = "Some weird stuff"
+        self.worker1_1.last_response_status = "error"
+        self.worker1_1.total_errors = 5
 
-        worker1_2 = self.worker1_2
-        worker1_2.last_response = "Bad response on worker2"
-        worker1_2.last_response_status = "Bad"
-        worker1_2.health_check_result = "Good"
-
-        manager_status.total_errors = 5
+        self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
         report_status(output, self.status, self.time)
@@ -708,34 +591,14 @@ Log transmission:
 (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
 
 Bytes uploaded successfully:               10000
-Last requests:                             Last requests on some workers is not successful, see below for more info.
-Health check:                              Good
+Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Last copy request size:                    10000
+Last copy response size:                   16
+Last copy response status:                 error
+Last copy response:                        Some weird stuff
 Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-
-Uploads statistics by API key:
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Failed copy response statuses:
-        Worker worker1_1:
-            Last copy response status:         Bad
-            Last copy response:                Bad response on worker1
-        Worker worker1_2:
-            Last copy response status:         Bad
-            Last copy response:                Bad response on worker2
-    Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
+Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -763,7 +626,7 @@ Failed monitors:
     def test_no_health_check(self):
         output = io.StringIO()
 
-        self.status.copying_manager_status.health_check_result = None
+        self.worker1_1.health_check_result = None
 
         # Environment variables
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
@@ -783,6 +646,9 @@ Failed monitors:
             os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
 
         os.environ["SCALYR_ZZZ"] = "Should appear at the end"
+
+        self.make_default()
+        self.status.copying_manager_status.calculate_status()
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
@@ -827,24 +693,11 @@ Log transmission:
 (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
 
 Bytes uploaded successfully:               10000
-Last requests:                             All successful
-
-Uploads statistics by API key:
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
+Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -877,30 +730,13 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_last_success_is_none(self):
-        manager_status = self.status.copying_manager_status
 
-        manager_status.last_responses_status_info = (
-            "Last requests on some workers is not successful, see below for more info."
-        )
-
-        api_key1 = self.api_key1
-        api_key1.all_responses_successful = False
-        worker1_1 = self.worker1_1
-        worker1_1.last_response = "Some weird stuff"
-        worker1_1.last_response_status = "error"
-        worker1_1.total_errors = 5
-        api_key1.last_success_time = None
-        worker1_1.last_success_time = None
-
-        worker1_2 = self.worker1_2
-        worker1_2.last_response = "Some weird stuff"
-        worker1_2.last_response_status = "error"
-        worker1_2.total_errors = 5
-        worker1_2.last_success_time = None
-
-        api_key1.total_errors = 10
-
-        manager_status.total_errors = 10
+        self.make_default()
+        self.worker1_1.last_response = "Some weird stuff"
+        self.worker1_1.last_response_status = "error"
+        self.worker1_1.total_errors = 5
+        self.worker1_1.last_success_time = None
+        self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
         report_status(output, self.status, self.time)
@@ -939,34 +775,14 @@ Log transmission:
 (these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
 
 Bytes uploaded successfully:               10000
-Last requests:                             Last requests on some workers is not successful, see below for more info.
+Last successful communication with Scalyr: Never
+Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+Last copy request size:                    10000
+Last copy response size:                   16
+Last copy response status:                 error
+Last copy response:                        Some weird stuff
+Total responses with errors:               5 (see '/var/logs/scalyr-agent/agent.log' for details)
 Health check:                              Good
-Total responses with errors:               10 (see '/var/logs/scalyr-agent/agent.log' for details)
-
-Uploads statistics by API key:
--------------------
-Api key ID: 0
-    Bytes uploaded successfully:               6000
-    Last successful communication with Scalyr: Never
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Failed copy response statuses:
-        Worker worker1_1:
-            Last copy response status:         error
-            Last copy response:                Some weird stuff
-        Worker worker1_2:
-            Last copy response status:         error
-            Last copy response:                Some weird stuff
-    Total responses with errors:               10 (see '/var/logs/scalyr-agent/agent.log' for details)
-    Files:
-        /var/logs/cron/logrotate.log
-        /var/logs/tomcat6/catalina.log
-
-Api key ID: 1
-    Bytes uploaded successfully:               4000
-    Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
-    Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
-    Files:
-        /var/logs/cron/ohno.log
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -993,6 +809,9 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_status_to_dict(self):
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
         result = self.status.to_dict()
 
         # Simple value on the OverallStats object
@@ -1028,22 +847,519 @@ Failed monitors:
         self.assertEqual(json.loads(result_json), result)
 
     def test_health_status(self):
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
+
         output = io.StringIO()
         report_status(output, self.status, self.time)
         expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
+        self.make_default()
+
         self.status.copying_manager_status.health_check_result = (
-            "Some workers has failed, see below for more info."
+            "Copying thread is failed"
         )
+
+        self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
         report_status(output, self.status, self.time)
-        expected_output = "Health check:                              Some workers has failed, see below for more info.\n"
+        expected_output = (
+            "Health check:                              Copying thread is failed\n"
+        )
+        print((output.getvalue()))
         self.assertTrue(expected_output in output.getvalue())
+
+    def test_health_status_bad_with_wotkers(self):
+        self.make_default()
+
+        self.worker1_1.health_check_result = "Worker 1 has failed"
+        self.status.copying_manager_status.health_check_result = (
+            "Copying thread is failed"
+        )
+
+        self.status.copying_manager_status.calculate_status()
+        output = io.StringIO()
+        report_status(output, self.status, self.time)
+        expected_output = "Health check:                              Copying thread is failed, Worker 1 has failed\n"
+        self.assertTrue(expected_output in output.getvalue())
+
+    def test_multi_worker_basic(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            27000
+Overall health check:                            Good
+
+Uploads statistics by API key:
+ Api key 0:
+    Worker worker1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Worker worker1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Api key 1:
+    Worker worker2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Worker worker2_2:
+      Bytes uploaded successfully:               3000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    2000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with api keys:
+  Api key 0:
+    Worker worker1_1:
+        /var/logs/tomcat6/catalina.log
+    Worker worker1_2:
+        /var/logs/cron/logrotate.log
+  Api key 1:
+    Worker worker2_1:
+        /var/logs/cron/ohno.log
+    Worker worker2_2:
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+"""
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_one_api_key(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.api_key_worker_pools.remove(self.api_key2)
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            15000
+Overall health check:                            Good
+
+Uploads statistics by API key:
+ Api key 0:
+    Worker worker1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Worker worker1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with api keys:
+  Api key 0:
+    Worker worker1_1:
+        /var/logs/tomcat6/catalina.log
+    Worker worker1_2:
+        /var/logs/cron/logrotate.log
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+"""
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_one_worker(self):
+        output = io.StringIO()
+
+        self.api_key2.workers.remove(self.worker2_2)
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            24000
+Overall health check:                            Good
+
+Uploads statistics by API key:
+ Api key 0:
+    Worker worker1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Worker worker1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Api key 1:
+    Worker worker2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with api keys:
+  Api key 0:
+    Worker worker1_1:
+        /var/logs/tomcat6/catalina.log
+    Worker worker1_2:
+        /var/logs/cron/logrotate.log
+  Api key 1:
+        /var/logs/cron/ohno.log
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+"""
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_bad_health_check(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.health_check_result = (
+            "File system scanning thread has failed"
+        )
+        self.worker2_1.health_check_result = "Not good"
+        self.worker2_1.total_errors = 6
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            27000
+Overall health check:                            File system scanning thread has failed, Some workers have failed.
+Total errors occurred:                           6
+
+Uploads statistics by API key:
+ Api key 0:
+    Worker worker1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Worker worker1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Api key 1:
+    Worker worker2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Total responses with errors:               6 (see '/var/logs/scalyr-agent/agent.log' for details)
+      Health check:                              Not good
+
+    Worker worker2_2:
+      Bytes uploaded successfully:               3000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    2000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with api keys:
+  Api key 0:
+    Worker worker1_1:
+        /var/logs/tomcat6/catalina.log
+    Worker worker1_2:
+        /var/logs/cron/logrotate.log
+  Api key 1:
+    Worker worker2_1:
+        /var/logs/cron/ohno.log
+    Worker worker2_2:
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+"""
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):
+    maxDiff = None
+
     def setUp(self):
         super(AgentMainStatusHandlerTestCase, self).setUp()
 
@@ -1140,9 +1456,22 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
     def test__find_health_result_in_status_data_text_format_good(self):
         def mock_generate_status(*args, **kwargs):
             result = self.original_generate_status(*args, **kwargs)
-            result.copying_manager_status = CopyingManagerStatus()
-            result.copying_manager_status.total_errors = 0
-            result.copying_manager_status.health_check_result = "Good"
+
+            # create default worker for copying manager.
+            manager = CopyingManagerStatus()
+            api_key = ApiKeyWorkerPoolStatus()
+            manager.api_key_worker_pools.append(api_key)
+            worker = CopyingManagerWorkerStatus()
+            api_key.workers.append(worker)
+
+            manager.total_errors = 0
+
+            worker.health_check_result = "Good"
+            manager.health_check_result = "Good"
+
+            manager.calculate_status()
+
+            result.copying_manager_status = manager
             return result
 
         self.agent._ScalyrAgent__generate_status = mock_generate_status
@@ -1160,9 +1489,22 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         def mock_generate_status_wrapper(health_check_result):
             def mock_generate_status(*args, **kwargs):
                 result = self.original_generate_status(*args, **kwargs)
-                result.copying_manager_status = CopyingManagerStatus()
-                result.copying_manager_status.total_errors = 0
-                result.copying_manager_status.health_check_result = health_check_result
+
+                # create default worker for copying manager.
+                manager = CopyingManagerStatus()
+                api_key = ApiKeyWorkerPoolStatus()
+                manager.api_key_worker_pools.append(api_key)
+                worker = CopyingManagerWorkerStatus()
+                api_key.workers.append(worker)
+
+                manager.total_errors = 0
+                worker.health_check_result = health_check_result
+                manager.health_check_result = health_check_result
+
+                manager.calculate_status()
+
+                result.copying_manager_status = manager
+
                 return result
 
             return mock_generate_status

@@ -7,7 +7,7 @@ from io import open
 try:
     import pathlib
 except ImportError:
-    import pathlib2 as pathlib
+    import pathlib2 as pathlib  # type: ignore
 
 from tests.utils.log_reader import (
     LogReader,

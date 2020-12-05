@@ -18,11 +18,9 @@ from __future__ import absolute_import
 
 
 import time
-import shutil
 import os
 import platform
 import sys
-from six.moves import range
 
 
 if False:
@@ -32,7 +30,8 @@ if False:
 try:
     import pathlib
 except ImportError:
-    import pathlib2 as pathlib
+    import pathlib2 as pathlib  # type: ignore
+
 import pytest
 
 from scalyr_agent import scalyr_logging
@@ -46,7 +45,10 @@ from tests.unit.copying_manager_tests.common import (
     TestingConfiguration,
 )
 
+from scalyr_agent import util as scalyr_util
+
 import six
+from six.moves import range
 import mock
 
 log = scalyr_logging.getLogger(__name__)
@@ -209,10 +211,16 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert (
-            status.health_check_result
-            == "Some workers has failed, see below for more info."
-        )
+
+        if self.workers_count > 1 or self.api_keys_count > 1:
+            assert status.workers_health_check == "Some workers have failed."
+            assert status.health_check_result == "Good"
+        else:
+            assert (
+                status.workers_health_check
+                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+            )
+            assert status.health_check_result == "Good"
 
     def test_failed_health_check_status_and_failed_worker(self):
         (test_file, test_file2), manager = self._init_manager(2)
@@ -224,11 +232,22 @@ class TestBasic(CopyingManagerTest):
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
-        assert (
-            status.health_check_result
-            == "Failed, max time since last scan attempt (60.0 seconds) exceeded\n"
-            "Some workers has failed, see below for more info."
-        )
+
+        if self.workers_count > 1 or self.api_keys_count > 1:
+            assert status.workers_health_check == "Some workers have failed."
+            assert (
+                status.health_check_result
+                == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+            )
+        else:
+            assert (
+                status.workers_health_check
+                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+            )
+            assert (
+                status.health_check_result
+                == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
+            )
 
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._init_manager(2)
@@ -277,51 +296,6 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == set(["Line9", "Line10"])
 
-    def test_old_version_checkpoints(self):
-        """
-        Test if the copying manager is able to pick checkpoint from the older versions of the agent.
-        """
-
-        (test_file, test_file2), manager = self._init_manager(2)
-
-        test_file.append_lines("line1")
-        test_file2.append_lines("line2")
-
-        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
-
-        manager.stop_manager()
-
-        # write new lines, those lines should be send because of the checkpoints.
-        test_file.append_lines("line3")
-        test_file2.append_lines("line4")
-
-        # get any worker and copy its checkpoints to the "<agent_dir>/data.checkpoints.json".
-        #
-        worker = manager.workers[-1]
-
-        old_checkpoints_path = os.path.join(
-            self._env_builder.config.agent_data_path, "checkpoints.json"
-        )
-        old_active_checkpoints_path = os.path.join(
-            self._env_builder.config.agent_data_path, "active-checkpoints.json"
-        )
-
-        # move checkpoints files and rename tham as they were names in previous versions.
-        shutil.move(str(worker.get_checkpoints_path()), old_checkpoints_path)
-        shutil.move(
-            str(worker.get_active_checkpoints_path()), old_active_checkpoints_path
-        )
-
-        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
-        manager.start_manager()
-
-        # copying manager should read worker checkpoints from the new place.
-        assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
-
-        # the checkpoint files from older versions of the agent have to be removed.
-        assert not os.path.exists(old_checkpoints_path)
-        assert not os.path.exists(old_active_checkpoints_path)
-
     def test_checkpoints_master_checkpoints(self):
         if self.workers_count == 1 and self.api_keys_count == 1:
             pytest.skip("This test is only for multi-worker copying manager.")
@@ -339,7 +313,7 @@ class TestBasic(CopyingManagerTest):
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
-        # start manager, it has to create master checkpoint file when starts.
+        # start manager, it has to create consolidated checkpoint file when starts.
         manager.start_manager()
 
         manager.stop()
@@ -348,15 +322,17 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("line3")
         test_file2.append_lines("line4")
 
-        # remove worker checkpoints, but files must not be skipped because of the
-        for worker in manager.workers:
-            os.unlink(str(worker.get_checkpoints_path()))
-            os.unlink(str(worker.get_active_checkpoints_path()))
+        checkpoint_files = scalyr_util.match_glob(
+            six.text_type(manager.consolidated_checkpoints_path)
+        )
+
+        # verify that only one file remains and it is a consolidated file.
+        assert checkpoint_files == [str(manager.consolidated_checkpoints_path)]
 
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
-        # start manager, it has to create master checkpoint file when starts.
+        # start manager, it has to create consolidated checkpoint file when starts.
         manager.start_manager()
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])

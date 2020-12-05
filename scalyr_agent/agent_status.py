@@ -33,12 +33,13 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
-import operator
+import io
 
 if False:
     from typing import TextIO
     from typing import List
     from typing import Optional
+    from typing import Generator
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -326,19 +327,19 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
     def __init__(self):
         self.worker_id = None
         # The total number of bytes successfully uploaded.
-        self.total_bytes_uploaded = 0
+        self.total_bytes_uploaded = 0  # type: int
         # The last time the agent successfully copied bytes from log files to the Scalyr servers.
-        self.last_success_time = None
+        self.last_success_time = None  # type: Optional[float]
         # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
-        self.last_attempt_time = None
+        self.last_attempt_time = None  # type: Optional[float]
         # The size of the request for the last attempt.
-        self.last_attempt_size = None
+        self.last_attempt_size = None  # type: Optional[int]
         # The last response from the Scalyr servers.
-        self.last_response = None
+        self.last_response = None  # type: Optional[six.text_type]
         # The last status from the last response (should be 'success').
-        self.last_response_status = None
+        self.last_response_status = None  # type: Optional[six.text_type]
         # The total number of failed copy requests.
-        self.total_errors = 0
+        self.total_errors = 0  # type: int
         # The total time in seconds we were blocked by the rate limiter
         self.total_rate_limited_time = 0
         # The time in seconds we were blocked by the rate limiter since the last status
@@ -359,28 +360,22 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
 
 class ApiKeyWorkerPoolStatus(BaseAgentStatus):
     def __init__(self):
-
         self.api_key_id = None
-        # The total number of bytes successfully uploaded by all workers in this worker pool.
-        self.total_bytes_uploaded = 0  # type: int
-        # The most recent success time from all workers in this worker pool.
-        self.last_success_time = None  # type: Optional[float]
-        # The most recent request time from all workers in the worker pool.
-        self.last_attempt_time = None  # type: Optional[float]
-        # The overall size of the last requests from all workers in the worker pool.
-        self.last_attempt_requests_overall_size = 0  # type: int
-
-        # The flag indicates whether all last requests from all workers are successful.
-        self.all_responses_successful = None  # type: Optional[bool]
-
-        # The flag indicates whether all workers has a good health check result.
-        self.all_health_checks_good = None  # type: Optional[bool]
-
-        # The total number of failed copy requests.
-        self.total_errors = 0  # type: int
-
         # the status objects from all workers in the worker pool.
         self.workers = []  # type: List[CopyingManagerWorkerStatus]
+
+    @property
+    def has_files(self):
+        # type: () -> bool
+        """
+        Shows if there is at least one file exists on some worker.
+        :return:
+        """
+        for worker in self.workers:
+            if worker.log_processors:
+                return True
+        else:
+            return False
 
 
 class CopyingManagerStatus(BaseAgentStatus):
@@ -389,17 +384,14 @@ class CopyingManagerStatus(BaseAgentStatus):
     def __init__(self):
         # The total number of bytes successfully uploaded by all workers.
         self.total_bytes_uploaded = 0  # type: int
-        # The overall text message with an information about recent responses in all workers.
-        # For example it equals to "All successful" in case if every request is successful
-        self.last_responses_status_info = None  # type: Optional[six.text_type]
-        # The total number of failed copy requests.
+        # The total number of all failures from all workers.
         self.total_errors = 0  # type: int
         # The overall text message with an information about the health check.
         # For example it equals to "Good" if everything is ok.
-        # NOTE: this variable will have a value only if all health checks from all workers
-        # and the health check of the copying manager itself are determined.
-        # In other case this variable is None.
         self.health_check_result = None  # type: Optional[six.text_type]
+
+        # The overall text message with an information about the health check of the workers..
+        self.workers_health_check = None  # type: Optional[six.text_type]
 
         # How many times the copying manager scanned the file system for new files.
         self.total_scan_iterations = 0  # type: int
@@ -407,16 +399,102 @@ class CopyingManagerStatus(BaseAgentStatus):
         # status objects for all log matchers.
         self.log_matchers = []  # type: List[LogMatcherStatus]
 
+        # status object for each ApiKeyWorkerPool object.
         self.api_key_worker_pools = []  # type: List[ApiKeyWorkerPoolStatus]
 
-        # overall stat from workers.
+        # overall stats from workers.
         self.total_rate_limited_time = 0
+        self.rate_limited_time_since_last_status = 0
         self.total_read_time = 0
         self.total_waiting_time = 0
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
-        self.rate_limited_time_since_last_status = 0
+
+    def is_single_worker(self):
+        # type: () -> bool
+        """
+        Checks if the copying manager is in default configuration (1 api key, 1 worker)
+        """
+        if len(self.api_key_worker_pools) == 1:
+            pool = self.api_key_worker_pools[-1]
+            if len(pool.workers) == 1:
+                return True
+        return False
+
+    def _workers(self):
+        # type: () -> Generator
+        """
+        Generator that yields all workers from all api keys.
+        """
+        for api_key_status in self.api_key_worker_pools:
+            for worker_status in api_key_status.workers:
+                yield worker_status
+
+    def _verify_workers_health_check(self):
+        """
+        Prepare the message string with an information about workers health check.
+        """
+        if self.is_single_worker():
+            worker = next(iter(self._workers()))
+            # just copy the health check from the single worker.
+            self.workers_health_check = worker.health_check_result
+        else:
+            # get the message for the workers health check
+            all_healthy = True
+            for worker_status in self._workers():
+                if worker_status.health_check_result is None:
+                    # if some workers do not have their health check results, then the result is None too.
+                    all_healthy = False
+                if worker_status.health_check_result != "Good":
+                    # if there are workers with errors, set the message about it.
+                    self.workers_health_check = "Some workers have failed."
+                    all_healthy = False
+                    break
+
+            if all_healthy:
+                # every worker is healthy, so the manager is healthy too.
+                self.workers_health_check = "Good"
+
+    def calculate_status(self):
+        """
+        Calculate overall stats based on all workers.
+        :return:
+        """
+
+        self._verify_workers_health_check()
+
+        # sum up all stats from workers if it is not a default config.
+        if not self.is_single_worker():
+            # sum up some worker stats to overall stats.
+            for worker_status in self._workers():
+                self.total_errors += worker_status.total_errors
+                self.total_bytes_uploaded += worker_status.total_bytes_uploaded
+
+                self.total_rate_limited_time = worker_status.total_rate_limited_time
+                self.total_read_time = worker_status.total_read_time
+                self.total_waiting_time = worker_status.total_waiting_time
+                self.total_blocking_response_time = (
+                    worker_status.total_blocking_response_time
+                )
+                self.total_request_time = worker_status.total_request_time
+                self.total_pipelined_requests = worker_status.total_pipelined_requests
+                self.rate_limited_time_since_last_status = (
+                    worker_status.rate_limited_time_since_last_status
+                )
+
+    def to_dict(self):  # type: () -> dict
+        result = super(CopyingManagerStatus, self).to_dict()
+        if self.is_single_worker():
+            # In case of default configuration,
+            # On previous versions, the copying manager has those stats in its own dict,
+            # but now they are moved to workers.
+            # We put stats from single worker and copy them to copying manager's dict,
+            # to not break things for customers with default configuration
+            worker = self.api_key_worker_pools[-1].workers[-1]
+            result.update(worker.to_dict())
+
+        return result
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -631,119 +709,114 @@ def _indent_print(str, file, indent=4):
     print(str, file=file)
 
 
-def __print_api_key_stats(api_key_stats, agent_log_file_path, is_single, output):
+def __get_overall_health_check(manager_status):
+    # type: (CopyingManagerStatus) -> six.text_type
     """
-    Print statistics of the api key worker pool..
-    :param api_key_stats: Statistics object.
-    :param agent_log_file_path: Pth to the agent log file.
-    :param is_single: If True, then it meant that this statistics object is only one,
-     so we do not show some unneeded elements.
-    :param output: Output file-like object.
+    Get the health checkfor the copying manager's thread and for its worker/workers.
     :return:
     """
-    if is_single:
-        indent = 0
+    # show overall health check
+    health_check_buffer = io.StringIO()
+    if (
+        manager_status.health_check_result == "Good"
+        and manager_status.workers_health_check == "Good"
+    ):
+        # the copying manager thread and workers are good, so overall health check is good too.
+        health_check_buffer.write("Good")
     else:
-        indent = 4
-    if not is_single:
-        _indent_print(
-            "Bytes uploaded successfully:               %ld"
-            % api_key_stats.total_bytes_uploaded,
-            file=output,
-        )
+        if (
+            manager_status.health_check_result
+            and manager_status.health_check_result != "Good"
+        ):
+            # managers health check is something, but it's not Good, so there must be an error. Write it.
+            health_check_buffer.write(manager_status.health_check_result)
+        if (
+            manager_status.workers_health_check
+            and manager_status.workers_health_check != "Good"
+        ):
+            if health_check_buffer.tell() > 0:
+                # if the buffer not empty, then there is a previous error, put comma.
+                health_check_buffer.write(", ")
+            # workers health check is something, but it's not Good, so there must be an error. Write it.
+            health_check_buffer.write(manager_status.workers_health_check)
+
+    return health_check_buffer.getvalue()
+
+
+def _report_worker(output, worker, manager_status, agent_log_file_path, indent):
+    # type: (TextIO, CopyingManagerWorkerStatus, CopyingManagerStatus, six.text_type, int) -> None
+    """
+    Write worker status to the file-like object.
+    :param output: file-like object.
+    :param worker: worker status object.
+    :param agent_log_file_path:
+    :param indent: Number of spaces to indent on each new line.
+    :param manager_status: the manager status to produce the health check.
+    :return:
+    """
+    _indent_print(
+        "Bytes uploaded successfully:               %ld" % worker.total_bytes_uploaded,
+        file=output,
+        indent=indent,
+    )
     _indent_print(
         "Last successful communication with Scalyr: %s"
-        % scalyr_util.format_time(api_key_stats.last_success_time),
+        % scalyr_util.format_time(worker.last_success_time),
         file=output,
         indent=indent,
     )
     _indent_print(
         "Last attempt:                              %s"
-        % scalyr_util.format_time(api_key_stats.last_attempt_time),
+        % scalyr_util.format_time(worker.last_attempt_time),
         file=output,
         indent=indent,
     )
-    if api_key_stats.last_attempt_requests_overall_size:
+    if worker.last_attempt_size is not None:
         _indent_print(
-            "Last copy requests size:                   %ld"
-            % api_key_stats.last_attempt_requests_overall_size,
+            "Last copy request size:                    %ld" % worker.last_attempt_size,
+            file=output,
+            indent=indent,
+        )
+    if worker.last_response is not None:
+        _indent_print(
+            "Last copy response size:                   %ld"
+            % len(worker.last_response),
+            file=output,
+            indent=indent,
+        )
+        _indent_print(
+            "Last copy response status:                 %s"
+            % worker.last_response_status,
+            file=output,
+            indent=indent,
+        )
+        if worker.last_response_status != "success":
+            _indent_print(
+                "Last copy response:                        %s"
+                % scalyr_util.remove_newlines_and_truncate(worker.last_response, 1000),
+                file=output,
+                indent=indent,
+            )
+    if worker.total_errors > 0:
+        _indent_print(
+            "Total responses with errors:               %d (see '%s' for details)"
+            % (worker.total_errors, agent_log_file_path,),
             file=output,
             indent=indent,
         )
 
-    # NOTE: this should be exactly False, we skip it in case of None.
-    if api_key_stats.all_responses_successful is False:
-        _indent_print("Failed copy response statuses:", file=output, indent=indent)
-        workers = list(
-            sorted(api_key_stats.workers, key=operator.attrgetter("worker_id"))
+    if manager_status.is_single_worker():
+        health_check_message = __get_overall_health_check(manager_status)
+    else:
+        health_check_message = worker.health_check_result
+
+    if health_check_message:
+        # if message is not empty, write it. In other case we still don't have all health check data.
+        _indent_print(
+            "Health check:                              %s" % health_check_message,
+            file=output,
+            indent=indent,
         )
-        for worker_status in workers:
-            if worker_status.last_response_status == "success":
-                # show only unsuccessful requests.
-                continue
-            _indent_print(
-                "Worker %s:" % (worker_status.worker_id,),
-                file=output,
-                indent=indent + 4,
-            )
-            _indent_print(
-                "Last copy response status:         %s"
-                % worker_status.last_response_status,
-                file=output,
-                indent=indent + 8,
-            )
-
-            _indent_print(
-                "Last copy response:                %s"
-                % scalyr_util.remove_newlines_and_truncate(
-                    worker_status.last_response, 1000
-                ),
-                file=output,
-                indent=indent + 8,
-            )
-
-    # NOTE: this should be exactly False, we skip if in case of None.
-    if api_key_stats.all_health_checks_good is False:
-        _indent_print("Failed health checks:", file=output, indent=indent)
-
-        for worker_status in api_key_stats.workers:
-            if worker_status.health_check_result == "Good":
-                # show only unsuccessful requests.
-                continue
-            _indent_print(
-                "Worker %s:" % (worker_status.worker_id,),
-                file=output,
-                indent=indent + 4,
-            )
-            _indent_print(
-                "Last copy response status:         %s"
-                % worker_status.health_check_result,
-                file=output,
-                indent=indent + 8,
-            )
-
-    if not is_single:
-        if api_key_stats.total_errors > 0:
-            _indent_print(
-                "Total responses with errors:               %d (see '%s' for details)"
-                % (api_key_stats.total_errors, agent_log_file_path,),
-                file=output,
-                indent=indent,
-            )
-
-    worker_pool_files = []
-
-    for worker_status in api_key_stats.workers:
-        for log_processor in worker_status.log_processors:
-            worker_pool_files.append(log_processor.log_path)
-
-    if not is_single:
-        if worker_pool_files:
-            _indent_print("Files:", file=output, indent=indent)
-            worker_pool_files.sort()
-            for log_path in worker_pool_files:
-                _indent_print("%s" % log_path, file=output, indent=indent + 4)
-
     print("", file=output)
 
 
@@ -758,47 +831,66 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         file=output,
     )
     print("", file=output)
+    api_keys = manager_status.api_key_worker_pools
 
-    print(
-        "Bytes uploaded successfully:               %ld"
-        % manager_status.total_bytes_uploaded,
-        file=output,
-    )
-    if manager_status.last_responses_status_info is not None:
+    # if it is a default configuration, then we just print the stats of the single worker.
+    if manager_status.is_single_worker():
+        worker = api_keys[-1].workers[-1]
+        _report_worker(output, worker, manager_status, agent_log_file_path, indent=0)
+    else:
+        # print some overall information from all workers.
         print(
-            "Last requests:                             %s"
-            % manager_status.last_responses_status_info,
+            "Total bytes uploaded:                            %ld"
+            % manager_status.total_bytes_uploaded,
             file=output,
         )
 
-    if manager_status.health_check_result is not None:
-        print(
-            "Health check:                              %s"
-            % manager_status.health_check_result,
-            file=output,
-        )
+        # print the overlall health chech.
+        health_check_message = __get_overall_health_check(manager_status)
+        if health_check_message:
+            # if message is not empty, write it. In other case we still don't have all health check data.
+            _indent_print(
+                "Overall health check:                            %s"
+                % health_check_message,
+                file=output,
+                indent=0,
+            )
+        if manager_status.total_errors > 0:
+            print(
+                "Total errors occurred:                           %d"
+                % manager_status.total_errors,
+                file=output,
+            )
 
-    if manager_status.total_errors:
-        print(
-            "Total responses with errors:               %d (see '%s' for details)"
-            % (manager_status.total_errors, agent_log_file_path,),
-            file=output,
-        )
-
-    is_single_api_key = len(manager_status.api_key_worker_pools) == 1
-
-    if not is_single_api_key:
         print("", file=output)
 
+        # show every statistics for every worker in every api key.
         print("Uploads statistics by API key:", file=output)
-        print("-------------------", file=output)
+        for api_key in manager_status.api_key_worker_pools:
+            if not api_key.has_files:
+                # skip api key if there is no log files.
+                continue
+            print(" Api key %s:" % api_key.api_key_id, file=output)
+            for worker in api_key.workers:
+                print("    Worker %s:" % worker.worker_id, file=output)
+                _report_worker(
+                    output, worker, manager_status, agent_log_file_path, indent=6
+                )
 
-    for worker_pool in manager_status.api_key_worker_pools:
-        if not is_single_api_key:
-            print("Api key ID: %s" % worker_pool.api_key_id, file=output)
-        __print_api_key_stats(
-            worker_pool, agent_log_file_path, is_single_api_key, output
-        )
+        # Show in which api key and worker each file is located.
+        _indent_print(" Log files associated with api keys:", file=output, indent=0)
+        for api_key in manager_status.api_key_worker_pools:
+            # skip api key if there is no log files.
+            if not api_key.has_files:
+                continue
+            print("  Api key %s:" % api_key.api_key_id, file=output)
+            for worker in api_key.workers:
+                if len(api_key.workers) > 1:
+                    print("    Worker %s:" % worker.worker_id, file=output)
+                for log_processor in worker.log_processors:
+                    _indent_print(log_processor.log_path, file=output, indent=8)
+
+        print("", file=output)
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

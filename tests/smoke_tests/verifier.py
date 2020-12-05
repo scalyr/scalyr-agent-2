@@ -171,7 +171,7 @@ class AgentLogVerifier(AgentVerifier):
                 (
                     "No data in '{0}' file. Directory content: {1}".format(
                         self._runner.agent_log_file_path,
-                        os.listdir(self._runner.agent_logs_dir_path),
+                        os.listdir(self._runner.agent_logs_dir_path),  # type: ignore
                     )
                 )
             )

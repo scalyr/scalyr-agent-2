@@ -2754,6 +2754,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
 class TestApiKeysConfiguration(TestConfigurationBase):
     def test_no_api_keys_entry_(self):
+        # The 'api_keys' list does not exist, a default api_key entry should be created.
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
@@ -2765,11 +2766,20 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config.parse()
 
         # only defaults are created.
+        assert len(config.api_key_configs) == 1
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0")
+            JsonObject(
+                workers=config.default_workers_per_api_key,
+                api_key=config.api_key,
+                id="0",
+            )
         )
 
     def test_empty_api_keys_entry(self):
+        """
+        Does not make so much sense, but still a valid case to apply a default api key.
+        :return:
+        """
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there"
@@ -2784,7 +2794,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="0")
+            JsonObject(
+                workers=config.default_workers_per_api_key,
+                api_key=config.api_key,
+                id="0",
+            )
         )
 
     def test_default_api_keys_entry_id(self):
@@ -2804,7 +2818,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         assert config.api_key_configs == JsonArray(
-            JsonObject(workers=1, api_key=config.api_key, id="my_worker")
+            JsonObject(
+                workers=config.default_workers_per_api_key,
+                api_key=config.api_key,
+                id="my_worker",
+            )
         )
 
     def test_default_api_keys_with_no_api_key(self):
@@ -2830,7 +2848,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
 
     def test_default_api_keys_entry_and_invalid_second(self):
-        # secong log entry is empty, this is not allowed.
+        # second log entry is also without api key field,
+        # so the parser will treat it as a second default api key entry.
+        # The redefinition of the same api key is not allowed, so it should throw an error.
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
@@ -2847,8 +2867,13 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
 
-        with pytest.raises(BadConfiguration):
+        with pytest.raises(BadConfiguration) as err_info:
             config.parse()
+
+        assert (
+            "is redefined in next entries. Please use only unique api keys"
+            in err_info.value.message
+        )
 
         # second entry does not have api_key.
         self._write_file_with_separator_conversion(
@@ -3021,3 +3046,52 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
 
         self.assertRaises(BadConfiguration, config.parse)
+
+    def test_the_first_api_key_is_default(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "another_key"}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.api_key_configs) == 2
+        assert config.api_key_configs[0]["api_key"] == config.api_key
+        assert config.api_key_configs[1]["api_key"] == "another_key"
+
+    def test_default_workers_per_api_key(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "another_key"},
+                {"api_key": "another_key2", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.api_key_configs) == 3
+        assert config.api_key_configs[0]["api_key"] == config.api_key
+        assert (
+            config.api_key_configs[0]["workers"] == config.default_workers_per_api_key
+        )
+        assert config.api_key_configs[1]["api_key"] == "another_key"
+        assert (
+            config.api_key_configs[1]["workers"] == config.default_workers_per_api_key
+        )
+        assert config.api_key_configs[2]["api_key"] == "another_key2"
+        assert config.api_key_configs[2]["workers"] == 3

@@ -302,7 +302,9 @@ echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response status:         client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
 
 Log-Message ""
 Log-Message "Status output successfuly verified."
@@ -340,7 +342,9 @@ echo $status_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
-if ("$status_output" -notmatch "Last copy response status:         client/connectionFailedSSLError") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy request size:                    0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response size:                   0") { Throw "Invalid line found." };
+if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedSSLError") { Throw "Invalid line found." };
 
 Log-Message ""
 Log-Message "Status output successfuly verified."

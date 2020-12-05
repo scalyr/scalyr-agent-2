@@ -1175,10 +1175,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
             worker.write_checkpoints(worker.get_active_checkpoints_path(), active_chp)
 
-        # also shift time in the master checkpoint file.
-        master_checkpoints = self._manager.master_checkpoints
-        master_checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
-        self._manager.write_master_checkpoints(master_checkpoints)
+        # also shift time in the consolidated checkpoint file.
+        checkpoints = self._manager.consolidated_checkpoints
+        checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
+        self._manager.write_consolidated_checkpoints(checkpoints)
 
         # create and manager.
         controller = self.__create_test_instance(
@@ -1206,6 +1206,10 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         controller.stop_manager()
 
+        # remove the checkpoints file, which should be only one,
+        # because it has to clean all other files on stop. From this moment, all checkpoint states are removed
+        os.remove(os.path.join(self._config.agent_data_path, "checkpoints.json"))
+
         # "active_checkpoints" file is used if it is newer than "full_checkpoints",
         # so we read "full_checkpoints" ...
 
@@ -1214,6 +1218,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
             # ... and make bigger(fresher) time value for "active_checkpoints".
             active_checkpoints["time"] = checkpoints["time"] + 1
+            worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
             worker.write_checkpoints(
                 worker.get_active_checkpoints_path(), active_checkpoints
             )
@@ -1243,12 +1248,20 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
+
         controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
 
+        # remove the checkpoints file, which should be only one,
+        # because it has to clean all other files on stop. From this moment, all checkpoint states are removed
+        os.remove(os.path.join(self._config.agent_data_path, "checkpoints.json"))
+
         for worker in self._manager.workers:
-            os.remove(str(worker.get_active_checkpoints_path()))
+            # get preserved checkpoints from workers and write them ones more.
+            # we do not write active-checkpoints because it is the purpose of this test.
+            checkpoints, _ = worker.get_checkpoints()
+            worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1277,9 +1290,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         self.__append_log_lines("Third line", "Fourth line")
 
-        for worker in self._manager.workers:
-            _write_bad_checkpoint_file(str(worker.get_active_checkpoints_path()))
-            _write_bad_checkpoint_file(str(worker.get_checkpoints_path()))
+        _write_bad_checkpoint_file(str(controller.consolidated_checkpoints_path))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False
@@ -1308,9 +1319,7 @@ class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
 
         self.__append_log_lines("Third line", "Fourth line")
 
-        for worker in self._manager.workers:
-            _add_non_utf8_to_checkpoint_file(str(worker.get_active_checkpoints_path()))
-            _add_non_utf8_to_checkpoint_file(str(worker.get_checkpoints_path()))
+        _add_non_utf8_to_checkpoint_file(str(controller.consolidated_checkpoints_path))
 
         controller = self.__create_test_instance(
             root_dir=previous_root_dir, auto_start=False

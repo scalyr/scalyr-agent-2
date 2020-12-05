@@ -42,6 +42,7 @@ from six.moves import range
 import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
+from scalyr_agent.configuration import Configuration
 
 from scalyr_agent import __scalyr__
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -116,6 +117,7 @@ def verify_server_certificate(config):
 
 
 def create_client(config, quiet=False, api_key=None):
+    # type: (Configuration, bool, six.text_type) -> ScalyrClientSession
     """Creates and returns a new client to the Scalyr servers.
 
     @param quiet: If true, only errors should be written to stdout.
