@@ -13,6 +13,7 @@ Improvements:
 
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
+* New ``global_monitor_sample_interval_enable_jitter`` config option has been added which is enabled by default. When this option is enabled, random sleep between 2/10 and 8/10 of the configured monitor sample gather interval is used before gathering the sample for the first time. This ensures that sample gathering for all the monitors doesn't run at the same time. This comes in handy when running agent configured with many monitors on lower powered devices to spread the monitor sample gathering related load spike across a longer time frame.
 
 Bug fixes:
 * Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.

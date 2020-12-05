@@ -33,6 +33,7 @@ import inspect
 import os
 import sys
 import time
+import random
 from threading import Lock
 
 import six
@@ -48,6 +49,15 @@ from scalyr_agent.config_util import (
 from scalyr_agent.util import StoppableThread
 
 log = scalyr_logging.getLogger(__name__)
+
+# Maximum value we will use for random sleep before first sample gathering.
+# This way we guard against a potentially very large sleep which would be used for monitors
+# configured with very large sample intervals.
+MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS = 40
+
+# Minimum value for initial sample gather sleep for monitors which use very large sample gather
+# interval.
+MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS = 15
 
 
 class ScalyrMonitor(StoppableThread):
@@ -250,6 +260,40 @@ class ScalyrMonitor(StoppableThread):
         """
         pass
 
+    def _get_initial_sleep_delay(self):
+        # type: () -> int
+        """
+        Return initial sleep delay for this monitor.
+
+        We sleep this number of seconds before first sample gathering.
+
+        By default (on agent start up and when reloading the config and restarting the monitors),
+        all the monitors are started at the same time, which means that all the monitors with the
+        same sample gather interval will run at the same time.
+
+        To avoid this and potential larger load spike when running many monitors on lower powered
+        devices, we sleep random number of seconds before first sample gather interval for each
+        monitor.
+
+        This way we spread a potential short load spike during sample gathering across a longer time
+        frame.
+        """
+        if not self._global_config.global_monitor_sample_interval_enable_jitter:
+            return 0
+
+        sample_interval_secs = self._sample_interval_secs
+
+        if sample_interval_secs >= MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS:
+            min_jitter_secs = MIN_INITIAL_GATHER_SAMPLE_SLEEP_SECS
+            max_jitter_secs = MAX_INITIAL_GATHER_SAMPLE_SLEEP_SECS
+        else:
+            # min sleep time is 2/10 of the sample interval and max is 8/10
+            min_jitter_secs = round((sample_interval_secs / 10) * 2)
+            max_jitter_secs = round((sample_interval_secs / 10) * 8)
+
+        random_jitter_secs = random.randint(min_jitter_secs, max_jitter_secs)
+        return random_jitter_secs
+
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
 
@@ -269,25 +313,34 @@ class ScalyrMonitor(StoppableThread):
         """
         # noinspection PyBroadException
         try:
+            # To avoid all the monitors with the same sample interval running at the same time,
+            # we add random sleep delay before the first same gathering.
+            initial_sleep_delay = self._get_initial_sleep_delay()
+
+            if initial_sleep_delay >= 1:
+                self._sleep_but_awaken_if_stopped(initial_sleep_delay)
+                self._logger.debug(
+                    "Sleeping %s seconds before first sample gather interval"
+                    % (initial_sleep_delay)
+                )
+
             while not self._is_thread_stopped():
+                sample_interval = self._sample_interval_secs
+
                 # noinspection PyBroadException
                 adjustment = 0
                 try:
                     start_time = time.time()
                     self.gather_sample()
                     if self._adjust_sleep_by_gather_time:
-                        adjustment = min(
-                            time.time() - start_time, self._sample_interval_secs
-                        )
+                        adjustment = min(time.time() - start_time, sample_interval)
                 except Exception:
                     self._logger.exception(
                         "Failed to gather sample due to the following exception"
                     )
                     self.increment_counter(errors=1)
 
-                self._sleep_but_awaken_if_stopped(
-                    self._sample_interval_secs - adjustment
-                )
+                self._sleep_but_awaken_if_stopped(sample_interval - adjustment)
 
             self._logger.info("Monitor has finished")
         except Exception:
