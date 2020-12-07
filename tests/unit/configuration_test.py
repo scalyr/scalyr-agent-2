@@ -28,6 +28,7 @@ import sys
 import tempfile
 from io import open
 import platform
+import json
 
 import mock
 import pytest
@@ -2767,12 +2768,10 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         # only defaults are created.
         assert len(config.api_key_configs) == 1
-        assert config.api_key_configs == JsonArray(
-            JsonObject(
-                workers=config.default_workers_per_api_key,
-                api_key=config.api_key,
-                id="0",
-            )
+        assert config.api_key_configs[0] == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            workers=config.default_workers_per_api_key,
         )
 
     def test_empty_api_keys_entry(self):
@@ -2793,12 +2792,13 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        assert config.api_key_configs == JsonArray(
-            JsonObject(
-                workers=config.default_workers_per_api_key,
-                api_key=config.api_key,
-                id="0",
-            )
+        assert len(config.api_key_configs) == 1
+        api_key = config.api_key_configs[0]
+
+        assert api_key == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            workers=config.default_workers_per_api_key,
         )
 
     def test_default_api_keys_entry_id(self):
@@ -2817,12 +2817,10 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
         config.parse()
-        assert config.api_key_configs == JsonArray(
-            JsonObject(
-                workers=config.default_workers_per_api_key,
-                api_key=config.api_key,
-                id="my_worker",
-            )
+        assert config.api_key_configs[0] == JsonObject(
+            api_key=config.api_key,
+            id="my_worker",
+            workers=config.default_workers_per_api_key,
         )
 
     def test_default_api_keys_with_no_api_key(self):
@@ -2843,8 +2841,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert config.api_key_configs == JsonArray(
-            JsonObject(workers=3, api_key=config.api_key, id="0")
+        assert len(config.api_key_configs) == 1
+        assert config.api_key_configs[0] == JsonObject(
+            workers=3, api_key=config.api_key, id="default"
         )
 
     def test_default_api_keys_entry_and_invalid_second(self):
@@ -2871,7 +2870,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "is redefined in next entries. Please use only unique api keys"
+            "The default api key is redefined. Please use only unique api keys.The entries without 'api_key' field are also considered as default"
             in err_info.value.message
         )
 
@@ -2920,7 +2919,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 2
         assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="0",
+            workers=3, api_key=config.api_key, id="default",
         )
         assert config.api_key_configs[1] == JsonObject(
             workers=4, api_key="key2", id="second"
@@ -2958,7 +2957,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 2
         assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="0"
+            workers=3, api_key=config.api_key, id="default"
         )
         assert config.api_key_configs[1] == JsonObject(
             workers=4, api_key="key2", id="second",
@@ -2993,8 +2992,12 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
         config = self._create_test_configuration_instance()
 
-        with pytest.raises(BadConfiguration):
+        with pytest.raises(BadConfiguration) as err_info:
             config.parse()
+
+        assert (
+            "entry refers to a non-existing api key with id" in err_info.value.message
+        )
 
     def test_workers_type_default(self):
         self._write_file_with_separator_conversion(
@@ -3095,3 +3098,141 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
         assert config.api_key_configs[2]["api_key"] == "another_key2"
         assert config.api_key_configs[2]["workers"] == 3
+
+    def test_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                api_keys: [
+                    {"api_key": "another_key3", "workers": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "api_key_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if api keys from fragment are added.
+        assert len(config.api_key_configs) == 4
+        assert config.api_key_configs[0]["id"] == "default"
+        api_key_from_fragment = list(config.api_key_configs)[-1]
+        assert api_key_from_fragment["api_key"] == "another_key3"
+        assert api_key_from_fragment["id"] == "3"
+
+    def test_k8s_and_journald_logs_api_keys(self):
+
+        main_config = {
+            "api_key": "hi there",
+            "api_keys": [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2", "workers": 3},
+            ],
+            "logs": [
+                {"path": "path1"},
+                {"path": "path2", "api_key_id": "second_key"},
+                {"path": "path3", "api_key_id": "key3"},
+            ],
+        }
+
+        log_config2 = {"path": "path5", "api_key_id": "key3"}
+
+        config_fragment = {
+            "api_keys": [
+                {"api_key": "another_key3", "id": "key3"},
+                {"api_key": "another_key4", "workers": 3},
+            ],
+            "logs": [
+                {"path": "path4"},
+                log_config2,
+                {"path": "path6", "api_key_id": "second_key"},
+            ],
+        }
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        api_keys = list(config.api_key_configs)
+
+        assert len(api_keys) == 5
+
+        assert api_keys[0]["id"] == "default"
+        assert api_keys[1]["id"] == "second_key"
+        assert api_keys[2]["id"] == "2"
+        assert api_keys[3]["id"] == "key3"
+        assert api_keys[4]["id"] == "4"
+
+        log_config2["api_key_id"] = "wrong_api_key_id"
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "The log file '/var/log/scalyr-agent-2/path5' entry refers to a non-existing api key with id 'wrong_api_key_id'"
+            in err_info.value.message
+        )
+
+    def test_api_keys_negative_workers_number(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2", "workers": -1}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert "Value must be greater than 1" in err_info.value.message
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            default_workers_per_api_key: -1,
+            api_keys: [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2"}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert "Value must be greater than 1" in err_info.value.message

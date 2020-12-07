@@ -121,7 +121,10 @@ class Configuration(object):
         # are created by default by the platform.
         self.__monitor_configs = []
 
-        self.__api_keys_configs = []
+        self.__api_key_configs = []
+
+        # the config entry with a default api key
+        self.__default_api_key_config = None
 
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
@@ -201,6 +204,7 @@ class Configuration(object):
                 "k8s_logs",
                 "monitors",
                 "server_attributes",
+                "api_keys",
             )
 
             # Get any configuration snippets in the config directory
@@ -241,6 +245,7 @@ class Configuration(object):
                 self.__add_elements_from_array("journald_logs", content, self.__config)
                 self.__add_elements_from_array("k8s_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
+                self.__add_elements_from_array("api_keys", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
             self.__set_api_key(self.__config, api_key)
@@ -367,11 +372,117 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-            self.__api_keys_configs = list(self.__config.get_json_array("api_keys"))
+            # NOTE do this verifications only after all config fragments were added into configurations.
+            self.__verify_api_keys()
+            self.__verify_and_match_api_keys_in_logs()
+
+            self.__api_key_configs = list(self.__config.get_json_array("api_keys"))
 
         except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def __verify_api_keys(self):
+        """
+        Verify all api key config entries from the "api_keys" list in config.
+        """
+        api_keys = self.__config.get_json_array("api_keys")
+        default_key_config = None
+        for key_config in api_keys:
+            api_key = key_config.get("api_key", none_if_missing=True)
+            # if the 'api_key' from this entry equals to the 'main' api key,
+            # than this api key entry is considered as default.
+            if api_key is None or api_key == self.api_key:
+                if default_key_config is None:
+                    default_key_config = key_config
+                else:
+                    # if there are more than one api key entries that also can be considered as a default,
+                    # then raise a duplication error
+                    raise BadConfiguration(
+                        "The default api key is redefined. Please use only unique api keys."
+                        "The entries without 'api_key' field are also considered as default",
+                        "api_keys",
+                        "apiKeyDuplication",
+                    )
+
+        unique_keys = set()
+        other_api_key_configs = list()
+        # If there are multiple api key entries with the same api_key, then the duplication error is raised too.
+        for key_config in api_keys:
+            api_key = key_config.get("api_key", none_if_missing=True)
+            if api_key in unique_keys:
+                key_id = key_config["id"]
+                raise BadConfiguration(
+                    "The api key with api_key_id '%s' is redefined in next entries. Please use only unique api keys."
+                    % key_id,
+                    "api_keys",
+                    "apiKeyDuplication",
+                )
+            else:
+                unique_keys.add(api_key)
+                other_api_key_configs.append(key_config)
+
+        if default_key_config is None:
+            # if there is no entry for the default api key, create it.
+            default_key_config = JsonObject(api_key=self.api_key)
+            # create a new api keys list with the default one at the beginning.
+            other_api_key_configs.insert(0, default_key_config)
+            self.__config.put("api_keys", JsonArray(*other_api_key_configs))
+
+        # add missing fields for the default api key config.
+        if "id" not in default_key_config:
+            default_key_config["id"] = "default"
+        if "api_key" not in default_key_config:
+            default_key_config["api_key"] = self.api_key
+
+        # Apply defaults to all api key entries
+        for i, api_key_entry in enumerate(self.__config.get_json_array("api_keys")):
+            self.__verify_api_keys_entry_and_set_defaults(api_key_entry, entry_index=i)
+
+        self.__default_api_key_config = default_key_config
+
+    def __verify_and_match_api_keys_in_logs(self):
+        """
+        Check if every log file entry contains a valid reference to the api key.
+        Each log file config entry has to have a field "api_key_id" which refers to some entry in the "api_keys" list.
+        If such "api_key_id" field is not specified, then the id of the default api key is used.
+        If "api_key_id" is specified but there is no such api key, then the error is raised.
+        :return:
+        """
+
+        api_key_ids = set()
+        for key_config in self.__config.get_json_array("api_keys"):
+            api_key_ids.add(key_config["id"])
+
+        # get all lists where log files entries may be defined.
+        log_config_lists = [
+            self.__log_configs,
+            self.__k8s_log_configs,
+            self.__journald_log_configs,
+        ]
+
+        default_api_key_id = self.__config.get("api_keys")[0]["id"]
+
+        for log_config_list in log_config_lists:
+            for log_file_config in log_config_list:
+                api_key_id = log_file_config.get("api_key_id", none_if_missing=True)
+
+                if api_key_id is None:
+                    # set a default api key if api_key_id is not specified.
+                    log_file_config["api_key_id"] = self.__default_api_key_config["id"]
+                else:
+                    # if log file entry has api_key_id which is not defined in the 'api_keys' list, then throw an error.
+                    if api_key_id not in api_key_ids:
+                        raise BadConfiguration(
+                            "The log file '%s' entry refers to a non-existing api key with id '%s'."
+                            % (log_file_config["path"], api_key_id),
+                            "logs",
+                            "invalidApiKeyReference",
+                        )
+
+                # if there is no api key id, then use the id of the default api key.
+                if api_key_id is None:
+                    log_file_config["api_key_id"] = default_api_key_id
 
     def _check_config_file_permissions_and_warn(self, file_path):
         # type: (str) -> None
@@ -1427,7 +1538,7 @@ class Configuration(object):
 
     @property
     def api_key_configs(self):
-        return self.__get_config().get_json_array("api_keys")
+        return self.__api_key_configs
 
     @property
     def use_multiprocess_copying_workers(self):
@@ -1490,6 +1601,11 @@ class Configuration(object):
         """Returns the default configuration file path for the agent."""
         # TODO:  Support more platforms.
         return Configuration.__resolve_to_install_location("certs", "ca_certs.crt")
+
+    @property
+    def default_api_key_config(self):
+        """The config entry with the current default api key"""
+        return self.__default_api_key_config
 
     @property
     def intermediate_certs_path(self):
@@ -2767,6 +2883,7 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+            min_value=1,
         )
 
         # windows does not support copying manager backed with multiprocessing workers.
@@ -2914,55 +3031,6 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "monitors", description)
         self.__verify_or_set_optional_array(config, "api_keys", description)
 
-        # NOTE. Important to verify api_keys config entries before log config entries,
-        # because log configs may refer to some api_key entry by 'api_key_id' field.
-
-        api_keys = config.get_json_array("api_keys")
-        no_default = True
-
-        if api_keys:
-            # Check if there is a config entries with a default api key,
-            # or at least with missing api_key filed (if api_key is missing, then it also replaced by the default)
-
-            for api_config in api_keys:
-                api_key = api_config.get("api_key", none_if_missing=True)
-                if api_key is None or api_key == self.api_key:
-                    # If any of those found, then we dob't have to create a default api key entry.
-                    no_default = False
-                    break
-
-        # If there is no default key, then create it and recreate whole api key list
-        # with the default one at the beginning.
-        if no_default:
-            new_api_keys = JsonArray()
-            new_api_keys.add(JsonObject(api_key=self.api_key))
-            for api_config in api_keys:
-                new_api_keys.add(api_config)
-
-            config.put("api_keys", new_api_keys)
-
-        # Apply defaults to all api key entries
-        for i, api_key_entry in enumerate(config.get_json_array("api_keys")):
-            self.__verify_api_keys_entry_and_set_dafaults(
-                api_key_entry, entry_index=i, description=description
-            )
-
-        # The final verification of the api key entries. If there are multiple api key entries with the same api_key,
-        # then the error is raised.
-        unique_keys = set()
-        for key_config in config.get_json_array("api_keys"):
-            api_key = key_config["api_key"]
-            if api_key in unique_keys:
-                key_id = key_config["id"]
-                raise BadConfiguration(
-                    "The api key with api_key_id '%s' is redefined in next entries. Please use only unique api keys."
-                    % key_id,
-                    "api_keys",
-                    "apiKeyDuplication",
-                )
-            else:
-                unique_keys.add(api_key)
-
         i = 0
         for log_entry in config.get_json_array("logs"):
             self.__verify_log_entry_and_set_defaults(
@@ -3071,17 +3139,18 @@ class Configuration(object):
             entry_index=entry_index,
         )
 
-        # get first api_key entry as the default.
-        api_key_entries = self.__config.get_json_array("api_keys")
-        default_api_key_id = api_key_entries[0]["id"]
-        api_key_ids = set(e["id"] for e in api_key_entries)
-        self.__verify_or_set_optional_string(
-            log_entry,
-            "api_key_id",
-            default_api_key_id,
-            description,
-            valid_values=api_key_ids,
-        )
+        # Because the log file are verified earlier than api keys we can not verify the default api_key_id field there,
+        # and this is done in the '__verify_and_match_api_keys_in_logs' function,
+        # when the default api key is already known.
+        # But we still need to verify api_key_id in case if log file was added after the config was verifyed.
+        # For example, when monitors dynamically add new log files to the copying manager.
+        if self.__default_api_key_config is not None:
+            self.__verify_or_set_optional_string(
+                log_entry,
+                "api_key_id",
+                self.__default_api_key_config["id"],
+                description,
+            )
 
     def __verify_log_entry_with_key_and_set_defaults(
         self,
@@ -3291,24 +3360,21 @@ class Configuration(object):
             monitor_entry, "log_path", module_name + ".log", description
         )
 
-    def __verify_api_keys_entry_and_set_dafaults(
+    def __verify_api_keys_entry_and_set_defaults(
         self, api_key_entry, entry_index=None, description=None
     ):
         """
         Verify the copying manager api_keys entry. and set defaults.
         """
 
-        # if there is no 'api_key', then we use the default 'api_key' from the 'root' scope.
-        if "api_key" not in api_key_entry:
-            api_key_entry["api_key"] = self.api_key
-
-        # if the id for the api_key entry is not specified, just set the entry index as id.
-        if "id" not in api_key_entry:
-            api_key_entry["id"] = six.text_type(entry_index)
+        # If the api key id is not specified explicitly, then just set the entry index as id.
+        self.__verify_or_set_optional_string(
+            api_key_entry, "id", six.text_type(entry_index), description
+        )
 
         workers_number = self.__config.get_int("default_workers_per_api_key")
         self.__verify_or_set_optional_int(
-            api_key_entry, "workers", workers_number, description
+            api_key_entry, "workers", workers_number, description, min_value=1
         )
 
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
