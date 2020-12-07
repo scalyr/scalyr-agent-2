@@ -73,6 +73,7 @@ class ApiKeyWorkerPool(object):
     def __init__(self, config, api_key_config):
         # type: (Configuration, Dict) -> None
 
+        self.__api_key_config = api_key_config
         self.__api_key_id = api_key_config["id"]
         self.__config = config
 
@@ -137,6 +138,15 @@ class ApiKeyWorkerPool(object):
         to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
         """
         scalyr_logging.set_log_destination(agent_log_file_path=path, use_disk=True)
+
+    def __repr__(self):
+        api_key_config = copy.deepcopy(self.__api_key_config)
+        api_key = api_key_config.get("api_key", "")
+        api_key_config["api_key"] = "..." + api_key[-4:]
+        return "<ApiKeyWorkerPool api_key_config=%s>" % (api_key_config)
+
+    def __str__(self):
+        return str(self.__repr__())
 
     @property
     def api_key_id(self):
