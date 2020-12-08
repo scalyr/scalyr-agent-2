@@ -392,18 +392,22 @@ class Configuration(object):
         api_keys = list(self.__config.get_json_array("api_keys"))
 
         unique_api_ids = {}
+        api_key_positions = {}
         # Apply other defaults to all api key entries
         for i, api_key_entry in enumerate(api_keys):
-            self.__verify_api_keys_entry_and_set_defaults(api_key_entry)
+            self.__verify_api_keys_entry_and_set_defaults(api_key_entry, entry_index=i)
             api_key_id = api_key_entry["id"]
             if api_key_id in unique_api_ids:
+                position = api_key_positions[api_key_id]
                 raise BadConfiguration(
-                    "The entry field 'api_key_id' of the list 'api_keys' has to be unique.",
+                    "The api key #%s already has id '%s' but it has also been re-used by the api key #%s. Api key id's must remain unique."
+                    % (position, api_key_id, i),
                     "api_keys",
                     "apiKeyIdDuplication",
                 )
             else:
                 unique_api_ids[api_key_id] = api_key_entry
+                api_key_positions[api_key_id] = i
 
         default_api_key_entry = unique_api_ids.get("default")
 
@@ -3342,14 +3346,19 @@ class Configuration(object):
             monitor_entry, "log_path", module_name + ".log", description
         )
 
-    def __verify_api_keys_entry_and_set_defaults(
-        self, api_key_entry, entry_index=None, description=None
-    ):
+    def __verify_api_keys_entry_and_set_defaults(self, api_key_entry, entry_index=None):
         """
         Verify the copying manager api_keys entry. and set defaults.
         """
-        self.__verify_required_string(api_key_entry, "api_key", description)
 
+        description = "the #%s entry of the 'api_keys' list."
+
+        # the 'api_key' field is required, raise an error if it is not specified.
+        self.__verify_required_string(
+            api_key_entry, "api_key", description % entry_index
+        )
+
+        # the 'id' field is required, raise an error if it is not specified.
         self.__verify_required_string(api_key_entry, "id", description)
 
         if api_key_entry["id"] == "default":

@@ -2898,6 +2898,75 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             in err_info.value.message
         )
 
+    def test_api_key_id_duplication(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "api_key": "key", "id": "second"
+                    },
+                    {
+                        "api_key": "key2", "id": "second"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "The api key #0 already has id 'second' but it has also been re-used by the api key #1. Api key id's must remain unique."
+            in err_info.value.message
+        )
+
+    def test_api_key_field_missing(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "id": "second"
+                    },
+                    {
+                        "api_key": "key2", "id": "third"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert 'The required field "api_key" is missing.' in err_info.value.message
+
+    def test_api_key_entry_id_field_missing(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "api_key": "key"
+                    },
+                    {
+                        "api_key": "key2", "id": "third"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert 'The required field "id" is missing.' in err_info.value.message
+
     def test_log_file_bind_to_api_keys_entries(self):
         self._write_file_with_separator_conversion(
             """ {
