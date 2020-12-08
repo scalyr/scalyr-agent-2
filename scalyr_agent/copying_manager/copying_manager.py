@@ -171,6 +171,7 @@ class ApiKeyWorkerPool(object):
 
         for shared_object_manager in self.__shared_object_managers.values():
             try:
+                # ignore errors if process hasn't been created yet.
                 result.append(shared_object_manager._process.ident)
             except Exception:
                 pass
