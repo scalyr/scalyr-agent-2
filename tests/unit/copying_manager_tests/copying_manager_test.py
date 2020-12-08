@@ -301,6 +301,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.assertEquals("Third line", lines[2])
 
     def test_pipelined_requests(self):
+        if self.workers_count * self.api_keys_count > 1:
+            pytest.skip("This test works only on one worker configuration.")
+
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
 
@@ -330,6 +333,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         responder_callback("success")
 
     def test_pipelined_requests_with_normal_error(self):
+        if self.workers_count * self.api_keys_count > 1:
+            pytest.skip("This test works only on one worker configuration.")
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
 
@@ -370,6 +375,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         responder_callback("success")
 
     def test_pipelined_requests_with_retry_error(self):
+        if self.workers_count * self.api_keys_count > 1:
+            pytest.skip("This test works only on one worker configuration.")
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
 
