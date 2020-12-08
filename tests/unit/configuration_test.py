@@ -59,7 +59,7 @@ from scalyr_agent.compat import os_environ_unicode
 
 import six
 from six.moves import range
-from mock import patch, Mock, call
+from mock import patch, Mock
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -1738,7 +1738,6 @@ class TestConfiguration(TestConfigurationBase):
         """Make sure that when we print the config options that we
         don't throw any exceptions
         """
-
         self._write_file_with_separator_conversion("""{api_key: "hi there"}""")
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
@@ -1747,6 +1746,23 @@ class TestConfiguration(TestConfigurationBase):
         mock_logger.info.assert_any_call("Configuration settings")
         mock_logger.info.assert_any_call("\tmax_line_size: 49900")
 
+        # Verify actual API keys are masked
+        self._write_file_with_separator_conversion(
+            """{api_key: "hi there", api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}, {"workers":5, "api_key": "bar1234", "id": "two"}]}"""
+        )  # NOQA
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call("\tmax_line_size: 49900")
+
+        # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
+        # sorted string value
+        expected_line = "\tsanitized_api_key_configs: [{'workers': 5, 'api_key': '********** MASKED **********', 'id': 'two'}, {'workers': 2, 'api_key': '********** MASKED **********', 'id': 'one'}, {'workers': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        logged_line = mock_logger.info.call_args_list[-1][0][0]
+        self.assertEqual(sorted(expected_line), sorted(logged_line))
+
     def test_print_config_when_changed(self):
         """
         Test that `print_useful_settings` only outputs changed settings when compared to another
@@ -1754,7 +1770,9 @@ class TestConfiguration(TestConfigurationBase):
         """
         self._write_file_with_separator_conversion(
             """{
-            api_key: "hi there"
+            api_key: "hi there",
+            max_line_size: 5,
+            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1764,8 +1782,9 @@ class TestConfiguration(TestConfigurationBase):
 
         self._write_file_with_separator_conversion(
             """{
-            api_key: "hi there"
+            api_key: "hi there",
             max_line_size: 9900,
+            api_keys: [{"workers":10, "api_key": "foo1234", "id": "one"}]},
             }
         """
         )
@@ -1774,11 +1793,15 @@ class TestConfiguration(TestConfigurationBase):
 
         new_config.print_useful_settings(other_config=config)
 
-        calls = [
-            call("Configuration settings"),
-            call("\tmax_line_size: 9900"),
-        ]
-        mock_logger.info.assert_has_calls(calls)
+        self.assertEqual(mock_logger.info.call_count, 3)
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call("\tmax_line_size: 9900")
+
+        # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
+        # sorted string value
+        expected_line = "\tsanitized_api_key_configs: [{'workers': 10, 'api_key': '********** MASKED **********', 'id': 'one'}, {'workers': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        logged_line = mock_logger.info.call_args_list[-1][0][0]
+        self.assertEqual(sorted(expected_line), sorted(logged_line))
 
     def test_print_config_when_not_changed(self):
         """
@@ -1807,7 +1830,8 @@ class TestConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """{
             api_key: "hi there",
-            max_line_size: 49900
+            max_line_size: 49900,
+            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1826,8 +1850,8 @@ class TestConfiguration(TestConfigurationBase):
             self._write_file_with_separator_conversion(
                 """{
                 api_key: "hi there",
-                max_line_size: 49900
-                debug_level: %s
+                max_line_size: 49900,
+                debug_level: %s,
                 }
             """
                 % (level)
@@ -1847,7 +1871,8 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 49900,
-            debug_level: 5
+            debug_level: 5,
+            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1867,6 +1892,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertTrue("Raw config value:" in call_msg)
         self.assertTrue("*** MASKED ***" in call_msg)
         self.assertTrue('"debug_level": 5' in call_msg)
+        self.assertTrue('"api_key": "********** MASKED **********"' in call_msg)
+        self.assertTrue("foo1234" not in call_msg)
 
     def test_import_vars_in_configuration_directory(self):
         os.environ["TEST_VAR"] = "bye"
@@ -2564,9 +2591,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 2. value < min
         config_object = JsonObject(content={"foo": 9})
-        expected_msg = (
-            'Got invalid value "9" for field "foo". Value must be greater than 10'
-        )
+        expected_msg = 'Got invalid value "9" for field "foo". Value must be greater than or equal to 10'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -2582,9 +2607,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 3. value > max
         config_object = JsonObject(content={"foo": 101})
-        expected_msg = (
-            'Got invalid value "101" for field "foo". Value must be less than 100'
-        )
+        expected_msg = 'Got invalid value "101" for field "foo". Value must be less than or equal to 100'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -3062,7 +3085,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         with pytest.raises(BadConfiguration) as err_info:
             config.parse()
 
-        assert "Value must be greater than 1" in err_info.value.message
+        assert "Value must be greater than or equal to 1" in err_info.value.message
 
         self._write_file_with_separator_conversion(
             """ {
@@ -3080,7 +3103,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         with pytest.raises(BadConfiguration) as err_info:
             config.parse()
 
-        assert "Value must be greater than 1" in err_info.value.message
+        assert "Value must be greater than or equal to 1" in err_info.value.message
 
     def test_default_workers_per_api_key_from_env(self):
         os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "4"

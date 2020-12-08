@@ -67,6 +67,8 @@ You need to make sure that the file is owned by the same account which is used t
 Original error: %s
 """.strip()
 
+MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -660,6 +662,9 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "use_multiprocess_copying_workers",
+            # NOTE: It's important we use sanitzed_ version of this method which masks the API key
+            "sanitized_api_key_configs",
         ]
 
         # get options (if any) from the other configuration object
@@ -691,6 +696,10 @@ class Configuration(object):
                 if first:
                     self.__logger.info("Configuration settings")
                     first = False
+
+                if isinstance(value, (list, dict)):
+                    # We remove u"" prefix to ensure consistent output between Python 2 and 3
+                    value = six.text_type(value).replace("u'", "'")
 
                 self.__logger.info("\t%s: %s" % (option, value))
 
@@ -733,7 +742,11 @@ class Configuration(object):
 
         for key in values_to_mask:
             if key in raw_config:
-                raw_config[key] = "********** MASKED **********"
+                raw_config[key] = MASKED_CONFIG_ITEM_VALUE
+
+        # Ensure we also sanitize api_key values in api_keys dictionaries
+        if "api_keys" in raw_config:
+            raw_config["api_keys"] = self.sanitized_api_key_configs
 
         return raw_config
 
@@ -1591,6 +1604,23 @@ class Configuration(object):
     @property
     def api_key_configs(self):
         return self.__api_key_configs
+
+    @property
+    def sanitized_api_key_configs(self):
+        """
+        Special version of "api_key_configs" attribute which removes / masks actual API key values
+        in the returned output.
+        """
+        api_key_configs = copy.deepcopy(self.__api_key_configs)
+
+        result = []
+        for api_key_config in api_key_configs:
+            # TODO: Should we still log last 3-4 characters of the key to make troubleshooting
+            # easier?
+            api_key_config["api_key"] = MASKED_CONFIG_ITEM_VALUE
+            result.append(dict(api_key_config))
+
+        return result
 
     @property
     def use_multiprocess_copying_workers(self):
@@ -3614,7 +3644,7 @@ class Configuration(object):
 
         if value is not None and min_value is not None and value < min_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be greater than %s'
+                'Got invalid value "%s" for field "%s". Value must be greater than or equal to %s'
                 % (value, field, min_value),
                 field,
                 "invalidValue",
@@ -3622,7 +3652,7 @@ class Configuration(object):
 
         if value is not None and max_value is not None and value > max_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be less than %s'
+                'Got invalid value "%s" for field "%s". Value must be less than or equal to %s'
                 % (value, field, max_value),
                 field,
                 "invalidValue",
