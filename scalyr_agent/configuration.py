@@ -67,6 +67,8 @@ You need to make sure that the file is owned by the same account which is used t
 Original error: %s
 """.strip()
 
+MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -643,6 +645,10 @@ class Configuration(object):
                     self.__logger.info("Configuration settings")
                     first = False
 
+                if isinstance(value, (list, dict)):
+                    # We remove u"" prefix to ensure consistent output between Python 2 and 3
+                    value = six.text_type(value).replace("u'", "'")
+
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
@@ -684,7 +690,11 @@ class Configuration(object):
 
         for key in values_to_mask:
             if key in raw_config:
-                raw_config[key] = "********** MASKED **********"
+                raw_config[key] = MASKED_CONFIG_ITEM_VALUE
+
+        # Ensure we also sanitize api_key values in api_keys dictionaries
+        if "api_keys" in raw_config:
+            raw_config["api_keys"] = self.sanitized_api_key_configs
 
         return raw_config
 
@@ -1555,8 +1565,8 @@ class Configuration(object):
         for api_key_config in api_key_configs:
             # TODO: Should we still log last 3-4 characters of the key to make troubleshooting
             # easier?
-            api_key_config["api_key"] = "*******"
-            result.append(api_key_config)
+            api_key_config["api_key"] = MASKED_CONFIG_ITEM_VALUE
+            result.append(dict(api_key_config))
 
         return result
 
