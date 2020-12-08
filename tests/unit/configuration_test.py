@@ -3000,6 +3000,10 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert config.use_multiprocess_copying_workers
 
+    @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
     def test_workers_type_multiprocess_from_env(self):
         os_environ_unicode["SCALYR_USE_MULTIPROCESS_COPYING_WORKERS"] = "True"
         self._write_file_with_separator_conversion(

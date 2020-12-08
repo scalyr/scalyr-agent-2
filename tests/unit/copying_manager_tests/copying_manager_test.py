@@ -55,6 +55,8 @@ from tests.unit.copying_manager_tests.copying_manager_new_test import CopyingMan
 log = scalyr_logging.getLogger(__name__)
 log.setLevel(scalyr_logging.DEBUG_LEVEL_5)
 
+import six
+
 
 def pytest_generate_tests(metafunc):
     """
@@ -661,7 +663,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
             self.assertLogFileDoesntContainsRegex(
                 expected_body,
                 file_path_or_glob=os.path.join(
-                    self._env_builder.agent_logs_path, "agent.*log"
+                    six.text_type(self._env_builder.agent_logs_path), "agent.*log"
                 ),
             )
 
@@ -687,7 +689,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
                 self.assertLogFileContainsRegex(
                     expected_body,
                     file_path_or_glob=os.path.join(
-                        self._env_builder.agent_logs_path, "agent*_debug.log"
+                        six.text_type(self._env_builder.agent_logs_path),
+                        "agent*_debug.log",
                     ),
                 )
             finally:
