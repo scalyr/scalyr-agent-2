@@ -2801,14 +2801,13 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             workers=config.default_workers_per_api_key,
         )
 
-    def test_default_api_keys_entry_id(self):
-        # check the custom id for workers entry.
+    def test_overwrite_default_api_keys(self):
         self._write_file_with_separator_conversion(
             """ {
-                api_key: "some key"
+                api_key: "key"
                 api_keys: [
                     {
-                        id: "my_worker"
+                        "api_key": "key", id: "default", "workers": 4
                     }
                 ]
               }
@@ -2816,48 +2815,50 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
 
         config = self._create_test_configuration_instance()
-        config.parse()
-        assert config.api_key_configs[0] == JsonObject(
-            api_key=config.api_key,
-            id="my_worker",
-            workers=config.default_workers_per_api_key,
-        )
-
-    def test_default_api_keys_with_no_api_key(self):
-        # the first worker config entry is default so if api key is not specified, it uses main api_key.
-        self._write_file_with_separator_conversion(
-            """ {
-                api_key: "hi there",
-                api_keys: [
-                    {
-                        "workers": 3
-                    }
-                ]
-              }
-            """
-        )
-
-        config = self._create_test_configuration_instance()
-
         config.parse()
 
         assert len(config.api_key_configs) == 1
         assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="default"
+            api_key=config.api_key, id="default", workers=4,
         )
 
-    def test_default_api_keys_entry_and_invalid_second(self):
-        # second log entry is also without api key field,
-        # so the parser will treat it as a second default api key entry.
-        # The redefinition of the same api key is not allowed, so it should throw an error.
+    def test_default_api_keys_and_second(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
                 api_keys: [
                     {
-                        "workers": 3
+                        "api_key": "key", "id": "second"
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.api_key_configs) == 2
+        api_keys = list(config.api_key_configs)
+
+        assert api_keys[0] == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            workers=config.default_workers_per_api_key,
+        )
+        assert api_keys[1] == JsonObject(api_key="key", id="second", workers=1,)
+
+    def test_second_default_api_key(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                api_keys: [
+                    {
+                        "api_key": "key", "id": "default"
                     },
                     {
+                        "api_key": "key2", "id": "default"
                     }
                 ]
               }
@@ -2870,59 +2871,8 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "The default api key is redefined. Please use only unique api keys.The entries without 'api_key' field are also considered as default"
+            "The api key with a 'default' id has to match the main api key of the configuration"
             in err_info.value.message
-        )
-
-        # second entry does not have api_key.
-        self._write_file_with_separator_conversion(
-            """ {
-                api_key: "hi there",
-                api_keys: [
-                    {
-                        "workers": 3
-                    },
-                    {
-                        "workers": 4
-                    }
-                ]
-              }
-            """
-        )
-
-        config = self._create_test_configuration_instance()
-
-        with pytest.raises(BadConfiguration):
-            config.parse()
-
-    def test_default_api_keys_entry_with_second(self):
-        self._write_file_with_separator_conversion(
-            """ {
-                api_key: "hi there",
-                api_keys: [
-                    {
-                        "workers": 3
-                    },
-                    {
-                        api_key: "key2"
-                        "workers": 4,
-                        "id": "second"
-                    }
-                ]
-              }
-            """
-        )
-
-        config = self._create_test_configuration_instance()
-
-        config.parse()
-
-        assert len(config.api_key_configs) == 2
-        assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="default",
-        )
-        assert config.api_key_configs[1] == JsonObject(
-            workers=4, api_key="key2", id="second"
         )
 
     def test_log_file_bind_to_api_keys_entries(self):
@@ -2930,9 +2880,6 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             """ {
                 api_key: "hi there",
                 api_keys: [
-                    {
-                        "workers": 3
-                    },
                     {
                         api_key: "key2"
                         "workers": 4,
@@ -2957,7 +2904,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert len(config.api_key_configs) == 2
         assert config.api_key_configs[0] == JsonObject(
-            workers=3, api_key=config.api_key, id="default"
+            workers=1, api_key=config.api_key, id="default"
         )
         assert config.api_key_configs[1] == JsonObject(
             workers=4, api_key="key2", id="second",
@@ -2969,9 +2916,6 @@ class TestApiKeysConfiguration(TestConfigurationBase):
                 api_key: "hi there",
                 api_keys: [
                     {
-                        "workers": 3
-                    },
-                    {
                         api_key: "key2"
                         "workers": 4,
                         "id": "second"
@@ -2981,7 +2925,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
                 logs: [
                     {
                         path: "/some/path.log",
-                        api_key_id: "there is no such worker pool."
+                        api_key_id: "wrong api key"
                     },
                     {
                         path: "/some/path2.log",
@@ -2996,7 +2940,8 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "entry refers to a non-existing api key with id" in err_info.value.message
+            "refers to a non-existing api key with id 'wrong api key'."
+            in err_info.value.message
         )
 
     def test_workers_type_default(self):
@@ -3032,6 +2977,21 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert config.use_multiprocess_copying_workers
 
+    def test_workers_type_multiprocess_from_env(self):
+        os_environ_unicode["SCALYR_USE_MULTIPROCESS_COPYING_WORKERS"] = "True"
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.use_multiprocess_copying_workers
+
     @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
     @skipIf(
         sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
@@ -3048,36 +3008,22 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
 
-        self.assertRaises(BadConfiguration, config.parse)
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
 
-    def test_the_first_api_key_is_default(self):
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there"
-
-            api_keys: [
-                {"api_key": "another_key"}
-            ]
-          }
-        """
+        assert (
+            "The 'use_multiprocess_copying_workers' option is not supported on windows machines."
+            in err_info.value.message
         )
-
-        config = self._create_test_configuration_instance()
-
-        config.parse()
-
-        assert len(config.api_key_configs) == 2
-        assert config.api_key_configs[0]["api_key"] == config.api_key
-        assert config.api_key_configs[1]["api_key"] == "another_key"
 
     def test_default_workers_per_api_key(self):
         self._write_file_with_separator_conversion(
             """ {
-            api_key: "hi there"
+            api_key: "hi there",
 
             api_keys: [
-                {"api_key": "another_key"},
-                {"api_key": "another_key2", "workers": 3}
+                {"api_key": "another_key", "id": "second", "workers": 3},
+                {"api_key": "another_key2", "id": "third"}
             ]
           }
         """
@@ -3093,111 +3039,10 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.api_key_configs[0]["workers"] == config.default_workers_per_api_key
         )
         assert config.api_key_configs[1]["api_key"] == "another_key"
-        assert (
-            config.api_key_configs[1]["workers"] == config.default_workers_per_api_key
-        )
+        assert config.api_key_configs[1]["workers"] == 3
         assert config.api_key_configs[2]["api_key"] == "another_key2"
-        assert config.api_key_configs[2]["workers"] == 3
-
-    def test_fragment(self):
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there"
-
-            api_keys: [
-                {"api_key": "another_key", "id": "second_key"},
-                {"api_key": "another_key2", "workers": 3}
-            ]
-          }
-        """
-        )
-
-        self._write_config_fragment_file_with_separator_conversion(
-            "a.json",
-            """
-            {
-                api_keys: [
-                    {"api_key": "another_key3", "workers": 3}
-                ]
-
-                logs: [
-                    {"path": "some/path", "api_key_id": "second_key"}
-                ]
-            }
-            """,
-        )
-
-        config = self._create_test_configuration_instance()
-
-        config.parse()
-
-        # check if api keys from fragment are added.
-        assert len(config.api_key_configs) == 4
-        assert config.api_key_configs[0]["id"] == "default"
-        api_key_from_fragment = list(config.api_key_configs)[-1]
-        assert api_key_from_fragment["api_key"] == "another_key3"
-        assert api_key_from_fragment["id"] == "3"
-
-    def test_k8s_and_journald_logs_api_keys(self):
-
-        main_config = {
-            "api_key": "hi there",
-            "api_keys": [
-                {"api_key": "another_key", "id": "second_key"},
-                {"api_key": "another_key2", "workers": 3},
-            ],
-            "logs": [
-                {"path": "path1"},
-                {"path": "path2", "api_key_id": "second_key"},
-                {"path": "path3", "api_key_id": "key3"},
-            ],
-        }
-
-        log_config2 = {"path": "path5", "api_key_id": "key3"}
-
-        config_fragment = {
-            "api_keys": [
-                {"api_key": "another_key3", "id": "key3"},
-                {"api_key": "another_key4", "workers": 3},
-            ],
-            "logs": [
-                {"path": "path4"},
-                log_config2,
-                {"path": "path6", "api_key_id": "second_key"},
-            ],
-        }
-        self._write_file_with_separator_conversion(json.dumps(main_config))
-        self._write_config_fragment_file_with_separator_conversion(
-            "a.json", json.dumps(config_fragment)
-        )
-
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        api_keys = list(config.api_key_configs)
-
-        assert len(api_keys) == 5
-
-        assert api_keys[0]["id"] == "default"
-        assert api_keys[1]["id"] == "second_key"
-        assert api_keys[2]["id"] == "2"
-        assert api_keys[3]["id"] == "key3"
-        assert api_keys[4]["id"] == "4"
-
-        log_config2["api_key_id"] = "wrong_api_key_id"
-        self._write_file_with_separator_conversion(json.dumps(main_config))
-        self._write_config_fragment_file_with_separator_conversion(
-            "a.json", json.dumps(config_fragment)
-        )
-
-        config = self._create_test_configuration_instance()
-
-        with pytest.raises(BadConfiguration) as err_info:
-            config.parse()
-
         assert (
-            "The log file '/var/log/scalyr-agent-2/path5' entry refers to a non-existing api key with id 'wrong_api_key_id'"
-            in err_info.value.message
+            config.api_key_configs[2]["workers"] == config.default_workers_per_api_key
         )
 
     def test_api_keys_negative_workers_number(self):
@@ -3207,7 +3052,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
             api_keys: [
                 {"api_key": "another_key", "id": "second_key"},
-                {"api_key": "another_key2", "workers": -1}
+                {"api_key": "another_key2", "id": "third_key", "workers": -1}
             ]
           }
         """
@@ -3225,7 +3070,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             default_workers_per_api_key: -1,
             api_keys: [
                 {"api_key": "another_key", "id": "second_key"},
-                {"api_key": "another_key2"}
+                {"api_key": "another_key2", "id": "third_key"}
             ]
           }
         """
@@ -3236,3 +3081,182 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert "Value must be greater than 1" in err_info.value.message
+
+    def test_default_workers_per_api_key_from_env(self):
+        os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "4"
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            api_keys: [
+                {"api_key": "another_key", "id": "second_key"},
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.default_workers_per_api_key == 4
+
+        return
+
+    def test_config_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                api_keys: [
+                    {"api_key": "key4", "id": "fourth_key", "workers": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "api_key_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if api keys from fragment are added.
+
+        assert list(config.api_key_configs) == [
+            JsonObject(
+                api_key=config.api_key,
+                id="default",
+                workers=config.default_workers_per_api_key,
+            ),
+            JsonObject(
+                api_key="key2",
+                id="second_key",
+                workers=config.default_workers_per_api_key,
+            ),
+            JsonObject(api_key="key3", id="third_key", workers=3),
+            JsonObject(api_key="key4", id="fourth_key", workers=3),
+        ]
+
+    def test_k8s_and_journald_logs_api_keys(self):
+
+        journald_log1 = {
+            "journald_unit": "ssh\\.service",
+        }
+
+        main_config = {
+            "api_key": "hi there",
+            "api_keys": [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "workers": 3},
+            ],
+            "logs": [
+                {"path": "path1"},
+                {"path": "path2", "api_key_id": "second_key"},
+                {"path": "path3", "api_key_id": "third_key"},
+            ],
+            "journald_logs": [
+                journald_log1,
+                {"journald_unit": ".*", "api_key_id": "third_key"},
+            ],
+        }
+
+        k8s_config1 = {"k8s_pod_glob": "*nginx*"}
+
+        config_fragment = {
+            "api_keys": [
+                {"api_key": "key4", "id": "fourth_key"},
+                {"api_key": "key5", "id": "fifth_key", "workers": 3},
+            ],
+            "k8s_logs": [
+                k8s_config1,
+                {"k8s_pod_glob": "*apache*", "api_key_id": "second_key"},
+            ],
+            "logs": [{"path": "path4"}, {"path": "path6", "api_key_id": "second_key"}],
+        }
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        api_keys = list(config.api_key_configs)
+
+        assert len(api_keys) == 5
+
+        # check api keys for journald logs
+        for api_key in api_keys:
+            journald_unit = api_key.get("journald_unit", none_if_missing=True)
+            if journald_unit:
+                if journald_unit == "ssh\\.service":
+                    assert api_key["api_key_id"] == "default"
+                elif journald_unit == "journald_unit":
+                    assert api_key["api_key_id"] == "second_key"
+
+        # check api keys for k8s logs.
+        for api_key in api_keys:
+            k8s_pod_glob = api_key.get("k8s_pod_glob", none_if_missing=True)
+            if k8s_pod_glob:
+                if k8s_pod_glob == "*nginx*":
+                    assert api_key["api_key_id"] == "default"
+                elif k8s_pod_glob == "*apache*":
+                    assert api_key["api_key_id"] == "third_key"
+
+        # non existing api key for l8s, should fail
+        k8s_config1["api_key_id"] = "not_exist"
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "refers to a non-existing api key with id 'not_exist'"
+            in err_info.value.message
+        )
+
+        k8s_config1["api_key_id"] = "default"
+
+        # non existing api key for jornald, should fail
+        journald_log1["api_key_id"] = "not exist too."
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "refers to a non-existing api key with id 'not exist too.'"
+            in err_info.value.message
+        )
+
+        journald_log1["api_key_id"] = "default"
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
