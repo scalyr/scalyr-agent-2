@@ -3569,7 +3569,7 @@ class Configuration(object):
 
         if value is not None and min_value is not None and value < min_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be greater than %s'
+                'Got invalid value "%s" for field "%s". Value must be greater than or equal to %s'
                 % (value, field, min_value),
                 field,
                 "invalidValue",
@@ -3577,7 +3577,7 @@ class Configuration(object):
 
         if value is not None and max_value is not None and value > max_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be less than %s'
+                'Got invalid value "%s" for field "%s". Value must be less than or equal to %s'
                 % (value, field, max_value),
                 field,
                 "invalidValue",

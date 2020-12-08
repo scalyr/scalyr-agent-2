@@ -2564,9 +2564,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 2. value < min
         config_object = JsonObject(content={"foo": 9})
-        expected_msg = (
-            'Got invalid value "9" for field "foo". Value must be greater than 10'
-        )
+        expected_msg = 'Got invalid value "9" for field "foo". Value must be greater than or equal to 10'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -2582,9 +2580,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 3. value > max
         config_object = JsonObject(content={"foo": 101})
-        expected_msg = (
-            'Got invalid value "101" for field "foo". Value must be less than 100'
-        )
+        expected_msg = 'Got invalid value "101" for field "foo". Value must be less than or equal to 100'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -3217,7 +3213,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         with pytest.raises(BadConfiguration) as err_info:
             config.parse()
 
-        assert "Value must be greater than 1" in err_info.value.message
+        assert "Value must be greater than or equal to 1" in err_info.value.message
 
         self._write_file_with_separator_conversion(
             """ {
