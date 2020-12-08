@@ -1159,7 +1159,6 @@ _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
         six.ensure_str("add_sampler"),
         six.ensure_str("add_redacter"),
         six.ensure_str("skip_to_end"),
-        six.ensure_str("set_new_scalyr_client"),
     ],
 )
 
