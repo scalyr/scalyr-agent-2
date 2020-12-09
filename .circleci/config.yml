@@ -2263,6 +2263,7 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
+    resource_class: large
     steps:
       - ami-tests:
           test_type: "development"
