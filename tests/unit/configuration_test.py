@@ -3069,7 +3069,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert config.use_multiprocess_copying_workers
 
-    @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     @skipIf(
         sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
     )

@@ -104,8 +104,8 @@ class CopyingManagerTest(CopyingManagerCommonTest):
             api_keys = []
             for i in range(self.api_keys_count - 1):
                 api_key_config = {
-                    "id": "<key_id_%s>" % i,
-                    "api_key": "<key_%s>" % i,
+                    "id": "key_id_%s" % i,
+                    "api_key": "key_%s" % i,
                 }
                 api_keys.append(api_key_config)
             config_data["api_keys"] = api_keys

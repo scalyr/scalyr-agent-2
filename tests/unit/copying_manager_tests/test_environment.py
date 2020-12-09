@@ -62,10 +62,11 @@ class TestableLogFile(object):
         """
         Append lines to the file.
         """
-        with self.path.open("a") as file:  # type: ignore
+        # NOTE: We open file in binary mode, otherwise \n gets converted to \r\n on Windows on write
+        with self.path.open("ab") as file:  # type: ignore
             for line in lines:
-                file.write(line)
-                file.write("\n")
+                file.write(line.encode("utf-8"))
+                file.write(b"\n")
 
     @property
     def path(self):
