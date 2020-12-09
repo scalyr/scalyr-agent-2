@@ -135,14 +135,14 @@ EC2_DISTRO_DETAILS_MAP = {
     "ubuntu1604": {
         "image_id": "ami-08bc77a2c7eb2b1da",
         "image_name": "Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
-        "size_id": "t1.small",
+        "size_id": "m1.small",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "ubuntu1804": {
         "image_id": "ami-07ebfd5b3428b6f4d",
         "image_name": "Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
-        "size_id": "t1.small",
+        "size_id": "m1.small",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
