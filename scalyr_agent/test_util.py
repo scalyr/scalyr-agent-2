@@ -204,5 +204,7 @@ def parse_scalyr_request(payload):
 
     # NOTE: Special case for Windows where path is C:\ which we don't want to convert
     rewritten_payload = rewritten_payload.replace(b'"C":\\', b"C:\\")
+    # do the same for the low-case.
+    rewritten_payload = rewritten_payload.replace(b'"c":\\', b"c:\\")
 
     return scalyr_util.json_decode(rewritten_payload.decode("utf-8", "replace"))

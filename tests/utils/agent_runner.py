@@ -403,7 +403,7 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": config_log_files,
-            "api_keys": [{"workers": self._workers_count}],
+            "default_workers_per_api_key": self._workers_count,
             "monitors": [],
             "use_multiprocess_copying_workers": self._workers_type == "process",
             # NOTE: We disable this functionality so tests finish faster and we can use lower
