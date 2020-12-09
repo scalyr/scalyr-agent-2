@@ -122,7 +122,7 @@ MOCK_CONFIGS_DIRECTORY = os.path.join(BASE_DIR, "configs/")
 # server
 TEST_FILES_DIRECTORY = os.path.join(BASE_DIR, "files/")
 
-
+# TODO: Revert back to micro image if there are still failures with small
 EC2_DISTRO_DETAILS_MAP = {
     # Debian based distros
     "ubuntu1404": {
