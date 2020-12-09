@@ -2919,7 +2919,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "The api key #0 already has id 'second' but it has also been re-used by the api key #1. Api key id's must remain unique."
+            "There are multiple api keys with the same 'second' id. Api key id's must remain unique."
             in err_info.value.message
         )
 

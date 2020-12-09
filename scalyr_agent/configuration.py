@@ -392,22 +392,19 @@ class Configuration(object):
         api_keys = list(self.__config.get_json_array("api_keys"))
 
         unique_api_ids = {}
-        api_key_positions = {}
         # Apply other defaults to all api key entries
         for i, api_key_entry in enumerate(api_keys):
             self.__verify_api_keys_entry_and_set_defaults(api_key_entry, entry_index=i)
             api_key_id = api_key_entry["id"]
             if api_key_id in unique_api_ids:
-                position = api_key_positions[api_key_id]
                 raise BadConfiguration(
-                    "The api key #%s already has id '%s' but it has also been re-used by the api key #%s. Api key id's must remain unique."
-                    % (position, api_key_id, i),
+                    "There are multiple api keys with the same '%s' id. Api key id's must remain unique."
+                    % api_key_id,
                     "api_keys",
                     "apiKeyIdDuplication",
                 )
             else:
                 unique_api_ids[api_key_id] = api_key_entry
-                api_key_positions[api_key_id] = i
 
         default_api_key_entry = unique_api_ids.get("default")
 
