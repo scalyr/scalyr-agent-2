@@ -2310,8 +2310,8 @@ workflows:
          context: scalyr-agent
      - smoke-k8s:
          context: scalyr-agent
-     - smoke-monitors-tests:
-         context: scalyr-agent
+#     - smoke-monitors-tests:
+#         context: scalyr-agent
      - sonarcloud-scan:
          requires:
            # NOTE: This is not ideal, but Circle CI doesn't support cross
