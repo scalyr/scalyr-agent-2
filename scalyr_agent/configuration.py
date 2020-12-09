@@ -577,6 +577,7 @@ class Configuration(object):
             "max_existing_log_offset_size",
             "json_library",
             "use_multiprocess_copying_workers",
+            "default_workers_per_api_key",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_api_key_configs",
         ]
