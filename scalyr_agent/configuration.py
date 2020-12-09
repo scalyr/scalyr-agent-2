@@ -445,9 +445,14 @@ class Configuration(object):
                 else:
                     # if log file entry has api_key_id which is not defined in the 'api_keys' list, then throw an error.
                     if api_key_id not in api_key_ids:
+                        valid_api_key_ids = ", ".join(sorted(api_key_ids))
                         raise BadConfiguration(
-                            "The log entry '%s' refers to a non-existing api key with id '%s'."
-                            % (six.text_type(log_file_config), api_key_id),
+                            "The log entry '%s' refers to a non-existing api key with id '%s'. Valid api key ids: %s."
+                            % (
+                                six.text_type(log_file_config),
+                                api_key_id,
+                                valid_api_key_ids,
+                            ),
                             "logs",
                             "invalidApiKeyReference",
                         )
