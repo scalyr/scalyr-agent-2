@@ -2313,8 +2313,8 @@ workflows:
          context: scalyr-agent
      - smoke-k8s:
          context: scalyr-agent
-#     - smoke-monitors-tests:
-#         context: scalyr-agent
+     - smoke-monitors-tests:
+         context: scalyr-agent
      - sonarcloud-scan:
          requires:
            # NOTE: This is not ideal, but Circle CI doesn't support cross
@@ -2356,11 +2356,11 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-#     - ami-tests-development:
-#          context: scalyr-agent
-#          requires:
-#            - build-windows-package
-#            - build-linux-packages-and-installer-script
+     - ami-tests-development:
+          context: scalyr-agent
+          requires:
+            - build-windows-package
+            - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
           <<: *master_and_release_only
