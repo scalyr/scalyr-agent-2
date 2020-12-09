@@ -448,8 +448,8 @@ def main(
     # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
     # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
-        deploy_step_timeout = 420  # 320
-        deploy_overall_timeout = 440  # 320
+        deploy_step_timeout = 440  # 320
+        deploy_overall_timeout = 460  # 320
         cat_step_timeout = 10
         max_tries = 3
     else:
