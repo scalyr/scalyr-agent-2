@@ -145,18 +145,13 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         if config_data is not None:
             config_initial_data.update(config_data)
 
-        test_files, self._env_builder = TestEnvironBuilder.create_with_n_files(
-            log_files_number, config_data=config_initial_data
-        )
+        self._env_builder = TestEnvironBuilder()
+
+        self._env_builder.init_agent_dirs()
+
+        self._env_builder.init_config(config_data)
 
         self._env_builder.config.disable_flow_control = disable_flow_control
-
-        # if config is None:
-        #     self._create_config(
-        #         log_files_number=log_files_number,
-        #         use_pipelining=use_pipelining,
-        #         config_data=config_data,
-        #     )
 
     def _init_worker_instance(
         self,
@@ -174,16 +169,21 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
                 disable_flow_control=disable_flow_control,
             )
 
+        if log_files_number is not None:
+            test_files = self._env_builder.recreate_files(  # type: ignore
+                log_files_number, self._env_builder.non_glob_logs_dir  # type: ignore
+            )
+        else:
+            test_files = tuple()
+
         self._instance = self._create_worker()
 
         if add_processors:
-            for test_file in self._env_builder.log_files.values():  # type: ignore
+            for test_file in test_files:
                 self._spawn_single_log_processor(test_file)
 
         if auto_start:
             self._instance.start_worker()
-
-        test_files = tuple(self._env_builder.log_files.values())  # type: ignore
 
         return test_files, self._instance  # type: ignore
 

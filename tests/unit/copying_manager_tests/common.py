@@ -936,8 +936,9 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # 
         six.ensure_str("get_pid"),
         six.ensure_str("get_active_checkpoints_path"),
         six.ensure_str("get_checkpoints_path"),
-        six.ensure_str("_init_scalyr_client"),
         six.ensure_str("change_agent_log"),
+        six.ensure_str("get_checkpoints"),
+        six.ensure_str("write_checkpoints"),
     ],
 )
 

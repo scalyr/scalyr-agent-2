@@ -87,14 +87,11 @@ class CopyingManagerTest(CopyingManagerCommonTest):
             self._instance.stop_manager()
 
             self._instance.cleanup()
+
         super(CopyingManagerTest, self).teardown()
 
     def _init_test_environment(
-        self,
-        log_files_number=1,
-        use_pipelining=False,
-        config_data=None,
-        disable_flow_control=False,
+        self, use_pipelining=False, config_data=None, disable_flow_control=False,
     ):
         pipeline_threshold = 1.1
         if use_pipelining:
@@ -105,24 +102,39 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 
         if "api_keys" not in config_data:
             api_keys = []
-            for i in range(self.api_keys_count):
-                api_key_config = {"id": six.text_type(i), "workers": self.workers_count}
-                if i > 0:
-                    api_key_config["api_key"] = "<key_%s>" % i
+            for i in range(self.api_keys_count - 1):
+                api_key_config = {
+                    "id": "key_id_%s" % i,
+                    "api_key": "key_%s" % i,
+                }
                 api_keys.append(api_key_config)
             config_data["api_keys"] = api_keys
 
+        config_data["default_workers_per_api_key"] = self.workers_count
         config_data[
             "use_multiprocess_copying_workers"
         ] = self.use_multiprocessing_workers
         config_data["disable_max_send_rate_enforcement_overrides"] = True
         config_data["pipeline_threshold"] = pipeline_threshold
+        config_data["implicit_agent_log_collection"] = False
 
-        test_files, self._env_builder = TestEnvironBuilder.create_with_n_files(
-            log_files_number, config_data=config_data
+        self._env_builder = TestEnvironBuilder()
+
+        self._env_builder.init_agent_dirs()
+
+        self._env_builder.init_config(config_data)
+
+        scalyr_logging.set_log_destination(
+            use_disk=True,
+            logs_directory=six.text_type(self._env_builder.config.agent_log_path),
+            agent_log_file_path="agent.log",
+            agent_debug_log_file_suffix="_debug",
         )
 
+        scalyr_logging.__log_manager__.set_log_level(scalyr_logging.DEBUG_LEVEL_5)
+
         self._env_builder.config.disable_flow_control = disable_flow_control
+        self._env_builder.config.skip_agent_log_change = False
 
     def _create_manager_instance(self, auto_start=True):
         self._instance = TestableCopyingManager(self._env_builder.config, [])
@@ -133,8 +145,7 @@ class CopyingManagerTest(CopyingManagerCommonTest):
                 TestableCopyingManagerFlowController.SLEEPING
             )
 
-        test_files = tuple(self._env_builder.log_files.values())
-        return test_files, self._instance
+        return self._instance
 
     def _init_manager(
         self,
@@ -147,13 +158,20 @@ class CopyingManagerTest(CopyingManagerCommonTest):
 
         if self._env_builder is None:
             self._init_test_environment(
-                log_files_number=log_files_number,
                 use_pipelining=use_pipelining,
                 config_data=config_data,
                 disable_flow_control=disable_flow_control,
             )
 
-        return self._create_manager_instance(auto_start=auto_start)
+        if log_files_number is not None:
+            files = self._env_builder.recreate_files(  # type: ignore
+                log_files_number, self._env_builder.non_glob_logs_dir  # type: ignore
+            )
+        else:
+            files = tuple()
+        manager = self._create_manager_instance(auto_start=auto_start)
+
+        return files, manager  # type: ignore
 
 
 class TestBasic(CopyingManagerTest):
@@ -218,7 +236,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.workers_health_check
-                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert status.health_check_result == "Good"
 
@@ -242,7 +260,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.workers_health_check
-                == "Worker '0_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert (
                 status.health_check_result
@@ -408,21 +426,10 @@ class TestBasic(CopyingManagerTest):
 
         _, manager = self._init_manager(0)
 
-        # create log config with the glob path.
-        glob_path = self._env_builder.root_path / "file_*"
-        log_config = self._env_builder.config.parse_log_config(
-            {"path": six.text_type(glob_path)}
-        )
-        manager.add_log_config("scheduled-deletion", log_config)
-
-        files = []
-
         # create some matching files.
-        for i in range(10):
-            file = TestableLogFile(self._env_builder.config, "file_{0}".format(i))
-            file.initialize(self._env_builder.root_path)
-
-            files.append(file)
+        files = self._env_builder.recreate_files(
+            10, self._env_builder.non_glob_logs_dir
+        )
 
         assert manager.workers_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
@@ -434,8 +441,7 @@ class TestBasic(CopyingManagerTest):
         assert manager.workers_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
-        for log_file in files:
-            log_file.remove()
+        self._env_builder.remove_files(self._env_builder.non_glob_logs_dir)
 
         # 1) log processors perform file processing and close deleted files.
         manager.wait_for_full_iteration()
@@ -449,8 +455,9 @@ class TestBasic(CopyingManagerTest):
         assert manager.matchers_log_processor_count == 0
 
         # crete log file back and see if log processors are created back too.
-        for log_file in files:
-            log_file.create()
+        files = self._env_builder.recreate_files(
+            10, self._env_builder.non_glob_logs_dir
+        )
 
         manager.wait_for_full_iteration()
 
@@ -476,20 +483,19 @@ class TestBasic(CopyingManagerTest):
         # do the same to not wait when copying manager decides that file is deleted.
         max_new_log_detection_time.return_value = -1
 
-        files = []
-
         _, manager = self._init_manager(0)
 
-        for i in range(10):
-            file = TestableLogFile(self._env_builder.config, "file_{0}".format(i))
-            file.initialize(self._env_builder.root_path)
+        # create directory which is unknown for the managers configuration
+        logs_dir = self._env_builder.test_logs_dir / "dynamicaly-added-logs"
+        logs_dir.mkdir()
 
+        files = self._env_builder.recreate_files(10, logs_dir)
+
+        for file in files:
             log_config = self._env_builder.config.parse_log_config(
                 {"path": file.str_path}
             )
             manager.add_log_config("scheduled-deletion", log_config)
-
-            files.append(file)
 
         assert manager.workers_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
@@ -500,8 +506,7 @@ class TestBasic(CopyingManagerTest):
         assert manager.workers_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
-        for log_file in files:
-            log_file.remove()
+        self._env_builder.remove_files(logs_dir)
 
         # 1) log processors perform file processing and close deleted files.
         manager.wait_for_full_iteration()
@@ -515,8 +520,7 @@ class TestBasic(CopyingManagerTest):
         assert manager.matchers_log_processor_count == 0
 
         # crete log file back and see if log processors are created back too.
-        for log_file in files:
-            log_file.create()
+        files = self._env_builder.recreate_files(10, logs_dir)
 
         manager.wait_for_full_iteration()
 
