@@ -40,8 +40,17 @@ if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     exit 1
 fi
 
+sleep 5
+
+echo ""
 uname -a
+echo ""
 cat /etc/*-release
+echo ""
+cat /etc/passwd
+echo ""
+id
+echo ""
 
 sudo yum install -y wget
 sudo yum install -y "{{python_package}}"
