@@ -2282,10 +2282,10 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-#     - unittest-35-osx:
-#         context: scalyr-agent
-#     - unittest-35-windows:
-#         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-35-windows:
+         context: scalyr-agent
  smoke-tests:
    <<: *skip_release_build_branch_push
    jobs:
@@ -2321,7 +2321,7 @@ workflows:
            - smoke-docker-api-raw-logs-disabled
            - smoke-docker-syslog
            - smoke-k8s
-           #- smoke-monitors-tests
+           - smoke-monitors-tests
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
@@ -2353,11 +2353,11 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-     - ami-tests-development:
-          context: scalyr-agent
-          requires:
-            - build-windows-package
-            - build-linux-packages-and-installer-script
+#     - ami-tests-development:
+#          context: scalyr-agent
+#          requires:
+#            - build-windows-package
+#            - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
           <<: *master_and_release_only
