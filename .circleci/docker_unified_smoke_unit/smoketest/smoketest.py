@@ -752,6 +752,8 @@ class DockerAPIActor(DockerSmokeTestActor):
     """
     Verifier to be used when Docker monitor utilizes Docker API mode for ingesting log (aka
     docker_raw_logs config option is False).
+
+    It verifies both streams - stdout and stderr.
     """
 
     VERIFIER_TYPE = "Docker API (docker_raw_logs: false)"
@@ -844,7 +846,7 @@ class DockerAPIActor(DockerSmokeTestActor):
         )
 
     def _get_uploader_stream_names(self):
-        return ["stdout"]
+        return ["stdout", "stderr"]
 
     def _get_mapped_logfile_prefix(self):
         return "/var/log/scalyr-agent-2"
@@ -877,7 +879,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                 process_name=process_name,
             )
 
-        success = len(self._seen_matching_lines) == 3
+        success = len(self._seen_matching_lines) == 1 + 2 + 2
         if success:
             print(
                 "Found all the required log lines (%s)"
@@ -903,7 +905,19 @@ class DockerAPIActor(DockerSmokeTestActor):
         # INFO [core] [copying_manager.py:423] Adding new log file
         # '/var/log/scalyr-agent-2/docker-ci-agent-docker-api-57068-agent-stdout.log' for monitor
         # 'scalyr_agent.builtin_monitors.docker_monitor'
-        if "Adding new log file" in message and log_path in message:
+        if (
+            "Adding new log file" in message
+            and log_path in message
+            and "-stdout.log" in message
+        ):
+            self._seen_matching_lines.add(message)
+            return
+
+        if (
+            "Adding new log file" in message
+            and log_path in message
+            and "-stderr.log" in message
+        ):
             self._seen_matching_lines.add(message)
             return
 
@@ -914,7 +928,14 @@ class DockerAPIActor(DockerSmokeTestActor):
         # are available for it on disk. Original error: [Errno 2] No such file or directory:
         # '/var/log/scalyr-agent-2/docker-ci-agent-docker-api-57087-verifier-stdout.log'
         if (
-            "doesn't exist on disk. This likely means a new container has been started"
+            "-stdout.log doesn't exist on disk. This likely means a new container has been started"
+            in message
+        ):
+            self._seen_matching_lines.add(message)
+            return
+
+        if (
+            "-stderr.log doesn't exist on disk. This likely means a new container has been started"
             in message
         ):
             self._seen_matching_lines.add(message)

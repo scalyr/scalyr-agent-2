@@ -279,10 +279,14 @@ define_config_option(
     env_aware=True,
 )
 
-# for now, always log timestamps to help prevent a race condition
-# define_config_option( __monitor__, 'log_timestamps',
-#                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
-#                     convert_to=bool, default=False)
+# for now, always log timestamps by default to help prevent a race condition
+define_config_option(
+    __monitor__,
+    "log_timestamps",
+    "Optional (defaults to True). If true, stdout/stderr logs for logs consumed via Docker API will contain docker timestamps at the beginning of the line\n",
+    convert_to=bool,
+    default=True,
+)
 
 define_metric(
     __monitor__,
@@ -1416,6 +1420,9 @@ class ContainerChecker(StoppableThread):
                     attributes=attrs,
                     base_config=base_config,
                 )
+                result.append(
+                    {"cid": cid, "stream": "stderr", "log_config": log_config}
+                )
 
         return result
 
@@ -1479,9 +1486,7 @@ class DockerLogger(object):
         self.stream_name = name + "-" + stream
 
         self.__max_previous_lines = config.get("max_previous_lines")
-        self.__log_timestamps = (
-            True  # Note: always log timestamps for now.  config.get( 'log_timestamps' )
-        )
+        self.__log_timestamps = config.get("log_timestamps")
         self.__docker_api_version = config.get("docker_api_version")
 
         self.__last_request_lock = threading.Lock()
