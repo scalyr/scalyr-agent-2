@@ -103,7 +103,15 @@ ensure_path_group_permissions() {
   if [ "${file_permissions_group}" -ne "${wanted_permissions_group}" ]; then
     new_permissions="${file_permissions_owner}${wanted_permissions_group}${file_permissions_others}"
     echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
+
+    # NOTE: On CI chmod sometimes fails with 'getpwuid(): uid not found: 1001' which is likely
+    # related to some unfinished provisioning on the CI or similar. We simply ignore any
+    # errors returned by chmod.
+    set +e
+    set +o pipefail
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1 || true;
+    set -e
+    set -o pipefail
   fi
 }
 
@@ -130,7 +138,15 @@ ensure_path_other_permissions() {
   if [ "${file_permissions_others}" -ne "${wanted_permissions_other}" ]; then
     new_permissions="${file_permissions_owner_group}${wanted_permissions_other}"
     echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
+
+    # NOTE: On CI chmod sometimes fails with 'getpwuid(): uid not found: 1001' which is likely
+    # related to some unfinished provisioning on the CI or similar. We simply ignore any
+    # errors returned by chmod.
+    set +e
+    set +o pipefail
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1 || true;
+    set -e
+    set -o pipefail
   fi
 }
 
