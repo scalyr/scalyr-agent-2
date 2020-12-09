@@ -424,7 +424,9 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+# We don't print long status output since it sometimes results in connection
+# reset by peer on CI.
+#echo $status_output
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };
