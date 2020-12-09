@@ -61,7 +61,10 @@ orbs:
 parameters:
   default_tox_version:
     type: string
-    default: "3.15.2"
+    default: "3.20.1"
+  default_pip_version:
+    type: string
+    default: "20.0.2"
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
@@ -97,7 +100,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.15.2"
+        default: "3.20.1"
       apt_dependencies:
         description: "Any optional apt dependencies which should be installed."
         type: string
@@ -297,7 +300,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.15.2"
+        default: "3.20.1"
       codespeed_executable:
         description: "CodeSpeed executable name."
         type: string
@@ -372,7 +375,7 @@ commands:
       tox_version:
         description: "tox package version to use."
         type: string
-        default: "3.15.2"
+        default: "3.20.1"
       pre_checkout_apt_dependencies:
         description: "Any optional apt dependencies which are installed before checkout step."
         type: string
@@ -800,7 +803,7 @@ jobs:
             pyenv local $PYTHON
             python -m pip install virtualenv
             python -m virtualenv venv
-            ./venv/bin/pip install "tox==3.14.3"
+            ./venv/bin/pip install "tox==<< pipeline.parameters.default_tox_version >>"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
@@ -921,8 +924,8 @@ jobs:
           name: Install Python Dependencies
           command: |
             python.exe --version
-            python.exe -m pip install --user --upgrade "tox==3.15.2"
-            python.exe -m pip install --user --upgrade "pip==20.1.1"
+            python.exe -m pip install --user --upgrade "tox==<< pipeline.parameters.default_tox_version >>"
+            python.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
@@ -1507,7 +1510,7 @@ jobs:
       - run:
           name: Install Python dependencies
           command: |
-            sudo pip install "tox==3.14.3"
+            sudo pip install "tox==<< pipeline.parameters.default_tox_version >>"
       - run:
           name: Run Python Lint Checks
           command: |
@@ -2282,10 +2285,10 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-#     - unittest-35-osx:
-#         context: scalyr-agent
-#     - unittest-35-windows:
-#         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-35-windows:
+         context: scalyr-agent
  smoke-tests:
    <<: *skip_release_build_branch_push
    jobs:
@@ -2321,7 +2324,7 @@ workflows:
            - smoke-docker-api-raw-logs-disabled
            - smoke-docker-syslog
            - smoke-k8s
-           #- smoke-monitors-tests
+           - smoke-monitors-tests
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
@@ -2353,11 +2356,11 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-     - ami-tests-development:
-          context: scalyr-agent
-          requires:
-            - build-windows-package
-            - build-linux-packages-and-installer-script
+#     - ami-tests-development:
+#          context: scalyr-agent
+#          requires:
+#            - build-windows-package
+#            - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
           <<: *master_and_release_only
