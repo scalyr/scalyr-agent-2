@@ -41,15 +41,20 @@ fi
 
 sleep 5
 
-echo ""
+echo_with_date "==========================="
+echo_with_date "System information"
+echo_with_date "==========================="
+
+echo_with_date ""
 uname -a
-echo ""
+echo_with_date ""
 cat /etc/*-release
-echo ""
+echo_with_date ""
 cat /etc/passwd
-echo ""
+echo_with_date ""
 id
-echo ""
+echo_with_date ""
+echo_with_date "==========================="
 
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
