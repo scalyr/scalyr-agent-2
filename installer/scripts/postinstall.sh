@@ -108,8 +108,10 @@ ensure_path_group_permissions() {
     # related to some unfinished provisioning on the CI or similar. We simply ignore any
     # errors returned by chmod.
     set +e
+    set +o pipefail
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1 || true;
     set -e
+    set -o pipefail
   fi
 }
 
@@ -141,8 +143,10 @@ ensure_path_other_permissions() {
     # related to some unfinished provisioning on the CI or similar. We simply ignore any
     # errors returned by chmod.
     set +e
+    set +o pipefail
     chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1 || true;
     set -e
+    set -o pipefail
   fi
 }
 
