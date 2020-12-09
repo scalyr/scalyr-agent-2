@@ -2254,6 +2254,9 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie
+    # TODO: Remove resource_class and use default medium one if tests are still
+    # failing with large
+    resource_class: large
     steps:
       - ami-tests:
           test_type: "stable"
