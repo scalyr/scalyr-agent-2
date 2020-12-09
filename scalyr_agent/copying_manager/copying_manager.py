@@ -156,6 +156,29 @@ class ApiKeyWorkerPool(object):
     def workers(self):
         return self.__workers
 
+    def get_child_process_ids(self):
+        # type: () -> List[str]
+        """
+        Return a list of all the children processes process ids (pids) when running in multiprocess
+        mode.
+
+        When multi process mode is not used, empty list is returned instead.
+        """
+        if not self.__shared_object_managers:
+            return []
+
+        result = []
+
+        for shared_object_manager in self.__shared_object_managers.values():
+            try:
+                # add process identifier..
+                # since the non-public attribute is used, catch all potential errors.
+                result.append(shared_object_manager._process.ident)
+            except Exception:
+                pass
+
+        return result
+
     def __find_next_worker(self):
         # type: () -> CopyingManagerThreadedWorker
         """Get the next worker in the pool. For now it is just a round robin."""
@@ -738,13 +761,28 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.__copying_semaphore.release()
 
                 workers_count = 0
+                worker_child_process_ids = []
                 for worker_pool in self.__api_keys_worker_pools.values():
                     workers_count += len(worker_pool.workers)
+                    worker_child_process_ids += worker_pool.get_child_process_ids()
 
-                log.info(
-                    "Copying manager started. Total workers: %s, Pid: %s"
-                    % (workers_count, os.getpid())
-                )
+                # For multi processing mode we also include pids of all the spawned processes
+                if self.__config.use_multiprocess_copying_workers:
+                    msg = (
+                        "Copying manager started. Total workers: %s, Main Worker Pid: %s, Worker Processes Pids: %s"
+                        % (
+                            workers_count,
+                            os.getpid(),
+                            ", ".join([str(pid) for pid in worker_child_process_ids]),
+                        )
+                    )
+                else:
+                    msg = (
+                        "Copying manager started. Total workers: %s, Main Worker Pid: %s"
+                        % (workers_count, os.getpid())
+                    )
+
+                log.info(msg)
 
                 while self._run_state.is_running():
                     log.log(

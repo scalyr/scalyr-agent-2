@@ -2048,7 +2048,7 @@ if __name__ == "__main__":
         dest="no_check_remote",
         help="For the start command, does not perform the first check to see if the agent can "
         "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
-        "the backgroudn until it is successful.  This is useful if the network is not immediately "
+        "the background until it is successful.  This is useful if the network is not immediately "
         "available when the agent starts.",
     )
     my_controller.add_options(parser)

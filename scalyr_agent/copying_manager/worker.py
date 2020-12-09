@@ -1156,6 +1156,9 @@ _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
         six.ensure_str("add_missing_attributes"),
         six.ensure_str("get_log_path"),
         six.ensure_str("generate_status"),
+        six.ensure_str("add_sampler"),
+        six.ensure_str("add_redacter"),
+        six.ensure_str("skip_to_end"),
     ],
 )
 
