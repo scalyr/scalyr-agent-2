@@ -408,10 +408,13 @@ Log-Message "Initial files created, restarting agent..."
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
+Start-Sleep 5
+
 Log-Message "Writting mock data..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
-    Add-Content c:\logs\test$i.txt.log "line $i"
+    "line $i" | Out-File c:\logs\test$i.txt.log -Append
+    #Add-Content c:\logs\test$i.txt.log "line $i"
 }
 
 Start-Sleep 5
