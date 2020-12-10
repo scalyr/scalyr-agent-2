@@ -1238,11 +1238,11 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             This is the entry point of the SyncManager's process
             and it is overridden to handle the situation where parent process was killed.
             The current implementation of the multiprocess.managers does not provide ability to detect such situation
-            and the orphan process of the SyncManager still continues working even after the parent kill.
+            and the orphan process of the SyncManager still continues working even after the parent was killed.
 
 
             To achieve needed behaviour, before we call the original '_run_server', we create
-            and start a 'watchdog' thread, which checks the existence of the parent thread
+            and start a 'watchdog' thread, which checks the existence of the parent process
             and terminates everything after the parent dies.
             :param args: passed directly to the original parent method.
             :param kwargs: passed directly to the original parent method.
