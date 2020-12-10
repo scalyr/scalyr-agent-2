@@ -246,7 +246,7 @@ when starting \
                                                         will always try to get the list of running containers using \
                                                         docker even when the runtime is detected to be something \
                                                         different.
-|||# ``k8s_cri_query_filesystem``                   ||| Optional (defaults to False). If True, then when in CRI mode, \
+|||# ``k8s_cri_query_filesystem``                   ||| Optional (defaults to True). If True, then when in CRI mode, \
                                                         the monitor will only query the filesystem for the list of \
                                                         active containers, rather than first querying the Kubelet API. \
                                                         This is a useful optimization when the Kubelet API is known to \
