@@ -357,9 +357,9 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_cri_query_filesystem",
-    "Optional (defaults to False). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.",
+    "Optional (defaults to True). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.",
     convert_to=bool,
-    default=False,
+    default=True,
     env_aware=True,
 )
 
@@ -829,6 +829,12 @@ _CID_RE = re.compile("^(.+)://(.+)$")
 class K8sInitException(Exception):
     """ Wrapper exception to indicate when the monitor failed to start due to
         a problem with initializing the k8s cache
+    """
+
+
+class DockerSocketException(Exception):
+    """ Wrapper exception to indicate when the monitor failed to start due to
+        a problem with docker socket
     """
 
 
@@ -2545,6 +2551,21 @@ class ContainerChecker(object):
         # give this an initial empty value
         self.raw_logs = []
 
+    def _validate_socket_file(self):
+        """Gets the Docker API socket file and validates that it is a UNIX socket
+        """
+        # make sure the API socket exists and is a valid socket
+        api_socket = self.__socket_file
+        try:
+            st = os.stat(api_socket)
+            if not stat.S_ISSOCK(st.st_mode):
+                raise Exception()
+        except Exception:
+            raise DockerSocketException(
+                "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
+                % api_socket
+            )
+
     def _is_running_in_docker(self):
         """
         Checks to see if the agent is running inside a docker container
@@ -2660,6 +2681,7 @@ class ContainerChecker(object):
                 global_log.info(
                     "kubernetes_monitor is using docker for listing containers"
                 )
+                self._validate_socket_file()
                 self.__client = DockerClient(
                     base_url=("unix:/%s" % self.__socket_file),
                     version=self.__docker_api_version,
@@ -2736,6 +2758,11 @@ class ContainerChecker(object):
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
                 % e_as_text
             )
+            k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
+            raise
+        except DockerSocketException as e:
+            e_as_text = six.text_type(e)
+            global_log.error(e_as_text)
             k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
         except Exception as e:
@@ -3396,23 +3423,6 @@ container using annotations without updating the config yaml, and applying the u
 cluster.
     """
 
-    def __get_socket_file(self):
-        """Gets the Docker API socket file and validates that it is a UNIX socket
-        """
-        # make sure the API socket exists and is a valid socket
-        api_socket = self._config.get("api_socket")
-        try:
-            st = os.stat(api_socket)
-            if not stat.S_ISSOCK(st.st_mode):
-                raise Exception()
-        except Exception:
-            raise Exception(
-                "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
-                % api_socket
-            )
-
-        return api_socket
-
     def _set_namespaces_to_include(self):
         """This function is separated out for better testability
         (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
@@ -3465,7 +3475,7 @@ cluster.
         self._set_namespaces_to_include()
 
         self.__ignore_pod_sandboxes = self._config.get("k8s_ignore_pod_sandboxes")
-        self.__socket_file = self.__get_socket_file()
+        self.__socket_file = self._config.get("api_socket")
         self.__docker_api_version = self._config.get("docker_api_version")
         self.__k8s_api_url = self._global_config.k8s_api_url
         self.__docker_max_parallel_stats = self._config.get("docker_max_parallel_stats")
