@@ -1260,9 +1260,15 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                             os.kill(cls.parent_pid, 0)
                         time.sleep(1)
                     except OSError:
-                        # parent is not found.
-                        # stop the worker if it is still alive.
+                        # parent is not found. Stop the worker if it is still alive.
+                        # NOTE: since we are dealing with such an extreme case,
+                        # we should not expect that the following log statement will be sent to the Scalyr.
+                        # but they still may be useful to debug locally.
+                        log.error(
+                            "The worker can not find the parent process. Looks like the agent process was forcibly killed"
+                        )
                         if cls.worker and cls.worker.is_alive():
+                            log.error("The worker is still working. Stopping it.")
                             try:
                                 # Try to stop worker gracefully.
                                 # If this unsuccessful, then just ignore that
@@ -1270,6 +1276,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                                 cls.worker.stop_worker()
                             except:
                                 # ignore if worker can not be stopped everything will be killed later anyway.
+                                log.exception("The worker can not be stopped.")
                                 pass
                             finally:
                                 break
