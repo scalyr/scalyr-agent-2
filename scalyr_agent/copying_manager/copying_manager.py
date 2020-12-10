@@ -99,12 +99,16 @@ class ApiKeyWorkerPool(object):
                 # Important for the understanding. When the shared_object_manager is started, it creates a new process.
                 # We use this process as a process for the worker.
 
+                # set the parent process pid for the SharedObjectManager's watchdog
+                # which should detect if parent was killed.
+                SharedObjectManager.pid = os.getpid()
+
+                # change agent log path for the new worker.
+                # this initializer function will be invoked in the worker's process.
                 worker_agent_log_path = os.path.join(
                     self.__config.agent_log_path, "agent-%s.log" % worker_id
                 )
 
-                # change agent log path for the new worker.
-                # this initializer function will be invoked in the worker's process.
                 def initializer():
                     self._change_worker_process_agent_log_path(worker_agent_log_path)
 

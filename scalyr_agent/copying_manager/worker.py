@@ -1216,7 +1216,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
 
     class _SharedObjectManager(multiprocessing.managers.SyncManager):
         # the PID of the parent process.
-        pid = os.getpid()
+        pid = None
         # When the shared object manager's process is going to be terminated,
         # we need to be sure that the worker is stopped first.
         # This class attribute should provide access to the worker for the watchdog that is implemented below.
@@ -1256,7 +1256,8 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                 while True:
                     try:
                         # probing the parent process.
-                        os.kill(cls.pid, 0)
+                        if cls.pid is not None:
+                            os.kill(cls.pid, 0)
                         time.sleep(1)
                     except OSError:
                         # parent is not found.
