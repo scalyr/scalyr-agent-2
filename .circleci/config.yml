@@ -2409,8 +2409,6 @@ workflows:
          <<: *benchmarks_master_and_release_only
      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
          <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent_single_growing_with_monitors_2_process_workers-20mb-py-35:
-         <<: *benchmarks_master_and_release_only
      - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
          <<: *benchmarks_master_and_release_only
      - send-benchmark-results-and-graphs-to-slack:
