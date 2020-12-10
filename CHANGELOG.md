@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.16 "TBD" - TBD
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
+--->
+
+Misc:
+* The default value for the `k8s_cri_query_filesystem` kubernetes monitor configuration option has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to query the Kubelet API for active containers configure `k8s_cri_query_filesystem` as false.
+
 ## 2.1.15 "Endora" - December 2, 2020
 
 <!---
