@@ -19,8 +19,9 @@ Bug fixes:
 * Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
+* Docker monitor has been fixed that when running in "API mode" (``docker_raw_logs: false``) it also correctly ingests logs from container ``stderr``. Previously only logs from ``stdout`` have been ingested.
 
-Security fixes and improvments:
+Security fixes and improvements:
 * Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 
 ## 2.1.14 "Hydrus" - November 4, 2020
