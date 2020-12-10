@@ -357,7 +357,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_cri_query_filesystem",
-    "Optional (defaults to True). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.",
+    "Optional (defaults to True). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API.",
     convert_to=bool,
     default=True,
     env_aware=True,
