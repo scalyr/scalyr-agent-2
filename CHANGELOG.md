@@ -8,7 +8,7 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 
 Bug fixes:
-* Fix to make sure we don't expect valid Docker socket when running in CRI mode.
+* Fix to make sure we don't expect valid Docker socket when running the kubernetes monitor in CRI mode.
 
 Misc:
 * The default value for the `SCALYR_K8S_CRI_QUERY_FILESYSTEM` kubernetes monitor configuration option has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to revert to the original default to prefer using the Kubelet API, set `SCALYR_K8S_CRI_QUERY_FILESYSTEM` the environment variable to "false" for the Scalyr Agent daemonset.
