@@ -2077,9 +2077,15 @@ jobs:
             $ProgressPreference = "SilentlyContinue"
             mkdir win32evtlog-cache -Force
             if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
-                  wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+                echo "Downloading .pyd library from S3"
+                wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+            }
+            else {
+                echo "Using existing cached dependency on disk"
             }
 
+            echo "File hash"
+            Get-FileHash .\win32evtlog-cache\win32evtlog.pyd | Format-List
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
