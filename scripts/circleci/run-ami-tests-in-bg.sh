@@ -128,13 +128,13 @@ done
 if [ "${FAIL_COUNTER}" -ne 0 ];
 then
     echo ""
-    echo "${FAIL_COUNTER} of the the AMI tests failed. Please check the output logs above."
+    echo "${FAIL_COUNTER} of the AMI tests failed. Please check the output logs above."
     echo "NOTE: Output for all the jobs are also available as job build artifacts."
     echo ""
     exit 1
 else
     echo ""
-    echo "All the AMI tests have completed successfuly."
+    echo "All the AMI tests have completed successfully."
     echo ""
     exit 0
 fi
