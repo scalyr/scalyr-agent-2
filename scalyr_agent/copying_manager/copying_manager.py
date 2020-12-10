@@ -113,9 +113,10 @@ class ApiKeyWorkerPool(object):
                 # create proxy object of the worker. The real worker instance is created in the new process
                 # which was created when shared_object_manager started.
                 # pylint: disable=E1101
-                worker = shared_object_manager.CopyingManagerWorkerProxy(
+                worker = shared_object_manager.create_worker(
                     self.__config, api_key_config, worker_id
                 )
+
                 # pylint: enable=E1101
 
                 # also save new shared object manager.

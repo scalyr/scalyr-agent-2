@@ -24,6 +24,7 @@ import threading
 import time
 from abc import ABCMeta, abstractmethod
 import multiprocessing.managers
+import signal
 
 if False:
     from typing import Dict
@@ -426,7 +427,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
-
                 while self._run_state.is_running():
                     log.log(
                         scalyr_logging.DEBUG_LEVEL_1,
@@ -1215,7 +1215,82 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
     """
 
     class _SharedObjectManager(multiprocessing.managers.SyncManager):
-        pass
+        # the PID of the parent process.
+        pid = os.getpid()
+        # When the shared object manager's process is going to be terminated,
+        # we need to be sure that the worker is stopped first.
+        # This class attribute should provide access to the worker for the watchdog that is implemented below.
+        worker = None
+
+        @classmethod
+        def _create_worker(cls, *args, **kwargs):
+            """
+            Create a new worker and save it as a 'cls.worker' class attribute
+            to be able to access the worker's instance by the watchdog.
+            :return: the proxy object for the 'cls.worker'
+            """
+            cls.worker = worker_class(*args, **kwargs)
+            return cls.worker
+
+        @classmethod
+        def _run_server(cls, *args, **kwargs):
+            """
+            This is the entry point of the SyncManager's process
+            and it is overridden to handle the situation where parent process was killed.
+            The current implementation of the multiprocess.managers does not provide ability to detect such situation
+            and the orphan process of the SyncManager still continues working even after the parent kill.
+
+
+            To achieve needed behaviour, before we call the original '_run_server', we create
+            and start a 'watchdog' thread, which checks the existence of the parent thread
+            and terminates everything after the parent dies.
+            :param args: passed directly to the original parent method.
+            :param kwargs: passed directly to the original parent method.
+            """
+
+            def run_watchdog():
+                """
+                Periodically check the parent process for existence and terminate everything if process is not found.
+                :return:
+                """
+                while True:
+                    try:
+                        # probing the parent process.
+                        os.kill(cls.pid, 0)
+                        time.sleep(1)
+                    except OSError:
+                        # parent is not found.
+                        # stop the worker if it is still alive.
+                        if cls.worker and cls.worker.is_alive():
+                            try:
+                                # Try to stop worker gracefully.
+                                # If this unsuccessful, then just ignore that
+                                # because the whole process will be killed later.
+                                cls.worker.stop_worker()
+                            except:
+                                # ignore if worker can not be stopped everything will be killed later anyway.
+                                pass
+                            finally:
+                                break
+
+                # try to terminate everything gracefully first.
+                os.kill(os.getpid(), signal.SIGTERM)
+                time.sleep(1)
+
+                # kill everything to be sure that nothing is survived.
+                os.kill(os.getpid(), signal.SIGKILL)
+
+            # starting the watchdog thread.
+            watchdog = threading.Thread(target=run_watchdog)
+            watchdog.start()
+
+            try:
+                # pylint: disable=E1101
+                super(_SharedObjectManager, cls)._run_server(*args, **kwargs)
+                # pylint: enable=E1101
+            finally:
+                # kill everything to be sure that nothing is survived.
+                os.kill(os.getpid(), signal.SIGKILL)
 
     # register LogFileProcessor proxy.
     # pylint: disable=E1101
@@ -1224,9 +1299,9 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
     )
 
     _SharedObjectManager.register(
-        six.ensure_str("CopyingManagerWorkerProxy"),
-        worker_class,
-        proxytype=worker_proxy_class,
+        six.ensure_str("create_worker"),
+        _SharedObjectManager._create_worker,
+        worker_proxy_class,
         method_to_typeid={
             six.ensure_str("get_log_processors"): six.ensure_str("list"),
             six.ensure_str("create_and_schedule_new_log_processor"): six.ensure_str(

@@ -111,7 +111,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
         if self.use_multiprocessing_workers:
             # pylint: disable=E1101
-            worker = self._shared_object_manager.CopyingManagerWorkerProxy(
+            worker = self._shared_object_manager.create_worker(
                 config, api_key_config, worker_id
             )
             # pylint: enable=E1101
