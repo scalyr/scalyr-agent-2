@@ -283,7 +283,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "log_timestamps",
-    "Optional (defaults to True). If true, stdout/stderr logs for logs consumed via Docker API will contain docker timestamps at the beginning of the line\n",
+    "Optional (defaults to True). If true, stdout/stderr logs for logs consumed via Docker API (docker_raw_logs: false) will contain docker timestamps at the beginning of the line\n",
     convert_to=bool,
     default=True,
 )
