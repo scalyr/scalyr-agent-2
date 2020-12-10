@@ -29,7 +29,11 @@ try:
     import win32evtlogutil
     import win32con
     from ctypes import windll  # type: ignore
-except ImportError:
+
+    WIN32_IMPORT_ERROR = ""
+except ImportError as e:
+    WIN32_IMPORT_ERROR = str(e)
+
     win32evtlog = None
     win32evtlogutil = None
     win32con = None
@@ -780,8 +784,14 @@ and System sources:
             if channels:
                 msg = (
                     "Channels are not supported on the older Win32 EventLog API "
-                    "(evtapi_available=%s, windll_available=%s,event_api_import_error=%s)."
-                    % (evtapi, bool(windll), str(event_api_import_error))
+                    "(evtapi_available=%s, windll_available=%s, win32_import_error=%s, "
+                    "event_api_import_error=%s)."
+                    % (
+                        evtapi,
+                        bool(windll),
+                        WIN32_IMPORT_ERROR,
+                        str(event_api_import_error),
+                    )
                 )
                 raise Exception(msg)
 
