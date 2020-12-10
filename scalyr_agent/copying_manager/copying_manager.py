@@ -101,7 +101,7 @@ class ApiKeyWorkerPool(object):
 
                 # set the parent process pid for the SharedObjectManager's watchdog
                 # which should detect if parent was killed.
-                SharedObjectManager.pid = os.getpid()
+                SharedObjectManager.parent_pid = os.getpid()
 
                 # change agent log path for the new worker.
                 # this initializer function will be invoked in the worker's process.
