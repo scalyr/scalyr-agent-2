@@ -740,11 +740,15 @@ and System sources:
 
     def __get_api(self, sources, events, channels):
         evtapi = False
+        event_api_import_error = ""
         if windll:
             try:
                 if windll.wevtapi:
                     evtapi = True
-            except Exception:
+                else:
+                    event_api_import_error = "windll.wevtapi attribute doesn't exist"
+            except Exception as e:
+                event_api_import_error = str(e)
                 pass
 
         result = None
@@ -774,9 +778,12 @@ and System sources:
             result = NewApi(self._config, self._logger, channels)
         else:
             if channels:
-                raise Exception(
-                    "Channels are not supported on the older Win32 EventLog API"
+                msg = (
+                    "Channels are not supported on the older Win32 EventLog API "
+                    "(evtapi_available=%s, windll_available=%s,event_api_import_error=%s)."
+                    % (evtapi, bool(windll), str(event_api_import_error))
                 )
+                raise Exception(msg)
 
             result = OldApi(self._config, self._logger, source_list, event_filter)
 
