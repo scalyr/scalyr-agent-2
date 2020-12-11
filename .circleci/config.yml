@@ -2035,6 +2035,8 @@ jobs:
     executor:
       name: win/default
       size: "medium"
+      # windows-server-2019-vs2019:previous
+      version: "previous"
       shell: powershell.exe
     steps:
       - checkout
