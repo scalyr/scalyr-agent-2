@@ -373,7 +373,7 @@ class AgentRunner(object):
 
     @property
     def agent_pid(self):
-        path = os.path.join(self.agent_logs_dir_path / "agent.pid")
+        path = self.agent_logs_dir_path / "agent.pid"
         with open(six.text_type(path), "r") as f:
             return int(f.read())
 
