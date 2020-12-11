@@ -24,17 +24,18 @@ import threading
 import time
 from abc import ABCMeta, abstractmethod
 import multiprocessing.managers
-import signal
 
 if False:
     from typing import Dict
     from typing import Any
     from typing import List
+    from typing import Optional
 
 from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread
 from scalyr_agent.agent_status import CopyingManagerWorkerStatus
 from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
+from scalyr_agent import util as scalyr_util
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import create_client, create_new_client
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
@@ -273,18 +274,21 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
     This is run as its own thread.
     """
 
-    def __init__(self, configuration, api_key_config_entry, worker_id):
-        # type: (Configuration, Dict, six.text_type) -> None
+    def __init__(self, configuration, api_key_config_entry, worker_id, is_daemon=False):
+        # type: (Configuration, Dict, six.text_type, bool) -> None
         """Initializes the copying manager worker.
 
         @param configuration: The configuration file containing which log files need to be copied listed in the
             configuration file.
         @param api_key_config_entry:
         @param worker_id: Id of the worker.
+        @:param is_daemon: If true, start a worker thread as a daemon thread.
 
         """
         StoppableThread.__init__(
-            self, name="copying manager worker thread #%s" % worker_id
+            self,
+            name="copying manager worker thread #%s" % worker_id,
+            is_daemon=is_daemon,
         )
 
         self._id = six.text_type(worker_id)
@@ -718,6 +722,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
             result = CopyingManagerWorkerStatus()
             result.worker_id = self._id
+            result.pid = os.getpid()
             result.total_bytes_uploaded = self.__total_bytes_uploaded
             result.last_success_time = self.__last_success_time
             result.last_attempt_time = self.__last_attempt_time
@@ -1206,109 +1211,78 @@ class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):  # type: ignore
 
 def create_shared_object_manager(worker_class, worker_proxy_class):
     """
-    Creates and returns a subclass of the SyncManager and also registers all proxy types
-    that will be needed for the multiprocess worker.
+    Creates and returns an instance of the subclass of the 'scalyr_utils.ParentAwareSyncManager' and also registers
+    all proxy types that will be needed for the multiprocess worker.
     This is done in function, only to be reusable by the tests.
-    :param worker_class:
-    :param worker_proxy_class:
-    :return:
+    :param worker_class: The worker class to "proxify"
+    :param worker_proxy_class: The predefined worker proxy class.
+    :return: a new instance of the 'scalyr_utils.ParentAwareSyncManager' with registered proxies.
     """
 
-    class _SharedObjectManager(multiprocessing.managers.SyncManager):
-        # the PID of the parent process.
-        parent_pid = None
-        # When the shared object manager's process is going to be terminated,
-        # we need to be sure that the worker is stopped first.
-        # This class attribute should provide access to the worker for the watchdog that is implemented below.
-        worker = None
+    class _SharedObjectManager(scalyr_util.ParentProcessAwareSyncManager):
+        """
+        The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker
+        instance in order to stop it if the parent process is killed.
+        """
+
+        def __init__(self, *args, **kwargs):
+            super(_SharedObjectManager, self).__init__(*args, **kwargs)
+
+            self._worker = None  # type: Optional[CopyingManagerWorker]
+
+        def _create_worker(self, configuration, api_key_config_entry, worker_id):
+            # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorker
+            """
+            Create a new worker and save it as an attribute.
+            to be able to access the worker's instance within the local process.
+
+            The arguments are the same as in the workers's constructor.
+            :return: the proxy object for the worker instance.
+            """
+
+            # we set 'is_daemon' as True in order to be able to stop the
+            # worker's thread if the  manager's main thread is exited.
+            self._worker = worker_class(
+                configuration, api_key_config_entry, worker_id, is_daemon=True
+            )
+
+            return self._worker  # type: ignore
+
+        def _on_parent_process_kill(self):
+            log.error(
+                "The main agent process does not exist. Probably it was forcibly killed. "
+                "Checking if the worker is still alive."
+            )
+            if self._worker and self._worker.is_alive():
+                log.error("The worker is alive. Stopping it.")
+                try:
+                    self._worker.stop_worker()
+                except:
+                    log.exception(
+                        "Can not stop the worker. Wait for killing the process.."
+                    )
+                    # can not stop worker gracefully, just wait for the main thread of the process exits and
+                    # the the worker's thread(since it is a daemon)  will be terminated too.
 
         @classmethod
-        def _create_worker(cls, *args, **kwargs):
-            """
-            Create a new worker and save it as a 'cls.worker' class attribute
-            to be able to access the worker's instance by the watchdog.
-            :return: the proxy object for the 'cls.worker'
-            """
-            cls.worker = worker_class(*args, **kwargs)
-            return cls.worker
+        def _on_exit(cls, error=None):
+            if error:
+                log.exception(
+                    "The shared object manager thread has ended up with an error."
+                )
+            else:
+                log.info("The shared object manager of the worker has stopped.")
 
-        @classmethod
-        def _run_server(cls, *args, **kwargs):
-            """
-            This is the entry point of the SyncManager's process
-            and it is overridden to handle the situation where parent process was killed.
-            The current implementation of the multiprocess.managers does not provide ability to detect such situation
-            and the orphan process of the SyncManager still continues working even after the parent was killed.
+    manager = _SharedObjectManager()
 
-
-            To achieve needed behaviour, before we call the original '_run_server', we create
-            and start a 'watchdog' thread, which checks the existence of the parent process
-            and terminates everything after the parent dies.
-            :param args: passed directly to the original parent method.
-            :param kwargs: passed directly to the original parent method.
-            """
-
-            def run_watchdog():
-                """
-                Periodically check the parent process for existence and terminate everything if process is not found.
-                :return:
-                """
-                while True:
-                    try:
-                        # probing the parent process.
-                        if cls.parent_pid is not None:
-                            os.kill(cls.parent_pid, 0)
-                        time.sleep(1)
-                    except OSError:
-                        # parent is not found. Stop the worker if it is still alive.
-                        # NOTE: since we are dealing with such an extreme case,
-                        # we should not expect that the following log statement will be sent to the Scalyr.
-                        # but they still may be useful to debug locally.
-                        log.error(
-                            "The worker can not find the parent process. Looks like the agent process was forcibly killed"
-                        )
-                        if cls.worker and cls.worker.is_alive():
-                            log.error("The worker is still working. Stopping it.")
-                            try:
-                                # Try to stop worker gracefully.
-                                # If this unsuccessful, then just ignore that
-                                # because the whole process will be killed later.
-                                cls.worker.stop_worker()
-                            except:
-                                # ignore if worker can not be stopped everything will be killed later anyway.
-                                log.exception("The worker can not be stopped.")
-                                pass
-                            finally:
-                                break
-
-                # try to terminate everything gracefully first.
-                os.kill(os.getpid(), signal.SIGTERM)
-                time.sleep(1)
-
-                # kill everything to be sure that nothing is survived.
-                os.kill(os.getpid(), signal.SIGKILL)
-
-            # starting the watchdog thread.
-            watchdog = threading.Thread(target=run_watchdog)
-            watchdog.start()
-
-            try:
-                # pylint: disable=E1101
-                super(_SharedObjectManager, cls)._run_server(*args, **kwargs)
-                # pylint: enable=E1101
-            finally:
-                # kill everything to be sure that nothing is survived.
-                os.kill(os.getpid(), signal.SIGKILL)
-
-    # register LogFileProcessor proxy.
     # pylint: disable=E1101
-    _SharedObjectManager.register(
+    manager.register(
         six.ensure_str("LogFileProcessorProxy"), proxytype=LogFileProcessorProxy
     )
 
-    _SharedObjectManager.register(
+    manager.register(
         six.ensure_str("create_worker"),
-        _SharedObjectManager._create_worker,
+        manager._create_worker,
         worker_proxy_class,
         method_to_typeid={
             six.ensure_str("get_log_processors"): six.ensure_str("list"),
@@ -1319,10 +1293,4 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
     )
     # pylint: enable=E1101
 
-    return _SharedObjectManager
-
-
-# Create shared object manager class.
-SharedObjectManager = create_shared_object_manager(
-    CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
-)
+    return manager

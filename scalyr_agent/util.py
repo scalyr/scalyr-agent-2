@@ -37,6 +37,7 @@ import ssl
 import locale
 import collections
 import subprocess
+import signal
 from io import open
 
 if sys.version_info < (3, 5):
@@ -62,6 +63,7 @@ import os
 import threading
 import time
 import uuid
+import multiprocessing.managers
 
 try:
     from __scalyr__ import SCALYR_VERSION
@@ -2434,3 +2436,231 @@ def match_glob(pathname):
         # use the third party glob library to handle a recursive glob.
         result = glob2.glob(pathname)
     return result
+
+
+class ProcessWatchDog(threading.Thread):
+    """
+    A watchdog that creates a new thread and pools a particular process.
+    If the process does not exist anymore, the watchdog invokes a callback.
+    """
+
+    def __init__(self, pid, poll_interval):
+        """
+        :param pid: target process PID
+        :param poll_interval: The polling interval in seconds.
+        """
+        super(ProcessWatchDog, self).__init__(name="watchdog thread.")
+
+        self.daemon = True
+
+        self.pid = pid
+        self._poll_interval = poll_interval
+
+        # the callback which is invoked when the process iskilled.
+        self._on_stop_callback = None
+
+    def run(self):
+        """
+        Start probing the process.
+        :return:
+        """
+        while True:
+            try:
+                # probing the parent process.
+                if self.pid is not None:
+                    os.kill(self.pid, 0)
+                time.sleep(self._poll_interval)
+            except OSError:
+                self._on_stop_callback()
+                break
+
+    def start_watchdog(self, on_stop_callback):
+        # type: (Callable) -> None
+        """
+        Start a thread.
+
+        :param on_stop_callback: Function that will be invoked by this
+        abstraction once the parent is no longer running.  It can be used by the worker to
+        make sure it has been stopped.
+        out.
+         """
+        self._on_stop_callback = on_stop_callback
+        super(ProcessWatchDog, self).start()
+
+
+class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
+    """
+    The subclass of the SyncManager which is able to create a copying manager worker and return its proxy.
+
+    One of the downsides of the 'multiprocessing.managers.SyncManager' (further just 'manager') is that the
+    manager and its process can be shut down only externally through the IPC communication
+    by a parent or third process, and there is no facilities to handle the situation where the
+    parent(or other) process is killed and it can not send the shutdown request to manager.
+    In its current implementation, the manager is just remains orphan and keeps running.
+
+    According to the fact that the worker runs in manager's process in a separate thread, we have to
+    handle the situation where the agent was killed and worker remain alive in the manager's process
+    and keeps sending logs.
+    """
+
+    class SharedObjectManagerExit(Exception):
+        """
+        The special exception which is raised when we need to exit from the infinite loop of the SyncManager
+         and to shutdown it gracefully.
+        """
+
+        pass
+
+    def __init__(self, *args, **kwargs):
+        """
+        Arguments are eventually passed to the superclass, and may vary from the python versions,
+        """
+        super(ParentProcessAwareSyncManager, self).__init__(*args, **kwargs)
+        # the instance of the ProcessWatchDog class which is responsible for the detection of the killed parent process.
+        self._watchdog = None
+
+    def initialize(self, parent_pid, parent_process_poll_interval):
+        # type: (int, int) -> None
+        """
+        This function is called in at the beginning of the shared object manager's process.
+        Mostly, this function prepares and starts the watchdog thread which should take care of stopping the worker
+        and terminating everything in case if the parent process is killed and this process is left orphan.
+
+        :param parent_pid: PID of the parent process.
+        :param parent_process_poll_interval: Interval of polling the parent process.
+        """
+
+        # register a new handler for the SIGTERM signal
+
+        # The problem is that the main thread of its process is blocked by the infinite loop
+        # in the 'SyncManager._run_server' function and there is no documented options to break it.
+        # We also can not rely on the SIGTERM signal because it was inherited from the parent process
+        # and the it's signal handler is not able to terminate the process.
+
+        # Since the signal handler is always called in the main thread, we can use it and register
+        # a new handler which throws an exception and breaks the infinite loop.
+
+        # noinspection PyUnusedLocal
+        def terminate_main_thread(signal_num, frame):
+            raise type(self).SharedObjectManagerExit()
+
+        signal.signal(signal.SIGTERM, terminate_main_thread)
+
+        # create and start a watchdog for  a parent process.
+        self._watchdog = ProcessWatchDog(
+            parent_pid, poll_interval=parent_process_poll_interval,
+        )
+        self._watchdog.start_watchdog(on_stop_callback=self._terminate)
+
+    def start_shared_object_manager(
+        self, parent_pid, parent_process_poll_interval=5, initializer=None, initargs=(),
+    ):
+        # type: (int, int, Callable, Tuple) -> None
+        """
+        Wraps a an original start method and puts the 'self.initialize' function into initializer.
+        :param parent_pid: PID of the parent process.
+        :param parent_process_poll_interval: Interval of polling the parent process.
+        :param initializer: Additional callable, it has the same purpose as in the original 'self.start' method.
+        :param initargs: Passed directly to the 'self.start' method.
+        :return:
+        """
+
+        def final_initializer():
+            """
+            Custom initializer which combines the initializer which is provided from the outside,
+            and self.initialize functions.
+            """
+
+            # call the provided initialized first, if it is presented.
+            if initializer:
+                initializer()
+
+            # do the internal initializtion.
+            self.initialize(
+                parent_pid=parent_pid,
+                parent_process_poll_interval=parent_process_poll_interval,
+            )
+
+        # start a manager with the combined initializer function.
+        super(ParentProcessAwareSyncManager, self).start(
+            initializer=final_initializer, initargs=initargs
+        )
+
+    def _terminate(self):
+        """
+        This callback is called by the watchdog instance if the parent process is killed.
+        """
+
+        # invoke the callback to perform custom cleanup actions.
+        self._on_parent_process_kill()
+
+        # send a terminate signal which has to send an exception and break the infinite loop in main thread.
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    @classmethod
+    def _run_server(cls, *args, **kwargs):
+        """
+        Override the main blocking method of the SyncManager and wrap it
+        by exception clause to provide better logging information.
+        Argument are eventually passed directly to the super class function and may vary from version of the python.
+        """
+        error = None
+        try:
+            # pylint: disable=E1101
+            super(ParentProcessAwareSyncManager, cls)._run_server(*args, **kwargs)
+            # pylint: enable=E1101
+        except cls.SharedObjectManagerExit:
+            # this is a special error which has been called intentionally
+            # to exit the infinite loop in the "SyncManager._run_server" function and stop the thread;
+            pass
+        except Exception as err:
+            error = err
+            raise
+        finally:
+            # invoke the callback to handle the exit.
+            cls._on_exit(error=error)
+
+        sys.exit()
+
+    def _on_parent_process_kill(self):
+        """
+        Overridable callback to perform additional cleanup before the manager's process in terminated.
+        """
+
+    @classmethod
+    def _on_exit(cls, error=None):
+        # type: (Exception) -> None
+        """
+        Overridable callback to customize the exit of the main thread.
+        :param error: Exception object, if occurred.
+        """
+        pass
+
+    def shutdown_and_wait(self, timeout=5):
+        # pylint: disable=E1101
+        self.shutdown()  # type: ignore
+        self._process.join(timeout=timeout)  # type: ignore
+        # pylint: enable=E1101
+
+    @property
+    def process(self):
+        # type: () -> Optional[multiprocessing.Process]
+        """
+        Return the process object of the manager.
+        :return:
+        """
+        try:
+            return self._process  # type: ignore
+        except:
+            return None
+
+    @property
+    def pid(self):
+        # type: () -> Optional[int]
+        """
+        Return the PID of the manager's process.
+        """
+        try:
+            return self._process.pid  # type: ignore
+        except:
+            return None

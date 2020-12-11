@@ -326,6 +326,7 @@ class CopyingManagerWorkerStatus(BaseAgentStatus):
 
     def __init__(self):
         self.worker_id = None
+        self.pid = (None,)
         # The total number of bytes successfully uploaded.
         self.total_bytes_uploaded = 0  # type: int
         # The last time the agent successfully copied bytes from log files to the Scalyr servers.
