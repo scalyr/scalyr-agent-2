@@ -1223,6 +1223,10 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
         """
         The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker
         instance in order to stop it if the parent process is killed.
+
+        According to the fact that the worker runs in manager's process in a separate thread, we have to
+        handle the situation where the agent was killed and worker remain alive in the manager's process
+        and keeps sending logs.
         """
 
         def __init__(self, *args, **kwargs):

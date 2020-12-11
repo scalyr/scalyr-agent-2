@@ -2480,8 +2480,7 @@ class ProcessWatchDog(threading.Thread):
         Start a thread.
 
         :param on_stop_callback: Function that will be invoked by this
-        abstraction once the parent is no longer running.  It can be used by the worker to
-        make sure it has been stopped.
+        abstraction once the parent is no longer running.
         out.
          """
         self._on_stop_callback = on_stop_callback
@@ -2490,7 +2489,6 @@ class ProcessWatchDog(threading.Thread):
 
 class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
     """
-    The subclass of the SyncManager which is able to create a copying manager worker and return its proxy.
 
     One of the downsides of the 'multiprocessing.managers.SyncManager' (further just 'manager') is that the
     manager and its process can be shut down only externally through the IPC communication
@@ -2498,9 +2496,6 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
     parent(or other) process is killed and it can not send the shutdown request to manager.
     In its current implementation, the manager is just remains orphan and keeps running.
 
-    According to the fact that the worker runs in manager's process in a separate thread, we have to
-    handle the situation where the agent was killed and worker remain alive in the manager's process
-    and keeps sending logs.
     """
 
     class SharedObjectManagerExit(Exception):
@@ -2523,8 +2518,8 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         # type: (int, int) -> None
         """
         This function is called in at the beginning of the shared object manager's process.
-        Mostly, this function prepares and starts the watchdog thread which should take care of stopping the worker
-        and terminating everything in case if the parent process is killed and this process is left orphan.
+        Mostly, this function prepares and starts the watchdog thread which should terminate everything in case if
+        the parent process is killed and this process is left orphan.
 
         :param parent_pid: PID of the parent process.
         :param parent_process_poll_interval: Interval of polling the parent process.
