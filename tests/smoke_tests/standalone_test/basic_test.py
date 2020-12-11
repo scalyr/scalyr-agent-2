@@ -12,28 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
 
-import sys
-import time
 import json
 import logging
 import re
+import time
 
 if False:
     from typing import Dict
     from typing import List
     from typing import Tuple
 
-import pytest
 import psutil
-
+import pytest
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL
-from tests.smoke_tests.common import _test_standalone_smoke, AgentRunner
+from tests.utils.agent_runner import AgentRunner
 
 
 def _perform_workers_check(runner):
@@ -312,18 +311,3 @@ def test_standalone_agent_config_reload():
             new_workers[worker_id] = worker_pid
 
     _check_workers_gracefull_stop(runner, new_workers, occurrences=1)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
-def test_standalone_smoke():
-    _test_standalone_smoke(DEV_INSTALL)
-
-
-@pytest.mark.skipif(
-    sys.version_info < (2, 7), reason="Skip multiprocess configuration for python 2.6"
-)
-@pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
-def test_standalone_smoke_with_process_workers():
-    _test_standalone_smoke(DEV_INSTALL, workers_type="process", workers_count=2)
