@@ -2570,7 +2570,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
             if initializer:
                 initializer()
 
-            # do the internal initializtion.
+            # do the internal initialization.
             self.initialize(
                 parent_pid=parent_pid,
                 parent_process_poll_interval=parent_process_poll_interval,

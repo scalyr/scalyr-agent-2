@@ -1246,6 +1246,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
 
             # we set 'is_daemon' as True in order to be able to stop the
             # worker's thread if the  manager's main thread is exited.
+            # but it is just a 'last stand' option when the graceful worker stop is failed.
             self._worker = worker_class(
                 configuration, api_key_config_entry, worker_id, is_daemon=True
             )
@@ -1271,7 +1272,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
         @classmethod
         def _on_exit(cls, error=None):
             if error:
-                log.exception(
+                log.error(
                     "The shared object manager thread has ended up with an error."
                 )
             else:
