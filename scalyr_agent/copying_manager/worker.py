@@ -1254,6 +1254,10 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             return self._worker  # type: ignore
 
         def _on_parent_process_kill(self):
+            """
+            Override the callback which is invoked when the parent process is killed,
+            so we have to stop the workers before this process will be terminated.
+            """
             log.error(
                 "The main agent process does not exist. Probably it was forcibly killed. "
                 "Checking if the worker is still alive."
@@ -1271,6 +1275,10 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
 
         @classmethod
         def _on_exit(cls, error=None):
+            """
+            Just add more log messages beforethe process is terminated.
+            :return:
+            """
             if error:
                 log.error(
                     "The shared object manager thread has ended up with an error."
