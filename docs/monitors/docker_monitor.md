@@ -210,6 +210,10 @@ when starting to log a containers \
                                       container for any labels that begin with `com.scalyr.config.log.` and use those \
                                       labels (minus the prefix) as fields in the containers log_config.  Keys that \
                                       contain hyphens will automatically be converted to underscores.
+|||# ``log_timestamps``           ||| Optional (defaults to True). If true, stdout/stderr logs for logs consumed via \
+                                      Docker API (docker_raw_logs: false) will contain docker timestamps at the \
+                                      beginning of the line
+
 
 ## Metrics
 

@@ -25,7 +25,7 @@ echo_with_date() {
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 CLOUD_INIT_RESULT_FILE="/run/cloud-init/result.json"
-MAX_WAIT_COUNTER=20 # we wait a maximum of 20 x 2 seconds for provision to finish
+MAX_WAIT_COUNTER=30 # we wait a maximum of 30 x 2 seconds for provision to finish
 
 WAIT_COUNTER=0
 while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_COUNTER} ]; do
@@ -35,7 +35,7 @@ while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_C
 done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
-    echo_with_date "Provisioning didn't finish in 40 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "Provisioning didn't finish in 60 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
     exit 1
 fi
 
