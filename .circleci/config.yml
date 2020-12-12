@@ -730,7 +730,34 @@ commands:
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
 
-            ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
+            set +e
+
+            max_attempts="2"
+            sleep_delay="15"
+
+            i=0
+            until [ "$i" -ge ${max_attempts} ]; do
+                echo "Running tests command"
+                ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
+                exit_code=$?
+                if [ "${exit_code}" -eq 0 ]; then
+                    echo "Command exited with 0, breaking from the loop."
+                    break
+                else
+                    echo "Command exited with non-zero status, retrying in ${sleep_delay} seconds..."
+                fi
+                i=$((i+1))
+                sleep ${sleep_delay}
+              done
+
+              set -e
+
+              if [ "${exit_code}" -ne 0 ]; then
+                  echo "Command failed to exit with zero exit code after 2 attempts, failing (exit_code=${exit_code})"
+                  exit 1
+              fi
+
+              exit 0
       - store_artifacts:
           path: outputs
 
@@ -2024,6 +2051,8 @@ jobs:
     executor:
       name: win/default
       size: "medium"
+      # windows-server-2019-vs2019:previous
+      version: "previous"
       shell: powershell.exe
     steps:
       - checkout
@@ -2066,9 +2095,15 @@ jobs:
             $ProgressPreference = "SilentlyContinue"
             mkdir win32evtlog-cache -Force
             if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
-                  wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+                echo "Downloading .pyd library from S3"
+                wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
+            }
+            else {
+                echo "Using existing cached dependency on disk"
             }
 
+            echo "File hash"
+            Get-FileHash .\win32evtlog-cache\win32evtlog.pyd | Format-List
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
