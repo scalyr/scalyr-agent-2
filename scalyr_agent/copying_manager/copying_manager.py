@@ -97,7 +97,7 @@ class ApiKeyWorkerPool(object):
                 )
             else:
 
-                # Create shared object manager class.
+                # Create an instance of the shared object manager.
                 shared_object_manager = create_shared_object_manager(
                     CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
                 )
@@ -246,17 +246,35 @@ class ApiKeyWorkerPool(object):
         # also stop all shared object managers.
         for worker_id, memory_manager in self.__shared_object_managers.items():
             try:
-                memory_manager.shutdown_and_wait()
+                memory_manager.shutdown_manager()
             except:
                 log.exception(
-                    "Can not stop shared object manager for the worker '%s'. It will be killed."
+                    "Can not shutdown the shared object manager for the worker '%s'."
                     % worker_id
                 )
 
-        # kill any process of the shared object manager's which may survive the previous step.
+        # waiting for shared object manager is shut down.
+        # NOTE: we split the shutting down and waiting to make things more asynchronous and to save time.
+        for worker_id, memory_manager in self.__shared_object_managers.items():
+            try:
+                memory_manager.wait_for_shutdown(timeout=5)
+            except:
+                log.exception(
+                    "The error has occurred while waiting for shutdown of the shared object manager of the worker {0}.".format(
+                        worker_id
+                    )
+                    % worker_id
+                )
+
+        # kill any process of the shared object managers which may survive the previous steps.
         for worker_id, memory_manager in self.__shared_object_managers.items():
             try:
                 os.kill(memory_manager.pid, signal.SIGKILL)
+                log.warning(
+                    "The process of the shared object manager for the worker '{0}' has still been running and has been killed.".format(
+                        worker_id
+                    )
+                )
             except OSError as e:
                 if e.errno != errno.ESRCH:  # no such process
                     # we can not do anything more if even kill is failed, just report about it.

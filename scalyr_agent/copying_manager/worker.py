@@ -1280,9 +1280,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             :return:
             """
             if error:
-                log.error(
-                    "The shared object manager thread has ended up with an error."
-                )
+                log.error("The shared object manager thread has ended with an error.")
             else:
                 log.info("The shared object manager of the worker has stopped.")
 

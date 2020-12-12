@@ -2444,19 +2444,19 @@ class ProcessWatchDog(threading.Thread):
     If the process does not exist anymore, the watchdog invokes a callback.
     """
 
-    def __init__(self, pid, poll_interval):
+    def __init__(self, target_pid, poll_interval):
         """
-        :param pid: target process PID
+        :param target_pid: target process PID
         :param poll_interval: The polling interval in seconds.
         """
         super(ProcessWatchDog, self).__init__(name="watchdog thread.")
 
         self.daemon = True
 
-        self.pid = pid
+        self._target_pid = target_pid
         self._poll_interval = poll_interval
 
-        # the callback which is invoked when the process iskilled.
+        # the callback which is invoked when the process is killed.
         self._on_stop_callback = None
 
     def run(self):
@@ -2467,8 +2467,8 @@ class ProcessWatchDog(threading.Thread):
         while True:
             try:
                 # probing the parent process.
-                if self.pid is not None:
-                    os.kill(self.pid, 0)
+                if self._target_pid is not None:
+                    os.kill(self._target_pid, 0)
                 time.sleep(self._poll_interval)
             except OSError:
                 self._on_stop_callback()
@@ -2513,6 +2513,9 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         super(ParentProcessAwareSyncManager, self).__init__(*args, **kwargs)
         # the instance of the ProcessWatchDog class which is responsible for the detection of the killed parent process.
         self._watchdog = None
+
+        # time which is given to shutdown everything gracefully before the SIGKILL is sent.
+        self._time_before_kill = 10
 
     def initialize(self, parent_pid, parent_process_poll_interval):
         # type: (int, int) -> None
@@ -2587,10 +2590,20 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         """
 
         # invoke the callback to perform custom cleanup actions.
-        self._on_parent_process_kill()
+        try:
+            self._on_parent_process_kill()
+        except:
+            # for extra safety. But it is better to make sure
+            # that the overridden callback method '_on_parent_process_kill' does not throw anything.
+            pass
 
         # send a terminate signal which has to send an exception and break the infinite loop in main thread.
         os.kill(os.getpid(), signal.SIGTERM)
+
+        # To be on the safe side, give other threads some time to handle the SIGTERM gracefully and then send SIGKILL
+        time.sleep(self._time_before_kill)
+
+        os.kill(os.getpid(), signal.SIGKILL)
 
     @classmethod
     def _run_server(cls, *args, **kwargs):
@@ -2631,9 +2644,21 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         """
         pass
 
-    def shutdown_and_wait(self, timeout=5):
+    def shutdown_manager(self):
+        """
+        Send a shutdown request to the manager's process.
+        :return:
+        """
         # pylint: disable=E1101
         self.shutdown()  # type: ignore
+        # pylint: enable=E1101
+
+    def wait_for_shutdown(self, timeout=5):
+        """
+        Block the current thread until the manager's process is stopped.
+        The 'shutdown_manager' method has to be called before calling this.
+        """
+        # pylint: disable=E1101
         self._process.join(timeout=timeout)  # type: ignore
         # pylint: enable=E1101
 
