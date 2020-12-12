@@ -34,9 +34,11 @@ from scalyr_agent.test_base import skipIf
 from tests.unit.copying_manager_tests.common import (
     TestableCopyingManagerThreadedWorker,
     CopyingManagerCommonTest,
-    TestableSharedObjectManager,
     TestEnvironBuilder,
+    TestableCopyingManagerWorkerProxy,
 )
+
+from scalyr_agent.copying_manager.worker import create_shared_object_manager
 from scalyr_agent.configuration import Configuration
 from tests.unit.copying_manager_tests.test_environment import TestableLogFile
 
@@ -81,9 +83,9 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         self.use_multiprocessing_workers = worker_type == "process"
         super(CopyingManagerWorkerTest, self).setup()
 
-        if self.use_multiprocessing_workers:
-            self._shared_object_manager = TestableSharedObjectManager()
-            self._shared_object_manager.start()
+        self._shared_object_manager = None
+
+        self._recreate_shared_object_manager()
 
     def teardown(self):
         if self._instance is not None and self._instance.is_alive():
@@ -99,8 +101,11 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         Recreate and restart shared object manager to be able to fork and inherit changes done by the test cases.
         """
         if self.use_multiprocessing_workers:
-            self._shared_object_manager.shutdown()
-            self._shared_object_manager = TestableSharedObjectManager()
+            if self._shared_object_manager:
+                self._shared_object_manager.shutdown()
+            self._shared_object_manager = create_shared_object_manager(
+                TestableCopyingManagerThreadedWorker, TestableCopyingManagerWorkerProxy
+            )
             self._shared_object_manager.start()
 
     def _create_worker(self):
@@ -111,7 +116,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
 
         if self.use_multiprocessing_workers:
             # pylint: disable=E1101
-            worker = self._shared_object_manager.CopyingManagerWorkerProxy(
+            worker = self._shared_object_manager.create_worker(
                 config, api_key_config, worker_id
             )
             # pylint: enable=E1101

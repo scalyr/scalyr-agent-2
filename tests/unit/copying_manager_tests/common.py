@@ -57,10 +57,7 @@ from scalyr_agent.copying_manager import (
     ApiKeyWorkerPool,
     CopyingManagerThreadedWorker,
 )
-from scalyr_agent.copying_manager.worker import (
-    WORKER_PROXY_EXPOSED_METHODS,
-    create_shared_object_manager,
-)
+from scalyr_agent.copying_manager.worker import WORKER_PROXY_EXPOSED_METHODS
 
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.log_processing import LogMatcher
@@ -108,6 +105,7 @@ class CopyingManagerCommonTest(object):
 
     def teardown(self):
         if self._env_builder is not None:
+
             self._env_builder.clear()
 
     def _extract_lines(self, request):
@@ -409,7 +407,7 @@ class TestableCopyingManagerThreadedWorker(
 
     __test__ = False
 
-    def __init__(self, configuration, api_key_config_entry, worker_id):
+    def __init__(self, configuration, api_key_config_entry, worker_id, is_daemon=False):
         # Approach:  We will override key methods of CopyingManagerWorker, blocking them from returning until we tell
         # to proceed.  This allows us to then do things like write new log lines while the CopyingManagerWorker is
         # blocked.   Coordinating the communication between the two threads is done using one condition variable.
@@ -426,7 +424,7 @@ class TestableCopyingManagerThreadedWorker(
         # we set a new state to block at.
 
         CopyingManagerThreadedWorker.__init__(
-            self, configuration, api_key_config_entry, worker_id
+            self, configuration, api_key_config_entry, worker_id, is_daemon=is_daemon
         )
         TestableCopyingManagerFlowController.__init__(self, configuration)
         self.__config = configuration
@@ -710,26 +708,35 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         # that's why we need change original worker class by testable class.
         # We also do the same thing with 'ApiKeyWorkerPool' and the shared object manager class
         from scalyr_agent.copying_manager import copying_manager
+        from scalyr_agent.copying_manager import worker
 
-        # save original class of the CopyingManager from 'copying_manager' module
+        def create_testeble_shared_object_manager(*args, **kwargs):
+            return original_create_shared_object_manager(
+                TestableCopyingManagerThreadedWorker, TestableCopyingManagerWorkerProxy
+            )
+
+        # save original classes and function to the testable ones.
         original_worker = copying_manager.CopyingManagerThreadedWorker
+        original_worker_proxy = copying_manager.CopyingManagerWorkerProxy
         original_worker_pool = copying_manager.ApiKeyWorkerPool
-        original_shared_object_manager_class = copying_manager.SharedObjectManager
+        original_create_shared_object_manager = worker.create_shared_object_manager
 
-        # replace original class by testable.
-        copying_manager.SharedObjectManager = TestableSharedObjectManager
+        # replace original classes by testable.
         copying_manager.CopyingManagerThreadedWorker = (
             TestableCopyingManagerThreadedWorker
         )
+        copying_manager.CopyingManagerWorkerProxy = TestableCopyingManagerWorkerProxy
         copying_manager.ApiKeyWorkerPool = TestableApiKeyWorkerPool
+        worker.create_shared_object_manager = create_testeble_shared_object_manager
 
         try:
             super(TestableCopyingManager, self)._create_worker_pools()
         finally:
             # return back original worker class.
             copying_manager.CopyingManagerThreadedWorker = original_worker
-            copying_manager.SharedObjectManager = original_shared_object_manager_class
+            copying_manager.CopyingManagerWorkerProxy = original_worker_proxy
             copying_manager.ApiKeyWorkerPool = original_worker_pool
+            worker.create_shared_object_manager = original_create_shared_object_manager
 
     def _create_log_matchers(self, configuration, monitors):
         # override this to mock regular log matchers with testable ones.
@@ -960,8 +967,3 @@ class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):  # 
             self._callmethod("send_current_response", args=(status_message,))
 
         return request, send_response
-
-
-TestableSharedObjectManager = create_shared_object_manager(
-    TestableCopyingManagerThreadedWorker, TestableCopyingManagerWorkerProxy
-)

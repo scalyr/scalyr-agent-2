@@ -24,6 +24,8 @@ import threading
 import time
 import operator
 from six.moves import range
+import signal
+import errno
 
 if False:
     from typing import Dict
@@ -42,13 +44,15 @@ from scalyr_agent.agent_status import (
 )
 from scalyr_agent.copying_manager.worker import (
     CopyingManagerThreadedWorker,
-    SharedObjectManager,
+    create_shared_object_manager,
+    CopyingManagerWorkerProxy,
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
+
 
 import six
 
@@ -81,9 +85,7 @@ class ApiKeyWorkerPool(object):
 
         # collection of shared object managers. (Subclasses of the multiprocessing.BaseManager)
         # Those managers allow to communicate with workers if they are in the multiprocessing mode.
-        self.__shared_object_managers = (
-            dict()
-        )  # type: Dict[six.text_type, SharedObjectManager]
+        self.__shared_object_managers = dict()
 
         for i in range(api_key_config["workers"]):
             # combine the id of the api key and worker's position in the list to get a workers id.
@@ -94,26 +96,37 @@ class ApiKeyWorkerPool(object):
                     self.__config, api_key_config, worker_id
                 )
             else:
-                shared_object_manager = SharedObjectManager()
+
+                # Create an instance of the shared object manager.
+                shared_object_manager = create_shared_object_manager(
+                    CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
+                )
 
                 # Important for the understanding. When the shared_object_manager is started, it creates a new process.
                 # We use this process as a process for the worker.
 
+                # change agent log path for the new worker.
                 worker_agent_log_path = os.path.join(
                     self.__config.agent_log_path, "agent-%s.log" % worker_id
                 )
 
-                # change agent log path for the new worker.
                 # this initializer function will be invoked in the worker's process.
                 def initializer():
+                    """
+                    This function is called in the shared object manager's start.
+                    """
+                    # change log file path for the agent logger.
                     self._change_worker_process_agent_log_path(worker_agent_log_path)
 
-                shared_object_manager.start(initializer=initializer)
+                # start the shared object manager's process.
+                shared_object_manager.start_shared_object_manager(
+                    initializer=initializer, parent_pid=os.getpid()
+                )
 
                 # create proxy object of the worker. The real worker instance is created in the new process
                 # which was created when shared_object_manager started.
                 # pylint: disable=E1101
-                worker = shared_object_manager.CopyingManagerWorkerProxy(
+                worker = shared_object_manager.create_worker(
                     self.__config, api_key_config, worker_id
                 )
                 # pylint: enable=E1101
@@ -233,12 +246,43 @@ class ApiKeyWorkerPool(object):
         # also stop all shared object managers.
         for worker_id, memory_manager in self.__shared_object_managers.items():
             try:
-                memory_manager.shutdown()
+                memory_manager.shutdown_manager()
             except:
                 log.exception(
-                    "Can not stop shared object manager for the worker '%s'."
+                    "Can not shutdown the shared object manager for the worker '%s'."
                     % worker_id
                 )
+
+        # waiting for shared object manager is shut down.
+        # NOTE: we split the shutting down and waiting to make things more asynchronous and to save time.
+        for worker_id, memory_manager in self.__shared_object_managers.items():
+            try:
+                memory_manager.wait_for_shutdown(timeout=5)
+            except:
+                log.exception(
+                    "The error has occurred while waiting for shutdown of the shared object manager of the worker {0}.".format(
+                        worker_id
+                    )
+                    % worker_id
+                )
+
+        # kill any process of the shared object managers which may survive the previous steps.
+        for worker_id, memory_manager in self.__shared_object_managers.items():
+            try:
+                os.kill(memory_manager.pid, signal.SIGKILL)
+                log.warning(
+                    "The process of the shared object manager for the worker '{0}' has still been running and has been killed.".format(
+                        worker_id
+                    )
+                )
+            except OSError as e:
+                if e.errno != errno.ESRCH:  # no such process
+                    # we can not do anything more if even kill is failed, just report about it.
+                    log.exception(
+                        "The kill operation of the shared object manager process of the worker {0} has failed.".format(
+                            worker_id
+                        )
+                    )
 
     def generate_status(self, warn_on_rate_limit=False):
         # type: (bool) -> ApiKeyWorkerPoolStatus

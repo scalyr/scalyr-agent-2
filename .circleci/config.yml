@@ -1765,6 +1765,22 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
+  benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 4"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log & touch /tmp/random2.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-4"
+          capture_line_counts: true
+          cache_key_name: "agent_2-growing_logs-monitors-multiprocess-2-worker-py-35"
+
   benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2428,6 +2444,8 @@ workflows:
          <<: *benchmarks_master_and_release_only
      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
          <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
+         <<: *benchmarks_master_and_release_only
      - send-benchmark-results-and-graphs-to-slack:
          requires:
            - benchmarks-idle-agent-py-27
@@ -2439,6 +2457,7 @@ workflows:
            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
            - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+           - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
          <<: *benchmarks_master_and_release_only
  weekly-circle-ci-usage-report:
    triggers:
