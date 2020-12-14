@@ -2598,11 +2598,17 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
             pass
 
         # send a terminate signal which has to send an exception and break the infinite loop in main thread.
+        from scalyr_agent import scalyr_logging
+
+        logger = scalyr_logging.getLogger(__name__)
+
+        logger.info("Sending SIGTERM to worker process with PID %s" % (os.getpid()))
         os.kill(os.getpid(), signal.SIGTERM)
 
         # To be on the safe side, give other threads some time to handle the SIGTERM gracefully and then send SIGKILL
         time.sleep(self._time_before_kill)
 
+        logger.info("Sending SIGKILL to worker process with PID %s" % (os.getpid()))
         os.kill(os.getpid(), signal.SIGKILL)
 
     @classmethod

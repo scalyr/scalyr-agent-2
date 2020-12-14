@@ -1238,7 +1238,8 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorker
             """
             Create a new worker and save it as an attribute.
-            to be able to access the worker's instance within the local process.
+
+            To be able to access the worker's instance within the local process.
 
             The arguments are the same as in the workers's constructor.
             :return: the proxy object for the worker instance.
@@ -1268,15 +1269,15 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                     self._worker.stop_worker()
                 except:
                     log.exception(
-                        "Can not stop the worker. Wait for killing the process.."
+                        "Can not stop the worker. Waiting before killing the process..."
                     )
                     # can not stop worker gracefully, just wait for the main thread of the process exits and
-                    # the the worker's thread(since it is a daemon)  will be terminated too.
+                    # the worker's thread(since it is a daemon)  will be terminated too.
 
         @classmethod
         def _on_exit(cls, error=None):
             """
-            Just add more log messages beforethe process is terminated.
+            Just add more log messages before the process is terminated.
             :return:
             """
             if error:
