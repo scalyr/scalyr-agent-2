@@ -611,6 +611,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
                 data = request_stream.read()
                 if data is not None:
+                    self.server.syslog_handler.handle(data)
+                """
+                if data is not None:
                     request_stream.process(data, self.server.syslog_handler.handle)
                     count += 1
                     if count > 1000:
@@ -618,8 +621,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                         count = 0
                 else:
                     # don't hog the CPU
-                    time.sleep(0.01)
+                    time.sleep(0.001)
                     check_running = True
+                """
 
                 # limit the amount of times we check if the server is still running
                 # as this is a time consuming operation due to locking
