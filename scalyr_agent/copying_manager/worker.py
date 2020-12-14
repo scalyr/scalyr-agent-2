@@ -1269,7 +1269,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
                     self._worker.stop_worker()
                 except:
                     log.exception(
-                        "Can not stop the worker. Wait before killing the process.."
+                        "Can not stop the worker. Waiting before killing the process..."
                     )
                     # can not stop worker gracefully, just wait for the main thread of the process exits and
                     # the worker's thread(since it is a daemon)  will be terminated too.
