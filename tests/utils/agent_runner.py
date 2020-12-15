@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import shutil
 import os
 import atexit
+from io import open
 
 if False:  # NOSONAR
     from typing import Dict, Optional, Any, Union
@@ -186,6 +187,7 @@ class AgentRunner(object):
         )
 
     def start(self, executable="python"):
+        self.clear_agent_logs()
         # important to call this function before agent was started.
         self._create_agent_files()
 
@@ -369,6 +371,12 @@ class AgentRunner(object):
 
         print("Agent process restarted.")
 
+    @property
+    def agent_pid(self):
+        path = self.agent_logs_dir_path / "agent.pid"
+        with open(six.text_type(path), "r") as f:
+            return int(f.read())
+
     def __del__(self):
         self.stop()
 
@@ -471,3 +479,26 @@ class AgentRunner(object):
         data = six.ensure_text(data)
         data = "{0}\n".format(data)
         self.write_to_file(path, data)
+
+    def clear_agent_logs(self):
+        """Clear agent logs directory."""
+        if self.agent_logs_dir_path.exists():
+            for child in self.agent_logs_dir_path.iterdir():
+                if child.is_file():
+                    child.unlink()
+
+    @property
+    def config(self):
+        # type: () -> Dict
+        """
+        Read config file and return as dict
+        """
+
+        return json.loads(self._agent_config_path.read_text())  # type: ignore
+
+    def write_config(self, config):
+        # type: (Dict) -> None
+        """
+        Write new data to the config.
+        """
+        self._agent_config_path.write_text(six.text_type(json.dumps(config)))  # type: ignore
