@@ -1,6 +1,6 @@
 # Release Notes
 
-## 2.1.15 "Endora" - December 2, 2020
+## 2.1.15 "Endora" - December 15, 2020
 
 ### Increase Scalyr Agent upload throughput, using multiple Scalyr team accounts. (BETA)
 **Note, the use of multiple sessions to upload logs to Scalyr is currently in beta. Please be sure to test use of this
