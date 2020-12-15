@@ -1,14 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.15 "Endora" - December 2, 2020
+## 2.1.15 "Endora" - December 15, 2020
 
 <!---
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 Feature:
-* The configuration option `default_workers_per_api_key` which allows to establish more than one simultaneous sessions(workers) with the Scalyr servers.
-* The configuration option `use_multiprocess_copying_workers` which allows to start a all sessions(workers) in a separate processes, thereby providing more CPU resources to the agent.
+* Ability to upload logs to different Scalyr team accounts by specifying different API keys for different log files. See [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
+* New configuration option `default_workers_per_api_key` which creates more than one session with the Scalyr servers to increase upload throughput. This may be set using the `SCALYR_DEFAULT_WORKERS_PER_API_KEY` environment variable.
+* New configuration option `use_multiprocess_copying_workers` which uses separate processes for each upload session, thereby providing more CPU resources to the agent. This may be set using the `SCALYR_USE_MULTIPROCESS_COPYING_WORKERS` environment variable.
 Improvements:
 * Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/dev*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 * Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
