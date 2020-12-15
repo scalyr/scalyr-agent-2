@@ -93,7 +93,7 @@ Possible options for each element of the ``api_keys`` list:
 |---------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
 | api_key | yes      | The API key token.                                                                                                                                     |
 | id      | yes      | The identifier of the API key. Must be unique. String.                                                                                                 |
-| workers | no       | The number of workers for the API key. By default it has the same value as the `default_workers_per_api_key` option. |
+| workers | no       | The number of [workers](#multi-worker-configuration) for the API key. By default it has the same value as the `default_workers_per_api_key` [option](#multi-worker-configuration). |
 
 You may also split the definition of the api_keys field across [multiple configuration files](https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#modularConfig)
 in the agent.d directory. The agent will join together all entries in all api_keys fields defined.
