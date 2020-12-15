@@ -1,33 +1,26 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.16 "TBD" - TBD
+## 2.1.15 "Endora" - December 15, 2020
 
 <!---
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
-
-Bug fixes:
-* Fix to make sure we don't expect a valid Docker socket when running Kubernetes monitor in CRI mode. This fixes an issue preventing the K8s monitor from running in CRI mode if Docker is not available.
-
-Misc:
-* The default value for the `k8s_cri_query_filesystem` Kubernetes monitor config option (set via the `SCALYR_K8S_CRI_QUERY_FILESYSTEM` environment var) has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to revert to the original default to prefer using the Kubelet API, set `SCALYR_K8S_CRI_QUERY_FILESYSTEM` the environment variable to "false" for the Scalyr Agent daemonset.
-
-## 2.1.15 "Endora" - December 2, 2020
-
-<!---
-Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
---->
-
+Feature:
+* Ability to upload logs to different Scalyr team accounts by specifying different API keys for different log files. See [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
+* New configuration option `default_workers_per_api_key` which creates more than one session with the Scalyr servers to increase upload throughput. This may be set using the `SCALYR_DEFAULT_WORKERS_PER_API_KEY` environment variable.
+* New configuration option `use_multiprocess_copying_workers` which uses separate processes for each upload session, thereby providing more CPU resources to the agent. This may be set using the `SCALYR_USE_MULTIPROCESS_COPYING_WORKERS` environment variable.
 Improvements:
 * Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/dev*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 * Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
 
 Misc:
+* The default value for the `k8s_cri_query_filesystem` Kubernetes monitor config option (set via the `SCALYR_K8S_CRI_QUERY_FILESYSTEM` environment var) has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to revert to the original default to prefer using the Kubelet API, set `SCALYR_K8S_CRI_QUERY_FILESYSTEM` the environment variable to "false" for the Scalyr Agent daemonset.
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
 * New ``global_monitor_sample_interval_enable_jitter`` config option has been added which is enabled by default. When this option is enabled, random sleep between 2/10 and 8/10 of the configured monitor sample gather interval is used before gathering the sample for the first time. This ensures that sample gathering for all the monitors doesn't run at the same time. This comes in handy when running agent configured with many monitors on lower powered devices to spread the monitor sample gathering related load spike across a longer time frame.
 
 Bug fixes:
+* Fix to make sure we don't expect a valid Docker socket when running Kubernetes monitor in CRI mode. This fixes an issue preventing the K8s monitor from running in CRI mode if Docker is not available.
 * Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.

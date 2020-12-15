@@ -1,8 +1,151 @@
 # Release Notes
 
-## 2.1.15 "Endora" - December 2, 2020
+## 2.1.15 "Endora" - December 15, 2020
 
-* Linux system metrics monitor now ignores the following special mounts points by default:
+### Increase Scalyr Agent upload throughput, using multiple Scalyr team accounts. (BETA)
+**Note, the use of multiple sessions to upload logs to Scalyr is currently in beta. Please be sure to test use of this
+ feature before deploying it widely in your production environment.**
+
+
+#### Multi-worker configuration
+
+#### Use multiple workers.
+
+In a default configuration, the Scalyr Agent creates a single session with the Scalyr servers to upload all collected logs.
+This typically performs well enough for most users, but at some point, the log generation rate can exceed
+a single session's capacity (typically 2 to 8 MB/s depending on line size and other factors).
+You may increase overall throughput by increasing the number of sessions using the ``default_workers_per_pi_key`` option
+in the agent configuration. By default, the option value is ``1``.
+Each worker is assigned a subset of the log files to be uploaded, so increasing the number of workers,
+increasing the overall upload throughput.
+
+
+#### Use multiprocess workers.
+
+Even if the workers create separate sessions, by default, they will still run within the same Python process,
+limiting their resources to a single CPU core.
+This may become a problem when the number of log files is too big to be handled by a single CPU core, especially if
+additional features (such as [sampling](https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#filter)
+and [redaction](/https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#filter) rules)
+are enabled.
+
+This limitation can be addressed using the ``use_multiprocess_copying_workers`` option in the agent configuration.
+By default, the option value is ``false``
+
+
+#### Recommended configuration
+To significantly increase overall throughput, we recommend you set the default workers per API key to ``3``, as well
+as turn on multiprocess workers. The following configuration shows an example of setting both of those options.
+```
+{
+    "use_multiprocess_copying_workers": true,
+    "default_workers_per_api_key": 3,
+    "api_key": "<you_key>",
+    "logs": [
+      {
+        "path": "/var/log/app/*.log",
+      },
+    ]
+
+}
+```
+
+If you are using Kubernetes, you will find it easier to configure these settings using their corresponding environment
+variables in the configmap for the Scalyr Agent DaemonSet:
+
+```
+SCALYR_USE_MULTIPROCESS_COPYING_WORKERS=true
+SCALYR_DEFAULT_WORKERS_PER_API_KEY=3
+```
+
+### Multiple API keys.
+
+The multiple API keys feature is useful when it is necessary to upload particular log files using a different API keys,
+for instance, to upload to different Scalyr team accounts.
+
+#### Adding new API keys
+
+Each additional API key has to be defined in the list in the ``api_keys`` section.
+
+```
+"api_keys": [
+     {
+         "api_key": "<your_second_key>",
+         "id": "frontend_team",
+     },
+     {
+         "api_key": "<your_third_key>",
+         "id": "backend_team",
+     }
+]
+```
+
+Possible options for each element of the ``api_keys`` list:
+
+| Field   | required | Description                                                                                                                                            |
+|---------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| api_key | yes      | The API key token.                                                                                                                                     |
+| id      | yes      | The identifier of the API key. Must be unique. String.                                                                                                 |
+| workers | no       | The number of [workers](#multi-worker-configuration) for the API key. By default it has the same value as the `default_workers_per_api_key` [option](#multi-worker-configuration). |
+
+You may also split the definition of the api_keys field across [multiple configuration files](https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#modularConfig)
+in the agent.d directory. The agent will join together all entries in all api_keys fields defined.
+
+NOTE: The "main" API key, which is defined in the ``api_key`` section, also has it's own implicit identifier - ``"default"``.
+
+The identifier ``"default"`` is reserved by the "main" API key and can not be used by other API keys. For example, the next configuration is invalid.
+```
+{
+    "api_key": "<main_key>",
+    "api_keys": [
+         {
+             "api_key": "<second_key>",
+             "id": "default",  // WRONG, the <main_key> API key already has the identifier "default".
+         },
+    ]
+}
+```
+
+As an exception, the ``"default"`` identifier can be used with the same ``api_key`` value as in the "main" ``api_key`` section to change default options for this API key.
+
+```
+{
+    "api_key": "<main_key>",
+    "api_keys": [
+         {
+             "api_key": "<main_key>", // the same API key as in the "api_key" section.
+             "id": "default",
+             "workers": 3 // change the workers number from default - 1 to 3.
+         },
+         {
+             "api_key": "<second_key>",
+             "id": "second",
+         },
+    ]
+}
+```
+
+#### Associating logs with API keys.
+
+Each element of the ``logs`` section can be associated with a particular API key by specifying the ``api_key_id`` field.
+
+NOTE: If the ``api_key_id`` is omitted, then the ``default`` API key is used.
+```
+"logs": [
+    {
+       "path": "/var/log/frontend/*.log",
+       "api_key_id": "frontend_team" // the API key with identifier - "frontend_team" is used.
+    }
+    {
+       "path": "/var/log/backend/*.log"
+       // the "api_key_id" is omitted, the API key with "default" identifier is used.
+    }
+]
+```
+
+### Linux system metrics monitor improved.
+
+ Linux system metrics monitor now ignores the following special mounts points by default:
 ``/sys/*``, ``/dev*``, ``/run*``.
 
   In most cases users just want to monitor block and inodes usage for actual data partitions
