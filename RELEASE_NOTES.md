@@ -16,26 +16,9 @@ This typically performs well enough for most users, but at some point, the log g
 a single session's capacity (typically 2 to 8 MB/s depending on line size and other factors).
 You may increase overall throughput by increasing the number of sessions using the ``default_workers_per_pi_key`` option
 in the agent configuration. By default, the option value is ``1``.
+Each worker is assigned a subset of the log files to be uploaded, so increasing the number of workers,
+increasing the overall upload throughput.
 
-The main idea of the multi-worker configuration is to spread the produced load among multiple
-upload sessions(workers).
-
-For example:
-
-```
-{
-    "default_workers_per_api_key": 3,
-    "api_key": "<you_key>",
-    "logs": [
-      {
-        "path": "/var/log/app/*.log",
-      },
-    ]
-}
-```
-
-Here all the matched log files will be distributed among three workers. Each of them will establish their own independent
-upload session and will upload only a subset of the log files, thereby reducing the load on a particular worker.
 
 #### Use multiprocess workers.
 
@@ -49,6 +32,10 @@ are enabled.
 This limitation can be addressed using the ``use_multiprocess_copying_workers`` option in the agent configuration.
 By default, the option value is ``false``
 
+
+#### Recommended configuration
+To significantly increase overall throughput, we recommend you set the default workers per API key to ``3``, as well
+as turn on multiprocess workers. The following configuration shows an example of setting both of those options.
 ```
 {
     "use_multiprocess_copying_workers": true,
@@ -63,7 +50,13 @@ By default, the option value is ``false``
 }
 ```
 
-Now each worker starts its own process and does not share the same CPU with other workers.
+If you are using Kubernetes, you will find it easier to configure these settings using their corresponding environment
+variables in the configmap for the Scalyr Agent DaemonSet:
+
+```
+SCALYR_USE_MULTIPROCESS_COPYING_WORKERS=true
+SCALYR_DEFAULT_WORKERS_PER_API_KEY=3
+```
 
 ### Multiple API keys.
 
@@ -148,43 +141,6 @@ NOTE: If the ``api_key_id`` is omitted, then the ``default`` API key is used.
        // the "api_key_id" is omitted, the API key with "default" identifier is used.
     }
 ]
-```
-
-
-##### Full configuration example.
-Let's say that there are two teams: "messaging" and "queue" and the agent should upload some logs using the API key
-of the "messaging" team and upload some logs using the API key of the "queue" team.
-
-The resulting configuration:
-
-```
-{
-    "api_key": "<messaging_team_api_key>", // the "messaging" team uses the "main" API key with "default" identifier.
-    "api_keys": [
-        {
-            // Since the id - "default" and the api_key matches the "main" API key,
-            // we do not create new api key, but change the default values of the "main" API key.
-            "api_key": "<messaging_team_api_key>",
-            "id": "default",
-            "workers": 4 // increase the number of workers from 1 to 4.
-        },
-        {
-            // Create new API key for the "queue" team.
-            "api_key": "<queue_team_api_key>",
-            "id": "queue",
-            "workers": 2 // set the number of workers for the API key of the "queue" team
-        }
-     ],
-    "logs": [
-      {
-        "path": "/var/log/app/messaging/*.log", // those logs are uploaded to the "messaging" team's account.
-      },
-      {
-        "path": "/var/log/app/queue/*.log" // those logs now are uploaded to the "queue" team's account.
-        "api_key_id": "queue_team_key" // refers to the <queue_team_api_key> API key.
-      }
-    ]
-}
 ```
 
 ### Linux system metrics monitor improved.
