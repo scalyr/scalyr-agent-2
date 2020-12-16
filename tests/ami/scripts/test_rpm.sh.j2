@@ -40,22 +40,8 @@ if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     exit 1
 fi
 
-sleep 5
-
-echo_with_date "==========================="
-echo_with_date "System information"
-echo_with_date "==========================="
-
-echo_with_date ""
 uname -a
-echo_with_date ""
 cat /etc/*-release
-echo_with_date ""
-cat /etc/passwd
-echo_with_date ""
-id
-echo_with_date ""
-echo_with_date "==========================="
 
 sudo yum install -y wget
 sudo yum install -y "{{python_package}}"
@@ -101,9 +87,6 @@ sudo yum downgrade -y "scalyr-agent-2-{{install_package["source"]}}"
 export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
-
-# TODO: Also perform agent.json and agent.d permission checks here when fix is
-# merged in stable, until then, it will fail with stable.
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
@@ -173,10 +156,6 @@ export UPGRADE_PACKAGE_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{
 sudo yum install -y "scalyr-agent-2-{{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
       {% endif -%}
-{% endif -%}
-
-{% if test_type == "upgrade" -%}
-{% include "partial/verify_config_permissions.sh.j2" %}
 {% endif -%}
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
