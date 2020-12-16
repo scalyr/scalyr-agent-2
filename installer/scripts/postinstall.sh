@@ -130,7 +130,7 @@ ensure_path_other_permissions() {
   if [ "${file_permissions_others}" -ne "${wanted_permissions_other}" ]; then
     new_permissions="${file_permissions_owner_group}${wanted_permissions_other}"
     echo "Changing permissions for file ${file_path} from \"${file_permissions}\" to \"${new_permissions}\"."
-    chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1 || true;
+    chmod "${new_permissions}" "${file_path}" > /dev/null 2>&1;
   fi
 }
 
