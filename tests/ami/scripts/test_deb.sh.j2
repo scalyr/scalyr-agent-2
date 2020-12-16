@@ -86,8 +86,6 @@ export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
 
-# TODO: Also perform agent.json and agent.d permission checks here when fix is
-# merged in stable, until then, it will fail with stable.
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
 # Run some basic sanity checks
@@ -156,10 +154,6 @@ export UPGRADE_PACKAGE_VERSION=$(apt-cache policy scalyr-agent-2 | grep Installe
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "scalyr-agent-2={{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
     {% endif -%}
-{% endif -%}
-
-{% if test_type == "upgrade" -%}
-{% include "partial/verify_config_permissions.sh.j2" %}
 {% endif -%}
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
