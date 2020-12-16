@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.15 "Endora" - December 15, 2020
+## 2.1.15 "Endora" - December 16, 2020
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Nov 20, 2020 14:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Dec 16, 2020 14:00 -0800
 --->
 Feature:
 * Ability to upload logs to different Scalyr team accounts by specifying different API keys for different log files. See [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
