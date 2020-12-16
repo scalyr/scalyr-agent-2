@@ -122,34 +122,34 @@ MOCK_CONFIGS_DIRECTORY = os.path.join(BASE_DIR, "configs/")
 # server
 TEST_FILES_DIRECTORY = os.path.join(BASE_DIR, "files/")
 
-# TODO: Revert back to micro image if there are still failures with small
+
 EC2_DISTRO_DETAILS_MAP = {
     # Debian based distros
     "ubuntu1404": {
         "image_id": "ami-07957d39ebba800d5",
         "image_name": "Ubuntu Server 14.04 LTS (HVM)",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "ubuntu1604": {
         "image_id": "ami-08bc77a2c7eb2b1da",
         "image_name": "Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
-        "size_id": "m1.small",
+        "size_id": "t1.micro",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "ubuntu1804": {
         "image_id": "ami-07ebfd5b3428b6f4d",
         "image_name": "Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
-        "size_id": "m1.small",
+        "size_id": "t1.micro",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "debian1003": {
         "image_id": "ami-0b9a611a02047d3b1",
         "image_name": "Debian 10 Buster",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "admin",
         "default_python_package_name": "python",
     },
@@ -159,28 +159,28 @@ EC2_DISTRO_DETAILS_MAP = {
     "centos6": {
         "image_id": "ami-03a941394ec9849de",
         "image_name": "CentOS 6 (x86_64) - with Updates HVM",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "root",
         "default_python_package_name": "python",
     },
     "centos7": {
         "image_id": "ami-0affd4508a5d2481b",
         "image_name": "CentOS 7 (x86_64) - with Updates HVM",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "centos",
         "default_python_package_name": "python",
     },
     "centos8": {
         "image_id": "ami-01ca03df4a6012157",
         "image_name": "CentOS 8 (x86_64) - with Updates HVM",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
     "amazonlinux2": {
         "image_id": "ami-09d95fab7fff3776c",
         "image_name": "Amazon Linux 2 AMI (HVM), SSD Volume Type",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "ec2-user",
         "default_python_package_name": "python",
     },
@@ -188,21 +188,21 @@ EC2_DISTRO_DETAILS_MAP = {
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2016": {
         "image_id": "ami-06e455febb7d693eb",
         "image_name": "WindowsServer2016-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2012": {
         "image_id": "ami-033513be5c11f0e67",
         "image_name": "WindowsServer2012R2-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.micro",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
@@ -448,13 +448,13 @@ def main(
     # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
     # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
-        deploy_step_timeout = 440  # 320
-        deploy_overall_timeout = 460  # 320
+        deploy_step_timeout = 380  # 320
+        deploy_overall_timeout = 400  # 320
         cat_step_timeout = 10
         max_tries = 3
     else:
-        deploy_step_timeout = 320  # 260
-        deploy_overall_timeout = 340  # 280
+        deploy_step_timeout = 300  # 260
+        deploy_overall_timeout = 320  # 280
         max_tries = 3
         cat_step_timeout = 5
 

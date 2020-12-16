@@ -1526,9 +1526,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        config_file = Configuration(
-            options.config_filename, default_paths, log, log_warnings=False
-        )
+        config_file = Configuration(options.config_filename, default_paths, log)
         config_file.parse()
     except Exception as e:
         print(

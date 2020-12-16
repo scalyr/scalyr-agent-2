@@ -408,13 +408,10 @@ Log-Message "Initial files created, restarting agent..."
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
-Start-Sleep 5
-
 Log-Message "Writting mock data..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
-    "line $i" | Out-File c:\logs\test$i.txt.log -Append
-    #Add-Content c:\logs\test$i.txt.log "line $i"
+    Add-Content c:\logs\test$i.txt.log "line $i"
 }
 
 Start-Sleep 5
@@ -424,9 +421,7 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-# We don't print long status output since it sometimes results in connection
-# reset by peer on CI.
-#echo $status_output
+echo $status_output
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };

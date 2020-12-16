@@ -3035,7 +3035,6 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             "refers to a non-existing api key with id 'wrong api key'."
             in err_info.value.message
         )
-        assert "Valid api key ids: default, second." in err_info.value.message
 
     def test_workers_type_default(self):
         self._write_file_with_separator_conversion(
