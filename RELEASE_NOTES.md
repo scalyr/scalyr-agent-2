@@ -1,5 +1,58 @@
 # Release Notes
 
+## 2.1.16 "Lasso" - December 23, 2020
+
+* This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
+  and ``*.json`` files inside that directory and makes sure those files are not readable by
+  others by default (aka "other" permission bit in octal notation for that file is ``0`` in case
+  of a file and ``1`` in case of a directory).
+
+  In the previous releases, ``agent.json`` file was readable by others by default which means if a
+  user didn't explicitly lock down and change the permission of that file after installation,
+  other users who have access to the system where the agent is running on could potentially read
+  that file and access information such as the API key which is used to send / upload logs to
+  Scalyr.
+
+  This issue only affects users which run agent on servers with multiple users. Container
+  installations (Docker, Kubernetes) are single user by default so those are not affected.
+
+  This issue also doesn't affect any installations which use a configuration management tool such
+  as Ansible, Chef, Puppet, Terraform or similar to manage the config file content and permissions.
+
+  In fact, using configuration management tool to manage configuration file access and locking down
+  the permission is the best practice and recommended approach by us.
+
+  As part of the fix, agent will now lock down those file permissions and also fix them on upgrade
+  as part of the post install step for the existing files and installations.
+
+  If you intentionally changed "other" permission bits for any of those files to something else than
+  ``0``, you will need to change it again after installing / upgrading the agent.
+
+  If you believe you may be affected, we recommend revoking the old write API key used to send logs
+  and generating a new one.
+
+  Keep in mind that the API key used by the agent is a write one which only has access to send logs
+  and nothing else.
+
+  It's also worth noting that this only affects agent.json file bundled with the default agent
+  installation. If you manually removed that file and created a new one, that is out of the agent
+  scope and domain of ``umask`` on Linux.
+
+  On Windows, permissions are not rectified automatically because some users run the agent under a
+  custom non-Administrator user account so automatically fixing the permissions would break this
+  scenario.
+
+  In this case, user can manually run ``scalyr-agent-2-config.exe`` as administrator to revoke
+  permissions for "Users" group for the agent config.
+
+  ```powershell
+  & "C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
+  ```
+
+  Keep in mind that after running this script you need to use Administrator account to grant read
+  permissions to user account which is used to run the agent in case this user is not Administrator
+  or not a member of Administrators group.
+
 ## 2.1.15 "Endora" - December 15, 2020
 
 ### Increase Scalyr Agent upload throughput, using multiple Scalyr team accounts. (BETA)
