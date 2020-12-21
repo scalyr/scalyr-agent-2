@@ -819,7 +819,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
     # sure it works correctly - we need to make sure root user is owner for the files which are
     # packaged
     # NOTE: We only need this workaround for debian packages and not rpm ones.
-    if getpass.getuser() in ["rpmbuilder", "circleci"] and not is_rpm:
+    username = getpass.getuser()
+    if username in ["rpmbuilder", "circleci"] and not is_rpm:
         print("Using builder VM sudo workaround for file ownership issue")
         use_sudo = True
         sudo_command_string = "sudo "
@@ -894,7 +895,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
     # We need to make sure that after we package everything up in deb, we restore the permissions
     # so Jenkins can access the files
     if use_sudo:
-        run_command("sudo chown -R rpmbuilder:rpmbuilder .")
+        run_command("sudo chown -R %s:%s ." % (username, username))
 
     # We determine the artifact name in a little bit of loose fashion.. we just glob over the current
     # directory looking for something either ending in .rpm or .deb.  There should only be one package,
