@@ -81,7 +81,7 @@ should be uploaded by script or already uploaded by Libloud. #}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-{% with package_file=install_package.deb %}
+{% with package_file="install_package.deb" %}
 {% include "partial/verify_deb_files_ownership.sh.j2" %}
 {% endwith %}
 
@@ -163,7 +163,7 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-{% with package_file=upgrade_package.deb %}
+{% with package_file="upgrade_package.deb" %}
 {% include "partial/verify_deb_files_ownership.sh.j2" %}
 {% endwith %}
 
