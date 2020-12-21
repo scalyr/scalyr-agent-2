@@ -602,7 +602,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    env = Environment(
+        loader=FileSystemLoader(SCRIPTS_DIR), extensions=["jinja2.ext.with_"]
+    )
     template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
     return rendered_template
