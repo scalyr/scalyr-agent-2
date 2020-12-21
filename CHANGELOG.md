@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.15 "Endora" - December 16, 2020
+## 2.1.15 "Endora" - December 15, 2020
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Dec 16, 2020 14:00 -0800
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 2, 2020 14:00 -0800
 --->
 Feature:
 * Ability to upload logs to different Scalyr team accounts by specifying different API keys for different log files. See [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
@@ -16,6 +16,7 @@ Improvements:
 
 Misc:
 * The default value for the `k8s_cri_query_filesystem` Kubernetes monitor config option (set via the `SCALYR_K8S_CRI_QUERY_FILESYSTEM` environment var) has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to revert to the original default to prefer using the Kubelet API, set `SCALYR_K8S_CRI_QUERY_FILESYSTEM` the environment variable to "false" for the Scalyr Agent daemonset.
+* On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
 * New ``global_monitor_sample_interval_enable_jitter`` config option has been added which is enabled by default. When this option is enabled, random sleep between 2/10 and 8/10 of the configured monitor sample gather interval is used before gathering the sample for the first time. This ensures that sample gathering for all the monitors doesn't run at the same time. This comes in handy when running agent configured with many monitors on lower powered devices to spread the monitor sample gathering related load spike across a longer time frame.
 
 Bug fixes:
@@ -24,6 +25,9 @@ Bug fixes:
 * Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
 * Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
 * Docker monitor has been fixed that when running in "API mode" (``docker_raw_logs: false``) it also correctly ingests logs from container ``stderr``. Previously only logs from ``stdout`` have been ingested.
+
+Security fixes and improvements:
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 
 ## 2.1.14 "Hydrus" - November 4, 2020
 

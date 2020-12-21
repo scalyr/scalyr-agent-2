@@ -29,6 +29,7 @@ import time
 import logging
 import copy
 import json
+import stat
 import platform
 
 import six
@@ -58,6 +59,13 @@ from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
 
+FILE_WRONG_OWNER_ERROR_MSG = """
+File \"%s\" is not readable the current user (%s).
+
+You need to make sure that the file is owned by the same account which is used to run the agent.
+
+Original error: %s
+""".strip()
 
 MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
 
@@ -149,10 +157,27 @@ class Configuration(object):
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException as e:
+                # Special case - file is not readable, likely means a permission issue so return a
+                # more user-friendly error
+                if "file is not readable" in str(e).lower():
+                    from scalyr_agent.platform_controller import PlatformController
+
+                    platform_controller = PlatformController.new_platform()
+                    current_user = platform_controller.get_current_user()
+
+                    msg = FILE_WRONG_OWNER_ERROR_MSG % (
+                        self.__file_path,
+                        current_user,
+                        six.text_type(e),
+                    )
+                    raise BadConfiguration(msg, None, "fileParseError")
+
                 raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
+
+            self._check_config_file_permissions_and_warn(self.__file_path)
 
             # get initial list of already seen config keys (we need to do this before
             # defaults have been applied)
@@ -207,6 +232,8 @@ class Configuration(object):
                             raise self.__last_error
                         else:
                             already_seen[k] = fp
+
+                self._check_config_file_permissions_and_warn(fp)
 
                 self.__perform_substitutions(content)
                 self.__verify_main_config(content, self.__file_path)
@@ -429,6 +456,36 @@ class Configuration(object):
                             "logs",
                             "invalidApiKeyReference",
                         )
+
+    def _check_config_file_permissions_and_warn(self, file_path):
+        # type: (str) -> None
+        """
+        Check config file permissions and log a warning is it's readable or writable by "others".
+        """
+        if not self.__log_warnings:
+            return None
+
+        if not os.path.isfile(file_path) or not self.__logger:
+            return None
+
+        st_mode = os.stat(file_path).st_mode
+
+        if bool(st_mode & stat.S_IROTH) or bool(st_mode & stat.S_IWOTH):
+            file_permissions = str(oct(st_mode)[4:])
+
+            if file_permissions.startswith("0") and len(file_permissions) == 4:
+                file_permissions = file_permissions[1:]
+
+            limit_key = "config-permissions-warn-%s" % (file_path)
+            self.__logger.warn(
+                "Config file %s is readable or writable by others (permissions=%s). Config "
+                "files can "
+                "contain secrets so you are strongly encouraged to change the config "
+                "file permissions so it's not readable by others."
+                % (file_path, file_permissions),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
 
     def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
         if self.__log_warnings and self.__config[config_option] != default:

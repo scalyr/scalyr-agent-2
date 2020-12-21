@@ -294,11 +294,13 @@ def build_win32_installer_package(variant, version):
     )
 
     # Copy the config file.
+    agent_json_path = make_path(agent_source_root, "config/agent.json")
     cat_files(
-        [make_path(agent_source_root, "config/agent.json")],
-        "agent_config.tmpl",
-        convert_newlines=True,
+        [agent_json_path], "agent_config.tmpl", convert_newlines=True,
     )
+    # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
+    # readable by others.
+    os.chmod(agent_json_path, int("640", 8))
 
     os.chdir("..")
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
@@ -338,6 +340,10 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("Scalyr/config/agent.d", int("741", 8))
+
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
@@ -585,6 +591,9 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
 
     # Make sure there is an agent.d directory regardless of the config directory we used.
     make_directory("root/etc/scalyr-agent-2/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("root/etc/scalyr-agent-2/agent.d", int("741", 8))
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
@@ -834,6 +843,16 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
+        # NOTE: By default fpm won't preserve all the permissions we set on the files so we need
+        # to use those flags.
+        # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
+        # "group"
+        "  --rpm-use-file-permissions --deb-use-file-permissions "
+        # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+        # directories such as /etc/init.d and we need to handle that in postinst :/
+        # "  --rpm-auto-add-directories "
+        # "  --rpm-defattrfile 640"
+        # "  --rpm-defattrdir 751"
         "  -C root usr etc var" % (package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
@@ -873,6 +892,9 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     make_directory("scalyr-agent-2/data")
     make_directory("scalyr-agent-2/log")
     make_directory("scalyr-agent-2/config/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("scalyr-agent-2/config/agent.d", int("741", 8))
 
     # Create a file named packageless.  This signals to the agent that
     # this a tarball install instead of an RPM/Debian install, which changes
@@ -997,7 +1019,11 @@ def build_base_files(base_configs="config"):
         config_path = base_configs
     else:
         config_path = "config"
+
     shutil.copytree(make_path(agent_source_root, config_path), "config")
+
+    # Make sure config file has 640 permissions
+    os.chmod("config/agent.json", int("640", 8))
 
     # Create the trusted CA root list.
     os.chdir("certs")
