@@ -75,10 +75,14 @@ echo_with_date ""
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
     {% if install_package["type"] == "url" -%}
-    wget -O install_package.deb "{{ install_package["source"] }}"
+    wget -O install_package.rpm "{{ install_package["source"] }}"
     {% elif install_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
+
+{% with package_file="install_package.rpm" %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
 
 # install Scalyr agent from package file.
 sudo rpm -iv install_package.rpm
@@ -159,6 +163,10 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% elif upgrade_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
+
+{% with package_file="upgrade_package.rpm" %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
 
 sudo rpm -FUv upgrade_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json

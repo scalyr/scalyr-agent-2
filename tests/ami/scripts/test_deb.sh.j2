@@ -59,6 +59,9 @@ echo_with_date "==========================="
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
+# Install dependencies
+sudo apt-get install -y binutils
+
 {% if additional_packages -%}
 sudo apt-get install -y {{additional_packages}}
 {% endif -%}
@@ -77,6 +80,10 @@ should be uploaded by script or already uploaded by Libloud. #}
     {% elif install_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
+
+{% with package_file="install_package.deb" %}
+{% include "partial/verify_deb_files_ownership.sh.j2" %}
+{% endwith %}
 
 # install Scalyr agent from package file.
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i install_package.deb
@@ -155,6 +162,10 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% elif upgrade_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
+
+{% with package_file="upgrade_package.deb" %}
+{% include "partial/verify_deb_files_ownership.sh.j2" %}
+{% endwith %}
 
 echo_with_date "Upgrade Scalyr agent from file."
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i upgrade_package.deb
