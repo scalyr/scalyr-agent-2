@@ -41,6 +41,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+import getpass
 
 from io import StringIO
 from io import BytesIO
@@ -814,8 +815,24 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "log files and transmit them to Scalyr."
     )
 
+    # Workaround for our ancient builder VM so we can use --deb-use-file-permissions flag and make
+    # sure it works correctly - we need to make sure root user is owner for the files which are
+    # packaged
+    # NOTE: We only need this workaround for debian packages and not rpm ones.
+    username = getpass.getuser()
+    if username in ["rpmbuilder", "circleci"] and not is_rpm:
+        print("Using builder VM sudo workaround for file ownership issue")
+        use_sudo = True
+        sudo_command_string = "sudo "
+    else:
+        use_sudo = False
+        sudo_command_string = ""
+
+    if use_sudo:
+        run_command("sudo chown -R root:root .")
+
     run_command(
-        'fpm -s dir -a all -t %s -n "scalyr-agent-2" -v %s '
+        '%s fpm -s dir -a all -t %s -n "scalyr-agent-2" -v %s '
         '  --license "Apache 2.0" '
         "  --vendor Scalyr %s "
         "  --maintainer czerwin@scalyr.com "
@@ -862,17 +879,23 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         # In theory it should work wth --*-user fpm flag, but it doesn't. Keep in mind that the
         # issue only applies to deb packages since --rpm-user and --rpm-root flag override the user
         # even if the --rpm-use-file-permissions flag is used.
-        "  --rpm-use-file-permissions "
-        # "  --rpm-use-file-permissions --deb-use-file-permissions "
+        # "  --rpm-use-file-permissions "
+        "  --rpm-use-file-permissions --deb-use-file-permissions "
         # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
         # directories such as /etc/init.d and we need to handle that in postinst :/
         # "  --rpm-auto-add-directories "
         # "  --rpm-defattrfile 640"
         # "  --rpm-defattrdir 751"
-        "  -C root usr etc var" % (package_type, version, iteration_arg, description),
+        "  -C root usr etc var"
+        % (sudo_command_string, package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
     )
+
+    # We need to make sure that after we package everything up in deb, we restore the permissions
+    # so Jenkins can access the files
+    if use_sudo:
+        run_command("sudo chown -R %s:%s ." % (username, username))
 
     # We determine the artifact name in a little bit of loose fashion.. we just glob over the current
     # directory looking for something either ending in .rpm or .deb.  There should only be one package,

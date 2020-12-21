@@ -9,7 +9,7 @@ if [ -f "{{ package_file }}" ]; then
     FILE_PERMISSIONS=$(ar p "{{ package_file }}" data.tar.gz | tar -zvt ./etc/scalyr-agent-2/agent.json)
     echo "${FILE_PERMISSIONS}"
 
-    echo "${FILE_PERMISSIONS}" | grep "0/0"
+    echo "${FILE_PERMISSIONS}" | grep "0/0" || echo "${FILE_PERMISSIONS}" | grep "root/root"
     if [ $? -ne 0 ]; then
         echo "Owner of the file is not root:root!"
         exit 1
