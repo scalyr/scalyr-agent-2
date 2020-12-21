@@ -59,6 +59,9 @@ echo_with_date "==========================="
 sudo apt-get update -y
 sudo apt-get install -y "{{python_package}}"
 
+# Install dependencies
+sudo apt-get install -y binutils
+
 {% if additional_packages -%}
 sudo apt-get install -y {{additional_packages}}
 {% endif -%}
