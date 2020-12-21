@@ -1806,20 +1806,26 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.5.9
+    # NOTE: We use larger resource class to speed up the tests. This job only runs on master merge
+    # aka not often.
+    resource_class: large
     steps:
       - codespeed_micro_benchmarks:
           codespeed_executable: "Python 3.5.9"
-          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          codespeed_environment: "Circle CI Docker Executor Large Size"
           cache_key_name: "benchmarks-micro-py36"
 
   benchmarks-micro-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7.17
+    # NOTE: We use larger resource class to speed up the tests. This job only runs on master merge
+    # aka not often.
+    resource_class: large
     steps:
       - codespeed_micro_benchmarks:
           codespeed_executable: "Python 2.7.17"
-          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          codespeed_environment: "Circle CI Docker Executor Large Size"
           cache_key_name: "benchmarks-micro-py27"
 
   # Job which sends notification to Slack after benchmark run has completed
