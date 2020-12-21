@@ -843,13 +843,13 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
-        # NOTE: By default fpm won't preserve all the permissions we set on the files so we need
+        # NOTE 1: By default fpm won't preserve all the permissions we set on the files so we need
         # to use those flags.
         # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
-        # "group"
-        # NOTE 2: This is commented out since it brakes buils produced on builder VM where
+        # "group" and it also means config file permissions won't be correct.
+        # NOTE 2: This is commented out since it breaks builds produced on builder VM where
         # build_package.py runs as rpmbuilder user (uid 1001) and that uid is preserved as file
-        # owner for the package tarball which brakes things.
+        # owner for the package tarball file which breaks things.
         # On Circle CI uid of the user under which the package job runs is 0 aka root so it works
         # fine.
         # We don't run fpm as root on builder VM which means we can't use any other workaround.
