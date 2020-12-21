@@ -165,9 +165,6 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {% endif -%}
 
 {% with package_file="upgrade_package.rpm" %}
-{% set foo="test_one" %}
-{% set bar="test.one" %}
-{% set baz="upgrade_package.rpm" %}
 {% include "partial/verify_rpm_files_ownership.sh.j2" %}
 {% endwith %}
 

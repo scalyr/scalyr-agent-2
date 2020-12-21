@@ -1,9 +1,3 @@
-echo "test"
-echo "{{ package_file }}"
-echo "{{ foo }}"
-echo "{{ bar }}"
-echo "{{ baz }}"
-echo "test"
 if [ -f "{{ package_file }}" ]; then
     echo_with_date "==========================="
     echo_with_date "Checking {{ package_file }} package file ownership"
@@ -12,10 +6,10 @@ if [ -f "{{ package_file }}" ]; then
     # Verify the permissions and file ownership inside the archive. Keep in mind that until we comment
     # out fpm flag in build_package.py, permissions won't be correct since they are fixed as part of
     # postinst step, but file ownership should be 0:0 aka owned by root:root
-    FILE_PERMISSIONS=$(rpm -qplv "{{ package_file }}" |grep "agent\\.json")
+    FILE_PERMISSIONS=$(rpm -qplv "{{ package_file }}" | grep "agent\\.json")
     echo "${FILE_PERMISSIONS}"
 
-    echo "${FILE_PERMISSIONS}" | grep "root root"
+    echo "${FILE_PERMISSIONS}" | grep "root"
     if [ $? -ne 0 ]; then
         echo "Owner of the file is not root:root!"
         exit 1
