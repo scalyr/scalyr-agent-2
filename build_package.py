@@ -847,7 +847,23 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         # to use those flags.
         # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
         # "group"
-        "  --rpm-use-file-permissions --deb-use-file-permissions "
+        # NOTE 2: This is commented out since it brakes buils produced on builder VM where
+        # build_package.py runs as rpmbuilder user (uid 1001) and that uid is preserved as file
+        # owner for the package tarball which brakes things.
+        # On Circle CI uid of the user under which the package job runs is 0 aka root so it works
+        # fine.
+        # We don't run fpm as root on builder VM which means we can't use any other workaround.
+        # Commenting this flag out means that original file permissions (+ownership) won't be
+        # preserved which means we will also rely on postinst step fixing permissions for fresh /
+        # new installations since those permissions won't be correct in the package artifact itself.
+        # Not great.
+        # Once we move all the build steps to Circle CI and ensure build_package.py runs as uid 0
+        # we should uncomment this.
+        # In theory it should work wth --*-user fpm flag, but it doesn't. Keep in mind that the
+        # issue only applies to deb packages since --rpm-user and --rpm-root flag override the user
+        # even if the --rpm-use-file-permissions flag is used.
+        "  --rpm-use-file-permissions "
+        # "  --rpm-use-file-permissions --deb-use-file-permissions "
         # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
         # directories such as /etc/init.d and we need to handle that in postinst :/
         # "  --rpm-auto-add-directories "
