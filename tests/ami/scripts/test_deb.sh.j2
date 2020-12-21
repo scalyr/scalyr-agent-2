@@ -78,6 +78,26 @@ should be uploaded by script or already uploaded by Libloud. #}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
+if [ -f "install_package.deb" ]; then
+    echo_with_date "==========================="
+    echo_with_date "Checking package file ownership"
+    echo_with_date "==========================="
+
+    # Verify the permissions and file ownership inside the archive. Keep in mind that until we comment
+    # out fpm flag in build_package.py, permissions won't be correct since they are fixed as part of
+    # postinst step, but file ownership should be 0:0 aka owned by root:root
+    FILE_PERMISSIONS=$(ar p "install_package.deb" data.tar.gz | tar -zvt ./etc/scalyr-agent-2/agent.json)
+    echo "${FILE_PERMISSIONS}"
+
+    echo "${FILE_PERMISSIONS}" | grep "0/0"
+    if [ $? -ne 0 ]; then
+        echo "Owner of the file is not root:root!"
+        exit 1
+    fi
+
+    echo_with_date "File ownership inside the deb package is correct."
+fi
+
 # install Scalyr agent from package file.
 sudo DEBIAN_FRONTEND=noninteractive dpkg -i install_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
