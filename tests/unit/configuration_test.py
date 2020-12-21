@@ -16,12 +16,14 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import print_function
 
 from scalyr_agent import scalyr_logging
 
 __author__ = "czerwin@scalyr.com"
 
 import os
+import re
 import sys
 import tempfile
 from io import open
@@ -51,6 +53,7 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
     JournaldLogFormatter,
 )
+from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
@@ -153,6 +156,9 @@ class TestConfigurationBase(ScalyrTestCase):
             self.convert_path("/etc/scalyr-agent-2/agent.json"),
             self.convert_path("/var/lib/scalyr-agent-2"),
         )
+
+        if os.path.isfile(self._config_file):
+            os.chmod(self._config_file, int("640", 8))
 
         return Configuration(
             self._config_file, default_paths, logger, extra_config_dir=extra_config_dir
@@ -647,6 +653,29 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_incorrect_file_permissions_or_owner(
+        self, mock_read_config_file_as_json
+    ):
+        mock_read_config_file_as_json.side_effect = JsonReadFileException(
+            self._config_file, "The file is not readable"
+        )
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ { path:"/var/log/tomcat6/access.log"} ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        expected_msg = r'File "%s" is not readable the current user (.*?).' % (
+            re.escape(self._config_file)
+        )
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     def test_sampling_rules(self):
         self._write_file_with_separator_conversion(
@@ -1287,6 +1316,39 @@ class TestConfiguration(TestConfigurationBase):
         )
         mock_logger.debug.assert_not_called()
 
+    def test_config_readable_by_others_warning_on_parse(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            logs: []
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        os.chmod(self._config_file, int("644", 8))
+        config.parse()
+
+        if sys.platform.startswith("win"):
+            expected_permissions = "666"
+        else:
+            expected_permissions = "644"
+
+        expected_msg = (
+            "Config file %s is readable or writable by others "
+            "(permissions=%s). Config files can contain secrets so you are strongly "
+            "encouraged to change the config file permissions so it's not "
+            "readable by others." % (self._config_file, expected_permissions)
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="config-permissions-warn-%s" % (self._config_file),
+        )
+
     def test_api_key_use_env(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -1297,6 +1359,7 @@ class TestConfiguration(TestConfigurationBase):
         os.environ["SCALYR_API_KEY"] = "xyz"
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
+        config._check_config_file_permissions_and_warn = lambda x: x
         config.parse()
 
         self.assertEquals(config.api_key, "xyz")

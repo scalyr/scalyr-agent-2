@@ -83,6 +83,38 @@ if ($msi_version -eq $null) {
 # install scalyr agent and wait until it is done.
 Start-Process C:\Windows\System32\msiexec.exe -ArgumentList "/i install_package.msi /quiet /qn" -wait
 
+# Verify agent.json permissions
+# NOTE: This check needs to be performed as early as possible after fresh installation before
+# other tools modify the config
+Log-Message ""
+Log-Message "agent.json and agent.d/ config files permissions checks"
+Log-Message ""
+
+# NOTE: At this point fix doesn't run automatically post install so we manually invoke the scrupt and verify it works
+& "C:\Program Files (x86)\Scalyr\bin\scalyr-agent-2-config.exe" "--fix-config-permissions"
+
+dir "C:\Program Files (x86)\Scalyr\config"
+dir "C:\Program Files (x86)\Scalyr\config\agent.d"
+dir "C:\Program Files (x86)\Scalyr\config\templates"
+
+$permissions_agent_json=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.json"
+$permissions_agent_d=icacls.exe "C:\Program Files (x86)\Scalyr\config\agent.d"
+
+echo $permissions_agent_json
+echo $permissions_agent_d
+
+if ("$permissions_agent_json" -match "User") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_json" -match "Users") { Throw "Found permissions grant for Users for agent.json which should not be there!" };
+if ("$permissions_agent_d" -match "User") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+if ("$permissions_agent_d" -match "Users") { Throw "Found permissions grant for Users for agent.d which should not be there!" };
+
+if ("$permissions_agent_json" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.json!" };
+if ("$permissions_agent_d" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.d!" };
+
+Log-Message ""
+Log-Message "agent.json and agent.d/ config files permissions completed successfuly"
+Log-Message ""
+
 # Copy over agent.json with the API key set up
 Copy-Item ".\agent.json" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
@@ -376,10 +408,13 @@ Log-Message "Initial files created, restarting agent..."
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
+Start-Sleep 5
+
 Log-Message "Writting mock data..."
 
 For ($i=0; $i -le $files_to_create; $i++) {
-    Add-Content c:\logs\test$i.txt.log "line $i"
+    "line $i" | Out-File c:\logs\test$i.txt.log -Append
+    #Add-Content c:\logs\test$i.txt.log "line $i"
 }
 
 Start-Sleep 5
@@ -389,7 +424,9 @@ Log-Message "Verifying agent status output"
 Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
-echo $status_output
+# We don't print long status output since it sometimes results in connection
+# reset by peer on CI.
+#echo $status_output
 
 if ("$status_output" -notmatch "test0.txt.log") { Throw "test.txt.log file not found in status output" };
 if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file not found in status output" };

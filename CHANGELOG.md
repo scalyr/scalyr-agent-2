@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.16 "Lasso" - December 23, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 23, 2020 14:00 -0800
+--->
+
+Misc:
+* On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
+
+Security fixes and improvements:
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+
 ## 2.1.15 "Endora" - December 16, 2020
 
 <!---

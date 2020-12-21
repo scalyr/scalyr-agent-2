@@ -1,15 +1,68 @@
 # Release Notes
 
+## 2.1.16 "Lasso" - December 23, 2020
+
+* This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
+  and ``*.json`` files inside that directory and makes sure those files are not readable by
+  others by default (aka "other" permission bit in octal notation for that file is ``0`` in case
+  of a file and ``1`` in case of a directory).
+
+  In the previous releases, ``agent.json`` file was readable by others by default which means if a
+  user didn't explicitly lock down and change the permission of that file after installation,
+  other users who have access to the system where the agent is running on could potentially read
+  that file and access information such as the API key which is used to send / upload logs to
+  Scalyr.
+
+  This issue only affects users which run agent on servers with multiple users. Container
+  installations (Docker, Kubernetes) are single user by default so those are not affected.
+
+  This issue also doesn't affect any installations which use a configuration management tool such
+  as Ansible, Chef, Puppet, Terraform or similar to manage the config file content and permissions.
+
+  In fact, using configuration management tool to manage configuration file access and locking down
+  the permission is the best practice and recommended approach by us.
+
+  As part of the fix, agent will now lock down those file permissions and also fix them on upgrade
+  as part of the post install step for the existing files and installations.
+
+  If you intentionally changed "other" permission bits for any of those files to something else than
+  ``0``, you will need to change it again after installing / upgrading the agent.
+
+  If you believe you may be affected, we recommend revoking the old write API key used to send logs
+  and generating a new one.
+
+  Keep in mind that the API key used by the agent is a write one which only has access to send logs
+  and nothing else.
+
+  It's also worth noting that this only affects agent.json file bundled with the default agent
+  installation. If you manually removed that file and created a new one, that is out of the agent
+  scope and domain of ``umask`` on Linux.
+
+  On Windows, permissions are not rectified automatically because some users run the agent under a
+  custom non-Administrator user account so automatically fixing the permissions would break this
+  scenario.
+
+  In this case, user can manually run ``scalyr-agent-2-config.exe`` as administrator to revoke
+  permissions for "Users" group for the agent config.
+
+  ```powershell
+  & "C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
+  ```
+
+  Keep in mind that after running this script you need to use Administrator account to grant read
+  permissions to user account which is used to run the agent in case this user is not Administrator
+  or not a member of Administrators group.
+
 ## 2.1.15 "Endora" - December 15, 2020
 
 ### Increase Scalyr Agent upload throughput, using multiple Scalyr team accounts. (BETA)
+
 **Note, the use of multiple sessions to upload logs to Scalyr is currently in beta. Please be sure to test use of this
  feature before deploying it widely in your production environment.**
 
-
 #### Multi-worker configuration
 
-#### Use multiple workers.
+##### Use multiple workers
 
 In a default configuration, the Scalyr Agent creates a single session with the Scalyr servers to upload all collected logs.
 This typically performs well enough for most users, but at some point, the log generation rate can exceed
@@ -19,8 +72,7 @@ in the agent configuration. By default, the option value is ``1``.
 Each worker is assigned a subset of the log files to be uploaded, so increasing the number of workers,
 increasing the overall upload throughput.
 
-
-#### Use multiprocess workers.
+##### Use multiprocess workers
 
 Even if the workers create separate sessions, by default, they will still run within the same Python process,
 limiting their resources to a single CPU core.
@@ -32,8 +84,8 @@ are enabled.
 This limitation can be addressed using the ``use_multiprocess_copying_workers`` option in the agent configuration.
 By default, the option value is ``false``
 
+##### Recommended configuration
 
-#### Recommended configuration
 To significantly increase overall throughput, we recommend you set the default workers per API key to ``3``, as well
 as turn on multiprocess workers. The following configuration shows an example of setting both of those options.
 ```
@@ -58,7 +110,7 @@ SCALYR_USE_MULTIPROCESS_COPYING_WORKERS=true
 SCALYR_DEFAULT_WORKERS_PER_API_KEY=3
 ```
 
-### Multiple API keys.
+### Multiple API keys
 
 The multiple API keys feature is useful when it is necessary to upload particular log files using a different API keys,
 for instance, to upload to different Scalyr team accounts.
@@ -125,7 +177,7 @@ As an exception, the ``"default"`` identifier can be used with the same ``api_ke
 }
 ```
 
-#### Associating logs with API keys.
+#### Associating logs with API keys
 
 Each element of the ``logs`` section can be associated with a particular API key by specifying the ``api_key_id`` field.
 
@@ -143,7 +195,7 @@ NOTE: If the ``api_key_id`` is omitted, then the ``default`` API key is used.
 ]
 ```
 
-### Linux system metrics monitor improved.
+### Linux system metrics monitor improved
 
  Linux system metrics monitor now ignores the following special mounts points by default:
 ``/sys/*``, ``/dev*``, ``/run*``.
