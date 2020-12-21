@@ -80,25 +80,9 @@ should be uploaded by script or already uploaded by Libloud. #}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-if [ -f "install_package.rpm" ]; then
-    echo_with_date "==========================="
-    echo_with_date "Checking install_package.rpm package file ownership"
-    echo_with_date "==========================="
-
-    # Verify the permissions and file ownership inside the archive. Keep in mind that until we comment
-    # out fpm flag in build_package.py, permissions won't be correct since they are fixed as part of
-    # postinst step, but file ownership should be 0:0 aka owned by root:root
-    FILE_PERMISSIONS=$(rpm -qplv install_package.rpm |grep "agent\\.json")
-    echo "${FILE_PERMISSIONS}"
-
-    echo "${FILE_PERMISSIONS}" | grep "root root"
-    if [ $? -ne 0 ]; then
-        echo "Owner of the file is not root:root!"
-        exit 1
-    fi
-
-    echo_with_date "File ownership inside the rpm package is correct."
-fi
+{% with package_file=install_package.rpm %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
 
 # install Scalyr agent from package file.
 sudo rpm -iv install_package.rpm
@@ -180,25 +164,9 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
-if [ -f "upgrade_package.rpm" ]; then
-    echo_with_date "==========================="
-    echo_with_date "Checking upgrade_package.rpm package file ownership"
-    echo_with_date "==========================="
-
-    # Verify the permissions and file ownership inside the archive. Keep in mind that until we comment
-    # out fpm flag in build_package.py, permissions won't be correct since they are fixed as part of
-    # postinst step, but file ownership should be 0:0 aka owned by root:root
-    FILE_PERMISSIONS=$(rpm -qplv upgrade_package.rpm |grep "agent\\.json")
-    echo "${FILE_PERMISSIONS}"
-
-    echo "${FILE_PERMISSIONS}" | grep "root root"
-    if [ $? -ne 0 ]; then
-        echo "Owner of the file is not root:root!"
-        exit 1
-    fi
-
-    echo_with_date "File ownership inside the rpm package is correct."
-fi
+{% with package_file=upgrade_package.rpm %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
 
 sudo rpm -FUv upgrade_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
