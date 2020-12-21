@@ -819,7 +819,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
     # sure it works correctly - we need to make sure root user is owner for the files which are
     # packaged
     # NOTE: We only need this workaround for debian packages and not rpm ones.
-    if getpass.getuser() == "rpmbuilder" and not is_rpm:
+    if getpass.getuser() in ["rpmbuilder", "circleci"] and not is_rpm:
         print("Using builder VM sudo workaround for file ownership issue")
         use_sudo = True
         sudo_command_string = "sudo "
