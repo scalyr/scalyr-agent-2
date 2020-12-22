@@ -250,8 +250,8 @@ class ScalyrClientSession(object):
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
         @param enforce_monotonic_timestamps: A bool that indicates whether event timestamps in the same session
             should be monotonically increasing or not.  Defaults to False
-        @param workers_api_keys_tuple: Tuple containing a total number of configured workers and unique
-            API keys.
+        @param workers_api_keys_tuple: Tuple containing worker type (multiprocess, threaded) total
+            number of configured workers and number of unique API keys configured.
 
         @type server: six.text_type
         @type api_key: six.text_type
@@ -960,13 +960,9 @@ class ScalyrClientSession(object):
             and len(workers_api_keys_tuple) == 3
             and workers_api_keys_tuple[1] > 1
         ):
-            (
-                use_multiprocess_workers,
-                workers_count,
-                api_keys_count,
-            ) = workers_api_keys_tuple
+            (worker_type, workers_count, api_keys_count,) = workers_api_keys_tuple
 
-            if use_multiprocess_workers:
+            if worker_type == "multiprocess":
                 sharded_copy_manager_string = "mw-2|"
             else:
                 sharded_copy_manager_string = "mw-1|"

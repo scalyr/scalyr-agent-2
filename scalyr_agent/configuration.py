@@ -1546,12 +1546,15 @@ class Configuration(object):
         return result
 
     def get_number_of_configured_workers_and_api_keys(self):
-        # type: () -> Tuple[bool, int, int]
+        # type: () -> Tuple[str, int, int]
         """
         Return total number of configured workers and a total number of unique API keys those
         workers are configured with.
 
-        If multiple workers / api keys functionality is not enabled (False, 1, 1) is returned.
+        It returns a tuple of (worker_type, workers_count, unique api_keys count). Value value for
+        worker_type is "threaded" and "multiprocess."
+
+        If multiple workers / api keys functionality is not enabled (*, 1, 1) is returned.
         """
         workers_count = 0
         api_keys_set = set([])
@@ -1562,7 +1565,12 @@ class Configuration(object):
         api_keys_count = len(api_keys_set)
         del api_keys_set
 
-        return self.use_multiprocess_copying_workers, workers_count, api_keys_count
+        if self.use_multiprocess_copying_workers:
+            worker_type = "multiprocess"
+        else:
+            worker_type = "threaded"
+
+        return worker_type, workers_count, api_keys_count
 
     @property
     def use_multiprocess_copying_workers(self):

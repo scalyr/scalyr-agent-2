@@ -1764,11 +1764,11 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 8)
         self.assertEqual(api_keys_count, 3)
 
@@ -1790,11 +1790,11 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 3)
         self.assertEqual(api_keys_count, 2)
 
@@ -1810,11 +1810,11 @@ class TestConfiguration(TestConfigurationBase):
         new_config.parse()
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = new_config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 11)
         self.assertEqual(api_keys_count, 2)
 
@@ -2852,11 +2852,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 1)
         self.assertEqual(api_keys_count, 1)
 
@@ -2882,11 +2882,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 4)
         self.assertEqual(api_keys_count, 1)
 
@@ -3048,11 +3048,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         )
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertFalse(mpw_enabled)
+        self.assertEqual(worker_type, "threaded")
         self.assertEqual(workers_count, 5)
         self.assertEqual(api_keys_count, 2)
 
@@ -3125,11 +3125,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert config.use_multiprocess_copying_workers
 
         (
-            mpw_enabled,
+            worker_type,
             workers_count,
             api_keys_count,
         ) = config.get_number_of_configured_workers_and_api_keys()
-        self.assertTrue(mpw_enabled)
+        self.assertEqual(worker_type, "multiprocess")
         self.assertEqual(workers_count, 1)
         self.assertEqual(api_keys_count, 1)
 
