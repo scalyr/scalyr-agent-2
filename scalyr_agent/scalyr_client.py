@@ -956,6 +956,7 @@ class ScalyrClientSession(object):
         # process based workers configured with <num_api_keys> unique API keys.
         if (
             workers_api_keys_tuple
+            and isinstance(workers_api_keys_tuple, tuple)
             and len(workers_api_keys_tuple) == 3
             and workers_api_keys_tuple[1] > 1
         ):
