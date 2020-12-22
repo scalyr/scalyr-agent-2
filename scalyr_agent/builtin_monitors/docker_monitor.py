@@ -1389,7 +1389,15 @@ class ContainerChecker(StoppableThread):
 
             attrs.update(container_attributes)
 
+            labels = info.get("labels", []) or []
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                'Found labels "%s" for container %s. Using attributes: %s.'
+                % (", ".join(labels), info["name"], str(attrs)),
+            )
+
             if self._use_raw_logs and "log_path" in info and info["log_path"]:
+                stream_count = 1
                 log_config = self.__create_log_config(
                     default_parser="docker",
                     path=info["log_path"],
@@ -1402,6 +1410,7 @@ class ContainerChecker(StoppableThread):
 
                 result.append({"cid": cid, "stream": "raw", "log_config": log_config})
             else:
+                stream_count = 2
                 path = prefix + info["name"] + "-stdout.log"
                 log_config = self.__create_log_config(
                     default_parser="dockerStdout",
@@ -1422,6 +1431,19 @@ class ContainerChecker(StoppableThread):
                 )
                 result.append(
                     {"cid": cid, "stream": "stderr", "log_config": log_config}
+                )
+
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "Using log config %s for container %s"
+                % (str(result[-1]), info["name"]),
+            )
+
+            if stream_count == 2:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Using log config %s for container %s"
+                    % (str(result[-2]), info["name"]),
                 )
 
         return result
