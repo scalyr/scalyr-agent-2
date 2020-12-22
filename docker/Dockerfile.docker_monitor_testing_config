@@ -21,7 +21,7 @@
 #
 # To run in:
 #
-# docker run -it --rm -d --name std-printer std-printer --env SLEEP_DELAY=5
+# docker run -it --rm -d --name std-printer std-printer -l my-label-1 -l my-label-2 --env SLEEP_DELAY=5
 #
 # To kill / restart it to test various scenarios:
 #
