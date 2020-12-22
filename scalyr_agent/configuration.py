@@ -21,6 +21,9 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+if False:
+    from typing import Tuple
+
 import os
 import re
 import sys
@@ -1541,6 +1544,24 @@ class Configuration(object):
             result.append(dict(api_key_config))
 
         return result
+
+    def get_number_of_configured_workers_and_api_keys(self):
+        # type: () -> Tuple[bool, int, int]
+        """
+        Return total number of configured workers and a total number of unique API keys those
+        workers are configured with.
+
+        If multiple workers / api keys functionality is not enabled (False, 1, 1) is returned.
+        """
+        workers_count = 0
+        api_keys_set = set([])
+        for api_key_config in self.__api_key_configs:
+            api_keys_set.add(api_key_config["api_key"])
+            workers_count += api_key_config["workers"]
+
+        api_keys_count = len(api_keys_set)
+
+        return self.use_multiprocess_copying_workers, workers_count, api_keys_count
 
     @property
     def use_multiprocess_copying_workers(self):

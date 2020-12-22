@@ -1025,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-2], "openssl-1.0.2-13")
+        self.assertEqual(split[-3], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1039,7 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-3], "openssl-1.0.2-13")
+        self.assertEqual(split[-4], "openssl-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
@@ -1092,6 +1092,52 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertTrue("admin-1" in split)
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    def test_get_user_agent_worker_and_api_key_info(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            workers_api_keys_tuple=None,
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-0" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            workers_api_keys_tuple=(False, 1, 1),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-0" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            workers_api_keys_tuple=(False, 3, 2),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-1|3|2" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            workers_api_keys_tuple=(True, 4, 3),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-2|4|3" in split)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):

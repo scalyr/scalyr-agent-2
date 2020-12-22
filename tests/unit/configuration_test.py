@@ -1763,6 +1763,15 @@ class TestConfiguration(TestConfigurationBase):
         logged_line = mock_logger.info.call_args_list[-1][0][0]
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 8)
+        self.assertEqual(api_keys_count, 3)
+
     def test_print_config_when_changed(self):
         """
         Test that `print_useful_settings` only outputs changed settings when compared to another
@@ -1780,6 +1789,15 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 3)
+        self.assertEqual(api_keys_count, 2)
+
         self._write_file_with_separator_conversion(
             """{
             api_key: "hi there",
@@ -1790,6 +1808,15 @@ class TestConfiguration(TestConfigurationBase):
         )
         new_config = self._create_test_configuration_instance(logger=mock_logger)
         new_config.parse()
+
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = new_config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 11)
+        self.assertEqual(api_keys_count, 2)
 
         new_config.print_useful_settings(other_config=config)
 
@@ -2824,6 +2851,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             workers=config.default_workers_per_api_key,
         )
 
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 1)
+        self.assertEqual(api_keys_count, 1)
+
     def test_overwrite_default_api_keys(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2844,6 +2880,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         assert config.api_key_configs[0] == JsonObject(
             api_key=config.api_key, id="default", workers=4,
         )
+
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 4)
+        self.assertEqual(api_keys_count, 1)
 
     def test_default_api_keys_and_second(self):
         self._write_file_with_separator_conversion(
@@ -3002,6 +3047,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             workers=4, api_key="key2", id="second",
         )
 
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertFalse(mpw_enabled)
+        self.assertEqual(workers_count, 5)
+        self.assertEqual(api_keys_count, 2)
+
     def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -3069,6 +3123,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config.parse()
 
         assert config.use_multiprocess_copying_workers
+
+        (
+            mpw_enabled,
+            workers_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_workers_and_api_keys()
+        self.assertTrue(mpw_enabled)
+        self.assertEqual(workers_count, 1)
+        self.assertEqual(api_keys_count, 1)
 
     @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     @skipIf(
