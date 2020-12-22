@@ -1560,6 +1560,7 @@ class Configuration(object):
             workers_count += api_key_config["workers"]
 
         api_keys_count = len(api_keys_set)
+        del api_keys_set
 
         return self.use_multiprocess_copying_workers, workers_count, api_keys_count
 
