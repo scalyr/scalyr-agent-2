@@ -1025,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-3], "openssl-1.0.2-13")
+        self.assertEqual(split[-3], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1039,7 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-4], "openssl-1.0.2-13")
+        self.assertEqual(split[-4], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
@@ -1055,7 +1055,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertTrue("admin-0" in split)
+        self.assertTrue("a-0" in split)
 
         mock_platform = mock.Mock()
         mock_platform.get_current_user.return_value = "User"
@@ -1079,7 +1079,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertTrue("admin-1" in split)
+        self.assertTrue("a-1" in split)
 
         mock_platform = mock.Mock()
         mock_platform.get_current_user.return_value = "MyDomain\\Administrators"
@@ -1091,7 +1091,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertTrue("admin-1" in split)
+        self.assertTrue("a-1" in split)
 
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
     def test_get_user_agent_worker_and_api_key_info(self):

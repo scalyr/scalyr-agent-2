@@ -921,7 +921,7 @@ class ScalyrClientSession(object):
                     + "-"
                     + str(openssl_version[3])
                 )
-                openssl_version_string = "openssl-%s" % (openssl_version_string)
+                openssl_version_string = "o-%s" % (openssl_version_string)
             except Exception:
                 openssl_version_string = None
         else:
@@ -941,10 +941,10 @@ class ScalyrClientSession(object):
             "\\Administrators"
         ):
             # Indicates agent running as a privileged / admin user
-            user_string = "admin-1"
+            user_string = "a-1"
         else:
             # Indicates agent running as a regular user
-            user_string = "admin-0"
+            user_string = "a-0"
 
         sharded_copy_manager_string = ""
 
