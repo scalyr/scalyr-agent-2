@@ -52,6 +52,9 @@ Usage $0 [options] where options are:
                            can be a bit hard to read.
     --version              Specifies the version number of the scalyr-agent-2
                            package to install, rather than the latest.
+    --use-bootstrap-packages
+                           Install the bootstrap packages which install repositories with final agent packages.
+
 EOF
 }
 
@@ -147,6 +150,11 @@ VERSION=
 # If non-empty, the scalyr server to use for uploading logs.
 SCALYR_SERVER=
 
+REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/{ % REPLACE_REPOSITORY_TYPE % }"
+KEYSERVER_URL="keyserver.ubuntu.com"
+PUBLIC_KEY_FINGERPRINT="84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+USE_BOOTSTRAP_PACKAGES=false
+
 # Handle the options
 while (( $# > 0)); do
   case "$1" in
@@ -158,6 +166,9 @@ while (( $# > 0)); do
     --extract-packages)
       echo "Extracting...";
       untar_tarball $0 || die "Failed to extract packages";
+      pwd
+      ls $TMPDIR
+      ls ./
       cp $TMPDIR/*.rpm ./ || die "Failed to copy rpm to current directory";
       cp $TMPDIR/*.deb ./ ||
         die "Failed to copy Debian package to current directory";
@@ -202,8 +213,8 @@ while (( $# > 0)); do
       shift;
       shift;;
 
-    --read-api-key-from-stdin)
-      CONFIG_KEY="stdin";
+    --use-bootstrap-packages)
+      USE_BOOTSTRAP_PACKAGES=true;
       shift;;
 
     *)
@@ -305,8 +316,6 @@ if [ -z "$VERBOSE" ]; then
 fi
 
 lecho "Installing scalyr-agent-2:";
-lecho "  Extracting configuration packages from downloaded script.";
-untar_tarball $0 || die_install "Failed to extract packages";
 
 if [ -z "$REPO_TYPE" ]; then
   if [ -f /etc/redhat-release ]; then
@@ -316,6 +325,8 @@ if [ -z "$REPO_TYPE" ]; then
     elif [ -n "`grep \"Red Hat Enterprise Linux Server release 5\" /etc/redhat-release`" ]; then
       print_detected_yum_package_manager_el5 "2"
       REPO_TYPE="alt-yum";
+      # use configuration packages with old RHEL releases
+      USE_BOOTSTRAP_PACKAGES=true
     else
       print_detected_yum_package_manager "3"
       REPO_TYPE="yum";
@@ -357,11 +368,15 @@ else
   lecho "  Configuring to use yum for package installs. (el5)";
 fi
 
-# The bootstrap rpm name will be something like
-# scalyr-repo-bootstrap-1.2-1.noarch.rpm,
-# scalyr-repo-bootstrap-1.2-1.internal.noarch.rpm
-# scalyr-repo-bootstrap-1.2-1.beta.noarch.rpm
-bootstrap_rpm=`ls $TMPDIR/*bootstrap*-1.[nib]*.rpm`
+if $USE_BOOTSTRAP_PACKAGES; then
+  lecho "  Extracting configuration packages from downloaded script.";
+  untar_tarball $0 || die_install "Failed to extract packages";
+  # The bootstrap rpm name will be something like
+  # scalyr-repo-bootstrap-1.2-1.noarch.rpm,
+  # scalyr-repo-bootstrap-1.2-1.internal.noarch.rpm
+  # scalyr-repo-bootstrap-1.2-1.beta.noarch.rpm
+  bootstrap_rpm=`ls $TMPDIR/*bootstrap*-1.[nib]*.rpm`
+fi
 
 # If we are using the alternate yum repository, then just change around
 # which files we are going to be installing so that we can reuse the
@@ -378,18 +393,28 @@ if [[ $REPO_TYPE == "yum" ]]; then
   run_command "yum remove -y scalyr-repo";
   run_command "yum remove -y scalyr-repo-bootstrap";
 
-  lecho "  Installing Scalyr yum repository configuration files.";
+  if $USE_BOOTSTRAP_PACKAGES; then
+    lecho "  Installing Scalyr yum repository configuration files.";
 
-  # Install the bootstrap rpm for the repository configuration.  This isn't
-  # signed since it is the first package, so disable the gpg check.
-  run_command "yum install --nogpgcheck -y $bootstrap_rpm";
+    # Install the bootstrap rpm for the repository configuration.  This isn't
+    # signed since it is the first package, so disable the gpg check.
+    run_command "yum install --nogpgcheck -y $bootstrap_rpm";
 
-  lecho "  Updating Scalyr yum repository configuration files using repository.";
-  # Now, use the repository to update the repository configuration.  This
-  # removes the old bootstrap package and allows the repository to distribute
-  # updates to the repository configuration itself.  This is the cleanest
-  # way we found to make sure the repository configuration can be updated.
-  run_command "yum install -y scalyr-repo";
+    lecho "  Updating Scalyr yum repository configuration files using repository.";
+    # Now, use the repository to update the repository configuration.  This
+    # removes the old bootstrap package and allows the repository to distribute
+    # updates to the repository configuration itself.  This is the cleanest
+    # way we found to make sure the repository configuration can be updated.
+    run_command "yum install -y scalyr-repo";
+  else
+      # Add tool that may be needed to add repository.
+      run_command "yum install -y yum-utils"
+      echo "Adding the public key."
+
+      run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
+      echo "Adding the scalyr agent repository."
+      run_command "yum-config-manager --add-repo ${REPOSITORY_URL}/yum/binaries/noarch"
+  fi
 
   PACKAGE_NAME="scalyr-agent-2"
   if [[ -n "$VERSION" ]]; then
@@ -405,24 +430,51 @@ else
   run_command "dpkg -r scalyr-repo";
   run_command "dpkg -r scalyr-repo-bootstrap";
 
-  echo "  Installing Scalyr apt repository configuration files.";
-  # Manually install dependencies for the repo package, since `dpkg -i` doesn't install them for you.
-  run_command "apt-get -y install gnupg"
-  # Now install the repo package, which must be done using `dpkg` since it is a package on local disk.
-  # Do not use `apt-get install` here. Even though it does now support installing a package from local disk, older
-  # versions run by our customers do not.
-  run_command "dpkg -i $TMPDIR/*.deb";
+  if $USE_BOOTSTRAP_PACKAGES; then
+    echo "  Installing Scalyr apt repository configuration files.";
+    # Manually install dependencies for the repo package, since `dpkg -i` doesn't install them for you.
+    run_command "apt-get -y install gnupg"
+    # Now install the repo package, which must be done using `dpkg` since it is a package on local disk.
+    # Do not use `apt-get install` here. Even though it does now support installing a package from local disk, older
+    # versions run by our customers do not.
+    run_command "dpkg -i $TMPDIR/*.deb";
 
-  # We need an apt-get update to force apt to refresh the list of repositories
-  # and available packages.  Since this will cause all to refresh,
-  # it takes a little bit of time, but we do not have a choice.
-  # Also, we specifically check for an error some distros experience where apt-transport-https is not installed to
-  # give a better error message.  We cannot depend on that package because not all separate out the https on its own.
-  lecho "  Refreshing available package list (may take several minutes)";
-  run_command "apt-get update" check_for_https_error;
+    # We need an apt-get update to force apt to refresh the list of repositories
+    # and available packages.  Since this will cause all to refresh,
+    # it takes a little bit of time, but we do not have a choice.
+    # Also, we specifically check for an error some distros experience where apt-transport-https is not installed to
+    # give a better error message.  We cannot depend on that package because not all separate out the https on its own.
+    lecho "  Refreshing available package list (may take several minutes)";
+    run_command "apt-get update" check_for_https_error;
 
-  lecho "  Updating Scalyr yum repository configuration files using repository.";
-  run_command "apt-get -y install scalyr-repo";
+    lecho "  Updating Scalyr yum repository configuration files using repository.";
+    run_command "apt-get -y install scalyr-repo";
+  else
+    # update repository and install tools that may be needed.
+    run_command "apt-get -y update";
+
+    echo "Install required dependencies."
+    export DEBIAN_FRONTEND=noninteractive
+    run_command "apt-get install -y gnupg"
+
+
+    apt_version=$(dpkg -s apt | grep -i version | awk '{print $2}')
+
+    # the apt-key tool is deprecated since debian 10 and is removed in debian 11,
+    # so we just manipulate key files directly through filesystem on newer versions.
+    # see https://manpages.debian.org/testing/apt/apt-key.8.en.html#DESCRIPTION
+    if [[ "$apt_version" < "1.8.2.1" ]]; then
+      run_command "apt-key adv --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    else
+      run_command "gpg --no-default-keyring --keyrnig gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    fi
+
+    echo "Adding the scalyr agent repository."
+    echo "deb ${REPOSITORY_URL}/apt scalyr main" > /etc/apt/sources.list.d/scalyr.list
+
+    echo "Update scalyr repository."
+    run_command "apt-get -y update";
+  fi
 
   PACKAGE_NAME="scalyr-agent-2"
   if [[ -n "$VERSION" ]]; then
