@@ -850,7 +850,8 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
 
 class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
-    def test_process_success_no_data(self):
+    @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
+    def test_process_success_no_data(self, mock_global_log):
         mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
@@ -859,9 +860,10 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
             socket=mock_socket, max_buffer_size=max_buffer_size
         )
 
+        self.assertEqual(mock_global_log.warning.call_count, 0)
         parser.process(None, mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 0)
-
+        self.assertEqual(mock_global_log.warning.call_count, 1)
         parser.process(b"", mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 0)
 
@@ -883,7 +885,7 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(parser._remaining, bytearray())
 
     def test_process_success_no_existing_buffer_recv_multiple_complete_messages(self):
-        # 2. Here we emulate multiple complete messages returned in a single recv call
+        # Here we emulate multiple complete messages returned in a single recv call
         mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
@@ -903,7 +905,9 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(mock_handle_frame.call_args_list[0][0][0], mock_data[:-1])
         self.assertEqual(parser._remaining, bytearray())
 
-    def test_process_no_frame_data_timeout_reached_flush_partial(self):
+    def test_process_success_no_existing_buffer_recv_multiple_messages_some_partial(
+        self,
+    ):
         # Here we emulate recv returning partial data and ensuring it's handled correctly
         mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
@@ -941,3 +945,34 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         )
 
         self.assertEqual(parser._remaining, bytearray())
+
+    @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
+    def test_process_no_frame_data_timeout_reached_flush_partial(self, mock_global_log):
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+
+        mock_data = mock_msg_1[: len(mock_msg_1) / 2]
+
+        parser = SyslogBatchedRequestParser(
+            socket=mock_socket,
+            max_buffer_size=max_buffer_size,
+            incomplete_frame_timeout=1,
+        )
+        parser.process(mock_data, mock_handle_frame)
+
+        # No complete frame
+        self.assertEqual(mock_handle_frame.call_count, 0)
+        self.assertEqual(mock_global_log.warning.call_count, 0)
+
+        # Wait for timeout to be reached
+        time.sleep(2)
+
+        # We have not seen a complete frame / message yet, but a timeout has been reached so what
+        # we have seen so far should be flushed.
+        parser.process(b"a", mock_handle_frame)
+        self.assertEqual(mock_handle_frame.call_count, 1)
+        self.assertEqual(mock_handle_frame.call_args_list[0][0][0], mock_data + "a")
+        self.assertEqual(mock_global_log.warning.call_count, 1)

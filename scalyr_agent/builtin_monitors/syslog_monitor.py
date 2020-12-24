@@ -327,8 +327,16 @@ define_config_option(
     convert_to=six.text_type,
 )
 
-# TODO: Make it a config option
-INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS = 60
+define_config_option(
+    __monitor__,
+    "tcp_incomplete_frame_timeout",
+    "How long we wait (in seconds) for a complete frame / syslog message when running in TCP mode "
+    "with batched request parser before giving up and flushing what has accumulated in the buffer.",
+    default=60,
+    min_value=0,
+    max_value=600,
+    convert_to=int,
+)
 
 
 def _get_default_gateway():
@@ -639,13 +647,14 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
     """
 
     # TODO: Refactor duplicated code and re-use common code between this and base class
-    def __init__(self, socket, max_buffer_size):
+    def __init__(self, socket, max_buffer_size, incomplete_frame_timeout=None):
         self._socket = socket
 
         if socket:
             self._socket.setblocking(False)
 
         self._max_buffer_size = max_buffer_size
+        self._incomplete_frame_timeout = incomplete_frame_timeout
 
         # Internal buffer of bytes remained to be processes
         self._remaining = bytearray()
@@ -707,8 +716,8 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             if frame_end == -1:
                 now_ts = int(time.time())
                 if (
-                    INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS
-                    and (now_ts - INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS)
+                    self._incomplete_frame_timeout
+                    and (now_ts - self._incomplete_frame_timeout)
                     > self._last_handle_frame_call_time
                 ):
                     # If we haven't seen a complete frame / line in this amount of seconds, this likely
@@ -718,7 +727,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         "Have not seen a complete syslog message / frame in %s seconds. This "
                         "likely indicates we have received bad or corrupted data. Flushing what "
                         "we have accumulated in internal buffer so far."
-                        % (INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS),
+                        % (self._incomplete_frame_timeout),
                         limit_once_per_x_secs=300,
                         limit_key="syslog-incomplete-message-flush",
                     )
@@ -773,6 +782,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self.request_parser = kwargs.pop("request_parser", False)
+        self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
 
         if six.PY3:
             super(SyslogTCPHandler, self).__init__(*args, **kwargs)
@@ -788,7 +798,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             )
         elif self.request_parser == "batched":
             request_stream = SyslogBatchedRequestParser(
-                socket=self.request, max_buffer_size=self.server.tcp_buffer_size,
+                socket=self.request,
+                max_buffer_size=self.server.tcp_buffer_size,
+                incomplete_frame_timeout=self.incomplete_frame_timeout,
             )
         elif self.request_parser == "raw":
             request_stream = SyslogRawRequestParser(
@@ -879,6 +891,7 @@ class SyslogTCPServer(
         verifier,
         message_size_can_exceed_tcp_buffer=False,
         request_parser="default",
+        incomplete_frame_timeout=None,
     ):
         self.__verifier = verifier
         address = (bind_address, port)
@@ -893,7 +906,11 @@ class SyslogTCPServer(
         self.message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
         self.request_parser = request_parser
 
-        handler_cls = functools.partial(SyslogTCPHandler, request_parser=request_parser)
+        handler_cls = functools.partial(
+            SyslogTCPHandler,
+            request_parser=request_parser,
+            incomplete_frame_timeout=incomplete_frame_timeout,
+        )
         six.moves.socketserver.TCPServer.__init__(self, address, handler_cls)
 
     def verify_request(self, request, client_address):
@@ -1455,6 +1472,8 @@ class SyslogServer(object):
                         "Invalid tcp_request_parser value: %s" % (request_parser)
                     )
 
+                incomplete_frame_timeout = config.get("tcp_incomplete_frame_timeout")
+
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_2,
                     "Starting TCP Server (tcp_buffer_size=%s, "
@@ -1472,6 +1491,7 @@ class SyslogServer(object):
                     verifier=verifier,
                     message_size_can_exceed_tcp_buffer=message_size_can_exceed_tcp_buffer,
                     request_parser=request_parser,
+                    incomplete_frame_timeout=incomplete_frame_timeout,
                 )
             elif protocol == "udp":
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
