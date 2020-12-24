@@ -324,8 +324,11 @@ define_config_option(
     "Optional (defaults to default). Which TCP packet data request parser to use. Most users "
     "should leave this as is.",
     default="default",
-    convert_to=str,
+    convert_to=six.text_type,
 )
+
+# TODO: Make it a config option
+INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS = 60
 
 
 def _get_default_gateway():
@@ -644,8 +647,13 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         self._max_buffer_size = max_buffer_size
 
+        # Internal buffer of bytes remained to be processes
         self._remaining = bytearray()
+        # Current offset into the internal remaining buffer
         self._offset = 0
+
+        # Stores the timestamp of when we last called "handle_frame()"
+        self._last_handle_frame_call_time = int(time.time())
 
         self.is_closed = False
 
@@ -661,12 +669,13 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             )
             return
 
-        # append data to what we had remaining from the previous call (if any)
+        # Append data to what we had remaining from the previous call (if any)
         self._remaining += data
 
         size = len(self._remaining)
 
-        # process the buffer until we are out of bytes
+        # Process the buffer until we are out of bytes. Once we are out of bytes, flush processed
+        # data to file.
         frames_handled = 0
         data_to_write = bytearray()
 
@@ -682,6 +691,9 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                 frame_end = -1
                 pos = self._remaining.find(b" ", self._offset)
                 if pos != -1:
+                    # NOTE: This could throw in case data was corrupted and we flushed incomplete
+                    # message early as part of the previous call so we should handle this scenario
+                    # better.
                     frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
                     if size - message_offset >= frame_size:
@@ -693,10 +705,33 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                 skip = 1
 
             if frame_end == -1:
-                # If we couldn't find the end of a frame, then it's time to exit the loop and wait
-                # for more data.
-                # NOTE: We could have some kind of guard here - e.g. we don't see a frame for X
-                # seconds we just flush what we have.
+                now_ts = int(time.time())
+                if (
+                    INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS
+                    and (now_ts - INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS)
+                    > self._last_handle_frame_call_time
+                ):
+                    # If we haven't seen a complete frame / line in this amount of seconds, this likely
+                    # indicates there we received bad / corrupted data so we just flush what we have
+                    # accumulated so far and start from the beginning.
+                    global_log.warning(
+                        "Have not seen a complete syslog message / frame in %s seconds. This "
+                        "likely indicates we have received bad or corrupted data. Flushing what "
+                        "we have accumulated in internal buffer so far."
+                        % (INCOMPLETE_FRAME_FLUSH_THRESHOLD_SECONDS),
+                        limit_once_per_x_secs=300,
+                        limit_key="syslog-incomplete-message-flush",
+                    )
+
+                    handle_frame(
+                        self._remaining.decode("utf-8", errors="ignore").strip()
+                    )
+                    frames_handled += 1
+
+                    self._last_handle_frame_call_time = int(time.time())
+                    self._remaining = bytearray()
+                    self._offset = 0
+
                 break
 
             # Instead of outputting each frame / line once we process it, we output it in batches at
@@ -720,11 +755,12 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         # All the currently available data has been processed, output it and reset the buffer
         if data_to_write:
-            handle_frame(data_to_write.decode("utf-8").strip())
+            handle_frame(data_to_write.decode("utf-8", errors="ignore").strip())
             data_to_write = bytearray()
 
-        self._remaining = self._remaining[self._offset :]
-        self._offset = 0
+            self._last_handle_frame_call_time = int(time.time())
+            self._remaining = self._remaining[self._offset :]
+            self._offset = 0
 
 
 class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
@@ -737,7 +773,11 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self.request_parser = kwargs.pop("request_parser", False)
-        super(SyslogTCPHandler, self).__init__(*args, **kwargs)
+
+        if six.PY3:
+            super(SyslogTCPHandler, self).__init__(*args, **kwargs)
+        else:
+            six.moves.socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
         if self.request_parser == "default":
