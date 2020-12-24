@@ -586,7 +586,7 @@ class SyslogRequestParser(object):
                     )
 
                     # skip invalid bytes which can appear because of the buffer overflow.
-                    frame_data = six.ensure_text(self._remaining, errors="ignore")
+                    frame_data = six.ensure_text(self._remaining, "ignore")
 
                     handle_frame(frame_data)
                     frames_handled += 1
@@ -732,9 +732,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         limit_key="syslog-incomplete-message-flush",
                     )
 
-                    handle_frame(
-                        self._remaining.decode("utf-8", errors="ignore").strip()
-                    )
+                    handle_frame(self._remaining.decode("utf-8", "ignore").strip())
                     frames_handled += 1
 
                     self._last_handle_frame_call_time = int(time.time())
@@ -764,7 +762,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         # All the currently available data has been processed, output it and reset the buffer
         if data_to_write:
-            handle_frame(data_to_write.decode("utf-8", errors="ignore").strip())
+            handle_frame(data_to_write.decode("utf-8", "ignore").strip())
             data_to_write = bytearray()
 
             self._last_handle_frame_call_time = int(time.time())
