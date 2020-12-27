@@ -150,7 +150,8 @@ VERSION=
 # If non-empty, the scalyr server to use for uploading logs.
 SCALYR_SERVER=
 
-REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/{ % REPLACE_REPOSITORY_TYPE % }" # replace the placeholder and this comment from the 'create-agent-installer.sh'
+# { # replace the repository type placeholder from the create-agent-installer.sh script.  NOTE. All comments like that are also removed. # }
+REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/{ % REPLACE_REPOSITORY_TYPE % }"
 KEYSERVER_URL="keyserver.ubuntu.com"
 PUBLIC_KEY_FINGERPRINT="84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
 USE_BOOTSTRAP_PACKAGES=false
