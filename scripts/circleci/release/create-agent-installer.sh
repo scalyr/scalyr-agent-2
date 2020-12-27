@@ -361,7 +361,7 @@ tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 # replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
 sed "s~{ % REPLACE_REPOSITORY_TYPE % }~$REPO_BASE_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
 # also remove all special comments which are usefull only for template but not for the resulting file.
-sed "s~# { #.*# }~~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
+sed "s~# { #.*# }~~g" -i installScalyrAgentV2.sh
 
 
 cat repo_packages.tar >> installScalyrAgentV2.sh
