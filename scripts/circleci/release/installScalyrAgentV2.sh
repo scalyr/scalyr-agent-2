@@ -407,12 +407,9 @@ if [[ $REPO_TYPE == "yum" ]]; then
     # way we found to make sure the repository configuration can be updated.
     run_command "yum install -y scalyr-repo";
   else
-      # Add tool that may be needed to add repository.
-      run_command "yum install -y yum-utils"
       echo "Adding the public key."
-
-      #run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
-      echo "Adding the scalyr agent repository."
+      run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
+      echo "Adding the scalyr agent repository file."
       cat > /etc/yum.repos.d/scalyr.repo <<EOF
 [scalyr]
 includepkgs=scalyr-agent-2
@@ -423,7 +420,6 @@ metadata_expire=300
 enabled=1
 gpgcheck=1
 EOF
-      #run_command "yum-config-manager --add-repo ${REPOSITORY_URL}/yum/binaries/noarch"
   fi
 
   PACKAGE_NAME="scalyr-agent-2"
@@ -468,23 +464,13 @@ else
     run_command "apt-get install -y gnupg"
 
 
-    apt_version=$(dpkg -s apt | grep -i version | awk '{print $2}')
-
-    # the apt-key tool is deprecated since debian 10 and is removed in debian 11,
-    # so we just manipulate key files directly through filesystem on newer versions.
-    # see https://manpages.debian.org/testing/apt/apt-key.8.en.html#DESCRIPTION
-
     # initialize gpg in case if it has been freshly installed.
     gpg --update-trustdb
 
-    if [[ "$apt_version" < "1.8.2.1" ]]; then
-      #run_command "apt-key adv --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
-      run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    echo "Adding the public key."
+    run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
 
-    else
-      run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
-    fi
-
+    # change permissions for the gpg key.
     chmod 666 /etc/apt/trusted.gpg.d/scalyr.gpg
 
     echo "Adding the scalyr agent repository."
