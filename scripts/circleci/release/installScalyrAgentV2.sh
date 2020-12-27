@@ -465,10 +465,10 @@ else
     # see https://manpages.debian.org/testing/apt/apt-key.8.en.html#DESCRIPTION
     if [[ "$apt_version" < "1.8.2.1" ]]; then
       #run_command "apt-key adv --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
-      run_command "gpg --no-default-keyring --keyrnig gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+      run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
 
     else
-      run_command "gpg --no-default-keyring --keyrnig gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+      run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
     fi
 
     echo "Adding the scalyr agent repository."
