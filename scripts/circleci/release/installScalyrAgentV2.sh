@@ -413,7 +413,17 @@ if [[ $REPO_TYPE == "yum" ]]; then
 
       run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
       echo "Adding the scalyr agent repository."
-      run_command "yum-config-manager --add-repo ${REPOSITORY_URL}/yum/binaries/noarch"
+      cat > /etc/yum.repos.d/scalyr.repo <<EOF
+[scalyr]
+includepkgs=scalyr-agent-2
+name=Scalyr packages - noarch
+baseurl=${REPOSITORY_URL}/yum/binaries/noarch"
+mirror_expire=300
+metadata_expire=300
+enabled=1
+gpgcheck=1
+EOF
+      #run_command "yum-config-manager --add-repo ${REPOSITORY_URL}/yum/binaries/noarch"
   fi
 
   PACKAGE_NAME="scalyr-agent-2"
@@ -464,6 +474,7 @@ else
     # so we just manipulate key files directly through filesystem on newer versions.
     # see https://manpages.debian.org/testing/apt/apt-key.8.en.html#DESCRIPTION
 
+    # initialize gpg in case if it has been freshly installed.
     gpg --update-trustdb
 
     if [[ "$apt_version" < "1.8.2.1" ]]; then
