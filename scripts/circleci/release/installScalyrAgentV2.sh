@@ -463,6 +463,9 @@ else
     # the apt-key tool is deprecated since debian 10 and is removed in debian 11,
     # so we just manipulate key files directly through filesystem on newer versions.
     # see https://manpages.debian.org/testing/apt/apt-key.8.en.html#DESCRIPTION
+
+    gpg --update-trustdb
+
     if [[ "$apt_version" < "1.8.2.1" ]]; then
       #run_command "apt-key adv --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
       run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
