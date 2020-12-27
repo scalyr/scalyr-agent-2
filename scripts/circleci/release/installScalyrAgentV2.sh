@@ -411,7 +411,7 @@ if [[ $REPO_TYPE == "yum" ]]; then
       run_command "yum install -y yum-utils"
       echo "Adding the public key."
 
-      run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
+      #run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
       echo "Adding the scalyr agent repository."
       cat > /etc/yum.repos.d/scalyr.repo <<EOF
 [scalyr]
