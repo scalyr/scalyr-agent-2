@@ -471,6 +471,8 @@ else
       run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
     fi
 
+    chmod 666 /etc/apt/trusted.gpg.d/scalyr.gpg
+
     echo "Adding the scalyr agent repository."
     echo "deb ${REPOSITORY_URL}/apt scalyr main" > /etc/apt/sources.list.d/scalyr.list
 
