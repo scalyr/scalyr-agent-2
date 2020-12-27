@@ -417,7 +417,7 @@ if [[ $REPO_TYPE == "yum" ]]; then
 [scalyr]
 includepkgs=scalyr-agent-2
 name=Scalyr packages - noarch
-baseurl=${REPOSITORY_URL}/yum/binaries/noarch"
+baseurl=${REPOSITORY_URL}/yum/binaries/noarch
 mirror_expire=300
 metadata_expire=300
 enabled=1
