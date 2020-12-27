@@ -359,7 +359,7 @@ create_alt_yum_repo_packages;
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
 # replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
-sed "s~{ % REPLACE_REPOSITORY_TYPE % }~$REPO_BASE_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
+sed sed "s~{ % REPLACE_REPOSITORY_TYPE % } #// .*//~$REPO_BASE_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
 
 
 cat repo_packages.tar >> installScalyrAgentV2.sh
