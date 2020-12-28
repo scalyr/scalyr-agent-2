@@ -690,12 +690,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_run_tcp_server_batched_request_parser(self):
+    def test_run_tcp_server_batch_request_parser(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
             "log_flush_delay": 0.0,
-            "tcp_request_parser": "batched",
+            "tcp_request_parser": "batch",
         }
 
         self.monitor = TestSyslogMonitor(config, self.logger)
@@ -849,7 +849,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         )
 
 
-class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
+class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
     @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
     def test_process_success_no_data(self, mock_global_log):
         mock_socket = mock.Mock()
