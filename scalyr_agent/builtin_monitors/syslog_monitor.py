@@ -332,10 +332,22 @@ define_config_option(
     "tcp_incomplete_frame_timeout",
     "How long we wait (in seconds) for a complete frame / syslog message when running in TCP mode "
     "with batched request parser before giving up and flushing what has accumulated in the buffer.",
-    default=60,
+    default=5,
     min_value=0,
     max_value=600,
     convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "tcp_message_delimiter",
+    "Which character sequence to use for a message delimiter / suffix (defaults to \\n). Some "
+    "implementations such as Python syslog handler one utilize null character (\\000) which allows "
+    "messages to contain new lines without using framing. If that is the case for you, set this "
+    "option to \\000. Keep in mind that this value needs to be escaped when specified in the "
+    "config option which means you need to use two backslashes instead of one.",
+    default="\n",
+    convert_to=six.text_type,
 )
 
 
@@ -484,7 +496,7 @@ class SyslogRequestParser(object):
     """
 
     def __init__(
-        self, socket, max_buffer_size, message_size_can_exceed_tcp_buffer=False
+        self, socket, max_buffer_size, message_size_can_exceed_tcp_buffer=False,
     ):
         self._socket = socket
 
@@ -587,8 +599,8 @@ class SyslogRequestParser(object):
 
                     # skip invalid bytes which can appear because of the buffer overflow.
                     frame_data = six.ensure_text(self._remaining, "ignore")
-
                     handle_frame(frame_data)
+
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
@@ -647,7 +659,13 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
     """
 
     # TODO: Refactor duplicated code and re-use common code between this and base class
-    def __init__(self, socket, max_buffer_size, incomplete_frame_timeout=None):
+    def __init__(
+        self,
+        socket,
+        max_buffer_size,
+        incomplete_frame_timeout=None,
+        message_delimiter="\n",
+    ):
         self._socket = socket
 
         if socket:
@@ -655,6 +673,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         self._max_buffer_size = max_buffer_size
         self._incomplete_frame_timeout = incomplete_frame_timeout
+        self._message_delimiter = six.ensure_binary(message_delimiter)
 
         # Internal buffer of bytes remained to be processes
         self._remaining = bytearray()
@@ -710,7 +729,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         frame_end = self._offset + frame_size
             else:
                 # not framed, find the first newline
-                frame_end = self._remaining.find(b"\n", self._offset)
+                frame_end = self._remaining.find(self._message_delimiter, self._offset)
                 skip = 1
 
             if frame_end == -1:
@@ -745,9 +764,13 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             # the end.
             frame_length = frame_end - self._offset
 
+            frame_data = self._remaining[self._offset : frame_end]
+
             # We add \n which is stripped to ensure line data is correctly written to a file on disk
             # (aka each syslog message is on a separate line)
-            frame_data = self._remaining[self._offset : frame_end] + b"\n"
+            if not frame_data.endswith(b"\n"):
+                frame_data += b"\n"
+
             data_to_write += frame_data
 
             frames_handled += 1
@@ -781,6 +804,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     def __init__(self, *args, **kwargs):
         self.request_parser = kwargs.pop("request_parser", False)
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
+        self.message_delimiter = kwargs.pop("message_delimiter", "\n")
 
         if six.PY3:
             super(SyslogTCPHandler, self).__init__(*args, **kwargs)
@@ -799,6 +823,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 socket=self.request,
                 max_buffer_size=self.server.tcp_buffer_size,
                 incomplete_frame_timeout=self.incomplete_frame_timeout,
+                message_delimiter=self.message_delimiter,
             )
         elif self.request_parser == "raw":
             request_stream = SyslogRawRequestParser(
@@ -890,6 +915,7 @@ class SyslogTCPServer(
         message_size_can_exceed_tcp_buffer=False,
         request_parser="default",
         incomplete_frame_timeout=None,
+        message_delimiter="\n",
     ):
         self.__verifier = verifier
         address = (bind_address, port)
@@ -903,11 +929,13 @@ class SyslogTCPServer(
         self.tcp_buffer_size = tcp_buffer_size
         self.message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
         self.request_parser = request_parser
+        self.message_delimiter = message_delimiter
 
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
+            message_delimiter=message_delimiter,
         )
         six.moves.socketserver.TCPServer.__init__(self, address, handler_cls)
 
@@ -1471,15 +1499,27 @@ class SyslogServer(object):
                     )
 
                 incomplete_frame_timeout = config.get("tcp_incomplete_frame_timeout")
+                message_delimiter = config.get("tcp_message_delimiter")
+
+                # NOTE: User needs to provide escaped value in the config (e.g. \\000), but we
+                # need to unsescape it to use it
+                # message_delimiter = message_delimiter.replace("\\", "a")
+                message_delimiter = six.ensure_binary(
+                    message_delimiter.encode("utf-8").decode("unicode_escape")
+                )
 
                 global_log.log(
-                    scalyr_logging.DEBUG_LEVEL_2,
+                    scalyr_logging.DEBUG_LEVEL_0,
                     "Starting TCP Server (tcp_buffer_size=%s, "
-                    "message_size_can_exceed_tcp_buffer=%s, tcp_request_parser=%s)"
+                    "message_size_can_exceed_tcp_buffer=%s, tcp_request_parser=%s,"
+                    "message_delimiter=%s)"
                     % (
                         tcp_buffer_size,
                         message_size_can_exceed_tcp_buffer,
                         request_parser,
+                        message_delimiter.decode("utf-8")
+                        .replace("\n", "\\n")
+                        .replace("\000", "\\000"),
                     ),
                 )
                 server = SyslogTCPServer(
@@ -1490,6 +1530,7 @@ class SyslogServer(object):
                     message_size_can_exceed_tcp_buffer=message_size_can_exceed_tcp_buffer,
                     request_parser=request_parser,
                     incomplete_frame_timeout=incomplete_frame_timeout,
+                    message_delimiter=message_delimiter,
                 )
             elif protocol == "udp":
                 global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")

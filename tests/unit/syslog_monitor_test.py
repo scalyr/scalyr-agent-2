@@ -881,7 +881,10 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         )
         parser.process(mock_msg_1, mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 1)
-        self.assertEqual(mock_handle_frame.call_args_list[0][0][0], mock_msg_1[:-1])
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_msg_1[:-1],
+        )
         self.assertEqual(parser._remaining, bytearray())
 
     def test_process_success_no_existing_buffer_recv_multiple_complete_messages(self):
@@ -902,7 +905,9 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
 
         # Ensure we only call handle_frame once with all the data
         self.assertEqual(mock_handle_frame.call_count, 1)
-        self.assertEqual(mock_handle_frame.call_args_list[0][0][0], mock_data[:-1])
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]), mock_data[:-1]
+        )
         self.assertEqual(parser._remaining, bytearray())
 
     def test_process_success_no_existing_buffer_recv_multiple_messages_some_partial(
@@ -918,7 +923,7 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_3 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
         mock_msg_4 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
-        mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: len(mock_msg_3) / 2]
+        mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: int(len(mock_msg_3) / 2)]
 
         parser = SyslogBatchedRequestParser(
             socket=mock_socket, max_buffer_size=max_buffer_size
@@ -930,18 +935,20 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         # buffer
         self.assertEqual(mock_handle_frame.call_count, 1)
         self.assertEqual(
-            mock_handle_frame.call_args_list[0][0][0], mock_msg_1 + mock_msg_2[:-1]
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_msg_1 + mock_msg_2[:-1],
         )
 
-        self.assertEqual(parser._remaining, mock_msg_3[: len(mock_msg_3) / 2])
+        self.assertEqual(parser._remaining, mock_msg_3[: int(len(mock_msg_3) / 2)])
 
         # Now emulate rest of the message 3 + complete message 4 arriving
-        mock_data = mock_msg_3[len(mock_msg_3) / 2 :] + mock_msg_4
+        mock_data = mock_msg_3[int(len(mock_msg_3) / 2) :] + mock_msg_4
 
         parser.process(mock_data, mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 2)
         self.assertEqual(
-            mock_handle_frame.call_args_list[1][0][0], mock_msg_3 + mock_msg_4[:-1]
+            six.ensure_binary(mock_handle_frame.call_args_list[1][0][0]),
+            mock_msg_3 + mock_msg_4[:-1],
         )
 
         self.assertEqual(parser._remaining, bytearray())
@@ -954,7 +961,7 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
 
         mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
-        mock_data = mock_msg_1[: len(mock_msg_1) / 2]
+        mock_data = mock_msg_1[: int(len(mock_msg_1) / 2)]
 
         parser = SyslogBatchedRequestParser(
             socket=mock_socket,
@@ -974,5 +981,52 @@ class SyslogBatchedRequestParserTestCase(SyslogMonitorTestCase):
         # we have seen so far should be flushed.
         parser.process(b"a", mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 1)
-        self.assertEqual(mock_handle_frame.call_args_list[0][0][0], mock_data + "a")
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_data + b"a",
+        )
         self.assertEqual(mock_global_log.warning.call_count, 1)
+
+    def test_process_null_character_custom_delimiter(self):
+        # Here we emulate recv returning partial data and ensuring it's handled correctly when
+        # utilizing a custom delimiter character
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\000"
+        mock_msg_2 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-2-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\000"
+        mock_msg_3 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\000"
+        mock_msg_4 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n\000"
+
+        mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: int(len(mock_msg_3) / 2)]
+
+        parser = SyslogBatchedRequestParser(
+            socket=mock_socket,
+            max_buffer_size=max_buffer_size,
+            message_delimiter="\000",
+        )
+        parser.process(mock_data, mock_handle_frame)
+
+        # Ensure we only call handle_frame. Since last message was incomplete, only first two
+        # messages should have been flushed and part of the 3rd one should still be in internal
+        # buffer
+        self.assertEqual(mock_handle_frame.call_count, 1)
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_msg_1[:-1] + b"\n" + mock_msg_2[:-1],
+        )
+
+        self.assertEqual(parser._remaining, mock_msg_3[: int(len(mock_msg_3) / 2)])
+
+        # Now emulate rest of the message 3 + complete message 4 arriving
+        mock_data = mock_msg_3[int(len(mock_msg_3) / 2) :] + mock_msg_4
+
+        parser.process(mock_data, mock_handle_frame)
+        self.assertEqual(mock_handle_frame.call_count, 2)
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[1][0][0]),
+            mock_msg_3[:-1] + b"\n" + mock_msg_4[:-2],
+        )
+
+        self.assertEqual(parser._remaining, bytearray())
