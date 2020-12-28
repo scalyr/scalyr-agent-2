@@ -331,7 +331,7 @@ define_config_option(
     __monitor__,
     "tcp_incomplete_frame_timeout",
     "How long we wait (in seconds) for a complete frame / syslog message when running in TCP mode "
-    "with batched request parser before giving up and flushing what has accumulated in the buffer.",
+    "with batch request parser before giving up and flushing what has accumulated in the buffer.",
     default=5,
     min_value=0,
     max_value=600,
@@ -818,7 +818,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 max_buffer_size=self.server.tcp_buffer_size,
                 message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
             )
-        elif self.request_parser == "batched":
+        elif self.request_parser == "batch":
             request_stream = SyslogBatchedRequestParser(
                 socket=self.request,
                 max_buffer_size=self.server.tcp_buffer_size,
@@ -1493,7 +1493,7 @@ class SyslogServer(object):
                 )
                 request_parser = config.get("tcp_request_parser")
 
-                if request_parser not in ["default", "batched", "raw"]:
+                if request_parser not in ["default", "batch", "raw"]:
                     raise ValueError(
                         "Invalid tcp_request_parser value: %s" % (request_parser)
                     )
