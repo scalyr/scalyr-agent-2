@@ -598,7 +598,7 @@ class SyslogRequestParser(object):
                     )
 
                     # skip invalid bytes which can appear because of the buffer overflow.
-                    frame_data = six.ensure_text(self._remaining, "ignore")
+                    frame_data = six.ensure_text(self._remaining, errors="ignore")
                     handle_frame(frame_data)
 
                     frames_handled += 1
