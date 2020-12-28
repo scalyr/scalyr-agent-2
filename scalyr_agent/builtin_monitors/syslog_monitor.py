@@ -1510,10 +1510,12 @@ class SyslogServer(object):
 
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Starting TCP Server (tcp_buffer_size=%s, "
-                    "message_size_can_exceed_tcp_buffer=%s, tcp_request_parser=%s,"
+                    "Starting TCP Server (host=%s, port=%s, tcp_buffer_size=%s, "
+                    "message_size_can_exceed_tcp_buffer=%s, tcp_request_parser=%s, "
                     "message_delimiter=%s)"
                     % (
+                        bind_address,
+                        port,
                         tcp_buffer_size,
                         message_size_can_exceed_tcp_buffer,
                         request_parser,
@@ -1533,7 +1535,10 @@ class SyslogServer(object):
                     message_delimiter=message_delimiter,
                 )
             elif protocol == "udp":
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
+                )
                 server = SyslogUDPServer(
                     port, bind_address=bind_address, verifier=verifier
                 )
