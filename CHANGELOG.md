@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.17 "TBD" - December 31, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 31, 2020 14:00 -0800
+--->
+
+Misc:
+* Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
+
 ## 2.1.16 "Lasso" - December 23, 2020
 
 <!---
