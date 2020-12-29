@@ -2950,7 +2950,7 @@ class Configuration(object):
             self.__logger.warn(
                 "No compression will be used for outgoing requests. In most scenarios this will "
                 "result in larger data egress traffic which may incur additional charges on your "
-                "side (depending on your location, provider, etc.).",
+                "side (depending on your infrastructure provider, location, pricing model, etc.).",
                 limit_once_per_x_secs=86400,
                 limit_key="compression_type_none",
             )
