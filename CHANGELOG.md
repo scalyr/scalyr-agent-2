@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.17 "TBD" - December 31, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 31, 2020 14:00 -0800
+--->
+
+Improvements:
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations. For backward compatibility reasons, the default parsed hasn't been changed yet.
+
 ## 2.1.16 "Lasso" - December 23, 2020
 
 <!---
