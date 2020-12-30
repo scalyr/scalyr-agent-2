@@ -2086,7 +2086,11 @@ class TestConfiguration(TestConfigurationBase):
 
             config = self._create_test_configuration_instance()
             config.parse()
-            self.assertEqual(config.compression_level, 5)
+
+            if config.compression_type == "none":
+                self.assertEqual(config.compression_level, 0)
+            else:
+                self.assertEqual(config.compression_level, 5)
 
     def test_parse_compression_algorithm_invalid_compression_level(self):
         # If invalid compression level is used, we should use a default value for that particular

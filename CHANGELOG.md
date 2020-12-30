@@ -7,11 +7,13 @@ Scalyr Agent 2 Changes By Release
 Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 31, 2020 14:00 -0800
 --->
 
+Misc:
 Improvements:
 * Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations. For backward compatibility reasons, the default parsed hasn't been changed yet.
 
 Misc:
 * Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
+* Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
 
 ## 2.1.16 "Lasso" - December 23, 2020
 
