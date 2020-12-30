@@ -10,6 +10,9 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 31, 2020 14:00 -0800
 Improvements:
 * Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations. For backward compatibility reasons, the default parsed hasn't been changed yet.
 
+Misc:
+* Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
+
 ## 2.1.16 "Lasso" - December 23, 2020
 
 <!---
