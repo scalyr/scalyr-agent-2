@@ -932,11 +932,21 @@ class ProcessList(object):
                 self.processes.append(
                     {"pid": int(_pid), "ppid": int(_ppid), "cmd": _cmd}
                 )
+
+        current_pid = os.getpid()
         for _process in self.processes:
             ppid = _process["ppid"]
             pid = _process["pid"]
             if ppid != pid:
                 self.parent_to_children_map[ppid].append(pid)
+
+            if pid == current_pid:
+                self._current_process = _process
+
+    @property
+    def current_process(self):
+        """Return the process of the agent."""
+        return self._current_process
 
     def get_matches_commandline(self, match_pattern):
         """
@@ -1313,6 +1323,14 @@ you'd like to view.
                 for t_pid in self.__target_pids:
                     if t_pid == "$$":
                         t_pid = int(os.getpid())
+                        # if we use multiprocess workers we also search for the child processes if that workers by  matching the agent cmd line.
+                        if self._global_config.use_multiprocess_copying_workers is True:
+                            child_processes = set(
+                                ps.get_matches_commandline(ps.current_process["cmd"])
+                            )
+                            # remove the agent process itself.
+                            child_processes.remove(t_pid)
+                            pids.extend(child_processes)
                     else:
                         t_pid = int(t_pid)
                     pids.append(t_pid)
