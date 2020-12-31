@@ -468,24 +468,22 @@ class CopyingManagerStatus(BaseAgentStatus):
 
         self._verify_workers_health_check()
 
-        # sum up all stats from workers if it is not a default config.
-        if not self.is_single_worker():
-            # sum up some worker stats to overall stats.
-            for worker_status in self._workers():
-                self.total_errors += worker_status.total_errors
-                self.total_bytes_uploaded += worker_status.total_bytes_uploaded
+        # sum up some worker stats to overall stats.
+        for worker_status in self._workers():
+            self.total_errors += worker_status.total_errors
+            self.total_bytes_uploaded += worker_status.total_bytes_uploaded
 
-                self.total_rate_limited_time = worker_status.total_rate_limited_time
-                self.total_read_time = worker_status.total_read_time
-                self.total_waiting_time = worker_status.total_waiting_time
-                self.total_blocking_response_time = (
-                    worker_status.total_blocking_response_time
-                )
-                self.total_request_time = worker_status.total_request_time
-                self.total_pipelined_requests = worker_status.total_pipelined_requests
-                self.rate_limited_time_since_last_status = (
-                    worker_status.rate_limited_time_since_last_status
-                )
+            self.total_rate_limited_time += worker_status.total_rate_limited_time
+            self.total_read_time += worker_status.total_read_time
+            self.total_waiting_time += worker_status.total_waiting_time
+            self.total_blocking_response_time += (
+                worker_status.total_blocking_response_time
+            )
+            self.total_request_time += worker_status.total_request_time
+            self.total_pipelined_requests += worker_status.total_pipelined_requests
+            self.rate_limited_time_since_last_status += (
+                worker_status.rate_limited_time_since_last_status
+            )
 
     def to_dict(self):  # type: () -> dict
         result = super(CopyingManagerStatus, self).to_dict()

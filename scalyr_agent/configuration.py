@@ -586,6 +586,7 @@ class Configuration(object):
             "json_library",
             "use_multiprocess_copying_workers",
             "default_workers_per_api_key",
+            "default_worker_status_message_interval",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_api_key_configs",
         ]
@@ -1585,6 +1586,10 @@ class Configuration(object):
         The default number of workers which should be created for each api key is no value is explicitly set
         """
         return self.__get_config().get_int("default_workers_per_api_key")
+
+    @property
+    def default_worker_status_message_interval(self):
+        return self.__get_config().get_float("default_worker_status_message_interval")
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -2911,6 +2916,15 @@ class Configuration(object):
             apply_defaults,
             env_aware=True,
             min_value=1,
+        )
+
+        self.__verify_or_set_optional_float(
+            config,
+            "default_worker_status_message_interval",
+            600.0,
+            description,
+            apply_defaults,
+            env_aware=True,
         )
 
         # windows does not support copying manager backed with multiprocessing workers.
