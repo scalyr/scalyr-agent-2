@@ -33,6 +33,7 @@ import errno
 import re
 import sys
 import time
+import threading
 from subprocess import Popen, PIPE
 from io import open
 
@@ -1097,6 +1098,8 @@ you'd like to view.
         else:
             self.__target_pids = []
 
+        self._target_pids_lock = threading.Lock()
+
         # Last 2 values of all metrics which has form:
         # {
         #   '<process id>: {
@@ -1321,8 +1324,10 @@ you'd like to view.
             #   '$$' mean this process.
             #   '$$TBD' mean that the PID of the target process has not been determined yet and it will be set later.
             pids = []
-            if self.__target_pids:
-                for t_pid in self.__target_pids:
+            with self._target_pids_lock:
+                target_pids = self.__target_pids[:]
+            if target_pids:
+                for t_pid in target_pids:
                     if t_pid == "$$":
                         t_pid = int(os.getpid())
 
@@ -1338,11 +1343,14 @@ you'd like to view.
     def set_pid(self, pid):  # type: (int) -> None
         """
         Set the PID of the process that was marked as $$TBD.
+        NOTE: this method is called from the a different thread, so all shared objects must be guarded.
         :param pid: Process PID
         """
-        for i in range(len(self.__target_pids)):
-            if self.__target_pids[i] == "$$TBD":
-                self.__target_pids[i] = pid
+        with self._target_pids_lock:
+            target_pids = self.__target_pids[:]
+        for i in range(len(target_pids)):
+            if target_pids[i] == "$$TBD":
+                target_pids[i] = pid
                 break
 
     @property

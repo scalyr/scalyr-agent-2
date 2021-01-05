@@ -828,8 +828,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                     # set the workers PID to the monitors.
                     for pool_status in self.generate_status().api_key_worker_pools:
                         for worker_status in pool_status.workers:
-                            monitor = workers_process_monitors[worker_status.worker_id]
-                            monitor.set_pid(worker_status.pid)
+                            monitor = workers_process_monitors.get(
+                                worker_status.worker_id
+                            )
+                            if monitor:
+                                monitor.set_pid(worker_status.pid)
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
