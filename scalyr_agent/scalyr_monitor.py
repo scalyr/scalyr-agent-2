@@ -278,6 +278,11 @@ class ScalyrMonitor(StoppableThread):
         This way we spread a potential short load spike during sample gathering across a longer time
         frame.
         """
+        # NOTE: self._global_config will be None when using scalyr_agent/run_monitor.py script with
+        # -c flag
+        if not self._global_config:
+            return 0
+
         if not self._global_config.global_monitor_sample_interval_enable_jitter:
             return 0
 
