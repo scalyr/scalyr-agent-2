@@ -1817,7 +1817,8 @@ class ScalyrAgent(object):
         result.num_copying_paths = copying_paths
         result.num_running_monitors = running_monitors
         result.num_dead_monitors = dead_monitors
-        result.num_workers = current_status.copying_manager_status.workers_number
+        if current_status.copying_manager_status is not None:
+            result.num_workers = current_status.copying_manager_status.workers_number
 
         (
             result.user_cpu,
