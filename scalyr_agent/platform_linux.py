@@ -23,9 +23,17 @@ __author__ = "czerwin@scalyr.com"
 import os
 from sys import platform as _platform
 
+if False:
+    from typing import List
+
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.copying_manager.copying_manager import (
+    get_api_key_worker_ids,
+    WORKER_PROCESS_MONITOR_ID_PREFIX,
+)
 
 from scalyr_agent.__scalyr__ import (
     get_install_root,
@@ -87,7 +95,7 @@ class LinuxPlatformController(PosixPlatformController):
                 os.path.join(base_dir, "data"),
             )
 
-    def get_default_monitors(self, config):
+    def get_default_monitors(self, config):  # type: (Configuration) -> List
         """Returns the default monitors to use for this platform.
 
         This method should return a list of dicts containing monitor configuration options just as you would specify
@@ -114,4 +122,19 @@ class LinuxPlatformController(PosixPlatformController):
                     id="agent",
                 )
             )
+            # if multi-process workers are enabled, then create linux metrics monitor for each worker process.
+            if config.use_multiprocess_copying_workers:
+                for api_key_config in config.api_key_configs:
+                    for worker_id in get_api_key_worker_ids(api_key_config):
+                        result.append(
+                            JsonObject(
+                                module="scalyr_agent.builtin_monitors.linux_process_metrics",
+                                # the copying manager start after the declaration of the managers,
+                                # so we can not put the real PID but just mark that it will be set later.
+                                pid="$$TBD",
+                                id="{0}{1}".format(
+                                    WORKER_PROCESS_MONITOR_ID_PREFIX, worker_id
+                                ),
+                            )
+                        )
         return result

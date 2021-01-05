@@ -156,6 +156,8 @@ class OverallStats(AgentStatus):
         self.num_running_monitors = 0
         # The current number of monitors that should be running but are not.
         self.num_dead_monitor = 0
+        # the current number of workers that run by the copying manager.
+        self.num_workers = 0
         # The total amount of user time CPU used by the agent (cpu secs).
         self.user_cpu = 0
         # The total amount of system time CPU used by the agent (cpu secs)

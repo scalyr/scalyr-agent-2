@@ -1317,25 +1317,37 @@ you'd like to view.
                 self.__pids = [self.__pids[0]]
         else:
             # See if the specified target pid is running.  If so, then return it.
-            # Special case '$$' to mean this process.
+            # Special cases:
+            #   '$$' mean this process.
+            #   '$$TBD' mean that the PID of the target process has not been determined yet and it will be set later.
             pids = []
             if self.__target_pids:
                 for t_pid in self.__target_pids:
                     if t_pid == "$$":
                         t_pid = int(os.getpid())
-                        # if we use multiprocess workers we also search for the child processes if that workers by  matching the agent cmd line.
-                        if self._global_config.use_multiprocess_copying_workers is True:
-                            child_processes = set(
-                                ps.get_matches_commandline(ps.current_process["cmd"])
-                            )
-                            # remove the agent process itself.
-                            child_processes.remove(t_pid)
-                            pids.extend(child_processes)
+
+                    # skip this until it will be replaced with a real PID.
+                    elif t_pid == "$$TBD":
+                        continue
                     else:
                         t_pid = int(t_pid)
                     pids.append(t_pid)
             self.__pids = pids
         return self.__pids
+
+    def set_pid(self, pid):  # type: (int) -> None
+        """
+        Set the PID of the process that was marked as $$TBD.
+        :param pid: Process PID
+        """
+        for i in range(len(self.__target_pids)):
+            if self.__target_pids[i] == "$$TBD":
+                self.__target_pids[i] = pid
+                break
+
+    @property
+    def process_monitor_id(self):  # type: () -> six.text_type
+        return self.__id
 
 
 __all__ = ["ProcessMonitor"]
