@@ -122,8 +122,12 @@ class LinuxPlatformController(PosixPlatformController):
                     id="agent",
                 )
             )
-            # if multi-process workers are enabled, then create linux metrics monitor for each worker process.
-            if config.use_multiprocess_copying_workers:
+            # if multi-process workers are enabled and workers process monitoring is enabled,
+            # then create linux metrics monitor for each worker process.
+            if (
+                config.use_multiprocess_copying_workers
+                and config.enable_worker_process_metrics_gather
+            ):
                 for api_key_config in config.api_key_configs:
                     for worker_id in get_api_key_worker_ids(api_key_config):
                         result.append(

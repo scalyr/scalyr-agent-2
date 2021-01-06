@@ -587,6 +587,7 @@ class Configuration(object):
             "use_multiprocess_copying_workers",
             "default_workers_per_api_key",
             "default_worker_status_message_interval",
+            "enable_worker_process_metrics_gather",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_api_key_configs",
         ]
@@ -1590,6 +1591,14 @@ class Configuration(object):
     @property
     def default_worker_status_message_interval(self):
         return self.__get_config().get_float("default_worker_status_message_interval")
+
+    @property
+    def enable_worker_process_metrics_gather(self):
+        """
+        If it True and multi-process workers are used, then the instance of the linux process monitor
+        is created for each worker process.
+        """
+        return self.__get_config().get_bool("enable_worker_process_metrics_gather")
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -2922,6 +2931,15 @@ class Configuration(object):
             config,
             "default_worker_status_message_interval",
             600.0,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_worker_process_metrics_gather",
+            False,
             description,
             apply_defaults,
             env_aware=True,
