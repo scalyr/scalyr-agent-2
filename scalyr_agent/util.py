@@ -132,6 +132,7 @@ SORT_KEYS = False
 SUPPORTED_COMPRESSION_ALGORITHMS = [
     "deflate",
     "bz2",
+    "none",
 ]
 
 # lz4 and zstandard library is not available for Python 2.6
@@ -145,6 +146,7 @@ COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
     "bz2": "bz2",
     "lz4": "lz4",
     "zstandard": "zstandard",
+    "none": "none",
 }
 
 # Maps compression type to a default compression level which is used if one is not specified by the
@@ -160,6 +162,7 @@ COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
     "bz2": 9,
     "lz4": 0,  # the fastest, but not the best compression ratio
     "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
+    "none": 0,
 }
 
 # Maps compression type to valid compression levels minimum and maximum compression level (inclusive)
@@ -168,6 +171,7 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
     "bz2": [1, 9],
     "lz4": [0, 16],
     "zstandard": [1, 22],
+    "none": [0, 0],
 }
 
 
@@ -1990,6 +1994,14 @@ class RedirectorClient(StoppableThread):
             pass
 
 
+def noop_compress(data, compression_level=0):
+    return data
+
+
+def noop_decompress(data):
+    return data
+
+
 def verify_and_get_compress_func(compression_type, compression_level=9):
     # type: (str, int) -> Optional[Callable]
     """
@@ -2012,6 +2024,10 @@ def verify_and_get_compress_func(compression_type, compression_level=9):
         compress_func, decompress_func = get_compress_and_decompress_func(
             compression_type, compression_level=compression_level
         )
+
+        # Return early if special "none" compression is used
+        if compression_type == "none":
+            return compress_func
 
         # Perform a sanity check that data compresses and that it can be decompressed
         cdata = compress_func(COMPRESSION_TEST_STR)
@@ -2095,6 +2111,9 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
 
         compress_func = functools.partial(brotli.compress, quality=compression_level)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore
+    elif compression_algorithm == "none":
+        compress_func = noop_compress
+        decompress_func = noop_decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 

@@ -2946,6 +2946,15 @@ class Configuration(object):
             )
             raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
 
+        if compression_type == "none":
+            self.__logger.warn(
+                "No compression will be used for outgoing requests. In most scenarios this will "
+                "result in larger data egress traffic which may incur additional charges on your "
+                "side (depending on your infrastructure provider, location, pricing model, etc.).",
+                limit_once_per_x_secs=86400,
+                limit_key="compression_type_none",
+            )
+
     def __verify_compression_level(self, compression_level):
         """
         Verify that the provided compression level is valid for the configured compression type.

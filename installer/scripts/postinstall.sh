@@ -214,8 +214,9 @@ fi
 # package, instead of removing it.  For an RPM, a remove is indicated by
 # a zero being passed into $1 (instead of 1 or higher).  For Debian, a
 # remove is indicated something other than "configure" being passed into $1.
+
 if [[ "$1" =~ ^[0-9]+$ && $1 -gt 0 ]] || [ "$1" == "configure" ]; then
-  service scalyr-agent-2 condrestart --quiet;
+  /etc/init.d/scalyr-agent-2 condrestart --quiet;
 
   exit $?;
 else
