@@ -329,7 +329,7 @@ class ScalyrClientSession(object):
                     % (compression_type, compression_type)
                 )
 
-        if encoding:
+        if encoding and encoding != "none":
             self.__standard_headers["Content-Encoding"] = encoding
 
         # Configure compression level

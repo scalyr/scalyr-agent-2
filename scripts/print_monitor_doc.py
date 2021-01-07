@@ -161,6 +161,7 @@ def print_options(option_list, column_size):
             "|||%s%s||| "
             % (row[0], space_filler(first_column_length - len(row[0]) - 3))
         )
+        row[1] = row[1].replace("\\n", "\\ n").replace("\\000", "\\ 000")
         write_wrapped_line(
             row[1],
             column_size - first_column_length - 4,
