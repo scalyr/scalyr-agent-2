@@ -1687,6 +1687,19 @@ class DockerLogger(object):
                 % (self.cid, self.name, str(e))
             )
         except Exception as e:
+            # Those errors are not fatal so we simply ignore dont dont log them under warning.
+            # They usually appear on agent restart when using log consumption via API since
+            # long running streaming API connection will be closed.
+            if "readinto of closed file" in str(e) or "operation on closed file" in str(
+                e
+            ):
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Unhandled non-fatal exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
+                    % (self.name, six.text_type(e), traceback.format_exc()),
+                )
+                return
+
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
                 % (self.name, six.text_type(e), traceback.format_exc())

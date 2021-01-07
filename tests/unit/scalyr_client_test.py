@@ -1299,16 +1299,25 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             )
 
             self.assertEqual(path[0], "/addEvents")
-            self.assertEqual(
-                session._ScalyrClientSession__standard_headers["Content-Encoding"],
-                compression_type,
-            )
 
-            # Verify decompressed data matches the raw body
-            self.assertTrue(b"test message 1" not in request["body"])
-            self.assertTrue(b"test message 2" not in request["body"])
-            self.assertFalse(serialized_data == request["body"])
-            self.assertEqual(serialized_data, decompress_func(request["body"]))
+            if compression_type == "none":
+                self.assertTrue(
+                    "Content-Encoding"
+                    not in session._ScalyrClientSession__standard_headers
+                )
+                self.assertTrue(b"test message 1" in request["body"])
+                self.assertTrue(b"test message 2" in request["body"])
+            else:
+                self.assertEqual(
+                    session._ScalyrClientSession__standard_headers["Content-Encoding"],
+                    compression_type,
+                )
+
+                # Verify decompressed data matches the raw body
+                self.assertTrue(b"test message 1" not in request["body"])
+                self.assertTrue(b"test message 2" not in request["body"])
+                self.assertFalse(serialized_data == request["body"])
+                self.assertEqual(serialized_data, decompress_func(request["body"]))
 
         # Compression is disabled
         session = ScalyrClientSession(

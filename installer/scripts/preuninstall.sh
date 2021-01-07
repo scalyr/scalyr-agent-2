@@ -19,7 +19,7 @@
 # RPM and $1 == "remove" for Debian.
 if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
   # Stop the service since we are about to completely remove it.
-  service scalyr-agent-2 stop > /dev/null 2>&1
+  /etc/init.d/scalyr-agent-2 stop > /dev/null 2>&1
 
   # Remove the symlinks from the /etc/rcX.d directories.
   if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
