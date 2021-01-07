@@ -628,3 +628,26 @@ class StatReaderTestCase(ScalyrTestCase):
         self.assertEqual(result[Metric("app.threads", None)], 1)
         self.assertEqual(result[Metric("app.mem.majflt", None)], 0)
         self.assertEqual(result[Metric("app.io.wait", None)], 0)
+
+
+class TestAgentProcessMetrics(ScalyrTestCase):
+    def test_late_process_pid_setting(self):
+        self.config = {
+            "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
+            "id": "myapp",
+            # the process ID is not known yet.
+            "pid": "$$TBD",
+        }
+        self.monitor = ProcessMonitor(
+            self.config, scalyr_logging.getLogger("syslog_monitor[test]")
+        )
+
+        # it can not select any process until the process id is set.
+        self.assertEqual(self.monitor._select_processes(), [])
+        self.assertEqual(self.monitor._select_processes(), [])
+
+        # set the process id.
+        self.monitor.set_pid(os.getpid())
+
+        #  it has to select the current PID after it has been set.
+        self.assertEqual(self.monitor._select_processes(), [os.getpid()])

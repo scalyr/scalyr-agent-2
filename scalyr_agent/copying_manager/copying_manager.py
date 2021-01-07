@@ -27,6 +27,8 @@ from six.moves import range
 import signal
 import errno
 
+WORKER_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
+
 if False:
     from typing import Dict
     from typing import List
@@ -52,6 +54,7 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
+from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
 
 
 import six
@@ -60,6 +63,20 @@ log = scalyr_logging.getLogger(__name__)
 
 SCHEDULED_DELETION = "scheduled-deletion"
 CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
+
+
+def get_api_key_worker_ids(api_key_config):  # type: (Dict) -> List
+    """
+    Generate the list of IDs of all workers for the specified api key.
+    :param api_key_config: config entry for the api key.
+    :return: List of worker IDs.
+    """
+    result = []
+    for i in range(api_key_config["workers"]):
+        # combine the id of the api key and worker's position in the list to get a workers id.
+        worker_id = "%s_%s" % (api_key_config["id"], i)
+        result.append(worker_id)
+    return result
 
 
 class ApiKeyWorkerPool(object):
@@ -87,10 +104,7 @@ class ApiKeyWorkerPool(object):
         # Those managers allow to communicate with workers if they are in the multiprocessing mode.
         self.__shared_object_managers = dict()
 
-        for i in range(api_key_config["workers"]):
-            # combine the id of the api key and worker's position in the list to get a workers id.
-            worker_id = "%s_%s" % (self.__api_key_id, i)
-
+        for worker_id in get_api_key_worker_ids(api_key_config):
             if not self.__config.use_multiprocess_copying_workers:
                 worker = CopyingManagerThreadedWorker(
                     self.__config, api_key_config, worker_id
@@ -792,6 +806,33 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # start all workers.
                 for worker_pool in self.__api_keys_worker_pools.values():
                     worker_pool.start_workers_and_block_until_copying()
+
+                # if the multi-process workers are enabled, then we have to set the worker PID's for the instances of the
+                # 'linux_process_monitor' that may be set to monitor the worker processes.
+                if self.__config.use_multiprocess_copying_workers:
+                    # create a dict that maps process' monitor id to the worker id.
+                    workers_process_monitors = {}
+                    for m in self.__monitors:
+                        if not isinstance(m, ProcessMonitor):
+                            continue
+
+                        # get the process monitor instance for the worker and fetch the worker id.
+                        if m.process_monitor_id.startswith(
+                            WORKER_PROCESS_MONITOR_ID_PREFIX
+                        ):
+                            worker_id = m.process_monitor_id.replace(
+                                WORKER_PROCESS_MONITOR_ID_PREFIX, ""
+                            )
+                            workers_process_monitors[worker_id] = m
+
+                    # set the workers PID to the monitors.
+                    for pool_status in self.generate_status().api_key_worker_pools:
+                        for worker_status in pool_status.workers:
+                            monitor = workers_process_monitors.get(
+                                worker_status.worker_id
+                            )
+                            if monitor:
+                                monitor.set_pid(worker_status.pid)
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
