@@ -55,6 +55,7 @@ from scalyr_agent.util import (
     RedirectorError,
 )
 from scalyr_agent.util import verify_and_get_compress_func
+from scalyr_agent.util import get_compress_and_decompress_func
 from scalyr_agent.json_lib import JsonObject
 
 
@@ -68,6 +69,21 @@ class TestUtilCompression(ScalyrTestCase):
     def setUp(self):
         super(TestUtilCompression, self).setUp()
         self._data = b"The rain in spain. " * 1000
+
+    def test_compression_none(self):
+        data = self._data
+        compress = verify_and_get_compress_func("none")
+        self.assertIsNotNone(compress)
+
+        self.assertEqual(data, compress(data))
+
+        compress_func, decompress_func = get_compress_and_decompress_func("none")
+        self.assertIsNotNone(compress_func)
+        self.assertIsNotNone(decompress_func)
+
+        self.assertEqual(data, compress_func(data))
+        self.assertEqual(data, decompress_func(data))
+        self.assertEqual(data, decompress_func(compress_func(data)))
 
     def test_zlib(self):
         """Successful zlib compression"""
