@@ -1033,25 +1033,34 @@ class LogFileIterator(object):
             self.__file_system.close(file_entry.file_handle)
             file_entry.file_handle = None
 
-    def __add_entry_for_log_path(self, inode):
+    def __add_entry_for_log_path(self, inode, copied_log_path=None, index=None):
         self.__log_deletion_time = None
+        log_path = copied_log_path if copied_log_path is not None else self.__path
         if len(self.__pending_files) > 0:
-            largest_position = self.__pending_files[-1].position_end
+            # copied_log_file for copy truncate log rotation should use current log file position_start
+            largest_position = (
+                self.__pending_files[-1].position_end
+                if copied_log_path is None
+                else self.__pending_files[-1].position_start
+            )
         else:
             largest_position = 0
         (file_handle, file_size, inode) = self.__open_file_by_path(
-            self.__path, starting_inode=inode
+            log_path, starting_inode=inode
         )
 
         if file_handle is not None:
-            self.__pending_files.append(
-                LogFileIterator.FileState(
-                    LogFileIterator.FileState.create_json(
-                        largest_position, 0, file_size, inode, True
-                    ),
-                    file_handle,
-                )
+            file_state = LogFileIterator.FileState(
+                LogFileIterator.FileState.create_json(
+                    largest_position, 0, file_size, inode, True
+                ),
+                file_handle,
             )
+
+            if index is None:
+                self.__pending_files.append(file_state)
+            else:
+                self.__pending_files.insert(index, file_state)
 
     def __refresh_pending_files(self, current_time):
         """Check to see if __pending_files needs to be adjusted due to log rotation or the
@@ -1090,7 +1099,7 @@ class LogFileIterator(object):
                     # Ok, the log file has rotated.  We need to add in a new entry to represent this.
                     # But, we also take this opportunity to see if the current entry we had for the log file has
                     # grown in length since the last time we checked it, which is possible.  This is the last time
-                    # we have to check it since theorectically, the file would have been fully rotated before a new
+                    # we have to check it since theoretically, the file would have been fully rotated before a new
                     # log file was created to take its place.
                     if current_log_file.file_handle is not None:
                         current_log_file.last_known_size = max(
@@ -1104,21 +1113,46 @@ class LogFileIterator(object):
                         # we do not trust inodes, then there is no way to get back to the original contents, so we
                         # just mark this file portion as now invalid.
                         current_log_file.valid = False
+
                     current_log_file.is_log_file = False
                     current_log_file.position_end = (
                         current_log_file.position_start
                         + current_log_file.last_known_size
                     )
-                    # Note, we do not yet detect if current_log_file is actually pointing to the same inode as the
-                    # log_path.  This could be true if the log file was copied to another location and then truncated
-                    # in place (a commom mode of operation used by logrotate).  If this is the case, then the
-                    # file_handle in current_log_file will eventually fail since it will seek to a location no longer
-                    # in the file.  We handle that fairly cleanly in __fill_buffer so no need to do it here.  However,
-                    # if we want to look for the file where the previous log file was copied, this is where we would
-                    # do it.  That is a future feature.
+                    if (
+                        self.__file_system.trust_inodes
+                        and latest_inode == current_log_file.inode
+                    ):
+                        # copy-truncate log rotation
+                        copied_file = self.__find_copy_truncate_file()
+                        if copied_file is not None:
+                            # Add copied log file before truncated log file
+                            self.__add_entry_for_log_path(
+                                None, copied_log_path=copied_file, index=-1
+                            )
+                            # Modify truncated log file to start at end of copied log file
+                            copied_log_file = self.__pending_files[-2]
+                            truncated_log_file = self.__pending_files[-1]
+                            truncated_log_file.position_start = (
+                                copied_log_file.position_end
+                            )
+                            truncated_log_file.position_end = (
+                                truncated_log_file.position_start + latest_size
+                            )
+                            truncated_log_file.last_known_size = latest_size
+                            truncated_log_file.is_log_file = True
+                            copied_log_file.is_log_file = False
+                        else:
+                            log.warning(
+                                "Could not find copied log file for copy-truncate log rotation file."
+                                "File=%s",
+                                self.__path,
+                            )
 
-                    # Add in an entry for the file content at log_path.
-                    self.__add_entry_for_log_path(latest_inode)
+                    else:
+                        # Move log file rotation - Add entry for the new log file at log_path.
+                        self.__add_entry_for_log_path(latest_inode)
+
                 else:
                     # It has not been rotated.  So we just update the size of the current entry.
                     current_log_file.last_known_size = latest_size
@@ -1159,6 +1193,48 @@ class LogFileIterator(object):
 
         if has_no_position and len(self.__pending_files) > 0:
             self.__position = self.__pending_files[-1].position_end
+
+    def __find_copy_truncate_file(self):
+        """
+        Determine filename that log file is copied to with logrotate copy truncate.
+        Use a heuristic based on naming convention of logrotate copy trucated files are typically follow the naming conventions:
+        syslog, syslog.1, syslog.2.gz
+        auth.log, auth.log.1, auth.log.2.gz
+        production.log, production-<date>.log
+
+        Possible copy truncate files are determined by considering all files starting with the log file prefix created
+        within the last 5 minutes that are not compressed.
+        If more than one file meets this criteria, the most recently created file is returned.
+
+        @return Most recent file that matches copy truncate filename heuristic
+        """
+        dir_path = os.path.dirname(self.__path)
+        file_prefix = os.path.basename(self.__path)
+        file_prefix = file_prefix[:-4] if file_prefix.endswith(".log") else file_prefix
+
+        # Files starting with the file prefix with create time within the last 5 minutes
+        # gzip files are excluded
+        # Use file with most recent creation date when there are multiple files
+        possible_copy_filepaths = filter(
+            lambda f: os.path.basename(f).startswith(file_prefix)
+            and not f.endswith(".gz")
+            and f != self.__path
+            and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
+            self.__file_system.list_files(dir_path),
+        )
+
+        most_recent_file = (
+            None if len(possible_copy_filepaths) == 0 else possible_copy_filepaths[0]
+        )
+        if len(possible_copy_filepaths) > 1:
+            most_recent_time = self.__file_system.stat(most_recent_file).st_ctime
+            for path in possible_copy_filepaths[1:]:
+                file_ctime = self.__file_system.stat(path).st_ctime
+                if file_ctime > most_recent_time:
+                    most_recent_time = file_ctime
+                    most_recent_file = path
+
+        return most_recent_file
 
     def __fill_buffer(self, current_time):
         """Fill the memory buffer with up to a page worth of file content read from the pending files.
@@ -1679,7 +1755,7 @@ class LogFileIterator(object):
             """Creates a new mark generation.  There are two forms of this initializer.  The first ever created
             MarkGeneration object for an instance of the LogFileIterator will not have any of the arguments
             supplied to indicate it is the root.  Otherwise, it will have the information supplied from the
-            pervious generation.
+            previous generation.
 
             @param previous_generation:  The previous mark generation, if there was any.  This must be used if
                 there was a previous generation because this will update that generation's offset so that their
