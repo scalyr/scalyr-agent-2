@@ -2101,7 +2101,11 @@ class TestLogFileProcessor(ScalyrTestCase):
             log_attributes={},
             checkpoint=checkpoint,
         )
-        self.write_file(self.__path, b"")
+        if checkpoint is None:
+            # Do not create/overwrite log file if checkpoint file is present
+            # checkpoint file contains offsets to existing file
+            self.write_file(self.__path, b"")
+
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time
         )
