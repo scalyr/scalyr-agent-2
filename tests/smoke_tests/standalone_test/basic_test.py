@@ -107,7 +107,7 @@ def _check_workers_gracefull_stop(runner, worker_pids, occurrences=1):
             worker_log_path.exists()
         ), "The log file of the worker '{0}' must exist.".format(worker_id)
         log_content = worker_log_path.read_text()
-        found = re.findall(r"Worker '{0}+' is finished".format(worker_id), log_content)
+        found = re.findall(r"Worker session '{0}+' is finished".format(worker_id), log_content)
 
         assert (
             len(found) == occurrences
@@ -122,7 +122,7 @@ def _check_workers_gracefull_stop(runner, worker_pids, occurrences=1):
 @pytest.mark.timeout(300)
 def test_standalone_agent_kill():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_session_count=2,
     )
 
     runner.start()
@@ -170,7 +170,7 @@ def test_standalone_agent_kill():
 @pytest.mark.timeout(300)
 def test_standalone_agent_stop():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_session_count=2,
     )
 
     runner.start()
@@ -190,7 +190,7 @@ def test_standalone_agent_stop():
 @pytest.mark.timeout(300)
 def test_standalone_agent_restart():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_session_count=2,
     )
 
     runner.start()
@@ -235,7 +235,7 @@ def test_standalone_agent_restart():
 @pytest.mark.timeout(300)
 def test_standalone_agent_config_reload():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_session_count=2,
     )
 
     runner.start()
@@ -283,9 +283,6 @@ def test_standalone_agent_config_reload():
     logging.info("checking in loop until the  workers number is increased")
     while True:
         try:
-            worker_pids = {}
-            children = []
-            workers_processes = []
             process, worker_pids, children, workers_processes = _perform_workers_check(
                 runner
             )
