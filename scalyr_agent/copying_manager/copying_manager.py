@@ -27,7 +27,7 @@ from six.moves import range
 import signal
 import errno
 
-WORKER_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
+WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
 if False:
     from typing import Dict
@@ -42,12 +42,12 @@ from scalyr_agent import (
 )
 from scalyr_agent.agent_status import (
     CopyingManagerStatus,
-    ApiKeyWorkerPoolStatus,
+    CopyingManagerWorkerStatus,
 )
 from scalyr_agent.copying_manager.worker import (
-    CopyingManagerThreadedWorker,
+    CopyingManagerWorkerSession,
     create_shared_object_manager,
-    CopyingManagerWorkerProxy,
+    CopyingManagerWorkerSessionProxy,
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
@@ -65,123 +65,127 @@ SCHEDULED_DELETION = "scheduled-deletion"
 CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
 
 
-def get_api_key_worker_ids(api_key_config):  # type: (Dict) -> List
+def get_worker_session_ids(worker_config):  # type: (Dict) -> List
     """
-    Generate the list of IDs of all workers for the specified api key.
-    :param api_key_config: config entry for the api key.
-    :return: List of worker IDs.
+    Generate the list of IDs of all sessions for the specified worker.
+    :param worker_config: config entry for the worker.
+    :return: List of worker session IDs.
     """
     result = []
-    for i in range(api_key_config["workers"]):
-        # combine the id of the api key and worker's position in the list to get a workers id.
-        worker_id = "%s_%s" % (api_key_config["id"], i)
-        result.append(worker_id)
+    for i in range(worker_config["sessions"]):
+        # combine the id of the worker and session's position in the list to get a session id.
+        worker_session_id = "%s_%s" % (worker_config["id"], i)
+        result.append(worker_session_id)
     return result
 
 
-class ApiKeyWorkerPool(object):
+class CopyingManagerWorker(object):
     """
-    This abstraction is responsible for maintaining the workers
-    for a particular entry in the 'api_keys' list in the configuration.
-    It also creates worker instances according to the number in the "workers" field in each entry.
+    This abstraction is responsible for maintaining the worker sessions
+    for a particular entry in the 'workers' list in the configuration.
+    It also creates worker session instances according to the number in the "sessions" field in each entry.
     Depending on workers type (multiprocess or not), it will operate with
-    instances of the CopyingManagerWorker or their proxy objects.
+    instances of the CopyingManagerWorkerSession or their proxy objects.
 
     The instances if this class itself live only in the original process,
     controlled by the copying manager and do not have any proxy versions.
     """
 
-    def __init__(self, config, api_key_config):
+    def __init__(self, config, worker_config):
         # type: (Configuration, Dict) -> None
 
-        self.__api_key_config = api_key_config
-        self.__api_key_id = api_key_config["id"]
+        self.__worker_config = worker_config
+        self.__worker_id = worker_config["id"]
         self.__config = config
 
-        self.__workers = []  # type: List[CopyingManagerThreadedWorker]
+        self.__sessions = []  # type: List[CopyingManagerWorkerSession]
 
         # collection of shared object managers. (Subclasses of the multiprocessing.BaseManager)
-        # Those managers allow to communicate with workers if they are in the multiprocessing mode.
+        # Those managers allow to communicate with worker sessions if the multiprocessing mode is enabled.
         self.__shared_object_managers = dict()
 
-        for worker_id in get_api_key_worker_ids(api_key_config):
-            if not self.__config.use_multiprocess_copying_workers:
-                worker = CopyingManagerThreadedWorker(
-                    self.__config, api_key_config, worker_id
+        for session_id in get_worker_session_ids(worker_config):
+            if not self.__config.use_multiprocess_workers:
+                session = CopyingManagerWorkerSession(
+                    self.__config, worker_config, session_id
                 )
             else:
 
                 # Create an instance of the shared object manager.
                 shared_object_manager = create_shared_object_manager(
-                    CopyingManagerThreadedWorker, CopyingManagerWorkerProxy
+                    CopyingManagerWorkerSession, CopyingManagerWorkerSessionProxy
                 )
 
                 # Important for the understanding. When the shared_object_manager is started, it creates a new process.
-                # We use this process as a process for the worker.
+                # We use this process as a process for the worker session.
 
-                # change agent log path for the new worker.
+                # change agent log path for the new worker session.
                 worker_agent_log_path = os.path.join(
-                    self.__config.agent_log_path, "agent-%s.log" % worker_id
+                    self.__config.agent_log_path, "agent-%s.log" % session_id
                 )
 
-                # this initializer function will be invoked in the worker's process.
+                # this initializer function will be invoked in the worker session's process.
                 def initializer():
                     """
                     This function is called in the shared object manager's start.
                     """
                     # change log file path for the agent logger.
-                    self._change_worker_process_agent_log_path(worker_agent_log_path)
+                    self._change_worker_session_process_agent_log_path(
+                        worker_agent_log_path
+                    )
 
                 # start the shared object manager's process.
                 shared_object_manager.start_shared_object_manager(
                     initializer=initializer, parent_pid=os.getpid()
                 )
 
-                # create proxy object of the worker. The real worker instance is created in the new process
+                # create proxy object of the worker session. The real worker session instance is created in the new process
                 # which was created when shared_object_manager started.
                 # pylint: disable=E1101
-                worker = shared_object_manager.create_worker(
-                    self.__config, api_key_config, worker_id
+                session = shared_object_manager.create_worker_session(
+                    self.__config, worker_config, session_id
                 )
                 # pylint: enable=E1101
 
                 # also save new shared object manager.
-                self.__shared_object_managers[worker.get_id()] = shared_object_manager
+                self.__shared_object_managers[session.get_id()] = shared_object_manager
 
-            self.__workers.append(worker)
+            self.__sessions.append(session)
             log.log(
                 scalyr_logging.DEBUG_LEVEL_1,
-                "CopyingManagerWorker #%s is created." % worker.get_id(),
+                "CopyingManagerWorkerSession #%s is created." % session.get_id(),
             )
 
-        # The index of the next worker which will be used to handle the log processor.
-        self.__current_worker = 0
+        # The index of the next worker session which will be used to handle the log processor.
+        self.__current_session = 0
 
-    def _change_worker_process_agent_log_path(self, path):
+    def _change_worker_session_process_agent_log_path(self, path):
         """
         Reconfigure the agent logger, mainly, to change to path of the agent.log file
-        for the worker when it is running in the separate thread.
+        for the worker session when it is running in the separate process.
         Multiple concurrent processes that write to the same 'agent.log' file may cause an incorrect results, so,
-        to be on a safe side, we just create separate agent-<worker_id>.log files for each worker.
+        to be on a safe side, we just create separate agent-<session_id>.log files for each worker session.
         """
         scalyr_logging.set_log_destination(agent_log_file_path=path, use_disk=True)
 
     def __repr__(self):
-        api_key_config = copy.deepcopy(self.__api_key_config)
-        api_key = api_key_config.get("api_key", "")
-        api_key_config["api_key"] = "..." + api_key[-4:]
-        return "<ApiKeyWorkerPool api_key_config=%s>" % (api_key_config)
+        worker_config = copy.deepcopy(self.__worker_config)
+        api_key = worker_config.get("api_key", "")
+        worker_config["api_key"] = "..." + api_key[-4:]
+        return "<CopyingManagerWorkerSessionInterface worker_config=%s>" % (
+            worker_config
+        )
 
     def __str__(self):
         return str(self.__repr__())
 
     @property
-    def api_key_id(self):
-        return self.__api_key_id
+    def worker_id(self):
+        return self.__worker_id
 
     @property
-    def workers(self):
-        return self.__workers
+    def sessions(self):
+        return self.__sessions
 
     def get_child_process_ids(self):
         # type: () -> List[str]
@@ -198,55 +202,56 @@ class ApiKeyWorkerPool(object):
 
         for shared_object_manager in self.__shared_object_managers.values():
             try:
-                # add process identifier..
-                # since the non-public attribute is used, catch all potential errors.
-                result.append(shared_object_manager._process.ident)
+                # add process identifier.
+                result.append(shared_object_manager.pid)
             except Exception:
                 pass
 
         return result
 
-    def __find_next_worker(self):
-        # type: () -> CopyingManagerThreadedWorker
-        """Get the next worker in the pool. For now it is just a round robin."""
-        current_worker = self.__workers[self.__current_worker]
-        if self.__current_worker == len(self.__workers) - 1:
-            self.__current_worker = 0
+    def __find_next_session(self):
+        # type: () -> CopyingManagerWorkerSession
+        """Gets the next session in the worker. For now it just uses a round robin algorithm"""
+        current_session = self.__sessions[self.__current_session]
+        if self.__current_session == len(self.__sessions) - 1:
+            self.__current_session = 0
         else:
-            self.__current_worker += 1
+            self.__current_session += 1
 
-        return current_worker
+        return current_session
 
     def create_and_add_new_log_processor(self, *args, **kwargs):
         # type: (Tuple, Dict) -> LogFileProcessor
         """
-        Find the next worker in the pool and make it to create and schedule a log processor.
+        Find the next session in the worker and make it to create and schedule a log processor.
         The the arguments will be eventually passed to the LogFileProcessor's constructor.
         :return: New log processor
         """
-        worker = self.__find_next_worker()
-        log_processor = worker.create_and_schedule_new_log_processor(*args, **kwargs)
+        session = self.__find_next_session()
+        log_processor = session.create_and_schedule_new_log_processor(*args, **kwargs)
 
         return log_processor
 
-    def start_workers_and_block_until_copying(self):
+    def start_sessions_and_block_until_copying(self):
         # type: () -> None
         """
-        Start all workers in the pool and wait until they started copying.
+        Start all sessions in the worker and wait until they started copying.
         """
-        for worker in self.__workers:
-            worker.start_worker()
+        for sessions in self.__sessions:
+            sessions.start_worker_session()
 
-        for worker in self.__workers:
-            worker.wait_for_copying_to_begin()
+        for sessions in self.__sessions:
+            sessions.wait_for_copying_to_begin()
 
-    def stop_workers(self, wait_on_join=True, join_timeout=5):
+    def stop_sessions(self, wait_on_join=True, join_timeout=5):
         # type: (bool, int) -> None
-        for worker in self.__workers:
+        for session in self.__sessions:
             try:
-                worker.stop_worker(wait_on_join=wait_on_join, join_timeout=join_timeout)
+                session.stop_worker_session(
+                    wait_on_join=wait_on_join, join_timeout=join_timeout
+                )
             except:
-                log.exception("Can not stop the worker '%s'." % worker.get_id())
+                log.exception("Can not stop the worker '%s'." % session.get_id())
 
         self._stop_shared_object_managers()
 
@@ -254,63 +259,62 @@ class ApiKeyWorkerPool(object):
         """
         Stop all shared object managers.
         This is moved to the separate function to be able to override it for the testing purposes
-        because we may need to get data from workers even if copying manager and worker pools are stopped.
-        :return:
+        because we may need to get data from worker sessions even if copying manager and workers are stopped.
         """
         # also stop all shared object managers.
-        for worker_id, memory_manager in self.__shared_object_managers.items():
+        for worker_session_id, memory_manager in self.__shared_object_managers.items():
             try:
                 memory_manager.shutdown_manager()
             except:
                 log.exception(
-                    "Can not shutdown the shared object manager for the worker '%s'."
-                    % worker_id
+                    "Can not shutdown the shared object manager for the worker session '%s'."
+                    % worker_session_id
                 )
 
         # waiting for shared object manager is shut down.
         # NOTE: we split the shutting down and waiting to make things more asynchronous and to save time.
-        for worker_id, memory_manager in self.__shared_object_managers.items():
+        for worker_session_id, memory_manager in self.__shared_object_managers.items():
             try:
                 memory_manager.wait_for_shutdown(timeout=5)
             except:
                 log.exception(
-                    "The error has occurred while waiting for shutdown of the shared object manager of the worker {0}.".format(
-                        worker_id
+                    "The error has occurred while waiting for shutdown of the shared object manager of the worker session {0}.".format(
+                        worker_session_id
                     )
-                    % worker_id
+                    % worker_session_id
                 )
 
         # kill any process of the shared object managers which may survive the previous steps.
-        for worker_id, memory_manager in self.__shared_object_managers.items():
+        for worker_session_id, memory_manager in self.__shared_object_managers.items():
             try:
                 os.kill(memory_manager.pid, signal.SIGKILL)
                 log.warning(
-                    "The process of the shared object manager for the worker '{0}' has still been running and has been killed.".format(
-                        worker_id
+                    "The process of the shared object manager for the worker session '{0}' has still been running and has been killed.".format(
+                        worker_session_id
                     )
                 )
             except OSError as e:
                 if e.errno != errno.ESRCH:  # no such process
                     # we can not do anything more if even kill is failed, just report about it.
                     log.exception(
-                        "The kill operation of the shared object manager process of the worker {0} has failed.".format(
-                            worker_id
+                        "The kill operation of the shared object manager process of the worker session {0} has failed.".format(
+                            worker_session_id
                         )
                     )
 
     def generate_status(self, warn_on_rate_limit=False):
-        # type: (bool) -> ApiKeyWorkerPoolStatus
-        """Generate status of the worker pool."""
-        result = ApiKeyWorkerPoolStatus()
+        # type: (bool) -> CopyingManagerWorkerStatus
+        """Generate status of the worker."""
+        result = CopyingManagerWorkerStatus()
 
-        result.api_key_id = self.__api_key_id
+        result.worker_id = self.__worker_id
 
-        worker_statuses = [
+        session_statuses = [
             ws.generate_status(warn_on_rate_limit=warn_on_rate_limit)
-            for ws in sorted(self.__workers, key=lambda w: w.get_id())
+            for ws in sorted(self.__sessions, key=lambda w: w.get_id())
         ]
 
-        result.workers = worker_statuses
+        result.sessions = session_statuses
 
         return result
 
@@ -422,13 +426,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Statistics for copying_manager_status messages
         self.__total_scan_iterations = 0
 
-        # A worker pools for each api key in the 'api_keys' list in the configuration.
-        self.__api_keys_worker_pools = (
-            dict()
-        )  # type: Dict[six.text_type, ApiKeyWorkerPool]
+        # The worker instance for each entry in the 'workers' list in the configuration.
+        self.__workers = dict()  # type: Dict[six.text_type, CopyingManagerWorker]
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        # NOTE: log matchers must be created only after worker pools.
+        # NOTE: log matchers must be created only after workers.
         self._log_matchers = self._create_log_matchers(
             self.__config, self.__monitors
         )  # type: List[LogMatcher]
@@ -451,12 +453,12 @@ class CopyingManager(StoppableThread, LogWatcher):
         return self._log_matchers
 
     @property
-    def api_keys_worker_pools(self):
+    def workers(self):
         # type: () -> Dict
         """
-        Get dict with api key worker pools. Only exposed for testing purposes.
+        Get dict with workers. Only exposed for testing purposes.
         """
-        return self.__api_keys_worker_pools
+        return self.__workers
 
     @property
     def config(self):
@@ -798,41 +800,41 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.info("Starting copying manager workers.")
 
                 # create copying workers according to settings in the configuration.
-                self._create_worker_pools()
-
-                # gather and merge all checkpoints from all active workers( or workers from previous launch)
-                # into single checkpoints object.
+                self._create_workers()
 
                 # start all workers.
-                for worker_pool in self.__api_keys_worker_pools.values():
-                    worker_pool.start_workers_and_block_until_copying()
+                for worker in self.__workers.values():
+                    worker.start_sessions_and_block_until_copying()
 
-                # if the multi-process workers are enabled, then we have to set the worker PID's for the instances of the
-                # 'linux_process_monitor' that may be set to monitor the worker processes.
-                if self.__config.use_multiprocess_copying_workers:
-                    # create a dict that maps process' monitor id to the worker id.
-                    workers_process_monitors = {}
+                # if configured, we have to set the worker session PID's for the instances of the
+                # 'linux_process_monitor' that may be set to monitor the worker session processes.
+                if (
+                    self.__config.enable_worker_session_process_metrics_gather
+                    and self.__config.use_multiprocess_workers
+                ):
+                    # create a dict that maps process' monitor id to the worker session id.
+                    worker_session_process_monitors = {}
                     for m in self.__monitors:
                         if not isinstance(m, ProcessMonitor):
                             continue
 
-                        # get the process monitor instance for the worker and fetch the worker id.
+                        # get the process monitor instance for the worker session and fetch the session id.
                         if m.process_monitor_id.startswith(
-                            WORKER_PROCESS_MONITOR_ID_PREFIX
+                            WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX
                         ):
-                            worker_id = m.process_monitor_id.replace(
-                                WORKER_PROCESS_MONITOR_ID_PREFIX, ""
+                            worker_session_id = m.process_monitor_id.replace(
+                                WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX, ""
                             )
-                            workers_process_monitors[worker_id] = m
+                            worker_session_process_monitors[worker_session_id] = m
 
-                    # set the workers PID to the monitors.
-                    for pool_status in self.generate_status().api_key_worker_pools:
-                        for worker_status in pool_status.workers:
-                            monitor = workers_process_monitors.get(
-                                worker_status.worker_id
+                    # set the worker sessions PID to the monitors.
+                    for worker_status in self.generate_status().workers:
+                        for worker_session_status in worker_status.sessions:
+                            monitor = worker_session_process_monitors.get(
+                                worker_session_status.session_id
                             )
                             if monitor:
-                                monitor.set_pid(worker_status.pid)
+                                monitor.set_pid(worker_session_status.pid)
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
@@ -845,26 +847,26 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
-                workers_count = 0
-                worker_child_process_ids = []
-                for worker_pool in self.__api_keys_worker_pools.values():
-                    workers_count += len(worker_pool.workers)
-                    worker_child_process_ids += worker_pool.get_child_process_ids()
+                worker_sessions_count = 0
+                worker_session_process_ids = []
+                for worker in self.__workers.values():
+                    worker_sessions_count += len(worker.sessions)
+                    worker_session_process_ids += worker.get_child_process_ids()
 
                 # For multi processing mode we also include pids of all the spawned processes
-                if self.__config.use_multiprocess_copying_workers:
+                if self.__config.use_multiprocess_workers:
                     msg = (
-                        "Copying manager started. Total workers: %s, Main Worker Pid: %s, Worker Processes Pids: %s"
+                        "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s"
                         % (
-                            workers_count,
+                            worker_sessions_count,
                             os.getpid(),
-                            ", ".join([str(pid) for pid in worker_child_process_ids]),
+                            ", ".join([str(pid) for pid in worker_session_process_ids]),
                         )
                     )
                 else:
                     msg = (
-                        "Copying manager started. Total workers: %s, Main Worker Pid: %s"
-                        % (workers_count, os.getpid())
+                        "Copying manager started. Total worker sessions: %s, Agent Pid: %s"
+                        % (worker_sessions_count, os.getpid())
                     )
 
                 log.info(msg)
@@ -942,8 +944,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 sys.exit(1)
         finally:
             # stopping all workers.
-            for worker_pool in self.__api_keys_worker_pools.values():
-                worker_pool.stop_workers()
+            for worker in self.__workers.values():
+                worker.stop_sessions()
 
             checkpoints = self.__find_and_read_checkpoints()
             if checkpoints:
@@ -1006,11 +1008,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                         % self.__config.healthy_max_time_since_last_copy_attempt
                     )
 
-            # collect api key statuses.
-            for api_key_id in sorted(self.__api_keys_worker_pools):
-                pool = self.__api_keys_worker_pools[api_key_id]
-                pool_status = pool.generate_status(warn_on_rate_limit)
-                result.api_key_worker_pools.append(pool_status)
+            # collect worker statuses.
+            for worker_id in sorted(self.__workers):
+                worker = self.__workers[worker_id]
+                worker_status = worker.generate_status(warn_on_rate_limit)
+                result.workers.append(worker_status)
 
             # when workers are defined, calculate overall stats.
             result.calculate_status()
@@ -1206,17 +1208,15 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
-            # get the worker pool which is responsible for this log matcher.
-            worker_pool = self.__api_keys_worker_pools[
-                matcher.log_entry_config.get("api_key_id")
-            ]
+            # get the worker which is responsible for this log matcher.
+            worker = self.__workers[matcher.log_entry_config.get("worker_id")]
             for new_processor in matcher.find_matches(
                 self.__log_paths_being_processed,
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
-                # this method of the worker pool will be called on every new match,
-                # to create and add new log processors to workers.
-                create_log_processor=worker_pool.create_and_add_new_log_processor,
+                # this method of the worker will be called on every new match,
+                # to create and add new log processors to the sessions of this worker.
+                create_log_processor=worker.create_and_add_new_log_processor,
             ):
 
                 log_path = new_processor.get_log_path()
@@ -1325,7 +1325,7 @@ class CopyingManager(StoppableThread, LogWatcher):
     def __consolidate_checkpoints(self, checkpoints):
         # type: (Dict) -> None
         """
-        Write the checkpoint state from all workers to a single consolidated file.
+        Write the checkpoint state from all worker sessions to a single consolidated file.
         :param checkpoints: Dict with checkpoints.
         """
 
@@ -1336,7 +1336,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             checkpoints, consolidated_checkpoints_path, time.time()
         )
 
-        # clear data folder by removing all worker checkpoint files.
+        # clear data folder by removing all worker session checkpoint files.
         checkpoints_glob = os.path.join(
             self.__config.agent_data_path, "*checkpoints*.json"
         )
@@ -1353,7 +1353,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # WARNING: Because this function is called on each iteration,
           put the logging statements very carefully there, to prevent spamming.
         Find and read checkpoints that were previously written.
-        During its work, the worker writes its own checkpoint files,
+        During their work, the worker sessions write their own checkpoint files,
         the copying manager reads them and combines into one checkpoints dict.
         : param warn_on_stale: If False do not log warning in case of stale checkpoint files.
         :return: Checkpoint state stored in dict.
@@ -1390,9 +1390,9 @@ class CopyingManager(StoppableThread, LogWatcher):
             found_checkpoints.append(checkpoints)
 
         result = {}  # type: ignore
-        # merge checkpoints from  all workers to one checkpoint.
+        # merge checkpoints from  all worker sessions to one checkpoint.
 
-        # checkpoints from different workers may contain checkpoint for the same file,
+        # checkpoints from different worker sessions may contain checkpoint for the same file,
         # so we sort checkpoints by time and update resulting collection with the same order.
         found_checkpoints.sort(key=operator.itemgetter("time"))
 
@@ -1455,36 +1455,35 @@ class CopyingManager(StoppableThread, LogWatcher):
             )
             return None
 
-    def _create_worker_pools(self):
+    def _create_workers(self):
         """
-        Create a new worker pools for each entry in the 'api_keys' list in the configuration.
-        :return:
+        Create a new workers for each entry in the 'workers' list in the configuration.
         """
-        for api_key_config in self.__config.api_key_configs:
-            pool = ApiKeyWorkerPool(self.__config, api_key_config)
-            self.__api_keys_worker_pools[api_key_config["id"]] = pool
+        for worker_config in self.__config.worker_configs:
+            worker = CopyingManagerWorker(self.__config, worker_config)
+            self.__workers[worker_config["id"]] = worker
 
     def augment_user_agent_for_workers_sessions(self, fragments):
         # type: (List[six.text_type]) -> None
         """
-        Modifies User-Agent header of the sessions to all worker.
+        Modifies User-Agent header of the sessions to all worker sessions.
 
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of six.text_type
         """
-        for worker_pool in self.__api_keys_worker_pools.values():
-            for worker in worker_pool.workers:
-                worker.augment_user_agent_for_client_session(fragments)
+        for worker in self.__workers.values():
+            for worker in worker.sessions:
+                worker.augment_scalyr_client_user_agent(fragments)
 
-    def get_worker_session_statuses(self):
+    def get_worker_session_scalyr_client_statuses(self):
         # type: () -> List[ScalyrClientSessionStatus]
         """
-        Get session statuses from all workers.
-        :return: dict with worker_id -> ScalyrClientSessionStatus.
+        Get Scalyr client session statuses from all worker session.
+        :return: dict with worker_session_id -> ScalyrClientSessionStatus.
         """
         session_stats = []
-        for worker_pool in self.__api_keys_worker_pools.values():
-            for worker in worker_pool.workers:
-                session_stats.append(worker.generate_scalyr_client_status())
+        for worker in self.__workers.values():
+            for worker_session in worker.sessions:
+                session_stats.append(worker_session.generate_scalyr_client_status())
 
         return session_stats

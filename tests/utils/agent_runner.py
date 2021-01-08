@@ -411,9 +411,9 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": config_log_files,
-            "default_workers_per_api_key": self._workers_count,
+            "default_sessions_per_worker": self._workers_count,
             "monitors": [],
-            "use_multiprocess_copying_workers": self._workers_type == "process",
+            "use_multiprocess_workers": self._workers_type == "process",
             # NOTE: We disable this functionality so tests finish faster and we can use lower
             # timeout
             "global_monitor_sample_interval_enable_jitter": False,

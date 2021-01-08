@@ -31,8 +31,8 @@ from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager.copying_manager import (
-    get_api_key_worker_ids,
-    WORKER_PROCESS_MONITOR_ID_PREFIX,
+    get_worker_session_ids,
+    WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX,
 )
 
 from scalyr_agent.__scalyr__ import (
@@ -122,14 +122,14 @@ class LinuxPlatformController(PosixPlatformController):
                     id="agent",
                 )
             )
-            # if multi-process workers are enabled and workers process monitoring is enabled,
+            # if multi-process workers are enabled and worker session processes monitoring is enabled,
             # then create linux metrics monitor for each worker process.
             if (
-                config.use_multiprocess_copying_workers
-                and config.enable_worker_process_metrics_gather
+                config.use_multiprocess_workers
+                and config.enable_worker_session_process_metrics_gather
             ):
-                for api_key_config in config.api_key_configs:
-                    for worker_id in get_api_key_worker_ids(api_key_config):
+                for worker_config in config.worker_configs:
+                    for worker_session_id in get_worker_session_ids(worker_config):
                         result.append(
                             JsonObject(
                                 module="scalyr_agent.builtin_monitors.linux_process_metrics",
@@ -137,7 +137,8 @@ class LinuxPlatformController(PosixPlatformController):
                                 # so we can not put the real PID but just mark that it will be set later.
                                 pid="$$TBD",
                                 id="{0}{1}".format(
-                                    WORKER_PROCESS_MONITOR_ID_PREFIX, worker_id
+                                    WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX,
+                                    worker_session_id,
                                 ),
                             )
                         )

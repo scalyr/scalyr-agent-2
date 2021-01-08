@@ -37,20 +37,20 @@ from tests.utils.agent_runner import AgentRunner
 
 def _perform_workers_check(runner):
     # type: (AgentRunner) -> Tuple[psutil.Process, Dict, List[psutil.Process], List[psutil.Process]]
-    worker_pids = {}
+    worker_session_pids = {}
     agent_children_processes = []  # type: ignore
     workers_processes = []
     status = json.loads(runner.status_json())  # type: ignore
 
-    for api_key in status["copying_manager_status"]["api_key_worker_pools"]:
-        for worker in api_key["workers"]:
-            worker_pids[worker["worker_id"]] = worker["pid"]
+    for worker in status["copying_manager_status"]["workers"]:
+        for worker_session in worker["sessions"]:
+            worker_session_pids[worker_session["session_id"]] = worker_session["pid"]
 
     process = psutil.Process(runner.agent_pid)
     assert process.is_running(), "process is not running"
     agent_children_processes.extend(process.children())
 
-    for wpid in worker_pids.values():
+    for wpid in worker_session_pids.values():
         for c in agent_children_processes:
             if wpid == c.pid:
                 workers_processes.append(c)
@@ -65,7 +65,7 @@ def _perform_workers_check(runner):
     for wp in workers_processes:
         assert wp.is_running(), "the agent worker process should being running"
 
-    return process, worker_pids, agent_children_processes, workers_processes
+    return process, worker_session_pids, agent_children_processes, workers_processes
 
 
 def _stop_and_perform_checks(runner):
@@ -252,8 +252,8 @@ def test_standalone_agent_config_reload():
 
     old_worker_pids = worker_pids.copy()
     config = runner.config
-    config_worker_count = config["default_workers_per_api_key"]
-    config["default_workers_per_api_key"] = config_worker_count + 1
+    config_worker_count = config["default_sessions_per_worker"]
+    config["default_sessions_per_worker"] = config_worker_count + 1
     runner.write_config(config)
 
     logging.info("checking in the loop until all old worker processes are gone")
