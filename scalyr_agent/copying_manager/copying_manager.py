@@ -1472,8 +1472,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type fragments: List of six.text_type
         """
         for worker in self.__workers.values():
-            for worker in worker.sessions:
-                worker.augment_scalyr_client_user_agent(fragments)
+            for session in worker.sessions:
+                session.augment_scalyr_client_user_agent(fragments)
 
     def get_worker_session_scalyr_client_statuses(self):
         # type: () -> List[ScalyrClientSessionStatus]
