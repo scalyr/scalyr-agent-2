@@ -1223,16 +1223,13 @@ class LogFileIterator(object):
             self.__file_system.list_files(dir_path),
         )
 
-        most_recent_file = (
-            None if len(possible_copy_filepaths) == 0 else possible_copy_filepaths[0]
-        )
-        if len(possible_copy_filepaths) > 1:
-            most_recent_time = self.__file_system.stat(most_recent_file).st_ctime
-            for path in possible_copy_filepaths[1:]:
-                file_ctime = self.__file_system.stat(path).st_ctime
-                if file_ctime > most_recent_time:
-                    most_recent_time = file_ctime
-                    most_recent_file = path
+        most_recent_file = None
+        most_recent_time = 0
+        for path in possible_copy_filepaths:
+            file_ctime = self.__file_system.stat(path).st_ctime
+            if file_ctime > most_recent_time:
+                most_recent_time = file_ctime
+                most_recent_file = path
 
         return most_recent_file
 
