@@ -511,7 +511,9 @@ class TestLogFileIterator(ScalyrTestCase):
         filename = os.path.basename(self.__path)
         copied_file = os.path.join(self.__tempdir, filename + ".1")
         self.write_file(copied_file, b"")
-        located_copy_truncate_file = self.log_file._LogFileIterator__find_copy_truncate_file()
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
     def test_find_copy_trucate_date_filename(self):
@@ -521,7 +523,9 @@ class TestLogFileIterator(ScalyrTestCase):
         copied_file = os.path.join(self.__tempdir, "app.2021-01-01-15:00.log")
         self.write_file(copied_file, b"")
         app_log_file = self._create_iterator({"path": filename})
-        located_copy_truncate_file = app_log_file._LogFileIterator__find_copy_truncate_file()
+        located_copy_truncate_file = (
+            app_log_file._LogFileIterator__find_copy_truncate_file()
+        )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
     def test_find_copy_truncate_multiple_files(self):
@@ -535,7 +539,9 @@ class TestLogFileIterator(ScalyrTestCase):
         time.sleep(0.01)
         self.write_file(copied_file_1, b"")
 
-        located_copy_truncate_file = self.log_file._LogFileIterator__find_copy_truncate_file()
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
         self.assertEqual(copied_file_1, located_copy_truncate_file)
 
     def test_find_copy_truncate_compressed_files(self):
@@ -549,9 +555,10 @@ class TestLogFileIterator(ScalyrTestCase):
         time.sleep(0.01)
         self.write_file(copied_file_1, b"")
 
-        located_copy_truncate_file = self.log_file._LogFileIterator__find_copy_truncate_file()
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
         self.assertEqual(None, located_copy_truncate_file)
-
 
     def test_rotated_file_with_copy_truncate(self):
         self.append_file(self.__path, b"L001\n", b"L002\n")
@@ -1525,7 +1532,10 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             "sometext.... secretoption=czerwin ,andsecret123=saurabh",
             "sometext.... secretczerwin =%s,andsecretsaurabh=%s"
-            % (md5_hexdigest("option"), md5_hexdigest("123"),),
+            % (
+                md5_hexdigest("option"),
+                md5_hexdigest("123"),
+            ),
             True,
         )
 
