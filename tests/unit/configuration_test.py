@@ -2173,6 +2173,98 @@ class TestConfiguration(TestConfigurationBase):
             msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
             self.assertEqual(config.compression_level, valid_level_max, msg)
 
+    def test_deprecated_param_names(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                "api_keys": [
+                    {
+                        "api_key": "key",
+                        "id": "my_key",
+                        "workers": 4
+                    }
+                ],
+                "default_workers_per_api_key": 2
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        # "api_keys" should become "worker_configs"
+        assert config.worker_configs == [
+            # "workers" field in workers entry should become "sessions"
+            JsonObject(api_key="hi there", id="default", sessions=2),
+            JsonObject(api_key="key", id="my_key", sessions=4),
+        ]
+        # "default_workers_per_api_key" should become "default_sessions_per_worker"
+        assert config.default_sessions_per_worker == 2
+
+    def test_deprecated_env_aware_params(self):
+        os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "5"
+
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.default_sessions_per_worker == 5
+
+    def test_deprecated_params_in_config_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                api_keys: [
+                    {"api_key": "key4", "id": "fourth_key", "workers": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "worker_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if workers from fragment are added.
+
+        assert list(config.worker_configs) == [
+            JsonObject(
+                api_key=config.api_key,
+                id="default",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(
+                api_key="key2",
+                id="second_key",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(api_key="key3", id="third_key", sessions=3),
+            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+        ]
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):

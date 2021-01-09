@@ -209,6 +209,9 @@ class Configuration(object):
                 "workers",
             )
 
+            # map keys to their deprecated versions to replace them later.
+            allowed_multiple_keys_deprecated_synonyms = {"workers": ["api_keys"]}
+
             # Get any configuration snippets in the config directory
             extra_config = self.__list_files(self.config_directory)
 
@@ -219,6 +222,19 @@ class Configuration(object):
             for fp in extra_config:
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
+
+                # if deprecated key names are used, then replace them with their current versions.
+                for k, v in list(content.items()):
+                    for (
+                        key,
+                        key_synonyms,
+                    ) in allowed_multiple_keys_deprecated_synonyms.items():
+                        if k in key_synonyms:
+                            # replace deprecated key.
+                            content[key] = v
+                            del content[k]
+                            break
+
                 for k in content.keys():
                     if k not in allowed_multiple_keys:
                         if k in already_seen:
@@ -247,7 +263,9 @@ class Configuration(object):
                 self.__add_elements_from_array("journald_logs", content, self.__config)
                 self.__add_elements_from_array("k8s_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
-                self.__add_elements_from_array("workers", content, self.__config)
+                self.__add_elements_from_array(
+                    "workers", content, self.__config, deprecated_names=["api_keys"]
+                )
                 self.__merge_server_attributes(fp, content, self.__config)
 
             self.__set_api_key(self.__config, api_key)
@@ -1715,14 +1733,25 @@ class Configuration(object):
                     result.append(full_path)
         return result
 
-    def __add_elements_from_array(self, field, source_json, destination_json):
+    def __add_elements_from_array(
+        self, field, source_json, destination_json, deprecated_names=None
+    ):
         """Appends any elements in the JsonArray in source_json to destination_json.
 
         @param field: The name of the field containing the JsonArray.
         @param source_json: The JsonObject containing the JsonArray from which to retrieve elements.
         @param destination_json: The JsonObject to which the elements should be added (in the JsonArray named field.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
-        destination_array = destination_json.get_json_array(field)
+        destination_array = destination_json.get_json_array(field, none_if_missing=True)
+        if destination_array is None and deprecated_names is not None:
+            for name in deprecated_names:
+                destination_array = destination_json.get_json_array(
+                    name, none_if_missing=True
+                )
+
         for element in source_json.get_json_array(field):
             destination_array.add(element)
 
@@ -2912,6 +2941,7 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+            deprecated_names=["use_multiprocess_copying_workers"],
         )
 
         # the default number of sessions per worker.
@@ -2923,6 +2953,7 @@ class Configuration(object):
             apply_defaults,
             env_aware=True,
             min_value=1,
+            deprecated_names=["default_workers_per_api_key"],
         )
 
         self.__verify_or_set_optional_float(
@@ -3005,30 +3036,13 @@ class Configuration(object):
                 scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[compression_type],
             )
 
-    def __get_config_or_environment_val(
-        self, config_object, param_name, param_type, env_aware, custom_env_name
-    ):
-        """Returns a type-converted config param value or if not found, a matching environment value.
-
-        If the environment value is returned, it is also written into the config_object.
-
-        Currently only handles the following types (str, int, bool, float, JsonObject, JsonArray).
-        Also validates that environment variables can be correctly converted into the primitive type.
-
-        Both upper-case and lower-case versions of the environment variable will be checked.
-
+    def __get_config_val(self, config_object, param_name, param_type):
+        """
+        Get parameter with a given type from the config object.
         @param config_object: The JsonObject config containing the field as a key
         @param param_name: Parameter name
         @param param_type: Parameter type
-        @param env_aware: If True and not defined in config file, look for presence of environment variable.
-        @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
-            scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
-            Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
-
-        @return A python object representing the config param (or environment) value or None
-        @raises
-            JsonConversionException: if the config value or env value cannot be correctly converted.
-            TypeError: if the param_type is not supported.
+        :return:
         """
         if param_type == int:
             config_val = config_object.get_int(param_name, none_if_missing=True)
@@ -3052,6 +3066,60 @@ class Configuration(object):
                 % (param_type, param_name)
             )
 
+        return config_val
+
+    def __get_config_or_environment_val(
+        self,
+        config_object,
+        param_name,
+        param_type,
+        env_aware,
+        custom_env_name,
+        deprecated_names=None,
+    ):
+        """Returns a type-converted config param value or if not found, a matching environment value.
+
+        If the environment value is returned, it is also written into the config_object.
+
+        Currently only handles the following types (str, int, bool, float, JsonObject, JsonArray).
+        Also validates that environment variables can be correctly converted into the primitive type.
+
+        Both upper-case and lower-case versions of the environment variable will be checked.
+
+        @param config_object: The JsonObject config containing the field as a key
+        @param param_name: Parameter name
+        @param param_type: Parameter type
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
+            Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
+        @param deprecated_names: List of synonym names for the *param_name* that were used in previous version but now
+        are deprecated. If the current *param_name* is not presented, then we also look for the deprecated names for
+        backward compatibility.
+
+        @return A python object representing the config param (or environment) value or None
+        @raises
+            JsonConversionException: if the config value or env value cannot be correctly converted.
+            TypeError: if the param_type is not supported.
+        """
+
+        config_val = self.__get_config_val(config_object, param_name, param_type)
+
+        # the config param is not presented by its current name, look for a deprecated name.
+        if config_val is None and deprecated_names is not None:
+            for name in deprecated_names:
+                config_val = self.__get_config_val(config_object, name, param_type)
+                if config_val:
+                    config_object.put(param_name, config_val)
+                    del config_object[name]
+                    if self.__logger:
+                        self.__logger.warning(
+                            "The configuration option {0} is deprecated, use {1} instead.".format(
+                                name, param_name
+                            )
+                        )
+                    break
+
         if not env_aware:
             if not custom_env_name:
                 return config_val
@@ -3067,6 +3135,18 @@ class Configuration(object):
             logger=self.__logger,
             param_val=config_val,
         )
+
+        # the config param environment variable is not presented by its current name, look for a deprecated name.
+        if env_val is None and deprecated_names is not None:
+            for name in deprecated_names:
+                env_val = get_config_from_env(
+                    name,
+                    convert_to=param_type,
+                    logger=self.__logger,
+                    param_val=config_val,
+                )
+                if env_val:
+                    break
 
         # Not set in environment
         if env_val is None:
@@ -3095,7 +3175,9 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
-        self.__verify_or_set_optional_array(config, "workers", description)
+        self.__verify_or_set_optional_array(
+            config, "workers", description, deprecated_names=["api_keys"]
+        )
 
         i = 0
         for log_entry in config.get_json_array("logs"):
@@ -3450,7 +3532,12 @@ class Configuration(object):
 
         sessions_number = self.__config.get_int("default_sessions_per_worker")
         self.__verify_or_set_optional_int(
-            worker_entry, "sessions", sessions_number, description, min_value=1
+            worker_entry,
+            "sessions",
+            sessions_number,
+            description,
+            min_value=1,
+            deprecated_names=["workers"],
         )
 
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
@@ -3552,6 +3639,7 @@ class Configuration(object):
         env_aware=False,
         env_name=None,
         valid_values=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
@@ -3568,10 +3656,18 @@ class Configuration(object):
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         @param valid_values: Optional list with valid values for this string.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, six.text_type, env_aware, env_name
+                config_object,
+                field,
+                six.text_type,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3606,6 +3702,7 @@ class Configuration(object):
         env_name=None,
         min_value=None,
         max_value=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
@@ -3624,10 +3721,18 @@ class Configuration(object):
             scalyr_<field> as the environment variable name.
         @param min_value: Optional minimum value for this configuration value.
         @param max_value: Optional maximum value for this configuration value.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, int, env_aware, env_name
+                config_object,
+                field,
+                int,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3668,6 +3773,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object can be converted to a float if present, otherwise
         sets default.
@@ -3684,10 +3790,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, float, env_aware, env_name
+                config_object,
+                field,
+                float,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3711,6 +3825,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
         object.
@@ -3727,10 +3842,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             json_object = self.__get_config_or_environment_val(
-                config_object, field, JsonObject, env_aware, env_name
+                config_object,
+                field,
+                JsonObject,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if json_object is None:
@@ -3766,6 +3889,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a boolean if present, otherwise sets default.
 
@@ -3781,10 +3905,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, bool, env_aware, env_name
+                config_object,
+                field,
+                bool,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3808,6 +3940,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is an array of json objects if present, otherwise sets
         to empty array.
@@ -3823,10 +3956,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             json_array = self.__get_config_or_environment_val(
-                config_object, field, JsonArray, env_aware, env_name
+                config_object,
+                field,
+                JsonArray,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if json_array is None:
@@ -3863,6 +4004,7 @@ class Configuration(object):
         separators=[","],
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
@@ -3880,6 +4022,9 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         # 2->TODO Python3 can not sort None values
         separators.sort(key=lambda s: s if s is not None else "")
@@ -3889,7 +4034,12 @@ class Configuration(object):
             cls = SpaceAndCommaSeparatedArrayOfStrings
         try:
             array_of_strings = self.__get_config_or_environment_val(
-                config_object, field, cls, env_aware, env_name
+                config_object,
+                field,
+                cls,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if array_of_strings is None:
