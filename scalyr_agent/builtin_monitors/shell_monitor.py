@@ -16,8 +16,10 @@
 # A ScalyrMonitor which executes a specified shell command and records the output.
 
 from __future__ import absolute_import
+
 import re
 import sys
+import time
 
 from subprocess import PIPE, Popen
 
@@ -164,6 +166,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
         # under a shell.
         # There is no possibility for 3rd part a shell injection here since the command is
         # controlled by the end user.
+        start_ts = int(time.time())
+
         command = self.command
         p = Popen(  # nosec
             command,
@@ -174,6 +178,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             close_fds=close_fds,
         )
         (stdout_text, stderr_text) = p.communicate()
+        end_ts = int(time.time())
+        duration = end_ts - start_ts
 
         output = stderr_text
         if len(stderr_text) > 0 and len(stdout_text) > 0:
@@ -199,6 +205,15 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 
         if len(s) > self.max_characters:
             s = s[: self.max_characters] + "..."
+
+        exit_code = p.returncode
         self._logger.emit_value(
-            "output", s, extra_fields={"command": self.command, "length": len(output)}
+            "output",
+            s,
+            extra_fields={
+                "command": self.command,
+                "length": len(output),
+                "duration": duration,
+                "exit_code": exit_code,
+            },
         )
