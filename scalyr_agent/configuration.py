@@ -1241,7 +1241,7 @@ class Configuration(object):
     @property
     def extra_config_directory(self):
         """Returns the configuration value for `extra_config_directory`, resolved to full path if
-        necessary.  """
+        necessary."""
 
         # If `extra_config_directory` is a relative path, then it will be relative
         # to the directory containing the main config file
@@ -1821,7 +1821,7 @@ class Configuration(object):
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
-    """
+        """
         description = 'configuration file "%s"' % file_path
 
         self.__verify_or_set_optional_string(
@@ -2957,7 +2957,7 @@ class Configuration(object):
             "enable_copy_truncate_log_rotation_support",
             True,
             description,
-            apply_defaults
+            apply_defaults,
         )
 
         # windows does not support copying manager backed with multiprocessing workers.
