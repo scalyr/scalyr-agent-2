@@ -1600,6 +1600,13 @@ class Configuration(object):
         """
         return self.__get_config().get_bool("enable_worker_process_metrics_gather")
 
+    @property
+    def enable_copy_truncate_log_rotation(self):
+        """
+        Return whether copy truncate log rotation support is enabled.
+        """
+        return self.__get_config().get_bool("enable_copy_truncate_log_rotation")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -2943,6 +2950,14 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_copy_truncate_log_rotation",
+            True,
+            description,
+            apply_defaults
         )
 
         # windows does not support copying manager backed with multiprocessing workers.

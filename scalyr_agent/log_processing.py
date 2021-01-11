@@ -277,6 +277,8 @@ class LogFileIterator(object):
         else:
             self.__max_extended_line_length = config.max_line_size
 
+        self.__enable_copy_truncate_log_rotation = config.enable_copy_truncate_log_rotation
+
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(
             log_config,
@@ -1122,6 +1124,7 @@ class LogFileIterator(object):
                     if (
                         self.__file_system.trust_inodes
                         and latest_inode == current_log_file.inode
+                        and self.__enable_copy_truncate_log_rotation
                     ):
                         # copy-truncate log rotation
                         copied_file = self.__find_copy_truncate_file()
