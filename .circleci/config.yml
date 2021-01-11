@@ -8,6 +8,7 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -26,6 +27,7 @@ master_only: &master_only
     branches:
       only:
         - master
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -49,7 +51,6 @@ skip_release_build_branch_push: &skip_release_build_branch_push
     and:
       - equal: [ false, << pipeline.parameters.is_release_build >>]
       - equal: [ release_build,  << pipeline.git.branch >>]
-
 
 version: 2.1
 
@@ -975,11 +976,11 @@ jobs:
       - store_artifacts:
           path: test-results
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Print the report
