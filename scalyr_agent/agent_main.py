@@ -1671,7 +1671,7 @@ class ScalyrAgent(object):
         stats = overall_stats
 
         log.info(
-            "copy_manager_status worker_sessions_number=%ld total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
+            "copy_manager_status num_worker_sessions=%ld total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
             "total_request_time=%lf total_pipelined_requests=%ld avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
             % (
                 stats.num_worker_sessions,
@@ -1821,7 +1821,7 @@ class ScalyrAgent(object):
         result.num_dead_monitors = dead_monitors
         if current_status.copying_manager_status is not None:
             result.num_workers = (
-                current_status.copying_manager_status.worker_sessions_number
+                current_status.copying_manager_status.num_worker_sessions
             )
 
         (

@@ -418,7 +418,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.total_pipelined_requests = 0
 
         # the number of all running worker sessions.
-        self.worker_sessions_number = 0
+        self.num_worker_sessions = 0
 
     def is_single_worker_session(self):
         # type: () -> bool
@@ -475,7 +475,7 @@ class CopyingManagerStatus(BaseAgentStatus):
 
         # sum up some worker session stats to overall stats.
         for worker_session_status in self._all_worker_sessions():
-            self.worker_sessions_number += 1
+            self.num_worker_sessions += 1
             self.total_errors += worker_session_status.total_errors
             self.total_bytes_uploaded += worker_session_status.total_bytes_uploaded
 
