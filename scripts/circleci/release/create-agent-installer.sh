@@ -49,6 +49,7 @@ fi
 
 
 
+
 function create_pubkey_file() {
   if [[ $2 == "main" ]]; then
     gpg --armor --export $GPG_SIGNING_KEYID > $1;
@@ -355,11 +356,14 @@ create_main_yum_repo_packages;
 clean_package_files;
 create_alt_yum_repo_packages;
 
-ls
+tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
-tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb;
+# replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
+sed "s~{ % REPLACE_REPOSITORY_TYPE % }~$REPO_BASE_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
+# also remove all special comments which are usefull only for template but not for the resulting file.
+sed "s~# { #.*# }~~g" -i installScalyrAgentV2.sh
 
-cp $SCRIPTPATH/installScalyrAgentV2.sh installScalyrAgentV2.sh
+
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
