@@ -516,15 +516,21 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
-    @skipIf(
-        platform.system() == "Windows",
-        "Skipping copy truncate find_copy_truncate_file test on Windows",
-    )
-    def test_find_copy_trucate_date_filename(self):
+    def test_find_copy_trucate_file_date_ext(self):
+        # Test find_copy_truncate_file with .1 name rotation scheme
+        filename = os.path.basename(self.__path)
+        copied_file = os.path.join(self.__tempdir, filename + "-20210101")
+        self.write_file(copied_file, b"")
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_trucate_with_ext_option_filename(self):
         # Test find_copy_truncate_file with date rotation scheme
         filename = os.path.join(self.__tempdir, "app.log")
         self.write_file(filename, b"")
-        copied_file = os.path.join(self.__tempdir, "app.2021-01-01-15:00.log")
+        copied_file = os.path.join(self.__tempdir, "app.1.log")
         self.write_file(copied_file, b"")
         app_log_file = self._create_iterator({"path": filename})
         located_copy_truncate_file = (

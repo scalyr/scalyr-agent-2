@@ -1201,9 +1201,11 @@ class LogFileIterator(object):
         """
         Determine filename that log file is copied to with logrotate copy truncate.
         Use a heuristic based on naming convention of logrotate copy trucated files are typically follow the naming conventions:
-        syslog, syslog.1, syslog.2.gz
-        auth.log, auth.log.1, auth.log.2.gz
-        production.log, production-<date>.log
+        production.log, production.log.1, production.log.2 (default)
+        production.log, production.log.1, production.log.2.gz (default with compress and delaycompress options)
+        syslog, syslog.1, syslog.2 (no .log extension with defaults)
+        production.log, production.log-YYYYMMDD (default dateext option)
+        production.log, production.1.log (default extension option)
 
         Possible copy truncate files are determined by considering all files starting with the log file prefix created
         within the last 5 minutes that are not compressed.
