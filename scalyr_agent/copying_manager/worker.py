@@ -37,7 +37,11 @@ from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
 from scalyr_agent import util as scalyr_util
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.scalyr_client import create_client, create_new_client
+from scalyr_agent.scalyr_client import (
+    create_client,
+    create_new_client,
+    ScalyrClientSession,
+)
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
 
 import six
@@ -295,7 +299,6 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__config = configuration
         self.__api_key_config_entry = api_key_config_entry
 
-        self._session = None
         self.__new_scalyr_client = None
 
         # Rate limiter
@@ -333,9 +336,12 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__current_processor = 0
 
         # The client to use for sending the data.  Set in the start_manager call.
-        self.__scalyr_client = None  # type: Any
+        self.__scalyr_client = None  # type: Optional[ScalyrClientSession]
         # The last time we scanned for new files that match the __log_matchers.
         self.__last_new_file_scan_time = 0
+
+        # last time when worker logged its stats.
+        self.__last_stats_message_time = 0
 
         # Status variables that track statistics reported to the status page.
         self.__last_attempt_time = None
@@ -361,6 +367,10 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
+
+        self.__last_total_bytes_skipped = 0
+        self.__last_total_bytes_copied = 0
+        self.__last_total_bytes_pending = 0
 
     @property
     def expanded_server_attributes(self):
@@ -428,6 +438,11 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
                 # Create new client for the worker
                 self._init_scalyr_client()
+
+                # add one time interval to skip the status logging immediately after start,
+                self.__last_status_message_time = (
+                    current_time + self.__config.default_worker_status_message_interval
+                )
 
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
@@ -625,6 +640,16 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                         if result == "success":
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
+
+                        # if worker is in another process than write its main stats periodically to the its log.
+                        if (
+                            self.__config.use_multiprocess_copying_workers
+                            and self.__last_status_message_time
+                            + self.__config.default_worker_status_message_interval
+                            < current_time
+                        ):
+                            self.log_worker_status()
+                            self.__last_status_message_time = current_time
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
@@ -1102,7 +1127,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         @type fragments: List of six.text_type
         """
         with self.__lock:
-            self.__scalyr_client.augment_user_agent(fragments)
+            self.__scalyr_client.augment_user_agent(fragments)  # type: ignore
 
     def generate_scalyr_client_status(self):
         return self.__scalyr_client.generate_status()
@@ -1124,6 +1149,72 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             self.__scalyr_client = create_client(
                 self.__config, quiet=quiet, api_key=api_key
             )
+
+    def log_worker_status(self):
+        """
+        Write the main information about the worker and session stats to the worker's agent log.
+        """
+        worker_status = self.generate_status()
+        session_state = self.__scalyr_client.generate_status()
+
+        total_bytes_skipped = 0
+        total_bytes_copied = 0
+        total_bytes_pending = 0
+
+        for processor_status in worker_status.log_processors:
+            total_bytes_skipped += processor_status.total_bytes_skipped
+            total_bytes_copied += processor_status.total_bytes_copied
+            total_bytes_pending += processor_status.total_bytes_pending
+
+        total_bytes_produced = (
+            total_bytes_skipped + total_bytes_copied + total_bytes_pending
+        )
+
+        last_total_bytes_produced = (
+            self.__last_total_bytes_skipped
+            + self.__last_total_bytes_copied
+            + self.__last_total_bytes_pending
+        )
+
+        avg_bytes_copied_rate = (
+            total_bytes_copied - self.__last_total_bytes_copied
+        ) / self.__config.default_worker_status_message_interval
+
+        avg_bytes_produced_rate = (
+            total_bytes_produced - last_total_bytes_produced
+        ) / self.__config.default_worker_status_message_interval
+
+        log.info(
+            "worker_session_requests worker_id=%s session_id=%s session requests_sent=%ld requests_failed=%ld "
+            "bytes_sent=%ld compressed_bytes_sent=%ld bytes_received=%ld request_latency_secs=%lf connections_"
+            "created=%ld total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_"
+            "waiting_time=%lf total_blocking_response_time=%lf total_request_time=%lf total_pipelined_requests=%ld "
+            "avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
+            % (
+                self._id,
+                self.__scalyr_client.session_id,
+                session_state.total_requests_sent,
+                session_state.total_requests_failed,
+                session_state.total_request_bytes_sent,
+                session_state.total_compressed_request_bytes_sent,
+                session_state.total_response_bytes_received,
+                session_state.total_request_latency_secs,
+                session_state.total_connections_created,
+                worker_status.total_copy_iterations,
+                worker_status.total_read_time,
+                session_state.total_compression_time,
+                worker_status.total_waiting_time,
+                worker_status.total_blocking_response_time,
+                worker_status.total_request_time,
+                worker_status.total_pipelined_requests,
+                avg_bytes_produced_rate,
+                avg_bytes_copied_rate,
+            )
+        )
+
+        self.__last_total_bytes_skipped = total_bytes_skipped
+        self.__last_total_bytes_copied = total_bytes_copied
+        self.__last_total_bytes_pending = total_bytes_pending
 
 
 if sys.version_info >= (3, 6, 0):

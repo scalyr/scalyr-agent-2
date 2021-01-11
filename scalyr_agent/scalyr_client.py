@@ -397,6 +397,10 @@ class ScalyrClientSession(object):
             self.__agent_version, fragments
         )
 
+    @property
+    def session_id(self):  # type: () -> six.text_type
+        return self.__session_id
+
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
 

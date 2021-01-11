@@ -156,6 +156,8 @@ class OverallStats(AgentStatus):
         self.num_running_monitors = 0
         # The current number of monitors that should be running but are not.
         self.num_dead_monitor = 0
+        # the current number of workers that run by the copying manager.
+        self.num_workers = 0
         # The total amount of user time CPU used by the agent (cpu secs).
         self.user_cpu = 0
         # The total amount of system time CPU used by the agent (cpu secs)
@@ -415,6 +417,9 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.total_request_time = 0
         self.total_pipelined_requests = 0
 
+        # the number of all running workers.
+        self.workers_number = 0
+
     def is_single_worker(self):
         # type: () -> bool
         """
@@ -468,24 +473,23 @@ class CopyingManagerStatus(BaseAgentStatus):
 
         self._verify_workers_health_check()
 
-        # sum up all stats from workers if it is not a default config.
-        if not self.is_single_worker():
-            # sum up some worker stats to overall stats.
-            for worker_status in self._workers():
-                self.total_errors += worker_status.total_errors
-                self.total_bytes_uploaded += worker_status.total_bytes_uploaded
+        # sum up some worker stats to overall stats.
+        for worker_status in self._workers():
+            self.workers_number += 1
+            self.total_errors += worker_status.total_errors
+            self.total_bytes_uploaded += worker_status.total_bytes_uploaded
 
-                self.total_rate_limited_time = worker_status.total_rate_limited_time
-                self.total_read_time = worker_status.total_read_time
-                self.total_waiting_time = worker_status.total_waiting_time
-                self.total_blocking_response_time = (
-                    worker_status.total_blocking_response_time
-                )
-                self.total_request_time = worker_status.total_request_time
-                self.total_pipelined_requests = worker_status.total_pipelined_requests
-                self.rate_limited_time_since_last_status = (
-                    worker_status.rate_limited_time_since_last_status
-                )
+            self.total_rate_limited_time += worker_status.total_rate_limited_time
+            self.total_read_time += worker_status.total_read_time
+            self.total_waiting_time += worker_status.total_waiting_time
+            self.total_blocking_response_time += (
+                worker_status.total_blocking_response_time
+            )
+            self.total_request_time += worker_status.total_request_time
+            self.total_pipelined_requests += worker_status.total_pipelined_requests
+            self.rate_limited_time_since_last_status += (
+                worker_status.rate_limited_time_since_last_status
+            )
 
     def to_dict(self):  # type: () -> dict
         result = super(CopyingManagerStatus, self).to_dict()
