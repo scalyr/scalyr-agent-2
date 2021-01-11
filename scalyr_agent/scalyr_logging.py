@@ -1016,7 +1016,7 @@ class RateLimiterLogFilter(object):
             return record.rate_limited_result
 
         record.rate_limited_set = True
-        # Note, it is important we set rate_limited_droppped_records before we invoke the formatter since the
+        # Note, it is important we set rate_limited_dropped_records before we invoke the formatter since the
         # formatting is dependent on that value and our formatters cache the result.
         record.rate_limited_dropped_records = self.__dropped_records
         record_str = self.__formatter.format(record)

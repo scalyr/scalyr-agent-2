@@ -3116,7 +3116,9 @@ class Configuration(object):
                         self.__logger.warning(
                             "The configuration option {0} is deprecated, use {1} instead.".format(
                                 name, param_name
-                            )
+                            ),
+                            limit_once_per_x_secs=86400,
+                            limit_key="deprecatedConfigOption",
                         )
                     break
 
