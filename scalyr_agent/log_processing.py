@@ -277,7 +277,7 @@ class LogFileIterator(object):
         else:
             self.__max_extended_line_length = config.max_line_size
 
-        self.__enable_copy_truncate_log_rotation = config.enable_copy_truncate_log_rotation
+        self.__enable_copy_truncate_log_rotation = config.enable_copy_truncate_log_rotation_support
 
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(
@@ -1147,7 +1147,7 @@ class LogFileIterator(object):
                             copied_log_file.is_log_file = False
                         else:
                             log.warning(
-                                "Could not find copied log file for copy-truncate log rotation file."
+                                "It appears that the file was rotated using copy-truncate but the copied file could not be found. This may mean some log lines are missing."
                                 "File=%s",
                                 self.__path,
                             )
