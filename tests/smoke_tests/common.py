@@ -57,7 +57,7 @@ def _test_standalone_smoke(
     python_version=None,
     rate_limited=False,
     workers_type="thread",
-    workers_count=1,
+    workers_sessions_count=1,
 ):
     """
     Agent standalone test to run within the same machine.
@@ -71,7 +71,7 @@ def _test_standalone_smoke(
         agent_installation_type,
         enable_debug_log=True,
         workers_type=workers_type,
-        workers_count=workers_count,
+        workers_session_count=workers_sessions_count,
     )
 
     if python_version:

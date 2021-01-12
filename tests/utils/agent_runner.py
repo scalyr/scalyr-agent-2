@@ -74,7 +74,7 @@ class AgentRunner(object):
         enable_debug_log=False,
         send_to_server=True,
         workers_type="thread",
-        workers_count=1,
+        workers_session_count=1,
     ):  # type: (int, bool, bool, bool, six.text_type, int) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
@@ -115,7 +115,7 @@ class AgentRunner(object):
         self._agent_process = None
 
         self._workers_type = workers_type
-        self._workers_count = workers_count
+        self._worker_sessions_count = workers_session_count
 
     def get_file_path_text(self, path):  # type: (Path) -> str
         return str(self._files[six.text_type(path)])
@@ -411,9 +411,9 @@ class AgentRunner(object):
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": config_log_files,
-            "default_workers_per_api_key": self._workers_count,
+            "default_sessions_per_worker": self._worker_sessions_count,
             "monitors": [],
-            "use_multiprocess_copying_workers": self._workers_type == "process",
+            "use_multiprocess_workers": self._workers_type == "process",
             # NOTE: We disable this functionality so tests finish faster and we can use lower
             # timeout
             "global_monitor_sample_interval_enable_jitter": False,

@@ -1099,7 +1099,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             "https://dummserver.com",
             "DUMMY API KEY",
             SCALYR_VERSION,
-            workers_api_keys_tuple=None,
+            sessions_api_keys_tuple=None,
         )
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
@@ -1110,7 +1110,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             "https://dummserver.com",
             "DUMMY API KEY",
             SCALYR_VERSION,
-            workers_api_keys_tuple=("threaded", 1, 1),
+            sessions_api_keys_tuple=("threaded", 1, 1),
         )
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
@@ -1121,7 +1121,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             "https://dummserver.com",
             "DUMMY API KEY",
             SCALYR_VERSION,
-            workers_api_keys_tuple=("threaded", 3, 2),
+            sessions_api_keys_tuple=("threaded", 3, 2),
         )
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
@@ -1132,7 +1132,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             "https://dummserver.com",
             "DUMMY API KEY",
             SCALYR_VERSION,
-            workers_api_keys_tuple=("multiprocess", 4, 3),
+            sessions_api_keys_tuple=("multiprocess", 4, 3),
         )
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]

@@ -1,6 +1,6 @@
 {
-  "use_multiprocess_copying_workers": true,
-  "default_workers_per_api_key" : 2,
+  "use_multiprocess_workers": true,
+  "default_sessions_per_worker" : 2,
   logs: [
       {path: "/tmp/random.log"},
       {path: "/tmp/random2.log"}
