@@ -8,21 +8,35 @@ Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 31, 2020 14:00 -0800
 --->
 
 Improvements:
-* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations. For backward compatibility reasons, the default parsed hasn't been changed yet.
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser``
+include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default
+one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't
+been changed yet.
 
 Misc:
 * Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
 * Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
 * Linux system metrics monitor has been updated to also ignore ``/var/lib/docker/*`` and ``/snap/*`` mount points by default. Capturing metrics for those mount points usually offers no additional insight to the end user. For information on how to change the ignore list via configuration option, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
 
-## 2.1.16 "Lasso" - December 23, 2020
+## 2.1.16 "Lasso" - January 13, 2021
 
 <!---
-Packaged by Tomaz Muraus <tomaz@scalyr.com> on Dec 23, 2020 14:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 13, 2021 14:00 -0800
 --->
+
+Features:
+* Add copy truncate log rotation support. Use the ``enable_copy_truncate_log_rotation_support`` config option to enable it.
 
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
+* Add the config option ``enable_worker_process_metrics_gather`` to enable 'linux_process_metrics' monitor for each
+multiprocess worker.
+* Each session, which runs in a separate process, periodically writes its stats in the log file.
+The interval between writes can be changed by using the ``default_worker_session_status_message_interval``
+* Rename some of the configuration parameters: ``use_miltiprocess_copying_workers``  to ``use_multiprocess_workers``,
+``default_workers_per_api_key`` to ``default_sessions_per_api_key``. Previous option names are preserved for the
+backward compatibility but they are marked as deprecated.
+NOTE: The appropriate [environment variable names](https://app.scalyr.com/help/scalyr-agent-env-aware) are changed too.
 
 Security fixes and improvements:
 * Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
