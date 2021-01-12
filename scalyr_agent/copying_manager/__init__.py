@@ -1,4 +1,4 @@
-from .copying_manager import CopyingManager, ApiKeyWorkerPool
-from .worker import CopyingManagerThreadedWorker
+from .copying_manager import CopyingManager, CopyingManagerWorker
+from .worker import CopyingManagerWorkerSession
 
-__all__ = ["CopyingManager", "CopyingManagerThreadedWorker", "ApiKeyWorkerPool"]
+__all__ = ["CopyingManager", "CopyingManagerWorkerSession", "CopyingManagerWorker"]

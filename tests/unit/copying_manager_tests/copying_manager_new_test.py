@@ -71,16 +71,18 @@ def pytest_generate_tests(metafunc):
         if platform.system() != "Windows" and sys.version_info >= (2, 7):
             test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
-        metafunc.parametrize("worker_type, api_keys_count, workers_count", test_params)
+        metafunc.parametrize(
+            "worker_type, workers_count, worker_sessions_count", test_params
+        )
 
 
 class CopyingManagerTest(CopyingManagerCommonTest):
     @pytest.fixture(autouse=True)
-    def setup(self, worker_type, api_keys_count, workers_count):
+    def setup(self, worker_type, workers_count, worker_sessions_count):
         super(CopyingManagerTest, self).setup()
         self.use_multiprocessing_workers = worker_type == "process"
-        self.api_keys_count = api_keys_count
         self.workers_count = workers_count
+        self.worker_sessions_count = worker_sessions_count
 
     def teardown(self):
         if self._instance is not None:
@@ -100,20 +102,18 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         if config_data is None:
             config_data = {}
 
-        if "api_keys" not in config_data:
-            api_keys = []
-            for i in range(self.api_keys_count - 1):
-                api_key_config = {
+        if "workers" not in config_data:
+            workers = []
+            for i in range(self.workers_count - 1):
+                worker_config = {
                     "id": "key_id_%s" % i,
                     "api_key": "key_%s" % i,
                 }
-                api_keys.append(api_key_config)
-            config_data["api_keys"] = api_keys
+                workers.append(worker_config)
+            config_data["workers"] = workers
 
-        config_data["default_workers_per_api_key"] = self.workers_count
-        config_data[
-            "use_multiprocess_copying_workers"
-        ] = self.use_multiprocessing_workers
+        config_data["default_sessions_per_worker"] = self.worker_sessions_count
+        config_data["use_multiprocess_workers"] = self.use_multiprocessing_workers
         config_data["disable_max_send_rate_enforcement_overrides"] = True
         config_data["pipeline_threshold"] = pipeline_threshold
         config_data["implicit_agent_log_collection"] = False
@@ -179,12 +179,15 @@ class TestBasic(CopyingManagerTest):
 
         _, manager = self._init_manager(2)
 
-        assert len(manager.workers) == self.workers_count * self.api_keys_count
+        assert (
+            len(manager.worker_sessions)
+            == self.worker_sessions_count * self.workers_count
+        )
 
-        worker_pids = set(worker.get_pid() for worker in manager.workers)
+        worker_pids = set(worker.get_pid() for worker in manager.worker_sessions)
 
         if self.use_multiprocessing_workers:
-            assert len(worker_pids) == self.workers_count * self.api_keys_count
+            assert len(worker_pids) == self.worker_sessions_count * self.workers_count
             assert os.getpid() not in worker_pids
         else:
             # in case of non multiprocess workers, all workers has the same process id as the main process.
@@ -225,18 +228,18 @@ class TestBasic(CopyingManagerTest):
         (test_file, test_file2), manager = self._init_manager(2)
 
         # get all workers and simulate their last attempt timeout.
-        for worker in manager.workers:
+        for worker in manager.worker_sessions:
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
 
-        if self.workers_count > 1 or self.api_keys_count > 1:
-            assert status.workers_health_check == "Some workers have failed."
+        if self.worker_sessions_count > 1 or self.workers_count > 1:
+            assert status.worker_sessions_health_check == "Some workers have failed."
             assert status.health_check_result == "Good"
         else:
             assert (
-                status.workers_health_check
-                == "Worker 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                status.worker_sessions_health_check
+                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert status.health_check_result == "Good"
 
@@ -246,21 +249,21 @@ class TestBasic(CopyingManagerTest):
         manager._CopyingManager__last_scan_attempt_time = time.time() - (1000 * 65)
 
         # get all workers and simulate their last attempt timeout.
-        for worker in manager.workers:
+        for worker in manager.worker_sessions:
             worker.change_last_attempt_time(time.time() - (1000 * 65))
 
         status = manager.generate_status()
 
-        if self.workers_count > 1 or self.api_keys_count > 1:
-            assert status.workers_health_check == "Some workers have failed."
+        if self.worker_sessions_count > 1 or self.workers_count > 1:
+            assert status.worker_sessions_health_check == "Some workers have failed."
             assert (
                 status.health_check_result
                 == "Failed, max time since last scan attempt (60.0 seconds) exceeded"
             )
         else:
             assert (
-                status.workers_health_check
-                == "Worker 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                status.worker_sessions_health_check
+                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert (
                 status.health_check_result
@@ -315,7 +318,7 @@ class TestBasic(CopyingManagerTest):
         assert set(self._wait_for_rpc_and_respond()) == set(["Line9", "Line10"])
 
     def test_checkpoints_master_checkpoints(self):
-        if self.workers_count == 1 and self.api_keys_count == 1:
+        if self.worker_sessions_count == 1 and self.workers_count == 1:
             pytest.skip("This test is only for multi-worker copying manager.")
 
         (test_file, test_file2), manager = self._init_manager(2)
@@ -379,7 +382,7 @@ class TestBasic(CopyingManagerTest):
         for i, test_file in enumerate(test_files):
             self._append_lines(["file_{}_line1".format(i)], log_file=test_file)
 
-        assert manager.workers_log_processors_count == len(test_files)
+        assert manager.worker_sessions_log_processors_count == len(test_files)
         assert manager.matchers_log_processor_count == len(test_files)
 
         for log_file in test_files:
@@ -393,7 +396,7 @@ class TestBasic(CopyingManagerTest):
         manager.wait_for_full_iteration()
 
         # check if there are no log processors remaining inside workers and log matchers.
-        assert manager.workers_log_processors_count == 0
+        assert manager.worker_sessions_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
 
         # crete log file back and see if log processors are created back too.
@@ -402,7 +405,7 @@ class TestBasic(CopyingManagerTest):
 
         manager.wait_for_full_iteration()
 
-        assert manager.workers_log_processors_count == len(test_files)
+        assert manager.worker_sessions_log_processors_count == len(test_files)
         assert manager.matchers_log_processor_count == len(test_files)
 
     @pytest.mark.skipif(
@@ -431,14 +434,14 @@ class TestBasic(CopyingManagerTest):
             10, self._env_builder.non_glob_logs_dir
         )
 
-        assert manager.workers_log_processors_count == 0
+        assert manager.worker_sessions_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
 
         # wait for copying manager adds log processors.
         manager.wait_for_full_iteration()
 
         # both workers and log log matches should contain new log processors.
-        assert manager.workers_log_processors_count == len(files)
+        assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
         self._env_builder.remove_files(self._env_builder.non_glob_logs_dir)
@@ -451,7 +454,7 @@ class TestBasic(CopyingManagerTest):
         manager.wait_for_full_iteration()
 
         # check if there are no log processors remaining inside workers and log matchers.
-        assert manager.workers_log_processors_count == 0
+        assert manager.worker_sessions_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
 
         # crete log file back and see if log processors are created back too.
@@ -461,7 +464,7 @@ class TestBasic(CopyingManagerTest):
 
         manager.wait_for_full_iteration()
 
-        assert manager.workers_log_processors_count == len(files)
+        assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
     @pytest.mark.skipif(
@@ -497,13 +500,13 @@ class TestBasic(CopyingManagerTest):
             )
             manager.add_log_config("scheduled-deletion", log_config)
 
-        assert manager.workers_log_processors_count == 0
+        assert manager.worker_sessions_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
 
         # wait for copying manager adds log processors.
         manager.wait_for_full_iteration()
 
-        assert manager.workers_log_processors_count == len(files)
+        assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
 
         self._env_builder.remove_files(logs_dir)
@@ -516,7 +519,7 @@ class TestBasic(CopyingManagerTest):
         manager.wait_for_full_iteration()
 
         # check if there are no log processors remaining inside workers and log matchers.
-        assert manager.workers_log_processors_count == 0
+        assert manager.worker_sessions_log_processors_count == 0
         assert manager.matchers_log_processor_count == 0
 
         # crete log file back and see if log processors are created back too.
@@ -524,5 +527,5 @@ class TestBasic(CopyingManagerTest):
 
         manager.wait_for_full_iteration()
 
-        assert manager.workers_log_processors_count == len(files)
+        assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)

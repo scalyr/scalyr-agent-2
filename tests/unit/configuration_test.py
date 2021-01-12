@@ -1411,7 +1411,7 @@ class TestConfiguration(TestConfigurationBase):
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
             "json_library": "auto",
-            "use_multiprocess_copying_workers": False,
+            "use_multiprocess_workers": False,
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
@@ -1748,7 +1748,7 @@ class TestConfiguration(TestConfigurationBase):
 
         # Verify actual API keys are masked
         self._write_file_with_separator_conversion(
-            """{api_key: "hi there", api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}, {"workers":5, "api_key": "bar1234", "id": "two"}]}"""
+            """{api_key: "hi there", workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}, {"sessions":5, "api_key": "bar1234", "id": "two"}]}"""
         )  # NOQA
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
@@ -1759,17 +1759,17 @@ class TestConfiguration(TestConfigurationBase):
 
         # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
         # sorted string value
-        expected_line = "\tsanitized_api_key_configs: [{'workers': 5, 'api_key': '********** MASKED **********', 'id': 'two'}, {'workers': 2, 'api_key': '********** MASKED **********', 'id': 'one'}, {'workers': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 5, 'api_key': '********** MASKED **********', 'id': 'two'}, {'sessions': 2, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
         logged_line = mock_logger.info.call_args_list[-1][0][0]
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 8)
+        self.assertEqual(sessions_count, 8)
         self.assertEqual(api_keys_count, 3)
 
     def test_print_config_when_changed(self):
@@ -1781,7 +1781,7 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 5,
-            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1791,18 +1791,18 @@ class TestConfiguration(TestConfigurationBase):
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 3)
+        self.assertEqual(sessions_count, 3)
         self.assertEqual(api_keys_count, 2)
 
         self._write_file_with_separator_conversion(
             """{
             api_key: "hi there",
             max_line_size: 9900,
-            api_keys: [{"workers":10, "api_key": "foo1234", "id": "one"}]},
+            workers: [{"sessions":10, "api_key": "foo1234", "id": "one"}]},
             }
         """
         )
@@ -1811,11 +1811,11 @@ class TestConfiguration(TestConfigurationBase):
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = new_config.get_number_of_configured_workers_and_api_keys()
+        ) = new_config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 11)
+        self.assertEqual(sessions_count, 11)
         self.assertEqual(api_keys_count, 2)
 
         new_config.print_useful_settings(other_config=config)
@@ -1826,7 +1826,7 @@ class TestConfiguration(TestConfigurationBase):
 
         # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
         # sorted string value
-        expected_line = "\tsanitized_api_key_configs: [{'workers': 10, 'api_key': '********** MASKED **********', 'id': 'one'}, {'workers': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 10, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
         logged_line = mock_logger.info.call_args_list[-1][0][0]
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
@@ -1858,7 +1858,7 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 49900,
-            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1899,7 +1899,7 @@ class TestConfiguration(TestConfigurationBase):
             api_key: "hi there",
             max_line_size: 49900,
             debug_level: 5,
-            api_keys: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -2172,6 +2172,98 @@ class TestConfiguration(TestConfigurationBase):
 
             msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
             self.assertEqual(config.compression_level, valid_level_max, msg)
+
+    def test_deprecated_param_names(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                "api_keys": [
+                    {
+                        "api_key": "key",
+                        "id": "my_key",
+                        "workers": 4
+                    }
+                ],
+                "default_workers_per_api_key": 2
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        # "api_keys" should become "worker_configs"
+        assert config.worker_configs == [
+            # "workers" field in workers entry should become "sessions"
+            JsonObject(api_key="hi there", id="default", sessions=2),
+            JsonObject(api_key="key", id="my_key", sessions=4),
+        ]
+        # "default_workers_per_api_key" should become "default_sessions_per_worker"
+        assert config.default_sessions_per_worker == 2
+
+    def test_deprecated_env_aware_params(self):
+        os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "5"
+
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.default_sessions_per_worker == 5
+
+    def test_deprecated_params_in_config_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                api_keys: [
+                    {"api_key": "key4", "id": "fourth_key", "workers": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "worker_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if workers from fragment are added.
+
+        assert list(config.worker_configs) == [
+            JsonObject(
+                api_key=config.api_key,
+                id="default",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(
+                api_key="key2",
+                id="second_key",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(api_key="key3", id="third_key", sessions=3),
+            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+        ]
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):
@@ -2807,9 +2899,9 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         self.assertEquals(config.win32_max_open_fds, 1024)
 
 
-class TestApiKeysConfiguration(TestConfigurationBase):
-    def test_no_api_keys_entry_(self):
-        # The 'api_keys' list does not exist, a default api_key entry should be created.
+class TestWorkersConfiguration(TestConfigurationBase):
+    def test_no_workers_entry_(self):
+        # The 'workers' list does not exist, a default api_key entry should be created.
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
@@ -2821,22 +2913,22 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config.parse()
 
         # only defaults are created.
-        assert len(config.api_key_configs) == 1
-        assert config.api_key_configs[0] == JsonObject(
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
             api_key=config.api_key,
             id="default",
-            workers=config.default_workers_per_api_key,
+            sessions=config.default_sessions_per_worker,
         )
 
-    def test_empty_api_keys_entry(self):
+    def test_empty_workers_entry(self):
         """
-        Does not make so much sense, but still a valid case to apply a default api key.
+        Does not make so much sense, but still a valid case to apply a default worker.
         :return:
         """
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there"
-                api_keys: [
+                workers: [
 
                 ]
               }
@@ -2846,31 +2938,31 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        assert len(config.api_key_configs) == 1
-        api_key = config.api_key_configs[0]
+        assert len(config.worker_configs) == 1
+        api_key = config.worker_configs[0]
 
         assert api_key == JsonObject(
             api_key=config.api_key,
             id="default",
-            workers=config.default_workers_per_api_key,
+            sessions=config.default_sessions_per_worker,
         )
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 1)
+        self.assertEqual(sessions_count, 1)
         self.assertEqual(api_keys_count, 1)
 
-    def test_overwrite_default_api_keys(self):
+    def test_overwrite_default_workers(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "key"
-                api_keys: [
+                workers: [
                     {
-                        "api_key": "key", id: "default", "workers": 4
+                        "api_key": "key", id: "default", "sessions": 4
                     }
                 ]
               }
@@ -2880,25 +2972,55 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        assert len(config.api_key_configs) == 1
-        assert config.api_key_configs[0] == JsonObject(
-            api_key=config.api_key, id="default", workers=4,
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
+            api_key=config.api_key, id="default", sessions=4,
         )
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 4)
+        self.assertEqual(sessions_count, 4)
         self.assertEqual(api_keys_count, 1)
 
-    def test_default_api_keys_and_second(self):
+    def test_overwrite_default_workers_without_api_key(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "key"
+                workers: [
+                    {
+                        id: "default", "sessions": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
+            api_key=config.api_key, id="default", sessions=4,
+        )
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 4)
+        self.assertEqual(api_keys_count, 1)
+
+    def test_default_workers_and_second(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         "api_key": "key", "id": "second"
                     }
@@ -2911,21 +3033,21 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert len(config.api_key_configs) == 2
-        api_keys = list(config.api_key_configs)
+        assert len(config.worker_configs) == 2
+        workers = list(config.worker_configs)
 
-        assert api_keys[0] == JsonObject(
+        assert workers[0] == JsonObject(
             api_key=config.api_key,
             id="default",
-            workers=config.default_workers_per_api_key,
+            sessions=config.default_sessions_per_worker,
         )
-        assert api_keys[1] == JsonObject(api_key="key", id="second", workers=1,)
+        assert workers[1] == JsonObject(api_key="key", id="second", sessions=1,)
 
     def test_second_default_api_key(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         "api_key": "key", "id": "default"
                     },
@@ -2943,15 +3065,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "The api key with a 'default' id has to match the main api key of the configuration"
+            "The API key of the default worker has to match the main API key of the configuration"
             in err_info.value.message
         )
 
-    def test_api_key_id_duplication(self):
+    def test_worker_id_duplication(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         "api_key": "key", "id": "second"
                     },
@@ -2968,7 +3090,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "There are multiple api keys with the same 'second' id. Api key id's must remain unique."
+            "There are multiple workers with the same 'second' id. Worker id's must remain unique."
             in err_info.value.message
         )
 
@@ -2976,7 +3098,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         "id": "second"
                     },
@@ -2998,7 +3120,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         "api_key": "key"
                     },
@@ -3016,21 +3138,21 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert 'The required field "id" is missing.' in err_info.value.message
 
-    def test_log_file_bind_to_api_keys_entries(self):
+    def test_log_file_bind_to_workers_entries(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         api_key: "key2"
-                        "workers": 4,
+                        "sessions": 4,
                         "id": "second",
                     }
                 ],
                 logs: [
                     {
                         path: "/some/path.log",
-                        api_key_id: "second"
+                        worker_id: "second"
                     },
                     {
                         path: "/some/path2.log",
@@ -3043,31 +3165,31 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert len(config.api_key_configs) == 2
-        assert config.api_key_configs[0] == JsonObject(
-            workers=1, api_key=config.api_key, id="default"
+        assert len(config.worker_configs) == 2
+        assert config.worker_configs[0] == JsonObject(
+            sessions=1, api_key=config.api_key, id="default"
         )
-        assert config.api_key_configs[1] == JsonObject(
-            workers=4, api_key="key2", id="second",
+        assert config.worker_configs[1] == JsonObject(
+            sessions=4, api_key="key2", id="second",
         )
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "threaded")
-        self.assertEqual(workers_count, 5)
+        self.assertEqual(sessions_count, 5)
         self.assertEqual(api_keys_count, 2)
 
     def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
         self._write_file_with_separator_conversion(
             """ {
                 api_key: "hi there",
-                api_keys: [
+                workers: [
                     {
                         api_key: "key2"
-                        "workers": 4,
+                        "sessions": 4,
                         "id": "second"
                     }
                 ],
@@ -3075,7 +3197,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
                 logs: [
                     {
                         path: "/some/path.log",
-                        api_key_id: "wrong api key"
+                        worker_id: "wrong worker id"
                     },
                     {
                         path: "/some/path2.log",
@@ -3090,10 +3212,10 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "refers to a non-existing api key with id 'wrong api key'."
+            "refers to a non-existing worker with id 'wrong worker id'."
             in err_info.value.message
         )
-        assert "Valid api key ids: default, second." in err_info.value.message
+        assert "Valid worker ids: default, second." in err_info.value.message
 
     def test_workers_type_default(self):
         self._write_file_with_separator_conversion(
@@ -3107,7 +3229,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert not config.use_multiprocess_copying_workers
+        assert not config.use_multiprocess_workers
 
     @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     @skipIf(
@@ -3117,7 +3239,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
-            use_multiprocess_copying_workers: true
+            use_multiprocess_workers: true
           }
         """
         )
@@ -3126,15 +3248,15 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert config.use_multiprocess_copying_workers
+        assert config.use_multiprocess_workers
 
         (
             worker_type,
-            workers_count,
+            sessions_count,
             api_keys_count,
-        ) = config.get_number_of_configured_workers_and_api_keys()
+        ) = config.get_number_of_configured_sessions_and_api_keys()
         self.assertEqual(worker_type, "multiprocess")
-        self.assertEqual(workers_count, 1)
+        self.assertEqual(sessions_count, 1)
         self.assertEqual(api_keys_count, 1)
 
     @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
@@ -3142,7 +3264,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
     )
     def test_workers_type_multiprocess_from_env(self):
-        os_environ_unicode["SCALYR_USE_MULTIPROCESS_COPYING_WORKERS"] = "True"
+        os_environ_unicode["SCALYR_USE_MULTIPROCESS_WORKERS"] = "True"
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
@@ -3154,18 +3276,18 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert config.use_multiprocess_copying_workers
+        assert config.use_multiprocess_workers
 
     @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
     @skipIf(
         sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
     )
     def test_workers_type_multiprocess_windows(self):
-        # 'use_multiprocess_copying_workers' option should couse error on Windows.
+        # 'use_multiprocess_workers' option should cause error on Windows.
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
-            use_multiprocess_copying_workers: true
+            use_multiprocess_workers: true
           }
         """
         )
@@ -3176,17 +3298,17 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "The 'use_multiprocess_copying_workers' option is not supported on windows machines."
+            "The 'use_multiprocess_workers' option is not supported on windows machines."
             in err_info.value.message
         )
 
-    def test_default_workers_per_api_key(self):
+    def test_default_sessions_per_worker(self):
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there",
 
-            api_keys: [
-                {"api_key": "another_key", "id": "second", "workers": 3},
+            workers: [
+                {"api_key": "another_key", "id": "second", "sessions": 3},
                 {"api_key": "another_key2", "id": "third"}
             ]
           }
@@ -3197,26 +3319,26 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        assert len(config.api_key_configs) == 3
-        assert config.api_key_configs[0]["api_key"] == config.api_key
+        assert len(config.worker_configs) == 3
+        assert config.worker_configs[0]["api_key"] == config.api_key
         assert (
-            config.api_key_configs[0]["workers"] == config.default_workers_per_api_key
+            config.worker_configs[0]["sessions"] == config.default_sessions_per_worker
         )
-        assert config.api_key_configs[1]["api_key"] == "another_key"
-        assert config.api_key_configs[1]["workers"] == 3
-        assert config.api_key_configs[2]["api_key"] == "another_key2"
+        assert config.worker_configs[1]["api_key"] == "another_key"
+        assert config.worker_configs[1]["sessions"] == 3
+        assert config.worker_configs[2]["api_key"] == "another_key2"
         assert (
-            config.api_key_configs[2]["workers"] == config.default_workers_per_api_key
+            config.worker_configs[2]["sessions"] == config.default_sessions_per_worker
         )
 
-    def test_api_keys_negative_workers_number(self):
+    def test_workers_negative_sessions_number(self):
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
 
-            api_keys: [
+            workers: [
                 {"api_key": "another_key", "id": "second_key"},
-                {"api_key": "another_key2", "id": "third_key", "workers": -1}
+                {"api_key": "another_key2", "id": "third_key", "sessions": -1}
             ]
           }
         """
@@ -3231,8 +3353,8 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
-            default_workers_per_api_key: -1,
-            api_keys: [
+            default_sessions_per_worker: -1,
+            workers: [
                 {"api_key": "another_key", "id": "second_key"},
                 {"api_key": "another_key2", "id": "third_key"}
             ]
@@ -3246,12 +3368,12 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         assert "Value must be greater than or equal to 1" in err_info.value.message
 
-    def test_default_workers_per_api_key_from_env(self):
-        os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "4"
+    def test_default_sessions_per_worker_from_env(self):
+        os_environ_unicode["SCALYR_DEFAULT_SESSIONS_PER_WORKER"] = "4"
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there"
-            api_keys: [
+            workers: [
                 {"api_key": "another_key", "id": "second_key"},
             ]
           }
@@ -3260,7 +3382,7 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        assert config.default_workers_per_api_key == 4
+        assert config.default_sessions_per_worker == 4
 
         return
 
@@ -3269,9 +3391,9 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             """ {
             api_key: "hi there"
 
-            api_keys: [
+            workers: [
                 {"api_key": "key2", "id": "second_key"},
-                {"api_key": "key3", "id": "third_key", "workers": 3}
+                {"api_key": "key3", "id": "third_key", "sessions": 3}
             ]
           }
         """
@@ -3281,12 +3403,12 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             "a.json",
             """
             {
-                api_keys: [
-                    {"api_key": "key4", "id": "fourth_key", "workers": 3}
+                workers: [
+                    {"api_key": "key4", "id": "fourth_key", "sessions": 3}
                 ]
 
                 logs: [
-                    {"path": "some/path", "api_key_id": "second_key"}
+                    {"path": "some/path", "worker_id": "second_key"}
                 ]
             }
             """,
@@ -3296,24 +3418,24 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         config.parse()
 
-        # check if api keys from fragment are added.
+        # check if workers from fragment are added.
 
-        assert list(config.api_key_configs) == [
+        assert list(config.worker_configs) == [
             JsonObject(
                 api_key=config.api_key,
                 id="default",
-                workers=config.default_workers_per_api_key,
+                sessions=config.default_sessions_per_worker,
             ),
             JsonObject(
                 api_key="key2",
                 id="second_key",
-                workers=config.default_workers_per_api_key,
+                sessions=config.default_sessions_per_worker,
             ),
-            JsonObject(api_key="key3", id="third_key", workers=3),
-            JsonObject(api_key="key4", id="fourth_key", workers=3),
+            JsonObject(api_key="key3", id="third_key", sessions=3),
+            JsonObject(api_key="key4", id="fourth_key", sessions=3),
         ]
 
-    def test_k8s_and_journald_logs_api_keys(self):
+    def test_k8s_and_journald_logs_workers(self):
 
         journald_log1 = {
             "journald_unit": "ssh\\.service",
@@ -3321,33 +3443,33 @@ class TestApiKeysConfiguration(TestConfigurationBase):
 
         main_config = {
             "api_key": "hi there",
-            "api_keys": [
+            "workers": [
                 {"api_key": "key2", "id": "second_key"},
-                {"api_key": "key3", "id": "third_key", "workers": 3},
+                {"api_key": "key3", "id": "third_key", "sessions": 3},
             ],
             "logs": [
                 {"path": "path1"},
-                {"path": "path2", "api_key_id": "second_key"},
-                {"path": "path3", "api_key_id": "third_key"},
+                {"path": "path2", "worker_id": "second_key"},
+                {"path": "path3", "worker_id": "third_key"},
             ],
             "journald_logs": [
                 journald_log1,
-                {"journald_unit": ".*", "api_key_id": "third_key"},
+                {"journald_unit": ".*", "worker_id": "third_key"},
             ],
         }
 
         k8s_config1 = {"k8s_pod_glob": "*nginx*"}
 
         config_fragment = {
-            "api_keys": [
+            "workers": [
                 {"api_key": "key4", "id": "fourth_key"},
-                {"api_key": "key5", "id": "fifth_key", "workers": 3},
+                {"api_key": "key5", "id": "fifth_key", "sessions": 3},
             ],
             "k8s_logs": [
                 k8s_config1,
-                {"k8s_pod_glob": "*apache*", "api_key_id": "second_key"},
+                {"k8s_pod_glob": "*apache*", "worker_id": "second_key"},
             ],
-            "logs": [{"path": "path4"}, {"path": "path6", "api_key_id": "second_key"}],
+            "logs": [{"path": "path4"}, {"path": "path6", "worker_id": "second_key"}],
         }
         self._write_file_with_separator_conversion(json.dumps(main_config))
         self._write_config_fragment_file_with_separator_conversion(
@@ -3357,30 +3479,30 @@ class TestApiKeysConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        api_keys = list(config.api_key_configs)
+        workers = list(config.worker_configs)
 
-        assert len(api_keys) == 5
+        assert len(workers) == 5
 
-        # check api keys for journald logs
-        for api_key in api_keys:
-            journald_unit = api_key.get("journald_unit", none_if_missing=True)
+        # check workers for journald logs
+        for worker in workers:
+            journald_unit = worker.get("journald_unit", none_if_missing=True)
             if journald_unit:
                 if journald_unit == "ssh\\.service":
-                    assert api_key["api_key_id"] == "default"
+                    assert worker["worker_id"] == "default"
                 elif journald_unit == "journald_unit":
-                    assert api_key["api_key_id"] == "second_key"
+                    assert worker["worker_id"] == "second_key"
 
-        # check api keys for k8s logs.
-        for api_key in api_keys:
-            k8s_pod_glob = api_key.get("k8s_pod_glob", none_if_missing=True)
+        # check workers for k8s logs.
+        for worker in workers:
+            k8s_pod_glob = worker.get("k8s_pod_glob", none_if_missing=True)
             if k8s_pod_glob:
                 if k8s_pod_glob == "*nginx*":
-                    assert api_key["api_key_id"] == "default"
+                    assert worker["worker_id"] == "default"
                 elif k8s_pod_glob == "*apache*":
-                    assert api_key["api_key_id"] == "third_key"
+                    assert worker["worker_id"] == "third_key"
 
-        # non existing api key for l8s, should fail
-        k8s_config1["api_key_id"] = "not_exist"
+        # non existing worker for l8s, should fail
+        k8s_config1["worker_id"] = "not_exist"
         self._write_file_with_separator_conversion(json.dumps(main_config))
         self._write_config_fragment_file_with_separator_conversion(
             "a.json", json.dumps(config_fragment)
@@ -3392,14 +3514,14 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "refers to a non-existing api key with id 'not_exist'"
+            "refers to a non-existing worker with id 'not_exist'"
             in err_info.value.message
         )
 
-        k8s_config1["api_key_id"] = "default"
+        k8s_config1["worker_id"] = "default"
 
-        # non existing api key for jornald, should fail
-        journald_log1["api_key_id"] = "not exist too."
+        # non existing worker for jornald, should fail
+        journald_log1["worker_id"] = "not exist too."
         self._write_file_with_separator_conversion(json.dumps(main_config))
         self._write_config_fragment_file_with_separator_conversion(
             "a.json", json.dumps(config_fragment)
@@ -3411,11 +3533,11 @@ class TestApiKeysConfiguration(TestConfigurationBase):
             config.parse()
 
         assert (
-            "refers to a non-existing api key with id 'not exist too.'"
+            "refers to a non-existing worker with id 'not exist too.'"
             in err_info.value.message
         )
 
-        journald_log1["api_key_id"] = "default"
+        journald_log1["worker_id"] = "default"
         self._write_file_with_separator_conversion(json.dumps(main_config))
         self._write_config_fragment_file_with_separator_conversion(
             "a.json", json.dumps(config_fragment)
