@@ -1222,12 +1222,14 @@ class LogFileIterator(object):
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
-        possible_copy_filepaths = filter(
-            lambda f: os.path.basename(f).startswith(file_prefix)
-            and not f.endswith(".gz")
-            and f != self.__path
-            and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
-            self.__file_system.list_files(dir_path),
+        possible_copy_filepaths = list(
+            six.moves.filter(
+                lambda f: os.path.basename(f).startswith(file_prefix)
+                and not f.endswith(".gz")
+                and f != self.__path
+                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
+                self.__file_system.list_files(dir_path),
+            )
         )
 
         most_recent_file = None
