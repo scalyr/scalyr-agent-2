@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.18 "TBD" - January 14, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 14, 2021 14:00 -0800
+--->
+Features
+* Linux ``logrotate`` ``copytruncate`` log rotation support.  Supports default ``logrotate`` options and ``dateext``.  If ``compress`` is enabled, ``delaycompress`` must also be enabled.  Only ``log`` extension is supported with ``extension`` option.
+
 ## 2.1.17 "TBD" - December 31, 2020
 
 <!---
