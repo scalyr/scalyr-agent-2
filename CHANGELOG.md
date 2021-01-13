@@ -19,14 +19,9 @@ been changed yet.
 
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
-* Add the config option ``enable_worker_process_metrics_gather`` to enable 'linux_process_metrics' monitor for each
-multiprocess worker.
-* Each session, which runs in a separate process, periodically writes its stats in the log file.
-The interval between writes can be changed by using the ``default_worker_session_status_message_interval``
-* Rename some of the configuration parameters: ``use_miltiprocess_copying_workers``  to ``use_multiprocess_workers``,
-``default_workers_per_api_key`` to ``default_sessions_per_api_key``. Previous option names are preserved for the
-backward compatibility but they are marked as deprecated.
-NOTE: The appropriate [environment variable names](https://app.scalyr.com/help/scalyr-agent-env-aware) are changed too.
+* Add the config option ``enable_worker_process_metrics_gather`` to enable 'linux_process_metrics' monitor for each multiprocess worker.
+* Each session, which runs in a separate process, periodically writes its stats in the log file. The interval between writes can be changed by using the ``default_worker_session_status_message_interval``
+* Rename some of the configuration parameters: ``use_miltiprocess_copying_workers``  to ``use_multiprocess_workers``, ``default_workers_per_api_key`` to ``default_sessions_per_api_key``. Previous option names are preserved for the backward compatibility but they are marked as deprecated. NOTE: The appropriate [environment variable names](https://app.scalyr.com/help/scalyr-agent-env-aware) are changed too.
 * Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
 * Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
 * Linux system metrics monitor has been updated to also ignore ``/var/lib/docker/*`` and ``/snap/*`` mount points by default. Capturing metrics for those mount points usually offers no additional insight to the end user. For information on how to change the ignore list via configuration option, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
