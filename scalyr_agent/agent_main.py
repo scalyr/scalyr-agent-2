@@ -65,6 +65,11 @@ scalyr_init()
 
 import six
 
+try:
+    import glob
+except ImportError:
+    import glob2 as glob  # type: ignore
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.remote_shell as remote_shell
@@ -1025,6 +1030,10 @@ class ScalyrAgent(object):
                 self.__log_file_path = os.path.join(
                     self.__config.agent_log_path, AGENT_LOG_FILENAME
                 )
+                worker_sessions_glob = os.path.join(
+                    self.__config.agent_log_path, "agent_*.log"
+                )
+                worker_session_log_files = glob.glob(self.__config.agent_log_path)
                 scalyr_logging.set_log_destination(
                     use_disk=True,
                     no_fork=self.__no_fork,

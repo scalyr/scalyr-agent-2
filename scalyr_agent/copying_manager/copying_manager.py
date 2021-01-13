@@ -27,7 +27,7 @@ from six.moves import range
 import signal
 import errno
 
-WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
+WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_session_"
 
 if False:
     from typing import Dict
