@@ -16,6 +16,7 @@ Improvements:
 include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default
 one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't
 been changed yet.
+* ``shell_monitor`` now outputs two additional metrics during each sample gather interval - ``duration`` and ``exit_code``. First one represents how many seconds it took to execute the shell command / script and the second one represents that script exit (status).
 
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
