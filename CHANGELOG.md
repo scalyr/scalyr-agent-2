@@ -30,9 +30,7 @@ NOTE: The appropriate [environment variable names](https://app.scalyr.com/help/s
 * Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
 * Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
 * Linux system metrics monitor has been updated to also ignore ``/var/lib/docker/*`` and ``/snap/*`` mount points by default. Capturing metrics for those mount points usually offers no additional insight to the end user. For information on how to change the ignore list via configuration option, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
-* The agent install bash script now adds the Scalyr repositories directly without installing the ``scalyr-repo`` packages.
-This also eliminates errors caused by re-acquiring the package manager's lock file during the *pre/post* *install/uninstall* scripts.
-The issue occurred in both ``apt`` and ``rpm`` package managers.
+* The agent install bash script now adds the Scalyr repositories directly without installing the ``scalyr-repo`` packages. This also eliminates errors caused by re-acquiring the package manager's lock file during the *pre/post* *install/uninstall* scripts. The issue occurred in both ``apt`` and ``rpm`` package managers.
 
 Security fixes and improvements:
 * Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
