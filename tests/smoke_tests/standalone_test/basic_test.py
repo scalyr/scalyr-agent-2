@@ -37,20 +37,20 @@ from tests.utils.agent_runner import AgentRunner
 
 def _perform_workers_check(runner):
     # type: (AgentRunner) -> Tuple[psutil.Process, Dict, List[psutil.Process], List[psutil.Process]]
-    worker_pids = {}
+    worker_session_pids = {}
     agent_children_processes = []  # type: ignore
     workers_processes = []
     status = json.loads(runner.status_json())  # type: ignore
 
-    for api_key in status["copying_manager_status"]["api_key_worker_pools"]:
-        for worker in api_key["workers"]:
-            worker_pids[worker["worker_id"]] = worker["pid"]
+    for worker in status["copying_manager_status"]["workers"]:
+        for worker_session in worker["sessions"]:
+            worker_session_pids[worker_session["session_id"]] = worker_session["pid"]
 
     process = psutil.Process(runner.agent_pid)
     assert process.is_running(), "process is not running"
     agent_children_processes.extend(process.children())
 
-    for wpid in worker_pids.values():
+    for wpid in worker_session_pids.values():
         for c in agent_children_processes:
             if wpid == c.pid:
                 workers_processes.append(c)
@@ -65,7 +65,7 @@ def _perform_workers_check(runner):
     for wp in workers_processes:
         assert wp.is_running(), "the agent worker process should being running"
 
-    return process, worker_pids, agent_children_processes, workers_processes
+    return process, worker_session_pids, agent_children_processes, workers_processes
 
 
 def _stop_and_perform_checks(runner):
@@ -107,7 +107,9 @@ def _check_workers_gracefull_stop(runner, worker_pids, occurrences=1):
             worker_log_path.exists()
         ), "The log file of the worker '{0}' must exist.".format(worker_id)
         log_content = worker_log_path.read_text()
-        found = re.findall(r"Worker '{0}+' is finished".format(worker_id), log_content)
+        found = re.findall(
+            r"Worker session '{0}+' is finished".format(worker_id), log_content
+        )
 
         assert (
             len(found) == occurrences
@@ -122,7 +124,10 @@ def _check_workers_gracefull_stop(runner, worker_pids, occurrences=1):
 @pytest.mark.timeout(300)
 def test_standalone_agent_kill():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL,
+        enable_debug_log=True,
+        workers_type="process",
+        workers_session_count=2,
     )
 
     runner.start()
@@ -170,7 +175,10 @@ def test_standalone_agent_kill():
 @pytest.mark.timeout(300)
 def test_standalone_agent_stop():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL,
+        enable_debug_log=True,
+        workers_type="process",
+        workers_session_count=2,
     )
 
     runner.start()
@@ -190,7 +198,10 @@ def test_standalone_agent_stop():
 @pytest.mark.timeout(300)
 def test_standalone_agent_restart():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL,
+        enable_debug_log=True,
+        workers_type="process",
+        workers_session_count=2,
     )
 
     runner.start()
@@ -235,7 +246,10 @@ def test_standalone_agent_restart():
 @pytest.mark.timeout(300)
 def test_standalone_agent_config_reload():
     runner = AgentRunner(
-        DEV_INSTALL, enable_debug_log=True, workers_type="process", workers_count=2,
+        DEV_INSTALL,
+        enable_debug_log=True,
+        workers_type="process",
+        workers_session_count=2,
     )
 
     runner.start()
@@ -252,8 +266,8 @@ def test_standalone_agent_config_reload():
 
     old_worker_pids = worker_pids.copy()
     config = runner.config
-    config_worker_count = config["default_workers_per_api_key"]
-    config["default_workers_per_api_key"] = config_worker_count + 1
+    config_worker_count = config["default_sessions_per_worker"]
+    config["default_sessions_per_worker"] = config_worker_count + 1
     runner.write_config(config)
 
     logging.info("checking in the loop until all old worker processes are gone")
@@ -283,9 +297,6 @@ def test_standalone_agent_config_reload():
     logging.info("checking in loop until the  workers number is increased")
     while True:
         try:
-            worker_pids = {}
-            children = []
-            workers_processes = []
             process, worker_pids, children, workers_processes = _perform_workers_check(
                 runner
             )

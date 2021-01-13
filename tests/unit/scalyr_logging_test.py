@@ -416,7 +416,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
 
         self.__logger.set_keep_last_record(True)
-        # NOTE: Actual value which is being used for the rate limitting is the formatted value
+        # NOTE: Actual value which is being used for the rate limiting is the formatted value
         # and that value contains much more information than the string we generate here.
         # This means that 450 + common formatted string data will aways be > 500 and we need to
         # make sure that "max_write_burst" value we use is large enough so formatted "First

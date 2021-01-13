@@ -1671,10 +1671,10 @@ class ScalyrAgent(object):
         stats = overall_stats
 
         log.info(
-            "copy_manager_status workers_number=%ld total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
+            "copy_manager_status num_worker_sessions=%ld total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
             "total_request_time=%lf total_pipelined_requests=%ld avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
             % (
-                stats.num_workers,
+                stats.num_worker_sessions,
                 stats.total_scan_iterations,
                 stats.total_read_time,
                 stats.total_compression_time,
@@ -1785,7 +1785,9 @@ class ScalyrAgent(object):
                 delta_stats.total_monitor_errors += monitor_status.errors
 
         # get client session states from all workers of the copying manager and sum up all their stats.
-        session_states = self.__copying_manager.get_worker_session_statuses()
+        session_states = (
+            self.__copying_manager.get_worker_session_scalyr_client_statuses()
+        )
         for session_state in session_states:
 
             delta_stats.total_requests_sent += session_state.total_requests_sent
@@ -1818,7 +1820,9 @@ class ScalyrAgent(object):
         result.num_running_monitors = running_monitors
         result.num_dead_monitors = dead_monitors
         if current_status.copying_manager_status is not None:
-            result.num_workers = current_status.copying_manager_status.workers_number
+            result.num_workers = (
+                current_status.copying_manager_status.num_worker_sessions
+            )
 
         (
             result.user_cpu,

@@ -54,10 +54,10 @@ from tests.unit.copying_manager_tests.test_environment import (
 from scalyr_agent.copying_manager import copying_manager
 from scalyr_agent.copying_manager import (
     CopyingManager,
-    ApiKeyWorkerPool,
-    CopyingManagerThreadedWorker,
+    CopyingManagerWorker,
+    CopyingManagerWorkerSession,
 )
-from scalyr_agent.copying_manager.worker import WORKER_PROXY_EXPOSED_METHODS
+from scalyr_agent.copying_manager.worker import WORKER_SESSION_PROXY_EXPOSED_METHODS
 
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.log_processing import LogMatcher
@@ -70,7 +70,7 @@ def extract_lines_from_request(request):
     """Extract lines from AddEventsRequest"""
     result = list()
 
-    # if we test ShardedCopyingManager, it returns multiple requests for each of its workers,
+    # if we test ShardedCopyingManager, it returns multiple requests for each of its worker sessions,
     if isinstance(request, (list, tuple)):
         for req in request:
             lines = extract_lines_from_request(req)
@@ -95,7 +95,7 @@ def extract_lines_from_request(request):
 
 class CopyingManagerCommonTest(object):
     """
-    Test case with many helpful features for CopyingManager and CopyingManagerWorker testing.
+    Test case with many helpful features for CopyingManager and CopyingManagerWorkerSession testing.
     """
 
     def setup(self):
@@ -151,8 +151,8 @@ class CopyingManagerCommonTest(object):
         :return:
         """
 
-        # set worker into sleeping state, so it can process new lines and send them.
-        self._instance.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
+        # set worker sessions into sleeping state, so it can process new lines and send them.
+        self._instance.run_and_stop_at(TestableCopyingManagerWorkerSession.SLEEPING)
 
         self._append_lines(lines, log_file=log_file)
         request_lines = self._wait_for_rpc_and_respond(response)
@@ -183,14 +183,14 @@ class CopyingManagerCommonTest(object):
 
 class TestableCopyingManagerFlowController:
     """
-    This abstraction is used to allow for end-to-end testing of the CopyingManagerWorker and the CopyingManager itself.
-    It is nothing more than set of common members that will be inherited by TestableCopyingWorker and TestableCopyingManager.
+    This abstraction is used to allow for end-to-end testing of the CopyingManagerWorkerSession and the CopyingManager itself.
+    It is nothing more than set of common members that will be inherited by TestableCopyingWorkerSession and TestableCopyingManager.
     For more info, please see the appropriate subclasses.
     """
 
     __test__ = False
 
-    # The different points at which the CopyingManagerWorker can be stopped.  See below.
+    # The different points at which the CopyingManagerWorkerSession can be stopped.  See below.
     SLEEPING = "SLEEPING"
     SENDING = "SENDING"
     RESPONDING = "RESPONDING"
@@ -203,7 +203,7 @@ class TestableCopyingManagerFlowController:
 
         # This cv protects all of the variables written by the CopyingManager thread.
         self._test_state_cv = threading.Condition()
-        # Which state the CopyingManager or Worker should block in -- "sleeping", "sending", "responding"
+        # Which state the CopyingManager or Worker session should block in -- "sleeping", "sending", "responding"
         # We initialize it to a special value "all" so that it stops as soon the CopyingManager starts up.
         self._test_stop_state = "all"
 
@@ -246,10 +246,10 @@ class TestableCopyingManagerFlowController:
         self._test_state_cv.release()
 
     def perform_scan(self):
-        """Tells the CopyingManagerWorker thread to go through the process loop until far enough where it has performed
+        """Tells the CopyingManagerWorkerSession thread to go through the process loop until far enough where it has performed
         the scan of the file system looking for new bytes in the log file.
 
-        At this point, the CopyingManagerWorker should have a request ready to be sent.
+        At this point, the CopyingManagerWorkerSession should have a request ready to be sent.
         """
         # We guarantee it has scanned by making sure it has gone from sleeping to sending.
         self.run_and_stop_at(
@@ -258,7 +258,7 @@ class TestableCopyingManagerFlowController:
         )
 
     def perform_pipeline_scan(self):
-        """Tells the CopyingManagerWorker thread to advance far enough where it has performed the file system scan
+        """Tells the CopyingManagerWorkerSession thread to advance far enough where it has performed the file system scan
         for the pipelined AddEventsRequest, if the manager is configured to send one..
 
         This is only valid to call immediately after a ``perform_scan``
@@ -270,16 +270,16 @@ class TestableCopyingManagerFlowController:
         )
 
     def wait_for_full_iteration(self):
-        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING,)
+        self.run_and_stop_at(TestableCopyingManagerWorkerSession.SLEEPING,)
 
         self.run_and_stop_at(
-            TestableCopyingManagerThreadedWorker.SENDING,
-            required_transition_state=TestableCopyingManagerThreadedWorker.SLEEPING,
+            TestableCopyingManagerWorkerSession.SENDING,
+            required_transition_state=TestableCopyingManagerWorkerSession.SLEEPING,
         )
 
         self.run_and_stop_at(
-            TestableCopyingManagerThreadedWorker.SLEEPING,
-            required_transition_state=TestableCopyingManagerThreadedWorker.SENDING,
+            TestableCopyingManagerWorkerSession.SLEEPING,
+            required_transition_state=TestableCopyingManagerWorkerSession.SENDING,
         )
 
     def _block_if_should_stop_at(self, current_point):
@@ -383,7 +383,7 @@ class TestableCopyingManagerFlowController:
         @param start_time:  The start time when we first began waiting on this condition, in seconds past epoch.
         @type start_time: Number
         """
-        deadline = start_time + TestableCopyingManagerThreadedWorker.WAIT_TIMEOUT
+        deadline = start_time + TestableCopyingManagerWorkerSession.WAIT_TIMEOUT
         self._test_state_cv.wait(timeout=(deadline - time.time()) + 0.5)
         if time.time() > deadline:
             raise AssertionError(
@@ -391,15 +391,15 @@ class TestableCopyingManagerFlowController:
             )
 
 
-class TestableCopyingManagerThreadedWorker(
-    CopyingManagerThreadedWorker, TestableCopyingManagerFlowController
+class TestableCopyingManagerWorkerSession(
+    CopyingManagerWorkerSession, TestableCopyingManagerFlowController
 ):
-    """An instrumented version of the CopyingManagerWorker which allows intercepting of requests sent, control when
-    the worker processes new logs, etc.
+    """An instrumented version of the CopyingManagerWorkerSession which allows intercepting of requests sent, control when
+    the worker session processes new logs, etc.
 
-    This allows for end-to-end testing of the core of the CopyingManagerWorker.
+    This allows for end-to-end testing of the core of the CopyingManagerWorkerSession.
 
-    Doing this right is a bit complicated because the CopyingManagerWorker runs in its own thread.
+    Doing this right is a bit complicated because the CopyingManagerWorkerSession runs in its own thread.
 
     Many members of this class are common with the TestableCopyingManager class
     and moved to the base class - TestableCopyingManagerFlowController
@@ -407,35 +407,35 @@ class TestableCopyingManagerThreadedWorker(
 
     __test__ = False
 
-    def __init__(self, configuration, api_key_config_entry, worker_id, is_daemon=False):
-        # Approach:  We will override key methods of CopyingManagerWorker, blocking them from returning until we tell
-        # to proceed.  This allows us to then do things like write new log lines while the CopyingManagerWorker is
+    def __init__(self, configuration, worker_config_entry, session_id, is_daemon=False):
+        # Approach:  We will override key methods of CopyingManagerWorkerSession, blocking them from returning until we tell
+        # to proceed.  This allows us to then do things like write new log lines while the CopyingManagerWorkerSession is
         # blocked.   Coordinating the communication between the two threads is done using one condition variable.
-        # We changed the CopyingManagerWorker to block in three places: while it is sleeping before it starts a new loop,
+        # We changed the CopyingManagerWorkerSession to block in three places: while it is sleeping before it starts a new loop,
         # when it invokes `_send_events` to send a new request, and when it blocks to receive the response.
         # These three states are referred to as 'sleeping', 'sending', 'responding'.
         #
-        # The CopyingManagerWorker will have state to record where it should next block (i.e., if it should block at
+        # The CopyingManagerWorkerSession will have state to record where it should next block (i.e., if it should block at
         # 'sleeping' when it attempts to sleep).
         #
         # We can manipulate this state, notifying changes on the conditional variable
         # by using following methods: 'wait_for_rpc', 'perform_scan', 'perform_pipeline_scan'
-        # The CopyingManagerWorker will block in this state (and indicate it is blocked) until the
+        # The CopyingManagerWorkerSession will block in this state (and indicate it is blocked) until the
         # we set a new state to block at.
 
-        CopyingManagerThreadedWorker.__init__(
-            self, configuration, api_key_config_entry, worker_id, is_daemon=is_daemon
+        CopyingManagerWorkerSession.__init__(
+            self, configuration, worker_config_entry, session_id, is_daemon=is_daemon
         )
         TestableCopyingManagerFlowController.__init__(self, configuration)
         self.__config = configuration
 
-        # the copying manager deletes worker checkpoint files when it stops.
-        # This variable preserves the content of thos files for testing.
+        # the copying manager deletes worker session checkpoint files when it stops.
+        # This variable preserves the content of those files for testing.
         self._saved_checkpoints = None
         self.saved_active_checkpoints = None
 
     def _sleep_but_awaken_if_stopped(self, seconds):
-        """Blocks the CopyingManagerWorker thread until the controller tells it to proceed.
+        """Blocks the CopyingManagerWorkerSession thread until the controller tells it to proceed.
         """
 
         if self._disable_flow_control:
@@ -445,14 +445,14 @@ class TestableCopyingManagerThreadedWorker(
 
         self._test_state_cv.acquire()
         try:
-            self._block_if_should_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
+            self._block_if_should_stop_at(TestableCopyingManagerWorkerSession.SLEEPING)
         finally:
             self._test_state_cv.release()
 
-    def _create_add_events_request(self, session_info=None, max_size=None):
+    def _create_add_events_request(self, client_session_info=None, max_size=None):
         # Need to override this to return an AddEventsRequest even though we don't have a real scalyr client instance.
-        if session_info is None:
-            body = dict(server_attributes=session_info, token="fake")
+        if client_session_info is None:
+            body = dict(server_attributes=client_session_info, token="fake")
         else:
             body = dict(token="fake")
 
@@ -475,7 +475,7 @@ class TestableCopyingManagerThreadedWorker(
 
         self._test_state_cv.acquire()
         try:
-            self._block_if_should_stop_at(TestableCopyingManagerThreadedWorker.SENDING)
+            self._block_if_should_stop_at(TestableCopyingManagerWorkerSession.SENDING)
             self._captured_request = add_events_task.add_events_request
         finally:
             self._test_state_cv.release()
@@ -486,7 +486,7 @@ class TestableCopyingManagerThreadedWorker(
             self._test_state_cv.acquire()
             try:
                 self._block_if_should_stop_at(
-                    TestableCopyingManagerThreadedWorker.RESPONDING
+                    TestableCopyingManagerWorkerSession.RESPONDING
                 )
 
                 # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
@@ -503,17 +503,19 @@ class TestableCopyingManagerThreadedWorker(
 
         return emit_response
 
-    def start_worker(self, stop_at=TestableCopyingManagerFlowController.SLEEPING):
+    def start_worker_session(
+        self, stop_at=TestableCopyingManagerFlowController.SLEEPING
+    ):
         """
         Overrides base class method, to initialize "scalyr_client" by default.
         """
-        super(TestableCopyingManagerThreadedWorker, self).start_worker()
+        super(TestableCopyingManagerWorkerSession, self).start_worker_session()
 
         if not self._disable_flow_control and stop_at:
             self.run_and_stop_at(stop_at)
 
-    def stop_worker(self, wait_on_join=True, join_timeout=5):
-        """Stops the worker's thread.
+    def stop_worker_session(self, wait_on_join=True, join_timeout=5):
+        """Stops the worker session's thread.
 
         @param wait_on_join:  Whether or not to wait on thread to finish.
         @param join_timeout:  The number of seconds to wait on the join.
@@ -524,14 +526,14 @@ class TestableCopyingManagerThreadedWorker(
         """
 
         if not self._disable_flow_control:
-            # We need to do some extra work here in case the CopyingManagerWorker thread is currently in a blocked state.
+            # We need to do some extra work here in case the CopyingManagerWorkerSession thread is currently in a blocked state.
             # We need to tell it to keep running.
             self._test_state_cv.acquire()
             self._test_stop_state = None
             self._test_state_cv.notifyAll()
             self._test_state_cv.release()
 
-        CopyingManagerThreadedWorker.stop_worker(
+        CopyingManagerWorkerSession.stop_worker_session(
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
 
@@ -543,13 +545,13 @@ class TestableCopyingManagerThreadedWorker(
         pass
 
     def wait_for_rpc(self, with_callback=True):
-        """Tells the CopyingManagerWorker thread to advance to the point where it has emulated sending an RPC.
+        """Tells the CopyingManagerWorkerSession thread to advance to the point where it has emulated sending an RPC.
 
-        @return:  A tuple containing the AddEventsRequest that was sent by the CopyingManagerWorker and a function that
+        @return:  A tuple containing the AddEventsRequest that was sent by the CopyingManagerWorkerSession and a function that
             when invoked will return the passed in status message as the response to the AddEventsRequest.
         @rtype: (AddEventsRequest, func)
         """
-        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.RESPONDING)
+        self.run_and_stop_at(TestableCopyingManagerWorkerSession.RESPONDING)
         request = self._get_captured_request()
 
         if with_callback:
@@ -564,10 +566,10 @@ class TestableCopyingManagerThreadedWorker(
         :param status_message: Response message for the request.
         """
         self._set_response(status_message)
-        self.run_and_stop_at(TestableCopyingManagerThreadedWorker.SLEEPING)
+        self.run_and_stop_at(TestableCopyingManagerWorkerSession.SLEEPING)
 
     def close_at_eof(self, filepath):
-        """Tells the CopyingManagerWorker to mark the LogFileProcessor copying the specified path to close itself
+        """Tells the CopyingManagerWorkerSession to mark the LogFileProcessor copying the specified path to close itself
         once all bytes have been copied up to Scalyr.  This can be used to remove LogProcessors for
         testing purposes.
 
@@ -584,11 +586,11 @@ class TestableCopyingManagerThreadedWorker(
         """
         Override this method to preserve the data of the checkpoint files in case
         if this function has been invoked before stop. (Copying manager removes
-        worker files when stops)
+        worker session files when stops)
         :param current_time:
         :return:
         """
-        super(TestableCopyingManagerThreadedWorker, self)._write_full_checkpoint_state(
+        super(TestableCopyingManagerWorkerSession, self)._write_full_checkpoint_state(
             current_time
         )
         self._saved_checkpoints, self.saved_active_checkpoints = self.get_checkpoints()
@@ -608,7 +610,7 @@ class TestableCopyingManagerThreadedWorker(
 
     def get_checkpoints(self):
         """
-        Get checkpoint states of the worker.
+        Get checkpoint states of the worker session.
         :return:
         """
         if self.get_checkpoints_path().exists():
@@ -629,11 +631,11 @@ class TestableCopyingManagerThreadedWorker(
         path.write_text(six.ensure_text(json.dumps(data)))
 
     def change_last_attempt_time(self, value):
-        self._CopyingManagerThreadedWorker__last_attempt_time = value
+        self._last_attempt_time = value
 
     @property
     def last_attempt_time(self):
-        return self._CopyingManagerThreadedWorker__last_attempt_time
+        return self._last_attempt_time
 
     def get_pid(self):
         return os.getpid()
@@ -641,26 +643,26 @@ class TestableCopyingManagerThreadedWorker(
     # endregion
 
 
-class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
-    def __init__(self, config, api_key_config):
+class TestableCopyingManagerWorker(CopyingManagerWorker):
+    def __init__(self, config, worker_config):
         # type: (TestingConfiguration, Dict) -> None
         self._skip_agent_log_change = config.skip_agent_log_change
-        super(TestableApiKeyWorkerPool, self).__init__(config, api_key_config)
+        super(TestableCopyingManagerWorker, self).__init__(config, worker_config)
 
-    def _change_worker_process_agent_log_path(self, path):
+    def _change_worker_session_process_agent_log_path(self, path):
         """
         If there ia an appropriate configuration value,
-        we do not say change agent log path for workers,
+        we do not say to change agent log path for workers,
         because some of the test cases do not create agent log files at all.
         """
         if not self._skip_agent_log_change:
-            super(TestableApiKeyWorkerPool, self)._change_worker_process_agent_log_path(
-                path
-            )
+            super(
+                TestableCopyingManagerWorker, self
+            )._change_worker_session_process_agent_log_path(path)
 
     def _stop_shared_object_managers(self):
         """
-        We may need to interact with workers even after manager is stopped,
+        We may need to interact with worker sessions even after manager is stopped,
          so do not stop the shared object managers.
         """
         pass
@@ -670,7 +672,7 @@ class TestableApiKeyWorkerPool(ApiKeyWorkerPool):
          Because the '_stop_shared_object_managers' is stubbed,
         we need to have another method to stop the shaded object managers when it is really time.
         """
-        return super(TestableApiKeyWorkerPool, self)._stop_shared_object_managers()
+        return super(TestableCopyingManagerWorker, self)._stop_shared_object_managers()
 
 
 class TestableLogMatcher(LogMatcher):
@@ -687,11 +689,11 @@ class TestableLogMatcher(LogMatcher):
 
 class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowController):
     """
-    Since the real copying happens in the workers of the CopyingManager, this abstraction
-    is used to synchronize its worker instances.
-    The main goal of this - is to provide the same interface as TestalbeCopyingManagerWorker provides
-    and to control workers seamlessly through the copying manager.
-    NOTE: Many members do not differ from  some members of the TestableCopyingManagerWorker,
+    Since the real copying happens in the worker sessions in the CopyingManager, this abstraction
+    is used to synchronize those worker session instances.
+    The main goal of this - is to provide the same interface as TestalbeCopyingManagerWorkerSession provides
+    and to control worker sessions seamlessly through the copying manager.
+    NOTE: Many members do not differ from  some members of the TestableCopyingManagerWorkerSession,
     so they were moved into common base class - TestableCopyingManagerFlowController. Please see also there.
     """
 
@@ -702,40 +704,45 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         # do this just to tell static analyzer that this is a testable instances.
         self._log_matchers = self._log_matchers  # type: List[TestableLogMatcher]
 
-    def _create_worker_pools(self):
+    def _create_workers(self):
         # We are going to control the flow of our
-        # workers by using 'TestableCopyingManagerWorker' subclass of the 'CopyingManagerWorker'
-        # that's why we need change original worker class by testable class.
-        # We also do the same thing with 'ApiKeyWorkerPool' and the shared object manager class
+        # worker sessions by using 'TestableCopyingManagerWorkerSession' subclass of the 'CopyingManagerWorkerSession'
+        # that's why we need change original worker session class by testable class.
+        # We also do the same thing with 'Worker' and the shared object manager classed
         from scalyr_agent.copying_manager import copying_manager
         from scalyr_agent.copying_manager import worker
 
         def create_testeble_shared_object_manager(*args, **kwargs):
             return original_create_shared_object_manager(
-                TestableCopyingManagerThreadedWorker, TestableCopyingManagerWorkerProxy
+                TestableCopyingManagerWorkerSession,
+                TestableCopyingManagerWorkerSessionProxy,
             )
 
         # save original classes and function to the testable ones.
-        original_worker = copying_manager.CopyingManagerThreadedWorker
-        original_worker_proxy = copying_manager.CopyingManagerWorkerProxy
-        original_worker_pool = copying_manager.ApiKeyWorkerPool
+        original_worker_session = copying_manager.CopyingManagerWorkerSession
+        original_worker_session_proxy = copying_manager.CopyingManagerWorkerSessionProxy
+        original_worker = copying_manager.CopyingManagerWorker
         original_create_shared_object_manager = worker.create_shared_object_manager
 
         # replace original classes by testable.
-        copying_manager.CopyingManagerThreadedWorker = (
-            TestableCopyingManagerThreadedWorker
+        copying_manager.CopyingManagerWorkerSession = (
+            TestableCopyingManagerWorkerSession
         )
-        copying_manager.CopyingManagerWorkerProxy = TestableCopyingManagerWorkerProxy
-        copying_manager.ApiKeyWorkerPool = TestableApiKeyWorkerPool
+        copying_manager.CopyingManagerWorkerSessionProxy = (
+            TestableCopyingManagerWorkerSessionProxy
+        )
+        copying_manager.CopyingManagerWorker = TestableCopyingManagerWorker
         worker.create_shared_object_manager = create_testeble_shared_object_manager
 
         try:
-            super(TestableCopyingManager, self)._create_worker_pools()
+            super(TestableCopyingManager, self)._create_workers()
         finally:
-            # return back original worker class.
-            copying_manager.CopyingManagerThreadedWorker = original_worker
-            copying_manager.CopyingManagerWorkerProxy = original_worker_proxy
-            copying_manager.ApiKeyWorkerPool = original_worker_pool
+            # return back original classes.
+            copying_manager.CopyingManagerWorkerSession = original_worker_session
+            copying_manager.CopyingManagerWorkerSessionProxy = (
+                original_worker_session_proxy
+            )
+            copying_manager.CopyingManagerWorker = original_worker
             worker.create_shared_object_manager = original_create_shared_object_manager
 
     def _create_log_matchers(self, configuration, monitors):
@@ -766,7 +773,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     def _sleep_but_awaken_if_stopped(self, seconds):
         """
         This method is overridden for in order to synchronize with
-        its workers. After each loop, the copying manager enters this method and manipulates its workers.
+        its worker sessions. After each loop, the copying manager enters this method and manipulates its worker sessions.
 
         :param seconds:
         :return:
@@ -780,14 +787,13 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         self._test_state_cv.acquire()
         try:
 
-            # this block is used to synchronize with workers before the do their "send_event".
+            # this block is used to synchronize with worker sessions before doing their "send_event".
             self._block_if_should_stop_at(TestableCopyingManagerFlowController.SENDING)
             responder_callbacks = list()
             requests = list()
-            # get requests from every worker
-            # for api_key_pool in self._api_keys_worker_pools.values():
-            for worker in self.workers:
-                request, responder_callback = worker.wait_for_rpc()
+            # get requests from every worker session
+            for worker_session in self.worker_sessions:
+                request, responder_callback = worker_session.wait_for_rpc()
 
                 # save respond callbacks to be able to set responses for requests that were made by workers.
                 responder_callbacks.append(responder_callback)
@@ -849,9 +855,9 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
 
     def cleanup(self):
         """
-        Stopping the shared object managers from api worker pools.
+        Stopping the shared object managers from workers.
         """
-        for worker_pool in self.api_keys_worker_pools.values():
+        for worker_pool in self.workers.values():
             worker_pool.stop_shared_object_managers()
 
     def perform_scan(self):
@@ -864,7 +870,7 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         # We guarantee it has scanned by making sure it has gone from sleeping to sending.
         super(TestableCopyingManager, self).perform_scan()
 
-        for worker in self.workers:
+        for worker in self.worker_sessions:
             worker.perform_scan()
 
     def wait_for_rpc(self):
@@ -886,15 +892,15 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
 
     # region Utility functions
     @property
-    def workers(self):
-        # type: () -> List[TestableCopyingManagerThreadedWorker]
+    def worker_sessions(self):
+        # type: () -> List[TestableCopyingManagerWorkerSession]
         """
-        Return all workers from all worker pools as a single list.
+        Return all worker sessions from all workers as a single list.
         :return:
         """
         result = []  # type: ignore
-        for api_key_pool in self.api_keys_worker_pools.values():
-            result.extend(api_key_pool.workers)
+        for worker in self.workers.values():
+            result.extend(worker.sessions)
         return result
 
     @property
@@ -918,17 +924,17 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         return sum(len(m.log_processors) for m in self.log_matchers)
 
     @property
-    def workers_log_processors_count(self):
-        return sum(len(w.get_log_processors()) for w in self.workers)
+    def worker_sessions_log_processors_count(self):
+        return sum(len(w.get_log_processors()) for w in self.worker_sessions)
 
     # endregion
 
 
 # create proxy class for the testable worker. The testable worker has its own methods that also have to be exposed
 # by proxies.
-_TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
-    six.ensure_str("CopyingManagerWorkerProxy"),
-    WORKER_PROXY_EXPOSED_METHODS
+_TestableCopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
+    six.ensure_str("CopyingManagerWorkerSessionProxy"),
+    WORKER_SESSION_PROXY_EXPOSED_METHODS
     + [
         six.ensure_str("run_and_stop_at"),
         six.ensure_str("wait_for_rpc"),
@@ -950,7 +956,7 @@ _TestableCopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # 
 )
 
 
-class TestableCopyingManagerWorkerProxy(_TestableCopyingManagerWorkerProxy):  # type: ignore
+class TestableCopyingManagerWorkerSessionProxy(_TestableCopyingManagerWorkerSessionProxy):  # type: ignore
     def wait_for_rpc(self, *args, **kwargs):
         """
         Override this method for proxy to be able to return the callable objects.
