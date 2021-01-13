@@ -68,7 +68,9 @@ def pytest_generate_tests(metafunc):
         if platform.system() != "Windows" and sys.version_info >= (2, 7):
             test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
-        metafunc.parametrize("worker_type, api_keys_count, workers_count", test_params)
+        metafunc.parametrize(
+            "worker_type, workers_count, worker_sessions_count", test_params
+        )
 
 
 def _add_non_utf8_to_checkpoint_file(path):
@@ -301,7 +303,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.assertEquals("Third line", lines[2])
 
     def test_pipelined_requests(self):
-        if self.workers_count * self.api_keys_count > 1:
+        if self.worker_sessions_count * self.workers_count > 1:
             pytest.skip("This test works only on one worker configuration.")
 
         controller = self.__create_test_instance(use_pipelining=True)
@@ -333,7 +335,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         responder_callback("success")
 
     def test_pipelined_requests_with_normal_error(self):
-        if self.workers_count * self.api_keys_count > 1:
+        if self.worker_sessions_count * self.workers_count > 1:
             pytest.skip("This test works only on one worker configuration.")
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
@@ -375,7 +377,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         responder_callback("success")
 
     def test_pipelined_requests_with_retry_error(self):
-        if self.workers_count * self.api_keys_count > 1:
+        if self.worker_sessions_count * self.workers_count > 1:
             pytest.skip("This test works only on one worker configuration.")
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines("First line", "Second line")
@@ -448,7 +450,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.__append_log_lines("Fifth line", "Sixth line")
 
         # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
-        for worker in self._manager.workers:
+        for worker in self._manager.worker_sessions:
             checkpoints, active_chp, = worker.get_checkpoints()
             checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
             active_chp["time"] -= self._config.max_allowed_checkpoint_age + 1
@@ -493,7 +495,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         # "active_checkpoints" file is used if it is newer than "full_checkpoints",
         # so we read "full_checkpoints" ...
 
-        for worker in self._manager.workers:
+        for worker in self._manager.worker_sessions:
             checkpoints, active_checkpoints = worker.get_checkpoints()
 
             # ... and make bigger(fresher) time value for "active_checkpoints".
@@ -537,7 +539,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         # because it has to clean all other files on stop. From this moment, all checkpoint states are removed
         os.remove(os.path.join(self._config.agent_data_path, "checkpoints.json"))
 
-        for worker in self._manager.workers:
+        for worker in self._manager.worker_sessions:
             # get preserved checkpoints from workers and write them ones more.
             # we do not write active-checkpoints because it is the purpose of this test.
             checkpoints, _ = worker.get_checkpoints()
@@ -632,8 +634,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         all_log_processors = {}
 
         # chech if each log file has its own log processor.
-        for api_key_status in status.api_key_worker_pools:
-            for worker_status in api_key_status.workers:
+        for api_key_status in status.workers:
+            for worker_status in api_key_status.sessions:
                 for processor_status in worker_status.log_processors:
                     all_log_processors[processor_status.log_path] = processor_status
 

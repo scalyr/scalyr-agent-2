@@ -151,7 +151,7 @@ def create_client(config, quiet=False, api_key=None):
         disable_send_requests=config.disable_send_requests,
         disable_logfile_addevents_format=config.disable_logfile_addevents_format,
         enforce_monotonic_timestamps=config.enforce_monotonic_timestamps,
-        workers_api_keys_tuple=config.get_number_of_configured_workers_and_api_keys(),
+        sessions_api_keys_tuple=config.get_number_of_configured_sessions_and_api_keys(),
     )
 
 
@@ -229,7 +229,7 @@ class ScalyrClientSession(object):
         disable_send_requests=False,
         disable_logfile_addevents_format=False,
         enforce_monotonic_timestamps=False,
-        workers_api_keys_tuple=None,
+        sessions_api_keys_tuple=None,
     ):
         """Initializes the connection.
 
@@ -250,8 +250,8 @@ class ScalyrClientSession(object):
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
         @param enforce_monotonic_timestamps: A bool that indicates whether event timestamps in the same session
             should be monotonically increasing or not.  Defaults to False
-        @param workers_api_keys_tuple: Tuple containing worker type (multiprocess, threaded) total
-            number of configured workers and number of unique API keys configured.
+        @param sessions_api_keys_tuple: Tuple containing worker type (multiprocess, threaded) total
+            number of configured worker sessions and number of unique API keys configured.
 
         @type server: six.text_type
         @type api_key: six.text_type
@@ -264,7 +264,7 @@ class ScalyrClientSession(object):
         @type compression_type: six.text_type
         @type compression_level: int
         @type enforce_monotonic_timestamps: bool
-        @type workers_api_keys_tuple: tuple
+        @type sessions_api_keys_tuple: tuple
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
@@ -304,7 +304,7 @@ class ScalyrClientSession(object):
             "Connection": "Keep-Alive",
             "Accept": "application/json",
             "User-Agent": self.__get_user_agent(
-                agent_version, workers_api_keys_tuple=workers_api_keys_tuple
+                agent_version, sessions_api_keys_tuple=sessions_api_keys_tuple
             ),
         }
 
@@ -859,7 +859,7 @@ class ScalyrClientSession(object):
         )
 
     def __get_user_agent(
-        self, agent_version, fragments=None, workers_api_keys_tuple=None
+        self, agent_version, fragments=None, sessions_api_keys_tuple=None
     ):
         """Determine the user agent to report in the request headers.
 
@@ -954,17 +954,17 @@ class ScalyrClientSession(object):
 
         # Possible values for this header fragment:
         # mw-0 - Sharded copy manager functionality is disabled
-        # mw-1|<num_workers>|<num_api_keys> - Functionality is enabled and there are <num_workers>
-        # thread based workers configured with <num_api_keys> unique API keys.
-        # mw-2|<num_workers>|<num_api_keys> - Functionality is enabled and there are <num_workers>
-        # process based workers configured with <num_api_keys> unique API keys.
+        # mw-1|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
+        # thread based sessions configured with <num_api_keys> unique API keys.
+        # mw-2|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
+        # process based sessions configured with <num_api_keys> unique API keys.
         if (
-            workers_api_keys_tuple
-            and isinstance(workers_api_keys_tuple, tuple)
-            and len(workers_api_keys_tuple) == 3
-            and workers_api_keys_tuple[1] > 1
+            sessions_api_keys_tuple
+            and isinstance(sessions_api_keys_tuple, tuple)
+            and len(sessions_api_keys_tuple) == 3
+            and sessions_api_keys_tuple[1] > 1
         ):
-            (worker_type, workers_count, api_keys_count,) = workers_api_keys_tuple
+            (worker_type, workers_count, api_keys_count,) = sessions_api_keys_tuple
 
             if worker_type == "multiprocess":
                 sharded_copy_manager_string = "mw-2|"

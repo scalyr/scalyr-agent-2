@@ -32,7 +32,7 @@ if False:
     from typing import Optional
 
 from scalyr_agent import scalyr_logging as scalyr_logging, StoppableThread
-from scalyr_agent.agent_status import CopyingManagerWorkerStatus
+from scalyr_agent.agent_status import CopyingManagerWorkerSessionStatus
 from scalyr_agent.log_processing import LogFileProcessor
 from scalyr_agent.util import RateLimiter
 from scalyr_agent import util as scalyr_util
@@ -41,6 +41,7 @@ from scalyr_agent.scalyr_client import (
     create_client,
     create_new_client,
     ScalyrClientSession,
+    ScalyrClientSessionStatus,
 )
 from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
 
@@ -205,42 +206,43 @@ class AddEventsTask(object):
         self.next_pipelined_task = None
 
 
-class CopyingManagerWorker(six.with_metaclass(ABCMeta)):
+class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
     """
-    The interface for the Copying manager worker classes.
+    The interface for the Copying manager worker session classes.
     """
 
     @abstractmethod
-    def start_worker(self):
+    def start_worker_session(self):
         pass
 
     @abstractmethod
-    def stop_worker(self, wait_on_join=True, join_timeout=5):
-        """Stops the worker.
+    def stop_worker_session(self, wait_on_join=True, join_timeout=5):
+        """Stops the worker session.
 
-        @param wait_on_join: If True, will block on a join of the thread running the worker.
+        @param wait_on_join: If True, will block on a join of the thread running the worker session.
         @param join_timeout: The maximum number of seconds to block for the join.
         """
         pass
 
     @abstractmethod
-    def generate_status(self, warn_on_rate_limit=False):
-        """Generate the status for the copying manager worker to be reported.
+    def generate_status(
+        self, warn_on_rate_limit=False
+    ):  # type: (bool) -> CopyingManagerWorkerSessionStatus
+        """Generate the status for the copying manager worker session to be reported.
 
         This is used in such features as 'scalyr-agent-2 status -v'.
 
         Note, this method is thread safe.  It needs to be since another thread will ask this object for its
         status.
 
-        @return:  The status object containing the statistics for the copying manager.
-        @rtype: CopyingManagerStatus
+        @return:  The status object containing the statistics for the copying manager worker session.
         """
         pass
 
     @abstractmethod
     def wait_for_copying_to_begin(self):
         """
-        Block the current thread until worker's instance has begun copying.
+        Block the current thread until session's instance has begun copying.
         """
         pass
 
@@ -253,12 +255,13 @@ class CopyingManagerWorker(six.with_metaclass(ABCMeta)):
         pass
 
     @abstractmethod
-    def augment_user_agent_for_client_session(self, fragments):
+    def augment_scalyr_client_user_agent(
+        self, fragments
+    ):  # type: (List[six.text_type]) -> None
         """
-        Modifies User-Agent header of the session of the worker.
+        Modifies User-Agent header of the Scalyr client session.
 
         @param fragments String fragments to append (in order) to the standard user agent data
-        @type fragments: List of six.text_type
         """
         pass
 
@@ -267,37 +270,49 @@ class CopyingManagerWorker(six.with_metaclass(ABCMeta)):
         pass
 
     @abstractmethod
-    def generate_scalyr_client_status(self):
+    def generate_scalyr_client_status(self):  # type: () -> ScalyrClientSessionStatus
+        """
+        Get the status object of the Scalyr client.
+        """
+        pass
+
+    @abstractmethod
+    def log_worker_session_status(self):
+        """
+        Write the main information about the worker and session stats to the worker's agent log.
+        """
         pass
 
 
-class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
+class CopyingManagerWorkerSession(
+    StoppableThread, CopyingManagerWorkerSessionInterface
+):
     """
     Abstraction which is responsible for copying the log files to the Scalyr servers.
 
     This is run as its own thread.
     """
 
-    def __init__(self, configuration, api_key_config_entry, worker_id, is_daemon=False):
+    def __init__(self, configuration, worker_config_entry, session_id, is_daemon=False):
         # type: (Configuration, Dict, six.text_type, bool) -> None
-        """Initializes the copying manager worker.
+        """Initializes the copying manager worker session.
 
         @param configuration: The configuration file containing which log files need to be copied listed in the
             configuration file.
-        @param api_key_config_entry:
-        @param worker_id: Id of the worker.
-        @:param is_daemon: If true, start a worker thread as a daemon thread.
+        @param worker_config_entry:
+        @param session_id: Id of the worker session.
+        @:param is_daemon: If true, start a session thread as a daemon thread.
 
         """
         StoppableThread.__init__(
             self,
-            name="copying manager worker thread #%s" % worker_id,
+            name="copying manager worker session thread #%s" % session_id,
             is_daemon=is_daemon,
         )
 
-        self._id = six.text_type(worker_id)
+        self._id = six.text_type(session_id)
         self.__config = configuration
-        self.__api_key_config_entry = api_key_config_entry
+        self.__worker_config_entry = worker_config_entry
 
         self.__new_scalyr_client = None
 
@@ -319,7 +334,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__log_processors = []  # type: List[LogFileProcessor]
 
         # Temporary collection of recently added log processors.
-        # Every log processor which is added during the iteration of the worker is placed in here.
+        # Every log processor which is added during the iteration of the worker session is placed in here.
         # All those log processors will be added to the main collection
         # on the beginning of the next iteration.
         # It stores all new log processors before they are added to the main log processors list.
@@ -329,7 +344,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
 
-        # The current pending AddEventsTask.  We will retry the contained AddEventsRequest serveral times.
+        # The current pending AddEventsTask.  We will retry the contained AddEventsRequest several times.
         self.__pending_add_events_task = None
 
         # The next LogFileProcessor that should have log lines read from it for transmission.
@@ -344,7 +359,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         self.__last_stats_message_time = 0
 
         # Status variables that track statistics reported to the status page.
-        self.__last_attempt_time = None
+        self._last_attempt_time = None
         self.__last_success_time = None
         self.__last_attempt_size = None
         self.__last_response = None
@@ -378,7 +393,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         return copy.deepcopy(self.__expanded_server_attributes)
 
     def run(self):
-        """Processes the log files as requested by the configuration, looking for matching log files, reading their
+        """Processes the log files, which were added by copying manager, reading their
         bytes, applying redaction and sampling rules, and then sending them to the server.
 
         This method will not terminate until the thread has been stopped.
@@ -432,16 +447,17 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 )
 
                 log.info(
-                    "Copying manager worker #%s started. Pid: '%s'"
+                    "Copying manager worker session #%s started. Pid: '%s'"
                     % (self._id, os.getpid())
                 )
 
-                # Create new client for the worker
+                # Create new Scalyr client
                 self._init_scalyr_client()
 
                 # add one time interval to skip the status logging immediately after start,
-                self.__last_status_message_time = (
-                    current_time + self.__config.default_worker_status_message_interval
+                last_status_message_time = (
+                    current_time
+                    + self.__config.default_worker_session_status_message_interval
                 )
 
                 # We are about to start copying.  We can tell waiting threads.
@@ -449,7 +465,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 while self._run_state.is_running():
                     log.log(
                         scalyr_logging.DEBUG_LEVEL_1,
-                        "At top of copy log files loop on worker #%s. (Iteration #%s)"
+                        "At top of copy log files loop on worker session #%s. (Iteration #%s)"
                         % (self._id, self.total_copy_iterations),
                     )
                     current_time = time.time()
@@ -632,7 +648,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                         # Update the statistics and our copying parameters.
                         self.__lock.acquire()
                         copying_params.update_params(result, bytes_sent)
-                        self.__last_attempt_time = current_time
+                        self._last_attempt_time = current_time
                         self.__last_success_time = last_success_status
                         self.__last_attempt_size = bytes_sent
                         self.__last_response = six.ensure_text(full_response)
@@ -641,15 +657,15 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
 
-                        # if worker is in another process than write its main stats periodically to the its log.
+                        # if worker session is in another process than write its main stats periodically to the its log.
                         if (
-                            self.__config.use_multiprocess_copying_workers
-                            and self.__last_status_message_time
-                            + self.__config.default_worker_status_message_interval
+                            self.__config.use_multiprocess_workers
+                            and last_status_message_time
+                            + self.__config.default_worker_session_status_message_interval
                             < current_time
                         ):
-                            self.log_worker_status()
-                            self.__last_status_message_time = current_time
+                            self.log_worker_session_status()
+                            last_status_message_time = current_time
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
@@ -659,7 +675,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                                     "%s%s%s"
                                     % (
                                         self.__config.copying_thread_profile_output_path,
-                                        "copying_worker_",
+                                        "copying_worker_session_",
                                         datetime.datetime.utcnow().strftime(
                                             "%H_%M_%S.out"
                                         ),
@@ -676,7 +692,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                             "Failed while attempting to scan and transmit logs",
                         )
                         self.__lock.acquire()
-                        self.__last_attempt_time = current_time
+                        self._last_attempt_time = current_time
                         self.__total_errors += 1
                         self.__lock.release()
 
@@ -704,7 +720,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 # than we need to release it to be sure that the copying manager won't stuck in deadlock.
                 self.__copying_semaphore.release()
 
-                # stop worker's thread.
+                # stop worker session's thread.
                 sys.exit(1)
         finally:
             self._write_full_checkpoint_state(current_time)
@@ -720,37 +736,28 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 profiler.disable()
 
             log.log(
-                scalyr_logging.DEBUG_LEVEL_0, "Worker '%s' is finished." % self._id,
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Worker session '%s' is finished." % self._id,
             )
 
     def wait_for_copying_to_begin(self):
         """
-        Block the current thread until worker's instance has begun copying.
+        Block the current thread until worker session's instance has begun copying.
         """
         self.__copying_semaphore.acquire(True)
         return
 
     def generate_status(self, warn_on_rate_limit=False):
-        # type: (bool) -> CopyingManagerWorkerStatus
-        """Generate the status for the copying manager worker to be reported.
-
-        This is used in such features as 'scalyr-agent-2 status -v'.
-
-        Note, this method is thread safe.  It needs to be since another thread will ask this object for its
-        status.
-
-        @return:  The status object containing the statistics for the copying manager.
-        @rtype: CopyingManagerStatus
-        """
+        # type: (bool) -> CopyingManagerWorkerSessionStatus
         try:
             self.__lock.acquire()
 
-            result = CopyingManagerWorkerStatus()
-            result.worker_id = self._id
+            result = CopyingManagerWorkerSessionStatus()
+            result.session_id = self._id
             result.pid = os.getpid()
             result.total_bytes_uploaded = self.__total_bytes_uploaded
             result.last_success_time = self.__last_success_time
-            result.last_attempt_time = self.__last_attempt_time
+            result.last_attempt_time = self._last_attempt_time
             result.last_attempt_size = self.__last_attempt_size
             result.last_response = self.__last_response
             result.last_response_status = self.__last_response_status
@@ -768,18 +775,17 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
             for processor in self.__log_processors:
                 log_processor_status = processor.generate_status()
-                log_processor_status.worker_id = self._id
                 result.log_processors.append(log_processor_status)
 
-            if self.__last_attempt_time:
+            if self._last_attempt_time:
                 result.health_check_result = "Good"
                 if (
                     time.time()
-                    > self.__last_attempt_time
+                    > self._last_attempt_time
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
                     result.health_check_result = (
-                        "Worker '%s' failed, max time since last copy attempt (%s seconds) exceeded"
+                        "Worker session '%s' failed, max time since last copy attempt (%s seconds) exceeded"
                         % (
                             self._id,
                             self.__config.healthy_max_time_since_last_copy_attempt,
@@ -816,24 +822,24 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         """
         self._run_state.sleep_but_awaken_if_stopped(seconds)
 
-    def _create_add_events_request(self, session_info=None, max_size=None):
+    def _create_add_events_request(self, client_session_info=None, max_size=None):
         """Creates and returns a new AddEventRequest.
 
         This is created using the current instance of the scalyr client.
 
         Note, this method is exposed for testing purposes.
 
-        @param session_info:  The attributes to include as session attributes
+        @param client_session_info:  The attributes to include as client session attributes
         @param max_size:  The maximum number of bytes that request is allowed (when serialized)
 
-        @type session_info: JsonObject or dict
+        @type client_session_info: JsonObject or dict
         @type max_size: int
 
         @return: The add events request
         @rtype: AddEventsRequest
         """
         return self.__scalyr_client.add_events_request(
-            session_info=session_info, max_size=max_size
+            session_info=client_session_info, max_size=max_size
         )
 
     def _send_events(self, add_events_task):
@@ -902,7 +908,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         buffer_filled = False
 
         add_events_request = self._create_add_events_request(
-            session_info=self.__expanded_server_attributes,
+            client_session_info=self.__expanded_server_attributes,
             max_size=bytes_allowed_to_send,
         )
 
@@ -1071,23 +1077,15 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         """
         return self.__log_processors[:]
 
-    def start_worker(self):
+    def start_worker_session(self):
         self.start()
 
-    def stop_worker(self, wait_on_join=True, join_timeout=5):
-        """Stops the worker.
-
-        @param wait_on_join: If True, will block on a join of the thread running the worker.
-        @param join_timeout: The maximum number of seconds to block for the join.
-        """
+    def stop_worker_session(self, wait_on_join=True, join_timeout=5):
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
     def create_and_schedule_new_log_processor(self, *args, **kwargs):
         # type: (*Any, **Any) -> LogFileProcessor
-        """
-        Creates and also schedules a new log processor. It will be added to the main collection only on the next iteration,
-        so we don't have to guard the main collection with lock.
-        """
+
         log_processor = LogFileProcessor(*args, **kwargs)
 
         with self.__lock:
@@ -1118,14 +1116,9 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 "Log processor for file '%s' is added." % log_path,
             )
 
-    def augment_user_agent_for_client_session(self, fragments):
+    def augment_scalyr_client_user_agent(self, fragments):
         # type: (List[six.text_type]) -> None
-        """
-        Modifies User-Agent header of the session of the worker.
 
-        @param fragments String fragments to append (in order) to the standard user agent data
-        @type fragments: List of six.text_type
-        """
         with self.__lock:
             self.__scalyr_client.augment_user_agent(fragments)  # type: ignore
 
@@ -1141,7 +1134,7 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
         @return: The client to use for sending requests to Scalyr, using the server address and API write logs
             key in the configuration file.
         """
-        api_key = self.__api_key_config_entry["api_key"]
+        api_key = self.__worker_config_entry["api_key"]
         if self.__config.use_new_ingestion:
 
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
@@ -1150,18 +1143,15 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
                 self.__config, quiet=quiet, api_key=api_key
             )
 
-    def log_worker_status(self):
-        """
-        Write the main information about the worker and session stats to the worker's agent log.
-        """
-        worker_status = self.generate_status()
-        session_state = self.__scalyr_client.generate_status()
+    def log_worker_session_status(self):
+        worker_session_status = self.generate_status()
+        client_session_state = self.__scalyr_client.generate_status()
 
         total_bytes_skipped = 0
         total_bytes_copied = 0
         total_bytes_pending = 0
 
-        for processor_status in worker_status.log_processors:
+        for processor_status in worker_session_status.log_processors:
             total_bytes_skipped += processor_status.total_bytes_skipped
             total_bytes_copied += processor_status.total_bytes_copied
             total_bytes_pending += processor_status.total_bytes_pending
@@ -1178,14 +1168,14 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
 
         avg_bytes_copied_rate = (
             total_bytes_copied - self.__last_total_bytes_copied
-        ) / self.__config.default_worker_status_message_interval
+        ) / self.__config.default_worker_session_status_message_interval
 
         avg_bytes_produced_rate = (
             total_bytes_produced - last_total_bytes_produced
-        ) / self.__config.default_worker_status_message_interval
+        ) / self.__config.default_worker_session_status_message_interval
 
         log.info(
-            "worker_session_requests worker_id=%s session_id=%s session requests_sent=%ld requests_failed=%ld "
+            "worker_session_requests worker_session_id=%s scalyr_client_session_id=%s session requests_sent=%ld requests_failed=%ld "
             "bytes_sent=%ld compressed_bytes_sent=%ld bytes_received=%ld request_latency_secs=%lf connections_"
             "created=%ld total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_"
             "waiting_time=%lf total_blocking_response_time=%lf total_request_time=%lf total_pipelined_requests=%ld "
@@ -1193,20 +1183,20 @@ class CopyingManagerThreadedWorker(StoppableThread, CopyingManagerWorker):
             % (
                 self._id,
                 self.__scalyr_client.session_id,
-                session_state.total_requests_sent,
-                session_state.total_requests_failed,
-                session_state.total_request_bytes_sent,
-                session_state.total_compressed_request_bytes_sent,
-                session_state.total_response_bytes_received,
-                session_state.total_request_latency_secs,
-                session_state.total_connections_created,
-                worker_status.total_copy_iterations,
-                worker_status.total_read_time,
-                session_state.total_compression_time,
-                worker_status.total_waiting_time,
-                worker_status.total_blocking_response_time,
-                worker_status.total_request_time,
-                worker_status.total_pipelined_requests,
+                client_session_state.total_requests_sent,
+                client_session_state.total_requests_failed,
+                client_session_state.total_request_bytes_sent,
+                client_session_state.total_compressed_request_bytes_sent,
+                client_session_state.total_response_bytes_received,
+                client_session_state.total_request_latency_secs,
+                client_session_state.total_connections_created,
+                worker_session_status.total_copy_iterations,
+                worker_session_status.total_read_time,
+                client_session_state.total_compression_time,
+                worker_session_status.total_waiting_time,
+                worker_session_status.total_blocking_response_time,
+                worker_session_status.total_request_time,
+                worker_session_status.total_pipelined_requests,
                 avg_bytes_produced_rate,
                 avg_bytes_copied_rate,
             )
@@ -1274,96 +1264,99 @@ class LogFileProcessorProxy(_LogFileProcessorProxy):  # type: ignore
         return self.__cached_log_path
 
 
-# methods of the worker class that should be exposed through proxy object.
-WORKER_PROXY_EXPOSED_METHODS = [
-    six.ensure_str("start_worker"),
-    six.ensure_str("stop_worker"),
+# methods of the worker session class that should be exposed through proxy object.
+WORKER_SESSION_PROXY_EXPOSED_METHODS = [
+    six.ensure_str("start_worker_session"),
+    six.ensure_str("stop_worker_session"),
     six.ensure_str("wait_for_copying_to_begin"),
     six.ensure_str("get_id"),
-    six.ensure_str("augment_user_agent_for_client_session"),
+    six.ensure_str("augment_scalyr_client_user_agent"),
     six.ensure_str("generate_status"),
     six.ensure_str("generate_scalyr_client_status"),
     six.ensure_str("schedule_new_log_processor"),
-    six.ensure_str("generate_scalyr_client_status"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
 ]
 
-# create base proxy class for the worker, here we also specify all its methods that may be called through proxy.
-_CopyingManagerWorkerProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
-    six.ensure_str("CopyingManagerWorkerProxy"), WORKER_PROXY_EXPOSED_METHODS,
+# create base proxy class for the worker session, here we also specify all its methods that may be called through proxy.
+_CopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
+    six.ensure_str("CopyingManagerWorkerSessionProxy"),
+    WORKER_SESSION_PROXY_EXPOSED_METHODS,
 )
 
 
-# Create final proxy class for the worker class by subclassing the base class.
-class CopyingManagerWorkerProxy(_CopyingManagerWorkerProxy):  # type: ignore
+# Create final proxy class for the worker session class by subclassing the base class.
+class CopyingManagerWorkerSessionProxy(_CopyingManagerWorkerSessionProxy):  # type: ignore
     pass
 
 
-def create_shared_object_manager(worker_class, worker_proxy_class):
+def create_shared_object_manager(worker_session_class, worker_session_proxy_class):
     """
     Creates and returns an instance of the subclass of the 'scalyr_utils.ParentAwareSyncManager' and also registers
-    all proxy types that will be needed for the multiprocess worker.
+    all proxy types that will be needed for the multiprocess worker session.
     This is done in function, only to be reusable by the tests.
-    :param worker_class: The worker class to "proxify"
-    :param worker_proxy_class: The predefined worker proxy class.
+    :param worker_session_class: The worker session class to "proxify"
+    :param worker_session_proxy_class: The predefined worker session proxy class.
     :return: a new instance of the 'scalyr_utils.ParentAwareSyncManager' with registered proxies.
     """
 
     class _SharedObjectManager(scalyr_util.ParentProcessAwareSyncManager):
         """
-        The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker
+        The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker session
         instance in order to stop it if the parent process is killed.
 
-        According to the fact that the worker runs in manager's process in a separate thread, we have to
-        handle the situation where the agent was killed and worker remain alive in the manager's process
+        According to the fact that the worker session runs in manager's process in a separate thread, we have to
+        handle the situation where the agent was killed and worker session remains alive in the manager's process
         and keeps sending logs.
         """
 
         def __init__(self, *args, **kwargs):
             super(_SharedObjectManager, self).__init__(*args, **kwargs)
 
-            self._worker = None  # type: Optional[CopyingManagerWorker]
+            self._worker_session = (
+                None
+            )  # type: Optional[CopyingManagerWorkerSessionInterface]
 
-        def _create_worker(self, configuration, api_key_config_entry, worker_id):
-            # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorker
+        def _create_worker_session(
+            self, configuration, worker_config_entry, worker_session_id
+        ):
+            # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorkerSessionInterface
             """
-            Create a new worker and save it as an attribute.
+            Create a new worker session and save it as an attribute to be able to access the
+            worker session's instance within the local process.
 
-            To be able to access the worker's instance within the local process.
-
-            The arguments are the same as in the workers's constructor.
-            :return: the proxy object for the worker instance.
+            The arguments are the same as in the worker session's constructor.
+            :return: the proxy object for the worker session instance.
             """
 
             # we set 'is_daemon' as True in order to be able to stop the
-            # worker's thread if the  manager's main thread is exited.
-            # but it is just a 'last stand' option when the graceful worker stop is failed.
-            self._worker = worker_class(
-                configuration, api_key_config_entry, worker_id, is_daemon=True
+            # worker session's thread if the  manager's main thread is exited.
+            # but it is just a 'last stand' option when the graceful worker session stop is failed.
+            self._worker_session = worker_session_class(
+                configuration, worker_config_entry, worker_session_id, is_daemon=True
             )
 
-            return self._worker  # type: ignore
+            return self._worker_session  # type: ignore
 
         def _on_parent_process_kill(self):
             """
             Override the callback which is invoked when the parent process is killed,
-            so we have to stop the workers before this process will be terminated.
+            so we have to stop the worker session before this process will be terminated.
             """
             log.error(
                 "The main agent process does not exist. Probably it was forcibly killed. "
-                "Checking if the worker is still alive."
+                "Checking if the worker session is still alive."
             )
-            if self._worker and self._worker.is_alive():
-                log.error("The worker is alive. Stopping it.")
+            if self._worker_session and self._worker_session.is_alive():
+                log.error("The worker session is alive. Stopping it.")
                 try:
-                    self._worker.stop_worker()
+                    self._worker_session.stop_worker_session()
                 except:
                     log.exception(
-                        "Can not stop the worker. Waiting before killing the process..."
+                        "Can not stop the worker session. Waiting before killing the process..."
                     )
-                    # can not stop worker gracefully, just wait for the main thread of the process exits and
-                    # the worker's thread(since it is a daemon)  will be terminated too.
+                    # can not stop worker session gracefully, just wait for the main thread of the process exits and
+                    # the worker session's thread(since it is a daemon)  will be terminated too.
 
         @classmethod
         def _on_exit(cls, error=None):
@@ -1374,7 +1367,7 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
             if error:
                 log.error("The shared object manager thread has ended with an error.")
             else:
-                log.info("The shared object manager of the worker has stopped.")
+                log.info("The shared object manager of the worker session has stopped.")
 
     manager = _SharedObjectManager()
 
@@ -1384,9 +1377,9 @@ def create_shared_object_manager(worker_class, worker_proxy_class):
     )
 
     manager.register(
-        six.ensure_str("create_worker"),
-        manager._create_worker,
-        worker_proxy_class,
+        six.ensure_str("create_worker_session"),
+        manager._create_worker_session,
+        worker_session_proxy_class,
         method_to_typeid={
             six.ensure_str("get_log_processors"): six.ensure_str("list"),
             six.ensure_str("create_and_schedule_new_log_processor"): six.ensure_str(

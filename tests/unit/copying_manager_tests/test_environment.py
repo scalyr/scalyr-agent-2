@@ -90,7 +90,7 @@ class TestingConfiguration(Configuration):
         # Configure the ability of the testable copying manager to manually control its execution flow.
         self.disable_flow_control = False  # type: bool
 
-        # Configure ApiKEyWorkerPool do not change the file path for the agent log for the workers.
+        # Configure worker do not change the file path for the agent log for the workers.
         self.skip_agent_log_change = True
 
 
