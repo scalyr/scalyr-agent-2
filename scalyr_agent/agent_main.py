@@ -1829,7 +1829,7 @@ class ScalyrAgent(object):
         result.num_running_monitors = running_monitors
         result.num_dead_monitors = dead_monitors
         if current_status.copying_manager_status is not None:
-            result.num_workers = (
+            result.num_worker_sessions = (
                 current_status.copying_manager_status.num_worker_sessions
             )
 
