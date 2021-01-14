@@ -8,14 +8,11 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 13, 2021 14:00 -0800
 --->
 
 Features:
-* Add copy truncate log rotation support.  This is enabled by default.  It does not support copy truncate with
-compression unless the `delaycompress` option is used.  This feature can be disabled by setting `enable_copy_truncate_log_rotation_support` to false.
+* Add copy truncate log rotation support. This is enabled by default.  It does not support copy truncate with compression unless the `delaycompress` option is used.  This feature can be disabled by setting `enable_copy_truncate_log_rotation_support` to false.
 
 Improvements:
-* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser``
-include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default
-one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't
-been changed yet.
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* ``shell_monitor`` now outputs two additional metrics during each sample gather interval - ``duration`` and ``exit_code``. First one represents how many seconds it took to execute the shell command / script and the second one represents that script exit (status).
 
 Misc:
 * On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
