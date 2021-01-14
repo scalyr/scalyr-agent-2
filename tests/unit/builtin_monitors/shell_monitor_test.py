@@ -47,6 +47,31 @@ class ShellMonitorTest(ScalyrTestCase):
         self.assertEqual(call_args, ("output", "foo bar!"))
         self.assertEqual(call_kwargs["extra_fields"]["command"], 'echo "foo bar!"')
         self.assertEqual(call_kwargs["extra_fields"]["length"], 9)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 0)
+
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
+    def test_gather_sample_duration_and_non_zero_exit_code(self):
+        monitor_config = {
+            "module": "shell_monitor",
+            "command": 'echo "foo bar!" ; sleep 1; exit 1',
+            "max_characters": 200,
+        }
+        mock_logger = mock.Mock()
+        monitor = ShellMonitor(monitor_config, mock_logger)
+
+        monitor.gather_sample()
+        call_args_list = mock_logger.emit_value.call_args_list[0]
+        call_args = call_args_list[0]
+        call_kwargs = call_args_list[1]
+
+        self.assertEqual(call_args, ("output", "foo bar!"))
+        self.assertEqual(
+            call_kwargs["extra_fields"]["command"], 'echo "foo bar!" ; sleep 1; exit 1'
+        )
+        self.assertEqual(call_kwargs["extra_fields"]["length"], 9)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"], 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 1)
 
     @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_max_characters_output_trimming(self):
@@ -66,6 +91,8 @@ class ShellMonitorTest(ScalyrTestCase):
         self.assertEqual(call_args, ("output", "foo..."))
         self.assertEqual(call_kwargs["extra_fields"]["command"], 'echo "foo bar!"')
         self.assertEqual(call_kwargs["extra_fields"]["length"], 9)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 0)
 
     @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_log_all_lines(self):
@@ -88,6 +115,8 @@ class ShellMonitorTest(ScalyrTestCase):
             call_kwargs["extra_fields"]["command"], 'echo "line 1\nline 2\nline 3"'
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 21)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 0)
 
     @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_extract_expression(self):
@@ -111,6 +140,8 @@ class ShellMonitorTest(ScalyrTestCase):
             'echo "line 1\nline 2\nline 100\nline 200"',
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 3)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 0)
 
     @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     def test_gather_sample_stdout_and_stderr_is_combined(self):
@@ -134,3 +165,5 @@ class ShellMonitorTest(ScalyrTestCase):
             call_kwargs["extra_fields"]["command"], 'echo "stdout" ; >&2 echo "stderr"',
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 15)
+        self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)
+        self.assertEqual(call_kwargs["extra_fields"]["exit_code"], 0)
