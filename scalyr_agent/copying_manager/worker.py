@@ -1175,7 +1175,7 @@ class CopyingManagerWorkerSession(
         ) / self.__config.default_worker_session_status_message_interval
 
         log.info(
-            "worker_session_requests worker_session_id=%s scalyr_client_session_id=%s session requests_sent=%ld requests_failed=%ld "
+            "worker_session_requests worker_session_id=%s scalyr_client_session_id=%s requests_sent=%ld requests_failed=%ld "
             "bytes_sent=%ld compressed_bytes_sent=%ld bytes_received=%ld request_latency_secs=%lf connections_"
             "created=%ld total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_"
             "waiting_time=%lf total_blocking_response_time=%lf total_request_time=%lf total_pipelined_requests=%ld "
