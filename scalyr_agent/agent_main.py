@@ -47,6 +47,10 @@ import re
 import ssl
 from io import open
 
+if False:
+    from typing import Optional
+    from typing import Dict
+
 try:
     from __scalyr__ import SCALYR_VERSION
     from __scalyr__ import scalyr_init
@@ -990,6 +994,61 @@ class ScalyrAgent(object):
                 % (raw_scalyr_server, scalyr_server)
             )
 
+    def __get_log_files_initial_positions(self, only_new_files=False):
+        # type: (bool) -> Optional[Dict]
+        """
+        According to the current configuration, determine all agent log files (including main agent.log and
+        multi-process worker sessions logs), create those files (if they do not exist) and get their current positions.
+
+        The preliminarily creation of the log files, in case of their absence, is needed because agent log messages may
+        be written to the agent log file before this log file is processed by the copying manager. In this case,
+        the copying manager will start sending log file from its current position, skipping everything before that and
+        causing data loss.
+
+        :param only_new_files: This option should be used when configuration is reloaded and more worker sessions were
+        added. We ignore existing files and only process log files for new worker sessions.
+        :return:
+        """
+
+        # all paths for all agent log files.
+        log_file_paths_to_check = [self.__log_file_path]
+
+        # we also all log files for all worker session if they are in multiprocess configuration.
+        if self.__config.use_multiprocess_workers:
+            for worker_session_id in self.__config.get_session_ids_from_all_workers():
+                log_file_path = self.__config.get_worker_session_agent_log_path(
+                    worker_session_id
+                )
+                log_file_paths_to_check.append(log_file_path)
+
+        log_file_paths = []
+        for log_file_path in log_file_paths_to_check:
+            include_file = True
+            if os.path.exists(log_file_path):
+                if only_new_files:
+                    # Only new files are handled, skip this file.
+                    include_file = False
+            else:
+                # the file does not exist, create it now so we can get its current position.
+                with open(log_file_path, "w"):
+                    pass
+
+            if include_file:
+                log_file_paths.append(log_file_path)
+
+        logs_initial_positions = {}
+
+        # get initial positions for the files. The copying manager will start copying files from those positions.
+        for log_path in log_file_paths:
+            log_position = self.__get_file_initial_position(log_path)
+            if log_position is not None:
+                logs_initial_positions[log_path] = log_position
+
+        if logs_initial_positions:
+            return logs_initial_positions
+        else:
+            return None
+
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
 
@@ -1030,10 +1089,6 @@ class ScalyrAgent(object):
                 self.__log_file_path = os.path.join(
                     self.__config.agent_log_path, AGENT_LOG_FILENAME
                 )
-                worker_sessions_glob = os.path.join(
-                    self.__config.agent_log_path, "agent_*.log"
-                )
-                worker_session_log_files = glob.glob(self.__config.agent_log_path)
                 scalyr_logging.set_log_destination(
                     use_disk=True,
                     no_fork=self.__no_fork,
@@ -1045,16 +1100,6 @@ class ScalyrAgent(object):
                 )
 
                 self.__update_debug_log_level(self.__config.debug_level)
-
-                # We record where the log file currently is so that we can (in the worse case) start copying it
-                # from this position.  That way we capture the first 'Starting scalyr agent' call.
-                agent_log_position = self.__get_file_initial_position(
-                    self.__log_file_path
-                )
-                if agent_log_position is not None:
-                    logs_initial_positions = {self.__log_file_path: agent_log_position}
-                else:
-                    logs_initial_positions = None
 
                 start_up_msg = scalyr_util.get_agent_start_up_message()
                 log.info(start_up_msg)
@@ -1093,11 +1138,17 @@ class ScalyrAgent(object):
                     wt.start(logs_initial_positions)
                     return wt, wt.copying_manager, wt.monitors_manager
 
+                # We record where the log files(including multiprocess worker sessions logs) currently are
+                # so that we can (in the worse case) start copying them from those position.
+                logs_initial_positions = self.__get_log_files_initial_positions()
+
                 (
                     worker_thread,
                     self.__copying_manager,
                     self.__monitors_manager,
-                ) = start_worker_thread(self.__config, logs_initial_positions)
+                ) = start_worker_thread(
+                    self.__config, logs_initial_positions=logs_initial_positions
+                )
 
                 # NOTE: It's important we call this after worker thread has been created since
                 # some of the global configuration options are only applied after creating a worker
@@ -1363,11 +1414,20 @@ class ScalyrAgent(object):
                     prev_server = scalyr_server
 
                     log.info("Starting new copying and metrics threads")
+
+                    # get log files initial positions for new worker session log files if they were added in
+                    # a new configuration.
+                    logs_initial_positions = self.__get_log_files_initial_positions(
+                        only_new_files=True
+                    )
+
                     (
                         worker_thread,
                         self.__copying_manager,
                         self.__monitors_manager,
-                    ) = start_worker_thread(new_config)
+                    ) = start_worker_thread(
+                        new_config, logs_initial_positions=logs_initial_positions
+                    )
 
                     self.__current_bad_config = None
                     config_change_check_interval = (

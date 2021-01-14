@@ -34,6 +34,7 @@ from distutils.spawn import find_executable
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL, get_package_root
 from scalyr_agent import compat
 from scalyr_agent.platform_controller import PlatformController
+from scalyr_agent.configuration import Configuration
 
 from tests.utils.compat import Path
 from tests.utils.common import get_env
@@ -437,6 +438,21 @@ class AgentRunner(object):
 
         return config
 
+    @property
+    def config_object(self):  # type: () -> Configuration
+        """
+        Get config object from the config file.
+        """
+        platform = PlatformController.new_platform()
+        platform._install_type = self._installation_type
+        default_types = platform.default_paths
+
+        config = Configuration(
+            six.text_type(self._agent_config_path), default_types, None
+        )
+        config.parse()
+        return config
+
     @staticmethod
     def _create_file(path, content=None):
         # type: (Path, Optional[Any[six.text_type, six.binary_type]]) -> None
@@ -502,3 +518,32 @@ class AgentRunner(object):
         Write new data to the config.
         """
         self._agent_config_path.write_text(six.text_type(json.dumps(config)))  # type: ignore
+
+    @property
+    def worker_type(self):
+        return self._workers_type
+
+    @property
+    def worker_session_ids(self):
+        """
+        Return ids of all running worker sessions.
+        """
+        status = json.loads(self.status_json())  # type: ignore
+        ids = []
+        for worker in status["copying_manager_status"]["workers"]:
+            for worker_session in worker["sessions"]:
+                ids.append(worker_session["session_id"])
+
+        return ids
+
+    @property
+    def worker_sessions_log_paths(self):
+        """Get list of log file path for all worker sessions."""
+        result = []
+        for worker_session_id in self.config_object.get_session_ids_from_all_workers():
+            log_file_path = self.config_object.get_worker_session_agent_log_path(
+                worker_session_id
+            )
+            result.append(Path(log_file_path))
+
+        return result

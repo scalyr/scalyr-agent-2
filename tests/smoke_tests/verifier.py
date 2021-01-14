@@ -212,7 +212,7 @@ class AgentLogVerifier(AgentVerifier):
 
     def _verify(self):
         """
-        Verify that the agent has successfuly started.
+        Verify that the agent has successfully started.
 
         Right now we do that by ensuring has produced 5 "spawned collector" log messages which have
         also been shipped to the Scalyr API.
@@ -293,6 +293,57 @@ class AgentLogVerifier(AgentVerifier):
             return
 
         print("Local agent logs and Scalyr API returned correct data.")
+        return True
+
+
+class AgentWorkerSessionLogVerifier(AgentVerifier):
+    """
+    Verifier class that checks if all agent worker session log files are ingested to Scalyr servers.
+    """
+
+    def _verify(self):
+        for worker_session_log_path in self._runner.worker_sessions_log_paths:
+            start_message_line_pattern = re.compile(
+                r"Copying manager worker session #\w+ started."
+            )
+            worker_session_log_content = worker_session_log_path.read_text()
+
+            if not start_message_line_pattern.search(worker_session_log_content):
+                print("Can not find worker session start message. Retry.")
+                return
+
+            print("Send query to Scalyr server.")
+            try:
+                request = ScalyrRequest(
+                    server_address=self._server_address,
+                    read_api_key=compat.os_environ_unicode["READ_API_KEY"],
+                    max_count=100,
+                    start_time=self._start_time,
+                )
+                request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+                request.add_filter(
+                    "$logfile=='{0}'".format(six.text_type(worker_session_log_path))
+                )
+                response_data = request.send()
+            except Exception:
+                print("Query failed.")
+                return
+
+            print("Query response received.")
+
+            if "matches" not in response_data:
+                print('Response is missing "matches" field')
+                print("Response data: %s" % (str(response_data)))
+                return
+
+            response_log = "\n".join(
+                [msg["message"] for msg in response_data["matches"]]
+            )
+
+            if not start_message_line_pattern.search(response_log):
+                print("Can not find worker session start message in remote log. Retry.")
+                return
+
         return True
 
 
