@@ -2246,6 +2246,8 @@ jobs:
       - run:
           name: Build deb and rpm packages
           command: |
+            set -e
+
             mkdir artifacts
             mkdir package
 
@@ -2255,9 +2257,19 @@ jobs:
             python ../build_package.py rpm
 
             dpkg -X "$(ls *.deb)" /tmp/deb_package
-            warnings=$(dpkg-parsechangelog --file /tmp/deb_package/usr/share/doc/scalyr-agent-2/changelog.gz 2>&1 1>/dev/null | grep warning || true)
+
+            set +e
+            stderr=$(dpkg-parsechangelog --file /tmp/deb_package/usr/share/doc/scalyr-agent-2/changelog.gz 2>&1 1>/dev/null)
+            if [[ "$?" -ne 0 ]]; then
+              >&2 echo "$stderr"
+              exit 1
+            fi
+            set -e
+            warnings=$(grep warning \<<< "$stderr" || true)
+
             if [[ -n "${warnings}" ]]; then
-              echo "The debian package changelog is built with warnings."
+              >&2 echo "The debian package changelog is built with warnings. This may be caused by splitting the text across miltiple lines."
+              >&2 echo "$warnings"
               exit 1
             fi
 
