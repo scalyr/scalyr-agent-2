@@ -2254,6 +2254,13 @@ jobs:
             python ../build_package.py deb
             python ../build_package.py rpm
 
+            dpkg -X "$(ls *.deb)" /tmp/deb_package
+            warnings=$(dpkg-parsechangelog --file /tmp/deb_package/usr/share/doc/scalyr-agent-2/changelog.gz 2>&1 1>/dev/null | grep warning || true)
+            if [[ -n "${warnings}" ]]; then
+              echo "The debian package changelog is built with warnings."
+              exit 1
+            fi
+
             popd
 
             # NOTE: We preserve two versions of the package as the build artifact. One with the
