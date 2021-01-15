@@ -712,8 +712,8 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         while self._offset < size:
             # 2->TODO use slicing to get bytes in both python versions.
-            # TODO: This is not really robust, we should make it an explicit config option if the
-            # we should try to parse messages as framed or new line delimited one
+            # TODO: This is not really robust, we should make it an explicit config option if
+            # we should try to parse messages as framed or new line delimited one.
             c = self._remaining[self._offset : self._offset + 1]
             framed = b"0" <= c <= b"9"
 
