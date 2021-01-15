@@ -628,6 +628,7 @@ class SyslogRequestParser(object):
             )
 
         self._remaining = self._remaining[self._offset :]
+        self._offset = 0
 
 
 class SyslogRawRequestParser(SyslogRequestParser):
