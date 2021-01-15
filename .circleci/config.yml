@@ -2159,19 +2159,19 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              #c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # copy patched win32evtlog.pyd.
-              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+              #cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              c:\Python27\python.exe build_package.py win32
+              #c:\Python27\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
 
-              cp .\ScalyrAgentInstaller-*.msi artifacts/
-              mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+              #cp .\ScalyrAgentInstaller-*.msi artifacts/
+              #mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
 
       - run:
           name: Copy Package With Version in Name
@@ -2183,7 +2183,16 @@ jobs:
             # if someone wgets a dev package or similar) they immediately know it's a dev version
             # from the name itself.
             export PACKAGE_VERSION="$(cat VERSION)"
-            cp package/ScalyrAgentInstaller.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+            curl -o .\installer.msi https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-2.1.16.msi
+
+            ls -la .
+
+            cp .\installer.msi package/ScalyrAgentInstaller.msi
+            cp .\installer.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+            cp .\installer.msi artifacts/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+
+            ls -la package/
+            ls -la artifacts
 
       - save_cache:
           name: Save Python Dependencies Cache
