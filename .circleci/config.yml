@@ -730,6 +730,8 @@ commands:
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
             fi
 
+            ls -la /tmp
+
             set +e
 
             max_attempts="2"
