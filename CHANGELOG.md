@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.17 "Xothichi" - January 15, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 15, 2021 14:00 -0800
+--->
+
+Bug fixes:
+* Fix syslog monitor default TCP message parser bug which was inadvertently introduced in 2.1.16 which may sometimes cause for a delayed ingest of some syslog data. This would only affect installations utilizing syslog monitor in TCP mode using the default message parser.
+
 ## 2.1.16 "Lasso" - January 13, 2021
 
 <!---
