@@ -2370,8 +2370,6 @@ workflows:
  benchmarks:
    <<: *skip_release_build_branch_push
    jobs:
-     - benchmarks-micro-py-27
-     - benchmarks-micro-py-35
      - benchmarks-idle-agent-py-27:
          <<: *benchmarks_master_and_release_only
      - benchmarks-idle-agent-py-35:
