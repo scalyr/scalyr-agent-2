@@ -2246,7 +2246,7 @@ jobs:
                   echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
 
       - run:
-          name: Build deb and rpm packages
+          name: Build and validate deb and rpm packages
           command: |
             set -e
 
@@ -2276,7 +2276,7 @@ jobs:
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
       - run:
-          name: Build deb and rpm packages
+          name: Build deb and rpm packages for installer
           command: |
 
             gpg --update-trustdb
