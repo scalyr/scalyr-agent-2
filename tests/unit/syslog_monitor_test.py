@@ -39,6 +39,7 @@ import platform
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
+from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogBatchedRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.scalyr_monitor import MonitorInformation
@@ -847,6 +848,82 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             expected_tcp2 in actual,
             "Unable to find '%s' in output:\n\t %s" % (expected_tcp2, actual),
         )
+
+
+class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
+    @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
+    def test_internal_buffer_and_offset_is_reset_on_handler_method_call_no_data(
+        self, mock_global_log
+    ):
+        # Verify internal buffer and offset is reset after handling the frame
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        parser = SyslogRequestParser(
+            socket=mock_socket, max_buffer_size=max_buffer_size
+        )
+        self.assertEqual(parser._remaining, None)
+
+        self.assertEqual(mock_global_log.warning.call_count, 0)
+        parser.process(None, mock_handle_frame)
+        self.assertEqual(mock_handle_frame.call_count, 0)
+        self.assertEqual(mock_global_log.warning.call_count, 1)
+
+        # Verify internal state is correctly reset
+        self.assertEqual(parser._remaining, None)
+
+        parser.process(b"", mock_handle_frame)
+        self.assertEqual(mock_handle_frame.call_count, 0)
+
+        # Verify internal state is correctly reset
+        self.assertEqual(parser._remaining, None)
+
+    def test_internal_buffer_and_offset_is_reset_on_handler_method_call_single_complete_message(
+        self,
+    ):
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-0-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+
+        parser = SyslogRequestParser(
+            socket=mock_socket, max_buffer_size=max_buffer_size
+        )
+        self.assertEqual(parser._remaining, None)
+
+        parser.process(mock_msg_1, mock_handle_frame)
+        self.assertEqual(mock_handle_frame.call_count, 1)
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_msg_1[:-1],
+        )
+        self.assertEqual(parser._remaining, bytearray())
+        self.assertEqual(parser._offset, 0)
+
+    def test_process_success_no_existing_buffer_recv_multiple_complete_messages(self):
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+        mock_msg_2 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-2-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+        mock_msg_3 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+        mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
+
+        parser = SyslogBatchedRequestParser(
+            socket=mock_socket, max_buffer_size=max_buffer_size
+        )
+        parser.process(mock_data, mock_handle_frame)
+
+        # Ensure we only call handle_frame once with all the data
+        self.assertEqual(mock_handle_frame.call_count, 1)
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]), mock_data[:-1]
+        )
+        self.assertEqual(parser._remaining, bytearray())
+        self.assertEqual(parser._offset, 0)
 
 
 class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
