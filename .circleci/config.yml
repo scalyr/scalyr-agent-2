@@ -2169,6 +2169,10 @@ jobs:
 
               mkdir package
               mkdir artifacts
+              wget -O .\installer.msi https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-2.1.16.msi
+
+              cp .\installer.msi artifacts/
+              cp .\installer.msi package\ScalyrAgentInstaller.msi
 
               #cp .\ScalyrAgentInstaller-*.msi artifacts/
               #mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
@@ -2183,13 +2187,16 @@ jobs:
             # if someone wgets a dev package or similar) they immediately know it's a dev version
             # from the name itself.
             export PACKAGE_VERSION="$(cat VERSION)"
-            curl -o .\installer.msi https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-2.1.16.msi
+            #curl -o .\installer.msi https://www.scalyr.com/scalyr-repo/stable/latest/ScalyrAgentInstaller-2.1.16.msi
 
             ls -la .
 
-            cp .\installer.msi package/ScalyrAgentInstaller.msi
-            cp .\installer.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
-            cp .\installer.msi artifacts/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+            #cp .\installer.msi package/ScalyrAgentInstaller.msi
+            #cp .\installer.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+            #cp .\installer.msi artifacts/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+
+            cp package/ScalyrAgentInstaller.msi package/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
+            cp package/ScalyrAgentInstaller.msi artifacts/ScalyrAgentInstaller-${PACKAGE_VERSION}.msi
 
             ls -la package/
             ls -la artifacts
