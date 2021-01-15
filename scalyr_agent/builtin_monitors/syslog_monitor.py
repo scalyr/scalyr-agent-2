@@ -627,6 +627,8 @@ class SyslogRequestParser(object):
                 limit_key="syslog-no-frames",
             )
 
+        self._remaining = self._remaining[self._offset :]
+
 
 class SyslogRawRequestParser(SyslogRequestParser):
     """
