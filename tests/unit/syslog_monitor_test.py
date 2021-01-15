@@ -869,14 +869,10 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         parser.process(None, mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 0)
         self.assertEqual(mock_global_log.warning.call_count, 1)
-
-        # Verify internal state is correctly reset
         self.assertEqual(parser._remaining, None)
 
         parser.process(b"", mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 0)
-
-        # Verify internal state is correctly reset
         self.assertEqual(parser._remaining, None)
 
     def test_internal_buffer_and_offset_is_reset_on_handler_method_call_single_complete_message(
@@ -899,6 +895,8 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
             mock_msg_1[:-1],
         )
+
+        # Verify internal state is correctly reset
         self.assertEqual(parser._remaining, bytearray())
         self.assertEqual(parser._offset, 0)
 
@@ -922,6 +920,8 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]), mock_data[:-1]
         )
+
+        # Verify internal state is correctly reset
         self.assertEqual(parser._remaining, bytearray())
         self.assertEqual(parser._offset, 0)
 
