@@ -32,7 +32,6 @@ try:
 
     WIN32_IMPORT_ERROR = ""
 except ImportError as e:
-    raise e
     WIN32_IMPORT_ERROR = str(e)
 
     win32evtlog = None
