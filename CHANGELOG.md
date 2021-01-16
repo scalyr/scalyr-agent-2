@@ -3,15 +3,12 @@ Scalyr Agent 2 Changes By Release
 
 ## 2.1.18 "TBD" - January 30, 2021
 
-Improvements:
-* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
-
 <!---
 Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 30, 2021 14:00 -0800
 --->
 
-Bug fixes:
-* Fix syslog monitor default TCP message parser bug which was inadvertently introduced in 2.1.16 which may sometimes cause for a delayed ingest of some syslog data. This would only affect installations utilizing syslog monitor in TCP mode using the default message parser.  As part of this fix, we have removed the new message parsers added in 2.1.16.  If you were using them, you will revert to the default parser.
+Improvements:
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 
