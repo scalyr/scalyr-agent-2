@@ -1344,10 +1344,16 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150
+            set -e
+
+            # We estore VERSION before each test run to avoid issues with test container names
+            cp VERSION VERSION.orig
+
+            ITERATIONS_TO_RUN=50 SLEEP_DELAY=20 scripts/circleci/run-multiple-times.sh "cp VERSION.orig VERSION ; source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150"
       - run:
           name: Submit Coverage Data to codecov.io
           command: |
+            exit 0
             ls -la .coverage* || true
 
             cp .circleci/.coveragerc_ci .coveragerc
@@ -2365,7 +2371,7 @@ workflows:
    <<: *skip_release_build_branch_push
    jobs:
       # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-json:
+     - smoke-docker-syslog:
          context: scalyr-agent
  benchmarks:
    <<: *skip_release_build_branch_push
