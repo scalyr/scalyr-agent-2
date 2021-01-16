@@ -599,9 +599,7 @@ class NewApi(Api):
 
         if "TimeCreated" in vals:
             time_format = "%Y-%m-%d %H:%M:%SZ"
-            vals["TimeCreated"] = time.strftime(
-                time_format, time.gmtime(int(vals["TimeCreated"]))
-            )
+            vals["TimeCreated"] = vals["TimeCreated"].strftime(time_format)
 
         if "Keywords" in vals:
             if isinstance(vals["Keywords"], list):
