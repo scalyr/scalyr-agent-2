@@ -141,8 +141,30 @@ bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname
 --uploader_hostname ${uploader_hostname} \
 --debug true"
 
+echo ""
+echo "Docker logs for ${contname_agent} container"
+echo ""
+docker logs "${contname_agent}" || true
+echo ""
+
+echo ""
+echo "Docker logs for ${contname_uploader} container"
+echo ""
+docker logs "${contname_uploader}" || true
+echo ""
+
+echo ""
+echo "Docker logs for ${contname_verifier} container"
+echo ""
+docker logs "${contname_verifier}" || true
+echo ""
+
+echo ""
 echo "Stopping agent."
+echo ""
 docker stop ${contname_agent}
+echo ""
 echo "Agent stopped, copying .coverage results."
+echo ""
 docker cp ${contname_agent}:/.coverage .
 kill_and_delete_docker_test_containers
