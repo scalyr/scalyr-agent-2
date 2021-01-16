@@ -2161,13 +2161,14 @@ jobs:
           command: |
               $Env:WIX = ";C:\wix311;"
               #c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              C:\Users\Administrator\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # copy patched win32evtlog.pyd.
               #cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
 
               # TODO: This step doesn't correctly exit with non zero on failure
               #c:\Python27\python.exe build_package.py win32
-              #C:\Users\Administrator\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
+              C:\Users\Administrator\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
