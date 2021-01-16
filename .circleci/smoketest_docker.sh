@@ -148,23 +148,22 @@ docker logs "${contname_agent}" || true
 echo ""
 
 echo ""
-echo "Docker logs for ${contname_uploader} container"
-echo ""
-docker logs "${contname_uploader}" || true
-echo ""
-
-echo ""
-echo "Docker logs for ${contname_verifier} container"
-echo ""
-docker logs "${contname_verifier}" || true
-echo ""
-
-echo ""
 echo "Stopping agent."
 echo ""
 docker stop ${contname_agent}
+
+# NOTE: We can't tail other two containers since they use syslog driver which
+# sends data to agent container.
+echo ""
+echo "Cating /var/log/scalyr-agent-2/syslog.log logs"
+echo ""
+docker cp ${contname_agent}:/var/log/scalyr-agent-2/syslog.log . || true
+cat syslog.log || true
+echo ""
+
 echo ""
 echo "Agent stopped, copying .coverage results."
 echo ""
 docker cp ${contname_agent}:/.coverage .
+
 kill_and_delete_docker_test_containers
