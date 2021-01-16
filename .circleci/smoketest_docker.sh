@@ -79,6 +79,10 @@ contname_verifier="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-verifier"
 
 # Kill leftover containers
 function kill_and_delete_docker_test_containers() {
+    echo ""
+    echo "Killing and deleting all test containers..."
+    echo ""
+
     for cont in $contname_agent $contname_uploader $contname_verifier
     do
         if [[ -n `docker ps | grep $cont` ]]; then
@@ -88,7 +92,12 @@ function kill_and_delete_docker_test_containers() {
             docker rm $cont;
         fi
     done
+
+    echo ""
+    echo "Containers deleted..."
+    echo ""
 }
+
 kill_and_delete_docker_test_containers
 echo `pwd`
 
