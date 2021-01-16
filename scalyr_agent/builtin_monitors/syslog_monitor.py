@@ -807,7 +807,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # each new connection.
 
     def __init__(self, *args, **kwargs):
-        self.request_parser = kwargs.pop("request_parser", False)
+        self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
         self.message_delimiter = kwargs.pop("message_delimiter", "\n")
 
