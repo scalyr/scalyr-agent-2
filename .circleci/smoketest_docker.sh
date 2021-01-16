@@ -130,6 +130,38 @@ uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_upload
 echo "Uploader container ID == ${uploader_hostname}"
 echo "Using smoketest.py script from ${SMOKE_TESTS_SCRIPT_BRANCH} branch and URL ${SMOKE_TESTS_SCRIPT_URL}"
 
+function print_debugging_info_on_exit() {
+    echo ""
+    echo "Docker logs for ${contname_agent} container"
+    echo ""
+    docker logs "${contname_agent}" || true
+    echo ""
+
+    # NOTE: We can't tail other two containers since they use syslog driver which
+    # sends data to agent container.
+    # TODO: Set agent debug level to 5
+
+    echo ""
+    echo "Cating /var/log/scalyr-agent-2/agent_syslog.log log file"
+    echo ""
+    docker cp ${contname_agent}:/var/log/scalyr-agent-2/agent_syslog.log . || true
+    cat agent_syslog.log || true
+    echo ""
+
+    echo ""
+    echo "Cating /var/log/scalyr-agent-2/docker_monitor.log log file"
+    echo ""
+    docker cp ${contname_agent}:/var/log/scalyr-agent-2/docker_monitor.log . || true
+    cat docker_monitor.log || true
+    echo ""
+
+    kill_and_delete_docker_test_containers || true
+}
+
+# We want to run some commands on exit which may help with troubleshooting on
+# test failures
+trap print_debugging_info_on_exit EXIT
+
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
@@ -142,37 +174,11 @@ bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname
 --debug true"
 
 echo ""
-echo "Docker logs for ${contname_agent} container"
-echo ""
-docker logs "${contname_agent}" || true
-echo ""
-
-# NOTE: We can't tail other two containers since they use syslog driver which
-# sends data to agent container.
-# TODO: Set agent debug level to 5
-
-echo ""
 echo "Stopping agent."
 echo ""
 docker stop ${contname_agent}
 
 echo ""
-echo "Cating /var/log/scalyr-agent-2/agent_syslog.log log file"
-echo ""
-docker cp ${contname_agent}:/var/log/scalyr-agent-2/agent_syslog.log . || true
-cat agent_syslog.log || true
-echo ""
-
-echo ""
-echo "Cating /var/log/scalyr-agent-2/docker_monitor.log log file"
-echo ""
-docker cp ${contname_agent}:/var/log/scalyr-agent-2/docker_monitor.log . || true
-cat docker_monitor.log || true
-echo ""
-
-echo ""
 echo "Agent stopped, copying .coverage results."
 echo ""
 docker cp ${contname_agent}:/.coverage .
-
-kill_and_delete_docker_test_containers
