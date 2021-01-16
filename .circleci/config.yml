@@ -2089,11 +2089,12 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-2.7.18.amd64.msi -PathType Leaf)) {
-                wget -O .\python_installer\python-2.7.18.amd64.msi https://www.python.org/ftp/python/2.7.18/python-2.7.18.amd64.msi
+            if (!(Test-Path .\python_installer\python-3.8.7-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.7-amd64.exe https://www.python.org/ftp/python/3.8.7/python-3.8.7-amd64.exe
             }
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+            #Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
+            #Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+            python_installer\python-3.8.7-amd64.exe /quiet
 
       - run:
           name: Download patched win32evtlog.pyd
@@ -2159,13 +2160,14 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              #c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # copy patched win32evtlog.pyd.
-              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+              #cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              c:\Python27\python.exe build_package.py win32
+              #c:\Python27\python.exe build_package.py win32
+              #C:\Users\Administrator\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
