@@ -2501,4 +2501,3 @@ workflows:
                - master
    jobs:
      - ami-tests-stable
-

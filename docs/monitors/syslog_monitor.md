@@ -179,3 +179,15 @@ Note:  You need to map the host's \
                                                the log deletion configuration options. If False, only the file \
                                                modification time of the main log file is checked, and the rotated \
                                                files will only be deleted when the main log file is deleted.
+|||# ``tcp_request_parser``                ||| Optional (defaults to default). Which TCP packet data request parser to \
+                                               use. Most users should leave this as is.
+|||# ``tcp_incomplete_frame_timeout``      ||| How long we wait (in seconds) for a complete frame / syslog message \
+                                               when running in TCP mode with batch request parser before giving up and \
+                                               flushing what has accumulated in the buffer.
+|||# ``tcp_message_delimiter``             ||| Which character sequence to use for a message delimiter / suffix \
+                                               (defaults to \ n). Some implementations such as Python syslog handler \
+                                               one utilize null character (\ 000) which allows messages to contain new \
+                                               lines without using framing. If that is the case for you, set this \
+                                               option to \ 000. Keep in mind that this value needs to be escaped when \
+                                               specified in the config option which means you need to use two \
+                                               backslashes instead of one.
