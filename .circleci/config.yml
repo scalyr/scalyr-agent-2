@@ -473,6 +473,10 @@ commands:
             - run:
                 name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
                 command: |
+                  # Also copy over .coverage file from tests (aka coverage for test files themselves)
+                  mkdir ~/artifacts/tests-coverage/
+                  cp .coverage ~/artifacts/tests-coverage/
+
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
@@ -480,14 +484,13 @@ commands:
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
-                  ls -la .
+                  ls -la .coverage*
                   coverage combine ~/artifacts/*/.coverage
-                  ls -la .
+                  ls -la .coverage*
 
                   # coverage data from inside docker contains uses different paths which we need to normalize for
                   # coverage combine and codecov reporting and merging to work.
                   sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
-                  cat .coverage
 
                   # Print the report
                   coverage report -i
