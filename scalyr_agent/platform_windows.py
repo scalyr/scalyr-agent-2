@@ -599,6 +599,9 @@ class WindowsPlatformController(PlatformController):
             if not quiet:
                 print("Agent service has stopped.")
         except win32api.error as e:
+            print(type(e))
+            print(e)
+
             if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not running."
