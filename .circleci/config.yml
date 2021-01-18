@@ -1648,13 +1648,9 @@ jobs:
 
             # Combine it
              coverage combine
-            ls -la .coverage*
-
-            cat .coverage
 
             # Generate XML file which can be processed by sonarcloud
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            cat coverage.xml
 
             # Print it
             coverage report
