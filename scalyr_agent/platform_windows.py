@@ -598,6 +598,8 @@ class WindowsPlatformController(PlatformController):
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
             if not quiet:
                 print("Agent service has stopped.")
+
+            return 0
         except win32api.error as e:
             if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning(
