@@ -47,6 +47,14 @@ import re
 import ssl
 from io import open
 
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 try:
     from __scalyr__ import SCALYR_VERSION
     from __scalyr__ import scalyr_init
@@ -1820,7 +1828,7 @@ class ScalyrAgent(object):
         result.num_running_monitors = running_monitors
         result.num_dead_monitors = dead_monitors
         if current_status.copying_manager_status is not None:
-            result.num_workers = (
+            result.num_worker_sessions = (
                 current_status.copying_manager_status.num_worker_sessions
             )
 

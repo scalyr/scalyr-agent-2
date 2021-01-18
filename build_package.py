@@ -1501,9 +1501,9 @@ def create_change_logs():
             )
             # Include release notes with an indented first level (using asterisk, then a dash for the next level,
             # finally a plus sign.
-            print_release_notes(fp, release["notes"], [" * ", "   - ", "     + "])
+            print_release_notes(fp, release["notes"], ["  * ", "   - ", "     + "])
             print(
-                "-- %s <%s>  %s"
+                " -- %s <%s>  %s"
                 % (release["packager"], release["packager_email"], date_str,),
                 file=fp,
             )

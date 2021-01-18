@@ -26,6 +26,14 @@ import time
 import calendar
 import datetime
 
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 import six
 from six.moves import map
 
