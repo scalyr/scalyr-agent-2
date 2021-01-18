@@ -1345,6 +1345,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1356,7 +1357,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1370,6 +1371,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
@@ -1397,6 +1403,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
@@ -1439,7 +1446,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1453,6 +1460,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
