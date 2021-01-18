@@ -480,11 +480,14 @@ commands:
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
+                  ls -la .
                   coverage combine ~/artifacts/*/.coverage
+                  ls -la .
 
                   # coverage data from inside docker contains uses different paths which we need to normalize for
                   # coverage combine and codecov reporting and merging to work.
                   sed -i "s#/agent_source/#/home/circleci/scalyr-agent-2/#g" .coverage
+                  cat .coverage
 
                   # Print the report
                   coverage report -i
@@ -1640,6 +1643,9 @@ jobs:
             ./scripts/circleci/download-coverage-data-from-s3.py "."
             ls -la .coverage*
 
+            mkdir coverage
+            cp .coverage* coverage/
+
             # Ensure consistent paths for all the code coverage reports
             # NOTE: In seed we need 3 \ for one \
             sed -i "s#C:\\\\\\\Users\\\\\\\circleci\\\\\\\scalyr-agent-2#/home/circleci/scalyr-agent-2#g" .coverage*
@@ -1647,13 +1653,20 @@ jobs:
             sed -i "s#\\\\\\\#/#g" .coverage*
 
             # Combine it
-             coverage combine
+            coverage combine
+
+            cp .coverage coverage/.coverage-combined-final
 
             # Generate XML file which can be processed by sonarcloud
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
 
             # Print it
             coverage report
+
+      # Stored all the downloaded coverage files for ease of troubleshooting
+      - store_artifacts:
+          path: coverage
+
       - run:
           name: Run Sonar Scanner
           command:
