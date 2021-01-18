@@ -983,12 +983,6 @@ jobs:
             python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
             cp .circleci/.coveragerc_ci .coveragerc
 
-            # NOTE: In seed we need 3 \ for one \
-            sed -i "s#C:\\\\\\\Users\\\\\\\circleci\\\\\\\scalyr-agent-2#/home/circleci/scalyr-agent-2#g" .coverage
-            sed -i "s#\\\\\\\#/#g" .coverage
-
-            cat .coverage
-
             # Print the report
             coverage.exe report -i
 
@@ -1649,13 +1643,18 @@ jobs:
             # Ensure consistent paths for all the code coverage reports
             # NOTE: In seed we need 3 \ for one \
             sed -i "s#C:\\\\\\\Users\\\\\\\circleci\\\\\\\scalyr-agent-2#/home/circleci/scalyr-agent-2#g" .coverage*
+            # Replace two \\ with one /
             sed -i "s#\\\\\\\#/#g" .coverage*
 
-            # Combine It
-            coverage combine
+            # Combine it
+             coverage combine
+            ls -la .coverage*
+
+            cat .coverage
 
             # Generate XML file which can be processed by sonarcloud
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            cat coverage.xml
 
             # Print it
             coverage report
