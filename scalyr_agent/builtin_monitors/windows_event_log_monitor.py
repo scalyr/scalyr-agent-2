@@ -450,7 +450,8 @@ class NewApi(Api):
     def stop(self):
         # explicitly empty the eventHandles array so that EvtClose will be called
         # on all the event handles - this prevents duplicate logs if the config changes
-        self.__eventHandles = []
+        return
+        # self.__eventHandles = []
 
     def _FormattedMessage(self, metadata, event, field, value):
         result = value
