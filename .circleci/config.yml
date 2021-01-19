@@ -57,6 +57,7 @@ version: 2.1
 orbs:
   slack: circleci/slack@3.4.2
   win: circleci/windows@2.4.0
+  swissknife: roopakv/swissknife@0.54.0
 
 # Global workflow level parameters
 parameters:
@@ -2382,12 +2383,16 @@ jobs:
           test_type: "development"
 
 workflows:
- version: 2
+ version: 2.1
  static-analysis:
    <<: *skip_release_build_branch_push
    jobs:
      - lint-checks:
          context: scalyr-agent
+     - swissknife/codeql-analysis:
+         context: scalyr-agent
+         name: "CodeQL Static Analysis"
+         languages: "python"
  unit-tests:
    <<: *skip_release_build_branch_push
    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
