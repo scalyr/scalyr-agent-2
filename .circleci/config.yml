@@ -1608,7 +1608,7 @@ jobs:
     docker:
       - image: circleci/python:3.6-jessie
     environment:
-      VERSION: "4.1.0.1829"
+      VERSION: "4.6.0.2311"
       SCANNER_DIRECTORY: "/tmp/cache/scanner"
       SONAR_USER_HOME: "/tmp/cache/scanner/.sonar"
       OS: "linux"
@@ -1621,7 +1621,7 @@ jobs:
           name: Create cache directory if it doesn't exist
           command: mkdir -p /tmp/cache/scanner
       - restore_cache:
-          key: v2-sonarcloud-scanner-4.1.0.1829
+          key: v2-sonarcloud-scanner-4.6.0.2311
       - run:
           name: Download Sonar Scanner
           command: |
@@ -1635,7 +1635,7 @@ jobs:
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/bin/sonar-scanner
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/jre/bin/java
       - save_cache:
-          key: v2sonarcloud-scanner-4.1.0.1829
+          key: v2sonarcloud-scanner-4.6.0.2311
           paths:
             - /tmp/cache/scanner
       - run:
