@@ -957,9 +957,9 @@ jobs:
       - run:
           name: Install Python Dependencies
           command: |
-            python.exe --version
-            python.exe -m pip install --user --upgrade "tox==<< pipeline.parameters.default_tox_version >>"
-            python.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
+            python3.exe --version
+            python3.exe -m pip install --user --upgrade "tox==<< pipeline.parameters.default_tox_version >>"
+            python3.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
@@ -986,7 +986,7 @@ jobs:
           command: |
             ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
+            python3.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Print the report
@@ -2100,11 +2100,10 @@ jobs:
       # windows-server-2019-vs2019:previous
       version: "previous"
       shell: powershell.exe
+    environment:
+      PYTHON: 3.9.1
     steps:
       - checkout
-      - restore_cache:
-          name: Restore Python installer Cache
-          key: windows-python-installer-python-{{ .Branch }}-python-installer-cache
 
       - restore_cache:
           name: Restore Wix cache
@@ -2123,17 +2122,26 @@ jobs:
               wget https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -OutFile wix311_binaries\wix311-binaries.zip
             }
             Expand-Archive -LiteralPath wix311_binaries\wix311-binaries.zip -DestinationPath C:\wix311
-
+      - restore_cache:
+          name: Restore Chocolatey Cache
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.9-windows-{{ checksum "win32/windows-build-requirements.txt" }}
       - run:
-          name: Install python.
+          name: Install Python
           command: |
-            $ProgressPreference = "SilentlyContinue"
-            mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-2.7.18.amd64.msi -PathType Leaf)) {
-                wget -O .\python_installer\python-2.7.18.amd64.msi https://www.python.org/ftp/python/2.7.18/python-2.7.18.amd64.msi
-            }
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+            # Install Python using chocolatey and set custom cache location so we preserve package cache over builds
+            mkdir -p ~/choco-cache
+            choco config set cacheLocation ~/choco-cache
+            choco install python --version "3.9.1" --yes --limit-output --no-progress
+
+            # Add Python we installed to PATH and make sure it has precedence over system Python
+            echo "export PATH=\"/c/Python39:/c/Python39/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python39/Scripts:$PATH\"" >> $BASH_ENV
+      - save_cache:
+          name: Save Chocolatey Cache
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.9-windows-{{ checksum "win32/windows-build-requirements.txt" }}
+          paths:
+            - ~/choco-cache
+            # Actual package files are stored in NuGet cache
+            - C:\Users\circleci\AppData\Local\NuGet\Cache
 
       - run:
           name: Download patched win32evtlog.pyd
@@ -2170,7 +2178,7 @@ jobs:
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.9.1-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2199,13 +2207,15 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
+              dir c:\
+              ls c:\
+              python3.exe -m pip install -r win32\windows-build-requirements.txt
 
               # copy patched win32evtlog.pyd.
-              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+              #cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              c:\Python27\python.exe build_package.py win32
+              python3.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
@@ -2227,7 +2237,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.9.1-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
