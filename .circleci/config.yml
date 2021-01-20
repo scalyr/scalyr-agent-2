@@ -2256,14 +2256,13 @@ jobs:
           command: |
             sudo apt-key update
             sudo apt update
-            sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+            sudo apt install -y ruby2.3 ruby2.3-dev rubygems rpm build-essential --force-yes
             # Needed to validate rpm package
             sudo apt install -y rpm
 
             # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
             # as a temporaty solution explicitly specify ffi version.
             sudo gem install --no-document ffi:1.12.2 fpm
-
 
       - when:
           condition: << pipeline.parameters.agent_version >>
