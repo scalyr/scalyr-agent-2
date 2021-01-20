@@ -12,6 +12,7 @@ Improvements:
 
 Bug fixes:
 * Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
+* Fix a config deprecated options bug when they are set to ``false``.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 
