@@ -261,14 +261,21 @@ class DockerMonitorTest(ScalyrTestCase):
                 fake_clock=fake_clock,
             )
 
+            counter_lock = threading.Lock()
+
             fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
             counter = {"callback_invocations": 0}
             detected_fragment_changes = []
 
             # Mock the callback (that would normally be invoked on ScalyrClientSession
             def augment_user_agent(fragments):
-                counter["callback_invocations"] += 1
-                detected_fragment_changes.append(fragments[0])
+                counter_lock.acquire()
+
+                try:
+                    counter["callback_invocations"] += 1
+                    detected_fragment_changes.append(fragments[0])
+                finally:
+                    counter_lock.release()
 
             # Decorate the get_user_agent_fragment() function as follows:
             # Each invocation increments the FakeClockCounter
