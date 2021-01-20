@@ -2201,6 +2201,8 @@ class TestConfiguration(TestConfigurationBase):
         ]
         # "default_workers_per_api_key" should become "default_sessions_per_worker"
         assert config.default_sessions_per_worker == 2
+
+        # verify a false deprecated option.
         assert config.use_multiprocess_workers is False
 
     def test_deprecated_env_aware_params(self):
