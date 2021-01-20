@@ -2242,7 +2242,10 @@ jobs:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:3.6-jessie
+        # NOTE: fpm and git gem depend on Ruby >= 2.3 so we need to use Debian
+        # 10 which ships with Ruby 2.5. Jessie (Debian 8) ships with 2.1 which
+        # doesn't work anymore with those gems.
+        - image: circleci/python:3.6-buster
     environment:
       AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
       REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
@@ -2262,7 +2265,7 @@ jobs:
 
             # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
             # as a temporaty solution explicitly specify ffi version.
-            sudo gem install --no-document ffi:1.12.2 fpm
+            sudo gem install --no-document ffi:1.14.2 fpm:1.12.0
 
 
       - when:
@@ -2322,8 +2325,16 @@ jobs:
             gpg --update-trustdb
 
             # import remote sign machine public keys from files in the Scalyr agent repo.
-            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            # gnupg < 2.1
+            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+
+            # gnupg > 2.1
+            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+
+            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
+            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
 
             # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
