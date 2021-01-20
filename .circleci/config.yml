@@ -2324,8 +2324,16 @@ jobs:
             gpg --update-trustdb
 
             # import remote sign machine public keys from files in the Scalyr agent repo.
-            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            # gnupg < 2.1
+            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+
+            # gnupg > 2.1
+            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+
+            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
+            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
 
             # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
