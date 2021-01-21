@@ -2,6 +2,7 @@
 # Testing tools and libraries
 mock==3.0.5
 psutil==5.7.0
+pyinstaller==3.6
 pywin32==224
 pytest==4.6.9; python_version < '3.0'
 pytest==5.4.3; python_version >= '3.5'
