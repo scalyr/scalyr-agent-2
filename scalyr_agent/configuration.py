@@ -159,7 +159,12 @@ class Configuration(object):
             except JsonReadFileException as e:
                 # Special case - file is not readable, likely means a permission issue so return a
                 # more user-friendly error
-                if "file is not readable" in str(e).lower():
+                msg = str(e).lower()
+                if (
+                    "file is not readable" in msg
+                    or "error reading" in msg
+                    or "failed while reading"
+                ):
                     from scalyr_agent.platform_controller import PlatformController
 
                     platform_controller = PlatformController.new_platform()
