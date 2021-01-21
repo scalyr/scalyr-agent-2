@@ -287,7 +287,7 @@ Log-Message ""
 # for IP here inside the power shell script is a bit of a PITA...
 # dig A agent.scalyr.com
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-Add-Content "c:\windows\system32\drivers\etc\hosts" "34.240.110.238 invalid.mitm.should.fail.test.agent.scalyr.com"
+Add-Content "c:\windows\system32\drivers\etc\hosts" "52.44.148.105 invalid.mitm.should.fail.test.agent.scalyr.com"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
