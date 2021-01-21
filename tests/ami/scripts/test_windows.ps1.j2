@@ -286,7 +286,7 @@ Log-Message ""
 # NOTE: If scalyr.com IP changes, we need to update this here. Sadly querying
 # for IP here inside the power shell script is a bit of a PITA...
 # dig A agent.scalyr.com
-scalyr_com_ip = (nslookup agent.scalyr.com | Select-String Address | Where-Object LineNumber -eq 5).ToString().Split(' ')[-1]
+$scalyr_com_ip = (nslookup agent.scalyr.com | Select-String Address | Where-Object LineNumber -eq 5).ToString().Split(' ')[-1]
 echo "ip"
 echo $scalyr_com_ip
 
