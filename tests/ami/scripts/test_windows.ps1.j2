@@ -406,11 +406,6 @@ Log-Message ""
 #
 scalyr-agent-2 stop
 
-if ((Get-Process -Name "ScalyrAgentService"))
-{
-    Log-Message "The agent process still running."
-}
-
 mkdir c:\logs\
 
 # Create monitored files with mock content
