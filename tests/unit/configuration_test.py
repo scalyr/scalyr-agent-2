@@ -1349,6 +1349,7 @@ class TestConfiguration(TestConfigurationBase):
             limit_key="config-permissions-warn-%s" % (self._config_file),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
     def test_k8s_logs_config_option_is_configured_but_k8s_monitor_is_not(self):
         # kubernetes_monitor is not configured
         self._write_file_with_separator_conversion(
