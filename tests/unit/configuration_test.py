@@ -1964,6 +1964,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
+    @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
     @mock.patch("scalyr_agent.util.read_config_file_as_json")
     def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
         # User-friendly exception should be thrown on some config permission related errors
