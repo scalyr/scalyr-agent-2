@@ -3128,7 +3128,7 @@ class Configuration(object):
         if config_val is None and deprecated_names is not None:
             for name in deprecated_names:
                 config_val = self.__get_config_val(config_object, name, param_type)
-                if config_val:
+                if config_val is not None:
                     config_object.put(param_name, config_val)
                     del config_object[name]
                     if self.__logger:
@@ -3166,7 +3166,7 @@ class Configuration(object):
                     logger=self.__logger,
                     param_val=config_val,
                 )
-                if env_val:
+                if env_val is not None:
                     break
 
         # Not set in environment

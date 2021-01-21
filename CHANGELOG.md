@@ -13,6 +13,8 @@ Improvements:
 
 Bug fixes:
 * Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
+* Fix a config deprecated options bug when they are set to ``false``.
+* Field values in log lines for monitor metrics which contain extra fields are now sorted in alphabetic order. This should have no impact on the end user since server side parsers already support arbitrary ordering, but it's done to ensure consistent ordering and output for for monitor log lines.
 * Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
