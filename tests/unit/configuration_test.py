@@ -672,7 +672,7 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
 
-        expected_msg = r'File "%s" is not readable the current user (.*?).' % (
+        expected_msg = r'File "%s" is not readable by the current user (.*?).' % (
             re.escape(self._config_file)
         )
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
@@ -1963,6 +1963,27 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
+
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
+        # User-friendly exception should be thrown on some config permission related errors
+        error_msgs = [
+            "File is not readable",
+            "Error reading file",
+            "Failed while reading",
+        ]
+
+        for error_msg in error_msgs:
+            mock_read_config_file_as_json.side_effect = Exception(error_msg)
+
+            config = self._create_test_configuration_instance()
+
+            expected_msg = re.compile(
+                r".*not readable by the current user.*Original error.*%s.*"
+                % (error_msg),
+                re.DOTALL,
+            )
+            self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):

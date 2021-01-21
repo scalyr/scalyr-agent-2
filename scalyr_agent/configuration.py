@@ -55,7 +55,6 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -63,7 +62,7 @@ from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
 
 FILE_WRONG_OWNER_ERROR_MSG = """
-File \"%s\" is not readable the current user (%s).
+File \"%s\" is not readable by the current user (%s).
 
 You need to make sure that the file is owned by the same account which is used to run the agent.
 
@@ -156,7 +155,7 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException as e:
+            except Exception as e:
                 # Special case - file is not readable, likely means a permission issue so return a
                 # more user-friendly error
                 msg = str(e).lower()
