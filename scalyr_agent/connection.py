@@ -240,7 +240,7 @@ class ScalyrHttpConnection(Connection):
             error_msg = str(error).lower()
 
             if isinstance(error, CertificateError) or "hostname mismatch" in error_msg:
-                # On Windows under Python 3 this error is returned instead:
+                # On Windows under Python >= 3.7 this error is returned instead:
                 #   ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate
                 # verify failed: Hostname mismatch, certificate is not valid for ...
                 # So we need to handle this scenario as well.
@@ -252,7 +252,12 @@ class ScalyrHttpConnection(Connection):
                     getattr(error, "message", str(error)),
                     error_code=error_code,
                 )
-            elif isinstance(error, ssl.SSLError):
+            elif (
+                isinstance(error, ssl.SSLError)
+                or "certificate verify failed" in error_msg
+            ):
+                # Second condition is special case for Windows under Python >= 3.7 where
+                # ssl.SSLCertVerificationError is thrown
                 error_code = "client/connectionFailedSSLError"
                 log.exception(
                     'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
