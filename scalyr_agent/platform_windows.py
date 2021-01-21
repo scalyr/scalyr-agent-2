@@ -126,6 +126,16 @@ _SERVICE_DESCRIPTION_ = "Collects logs and metrics and forwards them to Scalyr.c
 # A custom control message that is used to signal the agent should generate a detailed status report.
 _SERVICE_CONTROL_DETAILED_REPORT_ = win32service.SERVICE_USER_DEFINED_CONTROL - 1
 
+REGISTRY_ACCESS_DENIED_ERROR_MSG = """
+Unable to set registry entry due to access denied error. This likely indicates that the agent is
+running as a non-Administrator user which doesn't have permission to manipulate registry entries.
+
+You should ensure agent runs as an Administrator user / user who has access to manipulate Windows
+registry entries.
+
+Original error: %s
+""".strip()
+
 
 def _set_config_path_registry_entry(value):
     """Updates the Windows registry entry for the configuration file path.
@@ -574,7 +584,15 @@ class WindowsPlatformController(PlatformController):
         """
         # NOTE:  The config_main.py file relies on it being ok to pass in None for agent_run_method.
         # If this assumption changes, fix that in config_main.py.
-        _set_config_path_registry_entry(self.__config_file_path)
+        try:
+            _set_config_path_registry_entry(self.__config_file_path)
+        except Exception as e:
+            # Likely indicates that the agent is not running as admin and doesn't have permission
+            # to edit registry. Throw more user-friendly error.
+            if "access is denied" in str(e).lower():
+                raise Exception(REGISTRY_ACCESS_DENIED_ERROR_MSG % (str(e)))
+            raise e
+
         if fork:
             win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
         else:
