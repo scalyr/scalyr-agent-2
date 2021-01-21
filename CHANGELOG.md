@@ -9,9 +9,11 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 30, 2021 14:00 -0800
 
 Improvements:
 * Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* Update agent to throw more user-friendly exceptions on Windows when the agent doesn't have access to the agent config file and Windows registry.
 
 Bug fixes:
 * Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
+* Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 
