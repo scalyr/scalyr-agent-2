@@ -8,6 +8,7 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -26,6 +27,7 @@ master_only: &master_only
     branches:
       only:
         - master
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -49,7 +51,6 @@ skip_release_build_branch_push: &skip_release_build_branch_push
     and:
       - equal: [ false, << pipeline.parameters.is_release_build >>]
       - equal: [ release_build,  << pipeline.git.branch >>]
-
 
 version: 2.1
 
@@ -472,6 +473,10 @@ commands:
             - run:
                 name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
                 command: |
+                  # Also copy over .coverage file from tests (aka coverage for test files themselves)
+                  mkdir ~/artifacts/tests-coverage/
+                  cp .coverage ~/artifacts/tests-coverage/
+
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
@@ -479,7 +484,9 @@ commands:
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
+                  ls -la .coverage*
                   coverage combine ~/artifacts/*/.coverage
+                  ls -la .coverage*
 
                   # coverage data from inside docker contains uses different paths which we need to normalize for
                   # coverage combine and codecov reporting and merging to work.
@@ -975,11 +982,11 @@ jobs:
       - store_artifacts:
           path: test-results
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Print the report
@@ -988,6 +995,11 @@ jobs:
             # Submit it to codecov.io
             coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
@@ -1333,6 +1345,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1344,7 +1357,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1358,6 +1371,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
@@ -1385,6 +1403,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
@@ -1427,7 +1446,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1441,6 +1460,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
@@ -1584,7 +1608,7 @@ jobs:
     docker:
       - image: circleci/python:3.6-jessie
     environment:
-      VERSION: "4.1.0.1829"
+      VERSION: "4.6.0.2311"
       SCANNER_DIRECTORY: "/tmp/cache/scanner"
       SONAR_USER_HOME: "/tmp/cache/scanner/.sonar"
       OS: "linux"
@@ -1597,7 +1621,7 @@ jobs:
           name: Create cache directory if it doesn't exist
           command: mkdir -p /tmp/cache/scanner
       - restore_cache:
-          key: v2-sonarcloud-scanner-4.1.0.1829
+          key: v2-sonarcloud-scanner-4.6.0.2311
       - run:
           name: Download Sonar Scanner
           command: |
@@ -1611,7 +1635,7 @@ jobs:
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/bin/sonar-scanner
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/jre/bin/java
       - save_cache:
-          key: v2sonarcloud-scanner-4.1.0.1829
+          key: v2sonarcloud-scanner-4.6.0.2311
           paths:
             - /tmp/cache/scanner
       - run:
@@ -1634,14 +1658,30 @@ jobs:
             ./scripts/circleci/download-coverage-data-from-s3.py "."
             ls -la .coverage*
 
-            # Combine It
+            mkdir coverage
+            cp .coverage* coverage/
+
+            # Ensure consistent paths for all the code coverage reports
+            # NOTE: In seed we need 3 \ for one \
+            sed -i "s#C:\\\\\\\Users\\\\\\\circleci\\\\\\\scalyr-agent-2#/home/circleci/scalyr-agent-2#g" .coverage*
+            # Replace two \\ with one /
+            sed -i "s#\\\\\\\#/#g" .coverage*
+
+            # Combine it
             coverage combine
+
+            cp .coverage coverage/.coverage-combined-final
 
             # Generate XML file which can be processed by sonarcloud
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
 
             # Print it
             coverage report
+
+      # Stored all the downloaded coverage files for ease of troubleshooting
+      - store_artifacts:
+          path: coverage
+
       - run:
           name: Run Sonar Scanner
           command:
@@ -2206,7 +2246,10 @@ jobs:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:3.6-jessie
+        # NOTE: fpm and git gem depend on Ruby >= 2.3 so we need to use Debian
+        # 10 which ships with Ruby 2.5. Jessie (Debian 8) ships with 2.1 which
+        # doesn't work anymore with those gems.
+        - image: circleci/python:3.6-buster
     environment:
       AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
       REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
@@ -2226,7 +2269,7 @@ jobs:
 
             # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
             # as a temporaty solution explicitly specify ffi version.
-            sudo gem install --no-document ffi:1.12.2 fpm
+            sudo gem install --no-document ffi:1.14.2 fpm:1.12.0
 
 
       - when:
@@ -2286,8 +2329,16 @@ jobs:
             gpg --update-trustdb
 
             # import remote sign machine public keys from files in the Scalyr agent repo.
-            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            # gnupg < 2.1
+            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+
+            # gnupg > 2.1
+            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+
+            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
+            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
 
             # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
