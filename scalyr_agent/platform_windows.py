@@ -136,6 +136,16 @@ registry entries.
 Original error: %s
 """.strip()
 
+AGENT_STOP_ACCESS_DENIED_ERROR_MSG = """
+Unable to stop agent process due to access denied error. This likely indicates that the agent was
+started by a different user and / or the current user doesn't have correct permissions to stop the
+agent.
+
+You should run this script as an Administrator / user who started the agent.
+
+Original error: %s
+""".strip()
+
 
 def _set_config_path_registry_entry(value):
     """Updates the Windows registry entry for the configuration file path.
@@ -626,6 +636,8 @@ class WindowsPlatformController(PlatformController):
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
                 )
+            elif "access is denied" in str(e).lower():
+                raise Exception(AGENT_STOP_ACCESS_DENIED_ERROR_MSG % (str(e)))
             else:
                 raise e
 
