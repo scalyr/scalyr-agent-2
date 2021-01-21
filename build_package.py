@@ -332,7 +332,7 @@ def build_win32_installer_package(variant, version):
     )
 
     run_command(
-        "{0} -m PyInstaller scalyr-agent.spec --onefile".format(sys.executable),
+        "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
         exit_on_fail=True,
         command_name="pyinstaller",
     )
