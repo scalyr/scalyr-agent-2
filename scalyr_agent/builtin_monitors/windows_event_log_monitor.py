@@ -809,7 +809,7 @@ and System sources:
     def stop(self, wait_on_join=True, join_timeout=5):
         # stop the monitor
         ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
-        time.sleep(0.1)
+        # time.sleep(0.1)
         # stop any event monitoring
         self.__api.stop()
 
