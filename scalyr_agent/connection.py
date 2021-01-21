@@ -31,6 +31,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.compat import ssl_match_hostname
 from scalyr_agent.compat import CertificateError
 from scalyr_agent.compat import PY_post_equal_279
+from scalyr_agent.compat import PY3_post_equal_37
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -239,10 +240,34 @@ class ScalyrHttpConnection(Connection):
             error_code = "client/connectionFailed"
             error_msg = str(error).lower()
 
-            if isinstance(error, CertificateError) or "hostname mismatch" in error_msg:
+            if PY3_post_equal_37 and "hostname mismatch" in error_msg:
                 # On Windows under Python >= 3.7 this error is returned instead:
                 #   ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate
                 # verify failed: Hostname mismatch, certificate is not valid for ...
+                error_code = "client/connectionFailedCertHostnameValidationFailed"
+                log.exception(
+                    'Failed to connect to "%s" because of server certificate validation error: "%s". '
+                    "This likely indicates a MITM attack.",
+                    self._full_address,
+                    getattr(error, "message", str(error)),
+                    error_code=error_code,
+                )
+            elif PY3_post_equal_37 and "certificate verify failed" in error_msg:
+                # Special case for Windows under Python >= 3.7 where
+                # ssl.SSLCertVerificationError is thrown
+                error_code = "client/connectionFailedSSLError"
+                log.exception(
+                    'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
+                    "for the root Certificate Authority could not be parsed, or we attempted to connect to "
+                    "a server whose certificate could not be trusted (if so, maybe Scalyr's SSL cert has "
+                    "changed and you should update your agent to get the new certificate).  The returned "
+                    "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
+                    self._full_address,
+                    errno,
+                    six.text_type(error),
+                    error_code=error_code,
+                )
+            elif isinstance(error, CertificateError):
                 # So we need to handle this scenario as well.
                 error_code = "client/connectionFailedCertHostnameValidationFailed"
                 log.exception(
@@ -252,12 +277,7 @@ class ScalyrHttpConnection(Connection):
                     getattr(error, "message", str(error)),
                     error_code=error_code,
                 )
-            elif (
-                isinstance(error, ssl.SSLError)
-                or "certificate verify failed" in error_msg
-            ):
-                # Second condition is special case for Windows under Python >= 3.7 where
-                # ssl.SSLCertVerificationError is thrown
+            elif isinstance(error, ssl.SSLError):
                 error_code = "client/connectionFailedSSLError"
                 log.exception(
                     'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
