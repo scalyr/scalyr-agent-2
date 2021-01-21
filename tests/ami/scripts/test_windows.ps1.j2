@@ -293,12 +293,8 @@ echo "Using agent.scalyr.com IP: $scalyr_com_ip"
 echo ""
 
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-#Add-Content "c:\windows\system32\drivers\etc\hosts" "52.44.148.105 invalid.mitm.should.fail.test.agent.scalyr.com"
 "$scalyr_com_ip invalid.mitm.should.fail.test.agent.scalyr.com" | Add-Content "c:\windows\system32\drivers\etc\hosts"
 # "$scalyr_com_ip invalid.mitm.should.fail.test.agent.scalyr.com" | Out-File "c:\windows\system32\drivers\etc\hosts" -Append
-echo "-"
-type "c:\windows\system32\drivers\etc\hosts"
-echo "-"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
