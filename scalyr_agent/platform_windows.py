@@ -596,8 +596,14 @@ class WindowsPlatformController(PlatformController):
             if not quiet:
                 print("Sending control signal to stop agent service.")
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
+
+            if self.is_agent_running():
+                print("Agent service is still running.")
+                return -1
+
             if not quiet:
                 print("Agent service has stopped.")
+
             return 0
         except win32api.error as e:
             if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
