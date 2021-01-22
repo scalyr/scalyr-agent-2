@@ -2173,10 +2173,10 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              C:\Users\circleci\AppData\Local\Programs\Python\Python39\python.exe -m pip install -r win32\windows-build-requirements.txt
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              C:\Users\circleci\AppData\Local\Programs\Python\Python39\python.exe build_package.py win32
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
