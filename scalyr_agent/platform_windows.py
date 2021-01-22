@@ -927,11 +927,7 @@ class PipeRedirectorClient(RedirectorClient):
                 self.__pipe_handle = None
 
 
-# Workaround to make sure we don't run this as part of tests on import since it breaks
-# things
-if __name__ == "__main__" and not compat.os_environ_unicode.get(
-    "INSIDE_WINDOWS_TESTS_PYTEST", False
-):
+if __name__ == "__main__":
     if len(sys.argv) == 1:
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(ScalyrAgentService)

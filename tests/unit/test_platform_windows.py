@@ -14,7 +14,6 @@
 
 from __future__ import absolute_import
 
-import os
 import platform
 
 import mock
@@ -31,15 +30,6 @@ else:
 
 @pytest.mark.windows_platform
 class WindowsPlatformControllerTestCase(ScalyrTestCase):
-    @classmethod
-    def setUpClass(cls):
-        os.environ["INSIDE_WINDOWS_TESTS_PYTEST"] = "true"
-
-    @classmethod
-    def tearDownClass(cls):
-        if "INSIDE_WINDOWS_TESTS_PYTEST" in os.environ:
-            del os.environ["INSIDE_WINDOWS_TESTS_PYTEST"]
-
     @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
     @mock.patch("scalyr_agent.platform_windows._set_config_path_registry_entry")
     def test_start_agent_service_friendly_error_on_insufficient_permissions(
