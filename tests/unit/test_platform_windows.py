@@ -49,9 +49,14 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
 
         mock_set_config_path_registry_entry.side_effect = Exception("Access is denied")
 
+        def noop():
+            pass
+
         controller = WindowsPlatformController()
         expected_msg = r".*Unable to set registry entry.*"
-        self.assertRaisesRegexp(Exception, expected_msg, controller.start_agent_service)
+        self.assertRaisesRegexp(
+            Exception, expected_msg, controller.start_agent_service, noop, None
+        )
 
     @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
     @mock.patch("win32serviceutil.StopService")

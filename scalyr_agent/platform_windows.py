@@ -636,10 +636,11 @@ class WindowsPlatformController(PlatformController):
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
                 )
-            elif "access is denied" in str(e).lower():
-                raise Exception(AGENT_STOP_ACCESS_DENIED_ERROR_MSG % (str(e)))
             else:
                 raise e
+        except Exception as e:
+            if "access is denied" in str(e).lower():
+                raise Exception(AGENT_STOP_ACCESS_DENIED_ERROR_MSG % (str(e)))
 
     def get_usage_info(self):
         """Returns CPU and memory usage information.

@@ -1,9 +1,7 @@
 # Python requirements file which is used for running unit Tests on Windows
 # Testing tools and libraries
 mock==3.0.5
-psutil==5.7.0
 # NOTE: For Python 3 we need newer version of pywin32
-pywin32==300
 pytest==4.6.9; python_version < '3.0'
 pytest==5.4.3; python_version >= '3.5'
 pytest-cov==2.10.0
