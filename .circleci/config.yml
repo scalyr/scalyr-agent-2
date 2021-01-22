@@ -969,7 +969,7 @@ jobs:
             tox.exe -epy3.5-windows-unit-tests --notest > output 2>&1
             cat output
 
-            .tox/py3.5-windows-unit-tests/scripts/pip.exe uninstall pywin32
+            .tox/py3.5-windows-unit-tests/scripts/pip.exe uninstall --yes pywin32
             .tox/py3.5-windows-unit-tests/scripts/pip.exe install "pywin32==300"
 
             # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
