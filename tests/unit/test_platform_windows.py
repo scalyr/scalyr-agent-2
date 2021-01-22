@@ -23,11 +23,8 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
 if platform.system() == "Windows":
-    from scalyr_agent.platform_windows import WindowsPlatformController
-
     WINDOWS = True
 else:
-    WindowsPlatformController = None  # type: ignore
     WINDOWS = False
 
 
@@ -46,6 +43,8 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
     def test_start_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_set_config_path_registry_entry
     ):
+        from scalyr_agent.platform_windows import WindowsPlatformController
+
         mock_set_config_path_registry_entry.side_effect = Exception("Access is denied")
 
         controller = WindowsPlatformController()
@@ -57,6 +56,8 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
     def test_stop_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_StopService
     ):
+        from scalyr_agent.platform_windows import WindowsPlatformController
+
         mock_StopService.side_effect = Exception("Access is denied")
         controller = WindowsPlatformController()
         expected_msg = r".*Unable to stop agent process.*"
