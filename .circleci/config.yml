@@ -963,6 +963,15 @@ jobs:
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
+            # There is a weird issue on Circle ci when tests will fail with
+            # ImportError: DLL load failed: The specified module could not be found.
+            # so we need to reinstall the library for it to work :/
+            tox.exe -epy3.5-windows-unit-tests --notest > output 2>&1
+            cat output
+
+            .tox/py3.5-windows-unit-tests/scripts/pip.exe uninstall pywin32
+            .tox/py3.5-windows-unit-tests/scripts/pip.exe install "pywin32==300"
+
             # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
             # after the tox commands finishes. That's why we use the redirect workaround. Sadly
             # this means we don't see output immediately as it produced (using redirect + tee also
