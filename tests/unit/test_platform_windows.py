@@ -38,7 +38,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
         if "INSIDE_WINDOWS_TESTS_PYTEST" in os.environ:
             del os.environ["INSIDE_WINDOWS_TESTS_PYTEST"]
 
-    @skipIf(not WINDOWS, "Skipping tests under non-Windows platform")
+    @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
     @mock.patch("scalyr_agent.platform_windows._set_config_path_registry_entry")
     def test_start_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_set_config_path_registry_entry
@@ -51,7 +51,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
         expected_msg = r".*Unable to set registry entry.*"
         self.assertRaisesRegexp(Exception, expected_msg, controller.start_agent_service)
 
-    @skipIf(not WINDOWS, "Skipping tests under non-Windows platform")
+    @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
     @mock.patch("win32serviceutil.StopService")
     def test_stop_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_StopService
