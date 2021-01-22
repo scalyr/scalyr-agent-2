@@ -3,6 +3,9 @@ echo "Restarting agent"
 echo ""
 
 scalyr-agent-2 stop;
+
+Get-Process -Name ScalyrAgentService
+
 Start-Sleep 2
 
 echo "Tailling last 50 lines of log"
