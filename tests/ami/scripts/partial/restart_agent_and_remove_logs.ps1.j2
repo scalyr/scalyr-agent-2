@@ -4,7 +4,10 @@ echo ""
 
 scalyr-agent-2 stop;
 
+Set-StrictMode -Off
 Get-Process -Name ScalyrAgentService
+Set-StrictMode -Version 3.0
+
 
 Start-Sleep 2
 
