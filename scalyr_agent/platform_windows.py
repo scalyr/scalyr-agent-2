@@ -18,8 +18,6 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-if False:
-    from typing import Dict
 
 import atexit
 import errno
@@ -498,32 +496,6 @@ class WindowsPlatformController(PlatformController):
         client.stop()
         return win32process.GetExitCodeProcess(proc_handle)
 
-    def _get_agent_service_status(self):  # type: () -> Dict
-        """
-        Return the status data for the agent's service.
-        The status object is a wrapping around this structure:
-        https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status_process
-        :return: The status data for the agent service.
-        """
-        hscm = None
-        hs = None
-
-        try:
-            hscm = win32service.OpenSCManager(
-                None, None, win32service.SC_MANAGER_CONNECT
-            )
-            hs = win32serviceutil.SmartOpenService(
-                hscm, _SCALYR_AGENT_SERVICE_, win32service.SERVICE_QUERY_STATUS
-            )
-            status = win32service.QueryServiceStatusEx(hs)
-            return status
-
-        finally:
-            if hs is not None:
-                win32service.CloseServiceHandle(hs)
-            if hscm is not None:
-                win32service.CloseServiceHandle(hscm)
-
     def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
 
@@ -545,29 +517,45 @@ class WindowsPlatformController(PlatformController):
         @raise AgentNotRunning
         """
 
-        status = self._get_agent_service_status()
+        hscm = None
+        hs = None
 
-        state = status["CurrentState"]
-
-        is_running = state in (
-            win32service.SERVICE_RUNNING,
-            win32service.SERVICE_START_PENDING,
-        )
-        if fail_if_running and is_running:
-            pid = status["ProcessId"]
-            raise AgentAlreadyRunning(
-                "The operating system reports the Scalyr Agent Service is running with "
-                "pid=%d" % pid
+        try:
+            hscm = win32service.OpenSCManager(
+                None, None, win32service.SC_MANAGER_CONNECT
             )
-        if fail_if_not_running and not is_running:
-            raise AgentNotRunning(
-                "The operating system reports the Scalyr Agent Service is not running"
+            hs = win32serviceutil.SmartOpenService(
+                hscm, _SCALYR_AGENT_SERVICE_, win32service.SERVICE_QUERY_STATUS
+            )
+            status = win32service.QueryServiceStatusEx(hs)
+
+            state = status["CurrentState"]
+
+            is_running = state in (
+                win32service.SERVICE_RUNNING,
+                win32service.SERVICE_START_PENDING,
+            )
+            if fail_if_running and is_running:
+                pid = status["ProcessId"]
+                raise AgentAlreadyRunning(
+                    "The operating system reports the Scalyr Agent Service is running with "
+                    "pid=%d" % pid
+                )
+            if fail_if_not_running and not is_running:
+                raise AgentNotRunning(
+                    "The operating system reports the Scalyr Agent Service is not running"
+                )
+
+            return state in (
+                win32service.SERVICE_RUNNING,
+                win32service.SERVICE_START_PENDING,
             )
 
-        return state in (
-            win32service.SERVICE_RUNNING,
-            win32service.SERVICE_START_PENDING,
-        )
+        finally:
+            if hs is not None:
+                win32service.CloseServiceHandle(hs)
+            if hscm is not None:
+                win32service.CloseServiceHandle(hscm)
 
     def start_agent_service(self, agent_run_method, quiet, fork=True):
         """Start the agent service using the platform-specific method.
@@ -605,29 +593,12 @@ class WindowsPlatformController(PlatformController):
         @param quiet: True if only error messages should be printed to stdout, stderr.
         @type quiet: bool
         """
-
-        service_status = self._get_agent_service_status()
-        pid = service_status["ProcessId"]
-
-        service_process = psutil.Process(pid=pid)
-        if not service_process.is_running():
-            message = "Failed to stop the agent because it does not appear to be running. The service process with PID %s is not running.\n"
-            sys.stderr.write(message % pid)
-            return 0
         try:
             if not quiet:
                 print("Sending control signal to stop agent service.")
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
-
             if not quiet:
                 print("Agent service has stopped.")
-
-            if service_process.is_running():
-                sys.stderr.write(
-                    "The process %s of the Scalyr agent service is still running even if the service is stopped."
-                    % pid
-                )
-                return 1
 
             return 0
         except win32api.error as e:
