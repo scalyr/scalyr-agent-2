@@ -18,6 +18,7 @@ import os
 import platform
 
 import mock
+import pytest
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
@@ -28,6 +29,7 @@ else:
     WINDOWS = False
 
 
+@pytest.mark.windows_platform
 class WindowsPlatformControllerTestCase(ScalyrTestCase):
     @classmethod
     def setUpClass(cls):
