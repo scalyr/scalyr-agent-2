@@ -2104,15 +2104,11 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Python installer Cache
-          key: windows-python-installer-python-{{ .Branch }}-python-installer-cache
+          key: windows-python-installer-cache-{{ .Branch }}
 
       - restore_cache:
           name: Restore Wix cache
           key: windows-wix-cache-{{ .Branch }}
-
-      - restore_cache:
-          name: Restore patched win32evtlog.pyd
-          key: windows-win32evtlog-cache-{{ .Branch }}
 
       - run:
           name: Extract Wix.
@@ -2132,25 +2128,8 @@ jobs:
             if (!(Test-Path .\python_installer\python-3.8.7-amd64.exe -PathType Leaf)) {
                 wget -O .\python_installer\python-3.8.7-amd64.exe https://www.python.org/ftp/python/3.8.7/python-3.8.7-amd64.exe
             }
-            #Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
-            #Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
             python_installer\python-3.8.7-amd64.exe /quiet
 
-      - run:
-          name: Download patched win32evtlog.pyd
-          command: |
-            $ProgressPreference = "SilentlyContinue"
-            mkdir win32evtlog-cache -Force
-            if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
-                echo "Downloading .pyd library from S3"
-                wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
-            }
-            else {
-                echo "Using existing cached dependency on disk"
-            }
-
-            echo "File hash"
-            Get-FileHash .\win32evtlog-cache\win32evtlog.pyd | Format-List
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
@@ -2158,20 +2137,14 @@ jobs:
             - "wix311_binaries"
 
       - save_cache:
-          name: Save patched win32evtlog.pyd
-          key: windows-win32evtlog-cache-{{ .Branch }}
-          paths:
-            - "win32evtlog-cache"
-
-      - save_cache:
-          name: Save Pyinstaller Cache
-          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
+          name: Save Python Installer Cache
+          key: windows-python-installer-cache-{{ .Branch }}
           paths:
             - "python_installer"
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2200,15 +2173,9 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              #c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
-
-              # copy patched win32evtlog.pyd.
-              #cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
-
               # TODO: This step doesn't correctly exit with non zero on failure
-              #c:\Python27\python.exe build_package.py win32
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
 
               mkdir package
@@ -2231,7 +2198,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
