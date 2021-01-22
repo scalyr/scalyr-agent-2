@@ -452,13 +452,14 @@ class NewApi(Api):
         Close all handles for event subscriptions.
         """
         for handle in self.__eventHandles:
-            res = windll.wevtapi.EvtClose(handle.handle)
-            if not res:
-                self._logger.error(
-                    "Can not close event subscription handle '{0}'.".format(
-                        handle.handle
-                    )
-                )
+            pass
+            # res = windll.wevtapi.EvtClose(handle.handle)
+            # if not res:
+            #     self._logger.error(
+            #         "Can not close event subscription handle '{0}'.".format(
+            #             handle.handle
+            #         )
+            #     )
         self.__eventHandles = []
 
     def _FormattedMessage(self, metadata, event, field, value):
