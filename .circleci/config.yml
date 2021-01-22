@@ -963,7 +963,7 @@ jobs:
       - run:
           name: Run Unit Tests under Python 3.5
           command: |
-           # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
+            # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
             # after the tox commands finishes. That's why we use the redirect workaround. Sadly
             # this means we don't see output immediately as it produced (using redirect + tee also
             # results in the job not exiting when tox command finishes).
@@ -975,14 +975,17 @@ jobs:
               exit ${EXIT_CODE}
             fi
 
-            # There is a weird issue on Circle ci when tests will fail with
+            # There is a weird issue on Circle CIwhen tests will fail with
             # ImportError: DLL load failed: The specified module could not be found.
             # so we need to reinstall the library for it to work :/
+            # Likely something to do with pywin32 post install step not running
+            # for some reason (Scripts\pywin32_postinstall.py -install)
             tox.exe -epy3.5-windows-unit-tests-windows-platform --notest > output 2>&1
             cat output
 
             .tox/py3.5-windows-unit-tests-windows-platform/scripts/pip.exe uninstall --yes pywin32
             .tox/py3.5-windows-unit-tests-windows-platform/scripts/pip.exe install "pywin32==300"
+
             tox.exe -epy3.5-windows-unit-tests-windows-platform > output 2>&1
             EXIT_CODE=$?
             cat output
