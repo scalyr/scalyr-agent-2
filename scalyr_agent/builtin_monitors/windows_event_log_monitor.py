@@ -448,8 +448,17 @@ class NewApi(Api):
             self.__bookmark_lock.release()
 
     def stop(self):
-        # explicitly empty the eventHandles array so that EvtClose will be called
-        # on all the event handles - this prevents duplicate logs if the config changes
+        """
+        Close all handles for event subscriptions.
+        """
+        for handle in self.__eventHandles:
+            res = windll.wevtapi.EvtClose(handle.handle)
+            if not res:
+                self._logger.error(
+                    "Can not close event subscription handle '{0}'.".format(
+                        handle.handle
+                    )
+                )
         self.__eventHandles = []
 
     def _FormattedMessage(self, metadata, event, field, value):
@@ -809,7 +818,6 @@ and System sources:
     def stop(self, wait_on_join=True, join_timeout=5):
         # stop the monitor
         ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
-        time.sleep(0.1)
         # stop any event monitoring
         self.__api.stop()
 
