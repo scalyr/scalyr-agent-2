@@ -22,10 +22,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
 if platform.system() == "Windows":
-    # TODO: Test is failing on Circle CI with
-    # ImportError: DLL load failed: The specified module could not be found.
-    # from scalyr_agent.platform_windows import WindowsPlatformController
-    WindowsPlatformController = None  # type: ignore
+    from scalyr_agent.platform_windows import WindowsPlatformController
 else:
     WindowsPlatformController = None  # type: ignore
 
