@@ -605,7 +605,7 @@ class Configuration(object):
             "use_multiprocess_workers",
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
-            "enable_worker_process_metrics_gather",
+            "enable_worker_session_process_metrics_gather",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
         ]
