@@ -1977,6 +1977,8 @@ class TestConfiguration(TestConfigurationBase):
     def test_print_config_windows(self):
         import win32file  # pylint: disable=import-error
 
+        scalyr_agent.configuration.win32file = win32file
+
         mock_logger = Mock()
         maxstdio = win32file._getmaxstdio()
 
