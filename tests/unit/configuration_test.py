@@ -1991,11 +1991,20 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
         config.print_useful_settings()
         mock_logger.info.assert_any_call("Configuration settings")
         mock_logger.info.assert_any_call(
             "\twin32_max_open_fds(maxstdio): %s" % (maxstdio)
         )
+
+        mock_logger.reset_mock()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        # If the value has not changed, the line should not be printed
+        config.print_useful_settings(other_config=config)
+        self.assertEqual(mock_logger.info.call_count, 0)
 
     @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
     @mock.patch("scalyr_agent.util.read_config_file_as_json")
