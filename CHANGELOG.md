@@ -17,6 +17,7 @@ Bug fixes:
 * Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
 * Fix a config deprecated options bug when they are set to ``false``.
 * Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
+* Make sure we only print the value of ``win32_max_open_fds`` config option on Windows if it has changed.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 

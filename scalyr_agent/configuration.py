@@ -146,6 +146,10 @@ class Configuration(object):
 
         self.__logger = logger
 
+        # We store this value here on Windows so we can reference it in print_useful_settings and
+        # only print this setting if it has changed
+        self._win32_current_max_open_fds = None
+
     def parse(self):
         self.__read_time = time.time()
 
@@ -406,6 +410,13 @@ class Configuration(object):
             self.__last_error = e
             raise e
 
+        # Store the current value of win32_current_max_open_fds
+        if sys.platform.startswith("win") and win32file:
+            try:
+                self._win32_current_max_open_fds = win32file._getmaxstdio()
+            except Exception:
+                self._win32_current_max_open_fds = None
+
     def __verify_workers(self):
         """
         Verify all worker config entries from the "workers" list in config.
@@ -653,17 +664,27 @@ class Configuration(object):
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file:
-            try:
-                maxstdio = win32file._getmaxstdio()
-            except Exception:
-                # This error should not be fatal
-                maxstdio = "unknown"
-
+        win32_max_open_fds_previous_value = getattr(
+            other_config, "_win32_current_max_open_fds", None
+        )
+        win32_max_open_fds_current_value = getattr(
+            self, "_win32_current_max_open_fds", None
+        )
+        if (
+            sys.platform.startswith("win")
+            and win32file
+            and (
+                win32_max_open_fds_current_value != win32_max_open_fds_previous_value
+                or other_config is None
+            )
+        ):
             if first:
                 self.__logger.info("Configuration settings")
 
-            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+            self.__logger.info(
+                "\twin32_max_open_fds(maxstdio): %s"
+                % (win32_max_open_fds_current_value)
+            )
 
         # If debug level 5 is set also log the raw config JSON excluding the api_key
         # This makes various troubleshooting easier.
