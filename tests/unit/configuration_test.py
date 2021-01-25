@@ -1973,6 +1973,21 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
+    @skipIf(platform.system() != "Windows", "Skipping tests on non-Windows platform")
+    def test_print_config_windows(self):
+        import win32file  # pylint: disable=import-error
+
+        mock_logger = Mock()
+        maxstdio = win32file._getmaxstdio()
+
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call(
+            "\twin32_max_open_fds(maxstdio): %s" % (maxstdio)
+        )
+
     @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
     @mock.patch("scalyr_agent.util.read_config_file_as_json")
     def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
