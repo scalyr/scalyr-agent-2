@@ -24,4 +24,8 @@ COPY py26-unit-tests-requirements.txt py26-unit-tests-requirements.txt
 COPY dev-requirements.txt dev-requirements.txt
 
 RUN pip install -r py26-unit-tests-requirements.txt
+
+# We need newer version of pip since old version don't support manylinux wheels
+RUN python3 -m pip install --upgrade "pip==21.0"
+RUN python3 -m pip --version
 RUN python3 -m pip install -r dev-requirements.txt
