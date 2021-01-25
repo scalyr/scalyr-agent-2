@@ -57,6 +57,8 @@ from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
+import scalyr_agent.configuration
+
 import six
 from six.moves import range
 from mock import patch, Mock
@@ -78,10 +80,17 @@ class TestConfigurationBase(ScalyrTestCase):
             if "scalyr" in key.lower():
                 del os.environ[key]
 
+        self._original_win32_file = scalyr_agent.configuration.win32file
+
+        # Patch it so tests pass on Windows
+        scalyr_agent.configuration.win32file = None
+
     def tearDown(self):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+        scalyr_agent.configuration.win32file = self._original_win32_file
 
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
