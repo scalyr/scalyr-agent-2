@@ -22,12 +22,12 @@ docker==4.1.0
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 requests==2.15.1
 ujson==1.35
-orjson==2.6.1; python_version >= '3.6'
+orjson==3.4.7; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1
 pathlib2==2.3.5; python_version <= '2.7'
-# Used for performanice optimized versions of rfc3339_to_* functions
+# Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
 udatetime==0.0.16
 futures==3.3.0; python_version <= '2.7'

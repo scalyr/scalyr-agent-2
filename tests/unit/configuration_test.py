@@ -57,6 +57,8 @@ from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
+import scalyr_agent.configuration
+
 import six
 from six.moves import range
 from mock import patch, Mock
@@ -78,10 +80,17 @@ class TestConfigurationBase(ScalyrTestCase):
             if "scalyr" in key.lower():
                 del os.environ[key]
 
+        self._original_win32_file = scalyr_agent.configuration.win32file
+
+        # Patch it so tests pass on Windows
+        scalyr_agent.configuration.win32file = None
+
     def tearDown(self):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+        scalyr_agent.configuration.win32file = self._original_win32_file
 
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
@@ -672,7 +681,7 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
 
-        expected_msg = r'File "%s" is not readable the current user (.*?).' % (
+        expected_msg = r'File "%s" is not readable by the current user (.*?).' % (
             re.escape(self._config_file)
         )
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
@@ -1963,6 +1972,61 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
+
+    @skipIf(platform.system() != "Windows", "Skipping tests on non-Windows platform")
+    def test_print_config_windows(self):
+        import win32file  # pylint: disable=import-error
+
+        scalyr_agent.configuration.win32file = win32file
+
+        mock_logger = Mock()
+        maxstdio = win32file._getmaxstdio()
+
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            }
+        """
+        )
+
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call(
+            "\twin32_max_open_fds(maxstdio): %s" % (maxstdio)
+        )
+
+        mock_logger.reset_mock()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        # If the value has not changed, the line should not be printed
+        config.print_useful_settings(other_config=config)
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+    @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
+        # User-friendly exception should be thrown on some config permission related errors
+        error_msgs = [
+            "File is not readable",
+            "Error reading file",
+            "Failed while reading",
+        ]
+
+        for error_msg in error_msgs:
+            mock_read_config_file_as_json.side_effect = Exception(error_msg)
+
+            config = self._create_test_configuration_instance()
+
+            expected_msg = re.compile(
+                r".*not readable by the current user.*Original error.*%s.*"
+                % (error_msg),
+                re.DOTALL,
+            )
+            self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):
