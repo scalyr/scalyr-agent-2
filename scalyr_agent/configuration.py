@@ -634,6 +634,12 @@ class Configuration(object):
             ):
                 print_value = True
 
+            # For json_library config option, we also print actual library which is being used in
+            # case the value is set to "auto"
+            if option == "json_library" and value == "auto":
+                json_lib = scalyr_util.get_json_lib()
+                value = "%s (%s)" % (value, json_lib)
+
             if print_value:
                 # if this is the first option we are printing, output a header
                 if first:
