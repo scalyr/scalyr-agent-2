@@ -83,10 +83,10 @@ class EncodeDecodeTest(ScalyrTestCase):
         self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
 
     def test_64_bit_int(self):
-        if six.PY3:
-            # this should throw an error because orjson can not serialize more than signed 64 integer.
-            with self.assertRaises(orjson.JSONEncodeError):
-                orjson.dumps(18446744073709551615)
+        # NOTE: latest version of orjson available for Python >= 3.6 can also serialize large
+        # igned and unsigned 64 bit ints now
+        if six.PY3 and sys.version_info >= (3, 6, 0):
+            orjson.dumps(18446744073709551615)
 
         # here we do the regular json tests to be sure that
         # we fall back to native json library in case of too bit integer.
