@@ -944,7 +944,7 @@ jobs:
             choco install python --version "${PYTHON}" --yes --limit-output --no-progress
 
             # Add Python we installed to PATH and make sure it has precedence over system Python
-            echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
+            echo "export PATH=\"/c/Python38:/c/Python38/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python38/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
           key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
