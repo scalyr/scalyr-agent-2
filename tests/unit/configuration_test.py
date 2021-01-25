@@ -1980,6 +1980,13 @@ class TestConfiguration(TestConfigurationBase):
         mock_logger = Mock()
         maxstdio = win32file._getmaxstdio()
 
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            }
+        """
+        )
+
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
         config.print_useful_settings()
