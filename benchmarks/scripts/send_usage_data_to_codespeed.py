@@ -71,7 +71,7 @@ import psutil
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "../../")))
 
-from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
+from scalyr_agent.metrics_collector import PSUtilProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
 
 from utils import initialize_logging
@@ -179,7 +179,7 @@ def send_data_to_codespeed(
 def capture_metrics(
     tracker, process, metrics, values, capture_agent_status_metrics=False
 ):
-    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], dict, bool) -> dict
+    # type: (PSUtilProcessTracker, psutil.Process, Dict[str, Metric], dict, bool) -> dict
     """
     Capture gauge metric types and store them in the provided dictionary.
     """
@@ -190,10 +190,6 @@ def capture_metrics(
         raise ValueError('Process with pid "%s" is not alive' % (tracker.pid))
 
     process_metrics = tracker.collect()
-
-    # Add in metrics we capture via psutil
-    psutil_metrics = get_additional_psutil_metrics(process=process)
-    process_metrics.update(psutil_metrics)
 
     # Add in agent_status metrics (if enabled)
     if capture_agent_status_metrics:
@@ -289,7 +285,7 @@ def main(
     Main entry point / run loop for the script.
     """
     logger.info('Monitoring process with pid "%s" for metrics' % (pid))
-    tracker = ProcessTracker(pid=pid, logger=logger)
+    tracker = PSUtilProcessTracker(pid=pid, logger=logger)
     process = psutil.Process(pid)
 
     end_time = int(time.time() + args.capture_time)
