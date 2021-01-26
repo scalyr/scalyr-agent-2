@@ -373,8 +373,9 @@ commands:
           name: Install Python Dependencies
           command: |
             python.exe --version
+            python.exe -m pip install --upgrade "pip"
             python.exe -m pip install --user -r benchmarks/scripts/requirements.txt
-            python.exe -m pip install --user "six==1.16.0"
+            python.exe -m pip install --user "six==1.15.0"
       - save_cache:
           name: Store Python Dependencies Cache
           key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-windows-{{ checksum "benchmarks/scripts/requirements.txt" }}
