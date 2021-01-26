@@ -375,7 +375,9 @@ commands:
             python.exe --version
             python.exe -m pip install --upgrade "pip"
             python.exe -m pip install --user -r benchmarks/scripts/requirements.txt
+            python.exe -m pip install --user -r windows-unit-tests-requirements.txt
             python.exe -m pip install --user "six==1.15.0"
+            python.exe -m pip install --user "pywin32==300"
       - save_cache:
           name: Store Python Dependencies Cache
           key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-windows-{{ checksum "benchmarks/scripts/requirements.txt" }}
@@ -437,6 +439,14 @@ commands:
             fi
 
             # Wait for capture script to finish
+            # TODO: Also add timeout
+            sleep 30
+            ps aux |grep agent_main
+            ps aux | grep agent_main | grep "no-fork" | head -1
+            ps aux | grep agent_main | grep "no-fork" | head -1 | awk '{ print $2 }'
+            cat /tmp/capture_script.log
+            exit 1
+
             set +e
             sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
             wait ${CAPTURE_SCRIPT_PID} || true
@@ -2037,7 +2047,7 @@ jobs:
           agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
           # NOTE: We set agent run time slightly longer than the insert script time run so we give a chance for memory and
           # other metrics to stabilize.
-          run_time: 100
+          run_time: 60
           agent_pre_run_command: "touch /tmp/random.log"
           # NOTE: We write a chunk every 1 seconds for a total of 6 minutes.
           # Each chunk is 0.5 MB in size which means we write a total of 360 * 1

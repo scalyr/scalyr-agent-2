@@ -77,7 +77,14 @@ echo "Starting agent process..."
 echo "Using command line options: ${AGENT_START_COMMAND}"
 
 ${AGENT_START_COMMAND} 2>&1 &
-AGENT_PROCESS_PID=$!
+
+# TODO: On Windows --no-fork still results in service being managed by service manager which means
+# we need to parse PID from agent log file
+#AGENT_PROCESS_PID=$!
+AGENT_PROCESS_PID=$(ps aux | grep agent_main | grep "no-fork" | head -1 | awk '{ print $2 }')
+ps aux |grep agent_main
+echo "Using agent process pid: ${AGENT_PROCESS_PID}"
+echo ""
 
 # NOTE: We use a trap to ensure this function is always executed, even if some command in this
 # script returns non-zero. This way we ensure we always clean up correctly.
