@@ -286,8 +286,15 @@ Log-Message ""
 # NOTE: If scalyr.com IP changes, we need to update this here. Sadly querying
 # for IP here inside the power shell script is a bit of a PITA...
 # dig A agent.scalyr.com
+$scalyr_com_ip = (nslookup agent.scalyr.com | Select-String Address | Where-Object LineNumber -eq 5).ToString().Split(' ')[-1]
+
+echo ""
+echo "Using agent.scalyr.com IP: $scalyr_com_ip"
+echo ""
+
 Copy-Item ".\agent.json_invalid_host_mitm" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
-Add-Content "c:\windows\system32\drivers\etc\hosts" "34.240.110.238 invalid.mitm.should.fail.test.agent.scalyr.com"
+"$scalyr_com_ip invalid.mitm.should.fail.test.agent.scalyr.com" | Add-Content "c:\windows\system32\drivers\etc\hosts"
+# "$scalyr_com_ip invalid.mitm.should.fail.test.agent.scalyr.com" | Out-File "c:\windows\system32\drivers\etc\hosts" -Append
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
 
@@ -299,6 +306,9 @@ Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
 echo $status_output
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+echo $log_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };
@@ -339,6 +349,9 @@ Log-Message ""
 
 $status_output=scalyr-agent-2 status -v;
 echo $status_output
+
+$log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+echo $log_output
 
 if ("$status_output" -notmatch "Last successful communication with Scalyr: Never") { Throw "Invalid line found." };
 if ("$status_output" -notmatch "Bytes uploaded successfully:               0") { Throw "Invalid line found." };

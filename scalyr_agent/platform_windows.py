@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+
 import atexit
 import errno
 
@@ -626,12 +627,14 @@ class WindowsPlatformController(PlatformController):
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
             if not quiet:
                 print("Agent service has stopped.")
+
+            return 0
         except win32api.error as e:
-            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+            if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not running."
                 )
-            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+            elif e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
@@ -692,9 +695,9 @@ class WindowsPlatformController(PlatformController):
                 _SCALYR_AGENT_SERVICE_, _SERVICE_CONTROL_DETAILED_REPORT_
             )
         except win32api.error as e:
-            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+            if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 return errno.ESRCH
-            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+            elif e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
@@ -883,7 +886,7 @@ class PipeRedirectorClient(RedirectorClient):
                 else:
                     return False
             except pywintypes.error as e:
-                if e[0] == winerror.ERROR_FILE_NOT_FOUND:
+                if e.winerror == winerror.ERROR_FILE_NOT_FOUND:
                     return False
                 else:
                     raise e
