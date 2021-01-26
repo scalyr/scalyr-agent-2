@@ -27,9 +27,9 @@ block_cipher = None
 
 from dynamic_modules import WINDOWS_MONITOR_MODULES_TO_INCLUDE
 
-HIDDEN_IMPORTS = [
-    "win32timezone",
-] + WINDOWS_MONITOR_MODULES_TO_INCLUDE
+HIDDEN_IMPORTS = ["win32timezone"]
+
+HIDDEN_IMPORTS.extend(WINDOWS_MONITOR_MODULES_TO_INCLUDE)
 
 
 main_a = Analysis(
