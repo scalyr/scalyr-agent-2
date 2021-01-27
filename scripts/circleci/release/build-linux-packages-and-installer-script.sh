@@ -7,7 +7,7 @@ echo "$AGENT_SOURCE_PATH"
 AGENT_RELEASE_VERSION=$1
 echo "$AGENT_RELEASE_VERSION"
 
-OUTPUT_PATH=$2
+OUTPUT_PATH="$(realpath "$2")"
 RELEASE_REPO_BASE_URL=${3:-stable}
 RELEASE_REPO_NAME=${4:-stable}
 echo "GGG"
@@ -17,7 +17,7 @@ set -e
 
 VERSION_FILE_PATH="${AGENT_SOURCE_PATH}/VERSION"
 
-echo "Prepare the GPG public keys."q
+echo "Prepare the GPG public keys."
 gpg --update-trustdb
 
 # import remote sign machine public keys from files in the Scalyr agent repo.
