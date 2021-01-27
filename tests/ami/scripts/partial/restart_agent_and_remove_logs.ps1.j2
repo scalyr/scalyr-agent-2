@@ -6,7 +6,7 @@ scalyr-agent-2 stop;
 
 Start-Sleep 2
 
-Get-Process -Name ScalyrAgentService -ErrorAction Continue
+Get-Process -Name ScalyrAgentService -ErrorAction Continue 2> $null
 
 if ($?)
 {
