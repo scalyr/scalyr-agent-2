@@ -48,9 +48,13 @@ echo "Build deb and rpm packages."
 
 pushd "${OUTPUT_PATH}"
 
+echo "1111"
+pwd
+
 python "${AGENT_SOURCE_PATH}/build_package.py" deb
 python "${AGENT_SOURCE_PATH}/build_package.py" rpm
 
+echo "222"
 ls "${OUTPUT_PATH}"
 
 
