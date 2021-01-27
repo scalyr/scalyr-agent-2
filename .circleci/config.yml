@@ -2294,7 +2294,7 @@ jobs:
 
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
-            cp output/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
+            cp artifacts/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
 
 #      - run:
 #          name: Build and validate deb and rpm packages
