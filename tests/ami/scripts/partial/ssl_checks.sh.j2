@@ -99,6 +99,10 @@ AGENT_SCALYR_COM_IP=$(getent hosts agent.scalyr.com | awk '{ print $1 }' | tail 
 MOCK_HOST="invalid.mitm.should.fail.test.agent.scalyr.com"
 ETC_HOSTS_ENTRY="${AGENT_SCALYR_COM_IP} ${MOCK_HOST}"
 
+echo_with_date ""
+echo_with_date "Using agent.scalyr.com IP: ${AGENT_SCALYR_COM_IP}"
+echo_with_date ""
+
 # Add mock /etc/hosts entry and agent config scalyr_server entry
 echo "${ETC_HOSTS_ENTRY}" | sudo tee -a /etc/hosts
 

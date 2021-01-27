@@ -122,11 +122,20 @@ AGENT_LOG_FILENAME = "agent.log"
 AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
 
 # Message which is logged when locale used for the scalyr agent process is not UTF-8
-NON_UTF8_LOCALE_WARNING_MESSAGE = """
+NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE = """
 Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
 coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
 with non-ascii content or non-ascii characters in the log file names. On Linux you can do that by
 setting LANG and LC_ALL environment variable: e.g. export LC_ALL=en_US.UTF-8.
+""".strip().replace(
+    "\n", " "
+)
+
+NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE = """
+Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
+coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
+with non-ascii content or non-ascii characters in the log file names. On Windows you can do that by
+setting setting PYTHONUTF8=1 environment variable.
 """.strip().replace(
     "\n", " "
 )
@@ -310,8 +319,11 @@ class ScalyrAgent(object):
                 config_file_path, log_warnings=log_warnings
             )
 
-            # check if not a tty and override the no check remote variable
-            if not sys.stdout.isatty():
+            # NOTE: isatty won't be available on Redirector object on Windows when doing permission
+            # escalation so we need to handle this scenario as well
+            isatty_func = getattr(getattr(sys, "stdout", None), "isatty", None)
+            if isatty_func is not None and isatty_func():
+                # check if not a tty and override the no check remote variable
                 no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception as e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
@@ -1064,7 +1076,10 @@ class ScalyrAgent(object):
                 # content
                 _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
                 if encoding.lower() not in ["utf-8", "utf8"]:
-                    log.warn(NON_UTF8_LOCALE_WARNING_MESSAGE % (encoding))
+                    if sys.platform.startswith("win"):
+                        log.warn(NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE % (encoding))
+                    else:
+                        log.warn(NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE % (encoding))
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 

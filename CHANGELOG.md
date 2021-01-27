@@ -12,10 +12,14 @@ Improvements:
 * Update agent to emit a warning if ``k8s_logs`` config option is defined, but Kubernetes monitor is not enabled / configured.
 * Update Kubernetes and Docker monitor to not propagate and show some non-fatal errors.
 * Field values in log lines for monitor metrics which contain extra fields are now sorted in alphabetic order. This should have no impact on the end user since server side parsers already support arbitrary ordering, but it's done to ensure consistent ordering and output for for monitor log lines.
+* Update agent to throw more user-friendly exceptions on Windows when the agent doesn't have access to the agent config file and Windows registry.
+* Update code which periodically prints out useful configuration settings to also include actual value of the json library used in case the config option is set to "auto".
 
 Bug fixes:
 * Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
 * Fix a config deprecated options bug when they are set to ``false``.
+* Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
+* Make sure we only print the value of ``win32_max_open_fds`` config option on Windows if it has changed.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 

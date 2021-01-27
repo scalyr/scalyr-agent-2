@@ -55,7 +55,6 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -63,7 +62,7 @@ from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
 
 FILE_WRONG_OWNER_ERROR_MSG = """
-File \"%s\" is not readable the current user (%s).
+File \"%s\" is not readable by the current user (%s).
 
 You need to make sure that the file is owned by the same account which is used to run the agent.
 
@@ -147,6 +146,10 @@ class Configuration(object):
 
         self.__logger = logger
 
+        # We store this value here on Windows so we can reference it in print_useful_settings and
+        # only print this setting if it has changed
+        self._win32_current_max_open_fds = None
+
     def parse(self):
         self.__read_time = time.time()
 
@@ -156,10 +159,15 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException as e:
+            except Exception as e:
                 # Special case - file is not readable, likely means a permission issue so return a
                 # more user-friendly error
-                if "file is not readable" in str(e).lower():
+                msg = str(e).lower()
+                if (
+                    "file is not readable" in msg
+                    or "error reading" in msg
+                    or "failed while reading"
+                ):
                     from scalyr_agent.platform_controller import PlatformController
 
                     platform_controller = PlatformController.new_platform()
@@ -405,6 +413,13 @@ class Configuration(object):
             self.__last_error = e
             raise e
 
+        # Store the current value of win32_current_max_open_fds
+        if sys.platform.startswith("win") and win32file:
+            try:
+                self._win32_current_max_open_fds = win32file._getmaxstdio()
+            except Exception:
+                self._win32_current_max_open_fds = None
+
     def __verify_workers(self):
         """
         Verify all worker config entries from the "workers" list in config.
@@ -638,7 +653,7 @@ class Configuration(object):
             "use_multiprocess_workers",
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
-            "enable_worker_process_metrics_gather",
+            "enable_worker_session_process_metrics_gather",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
         ]
@@ -667,6 +682,12 @@ class Configuration(object):
             ):
                 print_value = True
 
+            # For json_library config option, we also print actual library which is being used in
+            # case the value is set to "auto"
+            if option == "json_library" and value == "auto":
+                json_lib = scalyr_util.get_json_lib()
+                value = "%s (%s)" % (value, json_lib)
+
             if print_value:
                 # if this is the first option we are printing, output a header
                 if first:
@@ -680,17 +701,27 @@ class Configuration(object):
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file:
-            try:
-                maxstdio = win32file._getmaxstdio()
-            except Exception:
-                # This error should not be fatal
-                maxstdio = "unknown"
-
+        win32_max_open_fds_previous_value = getattr(
+            other_config, "_win32_current_max_open_fds", None
+        )
+        win32_max_open_fds_current_value = getattr(
+            self, "_win32_current_max_open_fds", None
+        )
+        if (
+            sys.platform.startswith("win")
+            and win32file
+            and (
+                win32_max_open_fds_current_value != win32_max_open_fds_previous_value
+                or other_config is None
+            )
+        ):
             if first:
                 self.__logger.info("Configuration settings")
 
-            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+            self.__logger.info(
+                "\twin32_max_open_fds(maxstdio): %s"
+                % (win32_max_open_fds_current_value)
+            )
 
         # If debug level 5 is set also log the raw config JSON excluding the api_key
         # This makes various troubleshooting easier.

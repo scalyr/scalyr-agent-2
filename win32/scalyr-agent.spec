@@ -27,6 +27,10 @@ block_cipher = None
 
 from dynamic_modules import WINDOWS_MONITOR_MODULES_TO_INCLUDE
 
+HIDDEN_IMPORTS = ["win32timezone"]
+
+HIDDEN_IMPORTS.extend(WINDOWS_MONITOR_MODULES_TO_INCLUDE)
+
 
 main_a = Analysis(
     ["source_root\\scalyr_agent\\agent_main.py"],
@@ -34,7 +38,7 @@ main_a = Analysis(
         "source_root\\scalyr_agent\\third_party",
         "source_root\\scalyr_agent\\third_party_python2",
     ],
-    hiddenimports=WINDOWS_MONITOR_MODULES_TO_INCLUDE,
+    hiddenimports=HIDDEN_IMPORTS,
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
@@ -48,7 +52,7 @@ config_a = Analysis(
         "source_root\\scalyr_agent\\third_party",
         "source_root\\scalyr_agent\\third_party_python2",
     ],
-    hiddenimports=WINDOWS_MONITOR_MODULES_TO_INCLUDE,
+    hiddenimports=HIDDEN_IMPORTS,
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
@@ -62,7 +66,7 @@ service_a = Analysis(
         "source_root\\scalyr_agent\\third_party",
         "source_root\\scalyr_agent\\third_party_python2",
     ],
-    hiddenimports=WINDOWS_MONITOR_MODULES_TO_INCLUDE,
+    hiddenimports=HIDDEN_IMPORTS,
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
