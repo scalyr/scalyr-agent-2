@@ -2286,6 +2286,7 @@ jobs:
             mkdir package
 
             bash  ~/scalyr-agent-2/scripts/circleci/release/build-linux-packages-and-installer-script.sh \
+              << pipeline.parameters.agent_version >> \
               ./artifacts \
               "$RELEASE_REPO_BASE_URL" \
               "$RELEASE_REPO_NAME" \
