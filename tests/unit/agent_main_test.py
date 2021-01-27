@@ -19,6 +19,8 @@ from __future__ import unicode_literals
 import re
 from io import open
 import functools
+import tempfile
+import json
 
 import mock
 
@@ -256,6 +258,135 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                         "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
                     )
                 )
+
+    def test_check_remote_if_no_tty(self):
+        from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # tty is available, should use command line option value when specified
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = True
+
+        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
+        self.assertEqual(return_code, 7)
+        agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
+        # tty is available, command option is not set, should default to False
+        agent._ScalyrAgent__perform_config_checks.reset_mock()
+
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = None
+
+        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
+        self.assertEqual(return_code, 7)
+        agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        # tty is not available (stdout.isatty returns False), should use check_remote_if_no_tty
+        # config option value (config option is set to True)
+        agent._ScalyrAgent__perform_config_checks.reset_mock()
+
+        mock_command_options.no_check_remote = None
+
+        mock_stdout = mock.Mock()
+        mock_isatty = mock.Mock()
+        mock_isatty.return_value = False
+        mock_stdout.isatty = mock_isatty
+
+        mock_config.check_remote_if_no_tty = True
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        # tty is not available (stdout.isatty returns False), should use check_remote_if_no_tty
+        # config option value (config option is set to False)
+        agent._ScalyrAgent__perform_config_checks.reset_mock()
+
+        mock_command_options.no_check_remote = None
+
+        mock_stdout = mock.Mock()
+        mock_isatty = mock.Mock()
+        mock_isatty.return_value = False
+        mock_stdout.isatty = mock_isatty
+
+        mock_config.check_remote_if_no_tty = False
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
+        # tty is not available (stdout.isatty is not set), should use check_remote_if_no_tty
+        # config option value (config option is set to False)
+        agent._ScalyrAgent__perform_config_checks.reset_mock()
+
+        mock_command_options.no_check_remote = None
+
+        mock_stdout = mock.Mock()
+        mock_isatty = None
+        mock_stdout.isatty = mock_isatty
+
+        mock_config.check_remote_if_no_tty = True
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        # tty is not available (stdout.isatty is not set), should use check_remote_if_no_tty
+        # config option value (config option is set to True)
+        agent._ScalyrAgent__perform_config_checks.reset_mock()
+
+        mock_command_options.no_check_remote = None
+
+        mock_stdout = mock.Mock()
+        mock_isatty = None
+        mock_stdout.isatty = mock_isatty
+
+        mock_config.check_remote_if_no_tty = False
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
+    def _write_mock_config(self):
+        _, tmp_path = tempfile.mkstemp()
+
+        config_data = {
+            "api_key": "bar",
+        }
+
+        with open(tmp_path, "w") as fp:
+            fp.write(json.dumps(config_data))
+
+        return tmp_path
 
     @staticmethod
     def fake_get_useage_info():
