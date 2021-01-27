@@ -6,10 +6,12 @@ echo "$AGENT_SOURCE_PATH"
 
 AGENT_RELEASE_VERSION=$1
 echo "$AGENT_RELEASE_VERSION"
-RELEASE_REPO_BASE_URL="${2:stable}"
-RELEASE_REPO_NAME="${3:stable}"
 
-OUTPUT_PATH=$4
+OUTPUT_PATH=$2
+RELEASE_REPO_BASE_URL=${3:-stable}
+RELEASE_REPO_NAME=${4:-stable}
+echo "GGG"
+echo "$RELEASE_REPO_BASE_URL"
 
 set -e
 
@@ -42,12 +44,14 @@ fi
 
 echo "${agent_version}" > "${VERSION_FILE_PATH}"
 
-echo "Build deband rpm packages."
+echo "Build deb and rpm packages."
 
 pushd "${OUTPUT_PATH}"
 
 python "${AGENT_SOURCE_PATH}/build_package.py" deb
 python "${AGENT_SOURCE_PATH}/build_package.py" rpm
+
+ls "${OUTPUT_PATH}"
 
 
 DEB_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none *.deb)"
@@ -64,3 +68,6 @@ echo "Build deb and rpm repo packages and installer script."
 bash ${AGENT_SOURCE_PATH}/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$RELEASE_REPO_BASE_URL" "$RELEASE_REPO_NAME"
 
 cat "${VERSION_FILE_PATH}" > RELEASE_VERSION
+
+
+popd
