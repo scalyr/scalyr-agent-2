@@ -2241,6 +2241,7 @@ jobs:
     environment:
       RELEASE_REPO_NAME: "<< pipeline.parameters.release_repo_name >>"
       RELEASE_REPO_BASE_URL: "<< pipeline.parameters.release_repo_base_url >>"
+      RELEASE_AGENT_VERSION: "<< pipeline.parameters.agent_version >>"
     steps:
       - checkout
       - restore_cache:
@@ -2286,7 +2287,7 @@ jobs:
             mkdir package
 
             bash  ~/scalyr-agent-2/scripts/circleci/release/build-linux-packages-and-installer-script.sh \
-              << pipeline.parameters.agent_version >> \
+              "$RELEASE_AGENT_VERSION" \
               ./artifacts \
               "$RELEASE_REPO_BASE_URL" \
               "$RELEASE_REPO_NAME" \
