@@ -82,11 +82,11 @@ parameters:
     description: "The version of the packages which are built by specific jobs. It remains the same as in VERSION file if this parameter is empty."
     type: string
     default: ""
-  agent_repo_branch:
-    description: "Configuration repo version."
+  release_repo_name:
+    description: "The name of the target release S3 repo."
     type: string
     default: ""
-  repo_base_url:
+  release_repo_base_url:
     description: "Build artifacts path in S3 repo."
     type: string
     default: ""
@@ -2239,8 +2239,8 @@ jobs:
         # doesn't work anymore with those gems.
         - image: circleci/python:3.6-buster
     environment:
-      AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
-      REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
+      RELEASE_REPO_NAME: "<< pipeline.parameters.release_repo_name >>"
+      RELEASE_REPO_BASE_URL: "<< pipeline.parameters.release_repo_base_url >>"
     steps:
       - checkout
       - restore_cache:
@@ -2280,74 +2280,89 @@ jobs:
                   echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
 
       - run:
-          name: Build and validate deb and rpm packages
+          name: Build packages and install script.
           command: |
-            set -e
-
             mkdir artifacts
             mkdir package
 
-            pushd artifacts
+            bash  ~/scalyr-agent-2/scripts/circleci/release/build-linux-packages-and-installer-script.sh \
+              << pipeline.parameters.agent_version >> << pipeline.parameters.release_repo_base_url >> \
+              << pipeline.parameters.release_repo_name >> \
+              /artifacts
 
-            python ../build_package.py deb
-            python ../build_package.py rpm
-
-            # Validate that changelog files in the package artifacts are valid
-            DEB_PACKAGE_PATH="$(pwd)/$(ls --color=none *.deb)"
-            RPM_PACKAGE_PATH="$(pwd)/$(ls --color=none *.rpm)"
-
-            ./../scripts/circleci/validate-deb-changelog.sh "${DEB_PACKAGE_PATH}"
-            ./../scripts/circleci/validate-rpm-changelog.sh "${RPM_PACKAGE_PATH}"
-
-            popd
-
-            # NOTE: We preserve two versions of the package as the build artifact. One with the
-            # version in the name and one without.
-            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
-            # if someone wgets a dev package or similar) they immediately know it's a dev version
-            # from the name itself.
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
-
-      - run:
-          name: Build deb and rpm packages for installer
-          command: |
-
-            gpg --update-trustdb
-
-            # import remote sign machine public keys from files in the Scalyr agent repo.
-            # gnupg < 2.1
-            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-
-            # gnupg > 2.1
-            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
-            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
-
-            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
-            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
-
-            # import gpg public keys.
-            gpg --import scripts/circleci/release/public_keys/main.asc
-            gpg --import scripts/circleci/release/public_keys/alt.asc
-
-            mkdir output
-            pushd output
-
-            if [ -z "$AGENT_REPO_BRANCH" ]; then
-              AGENT_REPO_BRANCH="stable"
-            fi
-
-            if [ -z "$REPO_BASE_URL" ]; then
-              REPO_BASE_URL="stable"
-            fi
-
-            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$REPO_BASE_URL" "$AGENT_REPO_BRANCH"
-
-            popd
-
-            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
             cp output/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
+
+#      - run:
+#          name: Build and validate deb and rpm packages
+#          command: |
+#            set -e
+#
+#            mkdir artifacts
+#            mkdir package
+#
+#            pushd artifacts
+#
+#            python ../build_package.py deb
+#            python ../build_package.py rpm
+#
+#            # Validate that changelog files in the package artifacts are valid
+#            DEB_PACKAGE_PATH="$(pwd)/$(ls --color=none *.deb)"
+#            RPM_PACKAGE_PATH="$(pwd)/$(ls --color=none *.rpm)"
+#
+#            ./../scripts/circleci/validate-deb-changelog.sh "${DEB_PACKAGE_PATH}"
+#            ./../scripts/circleci/validate-rpm-changelog.sh "${RPM_PACKAGE_PATH}"
+#
+#            popd
+#
+#            # NOTE: We preserve two versions of the package as the build artifact. One with the
+#            # version in the name and one without.
+#            # This way AMI tests can use one with the static name and if we use it elsewhere (aka
+#            # if someone wgets a dev package or similar) they immediately know it's a dev version
+#            # from the name itself.
+#            cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
+#            cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
+#
+#      - run:
+#          name: Build deb and rpm packages for installer
+#          command: |
+#
+#            gpg --update-trustdb
+#
+#            # import remote sign machine public keys from files in the Scalyr agent repo.
+#            # gnupg < 2.1
+#            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+#            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+#
+#            # gnupg > 2.1
+#            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+#            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+#
+#            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
+#            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
+#
+#            # import gpg public keys.
+#            gpg --import scripts/circleci/release/public_keys/main.asc
+#            gpg --import scripts/circleci/release/public_keys/alt.asc
+#
+#            mkdir output
+#            pushd output
+#
+#            if [ -z "RELEASE_REPO_NAME" ]; then
+#              RELEASE_REPO_NAME="stable"
+#            fi
+#
+#            if [ -z "$RELEASE_REPO_BASE_URL" ]; then
+#              RELEASE_REPO_BASE_URL="stable"
+#            fi
+#
+#            bash ~/scalyr-agent-2/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$RELEASE_REPO_BASE_URL" "RELEASE_REPO_NAME"
+#
+#            popd
+#
+#            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
+#            cp output/installScalyrAgentV2.sh package/installScalyrAgentV2.sh
 
       - persist_to_workspace:
           root: package
