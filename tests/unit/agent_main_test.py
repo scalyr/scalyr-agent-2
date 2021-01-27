@@ -383,8 +383,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             "api_key": "bar",
         }
 
-        with open(tmp_path, "w") as fp:
-            fp.write(json.dumps(config_data))
+        with open(tmp_path, "wb") as fp:
+            fp.write(json.dumps(config_data).encode("utf-8"))
 
         return tmp_path
 
