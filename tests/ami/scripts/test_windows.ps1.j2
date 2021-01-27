@@ -466,6 +466,7 @@ Log-Message "Verifying agent.log"
 Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+echo $log_output
 
 if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 1024") { Throw "Matching win32_max_open_fds line not found" };
 
