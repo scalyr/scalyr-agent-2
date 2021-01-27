@@ -322,7 +322,9 @@ class ScalyrAgent(object):
             # NOTE: isatty won't be available on Redirector object on Windows when doing permission
             # escalation so we need to handle this scenario as well
             isatty_func = getattr(getattr(sys, "stdout", None), "isatty", None)
-            if isatty_func is not None and isatty_func():
+            if not isatty_func or (isatty_func and not isatty_func()):
+                # If stdout.atty is not available or if it is and returns False, we fall back to
+                # "check_remote_if_no_tty" config option
                 # check if not a tty and override the no check remote variable
                 no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception as e:

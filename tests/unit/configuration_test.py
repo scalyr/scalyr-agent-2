@@ -2064,7 +2064,7 @@ class TestConfiguration(TestConfigurationBase):
         config.print_useful_settings()
         mock_logger.info.assert_any_call("Configuration settings")
         mock_logger.info.assert_any_call(
-            "\twin32_max_open_fds(maxstdio): %s" % (maxstdio)
+            "\twin32_max_open_fds(maxstdio): %s (%s)" % (maxstdio, maxstdio)
         )
 
         mock_logger.reset_mock()
