@@ -2259,7 +2259,6 @@ jobs:
             # as a temporaty solution explicitly specify ffi version.
             sudo gem install --no-document ffi:1.14.2 fpm:1.12.0
 
-
       - when:
           condition: << pipeline.parameters.agent_version >>
           steps:

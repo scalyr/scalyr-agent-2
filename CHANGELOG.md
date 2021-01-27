@@ -9,6 +9,8 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 30, 2021 14:00 -0800
 
 Improvements:
 * Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* Update agent to emit a warning if ``k8s_logs`` config option is defined, but Kubernetes monitor is not enabled / configured.
+* Update Kubernetes and Docker monitor to not propagate and show some non-fatal errors.
 * Field values in log lines for monitor metrics which contain extra fields are now sorted in alphabetic order. This should have no impact on the end user since server side parsers already support arbitrary ordering, but it's done to ensure consistent ordering and output for for monitor log lines.
 * Update agent to throw more user-friendly exceptions on Windows when the agent doesn't have access to the agent config file and Windows registry.
 * Update code which periodically prints out useful configuration settings to also include actual value of the json library used in case the config option is set to "auto".

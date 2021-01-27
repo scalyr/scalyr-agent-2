@@ -396,6 +396,9 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
+            # Perform validation for k8s_logs option
+            self._check_k8s_logs_config_option_and_warn()
+
             # NOTE do this verifications only after all config fragments were added into configurations.
             self.__verify_workers()
             self.__verify_and_match_workers_in_logs()
@@ -507,6 +510,40 @@ class Configuration(object):
                 limit_once_per_x_secs=86400,
                 limit_key=limit_key,
             )
+
+    def _check_k8s_logs_config_option_and_warn(self):
+        # type: () -> None
+        """
+        Check if k8s_logs attribute is configured, but kubernetes monitor is not and warn.
+
+        k8s_logs is a top level config option, but it's utilized by Kubernetes monitor which means
+        it will have no affect if kubernetes monitor is not configured as well.
+        """
+        if self.__k8s_log_configs and not self._is_kubernetes_monitor_configured():
+            self.__logger.warn(
+                '"k8s_logs" config options is defined, but Kubernetes monitor is '
+                "not configured / enabled. That config option applies to "
+                "Kubernetes monitor so for it to have an affect, Kubernetes "
+                "monitor needs to be enabled and configured",
+                limit_once_per_x_secs=86400,
+                limit_key="k8s_logs_k8s_monitor_not_enabled",
+            )
+
+    def _is_kubernetes_monitor_configured(self):
+        # type: () -> bool
+        """
+        Return true if Kubernetes monitor is configured, false otherwise.
+        """
+        monitor_configs = self.monitor_configs or []
+
+        for monitor_config in monitor_configs:
+            if (
+                monitor_config.get("module", "")
+                == "scalyr_agent.builtin_monitors.kubernetes_monitor"
+            ):
+                return True
+
+        return False
 
     def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
         if self.__log_warnings and self.__config[config_option] != default:

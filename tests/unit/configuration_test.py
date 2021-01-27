@@ -1358,6 +1358,74 @@ class TestConfiguration(TestConfigurationBase):
             limit_key="config-permissions-warn-%s" % (self._config_file),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    def test_k8s_logs_config_option_is_configured_but_k8s_monitor_is_not(self):
+        # kubernetes_monitor is not configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+
+        expected_msg = (
+            '"k8s_logs" config options is defined, but Kubernetes monitor is not configured / '
+            "enabled. That config option applies to Kubernetes monitor so for it to have an "
+            "affect, Kubernetes monitor needs to be enabled and configured"
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="k8s_logs_k8s_monitor_not_enabled",
+        )
+
+        # kubernetes_monitor is configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ],
+            monitors: [
+                {
+                    "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
+        # By default option is not configured so no warning should be emitted
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
     def test_api_key_use_env(self):
         self._write_file_with_separator_conversion(
             """ {
