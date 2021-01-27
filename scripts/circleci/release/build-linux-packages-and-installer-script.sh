@@ -13,6 +13,9 @@ RELEASE_REPO_NAME=${4:-stable}
 echo "GGG"
 echo "$RELEASE_REPO_BASE_URL"
 
+
+PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+
 set -e
 
 VERSION_FILE_PATH="${AGENT_SOURCE_PATH}/VERSION"
@@ -71,6 +74,21 @@ echo "$DEB_PACKAGE_PATH"
 echo "Build deb and rpm repo packages and installer script."
 
 bash ${AGENT_SOURCE_PATH}/scripts/circleci/release/create-agent-installer.sh "$GPG_SIGNING_KEYID" "$GPG_ALT_SIGNING_KEYID" "$RELEASE_REPO_BASE_URL" "$RELEASE_REPO_NAME"
+
+
+echo "Create Scalyr yum repo spec file."
+cat > "${OUTPUT_PATH}/scalyr.repo" <<EOF
+[scalyr]
+includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
+name=Scalyr packages - noarch
+baseurl=https://scalyr-repo.s3.amazonaws.com/$RELEASE_REPO_BASE_URL/yum/binaries/noarch
+mirror_expire=300
+metadata_expire=300
+enabled=1
+gpgcheck=1
+gpgkey=https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6
+
+EOF
 
 cat "${VERSION_FILE_PATH}" > RELEASE_VERSION
 
