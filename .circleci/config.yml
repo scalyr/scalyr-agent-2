@@ -2293,7 +2293,7 @@ jobs:
               "$RELEASE_REPO_BASE_URL" \
               "$RELEASE_REPO_NAME" \
 
-            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
+            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh output/RELEASE_VERSION artifacts
 
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
