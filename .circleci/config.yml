@@ -2283,14 +2283,17 @@ jobs:
       - run:
           name: Build packages and install script.
           command: |
+            mkdir output
             mkdir artifacts
             mkdir package
 
             bash  ~/scalyr-agent-2/scripts/circleci/release/build-linux-packages-and-installer-script.sh \
               "$RELEASE_AGENT_VERSION" \
-              ./artifacts \
+              ./output \
               "$RELEASE_REPO_BASE_URL" \
               "$RELEASE_REPO_NAME" \
+
+            cp output/*.rpm output/*.deb output/installScalyrAgentV2.sh artifacts
 
             cp artifacts/scalyr-agent-2*.deb package/scalyr-agent-2.deb
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
