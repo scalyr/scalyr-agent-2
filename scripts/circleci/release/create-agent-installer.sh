@@ -364,7 +364,7 @@ echo 111qqqq
 REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
 
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
-echo "${PUBLIC_KEY_URL//\\&/\\\\&}"
+echo "${PUBLIC_KEY_URL//&/\\\\&}"
 echo 222qqqq
 YUM_REPO_SPEC=$(cat << EOM
   [scalyr]
@@ -375,7 +375,7 @@ YUM_REPO_SPEC=$(cat << EOM
   metadata_expire=300
   enabled=1
   gpgcheck=1
-  gpgkey="${PUBLIC_KEY_URL//\\&/\\\\&}"
+  gpgkey="${PUBLIC_KEY_URL//&/\\\\&}"
 EOM
 )
 echo 333qqqq
