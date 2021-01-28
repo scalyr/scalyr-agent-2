@@ -1350,7 +1350,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             active_checkpoint_path = os.path.join(
                 os.path.dirname(path), "active-{0}".format(checkpoint_file_name),
             )
-            if os.path.exists(active_checkpoint_path):
+            if os.path.isfile(active_checkpoint_path):
                 os.unlink(active_checkpoint_path)
 
     def __find_and_read_checkpoints(self, warn_on_stale=False):
