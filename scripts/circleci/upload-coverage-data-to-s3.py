@@ -23,6 +23,7 @@ from __future__ import print_function
 import os
 import sys
 import time
+import random
 
 from libcloud.storage.types import Provider
 from libcloud.storage.providers import get_driver
@@ -66,10 +67,17 @@ def upload_file(file_path):
 
     file_name = os.path.basename(file_path)
 
-    # We also attach timestamp to file name to avoid conflicts
+    # We also attach random number + timestamp to file name to avoid conflicts
     now = str(int(time.time()))
+    random_number = random.randint(0, 100000)
 
-    object_name = "%s/%s/%s.%s" % (CIRCLE_CI_BRANCH, CIRCLE_CI_COMMIT, file_name, now)
+    object_name = "%s/%s/%s.%s.%s" % (
+        CIRCLE_CI_BRANCH,
+        CIRCLE_CI_COMMIT,
+        file_name,
+        now,
+        random_number,
+    )
 
     container = driver.get_container(container_name=BUCKET_NAME)
     obj = container.upload_object(file_path=file_path, object_name=object_name)

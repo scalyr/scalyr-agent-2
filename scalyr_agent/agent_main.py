@@ -51,6 +51,14 @@ if False:
     from typing import Optional
     from typing import Dict
 
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 try:
     from __scalyr__ import SCALYR_VERSION
     from __scalyr__ import scalyr_init
@@ -123,11 +131,20 @@ AGENT_LOG_FILENAME = "agent.log"
 AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
 
 # Message which is logged when locale used for the scalyr agent process is not UTF-8
-NON_UTF8_LOCALE_WARNING_MESSAGE = """
+NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE = """
 Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
 coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
 with non-ascii content or non-ascii characters in the log file names. On Linux you can do that by
 setting LANG and LC_ALL environment variable: e.g. export LC_ALL=en_US.UTF-8.
+""".strip().replace(
+    "\n", " "
+)
+
+NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE = """
+Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
+coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
+with non-ascii content or non-ascii characters in the log file names. On Windows you can do that by
+setting setting PYTHONUTF8=1 environment variable.
 """.strip().replace(
     "\n", " "
 )
@@ -311,8 +328,13 @@ class ScalyrAgent(object):
                 config_file_path, log_warnings=log_warnings
             )
 
-            # check if not a tty and override the no check remote variable
-            if not sys.stdout.isatty():
+            # NOTE: isatty won't be available on Redirector object on Windows when doing permission
+            # escalation so we need to handle this scenario as well
+            isatty_func = getattr(getattr(sys, "stdout", None), "isatty", None)
+            if not isatty_func or (isatty_func and not isatty_func()):
+                # If stdout.atty is not available or if it is and returns False, we fall back to
+                # "check_remote_if_no_tty" config option
+                # check if not a tty and override the no check remote variable
                 no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception as e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
@@ -1110,7 +1132,10 @@ class ScalyrAgent(object):
                 # content
                 _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
                 if encoding.lower() not in ["utf-8", "utf8"]:
-                    log.warn(NON_UTF8_LOCALE_WARNING_MESSAGE % (encoding))
+                    if sys.platform.startswith("win"):
+                        log.warn(NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE % (encoding))
+                    else:
+                        log.warn(NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE % (encoding))
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 

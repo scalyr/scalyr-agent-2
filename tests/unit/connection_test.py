@@ -21,6 +21,7 @@ from scalyr_agent import scalyr_init
 scalyr_init()
 
 import os
+import sys
 import ssl
 import socket
 
@@ -77,10 +78,14 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
         socket.create_connection = mock_create_connection
 
         try:
-            expected_msg = (
-                r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
-                "of '\*.scalyr.com', 'scalyr.com'"
-            )  # NOQA
+            if sys.version_info >= (3, 7, 0):
+                expected_msg = r"Original error: .*Hostname mismatch.*"  # NOQA
+            else:
+                expected_msg = (
+                    r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
+                    "of '\*.scalyr.com', 'scalyr.com'"
+                )  # NOQA
+
             self.assertRaisesRegexp(
                 Exception,
                 expected_msg,

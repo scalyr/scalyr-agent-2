@@ -1,3 +1,4 @@
-psutil==5.6.6
-pyinstaller==3.6
-pywin32==224
+psutil==5.7.0
+pyinstaller==4.2
+pywin32==300
+orjson==3.4.7

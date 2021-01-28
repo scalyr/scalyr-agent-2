@@ -1,7 +1,6 @@
 # Python requirements file which is used for running unit Tests on Windows
 # Testing tools and libraries
 mock==3.0.5
-psutil==5.7.0
 pytest==4.6.9; python_version < '3.0'
 pytest==5.4.3; python_version >= '3.5'
 pytest-cov==2.10.0
@@ -19,7 +18,7 @@ docker==4.1.0
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 requests==2.15.1
 ujson==1.35
-orjson==2.6.1; python_version >= '3.6'
+orjson==3.4.7; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1

@@ -5,6 +5,7 @@ branch = True
 omit =
     */venv/*
     */third_party*/*
+    */platform_tests/*
     tests/ami/*
     tests/distribution/*
     tests/distribution_builders/*

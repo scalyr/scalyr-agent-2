@@ -8,6 +8,7 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -26,6 +27,7 @@ master_only: &master_only
     branches:
       only:
         - master
+        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -49,7 +51,6 @@ skip_release_build_branch_push: &skip_release_build_branch_push
     and:
       - equal: [ false, << pipeline.parameters.is_release_build >>]
       - equal: [ release_build,  << pipeline.git.branch >>]
-
 
 version: 2.1
 
@@ -472,6 +473,10 @@ commands:
             - run:
                 name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
                 command: |
+                  # Also copy over .coverage file from tests (aka coverage for test files themselves)
+                  mkdir ~/artifacts/tests-coverage/
+                  cp .coverage ~/artifacts/tests-coverage/
+
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
@@ -479,7 +484,9 @@ commands:
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
+                  ls -la .coverage*
                   coverage combine ~/artifacts/*/.coverage
+                  ls -la .coverage*
 
                   # coverage data from inside docker contains uses different paths which we need to normalize for
                   # coverage combine and codecov reporting and merging to work.
@@ -846,7 +853,7 @@ jobs:
           fail_only: true
           only_for_branches: master
 
-  unittest-35-windows:
+  unittest-38-windows:
     # TODO: That's a temporary in-line definition from slack orb. We can remove it once
     # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
     parameters:
@@ -921,12 +928,13 @@ jobs:
       size: medium
       shell: bash
     environment:
-      PYTHON: 3.5.4
+      # NOTE: This should be the same version as we use for pre-built Windows binaries
+      PYTHON: 3.8.7
     steps:
       - checkout
       - restore_cache:
           name: Restore Chocolatey Cache
-          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -936,17 +944,17 @@ jobs:
             choco install python --version "${PYTHON}" --yes --limit-output --no-progress
 
             # Add Python we installed to PATH and make sure it has precedence over system Python
-            echo "export PATH=\"/c/Python35:/c/Python35/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python35/Scripts:$PATH\"" >> $BASH_ENV
+            echo "export PATH=\"/c/Python38:/c/Python38/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python38/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
-          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
           paths:
             - ~/choco-cache
             # Actual package files are stored in NuGet cache
             - C:\Users\circleci\AppData\Local\NuGet\Cache
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python Dependencies
           command: |
@@ -954,20 +962,40 @@ jobs:
             python.exe -m pip install --user --upgrade "tox==<< pipeline.parameters.default_tox_version >>"
             python.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
       - run:
-          name: Run Unit Tests under Python 3.5
+          name: Run Unit Tests under Python 3.8
           command: |
             # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
             # after the tox commands finishes. That's why we use the redirect workaround. Sadly
             # this means we don't see output immediately as it produced (using redirect + tee also
             # results in the job not exiting when tox command finishes).
-            tox.exe -epy3.5-windows-unit-tests > output 2>&1
+            tox.exe -epy3.8-windows-unit-tests > output 2>&1
             EXIT_CODE=$?
             cat output
+
+            if [ "${EXIT_CODE}" -ne 0 ]; then
+              exit ${EXIT_CODE}
+            fi
+
+            # There is a weird issue on Circle CIwhen tests will fail with
+            # ImportError: DLL load failed: The specified module could not be found.
+            # so we need to reinstall the library for it to work :/
+            # Likely something to do with pywin32 post install step not running
+            # for some reason (Scripts\pywin32_postinstall.py -install)
+            tox.exe -epy3.8-windows-unit-tests-windows-platform --notest > output 2>&1
+            cat output
+
+            .tox/py3.8-windows-unit-tests-windows-platform/scripts/pip.exe uninstall --yes pywin32
+            .tox/py3.8-windows-unit-tests-windows-platform/scripts/pip.exe install "pywin32==300"
+
+            tox.exe -epy3.8-windows-unit-tests-windows-platform > output 2>&1
+            EXIT_CODE=$?
+            cat output
+
             exit ${EXIT_CODE}
           no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
-          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
       - store_test_results:
@@ -975,11 +1003,11 @@ jobs:
       - store_artifacts:
           path: test-results
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3"
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Print the report
@@ -988,6 +1016,11 @@ jobs:
             # Submit it to codecov.io
             coverage.exe xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
@@ -1333,6 +1366,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1344,7 +1378,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 150
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1358,6 +1392,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
@@ -1385,6 +1424,7 @@ jobs:
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
@@ -1427,7 +1467,7 @@ jobs:
           command: |
             source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
       - run:
-          name: Submit Coverage Data to codecov.io
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
             ls -la .coverage* || true
 
@@ -1441,6 +1481,11 @@ jobs:
             # Submit it to codecov.io
             ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
             ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
@@ -1584,7 +1629,7 @@ jobs:
     docker:
       - image: circleci/python:3.6-jessie
     environment:
-      VERSION: "4.1.0.1829"
+      VERSION: "4.6.0.2311"
       SCANNER_DIRECTORY: "/tmp/cache/scanner"
       SONAR_USER_HOME: "/tmp/cache/scanner/.sonar"
       OS: "linux"
@@ -1597,7 +1642,7 @@ jobs:
           name: Create cache directory if it doesn't exist
           command: mkdir -p /tmp/cache/scanner
       - restore_cache:
-          key: v2-sonarcloud-scanner-4.1.0.1829
+          key: v2-sonarcloud-scanner-4.6.0.2311
       - run:
           name: Download Sonar Scanner
           command: |
@@ -1611,7 +1656,7 @@ jobs:
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/bin/sonar-scanner
             chmod +x $SCANNER_DIRECTORY/sonar-scanner-$VERSION-$OS/jre/bin/java
       - save_cache:
-          key: v2sonarcloud-scanner-4.1.0.1829
+          key: v2sonarcloud-scanner-4.6.0.2311
           paths:
             - /tmp/cache/scanner
       - run:
@@ -1634,14 +1679,30 @@ jobs:
             ./scripts/circleci/download-coverage-data-from-s3.py "."
             ls -la .coverage*
 
-            # Combine It
+            mkdir coverage
+            cp .coverage* coverage/
+
+            # Ensure consistent paths for all the code coverage reports
+            # NOTE: In seed we need 3 \ for one \
+            sed -i "s#C:\\\\\\\Users\\\\\\\circleci\\\\\\\scalyr-agent-2#/home/circleci/scalyr-agent-2#g" .coverage*
+            # Replace two \\ with one /
+            sed -i "s#\\\\\\\#/#g" .coverage*
+
+            # Combine it
             coverage combine
+
+            cp .coverage coverage/.coverage-combined-final
 
             # Generate XML file which can be processed by sonarcloud
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
 
             # Print it
             coverage report
+
+      # Stored all the downloaded coverage files for ease of troubleshooting
+      - store_artifacts:
+          path: coverage
+
       - run:
           name: Run Sonar Scanner
           command:
@@ -2064,15 +2125,11 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Python installer Cache
-          key: windows-python-installer-python-{{ .Branch }}-python-installer-cache
+          key: windows-python-installer-cache-{{ .Branch }}
 
       - restore_cache:
           name: Restore Wix cache
           key: windows-wix-cache-{{ .Branch }}
-
-      - restore_cache:
-          name: Restore patched win32evtlog.pyd
-          key: windows-win32evtlog-cache-{{ .Branch }}
 
       - run:
           name: Extract Wix.
@@ -2089,27 +2146,11 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-2.7.18.amd64.msi -PathType Leaf)) {
-                wget -O .\python_installer\python-2.7.18.amd64.msi https://www.python.org/ftp/python/2.7.18/python-2.7.18.amd64.msi
+            if (!(Test-Path .\python_installer\python-3.8.7-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.7-amd64.exe https://www.python.org/ftp/python/3.8.7/python-3.8.7-amd64.exe
             }
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn" -wait
-            Start-Process msiexec -ArgumentList "/i python_installer\python-2.7.18.amd64.msi /qn REMOVE=TclTk" -wait
+            python_installer\python-3.8.7-amd64.exe /quiet /passive
 
-      - run:
-          name: Download patched win32evtlog.pyd
-          command: |
-            $ProgressPreference = "SilentlyContinue"
-            mkdir win32evtlog-cache -Force
-            if (!(Test-Path .\win32evtlog-cache\win32evtlog.pyd -PathType Leaf)) {
-                echo "Downloading .pyd library from S3"
-                wget -O .\win32evtlog-cache\win32evtlog.pyd https://scalyr-agent-2-ci.s3.amazonaws.com/win32evtlog.pyd
-            }
-            else {
-                echo "Using existing cached dependency on disk"
-            }
-
-            echo "File hash"
-            Get-FileHash .\win32evtlog-cache\win32evtlog.pyd | Format-List
       - save_cache:
           name: Save Wix Cache
           key: windows-wix-cache-{{ .Branch }}
@@ -2117,20 +2158,14 @@ jobs:
             - "wix311_binaries"
 
       - save_cache:
-          name: Save patched win32evtlog.pyd
-          key: windows-win32evtlog-cache-{{ .Branch }}
-          paths:
-            - "win32evtlog-cache"
-
-      - save_cache:
-          name: Save Pyinstaller Cache
-          key: windows_python_installer-python-{{ .Branch }}-python-installer-cache
+          name: Save Python Installer Cache
+          key: windows-python-installer-cache-{{ .Branch }}
           paths:
             - "python_installer"
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2159,13 +2194,10 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
-              c:\Python27\python.exe -m pip install -r win32\windows-build-requirements.txt
-
-              # copy patched win32evtlog.pyd.
-              cp .\win32evtlog-cache\win32evtlog.pyd C:\Python27\Lib\site-packages\win32\win32evtlog.pyd
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              c:\Python27\python.exe build_package.py win32
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
 
               mkdir package
               mkdir artifacts
@@ -2187,7 +2219,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-2.7.18-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
@@ -2202,7 +2234,10 @@ jobs:
     description: "Build deb and rpm packages."
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:3.6-jessie
+        # NOTE: fpm and git gem depend on Ruby >= 2.3 so we need to use Debian
+        # 10 which ships with Ruby 2.5. Jessie (Debian 8) ships with 2.1 which
+        # doesn't work anymore with those gems.
+        - image: circleci/python:3.6-buster
     environment:
       AGENT_REPO_BRANCH: "<< pipeline.parameters.agent_repo_branch >>"
       REPO_BASE_URL: "<< pipeline.parameters.repo_base_url >>"
@@ -2217,11 +2252,12 @@ jobs:
             sudo apt-key update
             sudo apt update
             sudo apt install -y ruby ruby-dev rubygems rpm build-essential --force-yes
+            # Needed to validate rpm package
+            sudo apt install -y rpm
 
             # TODO: looks like fpm upgraded its 'ffi' dependency version, which is now requres newer version of ruby.
             # as a temporaty solution explicitly specify ffi version.
-            sudo gem install --no-document ffi:1.12.2 fpm
-
+            sudo gem install --no-document ffi:1.14.2 fpm:1.12.0
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2244,7 +2280,7 @@ jobs:
                   echo "$(cat VERSION).dev1-$(git rev-parse --short HEAD)" > VERSION
 
       - run:
-          name: Build deb and rpm packages
+          name: Build and validate deb and rpm packages
           command: |
             set -e
 
@@ -2256,22 +2292,12 @@ jobs:
             python ../build_package.py deb
             python ../build_package.py rpm
 
-            dpkg -X "$(ls *.deb)" /tmp/deb_package
+            # Validate that changelog files in the package artifacts are valid
+            DEB_PACKAGE_PATH="$(pwd)/$(ls --color=none *.deb)"
+            RPM_PACKAGE_PATH="$(pwd)/$(ls --color=none *.rpm)"
 
-            set +e
-            stderr=$(dpkg-parsechangelog --file /tmp/deb_package/usr/share/doc/scalyr-agent-2/changelog.gz 2>&1 1>/dev/null)
-            if [[ "$?" -ne 0 ]]; then
-              >&2 echo "$stderr"
-              exit 1
-            fi
-            set -e
-            warnings=$(grep warning \<<< "$stderr" || true)
-
-            if [[ -n "${warnings}" ]]; then
-              >&2 echo "The debian package changelog is built with warnings. This may be caused by splitting the text across miltiple lines."
-              >&2 echo "$warnings"
-              exit 1
-            fi
+            ./../scripts/circleci/validate-deb-changelog.sh "${DEB_PACKAGE_PATH}"
+            ./../scripts/circleci/validate-rpm-changelog.sh "${RPM_PACKAGE_PATH}"
 
             popd
 
@@ -2284,14 +2310,22 @@ jobs:
             cp artifacts/scalyr-agent-2*.rpm package/scalyr-agent-2.rpm
 
       - run:
-          name: Build deb and rpm packages
+          name: Build deb and rpm packages for installer
           command: |
 
             gpg --update-trustdb
 
             # import remote sign machine public keys from files in the Scalyr agent repo.
-            GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
-            GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            # gnupg < 2.1
+            #GPG_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/main.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+            #GPG_ALT_SIGNING_KEYID=`gpg --with-fingerprint scripts/circleci/release/public_keys/alt.asc | grep "Key fingerprint" | awk '{print $10$11$12$13}'`
+
+            # gnupg > 2.1
+            GPG_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/main.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+            GPG_ALT_SIGNING_KEYID=$(cat scripts/circleci/release/public_keys/alt.asc | gpg --with-fingerprint --with-colons --import-options show-only --import | grep "fpr:" | head -1 | awk -F ":" '{print $10}')
+
+            echo "Using GPG_SIGNING_KEYID=${GPG_SIGNING_KEYID}"
+            echo "Using GPG_ALT_SIGNING_KEYID=${GPG_ALT_SIGNING_KEYID}"
 
             # import gpg public keys.
             gpg --import scripts/circleci/release/public_keys/main.asc
@@ -2369,7 +2403,7 @@ workflows:
          context: scalyr-agent
      - unittest-35-osx:
          context: scalyr-agent
-     - unittest-35-windows:
+     - unittest-38-windows:
          context: scalyr-agent
  smoke-tests:
    <<: *skip_release_build_branch_push

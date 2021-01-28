@@ -1316,7 +1316,12 @@ class StoppableThread(threading.Thread):
             indefinitely.
         @type timeout: float|None
         """
-        threading.Thread.join(self, timeout)
+        try:
+            threading.Thread.join(self, timeout)
+        except RuntimeError:
+            # Calling .join() on thread which is not started should not be considered fatal
+            pass
+
         if not self.isAlive() and self.__exception_info is not None:
             six.reraise(
                 self.__exception_info[0],

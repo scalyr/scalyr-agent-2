@@ -1,6 +1,35 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.18 "TBD" - January 30, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 30, 2021 14:00 -0800
+--->
+
+Improvements:
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* Update agent to emit a warning if ``k8s_logs`` config option is defined, but Kubernetes monitor is not enabled / configured.
+* Update Kubernetes and Docker monitor to not propagate and show some non-fatal errors.
+* Field values in log lines for monitor metrics which contain extra fields are now sorted in alphabetic order. This should have no impact on the end user since server side parsers already support arbitrary ordering, but it's done to ensure consistent ordering and output for for monitor log lines.
+* Update agent to throw more user-friendly exceptions on Windows when the agent doesn't have access to the agent config file and Windows registry.
+* Update code which periodically prints out useful configuration settings to also include actual value of the json library used in case the config option is set to "auto".
+
+Bug fixes:
+* Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
+* Fix a config deprecated options bug when they are set to ``false``.
+* Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
+* Make sure we only print the value of ``win32_max_open_fds`` config option on Windows if it has changed.
+
+## 2.1.17 "Xothichi" - January 15, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 15, 2021 14:00 -0800
+--->
+
+Bug fixes:
+* Fix syslog monitor default TCP message parser bug which was inadvertently introduced in 2.1.16 which may sometimes cause for a delayed ingest of some syslog data. This would only affect installations utilizing syslog monitor in TCP mode using the default message parser.  As part of this fix, we have removed the new message parsers added in 2.1.16.  If you were using them, you will revert to the default parser
+
 ## 2.1.16 "Lasso" - January 13, 2021
 
 <!---

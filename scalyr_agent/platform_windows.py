@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+
 import atexit
 import errno
 
@@ -125,6 +126,26 @@ _SCALYR_AGENT_SERVICE_DISPLAY_NAME_ = "Scalyr Agent Service"
 _SERVICE_DESCRIPTION_ = "Collects logs and metrics and forwards them to Scalyr.com"
 # A custom control message that is used to signal the agent should generate a detailed status report.
 _SERVICE_CONTROL_DETAILED_REPORT_ = win32service.SERVICE_USER_DEFINED_CONTROL - 1
+
+REGISTRY_ACCESS_DENIED_ERROR_MSG = """
+Unable to set registry entry due to access denied error. This likely indicates that the agent is
+running as a non-Administrator user which doesn't have permission to manipulate registry entries.
+
+You should ensure agent runs as an Administrator user / user who has access to manipulate Windows
+registry entries.
+
+Original error: %s
+""".strip()
+
+AGENT_STOP_ACCESS_DENIED_ERROR_MSG = """
+Unable to stop agent process due to access denied error. This likely indicates that the agent was
+started by a different user and / or the current user doesn't have correct permissions to stop the
+agent.
+
+You should run this script as an Administrator / user who started the agent.
+
+Original error: %s
+""".strip()
 
 
 def _set_config_path_registry_entry(value):
@@ -574,7 +595,15 @@ class WindowsPlatformController(PlatformController):
         """
         # NOTE:  The config_main.py file relies on it being ok to pass in None for agent_run_method.
         # If this assumption changes, fix that in config_main.py.
-        _set_config_path_registry_entry(self.__config_file_path)
+        try:
+            _set_config_path_registry_entry(self.__config_file_path)
+        except Exception as e:
+            # Likely indicates that the agent is not running as admin and doesn't have permission
+            # to edit registry. Throw more user-friendly error.
+            if "access is denied" in str(e).lower():
+                raise Exception(REGISTRY_ACCESS_DENIED_ERROR_MSG % (str(e)))
+            raise e
+
         if fork:
             win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
         else:
@@ -598,18 +627,23 @@ class WindowsPlatformController(PlatformController):
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
             if not quiet:
                 print("Agent service has stopped.")
+
+            return 0
         except win32api.error as e:
-            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+            if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not running."
                 )
-            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+            elif e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
                 )
             else:
                 raise e
+        except Exception as e:
+            if "access is denied" in str(e).lower():
+                raise Exception(AGENT_STOP_ACCESS_DENIED_ERROR_MSG % (str(e)))
 
     def get_usage_info(self):
         """Returns CPU and memory usage information.
@@ -661,9 +695,9 @@ class WindowsPlatformController(PlatformController):
                 _SCALYR_AGENT_SERVICE_, _SERVICE_CONTROL_DETAILED_REPORT_
             )
         except win32api.error as e:
-            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+            if e.winerror == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 return errno.ESRCH
-            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+            elif e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
                 raise AgentNotRunning(
                     "The operating system indicates the Scalyr Agent Service is not installed.  "
                     "This indicates a failed installation.  Try reinstalling the agent."
@@ -852,7 +886,7 @@ class PipeRedirectorClient(RedirectorClient):
                 else:
                     return False
             except pywintypes.error as e:
-                if e[0] == winerror.ERROR_FILE_NOT_FOUND:
+                if e.winerror == winerror.ERROR_FILE_NOT_FOUND:
                     return False
                 else:
                     raise e

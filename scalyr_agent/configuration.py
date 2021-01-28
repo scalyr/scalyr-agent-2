@@ -57,7 +57,6 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -65,7 +64,7 @@ from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
 
 FILE_WRONG_OWNER_ERROR_MSG = """
-File \"%s\" is not readable the current user (%s).
+File \"%s\" is not readable by the current user (%s).
 
 You need to make sure that the file is owned by the same account which is used to run the agent.
 
@@ -158,10 +157,15 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException as e:
+            except Exception as e:
                 # Special case - file is not readable, likely means a permission issue so return a
                 # more user-friendly error
-                if "file is not readable" in str(e).lower():
+                msg = str(e).lower()
+                if (
+                    "file is not readable" in msg
+                    or "error reading" in msg
+                    or "failed while reading"
+                ):
                     from scalyr_agent.platform_controller import PlatformController
 
                     platform_controller = PlatformController.new_platform()
@@ -394,6 +398,9 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
+            # Perform validation for k8s_logs option
+            self._check_k8s_logs_config_option_and_warn()
+
             # NOTE do this verifications only after all config fragments were added into configurations.
             self.__verify_workers()
             self.__verify_and_match_workers_in_logs()
@@ -506,6 +513,40 @@ class Configuration(object):
                 limit_key=limit_key,
             )
 
+    def _check_k8s_logs_config_option_and_warn(self):
+        # type: () -> None
+        """
+        Check if k8s_logs attribute is configured, but kubernetes monitor is not and warn.
+
+        k8s_logs is a top level config option, but it's utilized by Kubernetes monitor which means
+        it will have no affect if kubernetes monitor is not configured as well.
+        """
+        if self.__k8s_log_configs and not self._is_kubernetes_monitor_configured():
+            self.__logger.warn(
+                '"k8s_logs" config options is defined, but Kubernetes monitor is '
+                "not configured / enabled. That config option applies to "
+                "Kubernetes monitor so for it to have an affect, Kubernetes "
+                "monitor needs to be enabled and configured",
+                limit_once_per_x_secs=86400,
+                limit_key="k8s_logs_k8s_monitor_not_enabled",
+            )
+
+    def _is_kubernetes_monitor_configured(self):
+        # type: () -> bool
+        """
+        Return true if Kubernetes monitor is configured, false otherwise.
+        """
+        monitor_configs = self.monitor_configs or []
+
+        for monitor_config in monitor_configs:
+            if (
+                monitor_config.get("module", "")
+                == "scalyr_agent.builtin_monitors.kubernetes_monitor"
+            ):
+                return True
+
+        return False
+
     def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
         if self.__log_warnings and self.__config[config_option] != default:
             self.__logger.warn(
@@ -580,7 +621,6 @@ class Configuration(object):
         @param other_config: Another configuration option.  If not None, this function will
         only print configuration options that are different between the two objects.
         """
-
         options = [
             "verify_server_certificate",
             "ca_cert_path",
@@ -603,7 +643,7 @@ class Configuration(object):
             "use_multiprocess_workers",
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
-            "enable_worker_process_metrics_gather",
+            "enable_worker_session_process_metrics_gather",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
         ]
@@ -632,6 +672,12 @@ class Configuration(object):
             ):
                 print_value = True
 
+            # For json_library config option, we also print actual library which is being used in
+            # case the value is set to "auto"
+            if option == "json_library" and value == "auto":
+                json_lib = scalyr_util.get_json_lib()
+                value = "%s (%s)" % (value, json_lib)
+
             if print_value:
                 # if this is the first option we are printing, output a header
                 if first:
@@ -645,17 +691,31 @@ class Configuration(object):
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file:
+        win32_max_open_fds_previous_value = getattr(
+            other_config, "win32_max_open_fds", None
+        )
+        win32_max_open_fds_current_value = getattr(self, "win32_max_open_fds", None)
+
+        if (
+            sys.platform.startswith("win")
+            and win32file
+            and (
+                win32_max_open_fds_current_value != win32_max_open_fds_previous_value
+                or other_config is None
+            )
+        ):
             try:
-                maxstdio = win32file._getmaxstdio()
+                win32_max_open_fds_actual_value = win32file._getmaxstdio()
             except Exception:
-                # This error should not be fatal
-                maxstdio = "unknown"
+                win32_max_open_fds_actual_value = "unknown"
 
             if first:
                 self.__logger.info("Configuration settings")
 
-            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+            self.__logger.info(
+                "\twin32_max_open_fds(maxstdio): %s (%s)"
+                % (win32_max_open_fds_current_value, win32_max_open_fds_actual_value)
+            )
 
         # If debug level 5 is set also log the raw config JSON excluding the api_key
         # This makes various troubleshooting easier.
@@ -3162,7 +3222,7 @@ class Configuration(object):
         if config_val is None and deprecated_names is not None:
             for name in deprecated_names:
                 config_val = self.__get_config_val(config_object, name, param_type)
-                if config_val:
+                if config_val is not None:
                     config_object.put(param_name, config_val)
                     del config_object[name]
                     if self.__logger:
@@ -3200,7 +3260,7 @@ class Configuration(object):
                     logger=self.__logger,
                     param_val=config_val,
                 )
-                if env_val:
+                if env_val is not None:
                     break
 
         # Not set in environment

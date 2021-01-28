@@ -57,6 +57,8 @@ from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
+import scalyr_agent.configuration
+
 import six
 from six.moves import range
 from mock import patch, Mock
@@ -78,10 +80,17 @@ class TestConfigurationBase(ScalyrTestCase):
             if "scalyr" in key.lower():
                 del os.environ[key]
 
+        self._original_win32_file = scalyr_agent.configuration.win32file
+
+        # Patch it so tests pass on Windows
+        scalyr_agent.configuration.win32file = None
+
     def tearDown(self):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+        scalyr_agent.configuration.win32file = self._original_win32_file
 
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
@@ -672,7 +681,7 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
 
-        expected_msg = r'File "%s" is not readable the current user (.*?).' % (
+        expected_msg = r'File "%s" is not readable by the current user (.*?).' % (
             re.escape(self._config_file)
         )
         self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
@@ -1349,6 +1358,74 @@ class TestConfiguration(TestConfigurationBase):
             limit_key="config-permissions-warn-%s" % (self._config_file),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    def test_k8s_logs_config_option_is_configured_but_k8s_monitor_is_not(self):
+        # kubernetes_monitor is not configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+
+        expected_msg = (
+            '"k8s_logs" config options is defined, but Kubernetes monitor is not configured / '
+            "enabled. That config option applies to Kubernetes monitor so for it to have an "
+            "affect, Kubernetes monitor needs to be enabled and configured"
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="k8s_logs_k8s_monitor_not_enabled",
+        )
+
+        # kubernetes_monitor is configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ],
+            monitors: [
+                {
+                    "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
+        # By default option is not configured so no warning should be emitted
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
     def test_api_key_use_env(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -1964,6 +2041,61 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
+    @skipIf(platform.system() != "Windows", "Skipping tests on non-Windows platform")
+    def test_print_config_windows(self):
+        import win32file  # pylint: disable=import-error
+
+        scalyr_agent.configuration.win32file = win32file
+
+        mock_logger = Mock()
+        maxstdio = win32file._getmaxstdio()
+
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            }
+        """
+        )
+
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call(
+            "\twin32_max_open_fds(maxstdio): %s (%s)" % (maxstdio, maxstdio)
+        )
+
+        mock_logger.reset_mock()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        # If the value has not changed, the line should not be printed
+        config.print_useful_settings(other_config=config)
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+    @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
+        # User-friendly exception should be thrown on some config permission related errors
+        error_msgs = [
+            "File is not readable",
+            "Error reading file",
+            "Failed while reading",
+        ]
+
+        for error_msg in error_msgs:
+            mock_read_config_file_as_json.side_effect = Exception(error_msg)
+
+            config = self._create_test_configuration_instance()
+
+            expected_msg = re.compile(
+                r".*not readable by the current user.*Original error.*%s.*"
+                % (error_msg),
+                re.DOTALL,
+            )
+            self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
+
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
@@ -2184,7 +2316,8 @@ class TestConfiguration(TestConfigurationBase):
                         "workers": 4
                     }
                 ],
-                "default_workers_per_api_key": 2
+                "default_workers_per_api_key": 2,
+                "use_multiprocess_copying_workers": false
             }
             """
         )
@@ -2200,6 +2333,9 @@ class TestConfiguration(TestConfigurationBase):
         ]
         # "default_workers_per_api_key" should become "default_sessions_per_worker"
         assert config.default_sessions_per_worker == 2
+
+        # verify a false deprecated option.
+        assert config.use_multiprocess_workers is False
 
     def test_deprecated_env_aware_params(self):
         os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "5"
