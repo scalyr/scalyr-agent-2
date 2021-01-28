@@ -163,10 +163,6 @@ YUM_REPO_SPEC=$(cat << EOM
 EOM
 )
 
-echo "${YUM_REPO_SPEC}"
-
-
-
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
