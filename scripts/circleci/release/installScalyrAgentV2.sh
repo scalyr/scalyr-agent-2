@@ -466,6 +466,7 @@ else
     gpg --update-trustdb
 
     echo "Adding the public key."
+    echo "${PUBLIC_KEY}" > /ggg
     echo "${PUBLIC_KEY}" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import
 
     # change permissions for the gpg key.
