@@ -373,9 +373,14 @@ mirror_expire=300
 metadata_expire=300
 enabled=1
 gpgcheck=1
-gpgkey=${PUBLIC_KEY_URL//&/\\\\&}
+gpgkey=${PUBLIC_KEY_URL}
 EOM
 )
+
+echo "Create Scalyr yum repo spec file."
+echo "${YUM_REPO_SPEC}" > "scalyr.repo"
+
+YUM_REPO_SPEC=${YUM_REPO_SPEC//&/\\\\&}
 
 PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
 
