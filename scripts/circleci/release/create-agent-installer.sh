@@ -364,6 +364,7 @@ REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
 
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
 
+# create a yum repo spec data.
 YUM_REPO_SPEC=$(cat << EOM
 [scalyr]
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
@@ -380,6 +381,7 @@ EOM
 echo "Create Scalyr yum repo spec file."
 echo "${YUM_REPO_SPEC}" > "scalyr.repo"
 
+# we need to escape the ampersand in order to be able use this text as a replacement part for the awk.
 YUM_REPO_SPEC=${YUM_REPO_SPEC//&/\\\\&}
 
 PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
