@@ -357,7 +357,7 @@ clean_package_files;
 create_alt_yum_repo_packages;
 
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
-
+echo 111qqqq
 REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
 read -r -d '' YUM_REPO_SPEC <<- EOM
 [scalyr]
@@ -371,9 +371,15 @@ gpgcheck=1
 gpgkey=$PUBLIC_KEY_URL"
 EOM
 
+echo 222qqqq
+
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
 
+echo 333qqqq
+
 PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
+
+echo 4444qqqq
 
 install_script_text="$(cat "$SCRIPTPATH/installScalyrAgentV2.sh")"
 
