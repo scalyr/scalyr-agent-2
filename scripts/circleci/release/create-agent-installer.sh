@@ -375,7 +375,7 @@ YUM_REPO_SPEC=$(cat <<- EOM
   metadata_expire=300
   enabled=1
   gpgcheck=1
-  gpgkey=\$PUBLIC_KEY_URL
+  gpgkey=$PUBLIC_KEY_URL
 EOM
 )
 echo 333qqqq
