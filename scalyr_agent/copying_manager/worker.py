@@ -50,6 +50,9 @@ import six
 log = scalyr_logging.getLogger(__name__)
 
 WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX = "checkpoints-worker-"
+WORKER_SESSION_CHECKPOINT_FILENAME_GLOB = "{0}*-*.json".format(
+    WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX
+)
 
 
 class CopyingParameters(object):

@@ -20,6 +20,7 @@ Bug fixes:
 * Fix a config deprecated options bug when they are set to ``false``.
 * Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
 * Make sure we only print the value of ``win32_max_open_fds`` config option on Windows if it has changed.
+* Fix a bug which was produced by the bad naming of the worker session checkpoint files and it might lead to a deletion of the checkpoints of some monitors.
 
 ## 2.1.17 "Xothichi" - January 15, 2021
 

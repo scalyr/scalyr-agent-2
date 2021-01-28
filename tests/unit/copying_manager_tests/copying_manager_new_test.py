@@ -239,7 +239,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.worker_sessions_health_check
-                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker session 'default-0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert status.health_check_result == "Good"
 
@@ -263,7 +263,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.worker_sessions_health_check
-                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker session 'default-0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert (
                 status.health_check_result
@@ -324,6 +324,7 @@ class TestBasic(CopyingManagerTest):
         # make sure that all worker session checkpoint files are consolidated and removed.
         for worker_session in manager.worker_sessions:
             assert not worker_session.get_checkpoints_path().exists()
+            assert not worker_session.get_active_checkpoints_path().exists()
 
         assert manager.consolidated_checkpoints_path.exists()
         manager.consolidated_checkpoints_path.unlink()
