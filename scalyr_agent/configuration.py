@@ -711,7 +711,7 @@ class Configuration(object):
         result = []
         for i in range(worker_config["sessions"]):
             # combine the id of the worker and session's position in the list to get a session id.
-            worker_session_id = "%s_%s" % (worker_config["id"], i)
+            worker_session_id = "%s-%s" % (worker_config["id"], i)
             result.append(worker_session_id)
         return result
 
