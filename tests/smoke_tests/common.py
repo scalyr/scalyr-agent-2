@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import os
 import time
 from io import open
+import json
 
 import six
 
@@ -30,6 +31,7 @@ from tests.smoke_tests.verifier import (
     DataJsonVerifierRateLimited,
     SystemMetricsVerifier,
     ProcessMetricsVerifier,
+    AgentWorkerSessionLogVerifier,
 )
 from tests.utils.agent_runner import AgentRunner
 
@@ -80,6 +82,13 @@ def _test_standalone_smoke(
     agent_log_verifier = AgentLogVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
     )
+    worker_sessions_verifier = None
+
+    if workers_type == "process":
+        worker_sessions_verifier = AgentWorkerSessionLogVerifier(
+            runner, compat.os_environ_unicode["SCALYR_SERVER"]
+        )
+
     if rate_limited:
         data_json_verifier = DataJsonVerifierRateLimited(
             runner, compat.os_environ_unicode["SCALYR_SERVER"]
@@ -103,6 +112,14 @@ def _test_standalone_smoke(
 
     print("Verify 'agent.log'")
     assert agent_log_verifier.verify(), "Verification of the file: 'agent.log' failed"
+
+    if workers_type == "process":
+        # if workers are multiprocess, then we check if worker session logs are ingested.
+        print("Verify worker sessions log files.")
+        assert (
+            worker_sessions_verifier.verify()
+        ), "Verification of the worker session log files is failed"
+
     print("Verify 'linux_system_metrics.log'")
     assert (
         system_metrics_verifier.verify()
@@ -113,5 +130,31 @@ def _test_standalone_smoke(
     ), "Verification of the file: 'linux_process_metrics.log' failed"
 
     assert data_json_verifier.verify(), "Verification of the file: 'data.json' failed"
+
+    if workers_type == "process":
+        # increase worker sessions count, restart and also check if all worker logs are ingested.
+        config = runner.config
+        sessions_count = config["default_sessions_per_worker"]
+        sessions_count += 1
+
+        worker_sessions_verifier = AgentWorkerSessionLogVerifier(
+            runner, compat.os_environ_unicode["SCALYR_SERVER"]
+        )
+
+        config["default_sessions_per_worker"] = sessions_count
+        runner.write_config(config)
+        runner.restart()
+
+        agent_status = json.loads(runner.status_json())
+        assert (
+            len(agent_status["copying_manager_status"]["workers"][-1]["sessions"])
+            == sessions_count
+        )
+
+        print("Verify worker sessions log files.")
+
+        assert (
+            worker_sessions_verifier.verify()
+        ), "Verification of the worker session log files is failed"
 
     runner.stop()

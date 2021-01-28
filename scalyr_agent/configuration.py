@@ -23,6 +23,8 @@ __author__ = "czerwin@scalyr.com"
 
 if False:
     from typing import Tuple
+    from typing import Dict
+    from typing import List
 
 import os
 import re
@@ -758,6 +760,42 @@ class Configuration(object):
         if result is not None and self.strip_domain_from_default_server_host:
             result = result.split(".")[0]
         return result
+
+    @staticmethod
+    def get_session_ids_of_the_worker(worker_config):  # type: (Dict) -> List
+        """
+            Generate the list of IDs of all sessions for the specified worker.
+            :param worker_config: config entry for the worker.
+            :return: List of worker session IDs.
+        """
+        result = []
+        for i in range(worker_config["sessions"]):
+            # combine the id of the worker and session's position in the list to get a session id.
+            worker_session_id = "%s-%s" % (worker_config["id"], i)
+            result.append(worker_session_id)
+        return result
+
+    def get_session_ids_from_all_workers(self):  # type: () -> List[six.text_type]
+        """
+        Get session ids for all workers.
+        :return: List of worker session ids.
+        """
+        result = []
+
+        for worker_config in self.worker_configs:
+            result.extend(self.get_session_ids_of_the_worker(worker_config))
+
+        return result
+
+    def get_worker_session_agent_log_path(
+        self, worker_session_id
+    ):  # type: (six.text_type) -> six.text_type
+        """
+        Generate the name of the log file path for the worker session based on its id.
+        :param worker_session_id: ID of the worker session.
+        :return: path for the worker session log file.
+        """
+        return os.path.join(self.agent_log_path, "agent-%s.log" % worker_session_id)
 
     def parse_log_config(
         self,

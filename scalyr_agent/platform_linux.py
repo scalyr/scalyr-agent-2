@@ -31,7 +31,6 @@ from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager.copying_manager import (
-    get_worker_session_ids,
     WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX,
 )
 
@@ -129,7 +128,9 @@ class LinuxPlatformController(PosixPlatformController):
                 and config.enable_worker_session_process_metrics_gather
             ):
                 for worker_config in config.worker_configs:
-                    for worker_session_id in get_worker_session_ids(worker_config):
+                    for worker_session_id in config.get_session_ids_of_the_worker(
+                        worker_config
+                    ):
                         result.append(
                             JsonObject(
                                 module="scalyr_agent.builtin_monitors.linux_process_metrics",
