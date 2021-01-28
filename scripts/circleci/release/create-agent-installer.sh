@@ -358,6 +358,8 @@ create_alt_yum_repo_packages;
 
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
+REPO_BASE_URL="4adfas/internal"
+
 REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
 YUM_REPO_SPEC_FILE_URL="${REPOSITORY_URL}/scalyr.repo"
 
