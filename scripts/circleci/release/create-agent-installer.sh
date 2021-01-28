@@ -359,8 +359,7 @@ create_alt_yum_repo_packages;
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
 REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
-YUM_REPO_SPEC="
-$(cat <<EOF
+read -r -d '' YUM_REPO_SPEC <<- EOM
 [scalyr]
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
@@ -370,9 +369,7 @@ metadata_expire=300
 enabled=1
 gpgcheck=1
 gpgkey=$PUBLIC_KEY_URL"
-EOF
-)
-"
+EOM
 
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
 
