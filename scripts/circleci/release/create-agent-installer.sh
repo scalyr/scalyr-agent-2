@@ -360,8 +360,8 @@ tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
 REPO_BASE_URL="4adfas/internal"
 
-REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
-YUM_REPO_SPEC_FILE_URL="${REPOSITORY_URL}/scalyr.repo"
+REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL/"
+YUM_REPO_SPEC_FILE_URL="${REPOSITORY_URL}/latest/scalyr.repo"
 
 # replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
 sed "s~{ % REPLACE_REPOSITORY_URL % }~$REPOSITORY_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
