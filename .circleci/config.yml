@@ -755,6 +755,11 @@ commands:
                 fi
                 i=$((i+1))
                 sleep ${sleep_delay}
+
+                # We preserve logs of all the runs
+                mkdir -p outputs/run_$i/
+                cp outputs/*.log outputs/run_$i/
+                rm outputs/*.log
               done
 
               set -e
