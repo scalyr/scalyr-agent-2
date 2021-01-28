@@ -1046,7 +1046,7 @@ class ScalyrAgent(object):
         log_file_paths = []
         for log_file_path in log_file_paths_to_check:
             include_file = True
-            if os.path.exists(log_file_path):
+            if os.path.isfile(log_file_path):
                 if only_new_files:
                     # Only new files are handled, skip this file.
                     include_file = False
