@@ -359,35 +359,7 @@ create_alt_yum_repo_packages;
 tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
 REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
-YUM_REPO_SPEC_FILE_URL="${REPOSITORY_URL}/latest/scalyr.repo"
-PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
-
-YUM_REPO_SPEC="$(cat "${YUM_REPO_SPEC_FILE_URL}")"
-
-PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
-
-install_script_text="$(cat "$SCRIPTPATH/installScalyrAgentV2.sh")"
-
-# replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
-#sed "s~{ % REPLACE_REPOSITORY_URL % }~$REPOSITORY_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
-install_script_text="$(awk -v URL="$REPOSITORY_URL" 'sub("{ % REPLACE_REPOSITORY_URL % }", url); print' <<< "$install_script_text")"
-
-# replace a special placeholder for the yum spec file.
-#sed "s~{ % REPLACE_YUM_REPO_SPEC_FILE % }~$YUM_REPO_SPEC_FILE_URL~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk -v spec="$YUM_REPO_SPEC" 'sub("{ % REPLACE_YUM_REPO_SPEC % }", spec); print' <<< "$install_script_text")"
-
-# replace a special placeholder for the public key url.
-#sed "s~{ % REPLACE_PUBLIC_KEY_URL % }~$PUBLIC_KEY_URL~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk -v key="$PUBLIC_KEY" 'sub("{ % REPLACE_PUBLIC_KEY % }", key); print' <<< "$install_script_text")"
-
-# also remove all special comments which are usefull only for template but not for the resulting file.
-#sed "s~# { #.*# }~~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk 'sub("# { #.*# }", ""); print' <<< "$install_script_text")"
-
-echo "${install_script_text}" > installScalyrAgentV2.sh
-
-echo "Create Scalyr yum repo spec file."
-cat > "scalyr.repo" <<EOF
+YUM_REPO_SPEC=$(cat <<EOF
 [scalyr]
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
@@ -396,10 +368,36 @@ mirror_expire=300
 metadata_expire=300
 enabled=1
 gpgcheck=1
-gpgkey=$PUBLIC_KEY_URL
-
+gpgkey=$PUBLIC_KEY_URL"
 EOF
+)
 
+PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+
+PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
+
+install_script_text="$(cat "$SCRIPTPATH/installScalyrAgentV2.sh")"
+
+# replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
+#sed "s~{ % REPLACE_REPOSITORY_URL % }~$REPOSITORY_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
+install_script_text="$(awk -v URL="$REPOSITORY_URL" 'sub("{ % REPLACE_REPOSITORY_URL % }", url); print' <<<"$install_script_text")"
+
+# replace a special placeholder for the yum spec file.
+#sed "s~{ % REPLACE_YUM_REPO_SPEC_FILE % }~$YUM_REPO_SPEC_FILE_URL~g" -i installScalyrAgentV2.sh
+install_script_text="$(awk -v spec="$YUM_REPO_SPEC" 'sub("{ % REPLACE_YUM_REPO_SPEC % }", spec); print' <<<"$install_script_text")"
+
+# replace a special placeholder for the public key url.
+#sed "s~{ % REPLACE_PUBLIC_KEY_URL % }~$PUBLIC_KEY_URL~g" -i installScalyrAgentV2.sh
+install_script_text="$(awk -v key="$PUBLIC_KEY" 'sub("{ % REPLACE_PUBLIC_KEY % }", key); print' <<<"$install_script_text")"
+
+# also remove all special comments which are usefull only for template but not for the resulting file.
+#sed "s~# { #.*# }~~g" -i installScalyrAgentV2.sh
+install_script_text="$(awk 'sub("# { #.*# }", ""); print' <<<"$install_script_text")"
+
+echo "${install_script_text}" >installScalyrAgentV2.sh
+
+echo "Create Scalyr yum repo spec file."
+echo "${YUM_REPO_SPEC}" > "scalyr.repo"
 
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
