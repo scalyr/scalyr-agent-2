@@ -49,6 +49,11 @@ import six
 
 log = scalyr_logging.getLogger(__name__)
 
+WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX = "checkpoints-worker-"
+WORKER_SESSION_CHECKPOINT_FILENAME_GLOB = "{0}*-*.json".format(
+    WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX
+)
+
 
 class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
@@ -1049,7 +1054,7 @@ class CopyingManagerWorkerSession(
         """
         self.__write_checkpoint_state(
             self.__log_processors,
-            "checkpoints-%s.json" % self._id,
+            "%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
             current_time,
             full_checkpoint=True,
         )
@@ -1060,7 +1065,7 @@ class CopyingManagerWorkerSession(
         """
         self.__write_checkpoint_state(
             self.__log_processors,
-            "active-checkpoints-%s.json" % self._id,
+            "active-%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
             current_time,
             full_checkpoint=False,
         )

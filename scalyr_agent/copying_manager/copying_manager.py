@@ -48,6 +48,7 @@ from scalyr_agent.copying_manager.worker import (
     CopyingManagerWorkerSession,
     create_shared_object_manager,
     CopyingManagerWorkerSessionProxy,
+    WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
@@ -74,7 +75,7 @@ def get_worker_session_ids(worker_config):  # type: (Dict) -> List
     result = []
     for i in range(worker_config["sessions"]):
         # combine the id of the worker and session's position in the list to get a session id.
-        worker_session_id = "%s_%s" % (worker_config["id"], i)
+        worker_session_id = "%s-%s" % (worker_config["id"], i)
         result.append(worker_session_id)
     return result
 
@@ -1338,14 +1339,19 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # clear data folder by removing all worker session checkpoint files.
         checkpoints_glob = os.path.join(
-            self.__config.agent_data_path, "*checkpoints*.json"
+            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
         )
 
         for path in scalyr_util.match_glob(checkpoints_glob):
-            # do not delete consolidated checkpoint file
-            if path == consolidated_checkpoints_path:
-                continue
             os.unlink(path)
+
+            # also delete active checkpoint file.
+            checkpoint_file_name = os.path.basename(path)
+            active_checkpoint_path = os.path.join(
+                os.path.dirname(path), "active-{0}".format(checkpoint_file_name),
+            )
+            if os.path.isfile(active_checkpoint_path):
+                os.unlink(active_checkpoint_path)
 
     def __find_and_read_checkpoints(self, warn_on_stale=False):
         # type: (bool) -> Dict
@@ -1363,10 +1369,21 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         current_time = time.time()
 
-        # also search in the parent directory in case if there are checkpoint files from older versions.
-        glob_path = os.path.join(self.__config.agent_data_path, "checkpoints*.json")
+        # search for all worker session checkpoint files.
+        worker_checkpoints_glob = os.path.join(
+            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
+        )
 
-        for checkpoints_path in scalyr_util.match_glob(glob_path):
+        checkpoints_paths = scalyr_util.match_glob(worker_checkpoints_glob)
+
+        # also get the previously consolidated file.
+        consolidated_checkpoint_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints.json"
+        )
+
+        checkpoints_paths.append(consolidated_checkpoint_path)
+
+        for checkpoints_path in checkpoints_paths:
 
             checkpoints = self.__read_checkpoint_state(checkpoints_path)
 

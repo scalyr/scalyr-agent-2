@@ -29,6 +29,9 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent import scalyr_logging
+from scalyr_agent.copying_manager.worker import (
+    WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX,
+)
 
 
 import six
@@ -241,12 +244,20 @@ class TestEnvironBuilder(object):
         return self.test_logs_dir / "non-glob-logs"
 
     def get_checkpoints_path(self, worker_id):  # type: (six.text_type) -> pathlib.Path
-        return self.agent_data_path / ("checkpoints-%s.json" % worker_id)
+        checkpoint_file_name = "%s%s.json" % (
+            WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX,
+            worker_id,
+        )
+        return self.agent_data_path / checkpoint_file_name
 
     def get_active_checkpoints_path(
         self, worker_id
     ):  # type: (six.text_type) -> pathlib.Path
-        return self.agent_data_path / "active-checkpoints-%s.json" % worker_id
+        checkpoint_file_name = "active-%s%s.json" % (
+            WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX,
+            worker_id,
+        )
+        return self.agent_data_path / checkpoint_file_name
 
     def get_checkpoints(self, worker_id):
         return json.loads(self.get_checkpoints_path(worker_id).read_text())
