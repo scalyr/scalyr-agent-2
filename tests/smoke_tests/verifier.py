@@ -304,7 +304,7 @@ class AgentWorkerSessionLogVerifier(AgentVerifier):
     def _verify(self):
         for worker_session_log_path in self._runner.worker_sessions_log_paths:
             start_message_line_pattern = re.compile(
-                r"Copying manager worker session #\w+ started."
+                r"Copying manager worker session #\w+-\d+ started."
             )
             worker_session_log_content = worker_session_log_path.read_text()
 
