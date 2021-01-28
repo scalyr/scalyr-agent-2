@@ -400,9 +400,6 @@ install_script_text="$(awk '{sub("# { #.*# }", ""); print}' <<<"$install_script_
 
 echo "${install_script_text}" >installScalyrAgentV2.sh
 
-echo "Create Scalyr yum repo spec file."
-echo "${YUM_REPO_SPEC}" > "scalyr.repo"
-
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb
