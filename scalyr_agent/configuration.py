@@ -3641,6 +3641,19 @@ class Configuration(object):
                 worker_entry, "api_key", self.api_key, description % entry_index
             )
         else:
+
+            # validate the worker id. It should consist only from this set of characters.
+            allowed_worker_id_characters_pattern = "a-zA-Z0-9_"
+            if re.search(
+                r"[^{0}]+".format(allowed_worker_id_characters_pattern), worker_id
+            ):
+                raise BadConfiguration(
+                    "The worker id '{0}' contains an invalid character. Please use only '{1}'".format(
+                        worker_id, allowed_worker_id_characters_pattern
+                    ),
+                    "workers",
+                    "invalidWorkerId",
+                )
             self.__verify_required_string(
                 worker_entry, "api_key", description % entry_index
             )
