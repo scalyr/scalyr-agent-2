@@ -153,8 +153,7 @@ SCALYR_SERVER=
 # { # replace the repository type placeholder from the create-agent-installer.sh script.  NOTE. All comments like that are also removed. # }
 REPOSITORY_URL="{ % REPLACE_REPOSITORY_URL % }"
 YUM_REPO_SPEC_FILE_URL="{ % REPLACE_YUM_REPO_SPEC_FILE_URL % }"
-KEYSERVER_URL="keyserver.ubuntu.com"
-PUBLIC_KEY_FINGERPRINT="84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+PUBLIC_KEY_URL="{ % REPLACE_PUBLIC_KEY_URL % }"
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
@@ -452,12 +451,13 @@ else
     export DEBIAN_FRONTEND=noninteractive
     run_command "apt-get install -y gnupg"
 
+    command -v curl || die_install "The 'curl' command can not be found. Please install it first using the 'yum install curl' command."
 
     # initialize gpg in case if it has been freshly installed.
     gpg --update-trustdb
 
     echo "Adding the public key."
-    run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver https://${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    curl -s "${PUBLIC_KEY_URL}" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import
 
     # change permissions for the gpg key.
     chmod 644 /etc/apt/trusted.gpg.d/scalyr.gpg
