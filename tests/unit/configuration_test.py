@@ -3682,3 +3682,37 @@ class TestWorkersConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
 
         config.parse()
+
+    def test_invalid_worker_id(self):
+        def recreate(worker_id):
+            self._write_file_with_separator_conversion(
+                """ {{
+                    api_key: "hi there"
+                    workers: [
+                        {{"api_key": "another_key", "id": "{0}"}},
+                    ]
+                  }}
+                """.format(
+                    worker_id
+                )
+            )
+            config = self._create_test_configuration_instance()
+
+            config.parse()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key /")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key ")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        recreate("not_Invalid_key_anymore")

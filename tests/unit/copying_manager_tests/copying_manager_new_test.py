@@ -239,7 +239,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.worker_sessions_health_check
-                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker session 'default-0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert status.health_check_result == "Good"
 
@@ -263,7 +263,7 @@ class TestBasic(CopyingManagerTest):
         else:
             assert (
                 status.worker_sessions_health_check
-                == "Worker session 'default_0' failed, max time since last copy attempt (60.0 seconds) exceeded"
+                == "Worker session 'default-0' failed, max time since last copy attempt (60.0 seconds) exceeded"
             )
             assert (
                 status.health_check_result
@@ -272,6 +272,26 @@ class TestBasic(CopyingManagerTest):
 
     def test_checkpoints(self):
         (test_file, test_file2), manager = self._init_manager(2)
+
+        # also add non-copying manager related checkpoints files, to be sure that the copying manager does not
+        # touch them. This emulates the case where some agent monitors also store their own state in checkpoint files
+        # and we must not consolidate them with the worker checkpoints.
+        monitor_checkpoint_file_names = [
+            "windows-event-checkpoints.json",
+            "docker-checkpoints.json",
+            "journald-checkpoints.json",
+        ]
+
+        monitors_checkpoint_paths = {}
+
+        for name in monitor_checkpoint_file_names:
+            monitor_checkpoint_path = pathlib.Path(
+                self._env_builder.config.agent_data_path, name
+            )
+            check_text = "{0}. Do not delete me, please.".format(name)
+            # write some text to the monitor checkpoint files, just to verify that it is not changed later.
+            monitors_checkpoint_paths[monitor_checkpoint_path] = check_text
+            monitor_checkpoint_path.write_text(check_text)
 
         test_file.append_lines("line1")
         test_file2.append_lines("line2")
@@ -301,10 +321,13 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("Line7")
         test_file.append_lines("Line8")
 
-        for checkpoint_path in pathlib.Path(
-            self._env_builder.config.agent_data_path
-        ).glob("*checkpoints*.json"):
-            checkpoint_path.unlink()
+        # make sure that all worker session checkpoint files are consolidated and removed.
+        for worker_session in manager.worker_sessions:
+            assert not worker_session.get_checkpoints_path().exists()
+            assert not worker_session.get_active_checkpoints_path().exists()
+
+        assert manager.consolidated_checkpoints_path.exists()
+        manager.consolidated_checkpoints_path.unlink()
 
         self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
@@ -317,7 +340,12 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == set(["Line9", "Line10"])
 
-    def test_checkpoints_master_checkpoints(self):
+        # verify if monitor checkpoint file is remaining untouched.
+        for monitor_checkpoint_path, check_text in monitors_checkpoint_paths.items():
+            assert monitor_checkpoint_path.exists()
+            assert monitor_checkpoint_path.read_text() == check_text
+
+    def test_checkpoints_consolidated_checkpoints(self):
         if self.worker_sessions_count == 1 and self.workers_count == 1:
             pytest.skip("This test is only for multi-worker copying manager.")
 

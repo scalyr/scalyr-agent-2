@@ -23,7 +23,6 @@ import sys
 import threading
 import time
 import operator
-from six.moves import range
 import signal
 import errno
 
@@ -48,6 +47,7 @@ from scalyr_agent.copying_manager.worker import (
     CopyingManagerWorkerSession,
     create_shared_object_manager,
     CopyingManagerWorkerSessionProxy,
+    WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
 )
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
@@ -64,19 +64,7 @@ log = scalyr_logging.getLogger(__name__)
 SCHEDULED_DELETION = "scheduled-deletion"
 CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
 
-
-def get_worker_session_ids(worker_config):  # type: (Dict) -> List
-    """
-    Generate the list of IDs of all sessions for the specified worker.
-    :param worker_config: config entry for the worker.
-    :return: List of worker session IDs.
-    """
-    result = []
-    for i in range(worker_config["sessions"]):
-        # combine the id of the worker and session's position in the list to get a session id.
-        worker_session_id = "%s_%s" % (worker_config["id"], i)
-        result.append(worker_session_id)
-    return result
+WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_session_"
 
 
 class CopyingManagerWorker(object):
@@ -104,7 +92,7 @@ class CopyingManagerWorker(object):
         # Those managers allow to communicate with worker sessions if the multiprocessing mode is enabled.
         self.__shared_object_managers = dict()
 
-        for session_id in get_worker_session_ids(worker_config):
+        for session_id in config.get_session_ids_of_the_worker(worker_config):
             if not self.__config.use_multiprocess_workers:
                 session = CopyingManagerWorkerSession(
                     self.__config, worker_config, session_id
@@ -1338,14 +1326,19 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # clear data folder by removing all worker session checkpoint files.
         checkpoints_glob = os.path.join(
-            self.__config.agent_data_path, "*checkpoints*.json"
+            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
         )
 
         for path in scalyr_util.match_glob(checkpoints_glob):
-            # do not delete consolidated checkpoint file
-            if path == consolidated_checkpoints_path:
-                continue
             os.unlink(path)
+
+            # also delete active checkpoint file.
+            checkpoint_file_name = os.path.basename(path)
+            active_checkpoint_path = os.path.join(
+                os.path.dirname(path), "active-{0}".format(checkpoint_file_name),
+            )
+            if os.path.isfile(active_checkpoint_path):
+                os.unlink(active_checkpoint_path)
 
     def __find_and_read_checkpoints(self, warn_on_stale=False):
         # type: (bool) -> Dict
@@ -1363,10 +1356,21 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         current_time = time.time()
 
-        # also search in the parent directory in case if there are checkpoint files from older versions.
-        glob_path = os.path.join(self.__config.agent_data_path, "checkpoints*.json")
+        # search for all worker session checkpoint files.
+        worker_checkpoints_glob = os.path.join(
+            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
+        )
 
-        for checkpoints_path in scalyr_util.match_glob(glob_path):
+        checkpoints_paths = scalyr_util.match_glob(worker_checkpoints_glob)
+
+        # also get the previously consolidated file.
+        consolidated_checkpoint_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints.json"
+        )
+
+        checkpoints_paths.append(consolidated_checkpoint_path)
+
+        for checkpoints_path in checkpoints_paths:
 
             checkpoints = self.__read_checkpoint_state(checkpoints_path)
 

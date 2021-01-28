@@ -57,7 +57,10 @@ from scalyr_agent.copying_manager import (
     CopyingManagerWorker,
     CopyingManagerWorkerSession,
 )
-from scalyr_agent.copying_manager.worker import WORKER_SESSION_PROXY_EXPOSED_METHODS
+from scalyr_agent.copying_manager.worker import (
+    WORKER_SESSION_PROXY_EXPOSED_METHODS,
+    WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX,
+)
 
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.log_processing import LogMatcher
@@ -595,16 +598,18 @@ class TestableCopyingManagerWorkerSession(
         )
         self._saved_checkpoints, self.saved_active_checkpoints = self.get_checkpoints()
 
-    # region Utility funtions
+    # region Utility functions
     def get_checkpoints_path(self):
         result = pathlib.Path(
-            self.__config.agent_data_path, "checkpoints-%s.json" % self._id
+            self.__config.agent_data_path,
+            "%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
         )
         return result
 
     def get_active_checkpoints_path(self):
         result = pathlib.Path(
-            self.__config.agent_data_path, "active-checkpoints-%s.json" % self._id
+            self.__config.agent_data_path,
+            "active-%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
         )
         return result
 
