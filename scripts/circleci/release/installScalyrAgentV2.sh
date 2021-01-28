@@ -416,6 +416,7 @@ if [[ $REPO_TYPE == "yum" ]]; then
   else
     echo "Adding the Scalyr repo file."
     echo "${YUM_REPO_SPEC}" > /etc/yum.repos.d/scalyr.repo
+    cat /etc/yum.repos.d/scalyr.repo
   fi
 
   PACKAGE_NAME="scalyr-agent-2"
