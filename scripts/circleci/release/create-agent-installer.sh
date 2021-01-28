@@ -363,7 +363,7 @@ REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
 
 echo 222qqqq
-read -r -d '' YUM_REPO_SPEC <<- EOM
+read -r -d '' YUM_REPO_SPEC << EOM
 [scalyr]
 includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
 name=Scalyr packages - noarch
