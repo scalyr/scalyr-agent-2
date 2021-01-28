@@ -153,14 +153,16 @@ SCALYR_SERVER=
 # { # replace the repository type placeholder from the create-agent-installer.sh script.  NOTE. All comments like that are also removed. # }
 REPOSITORY_URL="{ % REPLACE_REPOSITORY_URL % }"
 
-read -r -d '' YUM_REPO_SPEC << EOM
+YUM_REPO_SPEC=$(cat << EOM
 { % REPLACE_YUM_REPO_SPEC % }
 EOM
+)
 
 
-read -r -d '' PUBLIC_KEY << EOM
+PUBLIC_KEY=$(cat << EOM
 { % REPLACE_PUBLIC_KEY % }
 EOM
+)
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
