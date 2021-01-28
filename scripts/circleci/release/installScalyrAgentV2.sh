@@ -152,8 +152,8 @@ SCALYR_SERVER=
 
 # { # replace the repository type placeholder from the create-agent-installer.sh script.  NOTE. All comments like that are also removed. # }
 REPOSITORY_URL="{ % REPLACE_REPOSITORY_URL % }"
-YUM_REPO_SPEC_FILE_URL="{ % REPLACE_YUM_REPO_SPEC_FILE_URL % }"
-PUBLIC_KEY_URL="{ % REPLACE_PUBLIC_KEY_URL % }"
+YUM_REPO_SPEC="{ % REPLACE_YUM_REPO_SPEC % }"
+PUBLIC_KEY="{ % REPLACE_PUBLIC_KEY % }"
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
@@ -405,9 +405,8 @@ if [[ $REPO_TYPE == "yum" ]]; then
     # way we found to make sure the repository configuration can be updated.
     run_command "yum install -y scalyr-repo";
   else
-    command -v curl || die_install "The 'curl' command can not be found. Please install it first using the 'yum install curl' command."
-    echo "Downloading the Scalyr repo file."
-    curl -s "${YUM_REPO_SPEC_FILE_URL}" > /etc/yum.repos.d/scalyr.repo
+    echo "Adding the Scalyr repo file."
+    echo "${YUM_REPO_SPEC}" > /etc/yum.repos.d/scalyr.repo
   fi
 
   PACKAGE_NAME="scalyr-agent-2"
@@ -451,13 +450,11 @@ else
     export DEBIAN_FRONTEND=noninteractive
     run_command "apt-get install -y gnupg"
 
-    command -v curl || die_install "The 'curl' command can not be found. Please install it first using the 'yum install curl' command."
-
     # initialize gpg in case if it has been freshly installed.
     gpg --update-trustdb
 
     echo "Adding the public key."
-    curl -s "${PUBLIC_KEY_URL}" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import
+    gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import <<< "${PUBLIC_KEY}"
 
     # change permissions for the gpg key.
     chmod 644 /etc/apt/trusted.gpg.d/scalyr.gpg
