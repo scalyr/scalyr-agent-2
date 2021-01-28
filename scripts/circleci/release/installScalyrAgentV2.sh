@@ -457,7 +457,7 @@ else
     gpg --update-trustdb
 
     echo "Adding the public key."
-    run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver https://${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
 
     # change permissions for the gpg key.
     chmod 644 /etc/apt/trusted.gpg.d/scalyr.gpg
