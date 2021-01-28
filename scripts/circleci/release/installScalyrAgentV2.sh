@@ -158,6 +158,8 @@ YUM_REPO_SPEC=$(cat << EOM
 EOM
 )
 
+echo "${YUM_REPO_SPEC}"
+
 PUBLIC_KEY=$(cat << EOM
 { % REPLACE_PUBLIC_KEY % }
 EOM
@@ -463,8 +465,6 @@ else
     gpg --update-trustdb
 
     echo "Adding the public key."
-    echo "GGGGGG"
-    echo "${PUBLIC_KEY}" > ggg
     echo "${PUBLIC_KEY}" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import
 
     # change permissions for the gpg key.
