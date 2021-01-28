@@ -163,6 +163,9 @@ PUBLIC_KEY=$(cat << EOM
 { % REPLACE_PUBLIC_KEY % }
 EOM
 )
+
+echo "${YUM_REPO_SPEC}"
+echo "${PUBLIC_KEY}"
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
