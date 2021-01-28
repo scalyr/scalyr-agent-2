@@ -382,25 +382,25 @@ echo 111
 
 # replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
 #sed "s~{ % REPLACE_REPOSITORY_URL % }~$REPOSITORY_URL~g" $SCRIPTPATH/installScalyrAgentV2.sh > installScalyrAgentV2.sh
-install_script_text="$(awk -v url="$REPOSITORY_URL" 'sub("{ % REPLACE_REPOSITORY_URL % }", url); print' <<<"$install_script_text")"
+install_script_text="$(awk -v url="$REPOSITORY_URL" '{sub("{ % REPLACE_REPOSITORY_URL % }", url); print}' <<<"$install_script_text")"
 
 echo 222
 
 # replace a special placeholder for the yum spec file.
 #sed "s~{ % REPLACE_YUM_REPO_SPEC_FILE % }~$YUM_REPO_SPEC_FILE_URL~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk -v spec="$YUM_REPO_SPEC" 'sub("{ % REPLACE_YUM_REPO_SPEC % }", spec); print' <<<"$install_script_text")"
+install_script_text="$(awk -v spec="$YUM_REPO_SPEC" '{sub("{ % REPLACE_YUM_REPO_SPEC % }", spec); print}' <<<"$install_script_text")"
 
 echo 3333
 
 # replace a special placeholder for the public key url.
 #sed "s~{ % REPLACE_PUBLIC_KEY_URL % }~$PUBLIC_KEY_URL~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk -v key="$PUBLIC_KEY" 'sub("{ % REPLACE_PUBLIC_KEY % }", key); print' <<<"$install_script_text")"
+install_script_text="$(awk -v key="$PUBLIC_KEY" '{sub("{ % REPLACE_PUBLIC_KEY % }", key); print}' <<<"$install_script_text")"
 
 echo 4444
 
 # also remove all special comments which are usefull only for template but not for the resulting file.
 #sed "s~# { #.*# }~~g" -i installScalyrAgentV2.sh
-install_script_text="$(awk 'sub("# { #.*# }", ""); print' <<<"$install_script_text")"
+install_script_text="$(awk '{sub("# { #.*# }", ""); print}' <<<"$install_script_text")"
 
 echo 5555
 
