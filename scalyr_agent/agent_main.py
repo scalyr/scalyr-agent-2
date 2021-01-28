@@ -1035,7 +1035,7 @@ class ScalyrAgent(object):
         # all paths for all agent log files.
         log_file_paths_to_check = [self.__log_file_path]
 
-        # we also all log files for all worker session if they are in multiprocess configuration.
+        # we also add log files for all worker session if they are in multiprocess configuration.
         if self.__config.use_multiprocess_workers:
             for worker_session_id in self.__config.get_session_ids_from_all_workers():
                 log_file_path = self.__config.get_worker_session_agent_log_path(
