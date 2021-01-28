@@ -151,9 +151,18 @@ VERSION=
 SCALYR_SERVER=
 
 # { # replace the repository type placeholder from the create-agent-installer.sh script.  NOTE. All comments like that are also removed. # }
-REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/{ % REPLACE_REPOSITORY_TYPE % }"
-KEYSERVER_URL="keyserver.ubuntu.com"
-PUBLIC_KEY_FINGERPRINT="84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+REPOSITORY_URL="{ % REPLACE_REPOSITORY_URL % }"
+
+PUBLIC_KEY=$(cat << EOM
+{ % REPLACE_PUBLIC_KEY % }
+EOM
+)
+
+YUM_REPO_SPEC=$(cat << EOM
+{ % REPLACE_YUM_REPO_SPEC % }
+EOM
+)
+
 USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
@@ -405,19 +414,8 @@ if [[ $REPO_TYPE == "yum" ]]; then
     # way we found to make sure the repository configuration can be updated.
     run_command "yum install -y scalyr-repo";
   else
-      echo "Adding the public key."
-      run_command "rpm --import https://${KEYSERVER_URL}/pks/lookup?op=get&search=0x${PUBLIC_KEY_FINGERPRINT}"
-      echo "Adding the scalyr agent repository file."
-      cat > /etc/yum.repos.d/scalyr.repo <<EOF
-[scalyr]
-includepkgs=scalyr-agent-2
-name=Scalyr packages - noarch
-baseurl=${REPOSITORY_URL}/yum/binaries/noarch
-mirror_expire=300
-metadata_expire=300
-enabled=1
-gpgcheck=1
-EOF
+    echo "Adding the Scalyr repo file."
+    echo "${YUM_REPO_SPEC}" > /etc/yum.repos.d/scalyr.repo
   fi
 
   PACKAGE_NAME="scalyr-agent-2"
@@ -461,12 +459,11 @@ else
     export DEBIAN_FRONTEND=noninteractive
     run_command "apt-get install -y gnupg"
 
-
     # initialize gpg in case if it has been freshly installed.
     gpg --update-trustdb
 
     echo "Adding the public key."
-    run_command "gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --keyserver ${KEYSERVER_URL} --recv ${PUBLIC_KEY_FINGERPRINT}"
+    echo "${PUBLIC_KEY}" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalyr.gpg --import
 
     # change permissions for the gpg key.
     chmod 644 /etc/apt/trusted.gpg.d/scalyr.gpg
