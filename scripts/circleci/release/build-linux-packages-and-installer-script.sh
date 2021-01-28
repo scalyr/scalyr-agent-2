@@ -2,16 +2,11 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 AGENT_SOURCE_PATH="$(realpath "${SCRIPTPATH}/../../..")"
 
-echo "$AGENT_SOURCE_PATH"
-
 AGENT_RELEASE_VERSION=$1
-echo "$AGENT_RELEASE_VERSION"
 
 OUTPUT_PATH="$(realpath "$2")"
 RELEASE_REPO_BASE_URL=${3:-stable}
 RELEASE_REPO_NAME=${4:-stable}
-echo "GGG"
-echo "$RELEASE_REPO_BASE_URL"
 
 
 PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
@@ -51,15 +46,8 @@ echo "Build deb and rpm packages."
 
 pushd "${OUTPUT_PATH}"
 
-echo "1111"
-echo "$OUTPUT_PATH"
-pwd
-
 python "${AGENT_SOURCE_PATH}/build_package.py" deb
 python "${AGENT_SOURCE_PATH}/build_package.py" rpm
-
-echo "222"
-ls "${OUTPUT_PATH}"
 
 
 DEB_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none *.deb)"
@@ -86,7 +74,7 @@ mirror_expire=300
 metadata_expire=300
 enabled=1
 gpgcheck=1
-gpgkey=https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6
+gpgkey=$PUBLIC_KEY_URL
 
 EOF
 

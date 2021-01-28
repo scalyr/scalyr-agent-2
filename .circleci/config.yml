@@ -2267,6 +2267,10 @@ jobs:
             mkdir artifacts
             mkdir package
 
+            # temporarily use internal repo until a new stable version is release.
+            RELEASE_REPO_BASE_URL="4adfas/internal"
+            RELEASE_REPO_NAME="internal"
+
             bash  ~/scalyr-agent-2/scripts/circleci/release/build-linux-packages-and-installer-script.sh \
               "$RELEASE_AGENT_VERSION" \
               ./output \
