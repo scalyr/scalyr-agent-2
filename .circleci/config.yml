@@ -747,6 +747,12 @@ commands:
                 echo "Running tests command"
                 ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
                 exit_code=$?
+
+                # We preserve logs of all the runs - we move logs to directory per run iteration
+                mkdir -p outputs/run_$i/
+                cp outputs/*.log outputs/run_$i/
+                rm outputs/*.log
+
                 if [ "${exit_code}" -eq 0 ]; then
                     echo "Command exited with 0, breaking from the loop."
                     break
@@ -755,11 +761,6 @@ commands:
                 fi
                 i=$((i+1))
                 sleep ${sleep_delay}
-
-                # We preserve logs of all the runs
-                mkdir -p outputs/run_$i/
-                cp outputs/*.log outputs/run_$i/
-                rm outputs/*.log
               done
 
               set -e
