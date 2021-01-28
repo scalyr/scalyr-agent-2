@@ -65,6 +65,9 @@ sudo yum install -y "{{python_package}}"
 sudo yum install -y {{additional_packages}}
 {% endif -%}
 
+# Deny the default gpg port to test the install script.
+sudo iptables -A OUTPUT -p tcp --dport 11371 -j DROP
+
 # Install Sclayr agent.
 echo_with_date ""
 echo_with_date "Installing Scalyr agent"
