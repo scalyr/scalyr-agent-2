@@ -23,6 +23,9 @@ Bug fixes:
 * Fix a bug which could result in docker, journald and windows event log checkpoint files to be deleted when restarting the agent. This would only affect docker monitor configurations which are setup to ingest logs via Docker API and not json log files on disk (aka ``docker_raw_logs: false`` docker monitor option is set).
 * Fix a small bug which might skip first lines of the worker session log file.
 
+Other:
+* Pre-built frozen Windows binaries now bundle and utilize Python 3 (3.8.7). In the past releases, they utilized Python 2.7, but due to the Python 2.7 being EOL for a year now, new release will utilize Python 3. This change should be opaque to the end user and everything should continue to work as it did in the previous releases.
+
 ## 2.1.17 "Xothichi" - January 15, 2021
 
 <!---
