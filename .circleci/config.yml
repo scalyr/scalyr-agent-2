@@ -2415,6 +2415,7 @@ workflows:
             - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
+          <<: *master_and_release_only
  benchmarks:
    <<: *skip_release_build_branch_push
    jobs:
