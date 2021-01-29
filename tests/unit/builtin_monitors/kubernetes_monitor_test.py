@@ -885,7 +885,5 @@ class ContainerCheckerTest(TestConfigurationBase):
             k8s_cache=mock.Mock(pod=_pod),
             base_attributes=cc._ContainerChecker__get_base_attributes(),
         )
-        self.assertIn("zzz_templ_container_name", result["attributes"])
-        self.assertEqual(
-            "xxx_test_container", result["attributes"]["zzz_templ_container_name"]
-        )
+        assert "zzz_templ_container_name" in result["attributes"]
+        assert "xxx_test_container" == result["attributes"]["zzz_templ_container_name"]
