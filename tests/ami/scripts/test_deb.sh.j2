@@ -93,20 +93,24 @@ sudo DEBIAN_FRONTEND=noninteractive dpkg -i install_package.deb
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export INSTALL_PACKAGE_VERSION=$(dpkg-deb -f "install_package.deb" Version)
 {% else -%}
-# install Scalyr agent by downloading convenience script.
+    {# install Scalyr agent by downloading convenience script. #}
     {% if installer_script_info["type"] == "url" -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_info["source"]}}"
-    # If source points to https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh
-    # ensure the script contains correct reference to prod.
-    # In the past, we had a bug where incorrect version of the script which pointed to internal instead
-    # of stable was published
+    {# If source points to https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh #}
+    {# ensure the script contains correct reference to prod. #}
+    {# In the past, we had a bug where incorrect version of the script which pointed to internal instead #}
+    {# of stable was published  #}
     {% if installer_script_info["source"] == "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" -%}
-echo "ttttest"
+echo_with_date ""
+echo_with_date "Verifying stable installer script content"
+echo_with_date ""
+
 cat install-scalyr-agent-2.sh | grep "REPOSITORY_URL"
 cat install-scalyr-agent-2.sh | grep "baseurl"
 
 cat install-scalyr-agent-2.sh | grep "REPOSITORY_URL" | grep "stable"
 cat install-scalyr-agent-2.sh | grep "baseurl" | grep "stable"
+echo_with_date ""
     {% endif -%}
     {% endif -%}
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
