@@ -105,11 +105,11 @@ echo_with_date ""
 echo_with_date "Verifying stable installer script content"
 echo_with_date ""
 
-cat install-scalyr-agent-2.sh | grep "REPOSITORY_URL"
-cat install-scalyr-agent-2.sh | grep "baseurl"
+cat -v install-scalyr-agent-2.sh | grep "REPOSITORY_URL"
+cat -v install-scalyr-agent-2.sh | grep "baseurl"
 
-cat install-scalyr-agent-2.sh | grep "REPOSITORY_URL" | grep "stable"
-cat install-scalyr-agent-2.sh | grep "baseurl" | grep "stable"
+cat -v install-scalyr-agent-2.sh | grep "REPOSITORY_URL" | grep "stable"
+cat -v install-scalyr-agent-2.sh | grep "baseurl" | grep "stable"
 echo_with_date ""
     {% endif -%}
     {% endif -%}
