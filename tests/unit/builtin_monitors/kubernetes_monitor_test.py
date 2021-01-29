@@ -859,9 +859,7 @@ class ContainerCheckerTest(TestConfigurationBase):
             ignore_pod_sandboxes=False,
         )
         cc._ContainerChecker__k8s_config_builder = K8sConfigBuilder(
-            config.k8s_log_configs,
-            mock.Mock(),
-            True,
+            config.k8s_log_configs, mock.Mock(), True,
         )
         cc.get_cluster_name = lambda *_: "the-cluster-name"
 
