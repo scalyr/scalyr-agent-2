@@ -832,6 +832,8 @@ _CONTROLLER_KEYS = {
 
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile("^(.+)://(.+)$")
+# A regex to determine whether a string contains template directives
+_TEMPLATE_RE = re.compile('\${[^}]+}')
 
 
 class K8sInitException(Exception):
@@ -3255,6 +3257,12 @@ class ContainerChecker(object):
         # Make sure to use a copy because it could be pointing to objects in the original attributes
         # or log configs, and we don't want to modify those
         attrs = result.get("attributes", JsonObject({})).copy()
+
+        # Look for any values from the config that contain templates.
+        for key, value in six.iteritems(attrs):
+            if isinstance(value, six.string_types) and _TEMPLATE_RE.search(value):
+                attrs[key] = Template(value).safe_substitute(rename_vars)
+
         for key, value in six.iteritems(container_attributes):
             # Only set values that haven't been explicity set
             # by an annotation or k8s_logs config option
