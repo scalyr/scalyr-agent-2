@@ -833,7 +833,7 @@ _CONTROLLER_KEYS = {
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile("^(.+)://(.+)$")
 # A regex to determine whether a string contains template directives
-_TEMPLATE_RE = re.compile("\${[^}]+}")
+_TEMPLATE_RE = re.compile(r"\${[^}]+}")
 
 
 class K8sInitException(Exception):
