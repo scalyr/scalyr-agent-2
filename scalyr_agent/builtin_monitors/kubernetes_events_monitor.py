@@ -126,6 +126,7 @@ EVENT_OBJECT_FILTER_DEFAULTS = [
     "ReplicaSet",
     "ReplicationController",
     "StatefulSet",
+    "Endpoint",
 ]
 define_config_option(
     __monitor__,
@@ -350,6 +351,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 "ReplicaSet",
                 "ReplicationController",
                 "StatefulSet",
+                "Endpoint",
             ],
         )
 
