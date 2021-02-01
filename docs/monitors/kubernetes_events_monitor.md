@@ -117,9 +117,10 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                                   which event messages are stored. The file will be placed in the default Scalyr log \
                                   directory, unless it is an absolute path
 |||# ``event_object_filter``  ||| Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', \
-                                  'ReplicaSet', 'ReplicationController', 'StatefulSet']). A list of event object types \
-                                  to filter on. If set, only events whose `involvedObject` `kind` is on this list will \
-                                  be included.
+                                  'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event \
+                                  object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this \
+                                  list will be included.  To not perform filtering and to send all event kinds, set \
+                                  the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``.
 |||# ``leader_check_interval``||| Optional (defaults to 60). The number of seconds to wait between checks to see if we \
                                   are still the leader.
 |||# ``leader_node``          ||| Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on \

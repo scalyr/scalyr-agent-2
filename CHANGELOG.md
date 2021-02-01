@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.19 "TBD" - TBD
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
+--->
+
+Improvements:
+* Add ``Endpoint`` to the default ``event_object_filter`` values.
+
 ## 2.1.18 "Ravis" - January 29, 2021
 
 <!---
