@@ -100,7 +100,7 @@ wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_info["source"]}}"
     {# ensure the script contains correct reference to prod. #}
     {# In the past, we had a bug where incorrect version of the script which pointed to internal instead #}
     {# of stable was published  #}
-    {% if installer_script_info["source"] == "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" -%}
+    {% if installer_script_info["source"] == "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" or "stable/latest/install-scalyr-agent-2.sh" in url -%}
 echo_with_date ""
 echo_with_date "Verifying stable installer script content"
 echo_with_date ""
