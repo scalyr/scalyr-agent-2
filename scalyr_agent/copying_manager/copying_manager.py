@@ -33,6 +33,7 @@ if False:
     from typing import List
     from typing import Optional
     from typing import Tuple
+    from typing import Any
 
 from scalyr_agent import (
     scalyr_logging as scalyr_logging,
@@ -442,7 +443,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     @property
     def workers(self):
-        # type: () -> Dict
+        # type: () -> Dict[six.text_type, CopyingManagerWorker]
         """
         Get dict with workers. Only exposed for testing purposes.
         """
@@ -777,7 +778,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             try:
                 # prepare and read checkpoints.
                 # read all checkpoints from the manager's previous run and combine them into one mater file.
-                checkpoints = self.__find_and_read_checkpoints(warn_on_stale=True)
+                checkpoints = self.__find_and_read_checkpoint_files(warn_on_stale=True)
                 if checkpoints:
                     self.__consolidate_checkpoints(checkpoints)
                 else:
@@ -935,7 +936,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             for worker in self.__workers.values():
                 worker.stop_sessions()
 
-            checkpoints = self.__find_and_read_checkpoints()
+            checkpoints = self.__find_and_read_checkpoint_files()
             if checkpoints:
                 log.info(
                     "Save consolidated checkpoints into file %s"
@@ -1105,7 +1106,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        checkpoints = self.__find_and_read_checkpoints()
+        checkpoints = self._get_all_checkpoints()
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -1340,7 +1341,33 @@ class CopyingManager(StoppableThread, LogWatcher):
             if os.path.isfile(active_checkpoint_path):
                 os.unlink(active_checkpoint_path)
 
-    def __find_and_read_checkpoints(self, warn_on_stale=False):
+    def _get_all_checkpoints(self):  # type: () -> Dict[six.text_type, Any]
+        """
+        Collects all checkpoint states from all running workers and the checkpoints from saved consolidated file.
+        :return: dict of the checkpoints.
+        """
+        checkpoints = {}  # type: Dict[six.text_type, Any]
+
+        # also get the previously consolidated file.
+        consolidated_checkpoint_path = os.path.join(
+            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME
+        )
+
+        # also read existing checkpoints from the consolidated checkpoint file.
+        previous_checkpoints = self.__read_checkpoint_state(
+            consolidated_checkpoint_path
+        )
+        if previous_checkpoints:
+            checkpoints.update(previous_checkpoints["checkpoints"])
+
+        # get all checkpoints from all files that are currently processed by all workers.
+        for worker in self.workers.values():
+            for worker_session in worker.sessions:
+                checkpoints.update(worker_session.get_full_checkpoints())
+
+        return checkpoints
+
+    def __find_and_read_checkpoint_files(self, warn_on_stale=False):
         # type: (bool) -> Dict
         """
         # WARNING: Because this function is called on each iteration,
@@ -1365,7 +1392,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # also get the previously consolidated file.
         consolidated_checkpoint_path = os.path.join(
-            self.__config.agent_data_path, "checkpoints.json"
+            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME
         )
 
         checkpoints_paths.append(consolidated_checkpoint_path)

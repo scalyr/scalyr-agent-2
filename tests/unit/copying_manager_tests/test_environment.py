@@ -170,7 +170,7 @@ class TestEnvironBuilder(object):
         self._config = config
 
     def recreate_files(self, files_number, path, file_name_format=None):
-        # type: (int, pathlib.Path, six.text_type) -> List
+        # type: (int, pathlib.Path, six.text_type) -> List[TestableLogFile]
         """
         Recreate *file_number* of files in the *path* directory with the *file_name_format* name format.
         :return:

@@ -45,8 +45,6 @@ from tests.unit.copying_manager_tests.common import (
     TestingConfiguration,
 )
 
-from scalyr_agent import util as scalyr_util
-
 import six
 from six.moves import range
 import mock
@@ -346,9 +344,6 @@ class TestBasic(CopyingManagerTest):
             assert monitor_checkpoint_path.read_text() == check_text
 
     def test_checkpoints_consolidated_checkpoints(self):
-        if self.worker_sessions_count == 1 and self.workers_count == 1:
-            pytest.skip("This test is only for multi-worker copying manager.")
-
         (test_file, test_file2), manager = self._init_manager(2)
 
         # write something and stop in order to create checkpoint files.
@@ -356,6 +351,10 @@ class TestBasic(CopyingManagerTest):
         test_file2.append_lines("line2")
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
+
+        # also save the checkpoints from all worker sessions to check them later with the checkpoints
+        # from the consolidated file.
+        all_worker_checkpoints = manager._get_all_checkpoints()
 
         manager.stop_manager()
 
@@ -371,12 +370,13 @@ class TestBasic(CopyingManagerTest):
         test_file.append_lines("line3")
         test_file2.append_lines("line4")
 
-        checkpoint_files = scalyr_util.match_glob(
-            six.text_type(manager.consolidated_checkpoints_path)
-        )
-
         # verify that only one file remains and it is a consolidated file.
-        assert checkpoint_files == [str(manager.consolidated_checkpoints_path)]
+        assert manager.consolidated_checkpoints_path.exists()
+        for worker_session in manager.worker_sessions:
+            assert not worker_session.get_checkpoints_path().exists()
+            assert not worker_session.get_active_checkpoints_path().exists()
+
+        assert manager.consolidated_checkpoints["checkpoints"] == all_worker_checkpoints
 
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
@@ -557,3 +557,66 @@ class TestBasic(CopyingManagerTest):
 
         assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
+
+
+class TestDynamicLogMatchers(CopyingManagerTest):
+    def test_checkpoints(self):
+        """
+        Basic test for the checkpoint files that were dynamically added to the copying manager.
+        """
+        _, manager = self._init_manager(0)
+
+        logs_dir = self._env_builder.test_logs_dir / "dynamicaly-added-logs"
+        logs_dir.mkdir()
+
+        files = self._env_builder.recreate_files(10, logs_dir)
+
+        def prepare_files():
+            for file in files:
+                log_config = self._env_builder.config.parse_log_config(
+                    {"path": file.str_path}
+                )
+                manager.add_log_config("scheduled-deletion", log_config)
+
+        # add some new files dynamically.
+        prepare_files()
+
+        # wait for copying manager adds log processors.
+        manager.wait_for_full_iteration()
+
+        # add new lines.
+        for file in files:
+            file.append_lines("{}_line1".format(file.str_path))
+
+        # check if all new lines there.
+        lines = self._wait_for_rpc_and_respond()
+        assert len(files) == len(lines)
+        for line in lines:
+            assert line.endswith("_line1")
+
+        # stop manager to write the checkpoint files.
+        manager.stop_manager()
+
+        # write new lines to log files to check if they are read by the manager.
+        for file in files:
+            file.append_lines("{}_line2".format(file.str_path))
+
+        _, manager = self._init_manager(0, auto_start=False)
+        manager.start_manager()
+
+        prepare_files()
+
+        # check if all new lines there.
+        lines = self._wait_for_rpc_and_respond()
+        assert len(files) == len(lines)
+        for line in lines:
+            assert line.endswith("_line2")
+
+        # also add some new lines.
+        for file in files:
+            file.append_lines("{}_line3".format(file.str_path))
+
+        lines = self._wait_for_rpc_and_respond()
+        assert len(files) == len(lines)
+        for line in lines:
+            assert line.endswith("_line3")

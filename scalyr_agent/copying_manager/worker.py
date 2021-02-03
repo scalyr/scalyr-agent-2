@@ -288,6 +288,16 @@ class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
         """
         pass
 
+    @abstractmethod
+    def get_full_checkpoints(self):  # type: () -> Dict
+        """
+        This method returns the full collection of the current log processor checkpoint states.
+        It also mainly designed to be called from the outside threads, so the checkpoint object should be protected
+        by the lock.
+        :return: the dict of the checkpoint states of the current log processors.
+        """
+        pass
+
 
 class CopyingManagerWorkerSession(
     StoppableThread, CopyingManagerWorkerSessionInterface
@@ -391,6 +401,11 @@ class CopyingManagerWorkerSession(
         self.__last_total_bytes_skipped = 0
         self.__last_total_bytes_copied = 0
         self.__last_total_bytes_pending = 0
+
+        # the collection with all checkpoint states for all current log processors.
+        self._full_checkpoints = {}  # type: Dict
+        # lock object that guard the checkpoints object.
+        self._checkpoints_lock = threading.Lock()
 
     @property
     def expanded_server_attributes(self):
@@ -1021,6 +1036,16 @@ class CopyingManagerWorkerSession(
         for processor in self.__log_processors:
             processor.scan_for_new_bytes(current_time)
 
+    def get_full_checkpoints(self):  # type: () -> Dict[six.text_type, Any]
+        """
+        This method returns the full collection of the current log processor checkpoint states.
+        It also mainly designed to be called from the outside threads, so the checkpoint object should be protected
+        by the lock.
+        :return: the dict of the checkpoint states of the current log processors.
+        """
+        with self._checkpoints_lock:
+            return self._full_checkpoints
+
     def __write_checkpoint_state(
         self, log_processors, base_file, current_time, full_checkpoint
     ):
@@ -1032,18 +1057,30 @@ class CopyingManagerWorkerSession(
         """
         # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
-        checkpoints = {}
+        checkpoints_to_write = {}
+        all_checkpoints = {}
 
         for processor in log_processors:
+            log_path = processor.get_log_path()
+            processor_checkpoint = processor.get_checkpoint()
+
             if full_checkpoint or processor.is_active:
-                checkpoints[processor.get_log_path()] = processor.get_checkpoint()
+                checkpoints_to_write[log_path] = processor_checkpoint
 
             if full_checkpoint:
                 processor.set_inactive()
 
+            # we also save the full collection of the checkpoints in order to share this information
+            # with the copying manager.
+            all_checkpoints[log_path] = processor_checkpoint
+
+        with self._checkpoints_lock:
+            # the checkpoints object has to be guarded by lock since other method can access it from the other thread.
+            self._full_checkpoints = all_checkpoints
+
         file_path = os.path.join(self.__config.agent_data_path, base_file)
 
-        write_checkpoint_state_to_file(checkpoints, file_path, current_time)
+        write_checkpoint_state_to_file(checkpoints_to_write, file_path, current_time)
 
     def _write_full_checkpoint_state(self, current_time):
         """Writes the full checkpont state to disk.
@@ -1281,6 +1318,7 @@ WORKER_SESSION_PROXY_EXPOSED_METHODS = [
     six.ensure_str("schedule_new_log_processor"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
+    six.ensure_str("get_full_checkpoints"),
 ]
 
 # create base proxy class for the worker session, here we also specify all its methods that may be called through proxy.

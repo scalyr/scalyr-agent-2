@@ -596,7 +596,10 @@ class TestableCopyingManagerWorkerSession(
         super(TestableCopyingManagerWorkerSession, self)._write_full_checkpoint_state(
             current_time
         )
-        self._saved_checkpoints, self.saved_active_checkpoints = self.get_checkpoints()
+        (
+            self._saved_checkpoints,
+            self.saved_active_checkpoints,
+        ) = self.get_checkpoints_from_files()
 
     # region Utility functions
     def get_checkpoints_path(self):
@@ -613,7 +616,7 @@ class TestableCopyingManagerWorkerSession(
         )
         return result
 
-    def get_checkpoints(self):
+    def get_checkpoints_from_files(self):
         """
         Get checkpoint states of the worker session.
         :return:
@@ -955,7 +958,7 @@ _TestableCopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyTy
         six.ensure_str("get_active_checkpoints_path"),
         six.ensure_str("get_checkpoints_path"),
         six.ensure_str("change_agent_log"),
-        six.ensure_str("get_checkpoints"),
+        six.ensure_str("get_checkpoints_from_files"),
         six.ensure_str("write_checkpoints"),
     ],
 )

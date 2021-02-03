@@ -451,7 +451,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
         for worker in self._manager.worker_sessions:
-            checkpoints, active_chp, = worker.get_checkpoints()
+            checkpoints, active_chp, = worker.get_checkpoints_from_files()
             checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
             active_chp["time"] -= self._config.max_allowed_checkpoint_age + 1
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
@@ -496,7 +496,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         # so we read "full_checkpoints" ...
 
         for worker in self._manager.worker_sessions:
-            checkpoints, active_checkpoints = worker.get_checkpoints()
+            checkpoints, active_checkpoints = worker.get_checkpoints_from_files()
 
             # ... and make bigger(fresher) time value for "active_checkpoints".
             active_checkpoints["time"] = checkpoints["time"] + 1
@@ -542,7 +542,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         for worker in self._manager.worker_sessions:
             # get preserved checkpoints from workers and write them ones more.
             # we do not write active-checkpoints because it is the purpose of this test.
-            checkpoints, _ = worker.get_checkpoints()
+            checkpoints, _ = worker.get_checkpoints_from_files()
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
 
         controller = self.__create_test_instance(

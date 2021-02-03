@@ -213,7 +213,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         return processors[0]
 
 
-class TestsRunning(CopyingManagerWorkerTest):
+class TestWorkerSessionRunning(CopyingManagerWorkerTest):
     @pytest.mark.skipif(sys.version_info < (2, 7), reason="Skip for python < 2.7")
     @skip_on_multiprocess_workers
     def test_wait_copying(self):
@@ -671,6 +671,10 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         worker.stop_worker_session()
 
         checkpoints = self._env_builder.get_checkpoints(worker.get_id())["checkpoints"]
+
+        # the checkpoints which has been returned by the worker session method have to be the same
+        # as in the checkpoint file
+        assert worker.get_full_checkpoints() == checkpoints
 
         assert test_file.str_path in checkpoints
 
