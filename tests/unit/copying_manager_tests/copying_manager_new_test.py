@@ -586,7 +586,7 @@ class TestDynamicLogMatchers(CopyingManagerTest):
 
         # add new lines.
         for file in files:
-            file.append_lines("{}_line1".format(file.str_path))
+            file.append_lines("{0}_line1".format(file.str_path))
 
         # check if all new lines there.
         lines = self._wait_for_rpc_and_respond()
@@ -599,7 +599,7 @@ class TestDynamicLogMatchers(CopyingManagerTest):
 
         # write new lines to log files to check if they are read by the manager.
         for file in files:
-            file.append_lines("{}_line2".format(file.str_path))
+            file.append_lines("{0}_line2".format(file.str_path))
 
         _, manager = self._init_manager(0)
 
@@ -613,7 +613,7 @@ class TestDynamicLogMatchers(CopyingManagerTest):
 
         # also add some new lines.
         for file in files:
-            file.append_lines("{}_line3".format(file.str_path))
+            file.append_lines("{0}_line3".format(file.str_path))
 
         lines = self._wait_for_rpc_and_respond()
         assert len(files) == len(lines)
