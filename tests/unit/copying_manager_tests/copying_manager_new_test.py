@@ -601,8 +601,7 @@ class TestDynamicLogMatchers(CopyingManagerTest):
         for file in files:
             file.append_lines("{}_line2".format(file.str_path))
 
-        _, manager = self._init_manager(0, auto_start=False)
-        manager.start_manager()
+        _, manager = self._init_manager(0)
 
         prepare_files()
 
