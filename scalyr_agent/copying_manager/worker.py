@@ -1044,6 +1044,7 @@ class CopyingManagerWorkerSession(
         :return: the dict of the checkpoint states of the current log processors.
         """
         with self._checkpoints_lock:
+            # this variable is updated when the '__write_checkpoint_state' method is writing to the checkpoint file.
             return self._full_checkpoints
 
     def __write_checkpoint_state(

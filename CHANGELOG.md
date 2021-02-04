@@ -10,6 +10,9 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
 Improvements:
 * Add ``Endpoint`` to the default ``event_object_filter`` values for the Kubernetes Event Monitor.
 
+Bug fixes:
+* Fix a race condition in the worker session checkpoint read/write logic, which was introduced with the ``multi-worker`` feature.
+
 ## 2.1.18 "Ravis" - January 29, 2021
 
 <!---
