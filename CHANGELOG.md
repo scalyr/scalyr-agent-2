@@ -9,6 +9,10 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
 
 Improvements:
 * Add ``Endpoint`` to the default ``event_object_filter`` values for the Kubernetes Event Monitor.
+* Update ``scalyr-agent-2 status -v`` output to also include process id (pid) of the main agent process and children worker processes in scenarios where the agent is configured with multiple worker processes.
+
+Bug fixes:
+* Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.
 
 ## 2.1.18 "Ravis" - January 29, 2021
 
