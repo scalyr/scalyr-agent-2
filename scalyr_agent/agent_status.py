@@ -610,7 +610,6 @@ def report_status(output, status, current_time):
         "Agent started at:        %s" % scalyr_util.format_time(status.launch_time),
         file=output,
     )
-    print(status)
 
     parent_process_pid = os.getpid()
     print("Main process pid:        %s" % (os.getpid()), file=output)
