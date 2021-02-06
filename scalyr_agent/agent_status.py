@@ -617,11 +617,17 @@ def report_status(output, status, current_time):
 
     # If parent and worker pid is the same, this means we are using a single worker or not using
     # multi process functionality so we don't report pids for child worker processes
-    worker_processes_pids = status.copying_manager_status.get_all_worker_pids()
+    if status.copying_manager_status:
+        worker_processes_pids = status.copying_manager_status.get_all_worker_pids()
+    else:
+        worker_processes_pids = []
 
-    if parent_process_pid not in worker_processes_pids:
+    if (
+        len(worker_processes_pids) >= 1
+        and parent_process_pid not in worker_processes_pids
+    ):
         worker_processes_pids = ", ".join([str(pid) for pid in worker_processes_pids])
-        print("Worker processes pids    %s" % worker_processes_pids, file=output)
+        print("Worker processes pids:   %s" % worker_processes_pids, file=output)
 
     print("Version:                 %s" % status.version, file=output)
     print("VCS revision:            %s" % status.revision, file=output)

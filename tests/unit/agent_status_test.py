@@ -386,6 +386,7 @@ class TestReportStatus(ScalyrTestCase):
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -395,7 +396,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -451,7 +452,9 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
@@ -475,6 +478,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -484,7 +488,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -534,7 +538,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_copy_response(self):
@@ -560,6 +567,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -569,7 +577,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -620,7 +628,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         self.assertEquals(expected_output, output.getvalue())
 
     def test_no_health_check(self):
@@ -655,6 +666,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -664,7 +676,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -719,7 +731,9 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
@@ -744,6 +758,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -753,7 +768,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -804,7 +819,9 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         self.assertEquals(expected_output, output.getvalue())
 
@@ -897,6 +914,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -906,7 +924,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -1000,7 +1018,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
             expected_output = expected_output.replace(
@@ -1014,6 +1035,9 @@ Failed monitors:
 
         self.status.copying_manager_status.workers.remove(self.worker2)
 
+        self.status.copying_manager_status.get_all_worker_pids = mock.Mock()
+        self.status.copying_manager_status.get_all_worker_pids.return_value = [3, 4]
+
         self.status.copying_manager_status.calculate_status()
 
         report_status(output, self.status, self.time)
@@ -1022,6 +1046,8 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Worker processes pids:   3, 4
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -1031,7 +1057,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -1102,7 +1128,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
             expected_output = expected_output.replace(
@@ -1116,6 +1145,9 @@ Failed monitors:
 
         self.worker2.sessions.remove(self.session2_2)
 
+        self.status.copying_manager_status.get_all_worker_pids = mock.Mock()
+        self.status.copying_manager_status.get_all_worker_pids.return_value = [3, 4]
+
         self.status.copying_manager_status.calculate_status()
 
         report_status(output, self.status, self.time)
@@ -1124,6 +1156,8 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Worker processes pids:   3, 4
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -1133,7 +1167,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -1216,7 +1250,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
             expected_output = expected_output.replace(
@@ -1242,6 +1279,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -1251,7 +1289,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -1347,7 +1385,10 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
             expected_output = expected_output.replace(
