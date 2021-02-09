@@ -45,7 +45,6 @@
 # In the future we plan to ship distribution specific packages when systemd will be configured
 # out of the box on supported distros and those manual commands won't be needed.
 #
-
 [Unit]
 Description=Scalyr Monitoring Agent
 
