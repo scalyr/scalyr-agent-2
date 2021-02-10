@@ -1612,7 +1612,7 @@ if __name__ == "__main__":
         print("The Scalyr Agent is using Python %s" % platform.python_version())
         sys.exit(0)
 
-    if options.systemd_managed:
+    if sys.platform.startswith("linux") and options.systemd_managed:
         configure_agent_service_for_systemd_management()
         sys.exit(0)
 
