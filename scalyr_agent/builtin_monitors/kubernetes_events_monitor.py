@@ -126,12 +126,15 @@ EVENT_OBJECT_FILTER_DEFAULTS = [
     "ReplicaSet",
     "ReplicationController",
     "StatefulSet",
+    "Endpoint",
 ]
 define_config_option(
     __monitor__,
     "event_object_filter",
     "Optional (defaults to %s). A list of event object types to filter on. "
-    "If set, only events whose `involvedObject` `kind` is on this list will be included."
+    "Only events whose ``involvedObject`` ``kind`` is on this list will be included.  "
+    "To not perform filtering and to send all event kinds, set the environment variable "
+    "``SCALYR_K8S_EVENT_OBJECT_FILTER=null``."
     % six.text_type(EVENT_OBJECT_FILTER_DEFAULTS),
     convert_to=ArrayOfStrings,
     default=EVENT_OBJECT_FILTER_DEFAULTS,
@@ -350,6 +353,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 "ReplicaSet",
                 "ReplicationController",
                 "StatefulSet",
+                "Endpoint",
             ],
         )
 
