@@ -227,6 +227,8 @@ SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
+VERBOSE = compat.os_environ_unicode.get("VERBOSE", "false").lower() == "true"
+
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "-automated-agent-tests-"
 assert "-tests-" in INSTANCE_NAME_STRING
@@ -750,7 +752,7 @@ if __name__ == "__main__":
             "True to enable verbose mode where every executed shell command is logged."
         ),
         action="store_true",
-        default=False,
+        default=VERBOSE,
     )
     parser.add_argument(
         "--no-destroy-node",

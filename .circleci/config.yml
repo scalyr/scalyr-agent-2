@@ -745,6 +745,13 @@ commands:
             i=0
             until [ "$i" -ge ${max_attempts} ]; do
                 echo "Running tests command"
+
+                # On subsequent runs we enable VERBOSE flag to perhaps make
+                # troubleshooting easier
+                if [ "${i}" -ge 1 ]; then
+                    export VERBOSE="true"
+                fi
+
                 ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
                 exit_code=$?
 

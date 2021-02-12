@@ -275,5 +275,6 @@ echo_with_date ""
 echo_with_date "Verifying service has been installed"
 echo_with_date ""
 
-sudo systemctl status scalyr-agent-2
+sudo systemctl status scalyr-agent-2 || true
+sudo systemctl status scalyr-agent-2 | grep "loaded"
 {% endif -%}
