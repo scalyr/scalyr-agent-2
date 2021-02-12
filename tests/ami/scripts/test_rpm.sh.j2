@@ -244,6 +244,10 @@ echo_with_date ""
 # Verify --systemd-managed flag
 # TODO: Also test on stable once v2.1.19 is out
 {% if test_type == "upgrade" and distro_name == "centos8" -%}
+sudo cp agent.json /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
 echo_with_date ""
 echo_with_date "Verifying --systemd-managed flag"
 echo_with_date ""
