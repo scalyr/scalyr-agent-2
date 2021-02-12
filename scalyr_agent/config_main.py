@@ -1264,6 +1264,14 @@ def configure_agent_service_for_systemd_management():
     if os.getuid() != 0:
         raise ValueError("This commands needs to run as root")
 
+    systemctl_binary = compat.which("systemctl")
+
+    if not systemctl_binary:
+        raise ValueError(
+            "Unable to find systemctl binary, this likely indicates systemd is not "
+            "installed"
+        )
+
     # 1. Copy over systemd service file
     # NOTE: We use the file content in line to avoid potential issue with different type of
     # installations and file maybe not already be present in /usr/share or similar
