@@ -434,6 +434,7 @@ def main(
 
     rendered_template = render_script_template(
         script_template=script_content,
+        distro_name=distro,
         distro_details=distro_details,
         python_package=python_package,
         test_type=test_type,
@@ -568,6 +569,7 @@ def main(
 
 def render_script_template(
     script_template,
+    distro_name,
     distro_details,
     python_package,
     test_type,
@@ -577,14 +579,14 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
+    # type: (str, str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
     # from_version = from_version or ""
     # to_version = to_version or ""
-
     template_context = distro_details.copy()
+    template_context["distro_name"] = distro_name
 
     template_context["test_type"] = test_type
 
