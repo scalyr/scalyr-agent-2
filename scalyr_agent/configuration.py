@@ -521,7 +521,11 @@ class Configuration(object):
         k8s_logs is a top level config option, but it's utilized by Kubernetes monitor which means
         it will have no affect if kubernetes monitor is not configured as well.
         """
-        if self.__k8s_log_configs and not self._is_kubernetes_monitor_configured():
+        if (
+            self.__k8s_log_configs
+            and not self._is_kubernetes_monitor_configured()
+            and self.__log_warnings
+        ):
             self.__logger.warn(
                 '"k8s_logs" config options is defined, but Kubernetes monitor is '
                 "not configured / enabled. That config option applies to "
@@ -3225,7 +3229,7 @@ class Configuration(object):
                 if config_val is not None:
                     config_object.put(param_name, config_val)
                     del config_object[name]
-                    if self.__logger:
+                    if self.__logger and self.__log_warnings:
                         self.__logger.warning(
                             "The configuration option {0} is deprecated, use {1} instead.".format(
                                 name, param_name
