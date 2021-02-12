@@ -227,6 +227,8 @@ SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
 
+VERBOSE = compat.os_environ_unicode.get("VERBOSE", "false").lower() == "true"
+
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "-automated-agent-tests-"
 assert "-tests-" in INSTANCE_NAME_STRING
@@ -434,6 +436,7 @@ def main(
 
     rendered_template = render_script_template(
         script_template=script_content,
+        distro_name=distro,
         distro_details=distro_details,
         python_package=python_package,
         test_type=test_type,
@@ -568,6 +571,7 @@ def main(
 
 def render_script_template(
     script_template,
+    distro_name,
     distro_details,
     python_package,
     test_type,
@@ -577,14 +581,14 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
+    # type: (str, str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
     # from_version = from_version or ""
     # to_version = to_version or ""
-
     template_context = distro_details.copy()
+    template_context["distro_name"] = distro_name
 
     template_context["test_type"] = test_type
 
@@ -748,7 +752,7 @@ if __name__ == "__main__":
             "True to enable verbose mode where every executed shell command is logged."
         ),
         action="store_true",
-        default=False,
+        default=VERBOSE,
     )
     parser.add_argument(
         "--no-destroy-node",

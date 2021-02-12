@@ -240,3 +240,41 @@ echo_with_date ""
 {% endif -%}
 
 {% include "partial/ssl_checks.sh.j2" %}
+
+# Verify --systemd-managed flag
+# TODO: Also test on stable once v2.1.19 is out
+{% if test_type == "upgrade" and distro_name == "centos8" -%}
+sudo cp agent.json /etc/scalyr-agent-2/agent.json
+
+{% include "partial/restart_agent_and_remove_logs.sh.j2" %}
+
+echo_with_date ""
+echo_with_date "Verifying --systemd-managed flag"
+echo_with_date ""
+
+sudo scalyr-agent-2-config --systemd-managed
+
+# Verify rc*.d symlinks have been removed
+echo_with_date ""
+echo_with_date "Verifying rc.d symlinks have been removed"
+echo_with_date ""
+
+ls -la /etc/rc*.d/
+echo_with_date ""
+ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 0
+
+# Verify systemd service config file is present
+echo_with_date ""
+echo_with_date "Verifying .service file is in place"
+echo_with_date ""
+
+ls -la /etc/systemd/system/scalyr-agent-2.service
+cat /etc/systemd/system/scalyr-agent-2.service
+
+echo_with_date ""
+echo_with_date "Verifying service has been installed"
+echo_with_date ""
+
+sudo systemctl status scalyr-agent-2 || true
+sudo systemctl status scalyr-agent-2 | grep "loaded"
+{% endif -%}

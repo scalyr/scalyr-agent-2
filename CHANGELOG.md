@@ -10,6 +10,7 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
 Improvements:
 * Add ``Endpoint`` to the default ``event_object_filter`` values for the Kubernetes Event Monitor.
 * Update ``scalyr-agent-2 status -v`` output to also include process id (pid) of the main agent process and children worker processes in scenarios where the agent is configured with multiple worker processes.
+* Add a new experimental ``--systemd-managed`` flag to the ``scalyr-agent-2-config`` tool which converts existing scalyr agent installation to be managed by systemd instead of init.d.
 
 Bug fixes:
 * Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.
