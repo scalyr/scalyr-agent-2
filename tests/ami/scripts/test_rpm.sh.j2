@@ -259,7 +259,7 @@ echo_with_date ""
 echo_with_date "Verifying rc.d symlinks have been removed"
 echo_with_date ""
 
-ls -la /etc/rc*.d/ | grep scalyr-agent
+ls -la /etc/rc*.d/
 echo_with_date ""
 ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 0
 
