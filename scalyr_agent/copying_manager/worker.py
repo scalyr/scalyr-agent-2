@@ -717,7 +717,9 @@ class CopyingManagerWorkerSession(
                         self.__total_errors += 1
                         self.__lock.release()
                     finally:
+                        # update the checkpoints object with the current states of the log processors.
                         self._update_checkpoints(current_time)
+                        # if there is any copying progress, then update the active checkpoints.
                         if write_active_checkpoints:
                             self.__write_active_checkpoint_state(current_time)
 
@@ -1059,6 +1061,7 @@ class CopyingManagerWorkerSession(
                         current_time
                         > checkpoint_time + self.__config.max_allowed_checkpoint_age
                     ):
+                        # remove stale checkpoint states.
                         del self._checkpoints[path]
 
             for processor in log_processors:
@@ -1083,6 +1086,8 @@ class CopyingManagerWorkerSession(
         #
         for path, checkpoint in result.items():
             checkpoint_copy = checkpoint.copy()
+
+            # this field is not needed outside of the copying manager.
             checkpoint_copy.pop("is_active", None)
             result[path] = checkpoint_copy
 

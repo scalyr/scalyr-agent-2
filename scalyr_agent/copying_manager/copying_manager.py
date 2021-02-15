@@ -309,13 +309,14 @@ class CopyingManagerWorker(object):
 def _merge_checkpoint_collections(worker_session_checkpoints):
     """
     Merge multiple checkpoint collections into a single one.
-    :param worker_session_checkpoints:
-    :return:
+    :param worker_session_checkpoints: List of checkpoint dicts
+    :return: single  checkpoint dict with all checkpoint states.
     """
     result = {}
     for checkpoints in worker_session_checkpoints:
         for path, checkpoint in checkpoints.items():
 
+            # get time value from the checkpoint state, if exists.
             result_checkpoint_time = result.get(path, {}).get("time", None)
 
             if (
@@ -443,6 +444,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__config, self.__monitors
         )  # type: List[LogMatcher]
 
+        # this dict stores all checkpoint states for all current and closed files
         self._checkpoints = {}
 
     @property
@@ -846,6 +848,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 self._scan_for_new_logs_if_necessary(
                     current_time=current_time,
+                    # pass the deep copy of the checkpoints, because this function can mutate them.
                     checkpoints=copy.deepcopy(self._checkpoints),
                     logs_initial_positions=self.__logs_initial_positions,
                 )
@@ -884,6 +887,9 @@ class CopyingManager(StoppableThread, LogWatcher):
                     current_time = time.time()
                     # noinspection PyBroadException
                     try:
+
+                        # update the current checkpoint states.
+                        self._update_checkpoints()
 
                         # Check for new logs.  If we do detect some new log files, they must have been created since our
                         # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
@@ -1122,7 +1128,6 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__dynamic_matchers[matcher.log_path] = matcher
 
         # update the checkpoints attribute by current checkpoint states from all workers.
-        self._update_checkpoints()
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -1148,6 +1153,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # remove close log processor.
         self.__remove_closed_processors()
 
+        # pass the deep copy of the checkpoints, because this function can mutate them.
         checkpoints = copy.deepcopy(self._checkpoints)
 
         self.__create_log_processors_for_log_matchers(
