@@ -240,3 +240,9 @@ echo_with_date ""
 {% endif -%}
 
 {% include "partial/ssl_checks.sh.j2" %}
+
+# Verify --systemd-managed flag
+# TODO: Also test on stable once v2.1.19 is out
+{% if test_type == "upgrade" and distro_name == "centos8" -%}
+{% include "partial/verify_systemd_managed_flag.sh.j2" %}
+{% endif -%}

@@ -162,6 +162,7 @@ sudo curl -o /tmp/ca_certs.crt https://raw.githubusercontent.com/scalyr/scalyr-a
 echo_with_date ""
 echo_with_date "Verifying agent status output"
 echo_with_date ""
+sleep 5
 STATUS_OUTPUT=$(sudo scalyr-agent-2 status -v)
 echo -e "${STATUS_OUTPUT}"
 echo_with_date ""
