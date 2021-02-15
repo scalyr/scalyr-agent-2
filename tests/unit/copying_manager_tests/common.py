@@ -199,7 +199,7 @@ class TestableCopyingManagerFlowController:
     RESPONDING = "RESPONDING"
 
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
-    WAIT_TIMEOUT = 5.0
+    WAIT_TIMEOUT = 5000.0
 
     def __init__(self, configuration):
         # type: (TestingConfiguration) -> None
@@ -599,7 +599,7 @@ class TestableCopyingManagerWorkerSession(
         (
             self._saved_checkpoints,
             self.saved_active_checkpoints,
-        ) = self.get_checkpoints_from_files()
+        ) = self.read_checkpoints_from_files()
 
     # region Utility functions
     def get_checkpoints_path(self):
@@ -616,7 +616,7 @@ class TestableCopyingManagerWorkerSession(
         )
         return result
 
-    def get_checkpoints_from_files(self):
+    def read_checkpoints_from_files(self):
         """
         Get checkpoint states of the worker session.
         :return:
@@ -647,6 +647,9 @@ class TestableCopyingManagerWorkerSession(
 
     def get_pid(self):
         return os.getpid()
+
+    def get_processed_file_paths(self):
+        return [processor.get_log_path() for processor in self.get_log_processors()]
 
     # endregion
 
@@ -912,16 +915,20 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
         return result
 
     @property
+    def checkpoints(self):
+        return self._checkpoints
+
+    @property
     def consolidated_checkpoints_path(self):
         # type: () -> pathlib.Path
         return pathlib.Path(self.config.agent_data_path, "checkpoints.json")
 
     @property
-    def consolidated_checkpoints(self):
+    def consolidated_file_checkpoints(self):
         # type: () -> Dict
         return json.loads(self.consolidated_checkpoints_path.read_text())
 
-    def write_consolidated_checkpoints(self, checkpoints):
+    def write_consolidated_checkpoints_file(self, checkpoints):
         # type: (Dict) -> None
         self.consolidated_checkpoints_path.write_text(
             six.text_type(json.dumps(checkpoints))
@@ -930,6 +937,15 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
     @property
     def matchers_log_processor_count(self):
         return sum(len(m.log_processors) for m in self.log_matchers)
+
+    def get_processed_log_files(self):
+        pass
+
+    def close_file_at_eof(self, path):
+        for w in self.worker_sessions:
+            if path in w.get_processed_file_paths():
+                w.close_at_eof(path)
+                break
 
     @property
     def worker_sessions_log_processors_count(self):
@@ -958,8 +974,9 @@ _TestableCopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyTy
         six.ensure_str("get_active_checkpoints_path"),
         six.ensure_str("get_checkpoints_path"),
         six.ensure_str("change_agent_log"),
-        six.ensure_str("get_checkpoints_from_files"),
+        six.ensure_str("read_checkpoints_from_files"),
         six.ensure_str("write_checkpoints"),
+        six.ensure_str("get_processed_file_paths"),
     ],
 )
 

@@ -289,7 +289,7 @@ class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
         pass
 
     @abstractmethod
-    def get_full_checkpoints(self):  # type: () -> Dict
+    def get_checkpoints(self):  # type: () -> Dict
         """
         This method returns the full collection of the current log processor checkpoint states.
         It also mainly designed to be called from the outside threads, so the checkpoint object should be protected
@@ -403,7 +403,7 @@ class CopyingManagerWorkerSession(
         self.__last_total_bytes_pending = 0
 
         # the collection with all checkpoint states for all current log processors.
-        self._full_checkpoints = {}  # type: Dict
+        self._checkpoints = {}  # type: Dict
         # lock object that guard the checkpoints object.
         self._checkpoints_lock = threading.Lock()
 
@@ -490,6 +490,7 @@ class CopyingManagerWorkerSession(
                     )
                     current_time = time.time()
                     pipeline_time = 0.0
+                    write_active_checkpoints = False
                     # noinspection PyBroadException
                     try:
                         # If we have a pending request and it's been too taken too long to send it, just drop it
@@ -620,6 +621,7 @@ class CopyingManagerWorkerSession(
                                 or "requestTooLarge" in result
                             ):
                                 next_add_events_task = None
+                                write_active_checkpoints = True
                                 try:
                                     if result == "success":
                                         log_bytes_sent = self.__pending_add_events_task.completion_callback(
@@ -643,7 +645,6 @@ class CopyingManagerWorkerSession(
                                     self.__pending_add_events_task = (
                                         next_add_events_task
                                     )
-                                    self.__write_active_checkpoint_state(current_time)
 
                             if result == "success":
                                 last_success = current_time
@@ -715,6 +716,10 @@ class CopyingManagerWorkerSession(
                         self._last_attempt_time = current_time
                         self.__total_errors += 1
                         self.__lock.release()
+                    finally:
+                        self._update_checkpoints(current_time)
+                        if write_active_checkpoints:
+                            self.__write_active_checkpoint_state(current_time)
 
                     if (
                         current_time - last_full_checkpoint_write
@@ -1036,21 +1041,55 @@ class CopyingManagerWorkerSession(
         for processor in self.__log_processors:
             processor.scan_for_new_bytes(current_time)
 
-    def get_full_checkpoints(self):  # type: () -> Dict[six.text_type, Any]
+    def _update_checkpoints(self, current_time):
+        """
+        Update the checkpoints collection from the current state of the log processors.
+        :param current_time:
+        :return:
+        """
+        # get all log processors, including those that need to be removed.
+        log_processors = self.__log_processors
+
+        with self._checkpoints_lock:
+            # remove stale checkpoints using the same config option as for the whole file staleness check.
+            for path, checkpoint in list(self._checkpoints.items()):
+                checkpoint_time = checkpoint.get("time")
+                if checkpoint_time:
+                    if (
+                        current_time
+                        > checkpoint_time + self.__config.max_allowed_checkpoint_age
+                    ):
+                        del self._checkpoints[path]
+
+            for processor in log_processors:
+                processor_checkpoint = processor.get_checkpoint()
+                processor_checkpoint["is_active"] = processor.is_active
+                processor_checkpoint["time"] = current_time
+
+                self._checkpoints[processor.get_log_path()] = processor_checkpoint
+
+    def get_checkpoints(self):  # type: () -> Dict[six.text_type, Any]
         """
         This method returns the full collection of the current log processor checkpoint states.
         It also mainly designed to be called from the outside threads, so the checkpoint object should be protected
         by the lock.
         :return: the dict of the checkpoint states of the current log processors.
         """
-        with self._checkpoints_lock:
-            # this variable is updated when the '__write_checkpoint_state' method is writing to the checkpoint file.
-            return self._full_checkpoints
 
-    def __write_checkpoint_state(
-        self, log_processors, base_file, current_time, full_checkpoint
-    ):
-        # type: (List[LogFileProcessor], six.text_type, float, bool) -> None
+        with self._checkpoints_lock:
+            # the '_checkpoints' attribute is updated by the '_update_checkpoints' function.
+            result = self._checkpoints.copy()
+
+        #
+        for path, checkpoint in result.items():
+            checkpoint_copy = checkpoint.copy()
+            checkpoint_copy.pop("is_active", None)
+            result[path] = checkpoint_copy
+
+        return result
+
+    def __write_checkpoint_state(self, base_file, current_time, full_checkpoint):
+        # type: (six.text_type, float, bool) -> None
         """Writes the current checkpoint state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -1059,25 +1098,15 @@ class CopyingManagerWorkerSession(
         # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
         checkpoints_to_write = {}
-        all_checkpoints = {}
 
-        for processor in log_processors:
-            log_path = processor.get_log_path()
-            processor_checkpoint = processor.get_checkpoint()
+        for path, checkpoint in self._checkpoints.items():
 
-            if full_checkpoint or processor.is_active:
-                checkpoints_to_write[log_path] = processor_checkpoint
+            state_to_write = checkpoint.copy()
 
-            if full_checkpoint:
-                processor.set_inactive()
+            is_active = state_to_write.pop("is_active")
 
-            # we also save the full collection of the checkpoints in order to share this information
-            # with the copying manager.
-            all_checkpoints[log_path] = processor_checkpoint
-
-        with self._checkpoints_lock:
-            # the checkpoints object has to be guarded by lock since other method can access it from the other thread.
-            self._full_checkpoints = all_checkpoints
+            if full_checkpoint or is_active:
+                checkpoints_to_write[path] = state_to_write
 
         file_path = os.path.join(self.__config.agent_data_path, base_file)
 
@@ -1091,7 +1120,6 @@ class CopyingManagerWorkerSession(
 
         """
         self.__write_checkpoint_state(
-            self.__log_processors,
             "%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
             current_time,
             full_checkpoint=True,
@@ -1102,7 +1130,6 @@ class CopyingManagerWorkerSession(
         """Writes checkpoints only for logs that have been active since the last full checkpoint write
         """
         self.__write_checkpoint_state(
-            self.__log_processors,
             "active-%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id),
             current_time,
             full_checkpoint=False,
@@ -1319,7 +1346,7 @@ WORKER_SESSION_PROXY_EXPOSED_METHODS = [
     six.ensure_str("schedule_new_log_processor"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
-    six.ensure_str("get_full_checkpoints"),
+    six.ensure_str("get_checkpoints"),
 ]
 
 # create base proxy class for the worker session, here we also specify all its methods that may be called through proxy.

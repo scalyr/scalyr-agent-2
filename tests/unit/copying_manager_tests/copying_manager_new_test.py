@@ -36,6 +36,7 @@ import pytest
 
 from scalyr_agent import scalyr_logging
 
+from scalyr_agent.copying_manager import copying_manager
 from tests.unit.copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
@@ -352,10 +353,6 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2"])
 
-        # also save the checkpoints from all worker sessions to check them later with the checkpoints
-        # from the consolidated file.
-        all_worker_checkpoints = manager._get_all_checkpoints()
-
         manager.stop_manager()
 
         # recreate the manager, in order to simulate a new start.
@@ -364,7 +361,7 @@ class TestBasic(CopyingManagerTest):
         # start manager, it has to create consolidated checkpoint file when starts.
         manager.start_manager()
 
-        manager.stop()
+        manager.stop_manager()
 
         # add some new lines
         test_file.append_lines("line3")
@@ -376,8 +373,6 @@ class TestBasic(CopyingManagerTest):
             assert not worker_session.get_checkpoints_path().exists()
             assert not worker_session.get_active_checkpoints_path().exists()
 
-        assert manager.consolidated_checkpoints["checkpoints"] == all_worker_checkpoints
-
         # recreate the manager, in order to simulate a new start.
         self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
 
@@ -386,6 +381,59 @@ class TestBasic(CopyingManagerTest):
 
         assert set(self._wait_for_rpc_and_respond()) == set(["line3", "line4"])
 
+    def test_closed_log_files_remain_in_checkpoints(self):
+        (test_file, test_file2, test_file3), manager = self._init_manager(3)
+
+        # write something and stop in order to create checkpoint files.
+        test_file.append_lines("line1")
+        test_file2.append_lines("line2")
+        test_file3.append_lines("line3")
+
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1", "line2", "line3"])
+
+        assert manager.worker_sessions_log_processors_count == 3
+
+        manager.close_file_at_eof(test_file3.str_path)
+
+        manager.wait_for_full_iteration()
+
+        assert manager.worker_sessions_log_processors_count == 2
+
+        checkpoints = manager.checkpoints
+        assert test_file3.str_path in checkpoints
+
+        manager.stop_manager()
+        assert (
+            test_file3.str_path in manager.consolidated_file_checkpoints["checkpoints"]
+        )
+
+    def test_merge_checkpoint_collections(self):
+        """
+        Test the merging process of the multiple checkpoints collections into a single collection.
+        If there are multiple checkpoint states for the single log path, then a state with the most resent "time"
+        field is chosen.
+        """
+
+        checkpoints1 = {"path1": {"time": 0}, "path2": {"time": 123}}
+        checkpoints2 = {"path1": {"time": 1}, "path3": {"time": 100}}
+        checkpoints3 = {"path4": {"time": 567}, "path3": {"time": 99}}
+
+        checkpoint_collections = [checkpoints1, checkpoints2, checkpoints3]
+
+        result = copying_manager._merge_checkpoint_collections(checkpoint_collections)
+
+        # 'path2' and 'path3' checkpoint state has to be with the largest "time" value.
+        assert result == {
+            "path1": {"time": 1},
+            "path2": {"time": 123},
+            "path3": {"time": 100},
+            "path4": {"time": 567},
+        }
+
+        return
+
+
+class TestLogProcessorsLifeCycle(CopyingManagerTest):
     @pytest.mark.skipif(
         sys.version_info < (2, 7),
         reason="This test case can not be run on python < 2.7",
@@ -588,14 +636,24 @@ class TestDynamicLogMatchers(CopyingManagerTest):
         for file in files:
             file.append_lines("{0}_line1".format(file.str_path))
 
+        assert manager.worker_sessions_log_processors_count == len(files)
+
         # check if all new lines there.
         lines = self._wait_for_rpc_and_respond()
         assert len(files) == len(lines)
         for line in lines:
             assert line.endswith("_line1")
 
+        # check if checkpoint state for the files is in the checkpoints objects.
+        for file in files:
+            assert file.str_path in manager.checkpoints
+
         # stop manager to write the checkpoint files.
         manager.stop_manager()
+
+        # check if checkpoint state for the files has been saved to the checkpoints file.
+        for file in files:
+            assert file.str_path in manager.consolidated_file_checkpoints["checkpoints"]
 
         # write new lines to log files to check if they are read by the manager.
         for file in files:
@@ -619,3 +677,105 @@ class TestDynamicLogMatchers(CopyingManagerTest):
         assert len(files) == len(lines)
         for line in lines:
             assert line.endswith("_line3")
+
+    @pytest.mark.skipif(
+        sys.version_info < (2, 7),
+        reason="This test case can not be run on python < 2.7",
+    )
+    @mock.patch.object(
+        TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
+    )
+    @mock.patch.object(
+        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
+    )
+    def test_closed_file_checkpoints(
+        self, log_deletion_delay, max_new_log_detection_time
+    ):
+
+        """
+        Verify that the checkpoint state of the removed log processor is still preserved in the checkpoint object and
+        in the checkpoint file.
+        """
+        # mock config values so we do not  need to wait for the next file scan.
+        log_deletion_delay.return_value = -1
+        # do the same to not wait when copying manager decides that file is deleted.
+        max_new_log_detection_time.return_value = -1
+
+        _, manager = self._init_manager(0)
+
+        logs_dir = self._env_builder.test_logs_dir / "dynamicaly-added-logs"
+        logs_dir.mkdir()
+
+        test_file, file_to_remove, stale_file = self._env_builder.recreate_files(
+            3, logs_dir
+        )
+
+        test_file_config = {"path": test_file.str_path}
+        file_to_remove_config = {"path": file_to_remove.str_path}
+        stale_file_config = {
+            "path": stale_file.str_path,
+            "ignore_stale_files": True,
+            "staleness_threshold_secs": 0.1,
+        }
+        manager.add_log_config("scheduled-deletion", test_file_config)
+        manager.add_log_config("scheduled-deletion", file_to_remove_config)
+        manager.add_log_config("scheduled-deletion", stale_file_config)
+
+        manager.wait_for_full_iteration()
+
+        self._append_lines_and_check(["Line1"], log_file=test_file)
+        self._append_lines_and_check(["Line2"], log_file=file_to_remove)
+        self._append_lines_and_check(["Line3"], log_file=stale_file)
+
+        assert manager.worker_sessions_log_processors_count == 3
+
+        time.sleep(0.2)
+
+        manager.wait_for_full_iteration()
+
+        assert test_file.str_path in manager.checkpoints
+        assert file_to_remove.str_path in manager.checkpoints
+        assert stale_file.str_path in manager.checkpoints
+
+        # the third file should be removed as stale
+        assert manager.worker_sessions_log_processors_count == 2
+
+        # all checkpoint states of all log files have to be preserved in the checkpoints.
+        assert test_file.str_path in manager.checkpoints
+        assert file_to_remove.str_path in manager.checkpoints
+        assert stale_file.str_path in manager.checkpoints
+
+        manager.remove_log_path("scheduled-deletion", file_to_remove.str_path)
+
+        manager.wait_for_full_iteration()
+
+        assert test_file.str_path in manager.checkpoints
+        assert file_to_remove.str_path in manager.checkpoints
+        assert stale_file.str_path in manager.checkpoints
+
+        manager.stop_manager()
+
+        assert (
+            test_file.str_path in manager.consolidated_file_checkpoints["checkpoints"]
+        )
+        assert (
+            file_to_remove.str_path
+            in manager.consolidated_file_checkpoints["checkpoints"]
+        )
+        assert (
+            stale_file.str_path in manager.consolidated_file_checkpoints["checkpoints"]
+        )
+
+        self._append_lines(["Line4"], log_file=test_file)
+        self._append_lines(["Line5"], log_file=file_to_remove)
+        self._append_lines(["Line6"], log_file=stale_file)
+
+        _, manager = self._init_manager(0)
+
+        stale_file_config["staleness_threshold_secs"] = 300
+
+        manager.add_log_config("scheduled-deletion", test_file_config)
+        manager.add_log_config("scheduled-deletion", file_to_remove_config)
+        manager.add_log_config("scheduled-deletion", stale_file_config)
+
+        assert set(self._wait_for_rpc_and_respond()) == set(["Line4", "Line5", "Line6"])

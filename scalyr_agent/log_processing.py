@@ -2439,6 +2439,8 @@ class LogFileProcessor(object):
                 if line_len == 0:
                     break
 
+                print(line_object.line)
+
                 # keep a copy of this value in case we need to reset bytes_read count
                 # See #AGENT-219
                 previous_bytes_read = bytes_read

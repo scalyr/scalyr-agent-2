@@ -168,6 +168,8 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         disable_flow_control=False,
     ):  # type: (int, bool, bool, bool, bool) -> Tuple[Tuple[TestableLogFile], TestableCopyingManagerWorkerSession]
 
+        test_files = tuple()  # type: ignore
+
         if self._env_builder is None:
             self._init_test_environment(
                 log_files_number=log_files_number,
@@ -175,12 +177,10 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
                 disable_flow_control=disable_flow_control,
             )
 
-        if log_files_number is not None:
-            test_files = self._env_builder.recreate_files(  # type: ignore
-                log_files_number, self._env_builder.non_glob_logs_dir  # type: ignore
-            )
-        else:
-            test_files = tuple()
+            if log_files_number is not None:
+                test_files = self._env_builder.recreate_files(  # type: ignore
+                    log_files_number, self._env_builder.non_glob_logs_dir  # type: ignore
+                )
 
         self._instance = self._create_worker_session()
 
@@ -390,6 +390,8 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
         test_file.append_lines("This line should not be in request.")
         test_file2.append_lines("This line is OK.")
 
+        assert len(worker.get_log_processors()) == 2
+
         # get next request, it must not contain lines from deleted file.
         assert self._wait_for_rpc_and_respond() == ["This line is OK."]
 
@@ -403,6 +405,50 @@ class TestCopyingManagerWorkerProcessors(CopyingManagerWorkerTest):
             self._append_lines_and_check(
                 ["This line is OK too now.", "This line is still OK."]
             )
+
+        assert len(worker.get_log_processors()) == 3
+
+    def test_closed_log_processors_in_checkpoints(self):
+        (test_file,), worker = self._init_worker_instance(1, add_processors=False)
+
+        assert len(worker.get_log_processors()) == 0
+
+        self._spawn_single_log_processor(test_file)
+
+        worker.perform_scan()
+
+        self._append_lines_and_check(["Line1"], log_file=test_file)
+
+        assert len(worker.get_log_processors()) == 1
+
+        worker.close_at_eof(test_file.str_path)
+
+        worker.wait_for_full_iteration()
+
+        assert len(worker.get_log_processors()) == 0
+
+        worker.stop_worker_session()
+
+        full_checkpoints, active_checkpoint = worker.read_checkpoints_from_files()
+        assert test_file.str_path in full_checkpoints["checkpoints"]
+        assert test_file.str_path in active_checkpoint["checkpoints"]
+
+        self._append_lines(["Line2"], log_file=test_file)
+
+        _, worker = self._init_worker_instance(auto_start=False, add_processors=False)
+
+        worker.start_worker_session()
+        worker.wait_for_copying_to_begin()
+
+        assert len(worker.get_log_processors()) == 0
+
+        self._spawn_single_log_processor(
+            test_file, checkpoints=full_checkpoints["checkpoints"]
+        )
+
+        self._append_lines(["Line3"], log_file=test_file)
+
+        assert self._wait_for_rpc_and_respond() == ["Line2", "Line3"]
 
 
 class TestCopyingManagerWorkerStatus(CopyingManagerWorkerTest):
@@ -663,6 +709,8 @@ class TestCopyingManagerWorkerResponses(CopyingManagerWorkerTest):
 
 
 class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
+    maxDiff = None
+
     def test_checkpoints(self):
         (test_file,), worker = self._init_worker_instance()
 
@@ -674,7 +722,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         # the checkpoints which has been returned by the worker session method have to be the same
         # as in the checkpoint file
-        assert worker.get_full_checkpoints() == checkpoints
+        assert worker.get_checkpoints() == checkpoints
 
         assert test_file.str_path in checkpoints
 
