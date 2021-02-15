@@ -1,0 +1,59 @@
+# This file contains sample systemd config file for the scalyr agent.
+#
+# It can be used / installed with the following commands:
+#
+# sudo touch /etc/systemd/system/scalyr-agent-2.service
+# sudo chmod 664 /etc/systemd/system/scalyr-agent-2.service
+#
+# Add the content bellow to /etc/systemd/system/scalyr-agent-2.service file
+#
+# reload systemd configs:
+#
+# sudo systemctl daemon-reload
+#
+# You can then use standard systemd commands to control the agent service.
+#
+# 1. sudo systemctl enable scalyr-agent-2 - make sure agent starts on boot
+# 2. sudo systemctl start scalyr-agent-2 - start the service
+# 3. sudo systemctl restart scalyr-agent-2 - restart the service
+# 4. sudo journalctl -f -u scalyr-agent-2 - view service logs
+#
+# All the agent info level logs will also be managed via journald (in addition to being it available
+# in the usual location at /var/log/scalyr-agent-2/agent.json) which means you can use journalctl
+# comamnd to view / tail main agent.info log file
+#
+# sudo journalctl -f -u scalyr-agent-2
+#
+# You also need to remove symlinks which are used by init.d to start the service on boot.
+#
+# On Debian systems with update-rc.d:
+#
+# sudo update-rc.d -f scalyr-agent-2 remove
+#
+# On RHEL systems with chkconfig:
+#
+# sudo chkconfig --del scalyr-agent-2
+#
+# On other systems without chkconfig or update-rc.d:
+#
+# sudo rm /etc/rc{0,1,6}/K02scalyr-agent-2
+# sudo rm /etc/rc{2,3,4,5}/S98scalyr-agent-2
+#
+# Keep in mind that you will need to run those steps each time agent is upgraded since our
+# post install script creates that symlink.
+#
+# In the future we plan to ship distribution specific packages when systemd will be configured
+# out of the box on supported distros and those manual commands won't be needed.
+#
+[Unit]
+Description=Scalyr Monitoring Agent
+
+[Service]
+# NOTE: Type=forking doesn't seem to be working correctly, bit usually "don't fork" behavior is more common since
+# it means logs also go to journald, etc. and it behaves more like a proper systemd service
+Type=simple
+ExecStart=/usr/share/scalyr-agent-2/bin/scalyr-agent-2 start --no-fork
+ExecStop=/usr/share/scalyr-agent-2/bin/scalyr-agent-2 stop
+
+[Install]
+WantedBy=multi-user.target

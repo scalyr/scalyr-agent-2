@@ -192,15 +192,20 @@ if [ -d "/etc/scalyr-agent-2/agent.d" ]; then
   done
 fi
 
-# Add in the symlinks in the appropriate /etc/rcX.d/ directories
-# to stop and start the service at boot time.
-if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
+# If this file exists this tells the installer that the service is managed by
+# systemd and not init.d by default.
+if [ -f "/etc/scalyr-agent-2/systemd_managed" ]; then
+    echo "Found \"/etc/scalyr-agent-2/systemd_managed\" file which indicates service life cycle is managed using systemd, not creating any init.d symlinks"
+else
+  # Add in the symlinks in the appropriate /etc/rcX.d/ directories
+  # to stop and start the service at boot time.
+  if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
   # For Redhat-based systems, use chkconfig to create links.
   chkconfig --add scalyr-agent-2;
-elif [ -f /usr/sbin/update-rc.d ] || [ -f /sbin/update-rc.d ]; then
+  elif [ -f /usr/sbin/update-rc.d ] || [ -f /sbin/update-rc.d ]; then
   # For Debian-based systems, update-rc.d does the job.
   update-rc.d scalyr-agent-2 defaults 98 02;
-else
+  else
   # Otherwise just fall back to creating them manually.
   for x in 0 1 6; do
     ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/K02scalyr-agent-2;
@@ -209,12 +214,13 @@ else
   for x in 2 3 4 5; do
     ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/S98scalyr-agent-2;
   done
+  fi
 fi
+
 # Do a restart of the service if we are either installing/upgrading the
 # package, instead of removing it.  For an RPM, a remove is indicated by
 # a zero being passed into $1 (instead of 1 or higher).  For Debian, a
 # remove is indicated something other than "configure" being passed into $1.
-
 if [[ "$1" =~ ^[0-9]+$ && $1 -gt 0 ]] || [ "$1" == "configure" ]; then
   /etc/init.d/scalyr-agent-2 condrestart --quiet;
 
