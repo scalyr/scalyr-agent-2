@@ -12,6 +12,7 @@ Improvements:
 * Update ``scalyr-agent-2 status -v`` output to also include process id (pid) of the main agent process and children worker processes in scenarios where the agent is configured with multiple worker processes.
 * Add a new experimental ``--systemd-managed`` flag to the ``scalyr-agent-2-config`` tool which converts existing scalyr agent installation to be managed by systemd instead of init.d.
 * Add support for capturing k8s container names to the kubernetes monitor via log line attributes. Container name can be captured using ``${k8s_container_name}`` config template syntax.
+* Kubernetes monitor has been updated to log 403 errors when connecting to the Kubernetes API before falling back to the old fallback URL under warning log level. Previously those errors were logged under debug log level which would make it hard to troubleshoot some issues related to missing permissions, etc. since those log messages would only end up in debug log file which is disabled by default.
 
 Bug fixes:
 * Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.

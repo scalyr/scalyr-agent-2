@@ -1243,8 +1243,11 @@ class KubernetesCache(object):
         if start_caching:
             self.start()
 
+        self.__stopped = False
+
     def stop(self):
         """Stops the cache, specifically stopping the background thread that refreshes the cache"""
+        self.__stopped = True
         self._thread.stop()
 
     def start(self):
@@ -1402,7 +1405,9 @@ class KubernetesCache(object):
 
         start_time = time.time()
         retry_delay_secs = None
-        while run_state.is_running() and not self.is_initialized():
+        while (
+            run_state.is_running() and not self.is_initialized() and not self.__stopped
+        ):
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
 
@@ -2372,24 +2377,40 @@ class KubeletApi(object):
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
-                    global_log.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
-                        "Invalid response while querying the Kubelet API: %d. Falling back to older endpoint."
-                        % response.status_code,
+                    msg = (
+                        "Invalid response while querying the Kubelet API on %s. Falling back "
+                        "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n"
+                        % (
+                            url,
+                            self._fallback_kubelet_url,
+                            url,
+                            response.status_code,
+                            response.text,
+                        )
+                    )
+
+                    global_log.warn(
+                        msg,
+                        limit_once_per_x_secs=300,
+                        limit_key="kubelet_api_query_non_fallback",
                     )
                     self._switch_to_fallback()
                     continue
                 else:
-                    global_log.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
-                        "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                        % (url, response.status_code, len(response.text)),
+                    msg = (
+                        "Invalid response while querying the Kubelet API on %s. "
+                        "\n\nurl: %s\nstatus: %s\nresponse: %s\n"
+                        % (url, url, response.status_code, response.text)
+                    )
+
+                    global_log.error(
+                        msg,
                         limit_once_per_x_secs=300,
-                        limit_key="kubelet_api_query",
+                        limit_key="kubelet_api_query_fallback",
                     )
                     raise KubeletApiException(
-                        "Invalid response from Kubelet API when querying '%s': %s"
-                        % (path, six.text_type(response))
+                        "Invalid response from Kubelet API when querying '%s' (%s): %s"
+                        % (path, url, six.text_type(response.text))
                     )
 
             return util.json_decode(response.text)
