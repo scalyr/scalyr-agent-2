@@ -924,7 +924,7 @@ class ProcessList(object):
         regex = r"\s*(\d+)\s+(\d+)\s+(.*)"
         # 2->TODO stdout is binary in Python3
         sub_proc_output = sub_proc.stdout.read()
-        sub_proc_output = sub_proc_output.decode("utf-8")
+        sub_proc_output = sub_proc_output.decode("utf-8", "replace")
         for line in sub_proc_output.splitlines(True):
             match = re.search(regex, line)
             if match:
@@ -932,11 +932,21 @@ class ProcessList(object):
                 self.processes.append(
                     {"pid": int(_pid), "ppid": int(_ppid), "cmd": _cmd}
                 )
+
+        current_pid = os.getpid()
         for _process in self.processes:
             ppid = _process["ppid"]
             pid = _process["pid"]
             if ppid != pid:
                 self.parent_to_children_map[ppid].append(pid)
+
+            if pid == current_pid:
+                self._current_process = _process
+
+    @property
+    def current_process(self):
+        """Return the process of the agent."""
+        return self._current_process
 
     def get_matches_commandline(self, match_pattern):
         """
@@ -1209,7 +1219,7 @@ you'd like to view.
         and we should keep polling for it.
         """
 
-        for _pid in self.__select_processes():
+        for _pid in self._select_processes():
             if not self.__trackers.get(_pid):
                 self.__trackers[_pid] = ProcessTracker(_pid, self._logger, self.__id)
 
@@ -1252,7 +1262,7 @@ you'd like to view.
             # know the process is running at least, so we ignore the error.
             return e.errno != errno.ESRCH
 
-    def __select_processes(self):
+    def _select_processes(self):
         """Returns a list of the process ids of processes that fulfills the match criteria.
 
         This will either use the commandline matcher or the target pid to find the process.
@@ -1307,17 +1317,37 @@ you'd like to view.
                 self.__pids = [self.__pids[0]]
         else:
             # See if the specified target pid is running.  If so, then return it.
-            # Special case '$$' to mean this process.
+            # Special cases:
+            #   '$$' mean this process.
+            #   '$$TBD' mean that the PID of the target process has not been determined yet and it will be set later.
             pids = []
             if self.__target_pids:
                 for t_pid in self.__target_pids:
                     if t_pid == "$$":
                         t_pid = int(os.getpid())
+
+                    # skip this until it will be replaced with a real PID.
+                    elif t_pid == "$$TBD":
+                        continue
                     else:
                         t_pid = int(t_pid)
                     pids.append(t_pid)
             self.__pids = pids
         return self.__pids
+
+    def set_pid(self, pid):  # type: (int) -> None
+        """
+        Set the PID of the process that was marked as $$TBD.
+        :param pid: Process PID
+        """
+        for i in range(len(self.__target_pids)):
+            if self.__target_pids[i] == "$$TBD":
+                self.__target_pids[i] = pid
+                break
+
+    @property
+    def process_monitor_id(self):  # type: () -> six.text_type
+        return self.__id
 
 
 __all__ = ["ProcessMonitor"]

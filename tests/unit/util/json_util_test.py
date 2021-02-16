@@ -1,3 +1,4 @@
+#  -*- coding: utf-8 -*-
 # Copyright 2014 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,10 +20,11 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-
+import os
 import sys
 import unittest
 import importlib
+import locale
 
 import six
 import mock
@@ -34,6 +36,7 @@ from scalyr_agent.test_base import skipIf
 
 if six.PY3:
     reload = importlib.reload
+    import orjson
 
 JSON = 1
 UJSON = 2
@@ -78,6 +81,20 @@ class EncodeDecodeTest(ScalyrTestCase):
 
     def test_negative_long(self):
         self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
+
+    def test_64_bit_int(self):
+        # NOTE: Latest version of orjson available for Python >= 3.6 can also serialize large
+        # siigned and unsigned 64 bit ints
+        if six.PY3:
+            if sys.version_info >= (3, 6, 0):
+                orjson.dumps(18446744073709551615)
+            else:
+                with self.assertRaises(orjson.JSONEncodeError):
+                    orjson.dumps(18446744073709551615)
+
+        # here we do the regular json tests to be sure that
+        # we fall back to native json library in case of too bit integer.
+        self.__test_encode_decode("18446744073709551615", 18446744073709551615)
 
     def test_bool(self):
         self.__test_encode_decode(r"false", False)
@@ -143,6 +160,75 @@ class EncodeDecodeTest(ScalyrTestCase):
         # do the same check but now with binary string.
         if isinstance(text, six.text_type):
             self.__test_encode_decode(text.encode("utf-8"), obj)
+
+
+class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
+    def setUp(self):
+        super(UnicodeAndLocaleEncodingAndDecodingTestCase, self).setUp()
+
+        self.original_locale = locale.getlocale()
+
+    def tearDown(self):
+        super(UnicodeAndLocaleEncodingAndDecodingTestCase, self).tearDown()
+
+        if self.original_locale:
+            try:
+                locale.setlocale(locale.LC_ALL, self.original_locale)
+            except locale.Error:
+                # unsupported localle setting error should not be fatal
+                pass
+
+        if "LC_ALL" in os.environ:
+            del os.environ["LC_ALL"]
+
+    def test_non_ascii_data_non_utf_locale_coding_default_json_lib(self):
+        util.set_json_lib("json")
+        original_data = "čććžšđ"
+
+        # Default (UTF-8) locale
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\u010d\\u0107\\u0107\\u017e\\u0161\\u0111"')
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+        # Non UTF-8 Locale
+        os.environ["LC_ALL"] = "invalid"
+
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\u010d\\u0107\\u0107\\u017e\\u0161\\u0111"')
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+    @skipIf(six.PY2, "Skipping under Python 2")
+    def test_non_ascii_data_non_utf_locale_coding_orjson(self):
+        util.set_json_lib("orjson")
+        original_data = "čććžšđ"
+
+        # Default (UTF-8) locale
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"%s"' % (original_data))
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+        # Non UTF-8 Locale
+        os.environ["LC_ALL"] = "invalid"
+
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"%s"' % (original_data))
+
+        loaded = util.json_decode(result)
+        self.assertEqual(loaded, original_data)
+
+        # Invalid UTF-8, should fall back to standard json implementation
+        original_data = "\ud800"
+        result = util.json_encode(original_data)
+        self.assertEqual(result, '"\\ud800"')
+
+        loaded = util.json_decode('"\ud800"')
+        self.assertEqual(loaded, original_data)
 
 
 @pytest.mark.json_lib

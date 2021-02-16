@@ -20,11 +20,20 @@ from __future__ import absolute_import
 from io import open
 
 import os
+import ssl
+import sys
+import locale
+import platform
 
 import mock
 import six
 
+from scalyr_agent import compat
+from scalyr_agent import util as scalyr_util
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
+from scalyr_agent.build_info import get_build_revision
 
 __all__ = ["LogCaptureClassTestCase"]
 
@@ -144,3 +153,75 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
 
         self.assertTrue(expected_msg_1 in print_message_1)
         self.assertTrue(expected_msg_2 in print_message_2)
+
+
+class MiscUtilsTestCase(ScalyrTestCase):
+    def tearDown(self):
+        super(MiscUtilsTestCase, self).tearDown()
+
+        if "LC_ALL" in os.environ:
+            del os.environ["LC_ALL"]
+
+    @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
+    def test_get_language_code_coding_and_locale(self):
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+
+        # NOTE: On some systems UTF-8 is normalized to UTF8 so we ignore "-" in the value
+        self.assertTrue(language_code in ["C", "en_US"])
+        self.assertEqual(encoding.replace("-", ""), "UTF8")
+        self.assertTrue(used_locale.replace("-", "") in ["C.UTF8", "en_US.UTF8"])
+
+        # NOTE: To be able to test other locales we would need to install other locale packages
+        os.environ["LC_ALL"] = "invalid"
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+        self.assertEqual(language_code, "unknown")
+        self.assertEqual(encoding, "unknown")
+        self.assertEqual(
+            used_locale, "unable to retrieve locale: unknown locale: invalid"
+        )
+
+        # Empty coding
+        os.environ["LC_ALL"] = "C"
+
+        (
+            language_code,
+            encoding,
+            used_locale,
+        ) = scalyr_util.get_language_code_coding_and_locale()
+        self.assertEqual(language_code, "unknown")
+        self.assertEqual(encoding, "unknown")
+        self.assertEqual(used_locale, "unable to retrieve locale")
+
+    def test_get_agent_start_up_message(self):
+        from scalyr_agent.agent_main import SCALYR_VERSION
+
+        msg = scalyr_util.get_agent_start_up_message()
+
+        python_version_str = sys.version.replace("\n", "")
+        build_revision = get_build_revision()
+        _, _, locale = scalyr_util.get_language_code_coding_and_locale()
+        openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+        lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
+        self.assertTrue("Starting scalyr agent..." in msg)
+        self.assertTrue("version=%s" % (SCALYR_VERSION) in msg)
+        self.assertTrue("Python version: %s" % (python_version_str) in msg)
+        self.assertTrue("OpenSSL version: %s" % (openssl_version) in msg)
+        self.assertTrue(
+            "default fs encoding: %s" % (sys.getfilesystemencoding()) in msg
+        )
+        self.assertTrue("revision=%s" % (build_revision) in msg)
+        self.assertTrue("locale: %s" % (locale) in msg)
+        self.assertTrue("LANG env variable: %s" % (lang_env_var) in msg)

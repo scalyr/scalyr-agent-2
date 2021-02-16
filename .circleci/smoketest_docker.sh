@@ -27,10 +27,10 @@
 # Docker image in which runs smoketest python3 code
 smoketest_image=$1
 
-# Chooses json or syslog docker test.  Incorporated into container name which is then used by
+# Chooses json, api or syslog docker test.  Incorporated into container name which is then used by
 # Verifier to choose the appropriate code to execute).
-# syslog_or_json="json"
-syslog_or_json=$2
+# log_mode="json"
+log_mode=$2
 
 # Max seconds before the test hard fails
 max_wait=$3
@@ -44,8 +44,6 @@ SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
 SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
 
 SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
-# TODO: Remove when pushing to open source remote
-SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
 DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o /tmp/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
 
 #----------------------------------------------------------------------------------------
@@ -59,22 +57,32 @@ smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketes
 syslog_driver_option=""
 syslog_driver_portmap=""
 jsonlog_containers_mount=""
-if [[ $syslog_or_json == "syslog" ]]; then
+if [[ $log_mode == "syslog" ]]; then
     syslog_driver_option="--log-driver=syslog --log-opt syslog-address=tcp://127.0.0.1:601"
     syslog_driver_portmap="-p 601:601"
-else
+elif [[ $log_mode == "json" ]]; then
     jsonlog_containers_mount="-v /var/lib/docker/containers:/var/lib/docker/containers"
+elif [[ $log_mode == "api" ]]; then
+    # Using Docker API mode aka docker_raw_logs: false
+    echo ""
+else
+    echo "Unsupported log mode: ${log_mode}"
+    exit 1
 fi
 
 # container names for all test containers
 # The suffixes MUST be one of (agent, uploader, verifier) to match verify_upload::DOCKER_CONTNAME_SUFFIXES
-contname_agent="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-agent"
-contname_uploader="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-uploader"
-contname_verifier="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-verifier"
+contname_agent="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-agent"
+contname_uploader="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-uploader"
+contname_verifier="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-verifier"
 
 
 # Kill leftover containers
 function kill_and_delete_docker_test_containers() {
+    echo ""
+    echo "Killing and deleting all test containers..."
+    echo ""
+
     for cont in $contname_agent $contname_uploader $contname_verifier
     do
         if [[ -n `docker ps | grep $cont` ]]; then
@@ -84,7 +92,12 @@ function kill_and_delete_docker_test_containers() {
             docker rm $cont;
         fi
     done
+
+    echo ""
+    echo "Containers deleted..."
+    echo ""
 }
+
 kill_and_delete_docker_test_containers
 echo `pwd`
 
@@ -93,13 +106,12 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-python build_package.py docker_${syslog_or_json}_builder --coverage
+python build_package.py docker_${log_mode}_builder --coverage
 
 # Extract and build agent docker image
-./scalyr-docker-agent-${syslog_or_json}-${fakeversion} --extract-packages
-agent_image="agent-ci/scalyr-agent-docker-${syslog_or_json}:${fakeversion}"
+./scalyr-docker-agent-${log_mode}-${fakeversion} --extract-packages
+agent_image="agent-ci/scalyr-agent-docker-${log_mode}:${fakeversion}"
 docker build -t ${agent_image} .
-
 
 # Launch Agent container (which begins gathering stdout logs)
 docker run -d --name ${contname_agent} \
@@ -127,6 +139,38 @@ uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_upload
 echo "Uploader container ID == ${uploader_hostname}"
 echo "Using smoketest.py script from ${SMOKE_TESTS_SCRIPT_BRANCH} branch and URL ${SMOKE_TESTS_SCRIPT_URL}"
 
+function print_debugging_info_on_exit() {
+    echo ""
+    echo "Docker logs for ${contname_agent} container"
+    echo ""
+    docker logs "${contname_agent}" || true
+    echo ""
+
+    # NOTE: We can't tail other two containers since they use syslog driver which
+    # sends data to agent container.
+    # TODO: Set agent debug level to 5
+
+    echo ""
+    echo "Cating /var/log/scalyr-agent-2/agent_syslog.log log file"
+    echo ""
+    docker cp ${contname_agent}:/var/log/scalyr-agent-2/agent_syslog.log . || true
+    cat agent_syslog.log || true
+    echo ""
+
+    echo ""
+    echo "Cating /var/log/scalyr-agent-2/docker_monitor.log log file"
+    echo ""
+    docker cp ${contname_agent}:/var/log/scalyr-agent-2/docker_monitor.log . || true
+    cat docker_monitor.log || true
+    echo ""
+
+    kill_and_delete_docker_test_containers || true
+}
+
+# We want to run some commands on exit which may help with troubleshooting on
+# test failures
+trap print_debugging_info_on_exit EXIT
+
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
@@ -138,8 +182,12 @@ bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname
 --uploader_hostname ${uploader_hostname} \
 --debug true"
 
+echo ""
 echo "Stopping agent."
+echo ""
 docker stop ${contname_agent}
+
+echo ""
 echo "Agent stopped, copying .coverage results."
+echo ""
 docker cp ${contname_agent}:/.coverage .
-kill_and_delete_docker_test_containers

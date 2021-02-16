@@ -249,12 +249,12 @@ if sys.version_info[:2] < (2, 7):
                     "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
                 )
 
-        def assertRaisesRegexp(self, exc_cls, expected_msg, func, **kwargs):
+        def assertRaisesRegexp(self, exc_cls, expected_msg, func, *args, **kwargs):
             """
             Compatibility layer for assertRaisesRegexp which also works under Python 2.6.
             """
             try:
-                func(**kwargs)
+                func(*args, **kwargs)
             except Exception as e:
                 if not isinstance(e, exc_cls):
                     raise AssertionError(

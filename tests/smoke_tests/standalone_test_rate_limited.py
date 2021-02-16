@@ -16,6 +16,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+
 import pytest
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL

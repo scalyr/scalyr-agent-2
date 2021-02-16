@@ -16,17 +16,22 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import print_function
 
 from scalyr_agent import scalyr_logging
 
 __author__ = "czerwin@scalyr.com"
 
 import os
+import re
 import sys
 import tempfile
 from io import open
+import platform
+import json
 
 import mock
+import pytest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -48,12 +53,15 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
     JournaldLogFormatter,
 )
+from scalyr_agent.util import JsonReadFileException
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.compat import os_environ_unicode
 
+import scalyr_agent.configuration
+
 import six
 from six.moves import range
-from mock import patch, Mock, call
+from mock import patch, Mock
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -72,10 +80,17 @@ class TestConfigurationBase(ScalyrTestCase):
             if "scalyr" in key.lower():
                 del os.environ[key]
 
+        self._original_win32_file = scalyr_agent.configuration.win32file
+
+        # Patch it so tests pass on Windows
+        scalyr_agent.configuration.win32file = None
+
     def tearDown(self):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+        scalyr_agent.configuration.win32file = self._original_win32_file
 
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
@@ -150,6 +165,9 @@ class TestConfigurationBase(ScalyrTestCase):
             self.convert_path("/etc/scalyr-agent-2/agent.json"),
             self.convert_path("/var/lib/scalyr-agent-2"),
         )
+
+        if os.path.isfile(self._config_file):
+            os.chmod(self._config_file, int("640", 8))
 
         return Configuration(
             self._config_file, default_paths, logger, extra_config_dir=extra_config_dir
@@ -320,7 +338,7 @@ class TestConfiguration(TestConfigurationBase):
         )
         self.assertPathEquals(
             config.log_configs[1].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
         self.assertFalse(config.log_configs[0].get_bool("ignore_stale_files"))
         self.assertEquals(
@@ -347,7 +365,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
 
     def test_overriding_basic_settings(self):
@@ -644,6 +662,29 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_incorrect_file_permissions_or_owner(
+        self, mock_read_config_file_as_json
+    ):
+        mock_read_config_file_as_json.side_effect = JsonReadFileException(
+            self._config_file, "The file is not readable"
+        )
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ { path:"/var/log/tomcat6/access.log"} ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        expected_msg = r'File "%s" is not readable by the current user (.*?).' % (
+            re.escape(self._config_file)
+        )
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     def test_sampling_rules(self):
         self._write_file_with_separator_conversion(
@@ -1056,7 +1097,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/agent*.log",
         )
 
     def test_parse_log_config(self):
@@ -1284,6 +1325,107 @@ class TestConfiguration(TestConfigurationBase):
         )
         mock_logger.debug.assert_not_called()
 
+    def test_config_readable_by_others_warning_on_parse(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            logs: []
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        os.chmod(self._config_file, int("644", 8))
+        config.parse()
+
+        if sys.platform.startswith("win"):
+            expected_permissions = "666"
+        else:
+            expected_permissions = "644"
+
+        expected_msg = (
+            "Config file %s is readable or writable by others "
+            "(permissions=%s). Config files can contain secrets so you are strongly "
+            "encouraged to change the config file permissions so it's not "
+            "readable by others." % (self._config_file, expected_permissions)
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="config-permissions-warn-%s" % (self._config_file),
+        )
+
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    def test_k8s_logs_config_option_is_configured_but_k8s_monitor_is_not(self):
+        # kubernetes_monitor is not configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+
+        expected_msg = (
+            '"k8s_logs" config options is defined, but Kubernetes monitor is not configured / '
+            "enabled. That config option applies to Kubernetes monitor so for it to have an "
+            "affect, Kubernetes monitor needs to be enabled and configured"
+        )
+        mock_logger.warn.assert_called_with(
+            expected_msg,
+            limit_once_per_x_secs=86400,
+            limit_key="k8s_logs_k8s_monitor_not_enabled",
+        )
+
+        # kubernetes_monitor is configured
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+            k8s_logs: [
+                { "rename_logfile": "foobar.log" }
+            ],
+            monitors: [
+                {
+                    "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                }
+            ]
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
+        # By default option is not configured so no warning should be emitted
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "foo",
+          }
+        """
+        )
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+
+        mock_logger.warn.assert_not_called()
+
+        config.parse()
+        mock_logger.warn.assert_not_called()
+
     def test_api_key_use_env(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -1294,6 +1436,7 @@ class TestConfiguration(TestConfigurationBase):
         os.environ["SCALYR_API_KEY"] = "xyz"
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
+        config._check_config_file_permissions_and_warn = lambda x: x
         config.parse()
 
         self.assertEquals(config.api_key, "xyz")
@@ -1345,6 +1488,7 @@ class TestConfiguration(TestConfigurationBase):
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
             "json_library": "auto",
+            "use_multiprocess_workers": False,
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
@@ -1671,7 +1815,6 @@ class TestConfiguration(TestConfigurationBase):
         """Make sure that when we print the config options that we
         don't throw any exceptions
         """
-
         self._write_file_with_separator_conversion("""{api_key: "hi there"}""")
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
@@ -1680,6 +1823,32 @@ class TestConfiguration(TestConfigurationBase):
         mock_logger.info.assert_any_call("Configuration settings")
         mock_logger.info.assert_any_call("\tmax_line_size: 49900")
 
+        # Verify actual API keys are masked
+        self._write_file_with_separator_conversion(
+            """{api_key: "hi there", workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}, {"sessions":5, "api_key": "bar1234", "id": "two"}]}"""
+        )  # NOQA
+        mock_logger = Mock()
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call("\tmax_line_size: 49900")
+
+        # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
+        # sorted string value
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 5, 'api_key': '********** MASKED **********', 'id': 'two'}, {'sessions': 2, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        logged_line = mock_logger.info.call_args_list[-1][0][0]
+        self.assertEqual(sorted(expected_line), sorted(logged_line))
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 8)
+        self.assertEqual(api_keys_count, 3)
+
     def test_print_config_when_changed(self):
         """
         Test that `print_useful_settings` only outputs changed settings when compared to another
@@ -1687,7 +1856,9 @@ class TestConfiguration(TestConfigurationBase):
         """
         self._write_file_with_separator_conversion(
             """{
-            api_key: "hi there"
+            api_key: "hi there",
+            max_line_size: 5,
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1695,23 +1866,46 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 3)
+        self.assertEqual(api_keys_count, 2)
+
         self._write_file_with_separator_conversion(
             """{
-            api_key: "hi there"
+            api_key: "hi there",
             max_line_size: 9900,
+            workers: [{"sessions":10, "api_key": "foo1234", "id": "one"}]},
             }
         """
         )
         new_config = self._create_test_configuration_instance(logger=mock_logger)
         new_config.parse()
 
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = new_config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 11)
+        self.assertEqual(api_keys_count, 2)
+
         new_config.print_useful_settings(other_config=config)
 
-        calls = [
-            call("Configuration settings"),
-            call("\tmax_line_size: 9900"),
-        ]
-        mock_logger.info.assert_has_calls(calls)
+        self.assertEqual(mock_logger.info.call_count, 3)
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call("\tmax_line_size: 9900")
+
+        # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
+        # sorted string value
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 10, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        logged_line = mock_logger.info.call_args_list[-1][0][0]
+        self.assertEqual(sorted(expected_line), sorted(logged_line))
 
     def test_print_config_when_not_changed(self):
         """
@@ -1740,7 +1934,8 @@ class TestConfiguration(TestConfigurationBase):
         self._write_file_with_separator_conversion(
             """{
             api_key: "hi there",
-            max_line_size: 49900
+            max_line_size: 49900,
+            workers: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1759,8 +1954,8 @@ class TestConfiguration(TestConfigurationBase):
             self._write_file_with_separator_conversion(
                 """{
                 api_key: "hi there",
-                max_line_size: 49900
-                debug_level: %s
+                max_line_size: 49900,
+                debug_level: %s,
                 }
             """
                 % (level)
@@ -1780,7 +1975,8 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 49900,
-            debug_level: 5
+            debug_level: 5,
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
             }
         """
         )
@@ -1800,6 +1996,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertTrue("Raw config value:" in call_msg)
         self.assertTrue("*** MASKED ***" in call_msg)
         self.assertTrue('"debug_level": 5' in call_msg)
+        self.assertTrue('"api_key": "********** MASKED **********"' in call_msg)
+        self.assertTrue("foo1234" not in call_msg)
 
     def test_import_vars_in_configuration_directory(self):
         os.environ["TEST_VAR"] = "bye"
@@ -1842,6 +2040,61 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
+
+    @skipIf(platform.system() != "Windows", "Skipping tests on non-Windows platform")
+    def test_print_config_windows(self):
+        import win32file  # pylint: disable=import-error
+
+        scalyr_agent.configuration.win32file = win32file
+
+        mock_logger = Mock()
+        maxstdio = win32file._getmaxstdio()
+
+        self._write_file_with_separator_conversion(
+            """{
+            api_key: "hi there",
+            }
+        """
+        )
+
+        config = self._create_test_configuration_instance(logger=mock_logger)
+        config.parse()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        config.print_useful_settings()
+        mock_logger.info.assert_any_call("Configuration settings")
+        mock_logger.info.assert_any_call(
+            "\twin32_max_open_fds(maxstdio): %s (%s)" % (maxstdio, maxstdio)
+        )
+
+        mock_logger.reset_mock()
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+        # If the value has not changed, the line should not be printed
+        config.print_useful_settings(other_config=config)
+        self.assertEqual(mock_logger.info.call_count, 0)
+
+    @skipIf(platform.system() == "Windows", "Skipping tests on Windows")
+    @mock.patch("scalyr_agent.util.read_config_file_as_json")
+    def test_parse_invalid_config_file_permissions(self, mock_read_config_file_as_json):
+        # User-friendly exception should be thrown on some config permission related errors
+        error_msgs = [
+            "File is not readable",
+            "Error reading file",
+            "Failed while reading",
+        ]
+
+        for error_msg in error_msgs:
+            mock_read_config_file_as_json.side_effect = Exception(error_msg)
+
+            config = self._create_test_configuration_instance()
+
+            expected_msg = re.compile(
+                r".*not readable by the current user.*Original error.*%s.*"
+                % (error_msg),
+                re.DOTALL,
+            )
+            self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):
@@ -1965,7 +2218,11 @@ class TestConfiguration(TestConfigurationBase):
 
             config = self._create_test_configuration_instance()
             config.parse()
-            self.assertEqual(config.compression_level, 5)
+
+            if config.compression_type == "none":
+                self.assertEqual(config.compression_level, 0)
+            else:
+                self.assertEqual(config.compression_level, 5)
 
     def test_parse_compression_algorithm_invalid_compression_level(self):
         # If invalid compression level is used, we should use a default value for that particular
@@ -2048,6 +2305,102 @@ class TestConfiguration(TestConfigurationBase):
             msg = "Expected %s for algorithm %s" % (valid_level_max, compression_type)
             self.assertEqual(config.compression_level, valid_level_max, msg)
 
+    def test_deprecated_param_names(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                "api_keys": [
+                    {
+                        "api_key": "key",
+                        "id": "my_key",
+                        "workers": 4
+                    }
+                ],
+                "default_workers_per_api_key": 2,
+                "use_multiprocess_copying_workers": false
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        # "api_keys" should become "worker_configs"
+        assert config.worker_configs == [
+            # "workers" field in workers entry should become "sessions"
+            JsonObject(api_key="hi there", id="default", sessions=2),
+            JsonObject(api_key="key", id="my_key", sessions=4),
+        ]
+        # "default_workers_per_api_key" should become "default_sessions_per_worker"
+        assert config.default_sessions_per_worker == 2
+
+        # verify a false deprecated option.
+        assert config.use_multiprocess_workers is False
+
+    def test_deprecated_env_aware_params(self):
+        os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "5"
+
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.default_sessions_per_worker == 5
+
+    def test_deprecated_params_in_config_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            api_keys: [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "workers": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                api_keys: [
+                    {"api_key": "key4", "id": "fourth_key", "workers": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "worker_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if workers from fragment are added.
+
+        assert list(config.worker_configs) == [
+            JsonObject(
+                api_key=config.api_key,
+                id="default",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(
+                api_key="key2",
+                id="second_key",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(api_key="key3", id="third_key", sessions=3),
+            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+        ]
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):
@@ -2118,6 +2471,13 @@ class TestConvertConfigParam(TestConfigurationBase):
         self.assertRaises(
             IndexError, lambda: convert_config_param("dummy_field", "", JsonArray)
         )
+
+    def test_convert_to_float(self):
+        self.assertEqual(5.0, convert_config_param("dummy_field", "5.0", float))
+        self.assertEqual(5.0, convert_config_param("dummy_field", 5.0, float))
+        self.assertEqual(5.0, convert_config_param("dummy_field", 5, float))
+        self.assertEqual(2.1, convert_config_param("dummy_field", "2.1", float))
+        self.assertEqual(2.1, convert_config_param("dummy_field", 2.1, float))
 
 
 class TestGetConfigFromEnv(TestConfigurationBase):
@@ -2490,9 +2850,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 2. value < min
         config_object = JsonObject(content={"foo": 9})
-        expected_msg = (
-            'Got invalid value "9" for field "foo". Value must be greater than 10'
-        )
+        expected_msg = 'Got invalid value "9" for field "foo". Value must be greater than or equal to 10'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -2508,9 +2866,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         # 3. value > max
         config_object = JsonObject(content={"foo": 101})
-        expected_msg = (
-            'Got invalid value "101" for field "foo". Value must be less than 100'
-        )
+        expected_msg = 'Got invalid value "101" for field "foo". Value must be less than or equal to 100'
 
         self.assertRaisesRegexp(
             BadConfiguration,
@@ -2677,3 +3033,686 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(config.win32_max_open_fds, 1024)
+
+
+class TestWorkersConfiguration(TestConfigurationBase):
+    def test_no_workers_entry_(self):
+        # The 'workers' list does not exist, a default api_key entry should be created.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # only defaults are created.
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            sessions=config.default_sessions_per_worker,
+        )
+
+    def test_empty_workers_entry(self):
+        """
+        Does not make so much sense, but still a valid case to apply a default worker.
+        :return:
+        """
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there"
+                workers: [
+
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert len(config.worker_configs) == 1
+        api_key = config.worker_configs[0]
+
+        assert api_key == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            sessions=config.default_sessions_per_worker,
+        )
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 1)
+        self.assertEqual(api_keys_count, 1)
+
+    def test_overwrite_default_workers(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "key"
+                workers: [
+                    {
+                        "api_key": "key", id: "default", "sessions": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
+            api_key=config.api_key, id="default", sessions=4,
+        )
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 4)
+        self.assertEqual(api_keys_count, 1)
+
+    def test_overwrite_default_workers_without_api_key(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "key"
+                workers: [
+                    {
+                        id: "default", "sessions": 4
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert len(config.worker_configs) == 1
+        assert config.worker_configs[0] == JsonObject(
+            api_key=config.api_key, id="default", sessions=4,
+        )
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 4)
+        self.assertEqual(api_keys_count, 1)
+
+    def test_default_workers_and_second(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "api_key": "key", "id": "second"
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.worker_configs) == 2
+        workers = list(config.worker_configs)
+
+        assert workers[0] == JsonObject(
+            api_key=config.api_key,
+            id="default",
+            sessions=config.default_sessions_per_worker,
+        )
+        assert workers[1] == JsonObject(api_key="key", id="second", sessions=1,)
+
+    def test_second_default_api_key(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "api_key": "key", "id": "default"
+                    },
+                    {
+                        "api_key": "key2", "id": "default"
+                    }
+                ]
+              }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "The API key of the default worker has to match the main API key of the configuration"
+            in err_info.value.message
+        )
+
+    def test_worker_id_duplication(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "api_key": "key", "id": "second"
+                    },
+                    {
+                        "api_key": "key2", "id": "second"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "There are multiple workers with the same 'second' id. Worker id's must remain unique."
+            in err_info.value.message
+        )
+
+    def test_api_key_field_missing(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "id": "second"
+                    },
+                    {
+                        "api_key": "key2", "id": "third"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert 'The required field "api_key" is missing.' in err_info.value.message
+
+    def test_api_key_entry_id_field_missing(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        "api_key": "key"
+                    },
+                    {
+                        "api_key": "key2", "id": "third"
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert 'The required field "id" is missing.' in err_info.value.message
+
+    def test_log_file_bind_to_workers_entries(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        api_key: "key2"
+                        "sessions": 4,
+                        "id": "second",
+                    }
+                ],
+                logs: [
+                    {
+                        path: "/some/path.log",
+                        worker_id: "second"
+                    },
+                    {
+                        path: "/some/path2.log",
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.worker_configs) == 2
+        assert config.worker_configs[0] == JsonObject(
+            sessions=1, api_key=config.api_key, id="default"
+        )
+        assert config.worker_configs[1] == JsonObject(
+            sessions=4, api_key="key2", id="second",
+        )
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "threaded")
+        self.assertEqual(sessions_count, 5)
+        self.assertEqual(api_keys_count, 2)
+
+    def test_log_file_bind_to_worker_entries_with_non_existing_id(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi there",
+                workers: [
+                    {
+                        api_key: "key2"
+                        "sessions": 4,
+                        "id": "second"
+                    }
+                ],
+
+                logs: [
+                    {
+                        path: "/some/path.log",
+                        worker_id: "wrong worker id"
+                    },
+                    {
+                        path: "/some/path2.log",
+                    }
+                ]
+              }
+            """
+        )
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "refers to a non-existing worker with id 'wrong worker id'."
+            in err_info.value.message
+        )
+        assert "Valid worker ids: default, second." in err_info.value.message
+
+    def test_workers_type_default(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert not config.use_multiprocess_workers
+
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
+    def test_workers_type_multiprocess(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            use_multiprocess_workers: true
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.use_multiprocess_workers
+
+        (
+            worker_type,
+            sessions_count,
+            api_keys_count,
+        ) = config.get_number_of_configured_sessions_and_api_keys()
+        self.assertEqual(worker_type, "multiprocess")
+        self.assertEqual(sessions_count, 1)
+        self.assertEqual(api_keys_count, 1)
+
+    @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
+    def test_workers_type_multiprocess_from_env(self):
+        os_environ_unicode["SCALYR_USE_MULTIPROCESS_WORKERS"] = "True"
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert config.use_multiprocess_workers
+
+    @skipIf(platform.system() != "Windows", "Skipping Linux only tests on Windows")
+    @skipIf(
+        sys.version_info < (2, 7), "Skipping multiprocess configuration for python 2.6"
+    )
+    def test_workers_type_multiprocess_windows(self):
+        # 'use_multiprocess_workers' option should cause error on Windows.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            use_multiprocess_workers: true
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "The 'use_multiprocess_workers' option is not supported on windows machines."
+            in err_info.value.message
+        )
+
+    def test_default_sessions_per_worker(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+
+            workers: [
+                {"api_key": "another_key", "id": "second", "sessions": 3},
+                {"api_key": "another_key2", "id": "third"}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        assert len(config.worker_configs) == 3
+        assert config.worker_configs[0]["api_key"] == config.api_key
+        assert (
+            config.worker_configs[0]["sessions"] == config.default_sessions_per_worker
+        )
+        assert config.worker_configs[1]["api_key"] == "another_key"
+        assert config.worker_configs[1]["sessions"] == 3
+        assert config.worker_configs[2]["api_key"] == "another_key2"
+        assert (
+            config.worker_configs[2]["sessions"] == config.default_sessions_per_worker
+        )
+
+    def test_workers_negative_sessions_number(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            workers: [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2", "id": "third_key", "sessions": -1}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert "Value must be greater than or equal to 1" in err_info.value.message
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            default_sessions_per_worker: -1,
+            workers: [
+                {"api_key": "another_key", "id": "second_key"},
+                {"api_key": "another_key2", "id": "third_key"}
+            ]
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert "Value must be greater than or equal to 1" in err_info.value.message
+
+    def test_default_sessions_per_worker_from_env(self):
+        os_environ_unicode["SCALYR_DEFAULT_SESSIONS_PER_WORKER"] = "4"
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+            workers: [
+                {"api_key": "another_key", "id": "second_key"},
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        assert config.default_sessions_per_worker == 4
+
+        return
+
+    def test_config_fragment(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there"
+
+            workers: [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "sessions": 3}
+            ]
+          }
+        """
+        )
+
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json",
+            """
+            {
+                workers: [
+                    {"api_key": "key4", "id": "fourth_key", "sessions": 3}
+                ]
+
+                logs: [
+                    {"path": "some/path", "worker_id": "second_key"}
+                ]
+            }
+            """,
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        # check if workers from fragment are added.
+
+        assert list(config.worker_configs) == [
+            JsonObject(
+                api_key=config.api_key,
+                id="default",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(
+                api_key="key2",
+                id="second_key",
+                sessions=config.default_sessions_per_worker,
+            ),
+            JsonObject(api_key="key3", id="third_key", sessions=3),
+            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+        ]
+
+    def test_k8s_and_journald_logs_workers(self):
+
+        journald_log1 = {
+            "journald_unit": "ssh\\.service",
+        }
+
+        main_config = {
+            "api_key": "hi there",
+            "workers": [
+                {"api_key": "key2", "id": "second_key"},
+                {"api_key": "key3", "id": "third_key", "sessions": 3},
+            ],
+            "logs": [
+                {"path": "path1"},
+                {"path": "path2", "worker_id": "second_key"},
+                {"path": "path3", "worker_id": "third_key"},
+            ],
+            "journald_logs": [
+                journald_log1,
+                {"journald_unit": ".*", "worker_id": "third_key"},
+            ],
+        }
+
+        k8s_config1 = {"k8s_pod_glob": "*nginx*"}
+
+        config_fragment = {
+            "workers": [
+                {"api_key": "key4", "id": "fourth_key"},
+                {"api_key": "key5", "id": "fifth_key", "sessions": 3},
+            ],
+            "k8s_logs": [
+                k8s_config1,
+                {"k8s_pod_glob": "*apache*", "worker_id": "second_key"},
+            ],
+            "logs": [{"path": "path4"}, {"path": "path6", "worker_id": "second_key"}],
+        }
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        workers = list(config.worker_configs)
+
+        assert len(workers) == 5
+
+        # check workers for journald logs
+        for worker in workers:
+            journald_unit = worker.get("journald_unit", none_if_missing=True)
+            if journald_unit:
+                if journald_unit == "ssh\\.service":
+                    assert worker["worker_id"] == "default"
+                elif journald_unit == "journald_unit":
+                    assert worker["worker_id"] == "second_key"
+
+        # check workers for k8s logs.
+        for worker in workers:
+            k8s_pod_glob = worker.get("k8s_pod_glob", none_if_missing=True)
+            if k8s_pod_glob:
+                if k8s_pod_glob == "*nginx*":
+                    assert worker["worker_id"] == "default"
+                elif k8s_pod_glob == "*apache*":
+                    assert worker["worker_id"] == "third_key"
+
+        # non existing worker for l8s, should fail
+        k8s_config1["worker_id"] = "not_exist"
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "refers to a non-existing worker with id 'not_exist'"
+            in err_info.value.message
+        )
+
+        k8s_config1["worker_id"] = "default"
+
+        # non existing worker for jornald, should fail
+        journald_log1["worker_id"] = "not exist too."
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            config.parse()
+
+        assert (
+            "refers to a non-existing worker with id 'not exist too.'"
+            in err_info.value.message
+        )
+
+        journald_log1["worker_id"] = "default"
+        self._write_file_with_separator_conversion(json.dumps(main_config))
+        self._write_config_fragment_file_with_separator_conversion(
+            "a.json", json.dumps(config_fragment)
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+    def test_invalid_worker_id(self):
+        def recreate(worker_id):
+            self._write_file_with_separator_conversion(
+                """ {{
+                    api_key: "hi there"
+                    workers: [
+                        {{"api_key": "another_key", "id": "{0}"}},
+                    ]
+                  }}
+                """.format(
+                    worker_id
+                )
+            )
+            config = self._create_test_configuration_instance()
+
+            config.parse()
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key /")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key ")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        with pytest.raises(BadConfiguration) as err_info:
+            recreate("Invalid.key")
+
+        assert "contains an invalid character" in err_info.value.message
+
+        recreate("not_Invalid_key_anymore")

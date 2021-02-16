@@ -33,6 +33,8 @@ import socket
 import sys
 import time
 import io
+import ssl
+import os
 
 import six
 from six.moves import map
@@ -40,7 +42,9 @@ from six.moves import range
 import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
+from scalyr_agent.configuration import Configuration
 
+from scalyr_agent import __scalyr__
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
@@ -70,8 +74,101 @@ def _set_last_timestamp(val):
     __last_time_stamp__ = val
 
 
+def create_new_client(config, api_key=None):
+    result = None
+    if config.use_new_ingestion:
+        from scalyr_agent.scalyr_client import NewScalyrClientSession
+
+        result = NewScalyrClientSession(config, api_key=api_key)
+    return result
+
+
+def verify_server_certificate(config):
+    """
+    Verify the Scalyr server certificates.
+    :param config:
+    :return:
+    """
+    is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
+    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
+        __scalyr__.DEV_INSTALL,
+        __scalyr__.MSI_INSTALL,
+    ]
+
+    ca_file = config.ca_cert_path
+    intermediate_certs_file = config.intermediate_certs_path
+
+    # Validate provided CA cert file and intermediate cert file exists. If they don't
+    # exist, throw and fail early and loudly
+    if not is_dev_install and not os.path.isfile(ca_file):
+        raise ValueError(
+            'Invalid path "%s" specified for the "ca_cert_path" config '
+            "option: file does not exist" % (ca_file)
+        )
+
+    # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+    # under the MSI / Windows install
+    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
+        raise ValueError(
+            'Invalid path "%s" specified for the '
+            '"intermediate_certs_path" config '
+            "option: file does not exist" % (intermediate_certs_file)
+        )
+
+
+def create_client(config, quiet=False, api_key=None):
+    # type: (Configuration, bool, six.text_type) -> ScalyrClientSession
+    """Creates and returns a new client to the Scalyr servers.
+
+    @param quiet: If true, only errors should be written to stdout.
+    @:param api_key: The Scalyr API key. If None, use default api_key from config
+    @type quiet: bool
+
+    @return: The client to use for sending requests to Scalyr, using the server address and API write logs
+        key in the configuration file.
+    @rtype: ScalyrClientSession
+    """
+    if config.verify_server_certificate:
+        verify_server_certificate(config)
+        ca_file = config.ca_cert_path
+        intermediate_certs_file = config.intermediate_certs_path
+    else:
+        ca_file = None
+        intermediate_certs_file = None
+    use_requests_lib = config.use_requests_lib
+    return ScalyrClientSession(
+        config.scalyr_server,
+        api_key or config.api_key,
+        __scalyr__.SCALYR_VERSION,
+        quiet=quiet,
+        request_deadline=config.request_deadline,
+        ca_file=ca_file,
+        intermediate_certs_file=intermediate_certs_file,
+        use_requests_lib=use_requests_lib,
+        compression_type=config.compression_type,
+        compression_level=config.compression_level,
+        proxies=config.network_proxies,
+        disable_send_requests=config.disable_send_requests,
+        disable_logfile_addevents_format=config.disable_logfile_addevents_format,
+        enforce_monotonic_timestamps=config.enforce_monotonic_timestamps,
+        sessions_api_keys_tuple=config.get_number_of_configured_sessions_and_api_keys(),
+    )
+
+
+class ScalyrClientSessionStatus(object):
+    def __init__(self):
+        self.total_requests_sent = None
+        self.total_requests_failed = None
+        self.total_request_bytes_sent = None
+        self.total_compressed_request_bytes_sent = None
+        self.total_response_bytes_received = None
+        self.total_request_latency_secs = None
+        self.total_connections_created = None
+        self.total_compression_time = None
+
+
 class NewScalyrClientSession(object):
-    def __init__(self, configuration):
+    def __init__(self, configuration, api_key=None):
         if configuration.use_new_ingestion:
             from scalyr_ingestion_client.session import (  # pylint: disable=import-error
                 Session,
@@ -87,7 +184,7 @@ class NewScalyrClientSession(object):
                 service_address=configuration.new_ingestion_bootstrap_address.split(
                     ":"
                 ),
-                api_token=str(configuration.api_key),
+                api_token=str(api_key or configuration.api_key),
                 cert_path=str(configuration.ca_cert_path),
                 use_tls=configuration.new_ingestion_use_tls,
             )
@@ -132,6 +229,7 @@ class ScalyrClientSession(object):
         disable_send_requests=False,
         disable_logfile_addevents_format=False,
         enforce_monotonic_timestamps=False,
+        sessions_api_keys_tuple=None,
     ):
         """Initializes the connection.
 
@@ -152,6 +250,8 @@ class ScalyrClientSession(object):
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
         @param enforce_monotonic_timestamps: A bool that indicates whether event timestamps in the same session
             should be monotonically increasing or not.  Defaults to False
+        @param sessions_api_keys_tuple: Tuple containing worker type (multiprocess, threaded) total
+            number of configured worker sessions and number of unique API keys configured.
 
         @type server: six.text_type
         @type api_key: six.text_type
@@ -164,6 +264,7 @@ class ScalyrClientSession(object):
         @type compression_type: six.text_type
         @type compression_level: int
         @type enforce_monotonic_timestamps: bool
+        @type sessions_api_keys_tuple: tuple
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
@@ -202,7 +303,9 @@ class ScalyrClientSession(object):
         self.__standard_headers = {
             "Connection": "Keep-Alive",
             "Accept": "application/json",
-            "User-Agent": self.__get_user_agent(agent_version),
+            "User-Agent": self.__get_user_agent(
+                agent_version, sessions_api_keys_tuple=sessions_api_keys_tuple
+            ),
         }
 
         # Configure compression type
@@ -226,7 +329,7 @@ class ScalyrClientSession(object):
                     % (compression_type, compression_type)
                 )
 
-        if encoding:
+        if encoding and encoding != "none":
             self.__standard_headers["Content-Encoding"] = encoding
 
         # Configure compression level
@@ -269,6 +372,21 @@ class ScalyrClientSession(object):
         # whether or not to monotonically increase event timestamps within the same session
         self.__enforce_monotonic_timestamps = enforce_monotonic_timestamps
 
+    def generate_status(self):
+        # type: () -> ScalyrClientSessionStatus
+        result = ScalyrClientSessionStatus()
+        result.total_requests_sent = self.total_requests_sent
+        result.total_requests_failed = self.total_requests_failed
+        result.total_request_bytes_sent = self.total_request_bytes_sent
+        result.total_compressed_request_bytes_sent = (
+            self.total_compressed_request_bytes_sent
+        )
+        result.total_response_bytes_received = self.total_response_bytes_received
+        result.total_request_latency_secs = self.total_request_latency_secs
+        result.total_connections_created = self.total_connections_created
+        result.total_compression_time = self.total_compression_time
+        return result
+
     def augment_user_agent(self, fragments):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
 
@@ -278,6 +396,10 @@ class ScalyrClientSession(object):
         self.__standard_headers["User-Agent"] = self.__get_user_agent(
             self.__agent_version, fragments
         )
+
+    @property
+    def session_id(self):  # type: () -> six.text_type
+        return self.__session_id
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -736,7 +858,9 @@ class ScalyrClientSession(object):
             enforce_monotonic_timestamps=self.__enforce_monotonic_timestamps,
         )
 
-    def __get_user_agent(self, agent_version, fragments=None):
+    def __get_user_agent(
+        self, agent_version, fragments=None, sessions_api_keys_tuple=None
+    ):
         """Determine the user agent to report in the request headers.
 
         We construct an agent that gives Scalyr some information about the platform the customer is running on,
@@ -791,16 +915,80 @@ class ScalyrClientSession(object):
         if platform_value is None:
             platform_value = platform.platform(terse=1)
 
-        # Include a string to indicate if python has a true ssl library available to record
-        # whether or not the client is doing server certificate verification.
-        ssl_str = "ssllib"
+        # Include openssl version if available
+        # Returns a tuple like this: (1, 1, 1, 8, 15)
+        openssl_version = getattr(ssl, "OPENSSL_VERSION_INFO", None)
+        if openssl_version:
+            try:
+                openssl_version_string = (
+                    ".".join([str(v) for v in openssl_version[:3]])
+                    + "-"
+                    + str(openssl_version[3])
+                )
+                openssl_version_string = "o-%s" % (openssl_version_string)
+            except Exception:
+                openssl_version_string = None
+        else:
+            openssl_version_string = None
+
+        # Include a string which indicates if the agent is running admin / root user
+        from scalyr_agent.platform_controller import PlatformController
+
+        try:
+            platform_controller = PlatformController.new_platform()
+            current_user = platform_controller.get_current_user()
+        except Exception:
+            # In some tests on Windows this can throw inside the tests so we ignore the error
+            current_user = "unknown"
+
+        if current_user in ["root", "Administrator"] or current_user.endswith(
+            "\\Administrators"
+        ):
+            # Indicates agent running as a privileged / admin user
+            user_string = "a-1"
+        else:
+            # Indicates agent running as a regular user
+            user_string = "a-0"
+
+        sharded_copy_manager_string = ""
+
+        # Possible values for this header fragment:
+        # mw-0 - Sharded copy manager functionality is disabled
+        # mw-1|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
+        # thread based sessions configured with <num_api_keys> unique API keys.
+        # mw-2|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
+        # process based sessions configured with <num_api_keys> unique API keys.
+        if (
+            sessions_api_keys_tuple
+            and isinstance(sessions_api_keys_tuple, tuple)
+            and len(sessions_api_keys_tuple) == 3
+            and sessions_api_keys_tuple[1] > 1
+        ):
+            (worker_type, workers_count, api_keys_count,) = sessions_api_keys_tuple
+
+            if worker_type == "multiprocess":
+                sharded_copy_manager_string = "mw-2|"
+            else:
+                sharded_copy_manager_string = "mw-1|"
+
+            sharded_copy_manager_string += "%s|%s" % (workers_count, api_keys_count)
+        else:
+            sharded_copy_manager_string = "mw-0"
 
         parts = [
             platform_value,
             python_version_str,
             "agent-%s" % agent_version,
-            ssl_str,
         ]
+
+        if openssl_version_string:
+            parts.append(openssl_version_string)
+
+        if user_string:
+            parts.append(user_string)
+
+        if sharded_copy_manager_string:
+            parts.append(sharded_copy_manager_string)
 
         if self.__use_requests:
             import scalyr_agent.third_party.requests as requests

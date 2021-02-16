@@ -427,6 +427,9 @@ if __name__ == "__main__":
         os.path.join(source_root, "compat.py"),
         os.path.join(root, "build_package.py"),
         os.path.join(root, ".circleci/coverage_report.py"),
+        os.path.join(
+            root, ".circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+        ),
     }
 
     if not args.files:

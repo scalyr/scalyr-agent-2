@@ -33,6 +33,13 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
+import io
+
+if False:
+    from typing import TextIO
+    from typing import List
+    from typing import Optional
+    from typing import Generator
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -108,7 +115,7 @@ class AgentStatus(BaseAgentStatus):
         # The CopyingManagerStatus object recording the status of the log copying manager (or none if CopyingManager
         # has not been started). This contains information about the different log paths being watched and the
         # progress of copying their bytes.
-        self.copying_manager_status = None
+        self.copying_manager_status = None  # type: Optional[CopyingManagerStatus]
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
@@ -149,6 +156,8 @@ class OverallStats(AgentStatus):
         self.num_running_monitors = 0
         # The current number of monitors that should be running but are not.
         self.num_dead_monitor = 0
+        # the current number of worker sessions that run by the copying manager.
+        self.num_worker_sessions = 0
         # The total amount of user time CPU used by the agent (cpu secs).
         self.user_cpu = 0
         # The total amount of system time CPU used by the agent (cpu secs)
@@ -198,7 +207,7 @@ class OverallStats(AgentStatus):
         self.total_connections_created = 0
 
         # Fields needed for copying manager status
-        self.total_copy_iterations = 0
+        self.total_scan_iterations = 0
         self.total_read_time = 0
         self.total_compression_time = 0
         self.total_waiting_time = 0
@@ -262,8 +271,8 @@ class OverallStats(AgentStatus):
         result.total_connections_created = (
             self.total_connections_created + other.total_connections_created
         )
-        result.total_copy_iterations = (
-            self.total_copy_iterations + other.total_copy_iterations
+        result.total_scan_iterations = (
+            self.total_scan_iterations + other.total_scan_iterations
         )
         result.total_read_time = self.total_read_time + other.total_read_time
         result.total_compression_time = (
@@ -314,24 +323,29 @@ class ConfigStatus(BaseAgentStatus):
         return self.__dict__
 
 
-class CopyingManagerStatus(BaseAgentStatus):
-    """The status object containing information about the agent's copying components."""
+class CopyingManagerWorkerSessionStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying manager worker session components."""
 
     def __init__(self):
+        self.session_id = None
+        # If the 'use_multiprocess_workers'config option is set to True,
+        # then it is a PID of the process in which the session is running.
+        # Otherwise, it equals to the agent's process PID.
+        self.pid = None  # type: Optional[int]
         # The total number of bytes successfully uploaded.
-        self.total_bytes_uploaded = 0
+        self.total_bytes_uploaded = 0  # type: int
         # The last time the agent successfully copied bytes from log files to the Scalyr servers.
-        self.last_success_time = None
+        self.last_success_time = None  # type: Optional[float]
         # The last time the agent attempted to copy bytes from log files to the Scalyr servers.
-        self.last_attempt_time = None
+        self.last_attempt_time = None  # type: Optional[float]
         # The size of the request for the last attempt.
-        self.last_attempt_size = None
+        self.last_attempt_size = None  # type: Optional[int]
         # The last response from the Scalyr servers.
-        self.last_response = None
+        self.last_response = None  # type: Optional[six.text_type]
         # The last status from the last response (should be 'success').
-        self.last_response_status = None
+        self.last_response_status = None  # type: Optional[six.text_type]
         # The total number of failed copy requests.
-        self.total_errors = None
+        self.total_errors = 0  # type: int
         # The total time in seconds we were blocked by the rate limiter
         self.total_rate_limited_time = 0
         # The time in seconds we were blocked by the rate limiter since the last status
@@ -343,13 +357,173 @@ class CopyingManagerStatus(BaseAgentStatus):
         self.total_blocking_response_time = 0
         self.total_request_time = 0
         self.total_pipelined_requests = 0
-        self.avg_bytes_produced_rate = 0
-        self.avg_bytes_copied_rate = 0
-
-        # LogMatcherStatus objects for each of the log paths being watched for copying.
-        self.log_matchers = []
 
         self.health_check_result = None
+
+        # LogProcessorStatus objects for each of the log files being processed by worker.
+        self.log_processors = []  # type: List[LogProcessorStatus]
+
+
+class CopyingManagerWorkerStatus(BaseAgentStatus):
+    def __init__(self):
+        self.worker_id = None
+        # the status objects from all sessions in the worker.
+        self.sessions = []  # type: List[CopyingManagerWorkerSessionStatus]
+
+    def get_pids(self):
+        # type: () -> List[int]
+        worker_pids = []
+        for session in self.sessions:
+            if session.pid:
+                worker_pids.append(session.pid)
+
+        return worker_pids
+
+    @property
+    def has_files(self):
+        # type: () -> bool
+        """
+        Shows if there is at least one file exists on some worker.
+        :return:
+        """
+        for worker in self.sessions:
+            if worker.log_processors:
+                return True
+        else:
+            return False
+
+
+class CopyingManagerStatus(BaseAgentStatus):
+    """The status object containing information about the agent's copying components."""
+
+    def __init__(self):
+        # The total number of bytes successfully uploaded by all workers.
+        self.total_bytes_uploaded = 0  # type: int
+        # The total number of all failures from all workers.
+        self.total_errors = 0  # type: int
+        # The overall text message with an information about the health check.
+        # For example it equals to "Good" if everything is ok.
+        self.health_check_result = None  # type: Optional[six.text_type]
+
+        # The overall text message with an information about the health check of the worker sessions..
+        self.worker_sessions_health_check = None  # type: Optional[six.text_type]
+
+        # How many times the copying manager scanned the file system for new files.
+        self.total_scan_iterations = 0  # type: int
+
+        # status objects for all log matchers.
+        self.log_matchers = []  # type: List[LogMatcherStatus]
+
+        # status object for each worker object.
+        self.workers = []  # type: List[CopyingManagerWorkerStatus]
+
+        # overall stats from workers.
+        self.total_rate_limited_time = 0
+        self.rate_limited_time_since_last_status = 0
+        self.total_read_time = 0
+        self.total_waiting_time = 0
+        self.total_blocking_response_time = 0
+        self.total_request_time = 0
+        self.total_pipelined_requests = 0
+
+        # the number of all running worker sessions.
+        self.num_worker_sessions = 0
+
+    def is_single_worker_session(self):
+        # type: () -> bool
+        """
+        Checks if the copying manager is in default configuration (1 worker, 1 session)
+        """
+        if len(self.workers) == 1:
+            worker = self.workers[-1]
+            if len(worker.sessions) == 1:
+                return True
+        return False
+
+    def get_all_worker_pids(self):
+        all_pids = []
+
+        for worker in self.workers:
+            all_pids.extend(worker.get_pids())
+
+        return all_pids
+
+    def _all_worker_sessions(self):
+        # type: () -> Generator
+        """
+        Generator that yields all sessions from all workers.
+        """
+        for worker_status in self.workers:
+            for session_status in worker_status.sessions:
+                yield session_status
+
+    def _verify_worker_sessions_health_check(self):
+        """
+        Prepare the message string with an information about worker sessions health check.
+        """
+        if self.is_single_worker_session():
+            worker_session = next(iter(self._all_worker_sessions()))
+            # just copy the health check from the single worker.
+            self.worker_sessions_health_check = worker_session.health_check_result
+        else:
+            # get the message for the worker session health check
+            all_healthy = True
+            for worker_session_status in self._all_worker_sessions():
+                if worker_session_status.health_check_result is None:
+                    # if some worker sessions do not have their health check results, then the result is None too.
+                    all_healthy = False
+                if worker_session_status.health_check_result != "Good":
+                    # if there are worker sessions with errors, set the message about it.
+                    self.worker_sessions_health_check = "Some workers have failed."
+                    all_healthy = False
+                    break
+
+            if all_healthy:
+                # every worker session is healthy, so the manager is healthy too.
+                self.worker_sessions_health_check = "Good"
+
+    def calculate_status(self):
+        """
+        Calculate overall stats based on all worker sessions.
+        :return:
+        """
+
+        self._verify_worker_sessions_health_check()
+
+        # sum up some worker session stats to overall stats.
+        for worker_session_status in self._all_worker_sessions():
+            self.num_worker_sessions += 1
+            self.total_errors += worker_session_status.total_errors
+            self.total_bytes_uploaded += worker_session_status.total_bytes_uploaded
+
+            self.total_rate_limited_time += (
+                worker_session_status.total_rate_limited_time
+            )
+            self.total_read_time += worker_session_status.total_read_time
+            self.total_waiting_time += worker_session_status.total_waiting_time
+            self.total_blocking_response_time += (
+                worker_session_status.total_blocking_response_time
+            )
+            self.total_request_time += worker_session_status.total_request_time
+            self.total_pipelined_requests += (
+                worker_session_status.total_pipelined_requests
+            )
+            self.rate_limited_time_since_last_status += (
+                worker_session_status.rate_limited_time_since_last_status
+            )
+
+    def to_dict(self):  # type: () -> dict
+        result = super(CopyingManagerStatus, self).to_dict()
+        if self.is_single_worker_session():
+            # In case of default configuration,
+            # On previous versions, the copying manager has those stats in its own dict,
+            # but now they are moved to worker sessions.
+            # We put stats from single worker session and copy them to copying manager's dict,
+            # to not break things for customers with default configuration
+            worker_session = self.workers[-1].sessions[-1]
+            result.update(worker_session.to_dict())
+
+        return result
 
 
 class LogMatcherStatus(BaseAgentStatus):
@@ -436,6 +610,24 @@ def report_status(output, status, current_time):
         "Agent started at:        %s" % scalyr_util.format_time(status.launch_time),
         file=output,
     )
+
+    parent_process_pid = os.getpid()
+    print("Main process pid:        %s" % (os.getpid()), file=output)
+
+    # If parent and worker pid is the same, this means we are using a single worker or not using
+    # multi process functionality so we don't report pids for child worker processes
+    if status.copying_manager_status:
+        worker_processes_pids = status.copying_manager_status.get_all_worker_pids()
+    else:
+        worker_processes_pids = []
+
+    if (
+        len(worker_processes_pids) >= 1
+        and parent_process_pid not in worker_processes_pids
+    ):
+        worker_processes_pids = ", ".join([str(pid) for pid in worker_processes_pids])
+        print("Worker processes pids:   %s" % worker_processes_pids, file=output)
+
     print("Version:                 %s" % status.version, file=output)
     print("VCS revision:            %s" % status.revision, file=output)
     print("Python version:          %s" % status.python_version, file=output)
@@ -549,7 +741,137 @@ def report_status(output, status, current_time):
         )
 
 
+def _indent_print(str, file, indent=4):
+    # type: (six.text_type, TextIO, int) -> None
+    """
+    Helper function to print with indents.
+    :param str: Original string.
+    :param file: Output file.
+    :param indent: Spaces to indent.
+    """
+    file.write(" " * indent)
+    print(str, file=file)
+
+
+def __get_overall_health_check(manager_status):
+    # type: (CopyingManagerStatus) -> six.text_type
+    """
+    Get the health check for the copying manager's thread and for its sessions.
+    :return:
+    """
+    # show overall health check
+    health_check_buffer = io.StringIO()
+    if (
+        manager_status.health_check_result == "Good"
+        and manager_status.worker_sessions_health_check == "Good"
+    ):
+        # the copying manager thread and workers are good, so overall health check is good too.
+        health_check_buffer.write("Good")
+    else:
+        if (
+            manager_status.health_check_result
+            and manager_status.health_check_result != "Good"
+        ):
+            # managers health check is something, but it's not Good, so there must be an error. Write it.
+            health_check_buffer.write(manager_status.health_check_result)
+        if (
+            manager_status.worker_sessions_health_check
+            and manager_status.worker_sessions_health_check != "Good"
+        ):
+            if health_check_buffer.tell() > 0:
+                # if the buffer not empty, then there is a previous error, put comma.
+                health_check_buffer.write(", ")
+            # workers health check is something, but it's not Good, so there must be an error. Write it.
+            health_check_buffer.write(manager_status.worker_sessions_health_check)
+
+    return health_check_buffer.getvalue()
+
+
+def _report_worker_session(
+    output, worker_session, manager_status, agent_log_file_path, indent
+):
+    # type: (TextIO, CopyingManagerWorkerSessionStatus, CopyingManagerStatus, six.text_type, int) -> None
+    """
+    Write worker session status to the file-like object.
+    :param output: file-like object.
+    :param worker_session: worker session status object.
+    :param agent_log_file_path:
+    :param indent: Number of spaces to indent on each new line.
+    :param manager_status: the manager status to produce the health check.
+    :return:
+    """
+    _indent_print(
+        "Bytes uploaded successfully:               %ld"
+        % worker_session.total_bytes_uploaded,
+        file=output,
+        indent=indent,
+    )
+    _indent_print(
+        "Last successful communication with Scalyr: %s"
+        % scalyr_util.format_time(worker_session.last_success_time),
+        file=output,
+        indent=indent,
+    )
+    _indent_print(
+        "Last attempt:                              %s"
+        % scalyr_util.format_time(worker_session.last_attempt_time),
+        file=output,
+        indent=indent,
+    )
+    if worker_session.last_attempt_size is not None:
+        _indent_print(
+            "Last copy request size:                    %ld"
+            % worker_session.last_attempt_size,
+            file=output,
+            indent=indent,
+        )
+    if worker_session.last_response is not None:
+        _indent_print(
+            "Last copy response size:                   %ld"
+            % len(worker_session.last_response),
+            file=output,
+            indent=indent,
+        )
+        _indent_print(
+            "Last copy response status:                 %s"
+            % worker_session.last_response_status,
+            file=output,
+            indent=indent,
+        )
+        if worker_session.last_response_status != "success":
+            _indent_print(
+                "Last copy response:                        %s"
+                % scalyr_util.remove_newlines_and_truncate(
+                    worker_session.last_response, 1000
+                ),
+                file=output,
+                indent=indent,
+            )
+    if worker_session.total_errors > 0:
+        _indent_print(
+            "Total responses with errors:               %d (see '%s' for details)"
+            % (worker_session.total_errors, agent_log_file_path,),
+            file=output,
+            indent=indent,
+        )
+
+    if manager_status.is_single_worker_session():
+        health_check_message = __get_overall_health_check(manager_status)
+    else:
+        health_check_message = worker_session.health_check_result
+
+    if health_check_message:
+        # if message is not empty, write it. In other case we still don't have all health check data.
+        _indent_print(
+            "Health check:                              %s" % health_check_message,
+            file=output,
+            indent=indent,
+        )
+    print("", file=output)
+
+
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
+    # type: (TextIO, CopyingManagerStatus, six.text_type, float) -> None
     print("Log transmission:", file=output)
     print("=================", file=output)
     print("", file=output)
@@ -559,60 +881,72 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         file=output,
     )
     print("", file=output)
+    workers = manager_status.workers
 
-    print(
-        "Bytes uploaded successfully:               %ld"
-        % manager_status.total_bytes_uploaded,
-        file=output,
-    )
-    print(
-        "Last successful communication with Scalyr: %s"
-        % scalyr_util.format_time(manager_status.last_success_time),
-        file=output,
-    )
-    print(
-        "Last attempt:                              %s"
-        % scalyr_util.format_time(manager_status.last_attempt_time),
-        file=output,
-    )
-    if manager_status.last_attempt_size is not None:
+    # if it is a default configuration, then we just print the stats of the single worker session.
+    if manager_status.is_single_worker_session():
+        worker_session = workers[-1].sessions[-1]
+        _report_worker_session(
+            output, worker_session, manager_status, agent_log_file_path, indent=0
+        )
+    else:
+        # print some overall information from all workers.
         print(
-            "Last copy request size:                    %ld"
-            % manager_status.last_attempt_size,
+            "Total bytes uploaded:                            %ld"
+            % manager_status.total_bytes_uploaded,
             file=output,
         )
-    if manager_status.last_response is not None:
-        print(
-            "Last copy response size:                   %ld"
-            % len(manager_status.last_response),
-            file=output,
-        )
-        print(
-            "Last copy response status:                 %s"
-            % manager_status.last_response_status,
-            file=output,
-        )
-        if manager_status.last_response_status != "success":
+
+        # print the overlall health chech.
+        health_check_message = __get_overall_health_check(manager_status)
+        if health_check_message:
+            # if message is not empty, write it. In other case we still don't have all health check data.
+            _indent_print(
+                "Overall health check:                            %s"
+                % health_check_message,
+                file=output,
+                indent=0,
+            )
+        if manager_status.total_errors > 0:
             print(
-                "Last copy response:                        %s"
-                % scalyr_util.remove_newlines_and_truncate(
-                    manager_status.last_response, 1000
-                ),
+                "Total errors occurred:                           %d"
+                % manager_status.total_errors,
                 file=output,
             )
-    if manager_status.total_errors > 0:
-        print(
-            "Total responses with errors:               %d (see '%s' for details)"
-            % (manager_status.total_errors, agent_log_file_path,),
-            file=output,
-        )
-    if manager_status.health_check_result:
-        print(
-            "Health check:                              %s"
-            % manager_status.health_check_result,
-            file=output,
-        )
-    print("", file=output)
+
+        print("", file=output)
+
+        # show every statistics for every session in every worker.
+        print("Uploads statistics by worker:", file=output)
+        for worker in manager_status.workers:
+            if not worker.has_files:
+                # skip worker if there is no log files.
+                continue
+            print(" Worker %s:" % worker.worker_id, file=output)
+            for worker_session in worker.sessions:
+                print("    Session %s:" % worker_session.session_id, file=output)
+                _report_worker_session(
+                    output,
+                    worker_session,
+                    manager_status,
+                    agent_log_file_path,
+                    indent=6,
+                )
+
+        # Show in which worker and session each file is located.
+        _indent_print(" Log files associated with workers:", file=output, indent=0)
+        for worker in manager_status.workers:
+            # skip worker if there is no log files.
+            if not worker.has_files:
+                continue
+            print("  Worker %s:" % worker.worker_id, file=output)
+            for worker_session in worker.sessions:
+                if len(worker.sessions) > 1:
+                    print("    Session %s:" % worker_session.session_id, file=output)
+                for log_processor in worker_session.log_processors:
+                    _indent_print(log_processor.log_path, file=output, indent=8)
+
+        print("", file=output)
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:

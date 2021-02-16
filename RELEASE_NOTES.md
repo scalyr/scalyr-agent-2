@@ -1,6 +1,228 @@
 # Release Notes
 
-## 2.1.8 - TBD
+## 2.1.16 "Lasso" - December 23, 2020
+
+* This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
+  and ``*.json`` files inside that directory and makes sure those files are not readable by
+  others by default (aka "other" permission bit in octal notation for that file is ``0`` in case
+  of a file and ``1`` in case of a directory).
+
+  In the previous releases, ``agent.json`` file was readable by others by default which means if a
+  user didn't explicitly lock down and change the permission of that file after installation,
+  other users who have access to the system where the agent is running on could potentially read
+  that file and access information such as the API key which is used to send / upload logs to
+  Scalyr.
+
+  This issue only affects users which run agent on servers with multiple users. Container
+  installations (Docker, Kubernetes) are single user by default so those are not affected.
+
+  This issue also doesn't affect any installations which use a configuration management tool such
+  as Ansible, Chef, Puppet, Terraform or similar to manage the config file content and permissions.
+
+  In fact, using configuration management tool to manage configuration file access and locking down
+  the permission is the best practice and recommended approach by us.
+
+  As part of the fix, agent will now lock down those file permissions and also fix them on upgrade
+  as part of the post install step for the existing files and installations.
+
+  If you intentionally changed "other" permission bits for any of those files to something else than
+  ``0``, you will need to change it again after installing / upgrading the agent.
+
+  If you believe you may be affected, we recommend revoking the old write API key used to send logs
+  and generating a new one.
+
+  Keep in mind that the API key used by the agent is a write one which only has access to send logs
+  and nothing else.
+
+  It's also worth noting that this only affects agent.json file bundled with the default agent
+  installation. If you manually removed that file and created a new one, that is out of the agent
+  scope and domain of ``umask`` on Linux.
+
+  On Windows, permissions are not rectified automatically because some users run the agent under a
+  custom non-Administrator user account so automatically fixing the permissions would break this
+  scenario.
+
+  In this case, user can manually run ``scalyr-agent-2-config.exe`` as administrator to revoke
+  permissions for "Users" group for the agent config.
+
+  ```powershell
+  & "C:\Program Files (x86)\Scalyr\config\scalyr-agent-2-config.exe" "--fix-config-permissions"
+  ```
+
+  Keep in mind that after running this script you need to use Administrator account to grant read
+  permissions to user account which is used to run the agent in case this user is not Administrator
+  or not a member of Administrators group.
+
+## 2.1.15 "Endora" - December 15, 2020
+
+### Increase Scalyr Agent upload throughput, using multiple Scalyr team accounts. (BETA)
+
+**Note, the use of multiple sessions to upload logs to Scalyr is currently in beta. Please be sure to test use of this
+ feature before deploying it widely in your production environment.**
+
+#### Multi-worker configuration
+
+##### Use multiple workers
+
+In a default configuration, the Scalyr Agent creates a single session with the Scalyr servers to upload all collected logs.
+This typically performs well enough for most users, but at some point, the log generation rate can exceed
+a single session's capacity (typically 2 to 8 MB/s depending on line size and other factors).
+You may increase overall throughput by increasing the number of sessions using the ``default_workers_per_pi_key`` option
+in the agent configuration. By default, the option value is ``1``.
+Each worker is assigned a subset of the log files to be uploaded, so increasing the number of workers,
+increasing the overall upload throughput.
+
+##### Use multiprocess workers
+
+Even if the workers create separate sessions, by default, they will still run within the same Python process,
+limiting their resources to a single CPU core.
+This may become a problem when the number of log files is too big to be handled by a single CPU core, especially if
+additional features (such as [sampling](https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#filter)
+and [redaction](/https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#filter) rules)
+are enabled.
+
+This limitation can be addressed using the ``use_multiprocess_copying_workers`` option in the agent configuration.
+By default, the option value is ``false``
+
+##### Recommended configuration
+
+To significantly increase overall throughput, we recommend you set the default workers per API key to ``3``, as well
+as turn on multiprocess workers. The following configuration shows an example of setting both of those options.
+```
+{
+    "use_multiprocess_copying_workers": true,
+    "default_workers_per_api_key": 3,
+    "api_key": "<you_key>",
+    "logs": [
+      {
+        "path": "/var/log/app/*.log",
+      },
+    ]
+
+}
+```
+
+If you are using Kubernetes, you will find it easier to configure these settings using their corresponding environment
+variables in the configmap for the Scalyr Agent DaemonSet:
+
+```
+SCALYR_USE_MULTIPROCESS_COPYING_WORKERS=true
+SCALYR_DEFAULT_WORKERS_PER_API_KEY=3
+```
+
+### Multiple API keys
+
+The multiple API keys feature is useful when it is necessary to upload particular log files using a different API keys,
+for instance, to upload to different Scalyr team accounts.
+
+#### Adding new API keys
+
+Each additional API key has to be defined in the list in the ``api_keys`` section.
+
+```
+"api_keys": [
+     {
+         "api_key": "<your_second_key>",
+         "id": "frontend_team",
+     },
+     {
+         "api_key": "<your_third_key>",
+         "id": "backend_team",
+     }
+]
+```
+
+Possible options for each element of the ``api_keys`` list:
+
+| Field   | required | Description                                                                                                                                            |
+|---------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| api_key | yes      | The API key token.                                                                                                                                     |
+| id      | yes      | The identifier of the API key. Must be unique. String.                                                                                                 |
+| workers | no       | The number of [workers](#multi-worker-configuration) for the API key. By default it has the same value as the `default_workers_per_api_key` [option](#multi-worker-configuration). |
+
+You may also split the definition of the api_keys field across [multiple configuration files](https://app.scalyr.com/help/scalyr-agent?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--#modularConfig)
+in the agent.d directory. The agent will join together all entries in all api_keys fields defined.
+
+NOTE: The "main" API key, which is defined in the ``api_key`` section, also has it's own implicit identifier - ``"default"``.
+
+The identifier ``"default"`` is reserved by the "main" API key and can not be used by other API keys. For example, the next configuration is invalid.
+```
+{
+    "api_key": "<main_key>",
+    "api_keys": [
+         {
+             "api_key": "<second_key>",
+             "id": "default",  // WRONG, the <main_key> API key already has the identifier "default".
+         },
+    ]
+}
+```
+
+As an exception, the ``"default"`` identifier can be used with the same ``api_key`` value as in the "main" ``api_key`` section to change default options for this API key.
+
+```
+{
+    "api_key": "<main_key>",
+    "api_keys": [
+         {
+             "api_key": "<main_key>", // the same API key as in the "api_key" section.
+             "id": "default",
+             "workers": 3 // change the workers number from default - 1 to 3.
+         },
+         {
+             "api_key": "<second_key>",
+             "id": "second",
+         },
+    ]
+}
+```
+
+#### Associating logs with API keys
+
+Each element of the ``logs`` section can be associated with a particular API key by specifying the ``api_key_id`` field.
+
+NOTE: If the ``api_key_id`` is omitted, then the ``default`` API key is used.
+```
+"logs": [
+    {
+       "path": "/var/log/frontend/*.log",
+       "api_key_id": "frontend_team" // the API key with identifier - "frontend_team" is used.
+    }
+    {
+       "path": "/var/log/backend/*.log"
+       // the "api_key_id" is omitted, the API key with "default" identifier is used.
+    }
+]
+```
+
+### Linux system metrics monitor improved
+
+ Linux system metrics monitor now ignores the following special mounts points by default:
+``/sys/*``, ``/dev*``, ``/run*``.
+
+  In most cases users just want to monitor block and inodes usage for actual data partitions
+  and not other special partitions.
+
+ If you want to preserve the old behavior and capture ``df.*`` metrics for those mounts points,
+ you can configure ``ignore_mounts`` monitor option like this:
+
+ ```javascript
+    ...
+    monitors: [
+        {
+            module: "scalyr_agent.builtin_monitors.linux_system_metrics",
+            ignore_mounts: [],
+        }
+    ],
+    implicit_metric_monitor: false,
+    ...
+ ```
+
+   Keep in mind that ``linux_system_metrics`` monitor is special since it's enabled automatically
+   by default so if you want to specify custom options for it, you need to add
+   ``implicit_metric_monitor: false,`` option to the config as well.
+
+## 2.1.8 "Titan" - August 3, 2020
 
 * The `status -v` and the new `status -H` command contain health check information and will have a return code
  of `2` if the health check is failing.

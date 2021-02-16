@@ -49,6 +49,7 @@ fi
 
 
 
+
 function create_pubkey_file() {
   if [[ $2 == "main" ]]; then
     gpg --armor --export $GPG_SIGNING_KEYID > $1;
@@ -355,11 +356,52 @@ create_main_yum_repo_packages;
 clean_package_files;
 create_alt_yum_repo_packages;
 
-ls
+tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb
 
-tar -cf repo_packages.tar *bootstrap*.rpm *bootstrap*.deb;
+set -e
 
-cp $SCRIPTPATH/installScalyrAgentV2.sh installScalyrAgentV2.sh
+REPOSITORY_URL="https://scalyr-repo.s3.amazonaws.com/$REPO_BASE_URL"
+
+PUBLIC_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6"
+
+# create a yum repo spec data.
+YUM_REPO_SPEC=$(cat << EOM
+[scalyr]
+includepkgs=scalyr-agent,scalyr-agent-2,scalyr-repo
+name=Scalyr packages - noarch
+baseurl=https://scalyr-repo.s3.amazonaws.com/$RELEASE_REPO_BASE_URL/yum/binaries/noarch
+mirror_expire=300
+metadata_expire=300
+enabled=1
+gpgcheck=1
+gpgkey=${PUBLIC_KEY_URL}
+EOM
+)
+
+echo "Create Scalyr yum repo spec file."
+echo "${YUM_REPO_SPEC}" > "scalyr.repo"
+
+# we need to escape the ampersand in order to be able use this text as a replacement part for the awk.
+YUM_REPO_SPEC=${YUM_REPO_SPEC//&/\\\\&}
+
+PUBLIC_KEY="$(curl -s "${PUBLIC_KEY_URL}")"
+
+install_script_text="$(cat "$SCRIPTPATH/installScalyrAgentV2.sh")"
+
+# replace a special placeholder for the repository type in the install sript to determine a final URL of the repository.
+install_script_text="$(awk -v url="$REPOSITORY_URL" '{sub("{ % REPLACE_REPOSITORY_URL % }", url); print}' <<<"$install_script_text")"
+
+# replace a special placeholder for the yum spec file.
+install_script_text="$(awk -v spec="$YUM_REPO_SPEC" '{sub("{ % REPLACE_YUM_REPO_SPEC % }", spec); print}' <<<"$install_script_text")"
+
+# replace a special placeholder for the public key url.
+install_script_text="$(awk -v key="$PUBLIC_KEY" '{sub("{ % REPLACE_PUBLIC_KEY % }", key); print}' <<<"$install_script_text")"
+
+# also remove all special comments which are usefull only for template but not for the resulting file.
+install_script_text="$(awk '{sub("# { #.*# }", ""); print}' <<<"$install_script_text")"
+
+echo "${install_script_text}" >installScalyrAgentV2.sh
+
 cat repo_packages.tar >> installScalyrAgentV2.sh
 rm -rf *bootstrap*.rpm
 rm -rf *bootstrap*.deb

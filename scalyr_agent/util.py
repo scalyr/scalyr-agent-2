@@ -27,10 +27,25 @@ if False:  # NOSONAR
     from typing import Tuple
     from typing import Callable
     from typing import Optional
+    from typing import Any
+    from typing import List
+    from typing import IO
 
 import codecs
 import sys
+import ssl
+import locale
+import collections
+import subprocess
+import signal
 from io import open
+
+if sys.version_info < (3, 5):
+    # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
+    import glob2  # pylint: disable=import-error
+else:
+    # Python 3.5 and higher supports `**`
+    import glob
 
 import six
 import functools
@@ -48,10 +63,17 @@ import os
 import threading
 import time
 import uuid
+import multiprocessing.managers
+
+try:
+    from __scalyr__ import SCALYR_VERSION
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
+from scalyr_agent.build_info import get_build_revision
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -110,6 +132,7 @@ SORT_KEYS = False
 SUPPORTED_COMPRESSION_ALGORITHMS = [
     "deflate",
     "bz2",
+    "none",
 ]
 
 # lz4 and zstandard library is not available for Python 2.6
@@ -123,6 +146,7 @@ COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
     "bz2": "bz2",
     "lz4": "lz4",
     "zstandard": "zstandard",
+    "none": "none",
 }
 
 # Maps compression type to a default compression level which is used if one is not specified by the
@@ -138,6 +162,7 @@ COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
     "bz2": 9,
     "lz4": 0,  # the fastest, but not the best compression ratio
     "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
+    "none": 0,
 }
 
 # Maps compression type to valid compression levels minimum and maximum compression level (inclusive)
@@ -146,6 +171,7 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
     "bz2": [1, 9],
     "lz4": [0, 16],
     "zstandard": [1, 22],
+    "none": [0, 0],
 }
 
 
@@ -199,7 +225,50 @@ def get_json_implementation(lib_name):
         except ImportError as e:
             raise ImportError(ORJSON_NOT_AVAILABLE_MSG % (str(e)))
 
-        return lib_name, orjson.dumps, orjson.loads
+        def orjson_dumps_custom(obj, fp):
+            """
+            This function falls back to native json library when there is a big unsigned 64 bit integer.
+            :return:
+            """
+
+            def default(obj):
+                # orjson can not serialize OrderedDict, so convert it to a regular dict.
+                if isinstance(obj, collections.OrderedDict):
+                    return dict(obj)
+                raise TypeError
+
+            def dump():
+                if fp is not None:
+                    return orjson.dump(obj, fp, default=default)
+                else:
+                    return orjson.dumps(obj, default=default)
+
+            try:
+                return dump()
+            except orjson.JSONEncodeError as e:
+                # if there is an integer size error, fall back to native json
+                if str(e) == "Integer exceeds 64-bit range":
+                    _, _json_dumps, _ = get_json_implementation("json")
+                    return _json_dumps(obj, fp)
+                if "surrogates not allowed" in str(e):
+                    # orjson also doesn't support non valid utf8-sequences so we fall back do standard
+                    # json implementation
+                    _, _json_dumps, _ = get_json_implementation("json")
+                    return _json_dumps(obj, fp)
+                else:
+                    raise
+
+        def orjson_loads_custom(data, *args, **kwargs):
+            try:
+                return orjson.loads(data, *args, **kwargs)
+            except Exception as e:
+                if "leading surrogate" in str(e) or "surrogates not allowed" in str(e):
+                    _, _, _json_loads = get_json_implementation("json")
+                    return _json_loads(data, *args, **kwargs)
+                else:
+                    raise
+
+        return lib_name, orjson_dumps_custom, orjson_loads_custom
 
     else:
         if lib_name != "json":
@@ -375,6 +444,7 @@ def value_to_bool(value):
 
 
 def _read_file_as_json(file_path, json_parser, strict_utf8=False):
+    # type: (six.text_type, Callable, bool) -> Any
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
@@ -387,7 +457,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
-    f = None
+    f = None  # type: Optional[IO]
     try:
         try:
             if not os.path.isfile(file_path):
@@ -436,6 +506,7 @@ def read_config_file_as_json(file_path):
 
 
 def read_file_as_json(file_path, strict_utf8=False):
+    # type: (six.text_type, bool) -> Any
     """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
     `dict`s, `list`s and primitive types.
 
@@ -456,9 +527,9 @@ def read_file_as_json(file_path, strict_utf8=False):
     def parse_standard_json(text):
         try:
             return json_decode(text)
-        except ValueError as e:
+        except Exception as err:
             raise JsonParseException(
-                "JSON parsing failed due to: %s" % six.text_type(e)
+                "JSON parsing failed due to: %s" % six.text_type(err)
             )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
@@ -508,7 +579,7 @@ def create_unique_id():
     """
     # 2->TODO this function should return unicode.
     base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
-    return base64_id.decode("utf-8")
+    return base64_id.decode("utf-8", "replace")
 
 
 def create_uuid3(namespace, name):
@@ -1245,7 +1316,12 @@ class StoppableThread(threading.Thread):
             indefinitely.
         @type timeout: float|None
         """
-        threading.Thread.join(self, timeout)
+        try:
+            threading.Thread.join(self, timeout)
+        except RuntimeError:
+            # Calling .join() on thread which is not started should not be considered fatal
+            pass
+
         if not self.isAlive() and self.__exception_info is not None:
             six.reraise(
                 self.__exception_info[0],
@@ -1766,7 +1842,7 @@ class RedirectorClient(StoppableThread):
                 bytes_to_read = code >> 1
                 stream_id = code % 2
 
-                content = self.__channel.read(bytes_to_read).decode("utf-8")
+                content = self.__channel.read(bytes_to_read).decode("utf-8", "replace")
 
                 if stream_id == RedirectorServer.STDOUT_STREAM_ID:
                     self.__stdout.write(content)
@@ -1923,6 +1999,14 @@ class RedirectorClient(StoppableThread):
             pass
 
 
+def noop_compress(data, compression_level=0):
+    return data
+
+
+def noop_decompress(data):
+    return data
+
+
 def verify_and_get_compress_func(compression_type, compression_level=9):
     # type: (str, int) -> Optional[Callable]
     """
@@ -1945,6 +2029,10 @@ def verify_and_get_compress_func(compression_type, compression_level=9):
         compress_func, decompress_func = get_compress_and_decompress_func(
             compression_type, compression_level=compression_level
         )
+
+        # Return early if special "none" compression is used
+        if compression_type == "none":
+            return compress_func
 
         # Perform a sanity check that data compresses and that it can be decompressed
         cdata = compress_func(COMPRESSION_TEST_STR)
@@ -2028,10 +2116,113 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
 
         compress_func = functools.partial(brotli.compress, quality=compression_level)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore
+    elif compression_algorithm == "none":
+        compress_func = noop_compress
+        decompress_func = noop_decompress  # type: ignore
     else:
         raise ValueError("Unsupported algorithm: %s" % (compression_algorithm))
 
     return compress_func, decompress_func
+
+
+def get_language_code_coding_and_locale():
+    # type: () -> Tuple[str, str, str]
+    """
+    Return values for the currently set language code, coding and user-friendly locale string.
+    """
+    try:
+        language_code, encoding = locale.getdefaultlocale()
+        if language_code and encoding:
+            used_locale = ".".join([language_code, encoding])
+        else:
+            language_code = "unknown"
+            encoding = "unknown"
+            used_locale = "unable to retrieve locale"
+    except Exception as e:
+        language_code = "unknown"
+        encoding = "unknown"
+        used_locale = "unable to retrieve locale: %s" % (str(e))
+
+    return language_code, encoding, used_locale
+
+
+def get_agent_start_up_message():
+    # type: () -> str
+    """
+    Return a message which is logged on agent start up.
+    """
+    python_version_str = sys.version.replace("\n", "")
+    build_revision = get_build_revision()
+    openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+
+    # We also include used locale and LANG env variable values since this makes it
+    # easier for us to troubleshoot invalid locale related issues
+    lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
+
+    (language_code, encoding, used_locale,) = get_language_code_coding_and_locale()
+
+    msg = (
+        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        % (
+            SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+        )
+    )
+
+    return msg
+
+
+def run_command_popen(args, shell=False, log_errors=False, logger_func=None):
+    # type: (List[str], bool, bool, Callable) -> Tuple[int, str, str]
+    """
+    Run the provided command using subprocess.Popen and return exit code, stdout and stderr.
+    """
+    logger_func = logger_func if logger_func else print
+
+    process = subprocess.Popen(
+        args, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE  # nosec
+    )
+    stdout, stderr = process.communicate()
+
+    if process.returncode != 0 and log_errors:
+        command = " ".join(args)
+        logger_func(
+            'Command "%s" returned exit code %s.' % (command, process.returncode)
+        )
+        logger_func("Stdout: %s" % (stdout.decode("utf-8")))
+        logger_func("Stderr: %s" % (stderr.decode("utf-8")))
+
+    return (process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8"))
+
+
+def win_remove_user_file_path_permissions(file_path, username):
+    # type: (str, str) -> None
+    """
+    Function which removes all the permissions for a user for a specified path.
+
+    This function uses icacls.exe underneath and should only be used on Windows.
+
+    NOTE: This function intentionally doesn't live in platform_windows.py since that module
+    also imports other Windows related modules which may not be available when we want to
+    call this function.
+    """
+    if not sys.platform.startswith("win"):
+        return None
+
+    # 1. First we need to disable inheritance for this file and the directory
+    args = ["icacls.exe", file_path, "/inheritance:d", "/T"]
+    run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
+
+    # 2. Then we remove the permissions for the user so only admin has permission to read
+    args = ["icacls.exe", file_path, "/remove", username, "/T"]
+    run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
 
 class RateLimiterToken(object):
@@ -2251,3 +2442,275 @@ class HistogramTracker(object):
             self.max(),
             self.estimate_median(),
         )
+
+
+def match_glob(pathname):
+    # type: (six.text_type) -> List[six.text_type]
+    """
+    Performs a glob match for the given pathname glob pattern, returning the list of matching
+    files. This is mostly done for the compatibility reason
+    because of the standard glob library on python <3.5, which does not support recursive globs
+
+    :param pathname: The glob pattern
+    :return: The list of matching paths
+    """
+    if sys.version_info >= (3, 5):
+        result = glob.glob(pathname, recursive=True)
+    else:
+        # use the third party glob library to handle a recursive glob.
+        result = glob2.glob(pathname)
+    return result
+
+
+class ProcessWatchDog(threading.Thread):
+    """
+    A watchdog that creates a new thread and pools a particular process.
+    If the process does not exist anymore, the watchdog invokes a callback.
+    """
+
+    def __init__(self, target_pid, poll_interval):
+        """
+        :param target_pid: target process PID
+        :param poll_interval: The polling interval in seconds.
+        """
+        super(ProcessWatchDog, self).__init__(name="watchdog thread.")
+
+        self.daemon = True
+
+        self._target_pid = target_pid
+        self._poll_interval = poll_interval
+
+        # the callback which is invoked when the process is killed.
+        self._on_stop_callback = None
+
+    def run(self):
+        """
+        Start probing the process.
+        :return:
+        """
+        while True:
+            try:
+                # probing the parent process.
+                if self._target_pid is not None:
+                    os.kill(self._target_pid, 0)
+                time.sleep(self._poll_interval)
+            except OSError:
+                self._on_stop_callback()
+                break
+
+    def start_watchdog(self, on_stop_callback):
+        # type: (Callable) -> None
+        """
+        Start a thread.
+
+        :param on_stop_callback: Function that will be invoked by this
+        abstraction once the parent is no longer running.
+        out.
+         """
+        self._on_stop_callback = on_stop_callback
+        super(ProcessWatchDog, self).start()
+
+
+class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
+    """
+
+    One of the downsides of the 'multiprocessing.managers.SyncManager' (further just 'manager') is that the
+    manager and its process can be shut down only externally through the IPC communication
+    by a parent or third process, and there is no facilities to handle the situation where the
+    parent(or other) process is killed and it can not send the shutdown request to manager.
+    In its current implementation, the manager is just remains orphan and keeps running.
+
+    """
+
+    class SharedObjectManagerExit(Exception):
+        """
+        The special exception which is raised when we need to exit from the infinite loop of the SyncManager
+         and to shutdown it gracefully.
+        """
+
+        pass
+
+    def __init__(self, *args, **kwargs):
+        """
+        Arguments are eventually passed to the superclass, and may vary from the python versions,
+        """
+        super(ParentProcessAwareSyncManager, self).__init__(*args, **kwargs)
+        # the instance of the ProcessWatchDog class which is responsible for the detection of the killed parent process.
+        self._watchdog = None
+
+        # time which is given to shutdown everything gracefully before the SIGKILL is sent.
+        self._time_before_kill = 10
+
+    def initialize(self, parent_pid, parent_process_poll_interval):
+        # type: (int, int) -> None
+        """
+        This function is called in at the beginning of the shared object manager's process.
+        Mostly, this function prepares and starts the watchdog thread which should terminate everything in case if
+        the parent process is killed and this process is left orphan.
+
+        :param parent_pid: PID of the parent process.
+        :param parent_process_poll_interval: Interval of polling the parent process.
+        """
+
+        # register a new handler for the SIGTERM signal
+
+        # The problem is that the main thread of its process is blocked by the infinite loop
+        # in the 'SyncManager._run_server' function and there is no documented options to break it.
+        # We also can not rely on the SIGTERM signal because it was inherited from the parent process
+        # and the it's signal handler is not able to terminate the process.
+
+        # Since the signal handler is always called in the main thread, we can use it and register
+        # a new handler which throws an exception and breaks the infinite loop.
+
+        # noinspection PyUnusedLocal
+        def terminate_main_thread(signal_num, frame):
+            raise type(self).SharedObjectManagerExit()
+
+        signal.signal(signal.SIGTERM, terminate_main_thread)
+
+        # create and start a watchdog for  a parent process.
+        self._watchdog = ProcessWatchDog(
+            parent_pid, poll_interval=parent_process_poll_interval,
+        )
+        self._watchdog.start_watchdog(on_stop_callback=self._terminate)
+
+    def start_shared_object_manager(
+        self, parent_pid, parent_process_poll_interval=5, initializer=None, initargs=(),
+    ):
+        # type: (int, int, Callable, Tuple) -> None
+        """
+        Wraps a an original start method and puts the 'self.initialize' function into initializer.
+        :param parent_pid: PID of the parent process.
+        :param parent_process_poll_interval: Interval of polling the parent process.
+        :param initializer: Additional callable, it has the same purpose as in the original 'self.start' method.
+        :param initargs: Passed directly to the 'self.start' method.
+        :return:
+        """
+
+        def final_initializer():
+            """
+            Custom initializer which combines the initializer which is provided from the outside,
+            and self.initialize functions.
+            """
+
+            # call the provided initialized first, if it is presented.
+            if initializer:
+                initializer()
+
+            # do the internal initialization.
+            self.initialize(
+                parent_pid=parent_pid,
+                parent_process_poll_interval=parent_process_poll_interval,
+            )
+
+        # start a manager with the combined initializer function.
+        super(ParentProcessAwareSyncManager, self).start(
+            initializer=final_initializer, initargs=initargs
+        )
+
+    def _terminate(self):
+        """
+        This callback is called by the watchdog instance if the parent process is killed.
+        """
+
+        # invoke the callback to perform custom cleanup actions.
+        try:
+            self._on_parent_process_kill()
+        except:
+            # for extra safety. But it is better to make sure
+            # that the overridden callback method '_on_parent_process_kill' does not throw anything.
+            pass
+
+        # send a terminate signal which has to send an exception and break the infinite loop in main thread.
+        from scalyr_agent import scalyr_logging
+
+        logger = scalyr_logging.getLogger(__name__)
+
+        logger.info("Sending SIGTERM to worker process with PID %s" % (os.getpid()))
+        os.kill(os.getpid(), signal.SIGTERM)
+
+        # To be on the safe side, give other threads some time to handle the SIGTERM gracefully and then send SIGKILL
+        time.sleep(self._time_before_kill)
+
+        logger.info("Sending SIGKILL to worker process with PID %s" % (os.getpid()))
+        os.kill(os.getpid(), signal.SIGKILL)
+
+    @classmethod
+    def _run_server(cls, *args, **kwargs):
+        """
+        Override the main blocking method of the SyncManager and wrap it
+        by exception clause to provide better logging information.
+        Argument are eventually passed directly to the super class function and may vary from version of the python.
+        """
+        error = None
+        try:
+            # pylint: disable=E1101
+            super(ParentProcessAwareSyncManager, cls)._run_server(*args, **kwargs)
+            # pylint: enable=E1101
+        except cls.SharedObjectManagerExit:
+            # this is a special error which has been called intentionally
+            # to exit the infinite loop in the "SyncManager._run_server" function and stop the thread;
+            pass
+        except Exception as err:
+            error = err
+            raise
+        finally:
+            # invoke the callback to handle the exit.
+            cls._on_exit(error=error)
+
+        sys.exit()
+
+    def _on_parent_process_kill(self):
+        """
+        Overridable callback to perform additional cleanup before the manager's process in terminated.
+        """
+
+    @classmethod
+    def _on_exit(cls, error=None):
+        # type: (Exception) -> None
+        """
+        Overridable callback to customize the exit of the main thread.
+        :param error: Exception object, if occurred.
+        """
+        pass
+
+    def shutdown_manager(self):
+        """
+        Send a shutdown request to the manager's process.
+        :return:
+        """
+        # pylint: disable=E1101
+        self.shutdown()  # type: ignore
+        # pylint: enable=E1101
+
+    def wait_for_shutdown(self, timeout=5):
+        """
+        Block the current thread until the manager's process is stopped.
+        The 'shutdown_manager' method has to be called before calling this.
+        """
+        # pylint: disable=E1101
+        self._process.join(timeout=timeout)  # type: ignore
+        # pylint: enable=E1101
+
+    @property
+    def process(self):
+        # type: () -> Optional[multiprocessing.Process]
+        """
+        Return the process object of the manager.
+        :return:
+        """
+        try:
+            return self._process  # type: ignore
+        except:
+            return None
+
+    @property
+    def pid(self):
+        # type: () -> Optional[int]
+        """
+        Return the PID of the manager's process.
+        """
+        try:
+            return self._process.pid  # type: ignore
+        except:
+            return None

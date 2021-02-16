@@ -30,6 +30,7 @@ PY26 = sys.version_info[0] == 2 and sys.version_info[1] == 6
 PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
 PY_post_equal_279 = sys.version_info >= (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
+PY3_post_equal_37 = PY3 and sys.version_info >= (3, 7)
 
 # NOTE: ssl.match_hostname was added in Python 2.7.9 so for earlier versions, we need to use
 # version from backports package
@@ -121,7 +122,9 @@ if six.PY2:
             for element in iterable:
                 if type(element) is tuple:
                     yield tuple(
-                        v.decode("utf-8") if type(v) is six.binary_type else v
+                        v.decode("utf-8", "replace")
+                        if type(v) is six.binary_type
+                        else v
                         for v in element
                     )
                 else:

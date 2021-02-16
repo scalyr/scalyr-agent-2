@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import shutil
 import os
 import atexit
+from io import open
 
 if False:  # NOSONAR
     from typing import Dict, Optional, Any, Union
@@ -33,6 +34,7 @@ from distutils.spawn import find_executable
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL, get_package_root
 from scalyr_agent import compat
 from scalyr_agent.platform_controller import PlatformController
+from scalyr_agent.configuration import Configuration
 
 from tests.utils.compat import Path
 from tests.utils.common import get_env
@@ -72,7 +74,9 @@ class AgentRunner(object):
         enable_coverage=False,
         enable_debug_log=False,
         send_to_server=True,
-    ):  # type: (int, bool, bool, bool) -> None
+        workers_type="thread",
+        workers_session_count=1,
+    ):  # type: (int, bool, bool, bool, six.text_type, int) -> None
 
         if enable_coverage and installation_type != DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")
@@ -110,6 +114,9 @@ class AgentRunner(object):
         self._init_agent_paths()
 
         self._agent_process = None
+
+        self._workers_type = workers_type
+        self._worker_sessions_count = workers_session_count
 
     def get_file_path_text(self, path):  # type: (Path) -> str
         return str(self._files[six.text_type(path)])
@@ -181,6 +188,7 @@ class AgentRunner(object):
         )
 
     def start(self, executable="python"):
+        self.clear_agent_logs()
         # important to call this function before agent was started.
         self._create_agent_files()
 
@@ -319,7 +327,7 @@ class AgentRunner(object):
             process.wait()
             self._agent_process.wait()
 
-            # Print any output produced by the agent before working which may not end up in the logs
+            # Print any output produced by the agent before forking which may not end up in the logs
             if self._agent_process.stdout and self._agent_process.stderr:
                 stdout = self._agent_process.stdout.read().decode("utf-8")
                 stderr = self._agent_process.stderr.read().decode("utf-8")
@@ -364,6 +372,12 @@ class AgentRunner(object):
 
         print("Agent process restarted.")
 
+    @property
+    def agent_pid(self):
+        path = self.agent_logs_dir_path / "agent.pid"
+        with open(six.text_type(path), "r") as f:
+            return int(f.read())
+
     def __del__(self):
         self.stop()
 
@@ -378,12 +392,32 @@ class AgentRunner(object):
         Build and return agent configuration.
         :return: dict with configuration.
         """
+
+        # do not include default log files.
+        files_to_exclude_from_config = [
+            str(Path(self.agent_logs_dir_path, name))  # type:ignore
+            for name in [
+                "linux_process_metrics.log",
+                "linux_system_metrics.log",
+                "agent.log",
+            ]
+        ]
+        config_log_files = list()
+        for log_file in self._log_files.values():
+            if log_file["path"] not in files_to_exclude_from_config:
+                config_log_files.append(log_file)
+
         config = {
             "api_key": compat.os_environ_unicode["SCALYR_API_KEY"],
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
-            "logs": list(self._log_files.values()),
+            "logs": config_log_files,
+            "default_sessions_per_worker": self._worker_sessions_count,
             "monitors": [],
+            "use_multiprocess_workers": self._workers_type == "process",
+            # NOTE: We disable this functionality so tests finish faster and we can use lower
+            # timeout
+            "global_monitor_sample_interval_enable_jitter": False,
         }
 
         if self._enable_debug_log:
@@ -402,6 +436,21 @@ class AgentRunner(object):
 
         print("Using agent config: %s" % (pprint.pformat(config_sanitized)))
 
+        return config
+
+    @property
+    def config_object(self):  # type: () -> Configuration
+        """
+        Get config object from the config file.
+        """
+        platform = PlatformController.new_platform()
+        platform._install_type = self._installation_type
+        default_types = platform.default_paths
+
+        config = Configuration(
+            six.text_type(self._agent_config_path), default_types, None
+        )
+        config.parse()
         return config
 
     @staticmethod
@@ -446,3 +495,55 @@ class AgentRunner(object):
         data = six.ensure_text(data)
         data = "{0}\n".format(data)
         self.write_to_file(path, data)
+
+    def clear_agent_logs(self):
+        """Clear agent logs directory."""
+        if self.agent_logs_dir_path.exists():
+            for child in self.agent_logs_dir_path.iterdir():
+                if child.is_file():
+                    child.unlink()
+
+    @property
+    def config(self):
+        # type: () -> Dict
+        """
+        Read config file and return as dict
+        """
+
+        return json.loads(self._agent_config_path.read_text())  # type: ignore
+
+    def write_config(self, config):
+        # type: (Dict) -> None
+        """
+        Write new data to the config.
+        """
+        self._agent_config_path.write_text(six.text_type(json.dumps(config)))  # type: ignore
+
+    @property
+    def worker_type(self):
+        return self._workers_type
+
+    @property
+    def worker_session_ids(self):
+        """
+        Return ids of all running worker sessions.
+        """
+        status = json.loads(self.status_json())  # type: ignore
+        ids = []
+        for worker in status["copying_manager_status"]["workers"]:
+            for worker_session in worker["sessions"]:
+                ids.append(worker_session["session_id"])
+
+        return ids
+
+    @property
+    def worker_sessions_log_paths(self):
+        """Get list of log file path for all worker sessions."""
+        result = []
+        for worker_session_id in self.config_object.get_session_ids_from_all_workers():
+            log_file_path = self.config_object.get_worker_session_agent_log_path(
+                worker_session_id
+            )
+            result.append(Path(log_file_path))
+
+        return result

@@ -187,7 +187,7 @@ def uptime(start_time):
     @param start_time: milliseconds passed since 'event' (not since epoc)
     @type float
     """
-    return datetime.datetime.now() - datetime.datetime.fromtimestamp(start_time)
+    return datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(start_time)
 
 
 def uptime_from_start_time(start_time):

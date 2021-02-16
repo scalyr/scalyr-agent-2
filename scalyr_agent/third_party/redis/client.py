@@ -50,7 +50,7 @@ def timestamp_to_datetime(response):
         response = int(response)
     except ValueError:
         return None
-    return datetime.datetime.fromtimestamp(response)
+    return datetime.datetime.utcfromtimestamp(response)
 
 
 def string_keys_to_dict(key_string, callback):

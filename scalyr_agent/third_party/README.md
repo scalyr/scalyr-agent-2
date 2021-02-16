@@ -32,7 +32,7 @@ The following libraries are included:
   * [PySocks](#PySocks)
   * [glob2](#glob2)
 
-## tcollector<a name="tcollector"> (GPL v3)
+## tcollector<a name="tcollector"> (LGPL v3)
 
 A project that enables adhoc metric collection by writing simple collectors, similar to ScalyrMonitors.
 For additional details, please visit the

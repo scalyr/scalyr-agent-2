@@ -419,7 +419,10 @@ class AgentLogger(logging.Logger):
         string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
 
         if extra_fields is not None:
-            for field_name in extra_fields:
+            # In (C)Python (2) dict keys are not sorted / ordering is not guaranteed so to ensure
+            # the same order of extra fields in each log line, we explicitly sort them here
+            extra_fields_names = sorted(extra_fields.keys())
+            for field_name in extra_fields_names:
                 if not isinstance(field_name, _METRIC_NAME_SUPPORTED_TYPES):
                     raise UnsupportedValueType(field_name=field_name)
 
@@ -1016,7 +1019,7 @@ class RateLimiterLogFilter(object):
             return record.rate_limited_result
 
         record.rate_limited_set = True
-        # Note, it is important we set rate_limited_droppped_records before we invoke the formatter since the
+        # Note, it is important we set rate_limited_dropped_records before we invoke the formatter since the
         # formatting is dependent on that value and our formatters cache the result.
         record.rate_limited_dropped_records = self.__dropped_records
         record_str = self.__formatter.format(record)

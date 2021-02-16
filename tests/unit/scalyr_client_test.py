@@ -40,9 +40,10 @@ from scalyr_agent.scalyr_client import (
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
-
+from scalyr_agent.test_base import skipIf
 
 import scalyr_agent.test_util as test_util
+import scalyr_agent.scalyr_client
 
 
 class AddEventsRequestTest(ScalyrTestCase):
@@ -1015,6 +1016,8 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
     def test_get_user_agent_includes_requests_version(self):
+        scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
+
         # without requests
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -1022,7 +1025,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "ssllib")
+        self.assertEqual(split[-3], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
         # with requests
@@ -1036,8 +1039,105 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
         self.assertEqual(split[-1], "requests-2.15.1")
-        self.assertEqual(split[-2], "ssllib")
+        self.assertEqual(split[-4], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    @mock.patch("scalyr_agent.platform_controller.PlatformController.new_platform")
+    def test_get_user_agent_string_run_as_admin(self, mock_new_platform):
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "nobody"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("a-0" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "User"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertFalse("" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "root"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("a-1" in split)
+
+        mock_platform = mock.Mock()
+        mock_platform.get_current_user.return_value = "MyDomain\\Administrators"
+        mock_new_platform.return_value = mock_platform
+
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("a-1" in split)
+
+    @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
+    def test_get_user_agent_worker_and_api_key_info(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            sessions_api_keys_tuple=None,
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-0" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            sessions_api_keys_tuple=("threaded", 1, 1),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-0" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            sessions_api_keys_tuple=("threaded", 3, 2),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-1|3|2" in split)
+
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            sessions_api_keys_tuple=("multiprocess", 4, 3),
+        )
+
+        user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
+        split = user_agent.split(";")
+        self.assertTrue("mw-2|4|3" in split)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
@@ -1199,16 +1299,25 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             )
 
             self.assertEqual(path[0], "/addEvents")
-            self.assertEqual(
-                session._ScalyrClientSession__standard_headers["Content-Encoding"],
-                compression_type,
-            )
 
-            # Verify decompressed data matches the raw body
-            self.assertTrue(b"test message 1" not in request["body"])
-            self.assertTrue(b"test message 2" not in request["body"])
-            self.assertFalse(serialized_data == request["body"])
-            self.assertEqual(serialized_data, decompress_func(request["body"]))
+            if compression_type == "none":
+                self.assertTrue(
+                    "Content-Encoding"
+                    not in session._ScalyrClientSession__standard_headers
+                )
+                self.assertTrue(b"test message 1" in request["body"])
+                self.assertTrue(b"test message 2" in request["body"])
+            else:
+                self.assertEqual(
+                    session._ScalyrClientSession__standard_headers["Content-Encoding"],
+                    compression_type,
+                )
+
+                # Verify decompressed data matches the raw body
+                self.assertTrue(b"test message 1" not in request["body"])
+                self.assertTrue(b"test message 2" not in request["body"])
+                self.assertFalse(serialized_data == request["body"])
+                self.assertEqual(serialized_data, decompress_func(request["body"]))
 
         # Compression is disabled
         session = ScalyrClientSession(

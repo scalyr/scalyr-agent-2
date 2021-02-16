@@ -12,6 +12,7 @@ omit =
     */.virtualenvs/*
     */venv/*
     */third_party*/*
+    */platform_tests/*
     tests/ami/*
     tests/distribution/*
     tests/distribution_builders/*

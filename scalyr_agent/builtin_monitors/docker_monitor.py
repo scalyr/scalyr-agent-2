@@ -33,10 +33,19 @@ import time
 import threading
 from io import open
 
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 import six
 from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
     ProtocolError,
 )
+from docker.types.daemon import CancellableStream
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
@@ -53,6 +62,19 @@ global_log = scalyr_logging.getLogger(__name__)
 __monitor__ = __name__
 
 DOCKER_LABEL_CONFIG_RE = re.compile(r"^(com\.scalyr\.config\.log\.)(.+)")
+
+# Error log message which is logged when Docker inspect API endpoint returns empty value for LogPath
+# attribute for a particular container.
+# Empty attribute usually indicates that the Docker daemon is not configured correctly and that some
+# other, non json-log log-driver is used.
+# If docker_raw_logs is False and LogPath is empty, it means no logs will be monitored / ingested
+# for that container.
+NO_LOG_PATH_ATTR_MSG = (
+    'LogPath attribute for container with id "%s" and name "%s" is empty. '
+    "Logs for this container will not be monitored / ingested. This likely "
+    "represents a misconfiguration on the Docker daemon side (e.g. docker "
+    "daemon is configured to use some other and not json-file log-driver)."
+)
 
 define_config_option(
     __monitor__,
@@ -76,7 +98,7 @@ define_config_option(
     __monitor__,
     "container_check_interval",
     "Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.",
-    convert_to=int,
+    convert_to=float,
     default=5,
     env_aware=True,
 )
@@ -265,10 +287,14 @@ define_config_option(
     env_aware=True,
 )
 
-# for now, always log timestamps to help prevent a race condition
-# define_config_option( __monitor__, 'log_timestamps',
-#                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
-#                     convert_to=bool, default=False)
+# for now, always log timestamps by default to help prevent a race condition
+define_config_option(
+    __monitor__,
+    "log_timestamps",
+    "Optional (defaults to True). If true, stdout/stderr logs for logs consumed via Docker API (docker_raw_logs: false) will contain docker timestamps at the beginning of the line\n",
+    convert_to=bool,
+    default=True,
+)
 
 define_metric(
     __monitor__,
@@ -597,7 +623,7 @@ define_metric(
 )
 
 
-class WrappedStreamResponse(object):
+class WrappedStreamResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
@@ -608,31 +634,32 @@ class WrappedStreamResponse(object):
         self.response = response
         self.decode = decode
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(DockerClient, self.client)._stream_helper(
-            self.response, self.decode
-        ):
-            yield item
+        stream = super(DockerClient, self.client)._stream_helper(
+            response=self.response, decode=decode
+        )
+        super(WrappedStreamResponse, self).__init__(stream=stream, response=response)
 
 
-class WrappedRawResponse(object):
+class WrappedRawResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._stream_raw_result
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
     """
 
-    def __init__(self, client, response):
+    def __init__(self, client, response, chunk_size=8096):
         self.client = client
         self.response = response
+        self.chunk_size = chunk_size
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
-            yield item
+        stream = super(DockerClient, self.client)._stream_raw_result(
+            response=self.response, chunk_size=self.chunk_size
+        )
+        super(WrappedRawResponse, self).__init__(stream=stream, response=response)
 
 
-class WrappedMultiplexedStreamResponse(object):
+class WrappedMultiplexedStreamResponse(CancellableStream):
     """ Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
@@ -642,12 +669,13 @@ class WrappedMultiplexedStreamResponse(object):
         self.client = client
         self.response = response
 
-    def __iter__(self):
         # pylint: disable=bad-super-call
-        for item in super(
-            DockerClient, self.client
-        )._multiplexed_response_stream_helper(self.response):
-            yield item
+        stream = super(DockerClient, self.client)._multiplexed_response_stream_helper(
+            response=self.response
+        )
+        super(WrappedMultiplexedStreamResponse, self).__init__(
+            stream=stream, response=response
+        )
 
 
 class DockerClient(docker.APIClient):  # pylint: disable=no-member
@@ -762,6 +790,16 @@ def _get_containers(
                                 log_path = (
                                     info["LogPath"] if "LogPath" in info else None
                                 )
+
+                                if not log_path:
+                                    # NOTE: If docker_raw_logs is True and we hit this code path it
+                                    # really means we won't be ingesting any logs so this should
+                                    # really be treated as a fatal error.
+                                    logger.error(
+                                        NO_LOG_PATH_ATTR_MSG % (cid, name),
+                                        limit_once_per_x_secs=300,
+                                        limit_key="docker-api-inspect",
+                                    )
 
                             if get_labels:
                                 config = info.get("Config", {})
@@ -1219,7 +1257,7 @@ class ContainerChecker(StoppableThread):
             if self.__log_watcher:
                 try:
                     log["log_config"] = self.__log_watcher.add_log_config(
-                        self.__module.module_name, log["log_config"]
+                        self.__module.module_name, log["log_config"], force_add=True
                     )
                 except Exception as e:
                     global_log.info(
@@ -1245,7 +1283,9 @@ class ContainerChecker(StoppableThread):
                 )
 
     def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+        result = datetime.datetime.utcfromtimestamp(self.__start_time)
+
+        fp = None
 
         try:
             full_path = os.path.join(self.__log_path, path)
@@ -1270,9 +1310,22 @@ class ContainerChecker(StoppableThread):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
-            fp.close()
+        except IOError as e:
+            # If file doesn't exist, this simple means that the new container has been started and
+            # the log file doesn't exist on disk yet.
+            if e.errno == 2:
+                global_log.info(
+                    "File %s doesn't exist on disk. This likely means a new container "
+                    "has been started and no existing logs are available for it on "
+                    "disk. Original error: %s" % (full_path, six.text_type(e))
+                )
+            else:
+                global_log.info("%s", six.text_type(e))
         except Exception as e:
             global_log.info("%s", six.text_type(e))
+        finally:
+            if fp:
+                fp.close()
 
         return scalyr_util.seconds_since_epoch(result)
 
@@ -1344,7 +1397,15 @@ class ContainerChecker(StoppableThread):
 
             attrs.update(container_attributes)
 
+            labels = info.get("labels", []) or []
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                'Found labels "%s" for container %s. Using attributes: %s.'
+                % (", ".join(labels), info["name"], str(attrs)),
+            )
+
             if self._use_raw_logs and "log_path" in info and info["log_path"]:
+                stream_count = 1
                 log_config = self.__create_log_config(
                     default_parser="docker",
                     path=info["log_path"],
@@ -1357,6 +1418,7 @@ class ContainerChecker(StoppableThread):
 
                 result.append({"cid": cid, "stream": "raw", "log_config": log_config})
             else:
+                stream_count = 2
                 path = prefix + info["name"] + "-stdout.log"
                 log_config = self.__create_log_config(
                     default_parser="dockerStdout",
@@ -1374,6 +1436,22 @@ class ContainerChecker(StoppableThread):
                     path=path,
                     attributes=attrs,
                     base_config=base_config,
+                )
+                result.append(
+                    {"cid": cid, "stream": "stderr", "log_config": log_config}
+                )
+
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "Using log config %s for container %s"
+                % (str(result[-1]), info["name"]),
+            )
+
+            if stream_count == 2:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Using log config %s for container %s"
+                    % (str(result[-2]), info["name"]),
                 )
 
         return result
@@ -1438,9 +1516,7 @@ class DockerLogger(object):
         self.stream_name = name + "-" + stream
 
         self.__max_previous_lines = config.get("max_previous_lines")
-        self.__log_timestamps = (
-            True  # Note: always log timestamps for now.  config.get( 'log_timestamps' )
-        )
+        self.__log_timestamps = config.get("log_timestamps")
         self.__docker_api_version = config.get("docker_api_version")
 
         self.__last_request_lock = threading.Lock()
@@ -1448,6 +1524,13 @@ class DockerLogger(object):
         self.__last_request = time.time()
         if last_request:
             self.__last_request = last_request
+
+        last_request_dt = datetime.datetime.utcfromtimestamp(self.__last_request)
+
+        global_log.debug(
+            'Using last_request value of "%s" for log_path "%s" and cid "%s", name "%s"'
+            % (last_request_dt, self.log_path, self.cid, self.name)
+        )
 
         self.__logger = logging.Logger(cid + "." + stream)
 
@@ -1471,10 +1554,23 @@ class DockerLogger(object):
         self.__thread.start()
 
     def stop(self, wait_on_join=True, join_timeout=5):
-        if self.__client and self.__logs and self.__logs.response:
-            sock = self.__client._get_raw_response_socket(self.__logs.response)
+        # NOTE: Depending on the class used, attribute name may either be response or _response
+        if (
+            self.__client
+            and self.__logs
+            and getattr(self.__logs, "response", getattr(self.__logs, "_response"))
+        ):
+            sock = self.__client._get_raw_response_socket(
+                getattr(self.__logs, "response", getattr(self.__logs, "_response"))
+            )
+
             if sock:
-                sock.shutdown(socket.SHUT_RDWR)
+                # Under Python 3, SocketIO is used which case close() attribute and not shutdown
+                if hasattr(sock, "shutdown"):
+                    sock.shutdown(socket.SHUT_RDWR)
+                else:
+                    sock.close()
+
         self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
     def last_request(self):
@@ -1531,6 +1627,7 @@ class DockerLogger(object):
                 )
                 try:
                     for line in self.__logs:
+                        line = six.ensure_text(line)
                         # split the docker timestamp from the frest of the line
                         dt, log_line = _split_datetime_from_line(line)
                         if not dt:
@@ -1551,6 +1648,10 @@ class DockerLogger(object):
                                 self.__last_request_lock.acquire()
                                 self.__last_request = timestamp
                                 self.__last_request_lock.release()
+                            else:
+                                # TODO: We should probably log under debug level 5 here to make
+                                # troubleshooting easier.
+                                pass
 
                         if not run_state.is_running():
                             self.__logger.log(
@@ -1584,11 +1685,32 @@ class DockerLogger(object):
             self.__last_request += 0.01
 
             self.__last_request_lock.release()
-
+        except docker.errors.NotFound as e:
+            # This simply represents the container has been stopped / killed before the client has
+            # been able to cleanly close the connection. This error is non-fatal and simply means we
+            # will clean up / remove the log on next iteration.
+            global_log.info(
+                'Container with id "%s" and name "%s" has been removed or deleted. Log file '
+                "will be removed on next loop iteration. Original error: %s."
+                % (self.cid, self.name, str(e))
+            )
         except Exception as e:
+            # Those errors are not fatal so we simply ignore dont dont log them under warning.
+            # They usually appear on agent restart when using log consumption via API since
+            # long running streaming API connection will be closed.
+            if "readinto of closed file" in str(e) or "operation on closed file" in str(
+                e
+            ):
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Unhandled non-fatal exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
+                    % (self.name, six.text_type(e), traceback.format_exc()),
+                )
+                return
+
             global_log.warn(
-                "Unhandled exception in DockerLogger.process_request for %s:\n\t%s"
-                % (self.name, six.text_type(e))
+                "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
+                % (self.name, six.text_type(e), traceback.format_exc())
             )
 
 

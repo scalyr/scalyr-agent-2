@@ -125,129 +125,150 @@ cluster.
 
 ## Configuration Reference
 
-|||# Option                               ||| Usage
-|||# ``module``                           ||| Always ``scalyr_agent.builtin_monitors.kubernetes_monitor``
-|||# ``container_name``                   ||| Optional (defaults to None). Defines a regular expression that matches \
-                                              the name given to the container running the scalyr-agent.
-If this is \
-                                              None, the scalyr agent will look for a container running \
-                                              /usr/sbin/scalyr-agent-2 as the main process.
+|||# Option                                         ||| Usage
+|||# ``module``                                     ||| Always ``scalyr_agent.builtin_monitors.kubernetes_monitor``
+|||# ``container_name``                             ||| Optional (defaults to None). Defines a regular expression that \
+                                                        matches the name given to the container running the \
+                                                        scalyr-agent.
+If this is None, the scalyr agent will look for \
+                                                        a container running /usr/sbin/scalyr-agent-2 as the main \
+                                                        process.
 
-|||# ``container_check_interval``         ||| Optional (defaults to 5). How often (in seconds) to check if containers \
-                                              have been started or stopped.
-|||# ``api_socket``                       ||| Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket \
-                                              used to communicate with the docker API.   WARNING, if you have `mode` \
-                                              set to `syslog`, you must also set the `docker_api_socket` configuration \
-                                              option in the syslog monitor to this same value
-Note:  You need to map \
-                                              the host's /run/docker.sock to the same value as specified here, using \
-                                              the -v parameter, e.g.
+|||# ``container_check_interval``                   ||| Optional (defaults to 5). How often (in seconds) to check if \
+                                                        containers have been started or stopped.
+|||# ``initial_stopped_container_collection_window``||| By default, the Scalyr Agent does not collect the logs from \
+                                                        any pods stopped before the agent was started. To override \
+                                                        this, set this parameter to the number of seconds the agent \
+                                                        will look in the past (before it was started). It will collect \
+                                                        logs for any pods that was started and stopped during this \
+                                                        window.
+|||# ``api_socket``                                 ||| Optional (defaults to /var/scalyr/docker.sock). Defines the \
+                                                        unix socket used to communicate with the docker API.   \
+                                                        WARNING, if you have `mode` set to `syslog`, you must also set \
+                                                        the `docker_api_socket` configuration option in the syslog \
+                                                        monitor to this same value
+Note:  You need to map the host's \
+                                                        /run/docker.sock to the same value as specified here, using \
+                                                        the -v parameter, e.g.
 	docker run -v \
-                                              /run/docker.sock:/var/scalyr/docker.sock ...
-|||# ``docker_api_version``               ||| Optional (defaults to 'auto'). The version of the Docker API to use.  \
-                                              WARNING, if you have `mode` set to `syslog`, you must also set the \
-                                              `docker_api_version` configuration option in the syslog monitor to this \
-                                              same value
+                                                        /run/docker.sock:/var/scalyr/docker.sock ...
+|||# ``docker_api_version``                         ||| Optional (defaults to 'auto'). The version of the Docker API \
+                                                        to use.  WARNING, if you have `mode` set to `syslog`, you must \
+                                                        also set the `docker_api_version` configuration option in the \
+                                                        syslog monitor to this same value
 
-|||# ``docker_log_prefix``                ||| Optional (defaults to docker). Prefix added to the start of all docker \
-                                              logs.
-|||# ``docker_max_parallel_stats``        ||| Optional (defaults to 20). Maximum stats requests to issue in parallel \
-                                              when retrieving container metrics using the Docker API.
-|||# ``docker_percpu_metrics``            ||| Optional (defaults to False). When `True`, emits cpu usage stats per \
-                                              core.  Note: This is disabled by default because it can result in an \
-                                              excessive amount of metric data on cpus with a large number of cores
-|||# ``max_previous_lines``               ||| Optional (defaults to 5000). The maximum number of lines to read \
-                                              backwards from the end of the stdout/stderr logs
-when starting to log a \
-                                              containers stdout/stderr to find the last line that was sent to Scalyr.
-|||# ``readback_buffer_size``             ||| Optional (defaults to 5k). The maximum number of bytes to read backwards \
-                                              from the end of any log files on disk
-when starting to log a containers \
-                                              stdout/stderr.  This is used to find the most recent timestamp logged to \
-                                              file was sent to Scalyr.
-|||# ``log_mode``                         ||| Optional (defaults to "docker_api"). Determine which method is used to \
-                                              gather logs from the local containers. If "docker_api", then this agent \
-                                              will use the docker API to contact the local containers and pull logs \
-                                              from them.  If "syslog", then this agent expects the other containers to \
-                                              push logs to this one using the syslog Docker log plugin.  Currently, \
-                                              "syslog" is the preferred method due to bugs/issues found with the \
-                                              docker API.  It is not the default to protect legacy behavior.
+|||# ``docker_log_prefix``                          ||| Optional (defaults to docker). Prefix added to the start of \
+                                                        all docker logs.
+|||# ``docker_max_parallel_stats``                  ||| Optional (defaults to 20). Maximum stats requests to issue in \
+                                                        parallel when retrieving container metrics using the Docker \
+                                                        API.
+|||# ``docker_percpu_metrics``                      ||| Optional (defaults to False). When `True`, emits cpu usage \
+                                                        stats per core.  Note: This is disabled by default because it \
+                                                        can result in an excessive amount of metric data on cpus with \
+                                                        a large number of cores
+|||# ``max_previous_lines``                         ||| Optional (defaults to 5000). The maximum number of lines to \
+                                                        read backwards from the end of the stdout/stderr logs
+when \
+                                                        starting to log a containers stdout/stderr to find the last \
+                                                        line that was sent to Scalyr.
+|||# ``readback_buffer_size``                       ||| Optional (defaults to 5k). The maximum number of bytes to read \
+                                                        backwards from the end of any log files on disk
+when starting \
+                                                        to log a containers stdout/stderr.  This is used to find the \
+                                                        most recent timestamp logged to file was sent to Scalyr.
+|||# ``log_mode``                                   ||| Optional (defaults to "docker_api"). Determine which method is \
+                                                        used to gather logs from the local containers. If \
+                                                        "docker_api", then this agent will use the docker API to \
+                                                        contact the local containers and pull logs from them.  If \
+                                                        "syslog", then this agent expects the other containers to push \
+                                                        logs to this one using the syslog Docker log plugin.  \
+                                                        Currently, "syslog" is the preferred method due to bugs/issues \
+                                                        found with the docker API.  It is not the default to protect \
+                                                        legacy behavior.
 
-|||# ``container_globs``                  ||| Optional (defaults to None). If true, a list of glob patterns for \
-                                              container names.  Only containers whose names match one of the glob \
-                                              patterns will be monitored.
-|||# ``report_container_metrics``         ||| Optional (defaults to True). If true, metrics will be collected from the \
-                                              container and reported  to Scalyr.  Note, metrics are only collected \
-                                              from those containers whose logs are being collected
-|||# ``report_k8s_metrics``               ||| Optional (defaults to True). If true and report_container_metrics is \
-                                              true, metrics will be collected from the k8s and reported to Scalyr.
-|||# ``k8s_ignore_namespaces``            ||| Optional (defaults to "kube-system"). A comma-delimited list of the \
-                                              namespaces whose pods's logs should not be collected and sent to Scalyr.
-|||# ``k8s_ignore_pod_sandboxes``         ||| Optional (defaults to True). If True then all containers with the label \
-                                              `io.kubernetes.docker.type` equal to `podsandbox` are excluded from \
-                                              thelogs being collected
-|||# ``k8s_include_all_containers``       ||| Optional (defaults to True). If True, all containers in all pods will be \
-                                              monitored by the kubernetes monitor unless they have an include: false \
-                                              or exclude: true annotation. If false, only pods/containers with an \
-                                              include:true or exclude:false annotation will be monitored. See \
-                                              documentation on annotations for further detail.
-|||# ``k8s_use_v2_attributes``            ||| Optional (defaults to False). If True, will use v2 version of attribute \
-                                              names instead of the names used with the original release of this \
-                                              monitor.  This is a breaking change so could break searches / alerts if \
-                                              you rely on the old names
-|||# ``k8s_use_v1_and_v2_attributes``     ||| Optional (defaults to False). If True, send attributes using both v1 and \
-                                              v2 versions of theirnames.  This may be used to fix breakages when you \
-                                              relied on the v1 attribute names
-|||# ``k8s_api_url``                      ||| DEPRECATED.
-|||# ``k8s_cache_expiry_secs``            ||| Optional (defaults to 30). The amount of time to wait between fully \
-                                              updating the k8s cache from the k8s api. Increase this value if you want \
-                                              less network traffic from querying the k8s api.  Decrease this value if \
-                                              you want dynamic updates to annotation configuration values to be \
-                                              processed more quickly.
-|||# ``k8s_cache_purge_secs``             ||| Optional (defaults to 300). The number of seconds to wait before purging \
-                                              unused items from the k8s cache
-|||# ``k8s_cache_init_abort_delay``       ||| Optional (defaults to 120). The number of seconds to wait for \
-                                              initialization of the kubernetes cache before aborting the \
-                                              kubernetes_monitor.
-|||# ``k8s_parse_json``                   ||| Deprecated, please use `k8s_parse_format`. If set, and True, then this \
-                                              flag will override the `k8s_parse_format` to `auto`. If set and False, \
-                                              then this flag will override the `k8s_parse_format` to `raw`.
-|||# ``k8s_parse_format``                 ||| Optional (defaults to `auto`). Valid values are: `auto`, `json`, `cri` \
-                                              and `raw`. If `auto`, the monitor will try to detect the format of the \
-                                              raw log files, e.g. `json` or `cri`.  Log files will be parsed in this \
-                                              format before uploading to the server to extract log and timestamp \
-                                              fields.  If `raw`, the raw contents of the log will be uploaded to \
-                                              Scalyr. (Note: An incorrect setting can cause parsing to fail which will \
-                                              result in raw logs being uploaded to Scalyr, so please leave this as \
-                                              `auto` if in doubt.)
-|||# ``k8s_always_use_cri``               ||| Optional (defaults to False). If True, the kubernetes monitor will \
-                                              always try to read logs using the container runtime interface even when \
-                                              the runtime is detected as docker
-|||# ``k8s_always_use_docker``            ||| Optional (defaults to False). If True, the kubernetes monitor will \
-                                              always try to get the list of running containers using docker even when \
-                                              the runtime is detected to be something different.
-|||# ``k8s_cri_query_filesystem``         ||| Optional (defaults to False). If True, then when in CRI mode, the \
-                                              monitor will only query the filesystem for the list of active \
-                                              containers, rather than first querying the Kubelet API. This is a useful \
-                                              optimization when the Kubelet API is known to be disabled.
-|||# ``k8s_verify_api_queries``           ||| Optional (defaults to True). If true, then the ssl connection for all \
-                                              queries to the k8s API will be verified using the ca.crt certificate \
-                                              found in the service account directory. If false, no verification will \
-                                              be performed. This is useful for older k8s clusters where certificate \
-                                              verification can fail.
-|||# ``gather_k8s_pod_info``              ||| Optional (defaults to False). If true, then every gather_sample \
-                                              interval, metrics will be collected from the docker and k8s APIs showing \
-                                              all discovered containers and pods. This is mostly a debugging aid and \
-                                              there are performance implications to always leaving this enabled
-|||# ``include_daemonsets_as_deployments``||| Deprecated
-|||# ``k8s_kubelet_host_ip``              ||| Optional (defaults to None). Defines the host IP address for the Kubelet \
-                                              API. If None, the Kubernetes API will be queried for it
-|||# ``k8s_kubelet_api_url_template``     ||| Optional (defaults to https://${host_ip}:10250). Defines the port and \
-                                              protocol to use when talking to the kubelet API. Allowed template \
-                                              variables are `node_name` and `host_ip`.
-|||# ``k8s_sidecar_mode``                 ||| Optional, (defaults to False). If true, then logs will only be collected \
-                                              for containers running in the same Pod as the agent. This is used in \
-                                              situations requiring very high throughput.
+|||# ``container_globs``                            ||| Optional (defaults to None). If true, a list of glob patterns \
+                                                        for container names.  Only containers whose names match one of \
+                                                        the glob patterns will be monitored.
+|||# ``report_container_metrics``                   ||| Optional (defaults to True). If true, metrics will be \
+                                                        collected from the container and reported  to Scalyr.  Note, \
+                                                        metrics are only collected from those containers whose logs \
+                                                        are being collected
+|||# ``report_k8s_metrics``                         ||| Optional (defaults to True). If true and \
+                                                        report_container_metrics is true, metrics will be collected \
+                                                        from the k8s and reported to Scalyr.
+|||# ``k8s_ignore_namespaces``                      ||| Optional (defaults to "kube-system"). A comma-delimited list \
+                                                        of the namespaces whose pods's logs should not be collected \
+                                                        and sent to Scalyr.
+|||# ``k8s_ignore_pod_sandboxes``                   ||| Optional (defaults to True). If True then all containers with \
+                                                        the label `io.kubernetes.docker.type` equal to `podsandbox` \
+                                                        are excluded from thelogs being collected
+|||# ``k8s_include_all_containers``                 ||| Optional (defaults to True). If True, all containers in all \
+                                                        pods will be monitored by the kubernetes monitor unless they \
+                                                        have an include: false or exclude: true annotation. If false, \
+                                                        only pods/containers with an include:true or exclude:false \
+                                                        annotation will be monitored. See documentation on annotations \
+                                                        for further detail.
+|||# ``k8s_use_v2_attributes``                      ||| Optional (defaults to False). If True, will use v2 version of \
+                                                        attribute names instead of the names used with the original \
+                                                        release of this monitor.  This is a breaking change so could \
+                                                        break searches / alerts if you rely on the old names
+|||# ``k8s_use_v1_and_v2_attributes``               ||| Optional (defaults to False). If True, send attributes using \
+                                                        both v1 and v2 versions of theirnames.  This may be used to \
+                                                        fix breakages when you relied on the v1 attribute names
+|||# ``k8s_api_url``                                ||| DEPRECATED.
+|||# ``k8s_cache_expiry_secs``                      ||| Optional (defaults to 30). The amount of time to wait between \
+                                                        fully updating the k8s cache from the k8s api. Increase this \
+                                                        value if you want less network traffic from querying the k8s \
+                                                        api.  Decrease this value if you want dynamic updates to \
+                                                        annotation configuration values to be processed more quickly.
+|||# ``k8s_cache_purge_secs``                       ||| Optional (defaults to 300). The number of seconds to wait \
+                                                        before purging unused items from the k8s cache
+|||# ``k8s_cache_init_abort_delay``                 ||| Optional (defaults to 120). The number of seconds to wait for \
+                                                        initialization of the kubernetes cache before aborting the \
+                                                        kubernetes_monitor.
+|||# ``k8s_parse_json``                             ||| Deprecated, please use `k8s_parse_format`. If set, and True, \
+                                                        then this flag will override the `k8s_parse_format` to `auto`. \
+                                                        If set and False, then this flag will override the \
+                                                        `k8s_parse_format` to `raw`.
+|||# ``k8s_parse_format``                           ||| Optional (defaults to `auto`). Valid values are: `auto`, \
+                                                        `json`, `cri` and `raw`. If `auto`, the monitor will try to \
+                                                        detect the format of the raw log files, e.g. `json` or `cri`.  \
+                                                        Log files will be parsed in this format before uploading to \
+                                                        the server to extract log and timestamp fields.  If `raw`, the \
+                                                        raw contents of the log will be uploaded to Scalyr. (Note: An \
+                                                        incorrect setting can cause parsing to fail which will result \
+                                                        in raw logs being uploaded to Scalyr, so please leave this as \
+                                                        `auto` if in doubt.)
+|||# ``k8s_always_use_cri``                         ||| Optional (defaults to False). If True, the kubernetes monitor \
+                                                        will always try to read logs using the container runtime \
+                                                        interface even when the runtime is detected as docker
+|||# ``k8s_always_use_docker``                      ||| Optional (defaults to False). If True, the kubernetes monitor \
+                                                        will always try to get the list of running containers using \
+                                                        docker even when the runtime is detected to be something \
+                                                        different.
+|||# ``k8s_cri_query_filesystem``                   ||| Optional (defaults to True). If True, then when in CRI mode, \
+                                                        the monitor will only query the filesystem for the list of \
+                                                        active containers, rather than first querying the Kubelet API.
+|||# ``k8s_verify_api_queries``                     ||| Optional (defaults to True). If true, then the ssl connection \
+                                                        for all queries to the k8s API will be verified using the \
+                                                        ca.crt certificate found in the service account directory. If \
+                                                        false, no verification will be performed. This is useful for \
+                                                        older k8s clusters where certificate verification can fail.
+|||# ``gather_k8s_pod_info``                        ||| Optional (defaults to False). If true, then every \
+                                                        gather_sample interval, metrics will be collected from the \
+                                                        docker and k8s APIs showing all discovered containers and \
+                                                        pods. This is mostly a debugging aid and there are performance \
+                                                        implications to always leaving this enabled
+|||# ``include_daemonsets_as_deployments``          ||| Deprecated
+|||# ``k8s_kubelet_host_ip``                        ||| Optional (defaults to None). Defines the host IP address for \
+                                                        the Kubelet API. If None, the Kubernetes API will be queried \
+                                                        for it
+|||# ``k8s_kubelet_api_url_template``               ||| Optional (defaults to https://${host_ip}:10250). Defines the \
+                                                        port and protocol to use when talking to the kubelet API. \
+                                                        Allowed template variables are `node_name` and `host_ip`.
+|||# ``k8s_sidecar_mode``                           ||| Optional, (defaults to False). If true, then logs will only be \
+                                                        collected for containers running in the same Pod as the agent. \
+                                                        This is used in situations requiring very high throughput.
 
 ## Metrics
 

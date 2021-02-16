@@ -1,4 +1,5 @@
-# Copyright 2014-2020 Scalyr Inc.
+#!/usr/bin/env bash
+# Copyright 2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
+# Script which prints a line to stdout and stderr every SLEEP_DELAY seconds
 
-import pytest
+SLEEP_DELAY=${SLEEP_DELAY:-"2"}
 
-from scalyr_agent.__scalyr__ import DEV_INSTALL
-from tests.smoke_tests.common import _test_standalone_smoke
+echo ""
+echo "Using sleep delay of ${SLEEP_DELAY} seconds"
+echo ""
 
-
-@pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
-def test_standalone_smoke():
-    _test_standalone_smoke(DEV_INSTALL)
+for i in {1..1000000}; do
+    echo "stdout: line $i"
+    echo "stderr: line $i" 1>&2
+    sleep "${SLEEP_DELAY}"
+done

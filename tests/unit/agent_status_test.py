@@ -18,6 +18,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 from io import open
 
 __author__ = "czerwin@scalyr.com"
@@ -47,6 +48,8 @@ from scalyr_agent.agent_status import (
     MonitorManagerStatus,
     LogMatcherStatus,
     report_status,
+    CopyingManagerWorkerStatus,
+    CopyingManagerWorkerSessionStatus,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -81,7 +84,7 @@ class TestOverallStats(ScalyrTestCase):
         a.skipped_new_bytes = 2
         a.skipped_preexisting_bytes = 3
 
-        a.total_copy_iterations = 1
+        a.total_scan_iterations = 1
         a.total_read_time = 2
         a.total_compression_time = 3
         a.total_waiting_time = 4
@@ -113,7 +116,7 @@ class TestOverallStats(ScalyrTestCase):
         b.skipped_new_bytes = 2
         b.skipped_preexisting_bytes = 3
 
-        b.total_copy_iterations = 1
+        b.total_scan_iterations = 1
         b.total_read_time = 2
         b.total_compression_time = 3
         b.total_waiting_time = 4
@@ -147,7 +150,7 @@ class TestOverallStats(ScalyrTestCase):
         self.assertEquals(c.skipped_new_bytes, 4)
         self.assertEquals(c.skipped_preexisting_bytes, 6)
 
-        self.assertEquals(c.total_copy_iterations, 2)
+        self.assertEquals(c.total_scan_iterations, 2)
         self.assertEquals(c.total_read_time, 4)
         self.assertEquals(c.total_compression_time, 6)
         self.assertEquals(c.total_waiting_time, 8)
@@ -160,6 +163,8 @@ class TestOverallStats(ScalyrTestCase):
 
 
 class TestReportStatus(ScalyrTestCase):
+    maxDiff = None
+
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self.saved_env)
@@ -191,14 +196,61 @@ class TestReportStatus(ScalyrTestCase):
         config_status.additional_paths = ["/etc/scalyr-agent-2/agent.d/server.json"]
 
         copying_status = CopyingManagerStatus()
-        self.status.copying_manager_status = copying_status
-        copying_status.last_attempt_size = 10000
-        copying_status.last_attempt_time = self.time - 60
-        copying_status.last_response_status = "success"
-        copying_status.total_errors = 0
-        copying_status.total_bytes_uploaded = 10000
-        copying_status.last_success_time = self.time - 60
         copying_status.health_check_result = "Good"
+        self.status.copying_manager_status = copying_status
+
+        self.worker1 = worker1 = CopyingManagerWorkerStatus()
+        worker1.worker_id = "0"
+        copying_status.workers.append(worker1)
+
+        self.worker2 = worker2 = CopyingManagerWorkerStatus()
+        worker2.worker_id = "1"
+        copying_status.workers.append(worker2)
+
+        self.session1_1 = session1_1 = CopyingManagerWorkerSessionStatus()
+        session1_1.session_id = "session1_1"
+        session1_1.total_bytes_uploaded = 10000
+        session1_1.last_attempt_time = self.time - 60
+        session1_1.last_success_time = self.time - 60
+        session1_1.last_response = "This is a good response."
+        session1_1.last_response_status = "success"
+        session1_1.health_check_result = "Good"
+        session1_1.last_attempt_size = 10000
+
+        self.session1_2 = session1_2 = CopyingManagerWorkerSessionStatus()
+        session1_2.session_id = "session1_2"
+        session1_2.total_bytes_uploaded = 5000
+        session1_2.last_attempt_time = self.time - 60
+        session1_2.last_success_time = self.time - 60
+        session1_2.last_response = "Everything is good."
+        session1_2.last_response_status = "success"
+        session1_2.health_check_result = "Good"
+        session1_2.last_attempt_size = 7000
+        worker1.sessions.extend([session1_1, session1_2])
+
+        self.session2_1 = session2_1 = CopyingManagerWorkerSessionStatus()
+        session2_1.session_id = "session2_1"
+        session2_1.total_bytes_uploaded = 9000
+        session2_1.last_attempt_time = self.time - 60
+        session2_1.last_success_time = self.time - 60
+        session2_1.last_response = "Everything is good."
+        session2_1.last_response_status = "success"
+        session2_1.last_attempt_size = 6000
+        session2_1.health_check_result = "Good"
+        worker2.sessions.append(session2_1)
+
+        self.session2_2 = session2_2 = CopyingManagerWorkerSessionStatus()
+        session2_2.session_id = "session2_2"
+        session2_2.total_bytes_uploaded = 3000
+        session2_2.last_attempt_time = self.time - 60
+        session2_2.last_success_time = self.time - 60
+        session2_2.last_response = "Everything is good."
+        session2_2.last_response_status = "success"
+        session2_2.last_attempt_size = 2000
+        session2_2.health_check_result = "Good"
+        worker2.sessions.append(session2_2)
+
+        # =========
 
         # Add in one log path that isn't a glob but does not have any matches yet.
         log_matcher = LogMatcherStatus()
@@ -213,18 +265,19 @@ class TestReportStatus(ScalyrTestCase):
         log_matcher.is_glob = False
         log_matcher.last_check_time = self.time - 10
         log_matcher.log_path = "/var/logs/tomcat6/catalina.log"
-        process_status = LogProcessorStatus()
-        log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/tomcat6/catalina.log"
-        process_status.last_scan_time = self.time - 120
-        process_status.total_bytes_copied = 2341234
-        process_status.total_bytes_pending = 1243
-        process_status.total_bytes_skipped = 12
-        process_status.total_bytes_failed = 1432
-        process_status.total_bytes_dropped_by_sampling = 0
-        process_status.total_lines_copied = 214324
-        process_status.total_lines_dropped_by_sampling = 0
-        process_status.total_redactions = 0
+        self.process_status1 = process_status1 = LogProcessorStatus()
+        log_matcher.log_processors_status.append(process_status1)
+        process_status1.log_path = "/var/logs/tomcat6/catalina.log"
+        process_status1.last_scan_time = self.time - 120
+        process_status1.total_bytes_copied = 2341234
+        process_status1.total_bytes_pending = 1243
+        process_status1.total_bytes_skipped = 12
+        process_status1.total_bytes_failed = 1432
+        process_status1.total_bytes_dropped_by_sampling = 0
+        process_status1.total_lines_copied = 214324
+        process_status1.total_lines_dropped_by_sampling = 0
+        process_status1.total_redactions = 0
+        session1_1.log_processors.append(process_status1)
 
         # Add in another matcher that is a glob and has two matches.
         log_matcher = LogMatcherStatus()
@@ -232,30 +285,33 @@ class TestReportStatus(ScalyrTestCase):
         log_matcher.is_glob = True
         log_matcher.last_check_time = self.time - 10
         log_matcher.log_path = "/var/logs/cron/*.log"
-        process_status = LogProcessorStatus()
-        log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/cron/logrotate.log"
-        process_status.last_scan_time = self.time - 120
-        process_status.total_bytes_copied = 2341234
-        process_status.total_bytes_pending = 1243
-        process_status.total_bytes_skipped = 12
-        process_status.total_bytes_failed = 1432
-        process_status.total_bytes_dropped_by_sampling = 0
-        process_status.total_lines_copied = 214324
-        process_status.total_lines_dropped_by_sampling = 0
-        process_status.total_redactions = 0
-        process_status = LogProcessorStatus()
-        log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/cron/ohno.log"
-        process_status.last_scan_time = self.time - 120
-        process_status.total_bytes_copied = 23434
-        process_status.total_bytes_pending = 12943
-        process_status.total_bytes_skipped = 12
-        process_status.total_bytes_failed = 1432
-        process_status.total_bytes_dropped_by_sampling = 5
-        process_status.total_lines_copied = 214324
-        process_status.total_lines_dropped_by_sampling = 10
-        process_status.total_redactions = 10
+        self.process_status2 = process_status2 = LogProcessorStatus()
+        log_matcher.log_processors_status.append(process_status2)
+        process_status2.log_path = "/var/logs/cron/logrotate.log"
+        process_status2.last_scan_time = self.time - 120
+        process_status2.total_bytes_copied = 2341234
+        process_status2.total_bytes_pending = 1243
+        process_status2.total_bytes_skipped = 12
+        process_status2.total_bytes_failed = 1432
+        process_status2.total_bytes_dropped_by_sampling = 0
+        process_status2.total_lines_copied = 214324
+        process_status2.total_lines_dropped_by_sampling = 0
+        process_status2.total_redactions = 0
+        session1_2.log_processors.append(process_status2)
+
+        self.process_status3 = process_status3 = LogProcessorStatus()
+        log_matcher.log_processors_status.append(process_status3)
+        process_status3.log_path = "/var/logs/cron/ohno.log"
+        process_status3.last_scan_time = self.time - 120
+        process_status3.total_bytes_copied = 23434
+        process_status3.total_bytes_pending = 12943
+        process_status3.total_bytes_skipped = 12
+        process_status3.total_bytes_failed = 1432
+        process_status3.total_bytes_dropped_by_sampling = 5
+        process_status3.total_lines_copied = 214324
+        process_status3.total_lines_dropped_by_sampling = 10
+        process_status3.total_redactions = 10
+        session2_1.log_processors.append(process_status3)
 
         # One more glob that doesn't have any matches.
         log_matcher = LogMatcherStatus()
@@ -290,6 +346,14 @@ class TestReportStatus(ScalyrTestCase):
         monitor_status.reported_lines = 20
         monitor_status.errors = 40
 
+    def make_default(self):
+        """
+        Keep only one worker and one session to reproduce the default config case.
+        """
+        self.status.copying_manager_status.workers.remove(self.worker2)
+
+        self.worker1.sessions.remove(self.session1_2)
+
     def test_basic(self):
         output = io.StringIO()
 
@@ -311,12 +375,18 @@ class TestReportStatus(ScalyrTestCase):
             os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
 
         os.environ["SCALYR_ZZZ"] = "Should appear at the end"
+
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
+
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -326,7 +396,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -358,6 +428,8 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
 Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
@@ -380,7 +452,9 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
@@ -391,6 +465,10 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_config(self):
+
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
         self.status.config_status.last_error = "Bad stuff"
 
         output = io.StringIO()
@@ -400,6 +478,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -409,7 +488,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -435,6 +514,8 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
 Health check:                              Good
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
@@ -457,13 +538,27 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_copy_response(self):
-        self.status.copying_manager_status.last_response = "Some weird stuff"
-        self.status.copying_manager_status.last_response_status = "error"
-        self.status.copying_manager_status.total_errors = 5
+        # Set the responses for all workers of the first api key as failed.
+
+        manager_status = self.status.copying_manager_status
+        manager_status.last_responses_status_info = (
+            "Last requests on some workers is not successful, see below for more info."
+        )
+
+        self.make_default()
+
+        self.session1_1.last_response = "Some weird stuff"
+        self.session1_1.last_response_status = "error"
+        self.session1_1.total_errors = 5
+
+        self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
         report_status(output, self.status, self.time)
@@ -472,6 +567,7 @@ Failed monitors:
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -481,7 +577,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -532,13 +628,16 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
+
         self.assertEquals(expected_output, output.getvalue())
 
     def test_no_health_check(self):
         output = io.StringIO()
 
-        self.status.copying_manager_status.health_check_result = None
+        self.session1_1.health_check_result = None
 
         # Environment variables
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
@@ -558,12 +657,16 @@ Failed monitors:
             os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
 
         os.environ["SCALYR_ZZZ"] = "Should appear at the end"
+
+        self.make_default()
+        self.status.copying_manager_status.calculate_status()
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -573,7 +676,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -605,6 +708,8 @@ Bytes uploaded successfully:               10000
 Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
 Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
 Last copy request size:                    10000
+Last copy response size:                   24
+Last copy response status:                 success
 
 Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
 Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
@@ -626,7 +731,9 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         if platform.system() == "Windows":
             # On Windows keys are not case sensitive and get upper cased
@@ -637,18 +744,21 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_last_success_is_none(self):
-        self.status.copying_manager_status.last_response = "Some weird stuff"
-        self.status.copying_manager_status.last_response_status = "error"
-        self.status.copying_manager_status.total_errors = 5
-        self.status.copying_manager_status.last_success_time = None
+
+        self.make_default()
+        self.session1_1.last_response = "Some weird stuff"
+        self.session1_1.last_response_status = "error"
+        self.session1_1.total_errors = 5
+        self.session1_1.last_success_time = None
+        self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
         report_status(output, self.status, self.time)
-
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
 Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
 Version:                 2.0.0.beta.7
 VCS revision:            git revision
 Python version:          3.6.8
@@ -658,7 +768,7 @@ ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
 
-View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
 
 Agent configuration:
@@ -709,11 +819,16 @@ Running monitors:
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
-"""
+""" % (
+            os.getpid()
+        )
 
         self.assertEquals(expected_output, output.getvalue())
 
     def test_status_to_dict(self):
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
         result = self.status.to_dict()
 
         # Simple value on the OverallStats object
@@ -749,22 +864,543 @@ Failed monitors:
         self.assertEqual(json.loads(result_json), result)
 
     def test_health_status(self):
+        self.make_default()
+
+        self.status.copying_manager_status.calculate_status()
+
         output = io.StringIO()
         report_status(output, self.status, self.time)
         expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
     def test_health_status_bad(self):
-        self.status.copying_manager_status.health_check_result = "Some bad message"
+        self.make_default()
+
+        self.status.copying_manager_status.health_check_result = (
+            "Copying thread is failed"
+        )
+
+        self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
         report_status(output, self.status, self.time)
         expected_output = (
-            "Health check:                              Some bad message\n"
+            "Health check:                              Copying thread is failed\n"
         )
+        print((output.getvalue()))
         self.assertTrue(expected_output in output.getvalue())
+
+    def test_health_status_bad_with_wotkers(self):
+        self.make_default()
+
+        self.session1_1.health_check_result = "Worker 1 has failed"
+        self.status.copying_manager_status.health_check_result = (
+            "Copying thread is failed"
+        )
+
+        self.status.copying_manager_status.calculate_status()
+        output = io.StringIO()
+        report_status(output, self.status, self.time)
+        expected_output = "Health check:                              Copying thread is failed, Worker 1 has failed\n"
+        self.assertTrue(expected_output in output.getvalue())
+
+    def test_multi_worker_basic(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            27000
+Overall health check:                            Good
+
+Uploads statistics by worker:
+ Worker 0:
+    Session session1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Session session1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Worker 1:
+    Session session2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Session session2_2:
+      Bytes uploaded successfully:               3000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    2000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with workers:
+  Worker 0:
+    Session session1_1:
+        /var/logs/tomcat6/catalina.log
+    Session session1_2:
+        /var/logs/cron/logrotate.log
+  Worker 1:
+    Session session2_1:
+        /var/logs/cron/ohno.log
+    Session session2_2:
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+""" % (
+            os.getpid()
+        )
+
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_one_api_key(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.workers.remove(self.worker2)
+
+        self.status.copying_manager_status.get_all_worker_pids = mock.Mock()
+        self.status.copying_manager_status.get_all_worker_pids.return_value = [3, 4]
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Worker processes pids:   3, 4
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            15000
+Overall health check:                            Good
+
+Uploads statistics by worker:
+ Worker 0:
+    Session session1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Session session1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with workers:
+  Worker 0:
+    Session session1_1:
+        /var/logs/tomcat6/catalina.log
+    Session session1_2:
+        /var/logs/cron/logrotate.log
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+""" % (
+            os.getpid()
+        )
+
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_one_worker(self):
+        output = io.StringIO()
+
+        self.worker2.sessions.remove(self.session2_2)
+
+        self.status.copying_manager_status.get_all_worker_pids = mock.Mock()
+        self.status.copying_manager_status.get_all_worker_pids.return_value = [3, 4]
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Worker processes pids:   3, 4
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            24000
+Overall health check:                            Good
+
+Uploads statistics by worker:
+ Worker 0:
+    Session session1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Session session1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Worker 1:
+    Session session2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with workers:
+  Worker 0:
+    Session session1_1:
+        /var/logs/tomcat6/catalina.log
+    Session session1_2:
+        /var/logs/cron/logrotate.log
+  Worker 1:
+        /var/logs/cron/ohno.log
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+""" % (
+            os.getpid()
+        )
+
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
+
+    def test_multi_worker_bad_health_check(self):
+        output = io.StringIO()
+
+        self.status.copying_manager_status.health_check_result = (
+            "File system scanning thread has failed"
+        )
+        self.session2_1.health_check_result = "Not good"
+        self.session2_1.total_errors = 6
+
+        self.status.copying_manager_status.calculate_status()
+
+        report_status(output, self.status, self.time)
+
+        expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
+
+Current time:            Fri Sep  5 23:14:13 2014 UTC
+Agent started at:        Thu Sep  4 23:14:13 2014 UTC
+Main process pid:        %s
+Version:                 2.0.0.beta.7
+VCS revision:            git revision
+Python version:          3.6.8
+Agent running as:        root
+Agent log:               /var/logs/scalyr-agent/agent.log
+ServerHost:              test_machine
+Compression algorithm:   deflate
+Compression level:       9
+
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
+
+
+Agent configuration:
+====================
+
+Configuration files:   /etc/scalyr-agent-2/agent.json
+                       /etc/scalyr-agent-2/agent.d/server.json
+Status:                Good (files parsed successfully)
+Last checked:          Fri Sep  5 23:14:13 2014 UTC
+Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
+
+Log transmission:
+=================
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Total bytes uploaded:                            27000
+Overall health check:                            File system scanning thread has failed, Some workers have failed.
+Total errors occurred:                           6
+
+Uploads statistics by worker:
+ Worker 0:
+    Session session1_1:
+      Bytes uploaded successfully:               10000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    10000
+      Last copy response size:                   24
+      Last copy response status:                 success
+      Health check:                              Good
+
+    Session session1_2:
+      Bytes uploaded successfully:               5000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    7000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Worker 1:
+    Session session2_1:
+      Bytes uploaded successfully:               9000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    6000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Total responses with errors:               6 (see '/var/logs/scalyr-agent/agent.log' for details)
+      Health check:                              Not good
+
+    Session session2_2:
+      Bytes uploaded successfully:               3000
+      Last successful communication with Scalyr: Fri Sep  5 23:13:13 2014 UTC
+      Last attempt:                              Fri Sep  5 23:13:13 2014 UTC
+      Last copy request size:                    2000
+      Last copy response size:                   19
+      Last copy response status:                 success
+      Health check:                              Good
+
+ Log files associated with workers:
+  Worker 0:
+    Session session1_1:
+        /var/logs/tomcat6/catalina.log
+    Session session1_2:
+        /var/logs/cron/logrotate.log
+  Worker 1:
+    Session session2_1:
+        /var/logs/cron/ohno.log
+    Session session2_2:
+
+Path /var/logs/tomcat6/access.log: no matching readable file, last checked Fri Sep  5 23:14:03 2014 UTC
+Path /var/logs/tomcat6/catalina.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+
+Glob: /var/logs/cron/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+  /var/logs/cron/logrotate.log: copied 2341234 bytes (214324 lines), 1243 bytes pending, 12 bytes skipped, 1432 bytes failed, last checked Fri Sep  5 23:12:13 2014 UTC
+  /var/logs/cron/ohno.log: copied 23434 bytes (214324 lines), 12943 bytes pending, 12 bytes skipped, 1432 bytes failed, 5 bytes dropped by sampling (10 lines), 10 redactions, last checked Fri Sep  5 23:12:13 2014 UTC
+Glob: /var/logs/silly/*.log:: last scanned for glob matches at Fri Sep  5 23:14:03 2014 UTC
+
+
+Monitors:
+=========
+
+(these statistics cover the period from Fri Sep  5 11:14:13 2014 UTC)
+
+Running monitors:
+  linux_process_metrics(agent): 50 lines emitted, 2 errors
+  linux_system_metrics(): 20 lines emitted, 0 errors
+
+Failed monitors:
+  bad_monitor() 20 lines emitted, 40 errors
+""" % (
+            os.getpid()
+        )
+
+        if platform.system() == "Windows":
+            # On Windows keys are not case sensitive and get upper cased
+            expected_output = expected_output.replace(
+                "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
+            )
+
+        self.assertEquals(expected_output, output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):
+    maxDiff = None
+
     def setUp(self):
         super(AgentMainStatusHandlerTestCase, self).setUp()
 
@@ -781,6 +1417,17 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         self.agent = ScalyrAgent(PlatformController())
         self.agent._ScalyrAgent__config = config
+        self.agent._ScalyrAgent__escalator = mock.Mock()
+        self.agent._ScalyrAgent__escalator.is_user_change_required = mock.Mock(
+            return_value=False
+        )
+
+        self.original_generate_status = self.agent._ScalyrAgent__generate_status
+
+    def tearDown(self):
+        super(AgentMainStatusHandlerTestCase, self).setUp()
+
+        self.agent._ScalyrAgent__generate_status = self.original_generate_status
 
     def test_report_status_to_file_no_format_specified(self):
         # No format is provided, should default to "text"
@@ -828,6 +1475,246 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertTrue("config_status" in parsed)
         self.assertTrue("user" in parsed)
         self.assertTrue("scalyr_server" in parsed)
+
+    def test__find_health_result_in_status_data_json_format_good(self):
+        def mock_generate_status(*args, **kwargs):
+            result = self.original_generate_status(*args, **kwargs)
+            result.copying_manager_status = CopyingManagerStatus()
+            result.copying_manager_status.health_check_result = "Good"
+            return result
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status
+
+        self._write_status_format_file("json")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        result = self.agent._ScalyrAgent__find_health_result_in_status_data(content)
+        self.assertEqual(result, "Good")
+
+    def test__find_health_result_in_status_data_text_format_good(self):
+        def mock_generate_status(*args, **kwargs):
+            result = self.original_generate_status(*args, **kwargs)
+
+            # create default worker for copying manager.
+            manager = CopyingManagerStatus()
+            api_key = CopyingManagerWorkerStatus()
+            manager.workers.append(api_key)
+            worker = CopyingManagerWorkerSessionStatus()
+            api_key.sessions.append(worker)
+
+            manager.total_errors = 0
+
+            worker.health_check_result = "Good"
+            manager.health_check_result = "Good"
+
+            manager.calculate_status()
+
+            result.copying_manager_status = manager
+            return result
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status
+
+        self._write_status_format_file("text")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        result = self.agent._ScalyrAgent__find_health_result_in_status_data(content)
+        self.assertEqual(result, "Good")
+
+    def test__detailed_status_correct_exit_return_code_is_returned(self):
+        def mock_generate_status_wrapper(health_check_result):
+            def mock_generate_status(*args, **kwargs):
+                result = self.original_generate_status(*args, **kwargs)
+
+                # create default worker for copying manager.
+                manager = CopyingManagerStatus()
+                api_key = CopyingManagerWorkerStatus()
+                manager.workers.append(api_key)
+                worker = CopyingManagerWorkerSessionStatus()
+                api_key.sessions.append(worker)
+
+                manager.total_errors = 0
+                worker.health_check_result = health_check_result
+                manager.health_check_result = health_check_result
+
+                manager.calculate_status()
+
+                result.copying_manager_status = manager
+
+                return result
+
+            return mock_generate_status
+
+        # status_format=text, health_check=False, health_result="Good" - should return 0
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Good")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=True, health_result="Good" - should return 0
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Good")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=False, health_result="Bad" - should return 2
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=text, health_check=True, health_result="Bad" - should return 2
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=json, health_check=False, health_result="Bad" - should return 2
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="json",
+            health_check=False,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=json, health_check=True, health_result="Bad" - should return 2
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper("Bad")
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="json",
+            health_check=True,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 2)
+
+        # status_format=text, health_check=False, health_result="" - should return 0
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=False,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=text, health_check=True, health_result="" - should return 3
+        self._write_status_format_file("text")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertFalse(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="text",
+            health_check=True,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 3)
+
+        # status_format=json, health_check=False, health_result="" - should return 0
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="json",
+            health_check=False,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 0)
+
+        # status_format=json, health_check=True, health_result="" - should return 3
+        self._write_status_format_file("json")
+
+        self.agent._ScalyrAgent__generate_status = mock_generate_status_wrapper(None)
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        self.assertTrue(status_file)
+        content = self._read_status_file(status_file)
+        self.assertTrue(content.startswith("{") and content.endswith("}"))
+
+        return_code = self.agent._ScalyrAgent__detailed_status(
+            self.data_path,
+            status_format="json",
+            health_check=True,
+            zero_status_file=False,
+        )
+        self.assertEqual(return_code, 3)
 
     def _write_status_format_file(self, status_format):
         with open(self.status_format_file, "w") as fp:

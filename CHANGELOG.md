@@ -1,14 +1,138 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.13 "TBD" - October 20, 2020
+## 2.1.19 "TBD" - TBD
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Oct 20, 2020 19:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
 --->
 
 Improvements:
+* Add ``Endpoint`` to the default ``event_object_filter`` values for the Kubernetes Event Monitor.
+* Update ``scalyr-agent-2 status -v`` output to also include process id (pid) of the main agent process and children worker processes in scenarios where the agent is configured with multiple worker processes.
+* Add a new experimental ``--systemd-managed`` flag to the ``scalyr-agent-2-config`` tool which converts existing scalyr agent installation to be managed by systemd instead of init.d.
+* Add support for capturing k8s container names to the kubernetes monitor via log line attributes. Container name can be captured using ``${k8s_container_name}`` config template syntax.
 * Kubernetes monitor has been updated to log 403 errors when connecting to the Kubernetes API before falling back to the old fallback URL under warning log level. Previously those errors were logged under debug log level which would make it hard to troubleshoot some issues related to missing permissions, etc. since those log messages would only end up in debug log file which is disabled by default.
+
+Bug fixes:
+* Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.
+
+## 2.1.18 "Ravis" - January 29, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
+--->
+
+Improvements:
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option to the ``syslog_monitor``. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* Update agent to emit a warning if ``k8s_logs`` config option is defined, but Kubernetes monitor is not enabled / configured.
+* Update Kubernetes and Docker monitor to not propagate and show some non-fatal errors.
+* Field values in log lines for monitor metrics which contain extra fields are now sorted in alphabetic order. This should have no impact on the end user since server side parsers already support arbitrary ordering, but it's done to ensure consistent ordering and output for for monitor log lines.
+* Update agent to throw more user-friendly exceptions on Windows when the agent doesn't have access to the agent config file and Windows registry.
+* Update code which periodically prints out useful configuration settings to also include actual value of the json library used in case the config option is set to "auto".
+
+Bug fixes:
+* Fix a race condition in ``docker_monitor`` which could cause the monitor to throw exception on start up.
+* Fix a config deprecated options bug when they are set to ``false``.
+* Fix agent so it doesn't throw an exception on Windows when trying to escalate permissions on agent start.
+* Make sure we only print the value of ``win32_max_open_fds`` config option on Windows if it has changed.
+* Fix a bug which could result in docker, journald and windows event log checkpoint files to be deleted when restarting the agent. This would only affect docker monitor configurations which are setup to ingest logs via Docker API and not json log files on disk (aka ``docker_raw_logs: false`` docker monitor option is set).
+* Fix a small bug which might skip first lines of the worker session log file.
+
+Other:
+* Pre-built frozen Windows binaries now bundle and utilize Python 3 (3.8.7). In the past releases, they utilized Python 2.7, but due to the Python 2.7 being EOL for a year now, new release will utilize Python 3. This change should be opaque to the end user and everything should continue to work as it did in the previous releases.
+
+## 2.1.17 "Xothichi" - January 15, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 15, 2021 14:00 -0800
+--->
+
+Bug fixes:
+* Fix syslog monitor default TCP message parser bug which was inadvertently introduced in 2.1.16 which may sometimes cause for a delayed ingest of some syslog data. This would only affect installations utilizing syslog monitor in TCP mode using the default message parser.  As part of this fix, we have removed the new message parsers added in 2.1.16.  If you were using them, you will revert to the default parser
+
+## 2.1.16 "Lasso" - January 13, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 13, 2021 14:00 -0800
+--->
+
+Features:
+* Add copy truncate log rotation support. This is enabled by default.  It does not support copy truncate with compression unless the `delaycompress` option is used.  This feature can be disabled by setting `enable_copy_truncate_log_rotation_support` to false.
+
+Improvements:
+* Add new ``tcp_request_parser`` and ``tcp_message_delimiter`` config option. Valid values for ``tcp_request_parser`` include ``default`` and ``batch``. New TCP recv batch oriented request parser is much more efficient than the default one and should be a preferred choice in most situations.  For backward compatibility reasons, the default parser hasn't been changed yet.
+* ``shell_monitor`` now outputs two additional metrics during each sample gather interval - ``duration`` and ``exit_code``. First one represents how many seconds it took to execute the shell command / script and the second one represents that script exit (status).
+
+Misc:
+* On startup and when parsing a config file, agent now emits a warning if the config file is readable by others.
+* Add the config option ``enable_worker_process_metrics_gather`` to enable 'linux_process_metrics' monitor for each multiprocess worker.
+* Each session, which runs in a separate process, periodically writes its stats in the log file. The interval between writes can be changed by using the ``default_worker_session_status_message_interval``
+* Rename some of the configuration parameters: ``use_miltiprocess_copying_workers``  to ``use_multiprocess_workers``, ``default_workers_per_api_key`` to ``default_sessions_per_api_key``. Previous option names are preserved for the backward compatibility but they are marked as deprecated. NOTE: The appropriate [environment variable names](https://app.scalyr.com/help/scalyr-agent-env-aware) are changed too.
+* Update docker monitor so we don't log some non-fatal errors under warning log level when consuming logs using Docker API.
+* Add support for ``compression_type: none`` config option which completely disables compression for outgoing requests. Right now one of the main bottle necks in the high volume scenarios in the agent is compression operation. Disabling it can, in some scenarios, lead to large increase to the overall throughput (up to 2x). Disabling the compression will in most cases result in larger data egress traffic which may incur additional charges on your infrastructure provider so this option should never be set to ``none`` unless explicitly advised by the technical support.
+* Linux system metrics monitor has been updated to also ignore ``/var/lib/docker/*`` and ``/snap/*`` mount points by default. Capturing metrics for those mount points usually offers no additional insight to the end user. For information on how to change the ignore list via configuration option, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+* The agent install bash script now adds the Scalyr repositories directly without installing the ``scalyr-repo`` packages. This also eliminates errors caused by re-acquiring the package manager's lock file during the *pre/post* *install/uninstall* scripts. The issue occurred in both ``apt`` and ``rpm`` package managers.
+
+Security fixes and improvements:
+* Agent installation artifacts have been updated so the default ``agent.json`` file which is bundled with the agent is not readable by "other" system users by default anymore. For more context, details and impact, please see [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+
+## 2.1.15 "Endora" - December 16, 2020
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Dec 16, 2020 14:00 -0800
+--->
+Feature:
+* Ability to upload logs to different Scalyr team accounts by specifying different API keys for different log files. See [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more details.
+* New configuration option `default_workers_per_api_key` which creates more than one session with the Scalyr servers to increase upload throughput. This may be set using the `SCALYR_DEFAULT_WORKERS_PER_API_KEY` environment variable.
+* New configuration option `use_multiprocess_copying_workers` which uses separate processes for each upload session, thereby providing more CPU resources to the agent. This may be set using the `SCALYR_USE_MULTIPROCESS_COPYING_WORKERS` environment variable.
+Improvements:
+* Linux system metrics monitor now ignores the following special mounts points by default: ``/sys/*``, ``/dev*``, ``/run*``. If you want still capture ``df.*`` metrics for those mount points, please refer to [RELEASE_NOTES](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md).
+* Update ``url_monitor`` so it sends correct ``User-Agent`` header which identifies requests are originating from the agent.
+
+Misc:
+* The default value for the `k8s_cri_query_filesystem` Kubernetes monitor config option (set via the `SCALYR_K8S_CRI_QUERY_FILESYSTEM` environment var) has changed to `True`. This means that by default when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. If you wish to revert to the original default to prefer using the Kubelet API, set `SCALYR_K8S_CRI_QUERY_FILESYSTEM` the environment variable to "false" for the Scalyr Agent daemonset.
+* New ``global_monitor_sample_interval_enable_jitter`` config option has been added which is enabled by default. When this option is enabled, random sleep between 2/10 and 8/10 of the configured monitor sample gather interval is used before gathering the sample for the first time. This ensures that sample gathering for all the monitors doesn't run at the same time. This comes in handy when running agent configured with many monitors on lower powered devices to spread the monitor sample gathering related load spike across a longer time frame.
+
+Bug fixes:
+* Fix to make sure we don't expect a valid Docker socket when running Kubernetes monitor in CRI mode. This fixes an issue preventing the K8s monitor from running in CRI mode if Docker is not available.
+* Fix line grouping code and make sure we don't throw if line data contains bad or partial unicode escape sequence.
+* Fix ``scalyr_agent/run_monitor.py`` script so it also works correctly out of the box when using source code installation.
+* Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
+* Docker monitor has been fixed that when running in "API mode" (``docker_raw_logs: false``) it also correctly ingests logs from container ``stderr``. Previously only logs from ``stdout`` have been ingested.
+
+## 2.1.14 "Hydrus" - November 4, 2020
+
+<!---
+Packaged by Tomaz Muraus <tomaz@scalyr.com> on Nov 4, 2020 14:00 -0800
+--->
+
+Features:
+* Add new ``initial_stopped_container_collection_window`` configuration option to the Kubernetes monitor, which can be configured by setting the ``SCALY_INITIAL_STOPPED_CONTAINER_COLLECTION_WINDOW`` environment variable. By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. To override this, set this parameter to the number of seconds the agent will look in the past (before it was started). It will collect logs for any pods that was started and stopped during this window. This can be useful in autoscaling environments to ensure all pod logs are captured since node creation, even if the Scalyr Agent daemonset starts just after other pods.
+
+Improvements:
+* Improve logging in the Kubernetes monitor.
+* On agent start up we now also log the locale (language code and encoding) used by the agent process. This will make it easier to troubleshoot issues which are related to the agent process not using UTF-8 coding.
+* Default value for ``tcp_buffer_size`` Syslog monitor config option has been increased from 2048 to 8192 bytes.
+* New ``message_size_can_exceed_tcp_buffer`` config option has been added to Syslog monitor. When set to True, monitor will support messages which are larger than ``tcp_buffer_size`` bytes in size and  ``tcp_buffer_size`` config option will tell how much bytes we try to read from the socket at once / in a single recv() call. For backward compatibility reasons, it defaults to False.
+
+Bug fixes:
+* Fix a bug / race-condition in Docker monitor which could cause, under some scenarios, when monitoring containers running on the same host, logs to stop being ingested after the container restart. There was a relatively short time window when this could happen and it was more likely to affect containers which take longer to stop / start.
+* Update code for all the monitors to correctly use UTC timezone everywhere. Previously some of the code incorrectly used local server time instead of UTC. This means some of those monitors could exhibit incorrect / undefined behavior when running the agent on a server which has local time set to something else than UTC.
+* Fix ``docker_raw_logs: false`` functionality in the Docker monitor which has been broken for a while now.
+* Update Windows System Metrics monitor to better handle a situation when disk io counters are not available.
+
+## 2.1.13 "Celaeno" - October 15, 2020
+
+<!---
+Packaged by Oliver Hsu <oliver@scalyr.com> on Oct 17, 2020 19:00 -0800
+--->
+
+Bug fixes:
+* Fix ``scalyr-agent-2 status`` command non-fatal error when running status command multiple times concurrently or in a short time frame.
+* Fix ``scalyr-agent-status`` command to not log config override warning to stdout since it may interfere with consumers of the status command output.
+* Fix merging of active-checkpoints.json and checkpoints.json checkpoint file data. Previously data from active checkpoints file was not correctly merged into full checkpoint data file which means that under some scenarios (e.g. agent crashed after active checkpoint file was written, but before full checkpoint file was written), data which was already sent to the server could be sent twice. Actual time window when this could happen was relatively small since full checkpoint data is written out every 60 seconds by default. Reported by @anton-ryzhov. #638
+* Fix Postgres monitor error when specifying the Postgres ``database_port`` in the agent config.
 
 ## 2.1.12 "Betelgeuze" - September 17, 2020
 

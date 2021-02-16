@@ -1,4 +1,3 @@
-# Copyright 2014 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +16,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from __future__ import print_function
 from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
@@ -33,6 +33,7 @@ import socket
 import threading
 import time
 import traceback
+import functools
 from string import Template
 from io import open
 
@@ -128,9 +129,18 @@ define_config_option(
     "Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD "
     "support messages up to 8192 bytes long.",
     default=8192,
-    min_value=2048,
     max_value=65536 * 1024,
     convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "message_size_can_exceed_tcp_buffer",
+    "Optional (defaults to False).  True to support syslog messages which are larger than the configured tcp buffer size. If not provided, we support "
+    "messages of tcp_buffer_size bytes long. When this value is True, we will use tcp_buffer_size option as the "
+    "amount of bytes we try to read from the socket in a single recv() call and a single syslog message will be able to span multiple TCP packets / reads from the socket.",
+    default=False,
+    convert_to=bool,
 )
 
 define_config_option(
@@ -308,6 +318,38 @@ define_config_option(
     default=True,
 )
 
+define_config_option(
+    __monitor__,
+    "tcp_request_parser",
+    "Optional (defaults to default). Which TCP packet data request parser to use. Most users "
+    "should leave this as is.",
+    default="default",
+    convert_to=six.text_type,
+)
+
+define_config_option(
+    __monitor__,
+    "tcp_incomplete_frame_timeout",
+    "How long we wait (in seconds) for a complete frame / syslog message when running in TCP mode "
+    "with batch request parser before giving up and flushing what has accumulated in the buffer.",
+    default=5,
+    min_value=0,
+    max_value=600,
+    convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "tcp_message_delimiter",
+    "Which character sequence to use for a message delimiter / suffix (defaults to \\n). Some "
+    "implementations such as Python syslog handler one utilize null character (\\000) which allows "
+    "messages to contain new lines without using framing. If that is the case for you, set this "
+    "option to \\000. Keep in mind that this value needs to be escaped when specified in the "
+    "config option which means you need to use two backslashes instead of one.",
+    default="\n",
+    convert_to=six.text_type,
+)
+
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
@@ -443,12 +485,28 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
 
 class SyslogRequestParser(object):
-    def __init__(self, socket, max_buffer_size):
+    """
+    Syslog TCP request data parser which supports framed and line delimited syslog messages.
+
+    It output line / frame data to disk (aka calls scalyr logger method which does that) as soon
+    as it's processed.
+
+    This approach of calling scalyr logger for each frame / line is very inefficient and only allows
+    syslog monitors to achieve a throughput of 1.5-3 MB/s or so.
+    """
+
+    def __init__(
+        self, socket, max_buffer_size, message_size_can_exceed_tcp_buffer=False,
+    ):
         self._socket = socket
+
         if socket:
             self._socket.setblocking(False)
+
         self._remaining = None
         self._max_buffer_size = max_buffer_size
+        self._message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
+
         self.is_closed = False
 
     def read(self):
@@ -502,7 +560,6 @@ class SyslogRequestParser(object):
         frames_handled = 0
 
         while self._offset < size:
-
             # get the first byte to determine if framed or not
             # 2->TODO use slicing to get bytes in both python versions.
             c = self._remaining[self._offset : self._offset + 1]
@@ -528,19 +585,22 @@ class SyslogRequestParser(object):
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data
             if frame_end == -1:
-
-                # if the remaining bytes exceed the maximum buffer size, issue a warning
-                # and dump existing contents to the handler
-                if size - self._offset >= self._max_buffer_size:
+                if not self._message_size_can_exceed_tcp_buffer and (
+                    size - self._offset >= self._max_buffer_size
+                ):
                     global_log.warning(
-                        "Syslog frame exceeded maximum buffer size",
+                        "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
+                        'increase the value of "tcp_buffer_size" monitor config option or set '
+                        '"message_size_can_exceed_tcp_buffer" monitor config option to True.'
+                        % (self._max_buffer_size),
                         limit_once_per_x_secs=300,
                         limit_key="syslog-max-buffer-exceeded",
                     )
+
                     # skip invalid bytes which can appear because of the buffer overflow.
                     frame_data = six.ensure_text(self._remaining, errors="ignore")
-
                     handle_frame(frame_data)
+
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
@@ -571,21 +631,219 @@ class SyslogRequestParser(object):
         self._offset = 0
 
 
+class SyslogRawRequestParser(SyslogRequestParser):
+    """
+    Special request parser which doesn't perform any handling of the received data, but writes it
+    as-is to a file on disk (aka sends it to Scalyr logger class).
+
+    It means it doesn't handle framed messages and received lines won't always be written as a
+    complete atomic unit to a file on disk at once, but as part of multiple write calls.
+
+    This handler is to be used when we want to avoid expensive framed message parsing and just want
+    to write received data as-is. It's much more efficient and offers much better throughput than
+    the default parser which handles framed data, etc.
+    """
+
+    def process(self, data, handle_frame):
+        handle_frame(data)
+
+
+class SyslogBatchedRequestParser(SyslogRequestParser):
+    """
+    This parser works in exactly the same manner as the default request parser (it supports framed
+    and line delimited data), but instead of calling scalyr logger class and writing each frame /
+    line as it's processed, it writes all the processed lines in a single batch at the end of
+    processing of a specific TCP packet.
+
+    This offers much less overhead and much better performance / throughput vs writing each line /
+    frame as it's processed.
+
+    Downside is that it requires us to buffer more data in memory thus increasing memory usage a bit.
+    """
+
+    # TODO: Refactor duplicated code and re-use common code between this and base class
+    def __init__(
+        self,
+        socket,
+        max_buffer_size,
+        incomplete_frame_timeout=None,
+        message_delimiter="\n",
+    ):
+        self._socket = socket
+
+        if socket:
+            self._socket.setblocking(False)
+
+        self._max_buffer_size = max_buffer_size
+        self._incomplete_frame_timeout = incomplete_frame_timeout
+        self._message_delimiter = six.ensure_binary(message_delimiter)
+
+        # Internal buffer of bytes remained to be processes
+        self._remaining = bytearray()
+        # Current offset into the internal remaining buffer
+        self._offset = 0
+
+        # Stores the timestamp of when we last called "handle_frame()"
+        self._last_handle_frame_call_time = int(time.time())
+
+        self.is_closed = False
+
+    def process(self, data, handle_frame):
+        """Processes data returned from a previous call to read
+        :type data: six.binary_type
+        """
+        if not data:
+            global_log.warning(
+                "Syslog has seen an empty request, could be an indication of missing data",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-empty-request",
+            )
+            return
+
+        # Append data to what we had remaining from the previous call (if any)
+        self._remaining += data
+
+        size = len(self._remaining)
+
+        # Process the buffer until we are out of bytes. Once we are out of bytes, flush processed
+        # data to file.
+        frames_handled = 0
+        data_to_write = bytearray()
+
+        while self._offset < size:
+            # 2->TODO use slicing to get bytes in both python versions.
+            # TODO: This is not really robust, we should make it an explicit config option if
+            # we should try to parse messages as framed or new line delimited one.
+            c = self._remaining[self._offset : self._offset + 1]
+            framed = b"0" <= c <= b"9"
+
+            skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
+
+            # if framed, read the frame size
+            if framed:
+                frame_end = -1
+                pos = self._remaining.find(b" ", self._offset)
+                if pos != -1:
+                    # NOTE: This could throw in case data was corrupted and we flushed incomplete
+                    # message early as part of the previous call so we should handle this scenario
+                    # better.
+                    frame_size = int(self._remaining[self._offset : pos])
+                    message_offset = pos + 1
+                    if size - message_offset >= frame_size:
+                        self._offset = message_offset
+                        frame_end = self._offset + frame_size
+            else:
+                # not framed, find the first newline
+                frame_end = self._remaining.find(self._message_delimiter, self._offset)
+                skip = 1
+
+            if frame_end == -1:
+                now_ts = int(time.time())
+                if (
+                    self._incomplete_frame_timeout
+                    and (now_ts - self._incomplete_frame_timeout)
+                    > self._last_handle_frame_call_time
+                ):
+                    # If we haven't seen a complete frame / line in this amount of seconds, this likely
+                    # indicates there we received bad / corrupted data so we just flush what we have
+                    # accumulated so far and start from the beginning.
+                    global_log.warning(
+                        "Have not seen a complete syslog message / frame in %s seconds. This "
+                        "likely indicates we have received bad or corrupted data. Flushing what "
+                        "we have accumulated in internal buffer so far."
+                        % (self._incomplete_frame_timeout),
+                        limit_once_per_x_secs=300,
+                        limit_key="syslog-incomplete-message-flush",
+                    )
+
+                    handle_frame(self._remaining.decode("utf-8", "ignore").strip())
+                    frames_handled += 1
+
+                    self._last_handle_frame_call_time = int(time.time())
+                    self._remaining = bytearray()
+                    self._offset = 0
+
+                break
+
+            # Instead of outputting each frame / line once we process it, we output it in batches at
+            # the end.
+            frame_length = frame_end - self._offset
+
+            frame_data = self._remaining[self._offset : frame_end]
+
+            # We add \n which is stripped to ensure line data is correctly written to a file on disk
+            # (aka each syslog message is on a separate line)
+            if not frame_data.endswith(b"\n"):
+                frame_data += b"\n"
+
+            data_to_write += frame_data
+
+            frames_handled += 1
+            self._offset += frame_length + skip
+
+        if frames_handled == 0:
+            global_log.info(
+                "No frames ready to be handled in syslog... Advisory notice.",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-no-frames",
+            )
+
+        # All the currently available data has been processed, output it and reset the buffer
+        if data_to_write:
+            handle_frame(data_to_write.decode("utf-8", "ignore").strip())
+            data_to_write = bytearray()
+
+            self._last_handle_frame_call_time = int(time.time())
+            self._remaining = self._remaining[self._offset :]
+            self._offset = 0
+
+
 class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     """Class that reads data from a TCP request and passes it to
     a protocol neutral handler
     """
 
+    # NOTE: Thole whole handler abstraction is not great since it means a new class instance for
+    # each new connection.
+
+    def __init__(self, *args, **kwargs):
+        self.request_parser = kwargs.pop("request_parser", "default")
+        self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
+        self.message_delimiter = kwargs.pop("message_delimiter", "\n")
+
+        if six.PY3:
+            super(SyslogTCPHandler, self).__init__(*args, **kwargs)
+        else:
+            six.moves.socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
+
     def handle(self):
-        try:
+        if self.request_parser == "default":
             request_stream = SyslogRequestParser(
-                self.request, self.server.tcp_buffer_size
+                socket=self.request,
+                max_buffer_size=self.server.tcp_buffer_size,
+                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
             )
-            global_log.log(
-                scalyr_logging.DEBUG_LEVEL_1,
-                "SyslogTCPHandler.handle - created request_stream. Thread: %d",
-                threading.current_thread().ident,
+        elif self.request_parser == "batch":
+            request_stream = SyslogBatchedRequestParser(
+                socket=self.request,
+                max_buffer_size=self.server.tcp_buffer_size,
+                incomplete_frame_timeout=self.incomplete_frame_timeout,
+                message_delimiter=self.message_delimiter,
             )
+        elif self.request_parser == "raw":
+            request_stream = SyslogRawRequestParser(
+                socket=self.request, max_buffer_size=self.server.tcp_buffer_size,
+            )
+        else:
+            raise ValueError("Invalid request parser: %s" % (self.request_parser))
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "SyslogTCPHandler.handle - created request_stream. Thread: %d",
+            threading.current_thread().ident,
+        )
+
+        try:
             count = 0
             while not request_stream.is_closed:
                 check_running = False
@@ -653,8 +911,17 @@ class SyslogTCPServer(
     """Class that creates a TCP SocketServer on a specified port
     """
 
-    def __init__(self, port, tcp_buffer_size, bind_address, verifier):
-
+    def __init__(
+        self,
+        port,
+        tcp_buffer_size,
+        bind_address,
+        verifier,
+        message_size_can_exceed_tcp_buffer=False,
+        request_parser="default",
+        incomplete_frame_timeout=None,
+        message_delimiter="\n",
+    ):
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -665,7 +932,17 @@ class SyslogTCPServer(
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
-        six.moves.socketserver.TCPServer.__init__(self, address, SyslogTCPHandler)
+        self.message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
+        self.request_parser = request_parser
+        self.message_delimiter = message_delimiter
+
+        handler_cls = functools.partial(
+            SyslogTCPHandler,
+            request_parser=request_parser,
+            incomplete_frame_timeout=incomplete_frame_timeout,
+            message_delimiter=message_delimiter,
+        )
+        six.moves.socketserver.TCPServer.__init__(self, address, handler_cls)
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -1215,15 +1492,58 @@ class SyslogServer(object):
                 docker_logging=docker_logging, accept_remote=accept_remote
             )
             if protocol == "tcp":
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting TCP Server")
+                tcp_buffer_size = config.get("tcp_buffer_size")
+                message_size_can_exceed_tcp_buffer = config.get(
+                    "message_size_can_exceed_tcp_buffer"
+                )
+                request_parser = config.get("tcp_request_parser")
+
+                if request_parser not in ["default", "batch", "raw"]:
+                    raise ValueError(
+                        "Invalid tcp_request_parser value: %s" % (request_parser)
+                    )
+
+                incomplete_frame_timeout = config.get("tcp_incomplete_frame_timeout")
+                message_delimiter = config.get("tcp_message_delimiter")
+
+                # NOTE: User needs to provide escaped value in the config (e.g. \\000), but we
+                # need to unsescape it to use it
+                # message_delimiter = message_delimiter.replace("\\", "a")
+                message_delimiter = six.ensure_binary(
+                    message_delimiter.encode("utf-8").decode("unicode_escape")
+                )
+
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Starting TCP Server (host=%s, port=%s, tcp_buffer_size=%s, "
+                    "message_size_can_exceed_tcp_buffer=%s, tcp_request_parser=%s, "
+                    "message_delimiter=%s)"
+                    % (
+                        bind_address,
+                        port,
+                        tcp_buffer_size,
+                        message_size_can_exceed_tcp_buffer,
+                        request_parser,
+                        message_delimiter.decode("utf-8")
+                        .replace("\n", "\\n")
+                        .replace("\000", "\\000"),
+                    ),
+                )
                 server = SyslogTCPServer(
                     port,
-                    config.get("tcp_buffer_size"),
+                    tcp_buffer_size,
                     bind_address=bind_address,
                     verifier=verifier,
+                    message_size_can_exceed_tcp_buffer=message_size_can_exceed_tcp_buffer,
+                    request_parser=request_parser,
+                    incomplete_frame_timeout=incomplete_frame_timeout,
+                    message_delimiter=message_delimiter,
                 )
             elif protocol == "udp":
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
+                )
                 server = SyslogUDPServer(
                     port, bind_address=bind_address, verifier=verifier
                 )

@@ -40,6 +40,7 @@ from scalyr_agent.log_processing import (
     LogFileProcessor,
     LogMatcher,
 )
+from scalyr_agent.line_matcher import LineGrouper
 from scalyr_agent.log_processing import FileSystem
 from scalyr_agent.log_processing import _parse_cri_log as parse_cri_log
 from scalyr_agent.json_lib import JsonObject
@@ -300,6 +301,101 @@ class TestLogFileIterator(ScalyrTestCase):
         for line in expected:
             self.assertEqual(line, self.readline().line)
 
+    def test_line_groupers_non_utf8_data_errors_strict(self):
+        # If errors="strict", code should fail
+        LineGrouper.DECODE_ERRORS_VALUE = "strict"
+
+        log_config = {
+            "path": self.__path,
+            "lineGroupers": JsonArray(
+                DEFAULT_CONTINUE_THROUGH,
+                DEFAULT_CONTINUE_PAST,
+                DEFAULT_HALT_BEFORE,
+                DEFAULT_HALT_WITH,
+            ),
+        }
+
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(200, 200)
+
+        line_data = [
+            b"--multi\n--continue\n--\xBA\xDD\\xAT\xA0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xBA\xDD\\xAT\xA0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+
+        self.append_file(self.__path, b"".join(line_data))
+        self.log_file.scan_for_new_bytes()
+
+        expected_msg = "invalid start byte"
+        self.assertRaisesRegexp(
+            UnicodeDecodeError, expected_msg, lambda: self.readline().line
+        )
+
+        result = self.readline().line
+        self.assertEqual(result, line_data[1])
+
+        expected_msg = "invalid start byte"
+        self.assertRaisesRegexp(
+            UnicodeDecodeError, expected_msg, lambda: self.readline().line
+        )
+
+    def test_line_groupers_non_utf8_data_errors_replace(self):
+        # errors="replace"
+        LineGrouper.DECODE_ERRORS_VALUE = "replace"
+
+        log_config = {
+            "path": self.__path,
+            "lineGroupers": JsonArray(
+                DEFAULT_CONTINUE_THROUGH,
+                DEFAULT_CONTINUE_PAST,
+                DEFAULT_HALT_BEFORE,
+                DEFAULT_HALT_WITH,
+            ),
+        }
+
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(200, 200)
+
+        # Lines contains corrupted / bad utf8 sequence
+        # UnicodeDecodeError: 'utf-8' codec can't decode byte 0xba in position 2: invalid start byte
+        line_data = [
+            b"--multi\n--continue\n--\xBA\xDD\\xAT\xA0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xBA\xDD\\xAT\xA0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+        expected = [
+            b"--multi\n--continue\n--\xba\xdd\\xAT\xa0some more\n",
+            b"single line\n",
+            b"multi\\\n--\xBA\xDD\\xAT\xA0continue\\\n--some more\n",
+            b"single line\n",
+            b"--begin\n--continue\xba\xdd\\xAT\xa0\n",
+            b"--end\n",
+            b"--start\n--continue\n--stop\n",
+            b"the end\n",
+        ]
+
+        self.append_file(self.__path, b"".join(line_data))
+        self.log_file.scan_for_new_bytes()
+
+        for line in expected:
+            actual_line = self.readline().line
+            self.assertEqual(line, actual_line)
+
     def test_multiple_line_grouper_options(self):
         log_config = {
             "path": self.__path,
@@ -410,22 +506,100 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertTrue(self.log_file.at_end)
         restore_access()
 
-    def test_rotated_file_with_truncation(self):
+    def test_find_copy_trucate_file_number_ext(self):
+        # Test find_copy_truncate_file with .1 name rotation scheme
+        filename = os.path.basename(self.__path)
+        copied_file = os.path.join(self.__tempdir, filename + ".1")
+        self.write_file(copied_file, b"")
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_trucate_file_date_ext(self):
+        # Test find_copy_truncate_file with .1 name rotation scheme
+        filename = os.path.basename(self.__path)
+        copied_file = os.path.join(self.__tempdir, filename + "-20210101")
+        self.write_file(copied_file, b"")
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_trucate_with_ext_option_filename(self):
+        # Test find_copy_truncate_file with date rotation scheme
+        filename = os.path.join(self.__tempdir, "app.log")
+        self.write_file(filename, b"")
+        copied_file = os.path.join(self.__tempdir, "app.1.log")
+        self.write_file(copied_file, b"")
+        app_log_file = self._create_iterator({"path": filename})
+        located_copy_truncate_file = (
+            app_log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_truncate_multiple_files(self):
+        # Test find_copy_truncate_file with multiple files - most recent file is used
+        filename = os.path.basename(self.__path)
+        copied_file_2 = os.path.join(self.__tempdir, filename + ".2")
+        copied_file_1 = os.path.join(self.__tempdir, filename + ".1")
+
+        self.write_file(copied_file_2, b"")
+        # No easy way to modify file ctime from Python, sleep to have later ctime
+        time.sleep(0.01)
+        self.write_file(copied_file_1, b"")
+
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file_1, located_copy_truncate_file)
+
+    def test_find_copy_truncate_compressed_files(self):
+        # Test find_copy_truncate_file ignores compressed log files
+        filename = os.path.basename(self.__path)
+        copied_file_2 = os.path.join(self.__tempdir, filename + ".2.gz")
+        copied_file_1 = os.path.join(self.__tempdir, filename + ".1.gz")
+
+        self.write_file(copied_file_2, b"")
+        # No easy way to modify file ctime from Python, sleep to have later ctime
+        time.sleep(0.01)
+        self.write_file(copied_file_1, b"")
+
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(None, located_copy_truncate_file)
+
+    @skipIf(
+        platform.system() == "Windows", "Skipping Linux copy truncate tests on Windows"
+    )
+    def test_rotated_file_with_copy_truncate(self):
         self.append_file(self.__path, b"L001\n", b"L002\n")
         self.log_file.scan_for_new_bytes()
 
-        self.assertEqual(self.readline().line, b"L001\n")
-        self.assertEqual(self.readline().line, b"L002\n")
-        self.assertEqual(self.readline().line, b"")
+        self.assertEqual(b"L001\n", self.readline().line)
+        self.assertEqual(b"L002\n", self.readline().line)
+        self.assertEqual(b"", self.readline().line)
 
         _, first_sequence_number = self.log_file.get_sequence()
 
-        self.truncate_file(self.__path)
+        # Write additional bytes to file that are not read before copy occurs
         self.append_file(self.__path, b"L003\n")
+
+        # Copy log file
+        filename = os.path.basename(self.__path)
+        copied_file = os.path.join(self.__tempdir, filename + ".1")
+        shutil.copy(self.__path, copied_file)
+
+        # Truncate log file and write new bytes to it
+        self.truncate_file(self.__path)
+        self.append_file(self.__path, b"L004\n")
         self.scan_for_new_bytes()
 
-        self.assertEqual(self.readline().line, b"L003\n")
-        self.assertEqual(self.readline().line, b"")
+        # Verify lines from copied and truncated log file are read
+        self.assertEqual(b"L003\n", self.readline().line)
+        self.assertEqual(b"L004\n", self.readline().line)
+        self.assertEqual(b"", self.readline().line)
 
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
@@ -1947,7 +2121,11 @@ class TestLogFileProcessor(ScalyrTestCase):
             log_attributes={},
             checkpoint=checkpoint,
         )
-        self.write_file(self.__path, b"")
+        if checkpoint is None:
+            # Do not create/overwrite log file if checkpoint file is present
+            # checkpoint file contains offsets to existing file
+            self.write_file(self.__path, b"")
+
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time
         )
@@ -2592,8 +2770,8 @@ class TestLogMatcher(ScalyrTestCase):
             )
             processors = matcher.find_matches(dict(), dict())
             self.assertEqual(len(processors), 2)
-            self.assertEqual(processors[0].log_path, self.__path_three)
-            self.assertEqual(processors[1].log_path, self.__path_four)
+            self.assertEqual(processors[0].get_log_path(), self.__path_three)
+            self.assertEqual(processors[1].get_log_path(), self.__path_four)
 
             self._close_processors(processors)
 

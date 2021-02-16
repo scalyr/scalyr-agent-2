@@ -41,6 +41,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+import getpass
 
 from io import StringIO
 from io import BytesIO
@@ -74,6 +75,7 @@ PACKAGE_TYPES = [
     "win32",
     "docker_syslog_builder",
     "docker_json_builder",
+    "docker_api_builder",
     "k8s_builder",
 ]
 
@@ -139,6 +141,20 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "docker/docker-json-config",
                 "scalyr-docker-agent-json",
                 ["scalyr/scalyr-agent-docker-json"],
+                coverage_enabled=coverage_enabled,
+            )
+        elif package_type == "docker_api_builder":
+            # An image for running on Docker configured to fetch logs via the Docker API using
+            # docker_raw_logs: false configuration option.
+            artifact_file_name = build_container_builder(
+                variant,
+                version,
+                no_versioned_file_name,
+                "scalyr-docker-agent.tar.gz",
+                "docker/Dockerfile",
+                "docker/docker-api-config",
+                "scalyr-docker-agent-api",
+                ["scalyr/scalyr-agent-docker-api"],
                 coverage_enabled=coverage_enabled,
             )
         elif package_type == "k8s_builder":
@@ -279,11 +295,13 @@ def build_win32_installer_package(variant, version):
     )
 
     # Copy the config file.
+    agent_json_path = make_path(agent_source_root, "config/agent.json")
     cat_files(
-        [make_path(agent_source_root, "config/agent.json")],
-        "agent_config.tmpl",
-        convert_newlines=True,
+        [agent_json_path], "agent_config.tmpl", convert_newlines=True,
     )
+    # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
+    # readable by others.
+    os.chmod(agent_json_path, int("640", 8))
 
     os.chdir("..")
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
@@ -323,6 +341,10 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("Scalyr/config/agent.d", int("741", 8))
+
     os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
@@ -570,6 +592,9 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
 
     # Make sure there is an agent.d directory regardless of the config directory we used.
     make_directory("root/etc/scalyr-agent-2/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("root/etc/scalyr-agent-2/agent.d", int("741", 8))
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
@@ -790,8 +815,24 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "log files and transmit them to Scalyr."
     )
 
+    # Workaround for our ancient builder VM so we can use --deb-use-file-permissions flag and make
+    # sure it works correctly - we need to make sure root user is owner for the files which are
+    # packaged
+    # NOTE: We only need this workaround for debian packages and not rpm ones.
+    username = getpass.getuser()
+    if username in ["rpmbuilder", "circleci"] and not is_rpm:
+        print("Using builder VM sudo workaround for file ownership issue")
+        use_sudo = True
+        sudo_command_string = "sudo "
+    else:
+        use_sudo = False
+        sudo_command_string = ""
+
+    if use_sudo:
+        run_command("sudo chown -R root:root .")
+
     run_command(
-        'fpm -s dir -a all -t %s -n "scalyr-agent-2" -v %s '
+        '%s fpm -s dir -a all -t %s -n "scalyr-agent-2" -v %s '
         '  --license "Apache 2.0" '
         "  --vendor Scalyr %s "
         "  --maintainer czerwin@scalyr.com "
@@ -819,10 +860,42 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
-        "  -C root usr etc var" % (package_type, version, iteration_arg, description),
+        # NOTE 1: By default fpm won't preserve all the permissions we set on the files so we need
+        # to use those flags.
+        # If we don't do that, fpm will use 77X for directories and we don't really want 7 for
+        # "group" and it also means config file permissions won't be correct.
+        # NOTE 2: This is commented out since it breaks builds produced on builder VM where
+        # build_package.py runs as rpmbuilder user (uid 1001) and that uid is preserved as file
+        # owner for the package tarball file which breaks things.
+        # On Circle CI uid of the user under which the package job runs is 0 aka root so it works
+        # fine.
+        # We don't run fpm as root on builder VM which means we can't use any other workaround.
+        # Commenting this flag out means that original file permissions (+ownership) won't be
+        # preserved which means we will also rely on postinst step fixing permissions for fresh /
+        # new installations since those permissions won't be correct in the package artifact itself.
+        # Not great.
+        # Once we move all the build steps to Circle CI and ensure build_package.py runs as uid 0
+        # we should uncomment this.
+        # In theory it should work wth --*-user fpm flag, but it doesn't. Keep in mind that the
+        # issue only applies to deb packages since --rpm-user and --rpm-root flag override the user
+        # even if the --rpm-use-file-permissions flag is used.
+        # "  --rpm-use-file-permissions "
+        "  --rpm-use-file-permissions --deb-use-file-permissions "
+        # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+        # directories such as /etc/init.d and we need to handle that in postinst :/
+        # "  --rpm-auto-add-directories "
+        # "  --rpm-defattrfile 640"
+        # "  --rpm-defattrdir 751"
+        "  -C root usr etc var"
+        % (sudo_command_string, package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
     )
+
+    # We need to make sure that after we package everything up in deb, we restore the permissions
+    # so Jenkins can access the files
+    if use_sudo:
+        run_command("sudo chown -R %s:%s ." % (username, username))
 
     # We determine the artifact name in a little bit of loose fashion.. we just glob over the current
     # directory looking for something either ending in .rpm or .deb.  There should only be one package,
@@ -858,10 +931,13 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     make_directory("scalyr-agent-2/data")
     make_directory("scalyr-agent-2/log")
     make_directory("scalyr-agent-2/config/agent.d")
+    # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
+    # readable by others.
+    os.chmod("scalyr-agent-2/config/agent.d", int("741", 8))
 
     # Create a file named packageless.  This signals to the agent that
     # this a tarball install instead of an RPM/Debian install, which changes
-    # the default paths for th econfig, logs, data, etc directories.  See
+    # the default paths for the config, logs, data, etc directories.  See
     # configuration.py.
     write_to_file("1", "scalyr-agent-2/packageless")
 
@@ -982,7 +1058,11 @@ def build_base_files(base_configs="config"):
         config_path = base_configs
     else:
         config_path = "config"
+
     shutil.copytree(make_path(agent_source_root, config_path), "config")
+
+    # Make sure config file has 640 permissions
+    os.chmod("config/agent.json", int("640", 8))
 
     # Create the trusted CA root list.
     os.chdir("certs")
@@ -1421,9 +1501,9 @@ def create_change_logs():
             )
             # Include release notes with an indented first level (using asterisk, then a dash for the next level,
             # finally a plus sign.
-            print_release_notes(fp, release["notes"], [" * ", "   - ", "     + "])
+            print_release_notes(fp, release["notes"], ["  * ", "   - ", "     + "])
             print(
-                "-- %s <%s>  %s"
+                " -- %s <%s>  %s"
                 % (release["packager"], release["packager_email"], date_str,),
                 file=fp,
             )

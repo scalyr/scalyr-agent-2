@@ -29,6 +29,7 @@ import sys
 from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
+    K8sConfigBuilder,
     K8sNamespaceFilter,
 )
 from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
@@ -42,6 +43,7 @@ __author__ = "echee@scalyr.com"
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
     ControlledCacheWarmer,
+    ContainerChecker,
     _ignore_old_dead_container,
 )
 from scalyr_agent.copying_manager import CopyingManager
@@ -50,7 +52,8 @@ from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
-from tests.unit.copying_manager_test import FakeMonitor
+from tests.unit.configuration_test import TestConfigurationBase
+from tests.unit.copying_manager_tests.copying_manager_test import FakeMonitor
 from scalyr_agent.test_base import skipIf
 
 import mock
@@ -842,3 +845,76 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
         created_before = None
         result = _ignore_old_dead_container(container, created_before)
         self.assertFalse(result)
+
+
+class ContainerCheckerTest(TestConfigurationBase):
+    def setUp(self):
+        super(ContainerCheckerTest, self).setUp()
+        self.k8s_info = {
+            "pod_name": "test_pod",
+            "pod_namespace": "test_namespace",
+            "k8s_container_name": "xxx_test_container",
+        }
+
+    def test_variable_container_log_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
+              {
+                "k8s_container_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "attributes": { "zzz_templ_container_name": "${k8s_container_name}" }
+              }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        cc = ContainerChecker(
+            config={"k8s_use_v2_attributes": True},
+            global_config=config,
+            logger=mock.Mock(),
+            socket_file=None,
+            docker_api_version=None,
+            agent_pod=None,
+            host_hostname=None,
+            log_path=None,
+            include_all=True,
+            include_controller_info=True,
+            namespaces_to_include=[K8sNamespaceFilter.default_value()],
+            ignore_pod_sandboxes=False,
+        )
+        cc._ContainerChecker__k8s_config_builder = K8sConfigBuilder(
+            config.k8s_log_configs, mock.Mock(), True,
+        )
+        cc.get_cluster_name = lambda *_: "the-cluster-name"
+
+        def _pod(pod_namespace, pod_name, **kwargs):
+            return mock.MagicMock(
+                name=pod_name,
+                namespace=pod_namespace,
+                node_name="asd",
+                uid="lkjsefr",
+                labels={},
+                controller=None,
+                annotations={},
+                container_names=["one", "two"],
+            )
+
+        result = cc._ContainerChecker__get_log_config_for_container(
+            "12345",
+            info={
+                "name": "myname",
+                "k8s_info": self.k8s_info,
+                "log_path": "/var/log/test.log",
+            },
+            k8s_cache=mock.Mock(pod=_pod),
+            base_attributes=cc._ContainerChecker__get_base_attributes(),
+        )
+        assert "zzz_templ_container_name" in result["attributes"]
+        assert "xxx_test_container" == result["attributes"]["zzz_templ_container_name"]

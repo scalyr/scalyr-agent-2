@@ -18,6 +18,9 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+if False:
+    from typing import List
+
 
 __author__ = "czerwin@scalyr.com"
 
@@ -39,6 +42,7 @@ from scalyr_agent import (
 )
 from scalyr_agent.third_party.tcollector.tcollector import ReaderThread
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent import StoppableThread
 
 # In this file, we make use of the third party tcollector library.  Much of the machinery here is to
@@ -548,6 +552,14 @@ define_config_option(
     default=True,
 )
 
+define_config_option(
+    __monitor__,
+    "ignore_mounts",
+    "List of glob patterns for mounts to ignore",
+    convert_to=ArrayOfStrings,
+    default=["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"],
+)
+
 
 class TcollectorOptions(object):
     """Bare minimum implementation of an object to represent the tcollector options.
@@ -567,6 +579,8 @@ class TcollectorOptions(object):
         self.network_interface_suffix = None
         # Whether or not to limit the metrics to only locally mounted filesystems.
         self.local_disks_only = True
+        # A list of glob patterns for mounts to ignore
+        self.ignore_mounts = []  # type: List[str]
 
 
 class WriterThread(StoppableThread):
@@ -735,6 +749,14 @@ You can see an overview of this data in the System dashboard. Click the {{menuRe
             "network_interface_suffix", default="[0-9A-Z]+"
         )
         self.options.local_disks_only = self._config.get("local_disks_only")
+
+        if self._config.get("ignore_mounts"):
+            if isinstance(self._config.get("ignore_mounts"), ArrayOfStrings):
+                self.options.ignore_mounts = self._config.get("ignore_mounts")._items
+            else:
+                self.options.ignore_mounts = self._config.get("ignore_mounts")
+        else:
+            self.options.ignore_mounts = []
 
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags

@@ -114,36 +114,42 @@ from tests.ami.utils import get_env_throw_if_not_set
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts/")
+
+# Directory which contains config files used by the tests which are uploaded to the server
 MOCK_CONFIGS_DIRECTORY = os.path.join(BASE_DIR, "configs/")
 
+# Directory which contains additional files which are used by the test and are uploaded to the
+# server
+TEST_FILES_DIRECTORY = os.path.join(BASE_DIR, "files/")
 
+# TODO: Revert back to micro image if there are still failures with small
 EC2_DISTRO_DETAILS_MAP = {
     # Debian based distros
     "ubuntu1404": {
         "image_id": "ami-07957d39ebba800d5",
         "image_name": "Ubuntu Server 14.04 LTS (HVM)",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "ubuntu1604": {
         "image_id": "ami-08bc77a2c7eb2b1da",
         "image_name": "Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
-        "size_id": "t1.micro",
+        "size_id": "m1.small",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "ubuntu1804": {
         "image_id": "ami-07ebfd5b3428b6f4d",
         "image_name": "Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
-        "size_id": "t1.micro",
+        "size_id": "m1.small",
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
     "debian1003": {
         "image_id": "ami-0b9a611a02047d3b1",
         "image_name": "Debian 10 Buster",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "admin",
         "default_python_package_name": "python",
     },
@@ -153,28 +159,28 @@ EC2_DISTRO_DETAILS_MAP = {
     "centos6": {
         "image_id": "ami-03a941394ec9849de",
         "image_name": "CentOS 6 (x86_64) - with Updates HVM",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "root",
         "default_python_package_name": "python",
     },
     "centos7": {
         "image_id": "ami-0affd4508a5d2481b",
         "image_name": "CentOS 7 (x86_64) - with Updates HVM",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "centos",
         "default_python_package_name": "python",
     },
     "centos8": {
-        "image_id": "ami-0e7ad70170b787201",
+        "image_id": "ami-01ca03df4a6012157",
         "image_name": "CentOS 8 (x86_64) - with Updates HVM",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "centos",
         "default_python_package_name": "python2",
     },
     "amazonlinux2": {
         "image_id": "ami-09d95fab7fff3776c",
         "image_name": "Amazon Linux 2 AMI (HVM), SSD Volume Type",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "ec2-user",
         "default_python_package_name": "python",
     },
@@ -182,21 +188,21 @@ EC2_DISTRO_DETAILS_MAP = {
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2016": {
         "image_id": "ami-06e455febb7d693eb",
         "image_name": "WindowsServer2016-SSH",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2012": {
         "image_id": "ami-033513be5c11f0e67",
         "image_name": "WindowsServer2012R2-SSH",
-        "size_id": "t2.micro",
+        "size_id": "t2.small",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
@@ -220,6 +226,8 @@ SECURITY_GROUPS_STR = get_env_throw_if_not_set(
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
+
+VERBOSE = compat.os_environ_unicode.get("VERBOSE", "false").lower() == "true"
 
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "-automated-agent-tests-"
@@ -339,6 +347,13 @@ def main(
         file_upload_step = _create_config_file_deployment_step(config_file_path)
         file_upload_steps.append(file_upload_step)
 
+    # Upload auxiliary files from tests/ami/files/
+    file_names = os.listdir(TEST_FILES_DIRECTORY)
+    for file_name in file_names:
+        file_path = os.path.join(TEST_FILES_DIRECTORY, file_name)
+        file_upload_step = _create_file_deployment_step(file_path, "ca_certs")
+        file_upload_steps.append(file_upload_step)
+
     if test_type == "install":
         install_package_source = to_version
     else:
@@ -421,6 +436,7 @@ def main(
 
     rendered_template = render_script_template(
         script_template=script_content,
+        distro_name=distro,
         distro_details=distro_details,
         python_package=python_package,
         test_type=test_type,
@@ -431,14 +447,17 @@ def main(
         verbose=verbose,
     )
 
+    # TODO: Lower those timeouts when upstream yum related issues or similar start to stabilize.
+    # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
+    # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
-        deploy_step_timeout = 320
-        deploy_overall_timeout = 320
+        deploy_step_timeout = 440  # 320
+        deploy_overall_timeout = 460  # 320
         cat_step_timeout = 10
         max_tries = 3
     else:
-        deploy_step_timeout = 260
-        deploy_overall_timeout = 280
+        deploy_step_timeout = 320  # 260
+        deploy_overall_timeout = 340  # 280
         max_tries = 3
         cat_step_timeout = 5
 
@@ -552,6 +571,7 @@ def main(
 
 def render_script_template(
     script_template,
+    distro_name,
     distro_details,
     python_package,
     test_type,
@@ -561,14 +581,14 @@ def render_script_template(
     additional_packages=None,
     verbose=False,
 ):
-    # type: (str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
+    # type: (str, str, dict, str, str, Optional[Dict], Optional[Dict], Optional[Dict], Optional[str], bool) -> str
     """
     Render the provided script template with common context.
     """
     # from_version = from_version or ""
     # to_version = to_version or ""
-
     template_context = distro_details.copy()
+    template_context["distro_name"] = distro_name
 
     template_context["test_type"] = test_type
 
@@ -586,7 +606,9 @@ def render_script_template(
 
     template_context["verbose"] = verbose
 
-    env = Environment(loader=FileSystemLoader(SCRIPTS_DIR),)
+    env = Environment(
+        loader=FileSystemLoader(SCRIPTS_DIR), extensions=["jinja2.ext.with_"]
+    )
     template = env.from_string(script_template)
     rendered_template = template.render(**template_context)
     return rendered_template
@@ -730,7 +752,7 @@ if __name__ == "__main__":
             "True to enable verbose mode where every executed shell command is logged."
         ),
         action="store_true",
-        default=False,
+        default=VERBOSE,
     )
     parser.add_argument(
         "--no-destroy-node",

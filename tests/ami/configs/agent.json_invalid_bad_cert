@@ -2,6 +2,11 @@
   api_key: "REPLACE_THIS",
 
   scalyr_server: "https://example.com:443",
+  // Note: We can't really on example.com using self signed cert so we use a CA which
+  // doesn't trust that cert.
+  // Long term we could spawn test HTTP server locally and use that, but that's more
+  // involved.
+  ca_cert_path: "/tmp/ca_certs.crt",
 
   logs: [
   ],

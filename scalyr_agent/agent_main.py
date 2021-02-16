@@ -47,6 +47,18 @@ import re
 import ssl
 from io import open
 
+if False:
+    from typing import Optional
+    from typing import Dict
+
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 try:
     from __scalyr__ import SCALYR_VERSION
     from __scalyr__ import scalyr_init
@@ -64,6 +76,11 @@ except ImportError:
 scalyr_init()
 
 import six
+
+try:
+    import glob
+except ImportError:
+    import glob2 as glob  # type: ignore
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -85,6 +102,7 @@ from optparse import OptionParser
 
 from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
+from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
@@ -100,6 +118,7 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent import compat
 
 
 STATUS_FILE = "last_status"
@@ -110,6 +129,35 @@ VALID_STATUS_FORMATS = ["text", "json"]
 AGENT_LOG_FILENAME = "agent.log"
 
 AGENT_NOT_RUNNING_MESSAGE = "The agent does not appear to be running."
+
+# Message which is logged when locale used for the scalyr agent process is not UTF-8
+NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE = """
+Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
+coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
+with non-ascii content or non-ascii characters in the log file names. On Linux you can do that by
+setting LANG and LC_ALL environment variable: e.g. export LC_ALL=en_US.UTF-8.
+""".strip().replace(
+    "\n", " "
+)
+
+NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE = """
+Detected a non UTF-8 locale (%s) being used. You are strongly encouraged to set the locale /
+coding for the agent process to UTF-8. Otherwise things won't work when trying to monitor files
+with non-ascii content or non-ascii characters in the log file names. On Windows you can do that by
+setting setting PYTHONUTF8=1 environment variable.
+""".strip().replace(
+    "\n", " "
+)
+
+# Work around for a potential race which may happen when threads try to resolve a unicode hostname
+# or similar
+# See:
+# - https://bugs.python.org/issue29288
+# - https://github.com/aws/aws-cli/pull/4383/files#diff-45cb40c448cb3c90162a08a8d5c86559afb843a7678339500c3fb15933b5dcceR55
+try:
+    "".encode("idna")
+except Exception as e:
+    print("Failed to force idna encoding: %s" % (str(e)))
 
 
 def _update_disabled_until(config_value, current_time):
@@ -171,10 +219,6 @@ class ScalyrAgent(object):
         self.__copying_manager = None
         # The current monitors manager.
         self.__monitors_manager = None
-        # The current ScalyrClientSession to use for sending requests.
-        self.__scalyr_client = None
-        # The current NewScalyrClientSession to use for sending requests.
-        self.__new_scalyr_client = None
 
         # Tracks whether or not the agent should still be running.  When a terminate signal is received,
         # the run state is set to false.  Threads are expected to notice this and finish as quickly as
@@ -279,10 +323,18 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            self.__config = self.__read_and_verify_config(config_file_path)
+            log_warnings = command not in ["status", "stop"]
+            self.__config = self.__read_and_verify_config(
+                config_file_path, log_warnings=log_warnings
+            )
 
-            # check if not a tty and override the no check remote variable
-            if not sys.stdout.isatty():
+            # NOTE: isatty won't be available on Redirector object on Windows when doing permission
+            # escalation so we need to handle this scenario as well
+            isatty_func = getattr(getattr(sys, "stdout", None), "isatty", None)
+            if not isatty_func or (isatty_func and not isatty_func()):
+                # If stdout.atty is not available or if it is and returns False, we fall back to
+                # "check_remote_if_no_tty" config option
+                # check if not a tty and override the no check remote variable
                 no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception as e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
@@ -365,27 +417,35 @@ class ScalyrAgent(object):
                     % (command, six.text_type(e), traceback.format_exc())
                 )
 
-    def __read_and_verify_config(self, config_file_path):
+    def __read_and_verify_config(self, config_file_path, log_warnings=True):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
 
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
+
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__make_config(config_file_path)
+        config = self.__make_config(config_file_path, log_warnings=log_warnings)
         self.__verify_config(config)
         return config
 
-    def __make_config(self, config_file_path):
+    def __make_config(self, config_file_path, log_warnings=True):
         """Make Configuration object. Does not read nor verify.
 
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: six.text_type
+
+        @param log_warnings: True if config.parse() should log any warnings which may come up during
+                             parsing.
+        @type log_warnings: bool
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -395,6 +455,7 @@ class ScalyrAgent(object):
             self.__default_paths,
             log,
             extra_config_dir=self.__extra_config_dir,
+            log_warnings=log_warnings,
         )
 
     def __verify_config(
@@ -409,6 +470,7 @@ class ScalyrAgent(object):
 
         @param config: The configuration object.
         @type config: scalyr_agent.Configuration
+
         @return: A boolean value indicating whether or not the configuration was fully verified
         """
         try:
@@ -510,7 +572,7 @@ class ScalyrAgent(object):
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
         if not no_check_remote or self.__config.use_new_ingestion:
-            client = self.__create_client(quiet=True)
+            client = create_client(self.__config, quiet=True)
             try:
                 ping_result = client.ping()
                 if ping_result != "success":
@@ -630,7 +692,11 @@ class ScalyrAgent(object):
             self.__run_state.stop()
 
     def __detailed_status(
-        self, data_directory, status_format="text", health_check=False
+        self,
+        data_directory,
+        status_format="text",
+        health_check=False,
+        zero_status_file=True,
     ):
         """Execute the status -v or -H command.
 
@@ -639,6 +705,11 @@ class ScalyrAgent(object):
 
         @param data_directory: The path to the data directory.
         @type data_directory: str
+
+        :param zero_status_file: True to zero the status file content so we can detect when agent writes
+                             a new status file This is primary meant to be used in testing where we can
+                             set it to False which means we can avoid a lot of nasty mocking if
+                             open() and related functiond.
 
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
@@ -696,7 +767,7 @@ class ScalyrAgent(object):
             return 1
 
         # Zero out the current file so that we can detect once the agent process has updated it.
-        if os.path.isfile(status_file):
+        if os.path.isfile(status_file) and zero_status_file:
             f = open(status_file, "w")
             f.truncate(0)
             f.close()
@@ -727,8 +798,17 @@ class ScalyrAgent(object):
 
         # Now loop until we see it show up.
         while True:
-            if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
-                break
+            try:
+                if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
+                    break
+            except OSError as e:
+                if e.errno == 2:
+                    # File doesn't exist - it could mean isfile() returned true, but getsize()
+                    # raised an exception since the file was deleted after isfile() call, but
+                    # before getsize()
+                    pass
+                else:
+                    raise e
 
             if time.time() > deadline:
                 if self.__config is not None:
@@ -757,40 +837,61 @@ class ScalyrAgent(object):
             return 1
 
         return_code = 0
-        fp = open(status_file)
-        for line in fp:
-            if not health_check:
-                print(line.rstrip())
 
-            if status_format == "json" or health_check:
-                health_result = self.__find_health_result_in_status_json(line)
-                if health_result:
-                    if health_check:
-                        print("Health check: %s" % health_result)
-                    if health_result != "Good":
-                        return_code = 2
-                elif health_check:
-                    print("Cannot get health check result.")
-            elif (
-                status_format == "text"
-                and "Health check:" in line
-                and not re.match(r"^Health check\:\s+Good$", line.strip())
-            ):
+        with open(status_file, "r") as fp:
+            content = fp.read()
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        health_result = self.__find_health_result_in_status_data(content)
+
+        if health_result:
+            if health_result.lower() == "good":
+                return_code = 0
+            else:
                 return_code = 2
-        fp.close()
+
+        # Regular non-health check invocation, just print the stats, but still use the correct exit
+        # code based on the health check value.
+        if not health_check:
+            print(content)
+            return return_code
+
+        # Health check invocation, try to parse status from the report and print and handle it here
+        if health_result:
+            print("Health check: %s" % health_result)
+        elif not health_result:
+            return_code = 3
+            print("Cannot get health check result.")
+
         return return_code
 
     @staticmethod
-    def __find_health_result_in_status_json(line):
+    def __find_health_result_in_status_data(data):
+        """
+        Parse health result from the agent status content (either in JSON or text format).
+
+        param data: last_status agent file content (either in JSON or text format).
+        """
+        # Keep in mind that user could have requested health check (json format), but concurrent
+        # scalyr-agent status invocation requested text format so we handle both here to avoid
+        # introducing global agent status read write lock.
         try:
-            status = scalyr_util.json_decode(line)
-            if (
-                "copying_manager_status" in status
-                and "health_check_result" in status["copying_manager_status"]
-            ):
-                return status["copying_manager_status"]["health_check_result"]
-        except ValueError:
-            pass
+            status = scalyr_util.json_decode(data.strip())
+
+            copying_manager_status = status.get("copying_manager_status", {}) or {}
+            health_check_result = copying_manager_status.get(
+                "health_check_result", None
+            )
+
+            if health_check_result:
+                return health_check_result
+        except ValueError as e:
+            # Likely not JSON, assume it's text format
+            match = re.search(r"^Health check\:\s+(.*?)$", data, flags=re.MULTILINE)
+
+            if match:
+                return match.groups()[0]
+
         return None
 
     def __stop(self, quiet):
@@ -915,6 +1016,61 @@ class ScalyrAgent(object):
                 % (raw_scalyr_server, scalyr_server)
             )
 
+    def __get_log_files_initial_positions(self, only_new_files=False):
+        # type: (bool) -> Optional[Dict]
+        """
+        According to the current configuration, determine all agent log files (including main agent.log and
+        multi-process worker sessions logs), create those files (if they do not exist) and get their current positions.
+
+        The preliminarily creation of the log files, in case of their absence, is needed because agent log messages may
+        be written to the agent log file before this log file is processed by the copying manager. In this case,
+        the copying manager will start sending log file from its current position, skipping everything before that and
+        causing data loss.
+
+        :param only_new_files: This option should be used when configuration is reloaded and more worker sessions were
+        added. We ignore existing files and only process log files for new worker sessions.
+        :return:
+        """
+
+        # all paths for all agent log files.
+        log_file_paths_to_check = [self.__log_file_path]
+
+        # we also add log files for all worker session if they are in multiprocess configuration.
+        if self.__config.use_multiprocess_workers:
+            for worker_session_id in self.__config.get_session_ids_from_all_workers():
+                log_file_path = self.__config.get_worker_session_agent_log_path(
+                    worker_session_id
+                )
+                log_file_paths_to_check.append(log_file_path)
+
+        log_file_paths = []
+        for log_file_path in log_file_paths_to_check:
+            include_file = True
+            if os.path.isfile(log_file_path):
+                if only_new_files:
+                    # Only new files are handled, skip this file.
+                    include_file = False
+            else:
+                # the file does not exist, create it now so we can get its current position.
+                with open(log_file_path, "w"):
+                    pass
+
+            if include_file:
+                log_file_paths.append(log_file_path)
+
+        logs_initial_positions = {}
+
+        # get initial positions for the files. The copying manager will start copying files from those positions.
+        for log_path in log_file_paths:
+            log_position = self.__get_file_initial_position(log_path)
+            if log_position is not None:
+                logs_initial_positions[log_path] = log_position
+
+        if logs_initial_positions:
+            return logs_initial_positions
+        else:
+            return None
+
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
 
@@ -967,37 +1123,19 @@ class ScalyrAgent(object):
 
                 self.__update_debug_log_level(self.__config.debug_level)
 
-                # We record where the log file currently is so that we can (in the worse case) start copying it
-                # from this position.  That way we capture the first 'Starting scalyr agent' call.
-                agent_log_position = self.__get_file_initial_position(
-                    self.__log_file_path
-                )
-                if agent_log_position is not None:
-                    logs_initial_positions = {self.__log_file_path: agent_log_position}
-                else:
-                    logs_initial_positions = None
+                start_up_msg = scalyr_util.get_agent_start_up_message()
+                log.info(start_up_msg)
+                log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
 
-                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
-                python_version_str = sys.version.replace("\n", "")
-                build_revision = get_build_revision()
-                openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
-
-                # TODO: Why do we log the same line under info and debug? Intentional?
-                msg = (
-                    "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-                    "(OpenSSL version: %s) (default fs encoding: %s)"
-                    % (
-                        SCALYR_VERSION,
-                        build_revision,
-                        scalyr_util.get_pid_tid(),
-                        python_version_str,
-                        openssl_version,
-                        sys.getfilesystemencoding(),
-                    )
-                )
-
-                log.info(msg)
-                log.log(scalyr_logging.DEBUG_LEVEL_1, msg)
+                # Log warn message if non UTF-8 locale is used - this would cause issues when trying
+                # to monitor files with unicode characters inside the file names or inside the
+                # content
+                _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
+                if encoding.lower() not in ["utf-8", "utf8"]:
+                    if sys.platform.startswith("win"):
+                        log.warn(NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE % (encoding))
+                    else:
+                        log.warn(NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE % (encoding))
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
@@ -1013,27 +1151,29 @@ class ScalyrAgent(object):
                 config_pre_global_apply = self.__config
                 self.__config.print_useful_settings()
 
-                self.__scalyr_client = self.__create_client()
-                self.__new_scalyr_client = self.__create_new_client()
+                # verify server certificates.
+                verify_server_certificate(self.__config)
 
                 def start_worker_thread(config, logs_initial_positions=None):
                     wt = self.__create_worker_thread(config)
                     # attach callbacks before starting monitors
                     wt.monitors_manager.set_user_agent_augment_callback(
-                        self.__scalyr_client.augment_user_agent
+                        wt.copying_manager.augment_user_agent_for_workers_sessions
                     )
-                    wt.start(
-                        self.__scalyr_client,
-                        self.__new_scalyr_client,
-                        logs_initial_positions,
-                    )
+                    wt.start(logs_initial_positions)
                     return wt, wt.copying_manager, wt.monitors_manager
+
+                # We record where the log files(including multiprocess worker sessions logs) currently are
+                # so that we can (in the worse case) start copying them from those position.
+                logs_initial_positions = self.__get_log_files_initial_positions()
 
                 (
                     worker_thread,
                     self.__copying_manager,
                     self.__monitors_manager,
-                ) = start_worker_thread(self.__config, logs_initial_positions)
+                ) = start_worker_thread(
+                    self.__config, logs_initial_positions=logs_initial_positions
+                )
 
                 # NOTE: It's important we call this after worker thread has been created since
                 # some of the global configuration options are only applied after creating a worker
@@ -1298,14 +1438,21 @@ class ScalyrAgent(object):
 
                     prev_server = scalyr_server
 
-                    self.__scalyr_client = self.__create_client()
-
                     log.info("Starting new copying and metrics threads")
+
+                    # get log files initial positions for new worker session log files if they were added in
+                    # a new configuration.
+                    logs_initial_positions = self.__get_log_files_initial_positions(
+                        only_new_files=True
+                    )
+
                     (
                         worker_thread,
                         self.__copying_manager,
                         self.__monitors_manager,
-                    ) = start_worker_thread(new_config)
+                    ) = start_worker_thread(
+                        new_config, logs_initial_positions=logs_initial_positions
+                    )
 
                     self.__current_bad_config = None
                     config_change_check_interval = (
@@ -1394,65 +1541,6 @@ class ScalyrAgent(object):
 
             result = NewScalyrClientSession(self.__config)
         return result
-
-    def __create_client(self, quiet=False):
-        """Creates and returns a new client to the Scalyr servers.
-
-        @param quiet: If true, only errors should be written to stdout.
-        @type quiet: bool
-
-        @return: The client to use for sending requests to Scalyr, using the server address and API write logs
-            key in the configuration file.
-        @rtype: ScalyrClientSession
-        """
-        if (
-            self.__config.verify_server_certificate
-            and not self.__config.use_new_ingestion
-        ):
-            is_dev_install = INSTALL_TYPE == DEV_INSTALL
-            is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
-
-            ca_file = self.__config.ca_cert_path
-            intermediate_certs_file = self.__config.intermediate_certs_path
-
-            # Validate provided CA cert file and intermediate cert file exists. If they don't
-            # exist, throw and fail early and loudly
-            if not is_dev_install and not os.path.isfile(ca_file):
-                raise ValueError(
-                    'Invalid path "%s" specified for the "ca_cert_path" config '
-                    "option: file does not exist" % (ca_file)
-                )
-
-            # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
-            # under the MSI / Windows install
-            if not is_dev_or_msi_install and not os.path.isfile(
-                intermediate_certs_file
-            ):
-                raise ValueError(
-                    'Invalid path "%s" specified for the '
-                    '"intermediate_certs_path" config '
-                    "option: file does not exist" % (intermediate_certs_file)
-                )
-        else:
-            ca_file = None
-            intermediate_certs_file = None
-        use_requests_lib = self.__config.use_requests_lib
-        return ScalyrClientSession(
-            self.__config.scalyr_server,
-            self.__config.api_key,
-            SCALYR_VERSION,
-            quiet=quiet,
-            request_deadline=self.__config.request_deadline,
-            ca_file=ca_file,
-            intermediate_certs_file=intermediate_certs_file,
-            use_requests_lib=use_requests_lib,
-            compression_type=self.__config.compression_type,
-            compression_level=self.__config.compression_level,
-            proxies=self.__config.network_proxies,
-            disable_send_requests=self.__config.disable_send_requests,
-            disable_logfile_addevents_format=self.__config.disable_logfile_addevents_format,
-            enforce_monotonic_timestamps=self.__config.enforce_monotonic_timestamps,
-        )
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
@@ -1677,10 +1765,11 @@ class ScalyrAgent(object):
         stats = overall_stats
 
         log.info(
-            "copy_manager_status total_copy_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
+            "copy_manager_status num_worker_sessions=%ld total_scan_iterations=%ld total_read_time=%lf total_compression_time=%lf total_waiting_time=%lf total_blocking_response_time=%lf "
             "total_request_time=%lf total_pipelined_requests=%ld avg_bytes_produced_rate=%lf avg_bytes_copied_rate=%lf"
             % (
-                stats.total_copy_iterations,
+                stats.num_worker_sessions,
+                stats.total_scan_iterations,
                 stats.total_read_time,
                 stats.total_compression_time,
                 stats.total_waiting_time,
@@ -1698,7 +1787,7 @@ class ScalyrAgent(object):
         """Return a newly calculated overall stats for the agent.
 
         This will calculate the latest stats based on the running agent.  Since most stats only can be
-        calculated since the last time the configuration file changed and was read, we need to seperately
+        calculated since the last time the configuration file changed and was read, we need to separately
         track the accumulated stats that occurred before the last config change.
 
         @param base_overall_stats: The accummulated stats from before the last config change.
@@ -1716,16 +1805,13 @@ class ScalyrAgent(object):
         watched_paths = 0
         copying_paths = 0
 
-        # Accumulate all the stats from the running processors that are copying log files.
+        # Accumulate all the stats from the running processors in all workers that are copying log files.
         if current_status.copying_manager_status is not None:
             delta_stats.total_copy_requests_errors = (
                 current_status.copying_manager_status.total_errors
             )
             delta_stats.total_rate_limited_time = (
                 current_status.copying_manager_status.total_rate_limited_time
-            )
-            delta_stats.total_copy_iterations = (
-                current_status.copying_manager_status.total_copy_iterations
             )
             delta_stats.total_read_time = (
                 current_status.copying_manager_status.total_read_time
@@ -1745,6 +1831,11 @@ class ScalyrAgent(object):
             delta_stats.rate_limited_time_since_last_status = (
                 current_status.copying_manager_status.rate_limited_time_since_last_status
             )
+
+            delta_stats.total_scan_iterations = (
+                current_status.copying_manager_status.total_scan_iterations
+            )
+
             watched_paths = len(current_status.copying_manager_status.log_matchers)
             for matcher in current_status.copying_manager_status.log_matchers:
                 copying_paths += len(matcher.log_processors_status)
@@ -1787,24 +1878,30 @@ class ScalyrAgent(object):
                 )
                 delta_stats.total_monitor_errors += monitor_status.errors
 
-        delta_stats.total_requests_sent = self.__scalyr_client.total_requests_sent
-        delta_stats.total_requests_failed = self.__scalyr_client.total_requests_failed
-        delta_stats.total_request_bytes_sent = (
-            self.__scalyr_client.total_request_bytes_sent
+        # get client session states from all workers of the copying manager and sum up all their stats.
+        session_states = (
+            self.__copying_manager.get_worker_session_scalyr_client_statuses()
         )
-        delta_stats.total_compressed_request_bytes_sent = (
-            self.__scalyr_client.total_compressed_request_bytes_sent
-        )
-        delta_stats.total_response_bytes_received = (
-            self.__scalyr_client.total_response_bytes_received
-        )
-        delta_stats.total_request_latency_secs = (
-            self.__scalyr_client.total_request_latency_secs
-        )
-        delta_stats.total_connections_created = (
-            self.__scalyr_client.total_connections_created
-        )
-        delta_stats.total_compression_time = self.__scalyr_client.total_compression_time
+        for session_state in session_states:
+
+            delta_stats.total_requests_sent += session_state.total_requests_sent
+            delta_stats.total_requests_failed += session_state.total_requests_failed
+            delta_stats.total_request_bytes_sent += (
+                session_state.total_request_bytes_sent
+            )
+            delta_stats.total_compressed_request_bytes_sent += (
+                session_state.total_compressed_request_bytes_sent
+            )
+            delta_stats.total_response_bytes_received += (
+                session_state.total_response_bytes_received
+            )
+            delta_stats.total_request_latency_secs += (
+                session_state.total_request_latency_secs
+            )
+            delta_stats.total_connections_created += (
+                session_state.total_connections_created
+            )
+            delta_stats.total_compression_time += session_state.total_compression_time
 
         # Add in the latest stats to the stats before the last restart.
         result = delta_stats + base_overall_stats
@@ -1816,6 +1913,10 @@ class ScalyrAgent(object):
         result.num_copying_paths = copying_paths
         result.num_running_monitors = running_monitors
         result.num_dead_monitors = dead_monitors
+        if current_status.copying_manager_status is not None:
+            result.num_worker_sessions = (
+                current_status.copying_manager_status.num_worker_sessions
+            )
 
         (
             result.user_cpu,
@@ -1891,9 +1992,14 @@ class ScalyrAgent(object):
         status_format_file = os.path.join(
             self.__config.agent_data_path, STATUS_FORMAT_FILE
         )
+
         if os.path.isfile(status_format_file):
-            with open(status_format_file, "r") as fp:
-                status_format = fp.read().strip()
+            try:
+                with open(status_format_file, "r") as fp:
+                    status_format = fp.read().strip()
+            except OSError:
+                # Non fatal race
+                status_format = "text"
 
         if not status_format or status_format not in VALID_STATUS_FORMATS:
             status_format = "text"
@@ -1925,12 +2031,22 @@ class ScalyrAgent(object):
             tmp_file = None
 
             os.rename(tmp_file_path, final_file_path)
-        except (OSError, IOError):
+        except (OSError, IOError) as e:
+            # Temporary workaround to make race conditions less likely.
+            # If agent status or health check is requested multiple times or concurrently around the
+            # same time, it's likely the race will occur and rename will fail because the file  was
+            # already renamed by the other process.
+            # This workaround is not 100%, only 100% solution is to use a global read write lock
+            # and only allow single invocation of status command at the same time.
+            if tmp_file is not None:
+                tmp_file.close()
+
+            if os.path.isfile(final_file_path):
+                return final_file_path
+
             log.exception(
                 "Exception caught will try to report status", error_code="failedStatus"
             )
-            if tmp_file is not None:
-                tmp_file.close()
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_4,
@@ -1946,21 +2062,13 @@ class WorkerThread(object):
     """
 
     def __init__(self, configuration, copying_manager, monitors):
-        self.__scalyr_client = None
-        self.__new_scalyr_client = None
         self.config = configuration
         self.copying_manager = copying_manager
         self.monitors_manager = monitors
 
-    def start(self, scalyr_client, new_scalyr_client, log_initial_positions=None):
-        if self.__scalyr_client is not None:
-            self.__scalyr_client.close()
-        self.__scalyr_client = scalyr_client
-        self.__new_scalyr_client = new_scalyr_client
+    def start(self, log_initial_positions=None):
 
-        self.copying_manager.start_manager(
-            scalyr_client, new_scalyr_client, log_initial_positions
-        )
+        self.copying_manager.start_manager(log_initial_positions)
         # We purposely wait for the copying manager to begin copying so that if the monitors create any new
         # files, they will be guaranteed to be copying up to the server starting at byte index zero.
         # Note, if copying never begins then the copying manager will sys exit, so this next call will never just
@@ -1974,10 +2082,6 @@ class WorkerThread(object):
 
         log.debug("Shutting copy monitors")
         self.copying_manager.stop_manager()
-
-        log.debug("Shutting client")
-        if self.__scalyr_client is not None:
-            self.__scalyr_client.close()
 
 
 if __name__ == "__main__":
@@ -2045,7 +2149,7 @@ if __name__ == "__main__":
         dest="no_check_remote",
         help="For the start command, does not perform the first check to see if the agent can "
         "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
-        "the backgroudn until it is successful.  This is useful if the network is not immediately "
+        "the background until it is successful.  This is useful if the network is not immediately "
         "available when the agent starts.",
     )
     my_controller.add_options(parser)

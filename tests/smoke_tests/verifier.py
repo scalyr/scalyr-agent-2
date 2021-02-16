@@ -14,6 +14,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
+import os
 import abc
 import datetime
 import json
@@ -146,7 +148,7 @@ class AgentLogVerifier(AgentVerifier):
         # This version check is done against a local agent.log file and status -v --format=json
         # output and not Scalyr API so we don't need to retry it and wait for logs to be shipped to
         # Scalyr API.
-        time.sleep(2)
+        time.sleep(4)
         self._verify_agent_version_string()
 
         # Now call the parent verify method which calls _verify()
@@ -166,7 +168,12 @@ class AgentLogVerifier(AgentVerifier):
 
         if not local_agent_log_data:
             raise ValueError(
-                ("No data in '{0}' file.".format(self._runner.agent_log_file_path))
+                (
+                    "No data in '{0}' file. Directory content: {1}".format(
+                        self._runner.agent_log_file_path,
+                        os.listdir(self._runner.agent_logs_dir_path),  # type: ignore
+                    )
+                )
             )
 
         print("Check start line contains correct version and revision string")
@@ -205,7 +212,7 @@ class AgentLogVerifier(AgentVerifier):
 
     def _verify(self):
         """
-        Verify that the agent has successfuly started.
+        Verify that the agent has successfully started.
 
         Right now we do that by ensuring has produced 5 "spawned collector" log messages which have
         also been shipped to the Scalyr API.
@@ -289,6 +296,57 @@ class AgentLogVerifier(AgentVerifier):
         return True
 
 
+class AgentWorkerSessionLogVerifier(AgentVerifier):
+    """
+    Verifier class that checks if all agent worker session log files are ingested to Scalyr servers.
+    """
+
+    def _verify(self):
+        for worker_session_log_path in self._runner.worker_sessions_log_paths:
+            start_message_line_pattern = re.compile(
+                r"Copying manager worker session #\w+-\d+ started."
+            )
+            worker_session_log_content = worker_session_log_path.read_text()
+
+            if not start_message_line_pattern.search(worker_session_log_content):
+                print("Can not find worker session start message. Retry.")
+                return
+
+            print("Send query to Scalyr server.")
+            try:
+                request = ScalyrRequest(
+                    server_address=self._server_address,
+                    read_api_key=compat.os_environ_unicode["READ_API_KEY"],
+                    max_count=100,
+                    start_time=self._start_time,
+                )
+                request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+                request.add_filter(
+                    "$logfile=='{0}'".format(six.text_type(worker_session_log_path))
+                )
+                response_data = request.send()
+            except Exception:
+                print("Query failed.")
+                return
+
+            print("Query response received.")
+
+            if "matches" not in response_data:
+                print('Response is missing "matches" field')
+                print("Response data: %s" % (str(response_data)))
+                return
+
+            response_log = "\n".join(
+                [msg["message"] for msg in response_data["matches"]]
+            )
+
+            if not start_message_line_pattern.search(response_log):
+                print("Can not find worker session start message in remote log. Retry.")
+                return
+
+        return True
+
+
 class DataJsonVerifier(AgentVerifier):
     """
     Simple verifier that writes 1000 lines into the 'data.json' log file
@@ -301,7 +359,7 @@ class DataJsonVerifier(AgentVerifier):
         self._data_json_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "data.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
+        self._timestamp = datetime.datetime.utcnow().isoformat()
 
         self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
         self._request.add_filter(
@@ -373,7 +431,7 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         self._data_json_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "data.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
+        self._timestamp = datetime.datetime.utcnow().isoformat()
 
         self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
         self._request.add_filter(
@@ -422,7 +480,8 @@ class DataJsonVerifierRateLimited(AgentVerifier):
         retry_delay = 2
 
         start_time = time.time()
-        ingestion_start_timeout_time = start_time + 20
+        # ingestion_start_timeout_time = start_time + 20
+        ingestion_start_timeout_time = start_time + timeout
 
         print("Verifying start of ingestion...")
         while True:

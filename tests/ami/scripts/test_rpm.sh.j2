@@ -26,7 +26,7 @@ echo_with_date() {
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 CLOUD_INIT_RESULT_FILE="/run/cloud-init/result.json"
-MAX_WAIT_COUNTER=20 # we wait a maximum of 20 x 2 seconds for provision to finish
+MAX_WAIT_COUNTER=30 # we wait a maximum of 30 x 2 seconds for provision to finish
 
 WAIT_COUNTER=0
 while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_COUNTER} ]; do
@@ -36,20 +36,37 @@ while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_C
 done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
-    echo_with_date "Provisioning didn't finish in 40 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "Provisioning didn't finish in 60 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
     exit 1
 fi
 
-uname -a
-cat /etc/*-release
+sleep 5
 
-sudo yum install -y wget
+echo_with_date "==========================="
+echo_with_date "System information"
+echo_with_date "==========================="
+
+echo_with_date ""
+uname -a
+echo_with_date ""
+cat /etc/*-release
+echo_with_date ""
+cat /etc/passwd
+echo_with_date ""
+id
+echo_with_date ""
+echo_with_date "==========================="
+
+sudo yum install -y wget iptables-services
 sudo yum install -y "{{python_package}}"
 
 # Install any optional additional packages
 {% if additional_packages -%}
 sudo yum install -y {{additional_packages}}
 {% endif -%}
+
+# Deny the default gpg port to test the install script.
+sudo iptables -A OUTPUT -p tcp --dport 11371 -j DROP
 
 # Install Sclayr agent.
 echo_with_date ""
@@ -61,19 +78,40 @@ echo_with_date ""
 {# type of the package is 'file' or 'url', that means that file
 should be uploaded by script or already uploaded by Libloud. #}
     {% if install_package["type"] == "url" -%}
-    wget -O install_package.deb "{{ install_package["source"] }}"
+    wget -O install_package.rpm "{{ install_package["source"] }}"
     {% elif install_package["type"] == "file" -%}
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
+
+{% with package_file="install_package.rpm" %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
 
 # install Scalyr agent from package file.
 sudo rpm -iv install_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export INSTALL_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "install_package.rpm" | sed "s/_.*//g")
 {% else -%}
-# install Scalyr agent by downloading convenience script.
+    {# install Scalyr agent by downloading convenience script. #}
     {% if installer_script_info["type"] == "url" -%}
 wget -O "install-scalyr-agent-2.sh" -q "{{installer_script_info["source"]}}"
+    {# If source points to https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh #}
+    {# ensure the script contains correct reference to prod. #}
+    {# In the past, we had a bug where incorrect version of the script which pointed to internal instead #}
+    {# of stable was published  #}
+    {% if installer_script_info["source"] == "https://www.scalyr.com/scalyr-repo/stable/latest/install-scalyr-agent-2.sh" or "stable/latest/install-scalyr-agent-2.sh" in url -%}
+echo_with_date ""
+echo_with_date "Verifying stable installer script content"
+echo_with_date ""
+
+cat -v install-scalyr-agent-2.sh | grep "REPOSITORY_URL"
+cat -v install-scalyr-agent-2.sh | grep "baseurl"
+
+cat -v install-scalyr-agent-2.sh | grep "REPOSITORY_URL" | grep "stable"
+cat -v install-scalyr-agent-2.sh | grep "baseurl" | grep "stable"
+echo_with_date ""
+    {% endif -%}
+
     {% endif -%}
 sudo bash ./install-scalyr-agent-2.sh --set-api-key "{{scalyr_api_key}}"
     {% if install_package["source"] == "current" -%}
@@ -87,6 +125,9 @@ sudo yum downgrade -y "scalyr-agent-2-{{install_package["source"]}}"
 export INSTALL_PACKAGE_VERSION="{{install_package["source"]}}"
     {% endif -%}
 {% endif -%}
+
+# TODO: Also perform agent.json and agent.d permission checks here when fix is
+# merged in stable, until then, it will fail with stable.
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
 
@@ -120,6 +161,9 @@ echo_with_date ""
 echo_with_date "Verifying agent.log"
 echo_with_date ""
 
+# Verify agent start up line
+sudo cat /var/log/scalyr-agent-2/agent.log | grep "Starting scalyr agent"
+
 # Ensure CA validation is not disabled with default install
 sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "sslverifyoff"
 sudo cat /var/log/scalyr-agent-2/agent.log | grep -v "Server certificate validation has been disabled"
@@ -140,6 +184,10 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
     {# file should be already uploaded by Libcloud, so just pass this. #}
     {% endif -%}
 
+{% with package_file="upgrade_package.rpm" %}
+{% include "partial/verify_rpm_files_ownership.sh.j2" %}
+{% endwith %}
+
 sudo rpm -FUv upgrade_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "upgrade_package.rpm" | sed "s/_.*//g")
@@ -153,6 +201,10 @@ export UPGRADE_PACKAGE_VERSION=$(yum info scalyr-agent-2 | grep Version | awk '{
 sudo yum install -y "scalyr-agent-2-{{upgrade_package["source"]}}"
 export UPGRADE_PACKAGE_VERSION="{{upgrade_package["source"]}}"
       {% endif -%}
+{% endif -%}
+
+{% if test_type == "upgrade" -%}
+{% include "partial/verify_config_permissions.sh.j2" %}
 {% endif -%}
 
 {% include "partial/restart_agent_and_remove_logs.sh.j2" %}
@@ -188,3 +240,9 @@ echo_with_date ""
 {% endif -%}
 
 {% include "partial/ssl_checks.sh.j2" %}
+
+# Verify --systemd-managed flag
+# TODO: Also test on stable once v2.1.19 is out
+{% if test_type == "upgrade" and distro_name == "centos8" -%}
+{% include "partial/verify_systemd_managed_flag.sh.j2" %}
+{% endif -%}

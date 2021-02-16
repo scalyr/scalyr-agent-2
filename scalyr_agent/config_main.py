@@ -37,6 +37,7 @@ import tarfile
 import tempfile
 import traceback
 import errno
+import itertools
 from io import open
 
 from optparse import OptionParser
@@ -45,6 +46,7 @@ from optparse import OptionParser
 if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
+# pylint: disable=import-error
 from __scalyr__ import (
     scalyr_init,
     get_install_root,
@@ -53,6 +55,8 @@ from __scalyr__ import (
     SCALYR_VERSION,
     PACKAGE_INSTALL,
 )
+
+# pylint: enable=import-error
 
 scalyr_init()
 
@@ -77,8 +81,25 @@ from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent import compat
+from scalyr_agent.util import run_command_popen
 
+from scalyr_agent.util import win_remove_user_file_path_permissions
 import scalyr_agent.util as scalyr_util
+
+SYSTEMD_SERVICE_CONFGI = """
+[Unit]
+Description=Scalyr Monitoring Agent
+
+[Service]
+# NOTE: Type=forking doesn't seem to be working correctly, bit usually "don't fork" behavior is more common since
+# it means logs also go to journald, etc. and it behaves more like a proper systemd service
+Type=simple
+ExecStart=/usr/share/scalyr-agent-2/bin/scalyr-agent-2 start --no-fork
+ExecStop=/usr/share/scalyr-agent-2/bin/scalyr-agent-2 stop
+
+[Install]
+WantedBy=multi-user.target
+""".strip()
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -1229,6 +1250,127 @@ def set_python_version(version):
     )
 
 
+def configure_agent_service_for_systemd_management():
+    """
+    Configure this Linux agent installation to be managed by systemd instead of init.d which is the
+    default.
+
+    This method performs the following:
+
+        - Copies over systemd service files
+        - Removes any rc.d symlinks (if any exist)
+        - Writes a special file which tells the installer that the installation is systemd managed
+    """
+    if os.getuid() != 0:
+        raise ValueError("This commands needs to run as root")
+
+    systemctl_binary = compat.which("systemctl")
+
+    if not systemctl_binary:
+        raise ValueError(
+            "Unable to find systemctl binary, this likely indicates systemd is not "
+            "installed"
+        )
+
+    # 1. Copy over systemd service file
+    # NOTE: We use the file content in line to avoid potential issue with different type of
+    # installations and file maybe not already be present in /usr/share or similar
+
+    systemd_service_config_file_path = "/etc/systemd/system/scalyr-agent-2.service"
+
+    with open(systemd_service_config_file_path, "w") as fp:
+        fp.write(SYSTEMD_SERVICE_CONFGI)
+
+    os.chmod(systemd_service_config_file_path, int("664", 8))
+
+    # 2. Remove any existing rc.d symlinks via chkconfig, update-rc.d and in the end regular
+    # symlinks (if any of those are available)
+    chkconfig_binary_path = compat.which("chkconfig")
+    update_rcd_binary_path = compat.which("update-rc.d")
+
+    if chkconfig_binary_path:
+        print("Removing rc.d symlinks using chkconfig")
+        exit_code, stdout, stderr = run_command_popen(
+            "chkconfig --del scalyr-agent-2", shell=True
+        )
+
+        if exit_code != 0:
+            print("Failed to remove symlinks via chkconfig")
+            print("stdout: %s" % (stdout))
+            print("stderr: %s" % (stderr))
+    elif update_rcd_binary_path:
+        print("Removing rc.d symlinks using update-rc.d")
+
+        exit_code, stdout, stderr = run_command_popen(
+            "update-rc.d -f scalyr-agent-2 remove", shell=True
+        )
+
+        if exit_code != 0:
+            print("Failed to remove symlinks via update-rc.d")
+            print("stdout: %s" % (stdout))
+            print("stderr: %s" % (stderr))
+
+    rc_d_paths_1 = [
+        "/etc/rc0.d/K02scalyr-agent-2"
+        "/etc/rc1.d/K02scalyr-agent-2"
+        "/etc/rc6.d/K02scalyr-agent-2"
+    ]
+
+    rc_d_paths_2 = [
+        "/etc/rc2.d/S98scalyr-agent-2"
+        "/etc/rc3.d/S98scalyr-agent-2"
+        "/etc/rc4.d/S98scalyr-agent-2"
+        "/etc/rc5.d/S98scalyr-agent-2"
+    ]
+
+    # 2. Remove any existing init.d symlinks to ensure service is not managed twice (once by init.d
+    # aod once by systemd)
+    for file_path in itertools.chain(rc_d_paths_1, rc_d_paths_2):
+        if os.path.isfile(file_path):
+            print('Removing rc.d file "%s"' % (file_path))
+            os.unlink(file_path)
+
+    # 3. Create a file which tells agent post install that this installation is systemd managed so
+    # post install script won't create any init symlinks
+    # If user wants to move back to init.d service management, they simply need to remove this file
+    # and re-install or upgrade the agent package
+    systemd_managed_file_path = "/etc/scalyr-agent-2/systemd_managed"
+
+    with open(systemd_managed_file_path, "w") as _:
+        pass
+
+    # 4. Reload systemd configs
+    systemctl_binary = compat.which("systemctl")
+
+    if systemctl_binary:
+        run_command_popen("systemctl daemon-reload", shell=True)
+
+    print(
+        "This agent installation has been configured to be managed by systemd and systemd "
+        'service config installed to "%s". ' % (systemd_service_config_file_path)
+    )
+    print("")
+    print(
+        "You can now use standard systemd commands to manage the service. For example:"
+    )
+    print("")
+    print("sudo systemctl status scalyr-agent-2 - view the service status")
+    print(
+        "sudo systemctl enable scalyr-agent-2 - enable the service so it starts on boot"
+    )
+    print("sudo systemctl start scalyr-agent-2 - start the service")
+    print("sudo systemctl stop scalyr-agent-2 - stop the service")
+    print("sudo systemctl restart scalyr-agent-2 - restart the service")
+    print("sudo journalctl -f -u scalyr-agent-2 - tail the service logs via journald")
+    print("")
+    print(
+        "If you wish to revert back to init.d approach, you need to delete %s and %s file, "
+        "reload systemd configs and re-install scalyr-agent-2 package which will cause init.d "
+        "symlinks to be created again."
+        % (systemd_service_config_file_path, systemd_managed_file_path)
+    )
+
+
 if __name__ == "__main__":
     parser = OptionParser(usage="Usage: scalyr-agent-2-config [options]")
     parser.add_option(
@@ -1428,6 +1570,34 @@ if __name__ == "__main__":
             help="Starts the agent if the conditional restart file marker exists.",
         )
 
+        # Special flag which is used by the Windows installer. We use it to indicate to this binary
+        # to fix up permissions for agent.json file and agent.d/ directory. This file is also used
+        # to create initial config by the install which means we can't correctly set those
+        # permissions inside the .wxs wix spec file.
+        # Right now it can only be used with "--init-config" flag on Windows.
+        parser.add_option(
+            "",
+            "--fix-config-permissions",
+            dest="fix_config_permissions",
+            action="store_true",
+            default=False,
+            help=(
+                "Fix permissions for agent.json file and agent.d/ directory and make sure it's. "
+                "not readable by others. Applies to Windows only."
+            ),
+        )
+
+    # Add Linux specific options
+    if sys.platform.startswith("linux"):
+        parser.add_option(
+            "",
+            "--systemd-managed",
+            dest="systemd_managed",
+            action="store_true",
+            default=False,
+            help="Configure the agent to be managed by systemd instead of init.d which is a default",
+        )
+
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print("Could not parse commandline arguments.", file=sys.stderr)
@@ -1448,6 +1618,10 @@ if __name__ == "__main__":
     # NOTE: This option is also intentionally at the top for the same reasons as `set_python`.
     if options.report_python_version:
         print("The Scalyr Agent is using Python %s" % platform.python_version())
+        sys.exit(0)
+
+    if sys.platform.startswith("linux") and options.systemd_managed:
+        configure_agent_service_for_systemd_management()
         sys.exit(0)
 
     if options.config_filename is None:
@@ -1505,7 +1679,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, log)
+        config_file = Configuration(
+            options.config_filename, default_paths, log, log_warnings=False
+        )
         config_file.parse()
     except Exception as e:
         print(
@@ -1519,6 +1695,24 @@ if __name__ == "__main__":
         sys.exit(1)
 
     controller.consume_config(config_file, options.config_filename)
+
+    if sys.platform.startswith("win") and options.fix_config_permissions:
+        print(
+            "Changing permissions for agent.json and agent.d and making sure it's not readable "
+            "by Users"
+        )
+
+        config_path = options.config_filename
+        configs_directory = os.path.dirname(config_path)
+        agent_json_path = os.path.join(configs_directory, "agent.json")
+        agent_d_path = os.path.join(configs_directory, "agent.d")
+
+        win_remove_user_file_path_permissions(
+            file_path=agent_json_path, username="Users"
+        )
+        win_remove_user_file_path_permissions(file_path=agent_d_path, username="Users")
+
+        print("Permissions updated.")
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
     if sys.platform.startswith("win") and options.mark_conditional_restart:

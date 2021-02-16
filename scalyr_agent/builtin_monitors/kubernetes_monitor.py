@@ -37,6 +37,14 @@ import time
 from io import open
 from six.moves.urllib.parse import quote_plus
 
+# Work around with a striptime race we see every now and then with docker monitor run() method.
+# That race would occur very rarely, since it depends on the order threads are started and when
+# strptime is first called.
+# See:
+# 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
+# 2. https://bugs.python.org/issue7980
+import _strptime  # NOQA
+
 from scalyr_agent import compat
 
 from scalyr_agent import (
@@ -99,6 +107,17 @@ define_config_option(
     "Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.",
     convert_to=int,
     default=5,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
+    "initial_stopped_container_collection_window",
+    "By default, the Scalyr Agent does not collect the logs from any pods stopped before the agent was started. "
+    "To override this, set this parameter to the number of seconds the agent will look in the past (before it was "
+    "started). It will collect logs for any pods that was started and stopped during this window.",
+    convert_to=int,
+    default=0,
     env_aware=True,
 )
 
@@ -346,9 +365,9 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_cri_query_filesystem",
-    "Optional (defaults to False). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.",
+    "Optional (defaults to True). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API.",
     convert_to=bool,
-    default=False,
+    default=True,
     env_aware=True,
 )
 
@@ -813,11 +832,19 @@ _CONTROLLER_KEYS = {
 
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile("^(.+)://(.+)$")
+# A regex to determine whether a string contains template directives
+_TEMPLATE_RE = re.compile(r"\${[^}]+}")
 
 
 class K8sInitException(Exception):
     """ Wrapper exception to indicate when the monitor failed to start due to
         a problem with initializing the k8s cache
+    """
+
+
+class DockerSocketException(Exception):
+    """ Wrapper exception to indicate when the monitor failed to start due to
+        a problem with docker socket
     """
 
 
@@ -2548,6 +2575,21 @@ class ContainerChecker(object):
 
         self.__stopped = False
 
+    def _validate_socket_file(self):
+        """Gets the Docker API socket file and validates that it is a UNIX socket
+        """
+        # make sure the API socket exists and is a valid socket
+        api_socket = self.__socket_file
+        try:
+            st = os.stat(api_socket)
+            if not stat.S_ISSOCK(st.st_mode):
+                raise Exception()
+        except Exception:
+            raise DockerSocketException(
+                "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
+                % api_socket
+            )
+
     def _is_running_in_docker(self):
         """
         Checks to see if the agent is running inside a docker container
@@ -2663,6 +2705,7 @@ class ContainerChecker(object):
                 global_log.info(
                     "kubernetes_monitor is using docker for listing containers"
                 )
+                self._validate_socket_file()
                 self.__client = DockerClient(
                     base_url=("unix:/%s" % self.__socket_file),
                     version=self.__docker_api_version,
@@ -2741,6 +2784,11 @@ class ContainerChecker(object):
             )
             k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
+        except DockerSocketException as e:
+            e_as_text = six.text_type(e)
+            global_log.error(e_as_text)
+            k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
+            raise
         except Exception as e:
             global_log.warn(
                 "Failed to start container checker - %s\n%s"
@@ -2799,7 +2847,9 @@ class ContainerChecker(object):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
-        previous_time = time.time()
+        previous_time = time.time() - self._config.get(
+            "initial_stopped_container_collection_window"
+        )
 
         while run_state.is_running():
             try:
@@ -2977,7 +3027,9 @@ class ContainerChecker(object):
             self.raw_logs.append(log)
 
     def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+        result = datetime.datetime.utcfromtimestamp(self.__start_time)
+
+        fp = None
 
         try:
             full_path = os.path.join(self.__log_path, path)
@@ -3002,9 +3054,11 @@ class ContainerChecker(object):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
-            fp.close()
         except Exception as e:
             global_log.info("%s", six.text_type(e))
+        finally:
+            if fp:
+                fp.close()
 
         return scalyr_util.seconds_since_epoch(result)
 
@@ -3221,6 +3275,12 @@ class ContainerChecker(object):
         # Make sure to use a copy because it could be pointing to objects in the original attributes
         # or log configs, and we don't want to modify those
         attrs = result.get("attributes", JsonObject({})).copy()
+
+        # Look for any values from the config that contain templates.
+        for key, value in six.iteritems(attrs):
+            if isinstance(value, six.string_types) and _TEMPLATE_RE.search(value):
+                attrs[key] = Template(value).safe_substitute(rename_vars)
+
         for key, value in six.iteritems(container_attributes):
             # Only set values that haven't been explicity set
             # by an annotation or k8s_logs config option
@@ -3397,23 +3457,6 @@ container using annotations without updating the config yaml, and applying the u
 cluster.
     """
 
-    def __get_socket_file(self):
-        """Gets the Docker API socket file and validates that it is a UNIX socket
-        """
-        # make sure the API socket exists and is a valid socket
-        api_socket = self._config.get("api_socket")
-        try:
-            st = os.stat(api_socket)
-            if not stat.S_ISSOCK(st.st_mode):
-                raise Exception()
-        except Exception:
-            raise Exception(
-                "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
-                % api_socket
-            )
-
-        return api_socket
-
     def _set_namespaces_to_include(self):
         """This function is separated out for better testability
         (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
@@ -3466,7 +3509,7 @@ cluster.
         self._set_namespaces_to_include()
 
         self.__ignore_pod_sandboxes = self._config.get("k8s_ignore_pod_sandboxes")
-        self.__socket_file = self.__get_socket_file()
+        self.__socket_file = self._config.get("api_socket")
         self.__docker_api_version = self._config.get("docker_api_version")
         self.__k8s_api_url = self._global_config.k8s_api_url
         self.__docker_max_parallel_stats = self._config.get("docker_max_parallel_stats")
@@ -3476,6 +3519,7 @@ cluster.
         self.__glob_list = self._config.get("container_globs")
         self.__include_all = self._config.get("k8s_include_all_containers")
 
+        self.__log_mode = self._config.get("log_mode")
         self.__report_container_metrics = self._config.get("report_container_metrics")
         self.__report_k8s_metrics = (
             self._config.get("report_k8s_metrics") and self.__report_container_metrics
@@ -3519,7 +3563,7 @@ cluster.
         )
 
         self.__container_checker = None
-        if self._config.get("log_mode") != "syslog":
+        if self.__log_mode != "syslog":
             self.__container_checker = ContainerChecker(
                 self._config,
                 self._global_config,
@@ -4111,6 +4155,8 @@ cluster.
             "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
             "SCALYR_K8S_VERIFY_KUBELET_QUERIES",
             "SCALYR_K8S_KUBELET_CA_CERT",
+            "SCALYR_REPORT_K8S_METRICS",
+            "SCALYR_REPORT_CONTAINER_METRICS",
         ]
         for envar in envars_to_log:
             self._logger.info(
@@ -4129,7 +4175,7 @@ cluster.
                 is not None
             ):
                 self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
+                    scalyr_logging.DEBUG_LEVEL_0,  # INFO
                     "Cluster name detected, enabling k8s metric reporting and controller information",
                 )
                 self.__include_controller_info = True
@@ -4173,12 +4219,37 @@ cluster.
             )
             self.__report_k8s_metrics = False
 
+        log_mode = self._config.get("log_mode")
+        if log_mode != "syslog":
+            always_use_docker = self._config.get("k8s_always_use_docker")
+            always_use_cri = self._config.get("k8s_always_use_cri")
+
+            if self.__container_checker:
+                container_runtime = self.__container_checker._container_runtime
+            else:
+                container_runtime = "unknown"
+
+            if always_use_docker or (
+                container_runtime == "docker" and not always_use_cri
+            ):
+                container_list_mode = "docker"
+            else:
+                container_list_mode = "cri (fs)"
+        else:
+            container_list_mode = "none (in syslog mode)"
+
         global_log.info(
-            "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, report_metrics: %s"
+            (
+                "kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, "
+                "report_metrics: %s, report_k8s_metrics: %s, log_mode: %s, container_list_mode: %s"
+            )
             % (
                 self.__namespaces_to_include,
                 self.__include_controller_info,
                 self.__report_container_metrics,
+                self.__report_k8s_metrics,
+                log_mode,
+                container_list_mode,
             )
         )
 

@@ -21,6 +21,11 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+if False:
+    from typing import Tuple
+    from typing import Dict
+    from typing import List
+
 import os
 import re
 import sys
@@ -29,6 +34,8 @@ import time
 import logging
 import copy
 import json
+import stat
+import platform
 
 import six
 import six.moves.urllib.parse
@@ -50,12 +57,21 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
+
+FILE_WRONG_OWNER_ERROR_MSG = """
+File \"%s\" is not readable by the current user (%s).
+
+You need to make sure that the file is owned by the same account which is used to run the agent.
+
+Original error: %s
+""".strip()
+
+MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
 
 
 class Configuration(object):
@@ -85,7 +101,9 @@ class Configuration(object):
     DEFAULT_K8S_IGNORE_NAMESPACES = ["kube-system"]
     DEFAULT_K8S_INCLUDE_NAMESPACES = ["*"]
 
-    def __init__(self, file_path, default_paths, logger, extra_config_dir=None):
+    def __init__(
+        self, file_path, default_paths, logger, extra_config_dir=None, log_warnings=True
+    ):
         # Captures all environment aware variables for testing purposes
         self._environment_aware_map = {}
         self.__file_path = os.path.abspath(file_path)
@@ -109,6 +127,8 @@ class Configuration(object):
         # are created by default by the platform.
         self.__monitor_configs = []
 
+        self.__worker_configs = []
+
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
@@ -121,6 +141,11 @@ class Configuration(object):
         # An additional directory to look for config snippets
         self.__extra_config_directory = extra_config_dir
 
+        # True to emit warnings on parse. In some scenarios such as when parsing config for agent
+        # status command we don't want to emit / log warnings since they will interleve with the
+        # status output
+        self.__log_warnings = log_warnings
+
         self.__logger = logger
 
     def parse(self):
@@ -132,11 +157,33 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException as e:
+            except Exception as e:
+                # Special case - file is not readable, likely means a permission issue so return a
+                # more user-friendly error
+                msg = str(e).lower()
+                if (
+                    "file is not readable" in msg
+                    or "error reading" in msg
+                    or "failed while reading"
+                ):
+                    from scalyr_agent.platform_controller import PlatformController
+
+                    platform_controller = PlatformController.new_platform()
+                    current_user = platform_controller.get_current_user()
+
+                    msg = FILE_WRONG_OWNER_ERROR_MSG % (
+                        self.__file_path,
+                        current_user,
+                        six.text_type(e),
+                    )
+                    raise BadConfiguration(msg, None, "fileParseError")
+
                 raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
+
+            self._check_config_file_permissions_and_warn(self.__file_path)
 
             # get initial list of already seen config keys (we need to do this before
             # defaults have been applied)
@@ -165,7 +212,11 @@ class Configuration(object):
                 "k8s_logs",
                 "monitors",
                 "server_attributes",
+                "workers",
             )
+
+            # map keys to their deprecated versions to replace them later.
+            allowed_multiple_keys_deprecated_synonyms = {"workers": ["api_keys"]}
 
             # Get any configuration snippets in the config directory
             extra_config = self.__list_files(self.config_directory)
@@ -177,6 +228,19 @@ class Configuration(object):
             for fp in extra_config:
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
+
+                # if deprecated key names are used, then replace them with their current versions.
+                for k, v in list(content.items()):
+                    for (
+                        key,
+                        key_synonyms,
+                    ) in allowed_multiple_keys_deprecated_synonyms.items():
+                        if k in key_synonyms:
+                            # replace deprecated key.
+                            content[key] = v
+                            del content[k]
+                            break
+
                 for k in content.keys():
                     if k not in allowed_multiple_keys:
                         if k in already_seen:
@@ -191,6 +255,8 @@ class Configuration(object):
                         else:
                             already_seen[k] = fp
 
+                self._check_config_file_permissions_and_warn(fp)
+
                 self.__perform_substitutions(content)
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
@@ -203,6 +269,9 @@ class Configuration(object):
                 self.__add_elements_from_array("journald_logs", content, self.__config)
                 self.__add_elements_from_array("k8s_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
+                self.__add_elements_from_array(
+                    "workers", content, self.__config, deprecated_names=["api_keys"]
+                )
                 self.__merge_server_attributes(fp, content, self.__config)
 
             self.__set_api_key(self.__config, api_key)
@@ -293,7 +362,12 @@ class Configuration(object):
             # Add in implicit entry to collect the log generated by this agent.
             agent_log = None
             if self.implicit_agent_log_collection:
-                config = JsonObject(path="agent.log", parser="scalyrAgentLog")
+                # set path as glob to handle log files from the multiprocess worker sessions.
+                config = JsonObject(
+                    path="agent*.log",
+                    exclude=JsonArray("*_debug.log"),
+                    parser="scalyrAgentLog",
+                )
                 self.__verify_log_entry_and_set_defaults(
                     config, description="implicit rule"
                 )
@@ -323,12 +397,162 @@ class Configuration(object):
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
+
+            # Perform validation for k8s_logs option
+            self._check_k8s_logs_config_option_and_warn()
+
+            # NOTE do this verifications only after all config fragments were added into configurations.
+            self.__verify_workers()
+            self.__verify_and_match_workers_in_logs()
+
+            self.__worker_configs = list(self.__config.get_json_array("workers"))
+
         except BadConfiguration as e:
             self.__last_error = e
             raise e
 
+    def __verify_workers(self):
+        """
+        Verify all worker config entries from the "workers" list in config.
+        """
+
+        workers = list(self.__config.get_json_array("workers"))
+
+        unique_worker_ids = {}
+        # Apply other defaults to all worker entries
+        for i, worker_entry in enumerate(workers):
+            self.__verify_workers_entry_and_set_defaults(worker_entry, entry_index=i)
+            worker_id = worker_entry["id"]
+            if worker_id in unique_worker_ids:
+                raise BadConfiguration(
+                    "There are multiple workers with the same '%s' id. Worker id's must remain unique."
+                    % worker_id,
+                    "workers",
+                    "workerIdDuplication",
+                )
+            else:
+                unique_worker_ids[worker_id] = worker_entry
+
+        default_worker_entry = unique_worker_ids.get("default")
+
+        if default_worker_entry is None:
+            default_worker_entry = JsonObject(api_key=self.api_key, id="default")
+            self.__verify_workers_entry_and_set_defaults(default_worker_entry)
+            workers.insert(0, default_worker_entry)
+            self.__config.put("workers", JsonArray(*workers))
+
+    def __verify_and_match_workers_in_logs(self):
+        """
+        Check if every log file entry contains a valid reference to the worker.
+        Each log file config entry has to have a field "worker_id" which refers to some entry in the "workers" list.
+        If such "worker_id" field is not specified, then the id of the default worker is used.
+        If "worker_id" is specified but there is no such api key, then the error is raised.
+        """
+
+        # get the set of all worker ids.
+        worker_ids = set()
+        for worker_config in self.__config.get_json_array("workers"):
+            worker_ids.add(worker_config["id"])
+
+        # get all lists where log files entries may be defined.
+        log_config_lists = [
+            self.__log_configs,
+            self.__k8s_log_configs,
+            self.__journald_log_configs,
+        ]
+
+        for log_config_list in log_config_lists:
+            for log_file_config in log_config_list:
+                worker_id = log_file_config.get("worker_id", none_if_missing=True)
+
+                if worker_id is None:
+                    # set a default worker if worker_id is not specified.
+                    log_file_config["worker_id"] = "default"
+                else:
+                    # if log file entry has worker_id which is not defined in the 'workers' list, then throw an error.
+                    if worker_id not in worker_ids:
+                        valid_worker_ids = ", ".join(sorted(worker_ids))
+                        raise BadConfiguration(
+                            "The log entry '%s' refers to a non-existing worker with id '%s'. Valid worker ids: %s."
+                            % (
+                                six.text_type(log_file_config),
+                                worker_id,
+                                valid_worker_ids,
+                            ),
+                            "logs",
+                            "invalidWorkerReference",
+                        )
+
+    def _check_config_file_permissions_and_warn(self, file_path):
+        # type: (str) -> None
+        """
+        Check config file permissions and log a warning is it's readable or writable by "others".
+        """
+        if not self.__log_warnings:
+            return None
+
+        if not os.path.isfile(file_path) or not self.__logger:
+            return None
+
+        st_mode = os.stat(file_path).st_mode
+
+        if bool(st_mode & stat.S_IROTH) or bool(st_mode & stat.S_IWOTH):
+            file_permissions = str(oct(st_mode)[4:])
+
+            if file_permissions.startswith("0") and len(file_permissions) == 4:
+                file_permissions = file_permissions[1:]
+
+            limit_key = "config-permissions-warn-%s" % (file_path)
+            self.__logger.warn(
+                "Config file %s is readable or writable by others (permissions=%s). Config "
+                "files can "
+                "contain secrets so you are strongly encouraged to change the config "
+                "file permissions so it's not readable by others."
+                % (file_path, file_permissions),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
+
+    def _check_k8s_logs_config_option_and_warn(self):
+        # type: () -> None
+        """
+        Check if k8s_logs attribute is configured, but kubernetes monitor is not and warn.
+
+        k8s_logs is a top level config option, but it's utilized by Kubernetes monitor which means
+        it will have no affect if kubernetes monitor is not configured as well.
+        """
+        if (
+            self.__k8s_log_configs
+            and not self._is_kubernetes_monitor_configured()
+            and self.__log_warnings
+        ):
+            self.__logger.warn(
+                '"k8s_logs" config options is defined, but Kubernetes monitor is '
+                "not configured / enabled. That config option applies to "
+                "Kubernetes monitor so for it to have an affect, Kubernetes "
+                "monitor needs to be enabled and configured",
+                limit_once_per_x_secs=86400,
+                limit_key="k8s_logs_k8s_monitor_not_enabled",
+            )
+
+    def _is_kubernetes_monitor_configured(self):
+        # type: () -> bool
+        """
+        Return true if Kubernetes monitor is configured, false otherwise.
+        """
+        monitor_configs = self.monitor_configs or []
+
+        for monitor_config in monitor_configs:
+            if (
+                monitor_config.get("module", "")
+                == "scalyr_agent.builtin_monitors.kubernetes_monitor"
+            ):
+                return True
+
+        return False
+
     def _warn_of_override_due_to_rate_enforcement(self, config_option, default):
-        if self.__config[config_option] != default:
+        if self.__log_warnings and self.__config[config_option] != default:
             self.__logger.warn(
                 "Configured option %s is being overridden due to max_send_rate_enforcement setting."
                 % config_option,
@@ -401,7 +625,6 @@ class Configuration(object):
         @param other_config: Another configuration option.  If not None, this function will
         only print configuration options that are different between the two objects.
         """
-
         options = [
             "verify_server_certificate",
             "ca_cert_path",
@@ -421,6 +644,12 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "use_multiprocess_workers",
+            "default_sessions_per_worker",
+            "default_worker_session_status_message_interval",
+            "enable_worker_session_process_metrics_gather",
+            # NOTE: It's important we use sanitzed_ version of this method which masks the API key
+            "sanitized_worker_configs",
         ]
 
         # get options (if any) from the other configuration object
@@ -447,26 +676,50 @@ class Configuration(object):
             ):
                 print_value = True
 
+            # For json_library config option, we also print actual library which is being used in
+            # case the value is set to "auto"
+            if option == "json_library" and value == "auto":
+                json_lib = scalyr_util.get_json_lib()
+                value = "%s (%s)" % (value, json_lib)
+
             if print_value:
                 # if this is the first option we are printing, output a header
                 if first:
                     self.__logger.info("Configuration settings")
                     first = False
 
+                if isinstance(value, (list, dict)):
+                    # We remove u"" prefix to ensure consistent output between Python 2 and 3
+                    value = six.text_type(value).replace("u'", "'")
+
                 self.__logger.info("\t%s: %s" % (option, value))
 
         # Print additional useful Windows specific information on Windows
-        if sys.platform.startswith("win") and win32file:
+        win32_max_open_fds_previous_value = getattr(
+            other_config, "win32_max_open_fds", None
+        )
+        win32_max_open_fds_current_value = getattr(self, "win32_max_open_fds", None)
+
+        if (
+            sys.platform.startswith("win")
+            and win32file
+            and (
+                win32_max_open_fds_current_value != win32_max_open_fds_previous_value
+                or other_config is None
+            )
+        ):
             try:
-                maxstdio = win32file._getmaxstdio()
+                win32_max_open_fds_actual_value = win32file._getmaxstdio()
             except Exception:
-                # This error should not be fatal
-                maxstdio = "unknown"
+                win32_max_open_fds_actual_value = "unknown"
 
             if first:
                 self.__logger.info("Configuration settings")
 
-            self.__logger.info("\twin32_max_open_fds(maxstdio): %s" % (maxstdio))
+            self.__logger.info(
+                "\twin32_max_open_fds(maxstdio): %s (%s)"
+                % (win32_max_open_fds_current_value, win32_max_open_fds_actual_value)
+            )
 
         # If debug level 5 is set also log the raw config JSON excluding the api_key
         # This makes various troubleshooting easier.
@@ -494,7 +747,11 @@ class Configuration(object):
 
         for key in values_to_mask:
             if key in raw_config:
-                raw_config[key] = "********** MASKED **********"
+                raw_config[key] = MASKED_CONFIG_ITEM_VALUE
+
+        # Ensure we also sanitize api_key values in workers dictionaries
+        if "workers" in raw_config:
+            raw_config["workers"] = self.sanitized_worker_configs
 
         return raw_config
 
@@ -507,6 +764,42 @@ class Configuration(object):
         if result is not None and self.strip_domain_from_default_server_host:
             result = result.split(".")[0]
         return result
+
+    @staticmethod
+    def get_session_ids_of_the_worker(worker_config):  # type: (Dict) -> List
+        """
+            Generate the list of IDs of all sessions for the specified worker.
+            :param worker_config: config entry for the worker.
+            :return: List of worker session IDs.
+        """
+        result = []
+        for i in range(worker_config["sessions"]):
+            # combine the id of the worker and session's position in the list to get a session id.
+            worker_session_id = "%s-%s" % (worker_config["id"], i)
+            result.append(worker_session_id)
+        return result
+
+    def get_session_ids_from_all_workers(self):  # type: () -> List[six.text_type]
+        """
+        Get session ids for all workers.
+        :return: List of worker session ids.
+        """
+        result = []
+
+        for worker_config in self.worker_configs:
+            result.extend(self.get_session_ids_of_the_worker(worker_config))
+
+        return result
+
+    def get_worker_session_agent_log_path(
+        self, worker_session_id
+    ):  # type: (six.text_type) -> six.text_type
+        """
+        Generate the name of the log file path for the worker session based on its id.
+        :param worker_session_id: ID of the worker session.
+        :return: path for the worker session log file.
+        """
+        return os.path.join(self.agent_log_path, "agent-%s.log" % worker_session_id)
 
     def parse_log_config(
         self,
@@ -1064,7 +1357,7 @@ class Configuration(object):
     @property
     def extra_config_directory(self):
         """Returns the configuration value for `extra_config_directory`, resolved to full path if
-        necessary.  """
+        necessary."""
 
         # If `extra_config_directory` is a relative path, then it will be relative
         # to the directory containing the main config file
@@ -1222,6 +1515,13 @@ class Configuration(object):
         return self.__get_config().get_float("global_monitor_sample_interval")
 
     @property
+    def global_monitor_sample_interval_enable_jitter(self):
+        """Returns the configuration value for 'global_monitor_sample_interval_enable_jitter'."""
+        return self.__get_config().get_bool(
+            "global_monitor_sample_interval_enable_jitter"
+        )
+
+    @property
     def full_checkpoint_interval(self):
         """Returns the configuration value for 'full_checkpoint_interval_in_seconds'."""
         return self.__get_config().get_int("full_checkpoint_interval_in_seconds")
@@ -1342,6 +1642,89 @@ class Configuration(object):
         """
         return self.__get_config().get_int("win32_max_open_fds")
 
+    @property
+    def worker_configs(self):
+        return self.__worker_configs
+
+    @property
+    def sanitized_worker_configs(self):
+        """
+        Special version of "worker_configs" attribute which removes / masks actual API tokens
+        in the returned output.
+        """
+        worker_configs = copy.deepcopy(self.__worker_configs)
+
+        result = []
+        for worker_config in worker_configs:
+            # TODO: Should we still log last 3-4 characters of the key to make troubleshooting
+            # easier?
+            worker_config["api_key"] = MASKED_CONFIG_ITEM_VALUE
+            result.append(dict(worker_config))
+
+        return result
+
+    def get_number_of_configured_sessions_and_api_keys(self):
+        # type: () -> Tuple[str, int, int]
+        """
+        Return total number of configured sessions from all workers and a total number of unique API keys those
+        workers are configured with.
+
+        It returns a tuple of (worker_type, sessions_count, unique API keys count). Value for
+        worker_type is "threaded" and "multiprocess."
+
+        If multiple sessions / workers functionality is not enabled (*, 1, 1) is returned.
+        """
+        sessions_count = 0
+        api_keys_set = set([])
+        for worker_config in self.__worker_configs:
+            api_keys_set.add(worker_config["api_key"])
+            sessions_count += worker_config["sessions"]
+
+        api_keys_count = len(api_keys_set)
+        del api_keys_set
+
+        if self.use_multiprocess_workers:
+            worker_type = "multiprocess"
+        else:
+            worker_type = "threaded"
+
+        return worker_type, sessions_count, api_keys_count
+
+    @property
+    def use_multiprocess_workers(self):
+        """
+        Return whether or not copying manager workers are in the multiprocessing mode.
+        """
+        return self.__get_config().get_bool("use_multiprocess_workers")
+
+    @property
+    def default_sessions_per_worker(self):
+        """
+        The default number of sessions which should be created for each worker if no value is explicitly set
+        """
+        return self.__get_config().get_int("default_sessions_per_worker")
+
+    @property
+    def default_worker_session_status_message_interval(self):
+        return self.__get_config().get_float(
+            "default_worker_session_status_message_interval"
+        )
+
+    @property
+    def enable_worker_session_process_metrics_gather(self):
+        """
+        If it True and multi-process workers are used, then the instance of the linux process monitor
+        is created for each worker session process.
+        """
+        return self.__get_config().get_bool("enable_worker_process_metrics_gather")
+
+    @property
+    def enable_copy_truncate_log_rotation_support(self):
+        """
+        Return whether copy truncate log rotation support is enabled.
+        """
+        return self.__get_config().get_bool("enable_copy_truncate_log_rotation_support")
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -1459,14 +1842,25 @@ class Configuration(object):
                     result.append(full_path)
         return result
 
-    def __add_elements_from_array(self, field, source_json, destination_json):
+    def __add_elements_from_array(
+        self, field, source_json, destination_json, deprecated_names=None
+    ):
         """Appends any elements in the JsonArray in source_json to destination_json.
 
         @param field: The name of the field containing the JsonArray.
         @param source_json: The JsonObject containing the JsonArray from which to retrieve elements.
         @param destination_json: The JsonObject to which the elements should be added (in the JsonArray named field.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
-        destination_array = destination_json.get_json_array(field)
+        destination_array = destination_json.get_json_array(field, none_if_missing=True)
+        if destination_array is None and deprecated_names is not None:
+            for name in deprecated_names:
+                destination_array = destination_json.get_json_array(
+                    name, none_if_missing=True
+                )
+
         for element in source_json.get_json_array(field):
             destination_array.add(element)
 
@@ -1556,7 +1950,7 @@ class Configuration(object):
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
-    """
+        """
         description = 'configuration file "%s"' % file_path
 
         self.__verify_or_set_optional_string(
@@ -1698,6 +2092,14 @@ class Configuration(object):
             config,
             "global_monitor_sample_interval",
             30.0,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "global_monitor_sample_interval_enable_jitter",
+            True,
             description,
             apply_defaults,
             env_aware=True,
@@ -2640,6 +3042,70 @@ class Configuration(object):
             apply_defaults,
         )
 
+        # if true, the copying manager creates each session of its workers in a separate process.
+        self.__verify_or_set_optional_bool(
+            config,
+            "use_multiprocess_workers",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+            deprecated_names=["use_multiprocess_copying_workers"],
+        )
+
+        # the default number of sessions per worker.
+        self.__verify_or_set_optional_int(
+            config,
+            "default_sessions_per_worker",
+            1,
+            description,
+            apply_defaults,
+            env_aware=True,
+            min_value=1,
+            deprecated_names=["default_workers_per_api_key"],
+        )
+
+        self.__verify_or_set_optional_float(
+            config,
+            "default_worker_session_status_message_interval",
+            600.0,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_worker_process_metrics_gather",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_copy_truncate_log_rotation_support",
+            True,
+            description,
+            apply_defaults,
+        )
+
+        # windows does not support copying manager backed with multiprocessing workers.
+        if config.get_bool("use_multiprocess_workers", none_if_missing=True):
+            if platform.system() == "Windows":
+                raise BadConfiguration(
+                    "The 'use_multiprocess_workers' option is not supported on windows machines.",
+                    "use_multiprocess_workers",
+                    error_code="invalidValue",
+                )
+            elif sys.version_info < (2, 7):
+                raise BadConfiguration(
+                    "The 'use_multiprocess_workers' option is supported only for Python version higher than 2.6.",
+                    "use_multiprocess_workers",
+                    error_code="invalidValue",
+                )
+
     def __verify_compression_type(self, compression_type):
         """
         Verify that the library for the specified compression type (algorithm) is available.
@@ -2657,6 +3123,15 @@ class Configuration(object):
                 "Original error: %s" % (compression_type, library_name, str(e))
             )
             raise BadConfiguration(msg, "compression_type", "invalidCompressionType")
+
+        if compression_type == "none":
+            self.__logger.warn(
+                "No compression will be used for outgoing requests. In most scenarios this will "
+                "result in larger data egress traffic which may incur additional charges on your "
+                "side (depending on your infrastructure provider, location, pricing model, etc.).",
+                limit_once_per_x_secs=86400,
+                limit_key="compression_type_none",
+            )
 
     def __verify_compression_level(self, compression_level):
         """
@@ -2678,30 +3153,13 @@ class Configuration(object):
                 scalyr_util.COMPRESSION_TYPE_TO_DEFAULT_LEVEL[compression_type],
             )
 
-    def __get_config_or_environment_val(
-        self, config_object, param_name, param_type, env_aware, custom_env_name
-    ):
-        """Returns a type-converted config param value or if not found, a matching environment value.
-
-        If the environment value is returned, it is also written into the config_object.
-
-        Currently only handles the following types (str, int, bool, float, JsonObject, JsonArray).
-        Also validates that environment variables can be correctly converted into the primitive type.
-
-        Both upper-case and lower-case versions of the environment variable will be checked.
-
+    def __get_config_val(self, config_object, param_name, param_type):
+        """
+        Get parameter with a given type from the config object.
         @param config_object: The JsonObject config containing the field as a key
         @param param_name: Parameter name
         @param param_type: Parameter type
-        @param env_aware: If True and not defined in config file, look for presence of environment variable.
-        @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
-            scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
-            Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
-
-        @return A python object representing the config param (or environment) value or None
-        @raises
-            JsonConversionException: if the config value or env value cannot be correctly converted.
-            TypeError: if the param_type is not supported.
+        :return:
         """
         if param_type == int:
             config_val = config_object.get_int(param_name, none_if_missing=True)
@@ -2725,6 +3183,62 @@ class Configuration(object):
                 % (param_type, param_name)
             )
 
+        return config_val
+
+    def __get_config_or_environment_val(
+        self,
+        config_object,
+        param_name,
+        param_type,
+        env_aware,
+        custom_env_name,
+        deprecated_names=None,
+    ):
+        """Returns a type-converted config param value or if not found, a matching environment value.
+
+        If the environment value is returned, it is also written into the config_object.
+
+        Currently only handles the following types (str, int, bool, float, JsonObject, JsonArray).
+        Also validates that environment variables can be correctly converted into the primitive type.
+
+        Both upper-case and lower-case versions of the environment variable will be checked.
+
+        @param config_object: The JsonObject config containing the field as a key
+        @param param_name: Parameter name
+        @param param_type: Parameter type
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
+            Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
+        @param deprecated_names: List of synonym names for the *param_name* that were used in previous version but now
+        are deprecated. If the current *param_name* is not presented, then we also look for the deprecated names for
+        backward compatibility.
+
+        @return A python object representing the config param (or environment) value or None
+        @raises
+            JsonConversionException: if the config value or env value cannot be correctly converted.
+            TypeError: if the param_type is not supported.
+        """
+
+        config_val = self.__get_config_val(config_object, param_name, param_type)
+
+        # the config param is not presented by its current name, look for a deprecated name.
+        if config_val is None and deprecated_names is not None:
+            for name in deprecated_names:
+                config_val = self.__get_config_val(config_object, name, param_type)
+                if config_val is not None:
+                    config_object.put(param_name, config_val)
+                    del config_object[name]
+                    if self.__logger and self.__log_warnings:
+                        self.__logger.warning(
+                            "The configuration option {0} is deprecated, use {1} instead.".format(
+                                name, param_name
+                            ),
+                            limit_once_per_x_secs=86400,
+                            limit_key="deprecatedConfigOption",
+                        )
+                    break
+
         if not env_aware:
             if not custom_env_name:
                 return config_val
@@ -2740,6 +3254,18 @@ class Configuration(object):
             logger=self.__logger,
             param_val=config_val,
         )
+
+        # the config param environment variable is not presented by its current name, look for a deprecated name.
+        if env_val is None and deprecated_names is not None:
+            for name in deprecated_names:
+                env_val = get_config_from_env(
+                    name,
+                    convert_to=param_type,
+                    logger=self.__logger,
+                    param_val=config_val,
+                )
+                if env_val is not None:
+                    break
 
         # Not set in environment
         if env_val is None:
@@ -2768,6 +3294,9 @@ class Configuration(object):
         self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "k8s_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
+        self.__verify_or_set_optional_array(
+            config, "workers", description, deprecated_names=["api_keys"]
+        )
 
         i = 0
         for log_entry in config.get_json_array("logs"):
@@ -2865,7 +3394,7 @@ class Configuration(object):
         @param entry_index: The index of the entry in the 'logs' json array. Used to generate the description if none
             was given.
         """
-        # Make sure the log_enty has a path and the path is absolute.
+        # Make sure the log_entry has a path and the path is absolute.
         path = log_entry.get_string("path", none_if_missing=True)
         if path and not os.path.isabs(path):
             log_entry.put("path", os.path.join(self.agent_log_path, path))
@@ -2875,6 +3404,11 @@ class Configuration(object):
             description=description,
             config_file_path=config_file_path,
             entry_index=entry_index,
+        )
+
+        # set default worker if it is not specified.
+        self.__verify_or_set_optional_string(
+            log_entry, "worker_id", "default", description,
         )
 
     def __verify_log_entry_with_key_and_set_defaults(
@@ -3085,6 +3619,59 @@ class Configuration(object):
             monitor_entry, "log_path", module_name + ".log", description
         )
 
+    def __verify_workers_entry_and_set_defaults(self, worker_entry, entry_index=None):
+        """
+        Verify the copying manager workers entry. and set defaults.
+        """
+
+        description = "the #%s entry of the 'workers' list."
+
+        # the 'id' field is required, raise an error if it is not specified.
+        self.__verify_required_string(worker_entry, "id", description)
+
+        # the 'api_key' field is required, raise an error if it is not specified,
+        # but we make an exception for the "default" worker.
+        # The worker entry with "default" id may not have a "api_key" field and it will be the same as main api_key.
+        worker_id = worker_entry.get("id")
+        if worker_id == "default":
+            api_key = worker_entry.get("api_key", none_if_missing=True)
+            if api_key is not None and api_key != self.api_key:
+                raise BadConfiguration(
+                    "The API key of the default worker has to match the main API key of the configuration",
+                    "workers",
+                    "wrongDefaultWorker",
+                )
+            self.__verify_or_set_optional_string(
+                worker_entry, "api_key", self.api_key, description % entry_index
+            )
+        else:
+
+            # validate the worker id. It should consist only from this set of characters.
+            allowed_worker_id_characters_pattern = "a-zA-Z0-9_"
+            if re.search(
+                r"[^{0}]+".format(allowed_worker_id_characters_pattern), worker_id
+            ):
+                raise BadConfiguration(
+                    "The worker id '{0}' contains an invalid character. Please use only '{1}'".format(
+                        worker_id, allowed_worker_id_characters_pattern
+                    ),
+                    "workers",
+                    "invalidWorkerId",
+                )
+            self.__verify_required_string(
+                worker_entry, "api_key", description % entry_index
+            )
+
+        sessions_number = self.__config.get_int("default_sessions_per_worker")
+        self.__verify_or_set_optional_int(
+            worker_entry,
+            "sessions",
+            sessions_number,
+            description,
+            min_value=1,
+            deprecated_names=["workers"],
+        )
+
     def __merge_server_attributes(self, fragment_file_path, config_fragment, config):
         """Merges the contents of the server attribute read from a configuration fragment to the main config object.
 
@@ -3184,6 +3771,7 @@ class Configuration(object):
         env_aware=False,
         env_name=None,
         valid_values=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
@@ -3200,10 +3788,18 @@ class Configuration(object):
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         @param valid_values: Optional list with valid values for this string.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, six.text_type, env_aware, env_name
+                config_object,
+                field,
+                six.text_type,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3238,6 +3834,7 @@ class Configuration(object):
         env_name=None,
         min_value=None,
         max_value=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
@@ -3256,10 +3853,18 @@ class Configuration(object):
             scalyr_<field> as the environment variable name.
         @param min_value: Optional minimum value for this configuration value.
         @param max_value: Optional maximum value for this configuration value.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, int, env_aware, env_name
+                config_object,
+                field,
+                int,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3277,7 +3882,7 @@ class Configuration(object):
 
         if value is not None and min_value is not None and value < min_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be greater than %s'
+                'Got invalid value "%s" for field "%s". Value must be greater than or equal to %s'
                 % (value, field, min_value),
                 field,
                 "invalidValue",
@@ -3285,7 +3890,7 @@ class Configuration(object):
 
         if value is not None and max_value is not None and value > max_value:
             raise BadConfiguration(
-                'Got invalid value "%s" for field "%s". Value must be less than %s'
+                'Got invalid value "%s" for field "%s". Value must be less than or equal to %s'
                 % (value, field, max_value),
                 field,
                 "invalidValue",
@@ -3300,6 +3905,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object can be converted to a float if present, otherwise
         sets default.
@@ -3316,10 +3922,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, float, env_aware, env_name
+                config_object,
+                field,
+                float,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3343,6 +3957,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
         object.
@@ -3359,10 +3974,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             json_object = self.__get_config_or_environment_val(
-                config_object, field, JsonObject, env_aware, env_name
+                config_object,
+                field,
+                JsonObject,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if json_object is None:
@@ -3398,6 +4021,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is a boolean if present, otherwise sets default.
 
@@ -3413,10 +4037,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, bool, env_aware, env_name
+                config_object,
+                field,
+                bool,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if value is None:
@@ -3440,6 +4072,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is an array of json objects if present, otherwise sets
         to empty array.
@@ -3455,10 +4088,18 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         try:
             json_array = self.__get_config_or_environment_val(
-                config_object, field, JsonArray, env_aware, env_name
+                config_object,
+                field,
+                JsonArray,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if json_array is None:
@@ -3495,6 +4136,7 @@ class Configuration(object):
         separators=[","],
         env_aware=False,
         env_name=None,
+        deprecated_names=None,
     ):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
@@ -3512,6 +4154,9 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param deprecated_names: List of synonym names for the *field* that were used in previous version but now
+        are deprecated. If the current *field* is not presented, then we also look for the deprecated names for
+        backward compatibility.
         """
         # 2->TODO Python3 can not sort None values
         separators.sort(key=lambda s: s if s is not None else "")
@@ -3521,7 +4166,12 @@ class Configuration(object):
             cls = SpaceAndCommaSeparatedArrayOfStrings
         try:
             array_of_strings = self.__get_config_or_environment_val(
-                config_object, field, cls, env_aware, env_name
+                config_object,
+                field,
+                cls,
+                env_aware,
+                env_name,
+                deprecated_names=deprecated_names,
             )
 
             if array_of_strings is None:
@@ -3632,6 +4282,16 @@ class Configuration(object):
             perform_object_substitution(
                 object_value=source_config, substitutions=substitutions
             )
+
+    def __getstate__(self):
+        """
+        Remove unpicklable fields from the configuration instance.
+        The configuration object need to be picklable because its instances may be passed
+        to the multi-process copying manager worker sessions.
+        """
+        state = self.__dict__.copy()
+        state.pop("_Configuration__logger", None)
+        return state
 
 
 """

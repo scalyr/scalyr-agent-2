@@ -49,17 +49,10 @@ import time
 
 from optparse import OptionParser
 
-# [start of 2->TODO]
-# Check for suitability.
-# This file can be executed as script and imported as module.
-if __name__ == "__main__":
-    # run as script, can not import __scalyr__.py as part of the package.
+try:
     from __scalyr__ import scalyr_init
-else:
-    # run as package module.
-    # Python3 does not allow to import __scalyr__.py file within the same package just by its name. (PEP 328)
+except ImportError:
     from scalyr_agent.__scalyr__ import scalyr_init
-# [end of 2->TOD0]
 
 scalyr_init()
 
