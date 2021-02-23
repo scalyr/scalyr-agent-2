@@ -3328,6 +3328,16 @@ class ContainerChecker(object):
                 "'automountServiceAccountToken' is set to True"
             )
 
+    def get_containers(self):
+        if self._container_runtime:
+            return self._container_enumerator.get_containers(
+                glob_list=self.__glob_list,
+                k8s_cache=self.k8s_cache,
+                k8s_include_by_default=self.__include_all,
+                k8s_namespaces_to_include=self.__namespaces_to_include,
+            )
+        return {}
+
 
 class KubernetesMonitor(
     ScalyrMonitor
@@ -4010,35 +4020,38 @@ cluster.
 
         # gather metrics
         containers = None
-        if self.__report_container_metrics and self.__client:
-            if (
-                self.__metrics_controlled_warmer is not None
-                and not self.__metrics_controlled_warmer.is_running()
-            ):
-                self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
-                self.__metrics_controlled_warmer.start()
-            containers = _get_containers(
-                self.__client,
-                ignore_container=None,
-                glob_list=self.__glob_list,
-                k8s_cache=k8s_cache,
-                k8s_include_by_default=self.__include_all,
-                k8s_namespaces_to_include=self.__namespaces_to_include,
-                controlled_warmer=self.__metrics_controlled_warmer,
-            )
+        if self.__report_container_metrics:
+            if self.__client:
+                if (
+                    self.__metrics_controlled_warmer is not None
+                    and not self.__metrics_controlled_warmer.is_running()
+                ):
+                    self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
+                    self.__metrics_controlled_warmer.start()
+                containers = _get_containers(
+                    self.__client,
+                    ignore_container=None,
+                    glob_list=self.__glob_list,
+                    k8s_cache=k8s_cache,
+                    k8s_include_by_default=self.__include_all,
+                    k8s_namespaces_to_include=self.__namespaces_to_include,
+                    controlled_warmer=self.__metrics_controlled_warmer,
+                )
+            else:
+                containers = self.__container_checker.get_containers()
         try:
             if containers:
-                if self.__report_container_metrics:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
+                if self.__report_container_metrics and self.__metric_fetcher:
+                    self._logger.warning(
+                        #scalyr_logging.DEBUG_LEVEL_3,
                         "Attempting to retrieve metrics for %d containers"
                         % len(containers),
                     )
                     self.__gather_metrics_from_api(containers, cluster_name)
 
                 if self.__report_k8s_metrics:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
+                    self._logger.warning(
+                        #scalyr_logging.DEBUG_LEVEL_3,
                         "Attempting to retrieve k8s metrics %d" % len(containers),
                     )
                     self.__gather_k8s_metrics_from_kubelet(
