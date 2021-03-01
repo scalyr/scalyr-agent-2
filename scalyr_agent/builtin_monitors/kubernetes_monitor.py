@@ -3659,7 +3659,7 @@ cluster.
         )
 
         self.__mem_metrics = self.__build_metric_dict(
-            "docker.mem.", ["max_usage", "usage", "fail_cnt", "limit"]
+            "docker.mem.", ["max_usage", "usage", "fail_cnt", "limit", "workingSetBytes", "availableBytes"]
         )
 
         self.__cpu_usage_metrics = self.__build_metric_dict(
@@ -3667,16 +3667,23 @@ cluster.
         )
 
         self.__cpu_throttling_metrics = self.__build_metric_dict(
-            "docker.cpu.throttling.", ["periods", "throttled_periods", "throttled_time"]
+            "docker.cpu.throttling.", ["periods", "throttled_periods", "throttled_time", "usageNanoCores"]
         )
 
-        self.__mem_cri_stats = self.__build_metric_dict(
-            "docker.mem.", ["pageFaults", "majorPageFaults", "rssBytes", "workingSetBytes", "availableBytes", "usageBytes"]
-        )
+        self.__mem_cri_translation = {
+            "pageFaults": "total_pgfault",
+            "majorPageFaults": "total_pgmajfault",
+            "rssBytes": "total_rss",
+            "usageBytes": "usage",
+            # Other metrics that don't map to docker ones:
+            # "workingSetBytes", "availableBytes"
+        }
 
-        self.__cpu_usage_cri_stats = self.__build_metric_dict(
-            "docker.cpu.", ["usageCoreNanoSeconds", "usageNanoCores"]
-        )
+        self.__cpu_usage_cri_translation = {
+            "usageCoreNanoSeconds": "total_usage"
+            # Other metrics that don't map to docker ones:
+            # "usageNanoCores"
+        }
 
     def set_log_watcher(self, log_watcher):
         """Provides a log_watcher object that monitors can use to add/remove log files
@@ -3705,9 +3712,14 @@ cluster.
                 env_var_name,
             )
 
-    def __log_metrics(self, monitor_override, metrics_to_emit, metrics, extra=None):
+    def __log_metrics(self, monitor_override, metrics_to_emit, metrics, extra=None, name_translation=None):
         if metrics is None:
             return
+
+        if name_translation is not None:
+            for key, value in six.iteritems(name_translation):
+                if key in metrics:
+                    metrics[value] = metrics[key]
 
         for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
@@ -3800,22 +3812,27 @@ cluster.
 
     def __log_memory_stats_cri_metrics(self, container, metrics, k8s_extra):
         """ Logs memory stats metrics
+            This method expects the metrics to come from the `stats/summary` kubelet endpoint and so has a translation
+            to the metric names we expect from the docker client
 
             @param container: name of the container the log originated from
             @param metrics: a dict of metrics keys/values to emit
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        self.__log_metrics(container, self.__mem_cri_stats, metrics, k8s_extra)
+        self.__log_metrics(container, self.__mem_metrics, metrics, k8s_extra, self.__mem_cri_translation)
+        self.__log_metrics(container, self.__mem_stat_metrics, metrics, k8s_extra, self.__mem_cri_translation)
 
     def __log_cpu_stats_cri_metrics(self, container, metrics, k8s_extra):
         """ Logs cpu stats metrics
+            This method expects the metrics to come from the `stats/summary` kubelet endpoint and so has a translation
+            to the metric names we expect from the docker client
 
             @param container: name of the container the log originated from
             @param metrics: a dict of metrics keys/values to emit
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         self.__log_metrics(
-            container, self.__cpu_usage_cri_stats, metrics, k8s_extra
+            container, self.__cpu_usage_metrics, metrics, k8s_extra, self.__cpu_usage_cri_translation
         )
 
     def __log_json_metrics(self, container, metrics, k8s_extra):
