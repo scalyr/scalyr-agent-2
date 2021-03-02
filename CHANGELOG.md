@@ -16,7 +16,7 @@ Improvements:
 
 Bug fixes:
 * Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.
-* Fix regression with syslog monitor which caused the ingestion of the file with a wrong parser.
+* Fix regression with syslog monitor which caused the ingestion of the file with a wrong parser. The root cause was in the too broad path glob that was used in the agent log's `LogMatcher`, so it also processed the `agent_syslog.log` as an agent log file.
 
 ## 2.1.18 "Ravis" - January 29, 2021
 
