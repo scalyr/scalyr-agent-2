@@ -101,7 +101,7 @@ def _check_workers_gracefull_stop(runner, worker_pids, occurrences=1):
     # type: (AgentRunner, Dict, int) -> None
     # check if every worker has logged that it finished.
     for worker_id in worker_pids.keys():
-        worker_log_name = "agent-{0}.log".format(worker_id)
+        worker_log_name = "agent-worker-session-{0}.log".format(worker_id)
         worker_log_path = runner.agent_logs_dir_path / worker_log_name  # type: ignore
         assert (
             worker_log_path.exists()
