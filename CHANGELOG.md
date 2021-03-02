@@ -16,6 +16,7 @@ Improvements:
 
 Bug fixes:
 * Fix ``scalyr-agent-status -v`` to not emit / print warnings under some edge cases.
+* Fix regression with syslog monitor which caused the ingestion of the file with a wrong parser.
 
 ## 2.1.18 "Ravis" - January 29, 2021
 
