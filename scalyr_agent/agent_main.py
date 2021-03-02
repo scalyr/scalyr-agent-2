@@ -1123,6 +1123,10 @@ class ScalyrAgent(object):
 
                 self.__update_debug_log_level(self.__config.debug_level)
 
+                # We record where the log files(including multiprocess worker sessions logs) currently are
+                # so that we can (in the worse case) start copying them from those position.
+                logs_initial_positions = self.__get_log_files_initial_positions()
+
                 start_up_msg = scalyr_util.get_agent_start_up_message()
                 log.info(start_up_msg)
                 log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
@@ -1162,10 +1166,6 @@ class ScalyrAgent(object):
                     )
                     wt.start(logs_initial_positions)
                     return wt, wt.copying_manager, wt.monitors_manager
-
-                # We record where the log files(including multiprocess worker sessions logs) currently are
-                # so that we can (in the worse case) start copying them from those position.
-                logs_initial_positions = self.__get_log_files_initial_positions()
 
                 (
                     worker_thread,
