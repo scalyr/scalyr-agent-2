@@ -3659,7 +3659,15 @@ cluster.
         )
 
         self.__mem_metrics = self.__build_metric_dict(
-            "docker.mem.", ["max_usage", "usage", "fail_cnt", "limit", "workingSetBytes", "availableBytes"]
+            "docker.mem.",
+            [
+                "max_usage",
+                "usage",
+                "fail_cnt",
+                "limit",
+                "workingSetBytes",
+                "availableBytes",
+            ],
         )
 
         self.__cpu_usage_metrics = self.__build_metric_dict(
@@ -3667,7 +3675,8 @@ cluster.
         )
 
         self.__cpu_throttling_metrics = self.__build_metric_dict(
-            "docker.cpu.throttling.", ["periods", "throttled_periods", "throttled_time", "usageNanoCores"]
+            "docker.cpu.throttling.",
+            ["periods", "throttled_periods", "throttled_time", "usageNanoCores"],
         )
 
         self.__mem_cri_translation = {
@@ -3712,7 +3721,14 @@ cluster.
                 env_var_name,
             )
 
-    def __log_metrics(self, monitor_override, metrics_to_emit, metrics, extra=None, name_translation=None):
+    def __log_metrics(
+        self,
+        monitor_override,
+        metrics_to_emit,
+        metrics,
+        extra=None,
+        name_translation=None,
+    ):
         if metrics is None:
             return
 
@@ -3819,8 +3835,20 @@ cluster.
             @param metrics: a dict of metrics keys/values to emit
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        self.__log_metrics(container, self.__mem_metrics, metrics, k8s_extra, self.__mem_cri_translation)
-        self.__log_metrics(container, self.__mem_stat_metrics, metrics, k8s_extra, self.__mem_cri_translation)
+        self.__log_metrics(
+            container,
+            self.__mem_metrics,
+            metrics,
+            k8s_extra,
+            self.__mem_cri_translation,
+        )
+        self.__log_metrics(
+            container,
+            self.__mem_stat_metrics,
+            metrics,
+            k8s_extra,
+            self.__mem_cri_translation,
+        )
 
     def __log_cpu_stats_cri_metrics(self, container, metrics, k8s_extra):
         """ Logs cpu stats metrics
@@ -3832,7 +3860,11 @@ cluster.
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         self.__log_metrics(
-            container, self.__cpu_usage_metrics, metrics, k8s_extra, self.__cpu_usage_cri_translation
+            container,
+            self.__cpu_usage_metrics,
+            metrics,
+            k8s_extra,
+            self.__cpu_usage_cri_translation,
         )
 
     def __log_json_metrics(self, container, metrics, k8s_extra):
@@ -3974,7 +4006,11 @@ cluster.
                 for container_stat in container_stats:
                     container_name = container_stat.get("name", "<unknown>")
                     if container_name in containers_to_check:
-                        self.__log_cri_container_metrics(container_name, container_stat, all_k8s_extra.get(container_name, {}))
+                        self.__log_cri_container_metrics(
+                            container_name,
+                            container_stat,
+                            all_k8s_extra.get(container_name, {}),
+                        )
 
             return stats
 
@@ -4032,7 +4068,9 @@ cluster.
                     pod_info.uid, self.__k8s_pod_network_metrics, metrics, extra
                 )
 
-    def __gather_k8s_metrics_from_kubelet(self, containers, kubelet_api, cluster_name, stats=None):
+    def __gather_k8s_metrics_from_kubelet(
+        self, containers, kubelet_api, cluster_name, stats=None
+    ):
         """
             Gathers k8s metrics from a response to a stats query of the Kubelet API
 
@@ -4157,7 +4195,9 @@ cluster.
                     if self.__metric_fetcher:
                         self.__gather_metrics_from_api(containers, cluster_name)
                     else:
-                        stats = self.__gather_metrics_from_kubelet(containers, self.__kubelet_api, cluster_name)
+                        stats = self.__gather_metrics_from_kubelet(
+                            containers, self.__kubelet_api, cluster_name
+                        )
 
                 if self.__report_k8s_metrics:
                     self._logger.log(
