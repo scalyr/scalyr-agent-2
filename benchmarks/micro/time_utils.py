@@ -1,4 +1,16 @@
-# Based on https://gist.github.com/zed/5073409
+# Copyright 2014-2021 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """
 Compatibility layer for Python 2 which exposes time.perf_counter and time.process_time under Python
@@ -10,17 +22,26 @@ more accurate and less noisy data.
 
 from __future__ import absolute_import
 
+import functools
 import ctypes
-import errno
+import ctypes.util
 import platform
-from ctypes.util import find_library
-from functools import partial
+import errno
 
-CLOCK_PROCESS_CPUTIME_ID = 2  # time.h
-CLOCK_MONOTONIC_RAW = 4
 
 clockid_t = ctypes.c_int
 time_t = ctypes.c_long
+
+# clock ID to be used in the time.process_time
+CLOCK_PROCESS_CPUTIME_ID = 2
+
+# clock ID to be used in the time.perf_counter
+CLOCK_MONOTONIC_RAW = 4
+
+rt_lib = ctypes.CDLL(ctypes.util.find_library("rt"), use_errno=True)  # type: ignore
+
+# get the "clock_gettime" function. See here: https://linux.die.net/man/3/clock_gettime
+_clock_gettime = rt_lib.clock_gettime  # type: ignore
 
 
 class timespec(ctypes.Structure):
@@ -30,33 +51,40 @@ class timespec(ctypes.Structure):
     ]
 
 
-_clock_gettime = ctypes.CDLL(find_library("rt"), use_errno=True).clock_gettime  # type: ignore
 _clock_gettime.argtypes = [clockid_t, ctypes.POINTER(timespec)]
 
 
-def clock_gettime(clk_id):
-    tp = timespec()
-    if _clock_gettime(clk_id, ctypes.byref(tp)) < 0:
-        err = ctypes.get_errno()
-        msg = errno.errorcode[err]
-        if err == errno.EINVAL:
-            msg += (
-                " The clk_id specified is not supported on this system" " clk_id=%r"
-            ) % (clk_id,)
-        raise OSError(err, msg)
-    return tp.tv_sec + tp.tv_nsec * 1e-9
+def clock_gettime_wrapper(clk_id):
+    result_time_spec = timespec()
+    if _clock_gettime(clk_id, ctypes.byref(result_time_spec)) < 0:
+
+        error_code = ctypes.get_errno()
+        message = errno.errorcode[error_code]
+
+        # raise error in case of unsupported clock
+        if error_code == errno.EINVAL:
+            message = (
+                " The clock ID is not supported on this system"
+                " clk_id={0}r".format(clk_id)
+            )
+        raise OSError(error_code, message)
+
+    return result_time_spec.tv_sec + result_time_spec.tv_nsec * 1e-9
 
 
 try:
-    from time import perf_counter, process_time
-except ImportError:  # Python <3.3
+    from time import process_time, perf_counter
+except ImportError:  # Python < 3.3
     if platform.system() == "Darwin":
         import time
 
-        perf_counter = time.time
         process_time = time.time
+        perf_counter = time.time
     else:
-        perf_counter = partial(clock_gettime, CLOCK_MONOTONIC_RAW)
-        perf_counter.__name__ = "perf_counter"  # type: ignore
-        process_time = partial(clock_gettime, CLOCK_PROCESS_CPUTIME_ID)
+        process_time = functools.partial(
+            clock_gettime_wrapper, CLOCK_PROCESS_CPUTIME_ID
+        )
+        perf_counter = functools.partial(clock_gettime_wrapper, CLOCK_MONOTONIC_RAW)
+
         process_time.__name__ = "process_time"  # type: ignore
+        perf_counter.__name__ = "perf_counter"  # type: ignore
