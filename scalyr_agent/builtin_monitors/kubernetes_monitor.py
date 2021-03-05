@@ -3469,6 +3469,115 @@ container using annotations without updating the config yaml, and applying the u
 cluster.
     """
 
+    @staticmethod
+    def __build_metric_dict(prefix, names):
+        result = {}
+        for name in names:
+            result["%s%s" % (prefix, name)] = name
+        return result
+
+    # Metrics provided by the kubelet API.
+    __k8s_pod_network_metrics = {
+        "k8s.pod.network.rx_bytes": "rxBytes",
+        "k8s.pod.network.rx_errors": "rxErrors",
+        "k8s.pod.network.tx_bytes": "txBytes",
+        "k8s.pod.network.tx_errors": "txErrors",
+    }
+
+    # Metrics provide by the kubelet API.
+    __k8s_node_network_metrics = {
+        "k8s.node.network.rx_bytes": "rxBytes",
+        "k8s.node.network.rx_errors": "rxErrors",
+        "k8s.node.network.tx_bytes": "txBytes",
+        "k8s.node.network.tx_errors": "txErrors",
+    }
+
+    # All the docker. metrics are provided by the docker API.
+    __network_metrics = __build_metric_dict.__func__(
+        "docker.net.",
+        [
+            "rx_bytes",
+            "rx_dropped",
+            "rx_errors",
+            "rx_packets",
+            "tx_bytes",
+            "tx_dropped",
+            "tx_errors",
+            "tx_packets",
+        ],
+    )
+
+    __mem_stat_metrics = __build_metric_dict.__func__(
+        "docker.mem.stat.",
+        [
+            "total_pgmajfault",
+            "cache",
+            "mapped_file",
+            "total_inactive_file",
+            "pgpgout",
+            "rss",
+            "total_mapped_file",
+            "writeback",
+            "unevictable",
+            "pgpgin",
+            "total_unevictable",
+            "pgmajfault",
+            "total_rss",
+            "total_rss_huge",
+            "total_writeback",
+            "total_inactive_anon",
+            "rss_huge",
+            "hierarchical_memory_limit",
+            "total_pgfault",
+            "total_active_file",
+            "active_anon",
+            "total_active_anon",
+            "total_pgpgout",
+            "total_cache",
+            "inactive_anon",
+            "active_file",
+            "pgfault",
+            "inactive_file",
+            "total_pgpgin",
+        ],
+    )
+
+    __mem_metrics = __build_metric_dict.__func__(
+        "docker.mem.",
+        [
+            "max_usage",
+            "usage",
+            "fail_cnt",
+            "limit",
+            "workingSetBytes",
+            "availableBytes",
+        ],
+    )
+
+    __cpu_usage_metrics = __build_metric_dict.__func__(
+        "docker.cpu.", ["usage_in_usermode", "total_usage", "usage_in_kernelmode"]
+    )
+
+    __cpu_throttling_metrics = __build_metric_dict.__func__(
+        "docker.cpu.throttling.",
+        ["periods", "throttled_periods", "throttled_time", "usageNanoCores"],
+    )
+
+    __mem_cri_translation = {
+        "pageFaults": "total_pgfault",
+        "majorPageFaults": "total_pgmajfault",
+        "rssBytes": "total_rss",
+        "usageBytes": "usage",
+        # Other metrics that don't map to docker ones:
+        # "workingSetBytes", "availableBytes"
+    }
+
+    __cpu_usage_cri_translation = {
+        "usageCoreNanoSeconds": "total_usage"
+        # Other metrics that don't map to docker ones:
+        # "usageNanoCores"
+    }
+
     def _set_namespaces_to_include(self):
         """This function is separated out for better testability
         (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
@@ -3592,119 +3701,11 @@ cluster.
                 controlled_warmer=self.__logs_controlled_warmer,
             )
 
-        # Metrics provided by the kubelet API.
-        self.__k8s_pod_network_metrics = {
-            "k8s.pod.network.rx_bytes": "rxBytes",
-            "k8s.pod.network.rx_errors": "rxErrors",
-            "k8s.pod.network.tx_bytes": "txBytes",
-            "k8s.pod.network.tx_errors": "txErrors",
-        }
-
-        # Metrics provide by the kubelet API.
-        self.__k8s_node_network_metrics = {
-            "k8s.node.network.rx_bytes": "rxBytes",
-            "k8s.node.network.rx_errors": "rxErrors",
-            "k8s.node.network.tx_bytes": "txBytes",
-            "k8s.node.network.tx_errors": "txErrors",
-        }
-
-        # All the docker. metrics are provided by the docker API.
-        self.__network_metrics = self.__build_metric_dict(
-            "docker.net.",
-            [
-                "rx_bytes",
-                "rx_dropped",
-                "rx_errors",
-                "rx_packets",
-                "tx_bytes",
-                "tx_dropped",
-                "tx_errors",
-                "tx_packets",
-            ],
-        )
-
-        self.__mem_stat_metrics = self.__build_metric_dict(
-            "docker.mem.stat.",
-            [
-                "total_pgmajfault",
-                "cache",
-                "mapped_file",
-                "total_inactive_file",
-                "pgpgout",
-                "rss",
-                "total_mapped_file",
-                "writeback",
-                "unevictable",
-                "pgpgin",
-                "total_unevictable",
-                "pgmajfault",
-                "total_rss",
-                "total_rss_huge",
-                "total_writeback",
-                "total_inactive_anon",
-                "rss_huge",
-                "hierarchical_memory_limit",
-                "total_pgfault",
-                "total_active_file",
-                "active_anon",
-                "total_active_anon",
-                "total_pgpgout",
-                "total_cache",
-                "inactive_anon",
-                "active_file",
-                "pgfault",
-                "inactive_file",
-                "total_pgpgin",
-            ],
-        )
-
-        self.__mem_metrics = self.__build_metric_dict(
-            "docker.mem.",
-            [
-                "max_usage",
-                "usage",
-                "fail_cnt",
-                "limit",
-                "workingSetBytes",
-                "availableBytes",
-            ],
-        )
-
-        self.__cpu_usage_metrics = self.__build_metric_dict(
-            "docker.cpu.", ["usage_in_usermode", "total_usage", "usage_in_kernelmode"]
-        )
-
-        self.__cpu_throttling_metrics = self.__build_metric_dict(
-            "docker.cpu.throttling.",
-            ["periods", "throttled_periods", "throttled_time", "usageNanoCores"],
-        )
-
-        self.__mem_cri_translation = {
-            "pageFaults": "total_pgfault",
-            "majorPageFaults": "total_pgmajfault",
-            "rssBytes": "total_rss",
-            "usageBytes": "usage",
-            # Other metrics that don't map to docker ones:
-            # "workingSetBytes", "availableBytes"
-        }
-
-        self.__cpu_usage_cri_translation = {
-            "usageCoreNanoSeconds": "total_usage"
-            # Other metrics that don't map to docker ones:
-            # "usageNanoCores"
-        }
-
     def set_log_watcher(self, log_watcher):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
         if self.__container_checker:
             self.__container_checker.set_log_watcher(log_watcher, self)
-
-    def __build_metric_dict(self, prefix, names):
-        result = {}
-        for name in names:
-            result["%s%s" % (prefix, name)] = name
-        return result
 
     def __verify_required_env_var(self, env_var_name):
         if len(compat.os_environ_unicode.get(env_var_name, "")) == 0:

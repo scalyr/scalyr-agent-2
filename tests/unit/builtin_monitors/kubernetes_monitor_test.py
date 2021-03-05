@@ -26,11 +26,12 @@ from string import Template
 
 import sys
 
+from scalyr_agent import AgentLogger
 from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
     K8sConfigBuilder,
-    K8sNamespaceFilter,
+    K8sNamespaceFilter, PodInfo,
 )
 from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
     InsecureRequestWarning,
@@ -642,9 +643,9 @@ class FakeKubernetesApi:
 
 
 class FakeResponse:
-    def __init__(self):
+    def __init__(self, text="{}"):
         self.status_code = 200
-        self.text = "{}"
+        self.text = text
 
 
 class TestKubeletApi(BaseScalyrLogCaptureTestCase):
@@ -918,3 +919,90 @@ class ContainerCheckerTest(TestConfigurationBase):
         )
         assert "zzz_templ_container_name" in result["attributes"]
         assert "xxx_test_container" == result["attributes"]["zzz_templ_container_name"]
+
+class KubernetesContainerMetricsTest(ScalyrTestCase):
+    @mock.patch("scalyr_agent.builtin_monitors.kubernetes_monitor.docker")
+    @mock.patch("scalyr_agent.builtin_monitors.kubernetes_monitor.scalyr_logging")
+    def test_user_agent_fragment(self, mock_docker, mock_logger):
+        fake_pod_info = PodInfo(
+            name="test-pod-name".encode("utf-8"),
+            namespace="test-namespace".encode("utf-8"),
+            uid="8bda366a-8a44-4e00-8fca-f70ace82a6dc".encode("utf-8"),
+            node_name="test-node".encode("utf-8"),
+            labels={},
+            container_names=['test-container-name'.encode("utf-8")],
+            annotations={},
+            controller=None,
+        )
+
+        fake_containers = {
+            'container1': {
+                'k8s_info': {
+                    'k8s_container_name': 'test-container-name',
+                    'pod_info': fake_pod_info,
+                    'pod_name': 'test-pod-name',
+                    'pod_namespace': 'test-namespace',
+                    'pod_uid': '8bda366a-8a44-4e00-8fca-f70ace82a6dc'
+                },
+                'log_path': '/var/log/containers/test.log',
+                'name': 'random-logger'
+            }
+        }
+
+        fake_stats_response = '{"node": {"fs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 10243129344, "time": "2021-03-05T03:57:28Z", "inodes": 3907584, "inodesUsed": 141939}, "network": {"name": "eth0", "rxErrors": 0, "interfaces": [{"txErrors": 0, "txBytes": 0, "rxBytes": 0, "name": "tunl0", "rxErrors": 0}, {"txErrors": 0, "txBytes": 12767090, "rxBytes": 3843488321, "name": "eth0", "rxErrors": 0}, {"txErrors": 0, "txBytes": 0, "rxBytes": 1108, "name": "cni0", "rxErrors": 0}, {"txErrors": 0, "txBytes": 0, "rxBytes": 0, "name": "ip6tnl0", "rxErrors": 0}], "txErrors": 0, "txBytes": 12767090, "rxBytes": 3843488321, "time": "2021-03-05T03:57:28Z"}, "systemContainers": [{"memory": {"pageFaults": 318879, "rssBytes": 41275392, "majorPageFaults": 8019, "workingSetBytes": 64704512, "time": "2021-03-05T03:57:27Z", "usageBytes": 92921856}, "name": "kubelet", "startTime": "2021-03-05T03:38:07Z", "cpu": {"usageCoreNanoSeconds": 0, "usageNanoCores": 0, "time": "2021-03-05T03:57:27Z"}}, {"memory": {"pageFaults": 0, "rssBytes": 317759488, "majorPageFaults": 0, "workingSetBytes": 409108480, "availableBytes": 1677070336, "time": "2021-03-05T03:57:28Z", "usageBytes": 539336704}, "name": "pods", "startTime": "2021-03-05T03:55:04Z", "cpu": {"usageCoreNanoSeconds": 271826164990, "usageNanoCores": 244034553, "time": "2021-03-05T03:57:28Z"}}], "rlimit": {"maxpid": 4194304, "curproc": 1026, "time": "2021-03-05T03:57:30Z"}, "startTime": "2021-03-03T17:54:00Z", "memory": {"pageFaults": 37092, "rssBytes": 481333248, "majorPageFaults": 33, "workingSetBytes": 626536448, "availableBytes": 1459642368, "time": "2021-03-05T03:57:28Z", "usageBytes": 1598562304}, "runtime": {"imageFs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 1708203927, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 62096}}, "cpu": {"usageCoreNanoSeconds": 750131721656, "usageNanoCores": 317926037, "time": "2021-03-05T03:57:28Z"}, "nodeName": "minikube"}, "pods": [{"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 69632, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 9}, "podRef": {"namespace": "default", "name": "loggen-58c5486566-fdmzf", "uid": "5ef12d19-d8e5-4280-9cdf-a80bae251c68"}, "volume": [{"name": "default-token-nm2ks", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:48:07Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:47:08Z", "memory": {"pageFaults": 0, "rssBytes": 602112, "majorPageFaults": 0, "workingSetBytes": 2662400, "time": "2021-03-05T03:57:28Z", "usageBytes": 2764800}, "cpu": {"usageCoreNanoSeconds": 1433157151, "usageNanoCores": 1649262, "time": "2021-03-05T03:57:28Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 45056, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "random-logger", "startTime": "2021-03-05T03:47:12Z", "memory": {"pageFaults": 90156, "rssBytes": 331776, "majorPageFaults": 0, "workingSetBytes": 2080768, "time": "2021-03-05T03:57:20Z", "usageBytes": 2183168}, "cpu": {"usageCoreNanoSeconds": 1378023167, "usageNanoCores": 2202002, "time": "2021-03-05T03:57:20Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 24576, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 7}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 84214, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 28}, "podRef": {"namespace": "kube-system", "name": "kindnet-kblsz", "uid": "95313449-857e-4a23-a4c6-653ff6cd2583"}, "volume": [{"name": "kindnet-token-njbbz", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:39:07Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:26Z", "memory": {"pageFaults": 0, "rssBytes": 4919296, "majorPageFaults": 0, "workingSetBytes": 11616256, "availableBytes": 40812544, "time": "2021-03-05T03:57:22Z", "usageBytes": 17784832}, "cpu": {"usageCoreNanoSeconds": 1152746538, "usageNanoCores": 181623, "time": "2021-03-05T03:57:22Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 16384, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "kindnet-cni", "startTime": "2021-03-05T03:38:28Z", "memory": {"pageFaults": 17754, "rssBytes": 4919296, "majorPageFaults": 1056, "workingSetBytes": 11309056, "availableBytes": 41119744, "time": "2021-03-05T03:57:30Z", "usageBytes": 17453056}, "cpu": {"usageCoreNanoSeconds": 1096529102, "usageNanoCores": 221068, "time": "2021-03-05T03:57:30Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 67830, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 26}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 4483135, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 303}, "podRef": {"namespace": "scalyr", "name": "scalyr-agent-2-dxclt", "uid": "f5433cb8-3cac-46cf-b6ec-4e599c9a0342"}, "volume": [{"name": "scalyr-service-account-token-8fwkf", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:57:06Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:56:35Z", "memory": {"pageFaults": 0, "rssBytes": 28041216, "majorPageFaults": 0, "workingSetBytes": 40833024, "availableBytes": 483454976, "time": "2021-03-05T03:57:17Z", "usageBytes": 64294912}, "cpu": {"usageCoreNanoSeconds": 1551418749, "usageNanoCores": 21544383, "time": "2021-03-05T03:57:17Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 8192, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "scalyr-agent", "startTime": "2021-03-05T03:56:35Z", "memory": {"pageFaults": 20526, "rssBytes": 28041216, "majorPageFaults": 99, "workingSetBytes": 40341504, "availableBytes": 483946496, "time": "2021-03-05T03:57:19Z", "usageBytes": 63422464}, "cpu": {"usageCoreNanoSeconds": 1571428372, "usageNanoCores": 21552013, "time": "2021-03-05T03:57:19Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 4474943, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 301}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 57344, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 17}, "podRef": {"namespace": "kube-system", "name": "storage-provisioner", "uid": "e81c9a9c-7c77-4fe5-9f94-41136b8f6b62"}, "volume": [{"name": "storage-provisioner-token-j6wwb", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:39:07Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:26Z", "memory": {"pageFaults": 0, "rssBytes": 7356416, "majorPageFaults": 0, "workingSetBytes": 11939840, "time": "2021-03-05T03:57:27Z", "usageBytes": 18669568}, "cpu": {"usageCoreNanoSeconds": 4580373461, "usageNanoCores": 3189595, "time": "2021-03-05T03:57:27Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 12288, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 3}, "name": "storage-provisioner", "startTime": "2021-03-05T03:38:59Z", "memory": {"pageFaults": 10989, "rssBytes": 7200768, "majorPageFaults": 1584, "workingSetBytes": 11636736, "time": "2021-03-05T03:57:18Z", "usageBytes": 18345984}, "cpu": {"usageCoreNanoSeconds": 4397854608, "usageNanoCores": 3607819, "time": "2021-03-05T03:57:18Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 45056, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 14}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 65536, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 21}, "podRef": {"namespace": "kube-system", "name": "coredns-74ff55c5b-2v4jg", "uid": "4eafdee9-c8fc-4183-b36c-a6005e087764"}, "volume": [{"name": "config-volume", "inodesFree": 3813595, "capacityBytes": 62725623808, "availableBytes": 43075002368, "usedBytes": 12288, "time": "2021-03-05T03:39:07Z", "inodes": 3907584, "inodesUsed": 5}, {"name": "coredns-token-6jq4k", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:39:07Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:39:00Z", "memory": {"pageFaults": 0, "rssBytes": 8196096, "majorPageFaults": 0, "workingSetBytes": 13176832, "availableBytes": 165081088, "time": "2021-03-05T03:57:22Z", "usageBytes": 27475968}, "cpu": {"usageCoreNanoSeconds": 8895284967, "usageNanoCores": 10009731, "time": "2021-03-05T03:57:22Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 8192, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "coredns", "startTime": "2021-03-05T03:39:00Z", "memory": {"pageFaults": 12507, "rssBytes": 8196096, "majorPageFaults": 1947, "workingSetBytes": 12955648, "availableBytes": 165302272, "time": "2021-03-05T03:57:28Z", "usageBytes": 27254784}, "cpu": {"usageCoreNanoSeconds": 8847112503, "usageNanoCores": 10696843, "time": "2021-03-05T03:57:28Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 45056, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 14}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 122880, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 18}, "podRef": {"namespace": "kube-system", "name": "kube-apiserver-minikube", "uid": "c767dbeb9ddd2d01964c2fc02c621c4e"}, "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 0, "rssBytes": 183521280, "majorPageFaults": 0, "workingSetBytes": 205963264, "time": "2021-03-05T03:57:27Z", "usageBytes": 234110976}, "cpu": {"usageCoreNanoSeconds": 153365786247, "usageNanoCores": 141945504, "time": "2021-03-05T03:57:27Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 69632, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "kube-apiserver", "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 271755, "rssBytes": 183476224, "majorPageFaults": 83226, "workingSetBytes": 205443072, "time": "2021-03-05T03:57:29Z", "usageBytes": 233590784}, "cpu": {"usageCoreNanoSeconds": 153521115898, "usageNanoCores": 136248870, "time": "2021-03-05T03:57:29Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 53248, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 16}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 155648, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 25}, "podRef": {"namespace": "kube-system", "name": "kube-controller-manager-minikube", "uid": "57b8c22dbe6410e4bd36cf14b0f8bdc7"}, "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 0, "rssBytes": 41242624, "majorPageFaults": 0, "workingSetBytes": 55177216, "time": "2021-03-05T03:57:23Z", "usageBytes": 80031744}, "cpu": {"usageCoreNanoSeconds": 55004270907, "usageNanoCores": 50623011, "time": "2021-03-05T03:57:23Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 77824, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "kube-controller-manager", "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 31284, "rssBytes": 41193472, "majorPageFaults": 5676, "workingSetBytes": 54882304, "time": "2021-03-05T03:57:21Z", "usageBytes": 79736832}, "cpu": {"usageCoreNanoSeconds": 54883234484, "usageNanoCores": 51592924, "time": "2021-03-05T03:57:21Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 77824, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 23}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 28672, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 9}, "podRef": {"namespace": "kube-system", "name": "kube-scheduler-minikube", "uid": "6b4a0ee8b3d15a1c2e47c15d32e6eb0d"}, "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 0, "rssBytes": 12656640, "majorPageFaults": 0, "workingSetBytes": 21057536, "time": "2021-03-05T03:57:13Z", "usageBytes": 32837632}, "cpu": {"usageCoreNanoSeconds": 7393175515, "usageNanoCores": 5479576, "time": "2021-03-05T03:57:13Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 16384, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "kube-scheduler", "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 18282, "rssBytes": 12656640, "majorPageFaults": 4125, "workingSetBytes": 20799488, "time": "2021-03-05T03:57:25Z", "usageBytes": 32579584}, "cpu": {"usageCoreNanoSeconds": 7415797084, "usageNanoCores": 5160641, "time": "2021-03-05T03:57:25Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 12288, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 7}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 73728, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 13}, "podRef": {"namespace": "kube-system", "name": "etcd-minikube", "uid": "c31fe6a5afdd142cf3450ac972274b36"}, "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 0, "rssBytes": 20578304, "majorPageFaults": 0, "workingSetBytes": 29360128, "time": "2021-03-05T03:57:21Z", "usageBytes": 36302848}, "cpu": {"usageCoreNanoSeconds": 36074754936, "usageNanoCores": 27064651, "time": "2021-03-05T03:57:21Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 40960, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "etcd", "startTime": "2021-03-05T03:38:00Z", "memory": {"pageFaults": 21120, "rssBytes": 20525056, "majorPageFaults": 4323, "workingSetBytes": 29003776, "time": "2021-03-05T03:57:22Z", "usageBytes": 35909632}, "cpu": {"usageCoreNanoSeconds": 36054608288, "usageNanoCores": 26153936, "time": "2021-03-05T03:57:22Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 32768, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 11}}]}, {"ephemeral-storage": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 88310, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 34}, "podRef": {"namespace": "kube-system", "name": "kube-proxy-7vvhk", "uid": "2cc3cd45-5765-4cdd-9bc5-528501ef9274"}, "volume": [{"name": "kube-proxy", "inodesFree": 3813595, "capacityBytes": 62725623808, "availableBytes": 43075002368, "usedBytes": 16384, "time": "2021-03-05T03:39:07Z", "inodes": 3907584, "inodesUsed": 7}, {"name": "kube-proxy-token-tvmsd", "inodesFree": 254651, "capacityBytes": 1043087360, "availableBytes": 1043075072, "usedBytes": 12288, "time": "2021-03-05T03:39:07Z", "inodes": 254660, "inodesUsed": 9}], "process_stats": {"process_count": 0}, "startTime": "2021-03-05T03:38:26Z", "memory": {"pageFaults": 0, "rssBytes": 10645504, "majorPageFaults": 0, "workingSetBytes": 17891328, "time": "2021-03-05T03:57:22Z", "usageBytes": 25665536}, "cpu": {"usageCoreNanoSeconds": 1464616252, "usageNanoCores": 240928, "time": "2021-03-05T03:57:22Z"}, "containers": [{"logs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 8192, "time": "2021-03-05T03:57:30Z", "inodes": 3907584, "inodesUsed": 2}, "name": "kube-proxy", "startTime": "2021-03-05T03:38:27Z", "memory": {"pageFaults": 23067, "rssBytes": 10641408, "majorPageFaults": 1782, "workingSetBytes": 17551360, "time": "2021-03-05T03:57:20Z", "usageBytes": 25288704}, "cpu": {"usageCoreNanoSeconds": 1437692295, "usageNanoCores": 232273, "time": "2021-03-05T03:57:20Z"}, "rootfs": {"inodesFree": 3765645, "capacityBytes": 62725623808, "availableBytes": 49265778688, "usedBytes": 63734, "time": "2021-03-05T03:57:27Z", "inodes": 3907584, "inodesUsed": 25}}]}]}'
+
+        def fake_init(self):
+            # Initialize variables that would have been
+            self._KubernetesMonitor__container_checker = None
+            self._KubernetesMonitor__namespaces_to_include = (
+                K8sNamespaceFilter.default_value()
+            )
+            self._KubernetesMonitor__include_controller_info = None
+            self._KubernetesMonitor__report_container_metrics = None
+            self._KubernetesMonitor__metric_fetcher = None
+            self._KubernetesMonitor__metrics_controlled_warmer = None
+
+        def fake_get(self, url, verify):
+            resp = FakeResponse(text=fake_stats_response)
+            return resp
+
+        self.emit_results = []
+        def fake_emit(
+                this,
+                metric_name,
+                metric_value,
+                extra_fields=None,
+                monitor=None,
+                monitor_id_override=None,):
+            result = {"metric_name": metric_name, "metric_value": metric_value, "extra_fields": extra_fields,
+                      "monitor": monitor, "monitor_id_override": monitor_id_override}
+            self.emit_results.append(result)
+
+        with mock.patch.object(KubernetesMonitor, "_initialize", fake_init):
+            with mock.patch.object(AgentLogger, "emit_value", fake_emit):
+                manager_poll_interval = 30
+                fake_clock = FakeClock()
+                monitors_manager, config = ScalyrTestUtils.create_test_monitors_manager(
+                    config_monitors=[
+                        {"module": "scalyr_agent.builtin_monitors.kubernetes_monitor"}
+                    ],
+                    extra_toplevel_config={
+                        "user_agent_refresh_interval": manager_poll_interval
+                    },
+                    null_logger=True,
+                    fake_clock=fake_clock,
+                )
+                k8s_mon = monitors_manager.monitors[0]
+
+                with mock.patch.object(KubeletApi, "_get", fake_get):
+                    api = KubeletApi(
+                        FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode"
+                    )
+                    k8s_mon._KubernetesMonitor__gather_metrics_from_kubelet(fake_containers, api, "TestCluster")
+
+        self.assertEqual(self.emit_results[0], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.usage', u'metric_value': 2183168, u'monitor': None})
+        self.assertEqual(self.emit_results[1], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.workingSetBytes', u'metric_value': 2080768, u'monitor': None})
+        self.assertEqual(self.emit_results[2], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_rss', u'metric_value': 331776, u'monitor': None})
+        self.assertEqual(self.emit_results[3], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_pgfault', u'metric_value': 90156, u'monitor': None})
+        self.assertEqual(self.emit_results[4], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_pgmajfault', u'metric_value': 0, u'monitor': None})
+        self.assertEqual(self.emit_results[5], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.cpu.total_usage', u'metric_value': 1378023167, u'monitor': None})
