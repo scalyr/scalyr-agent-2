@@ -3986,33 +3986,6 @@ cluster.
 
         try:
             stats = kubelet_api.query_stats()
-
-            all_k8s_extra = {}
-            containers_to_check = {}
-            for cid, info in six.iteritems(containers):
-                containers_to_check[info["name"]] = {}
-                if self.__include_controller_info:
-                    k8s_extra = self.__get_k8s_controller_info(info)
-                    if k8s_extra is not None:
-                        k8s_extra.update(cluster_info)
-                        k8s_extra.update({"pod_uid": info["name"]})
-                        all_k8s_extra[info["name"]] = k8s_extra
-
-            pods = stats.get("pods", [])
-
-            for pod in pods:
-                container_stats = pod.get("containers", {})
-                for container_stat in container_stats:
-                    container_name = container_stat.get("name", "<unknown>")
-                    if container_name in containers_to_check:
-                        self.__log_cri_container_metrics(
-                            container_name,
-                            container_stat,
-                            all_k8s_extra.get(container_name, {}),
-                        )
-
-            return stats
-
         except ConnectionError as e:
             self._logger.warning(
                 "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
@@ -4020,12 +3993,40 @@ cluster.
                 limit_once_per_x_secs=3600,
                 limit_key="kubelet-api-connection-stats",
             )
+            return
         except KubeletApiException as e:
             self._logger.warning(
                 "Error querying kubelet API: %s" % six.text_type(e),
                 limit_once_per_x_secs=300,
                 limit_key="kubelet-api-query-stats",
             )
+            return
+
+        all_k8s_extra = {}
+        containers_to_check = {}
+        for cid, info in six.iteritems(containers):
+            containers_to_check[info["name"]] = {}
+            if self.__include_controller_info:
+                k8s_extra = self.__get_k8s_controller_info(info)
+                if k8s_extra is not None:
+                    k8s_extra.update(cluster_info)
+                    k8s_extra.update({"pod_uid": info["name"]})
+                    all_k8s_extra[info["name"]] = k8s_extra
+
+        pods = stats.get("pods", [])
+
+        for pod in pods:
+            container_stats = pod.get("containers", {})
+            for container_stat in container_stats:
+                container_name = container_stat.get("name", "<unknown>")
+                if container_name in containers_to_check:
+                    self.__log_cri_container_metrics(
+                        container_name,
+                        container_stat,
+                        all_k8s_extra.get(container_name, {}),
+                    )
+
+        return stats
 
     def __gather_k8s_metrics_for_node(self, node, extra):
         """
@@ -4091,44 +4092,43 @@ cluster.
 
             pod_info[pod.uid] = pod
 
-        try:
-            if not stats:
+        if not stats:
+            try:
                 stats = kubelet_api.query_stats()
-            node = stats.get("node", {})
+            except ConnectionError as e:
+                self._logger.warning(
+                    "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
+                    % six.text_type(e),
+                    limit_once_per_x_secs=3600,
+                    limit_key="kubelet-api-connection-stats",
+                )
+            except KubeletApiException as e:
+                self._logger.warning(
+                    "Error querying kubelet API: %s" % six.text_type(e),
+                    limit_once_per_x_secs=300,
+                    limit_key="kubelet-api-query-stats",
+                )
+        node = stats.get("node", {})
 
-            if node:
-                self.__gather_k8s_metrics_for_node(node, cluster_info)
+        if node:
+            self.__gather_k8s_metrics_for_node(node, cluster_info)
 
-            pods = stats.get("pods", [])
+        pods = stats.get("pods", [])
 
-            # process pod stats, skipping any that are not in our list
-            # of pod_info
-            for pod in pods:
-                pod_ref = pod.get("podRef", {})
-                pod_uid = pod_ref.get("uid", "<invalid>")
-                if pod_uid not in pod_info:
-                    continue
+        # process pod stats, skipping any that are not in our list
+        # of pod_info
+        for pod in pods:
+            pod_ref = pod.get("podRef", {})
+            pod_uid = pod_ref.get("uid", "<invalid>")
+            if pod_uid not in pod_info:
+                continue
 
-                info = pod_info[pod_uid]
-                controller_info = {}
-                if self.__include_controller_info:
-                    controller_info = self.__build_k8s_controller_info(info)
-                    controller_info.update(cluster_info)
-                self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
-
-        except ConnectionError as e:
-            self._logger.warning(
-                "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
-                % six.text_type(e),
-                limit_once_per_x_secs=3600,
-                limit_key="kubelet-api-connection-stats",
-            )
-        except KubeletApiException as e:
-            self._logger.warning(
-                "Error querying kubelet API: %s" % six.text_type(e),
-                limit_once_per_x_secs=300,
-                limit_key="kubelet-api-query-stats",
-            )
+            info = pod_info[pod_uid]
+            controller_info = {}
+            if self.__include_controller_info:
+                controller_info = self.__build_k8s_controller_info(info)
+                controller_info.update(cluster_info)
+            self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
 
     def __get_k8s_cache(self):
         k8s_cache = None
