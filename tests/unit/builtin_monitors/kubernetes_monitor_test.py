@@ -31,7 +31,8 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
     K8sConfigBuilder,
-    K8sNamespaceFilter, PodInfo,
+    K8sNamespaceFilter,
+    PodInfo,
 )
 from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
     InsecureRequestWarning,
@@ -920,6 +921,7 @@ class ContainerCheckerTest(TestConfigurationBase):
         assert "zzz_templ_container_name" in result["attributes"]
         assert "xxx_test_container" == result["attributes"]["zzz_templ_container_name"]
 
+
 class KubernetesContainerMetricsTest(ScalyrTestCase):
     @mock.patch("scalyr_agent.builtin_monitors.kubernetes_monitor.docker")
     def test_cri_metrics(self, mock_docker):
@@ -929,22 +931,22 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
             uid="8bda366a-8a44-4e00-8fca-f70ace82a6dc",
             node_name="test-node",
             labels={},
-            container_names=['test-container-name'],
+            container_names=["test-container-name"],
             annotations={},
             controller=None,
         )
 
         fake_containers = {
-            'container1': {
-                'k8s_info': {
-                    'k8s_container_name': 'test-container-name',
-                    'pod_info': fake_pod_info,
-                    'pod_name': 'test-pod-name',
-                    'pod_namespace': 'test-namespace',
-                    'pod_uid': '8bda366a-8a44-4e00-8fca-f70ace82a6dc'
+            "container1": {
+                "k8s_info": {
+                    "k8s_container_name": "test-container-name",
+                    "pod_info": fake_pod_info,
+                    "pod_name": "test-pod-name",
+                    "pod_namespace": "test-namespace",
+                    "pod_uid": "8bda366a-8a44-4e00-8fca-f70ace82a6dc",
                 },
-                'log_path': '/var/log/containers/test.log',
-                'name': 'random-logger'
+                "log_path": "/var/log/containers/test.log",
+                "name": "random-logger",
             }
         }
 
@@ -966,15 +968,22 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
             return resp
 
         self.emit_results = []
+
         def fake_emit(
-                this,
-                metric_name,
-                metric_value,
-                extra_fields=None,
-                monitor=None,
-                monitor_id_override=None,):
-            result = {"metric_name": metric_name, "metric_value": metric_value, "extra_fields": extra_fields,
-                      "monitor": monitor, "monitor_id_override": monitor_id_override}
+            this,
+            metric_name,
+            metric_value,
+            extra_fields=None,
+            monitor=None,
+            monitor_id_override=None,
+        ):
+            result = {
+                "metric_name": metric_name,
+                "metric_value": metric_value,
+                "extra_fields": extra_fields,
+                "monitor": monitor,
+                "monitor_id_override": monitor_id_override,
+            }
             self.emit_results.append(result)
 
         with mock.patch.object(KubernetesMonitor, "_initialize", fake_init):
@@ -997,12 +1006,68 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
                     api = KubeletApi(
                         FakeKubernetesApi(), host_ip="127.0.0.1", node_name="FakeNode"
                     )
-                    k8s_mon._KubernetesMonitor__gather_metrics_from_kubelet(fake_containers, api, "TestCluster")
+                    k8s_mon._KubernetesMonitor__gather_metrics_from_kubelet(
+                        fake_containers, api, "TestCluster"
+                    )
 
-        self.emit_results = sorted(self.emit_results, key=lambda k: k[u'metric_name'])
-        self.assertEqual(self.emit_results[0], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.cpu.total_usage', u'metric_value': 1378023167, u'monitor': None})
-        self.assertEqual(self.emit_results[1], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_pgfault', u'metric_value': 90156, u'monitor': None})
-        self.assertEqual(self.emit_results[2], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_pgmajfault', u'metric_value': 0, u'monitor': None})
-        self.assertEqual(self.emit_results[3], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.stat.total_rss', u'metric_value': 331776, u'monitor': None})
-        self.assertEqual(self.emit_results[4], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.usage', u'metric_value': 2183168, u'monitor': None})
-        self.assertEqual(self.emit_results[5], {u'monitor_id_override': u'random-logger', u'extra_fields': {}, u'metric_name': u'docker.mem.workingSetBytes', u'metric_value': 2080768, u'monitor': None})
+        self.emit_results = sorted(self.emit_results, key=lambda k: k["metric_name"])
+        self.assertEqual(
+            self.emit_results[0],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.cpu.total_usage",
+                "metric_value": 1378023167,
+                "monitor": None,
+            },
+        )
+        self.assertEqual(
+            self.emit_results[1],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.mem.stat.total_pgfault",
+                "metric_value": 90156,
+                "monitor": None,
+            },
+        )
+        self.assertEqual(
+            self.emit_results[2],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.mem.stat.total_pgmajfault",
+                "metric_value": 0,
+                "monitor": None,
+            },
+        )
+        self.assertEqual(
+            self.emit_results[3],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.mem.stat.total_rss",
+                "metric_value": 331776,
+                "monitor": None,
+            },
+        )
+        self.assertEqual(
+            self.emit_results[4],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.mem.usage",
+                "metric_value": 2183168,
+                "monitor": None,
+            },
+        )
+        self.assertEqual(
+            self.emit_results[5],
+            {
+                "monitor_id_override": "random-logger",
+                "extra_fields": {},
+                "metric_name": "docker.mem.workingSetBytes",
+                "metric_value": 2080768,
+                "monitor": None,
+            },
+        )
