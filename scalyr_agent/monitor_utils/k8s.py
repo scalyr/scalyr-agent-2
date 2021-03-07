@@ -411,10 +411,10 @@ class PodInfo(object):
         # generate a hash we can use to compare whether or not
         # any of the pod info has changed
         md5 = hashlib.md5()
-        md5.update(name)
-        md5.update(namespace)
-        md5.update(uid)
-        md5.update(node_name)
+        md5.update(name.encode("latin1"))
+        md5.update(namespace.encode("latin1"))
+        md5.update(uid.encode("latin1"))
+        md5.update(node_name.encode("latin1"))
 
         # flatten the labels dict in to a single string because update
         # expects a string arg.  To avoid cases where the 'str' of labels is
@@ -424,11 +424,11 @@ class PodInfo(object):
         for k, v in six.iteritems(labels):
             flattened.append(k)
             flattened.append(v)
-        md5.update("".join(flattened))
+        md5.update("".join(flattened).encode("latin1"))
 
         # flatten the container names
         # see previous comment for why flattening is necessary
-        md5.update("".join(container_names))
+        md5.update("".join(container_names).encode("latin1"))
 
         # flatten the annotations dict in to a single string
         # see previous comment for why flattening is necessary
@@ -437,7 +437,7 @@ class PodInfo(object):
             flattened.append(k)
             flattened.append(six.text_type(v))
 
-        md5.update("".join(flattened))
+        md5.update("".join(flattened).encode("latin1"))
 
         self.digest = md5.digest()
 
