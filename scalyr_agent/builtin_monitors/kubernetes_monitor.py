@@ -19,6 +19,8 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+import json
+
 import six
 
 
@@ -976,6 +978,13 @@ def _ignore_old_dead_container(container, created_before=None):
                 return True
 
     return False
+
+
+def construct_metrics_container_name(cname, pod_name, pod_namespace, pod_uid):
+    """
+        Returns a string in the same format as container names in Docker runtime Kubernetes.
+    """
+    return "k8s_%s_%s_%s_%s_0" % (cname, pod_name, pod_namespace, pod_uid)
 
 
 class ControlledCacheWarmer(StoppableThread):
@@ -2279,6 +2288,8 @@ class CRIEnumerator(ContainerEnumerator):
                 # add this container to the list of results
                 result[cid] = {
                     "name": cname,
+                    # construct a pod name that is similar to what we see from labels in a docker runtime
+                    "metrics_name": construct_metrics_container_name(cname, pod_name, pod_namespace, k8s_info.get("pod_uid", "")),
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
@@ -4004,14 +4015,18 @@ cluster.
 
         all_k8s_extra = {}
         containers_to_check = {}
+        use_metrics_name = False
         for cid, info in six.iteritems(containers):
-            containers_to_check[info["name"]] = {}
+            if "metrics_name" in info:
+                use_metrics_name = True
+            name = info["metrics_name"] if "metrics_name" in info else info["name"]
+            containers_to_check[name] = {}
             if self.__include_controller_info:
                 k8s_extra = self.__get_k8s_controller_info(info)
                 if k8s_extra is not None:
                     k8s_extra.update(cluster_info)
-                    k8s_extra.update({"pod_uid": info["name"]})
-                    all_k8s_extra[info["name"]] = k8s_extra
+                    k8s_extra.update({"pod_uid": name})
+                    all_k8s_extra[name] = k8s_extra
 
         pods = stats.get("pods", [])
 
@@ -4019,11 +4034,17 @@ cluster.
             container_stats = pod.get("containers", {})
             for container_stat in container_stats:
                 container_name = container_stat.get("name", "<unknown>")
+                if use_metrics_name:
+                    # Construct a more unique name, same as we make "metrics_name" to ensure we use the right k8s_extra
+                    pod_ref = pod.get("podRef", {})
+                    container_name = construct_metrics_container_name(container_name, pod_ref.get("name", ""), pod_ref.get("namespace", ""), pod_ref.get("uid", ""))
+
                 if container_name in containers_to_check:
+                    k8s_extra = all_k8s_extra.get(container_name, {})
                     self.__log_cri_container_metrics(
-                        container_name,
+                        k8s_extra["pod_uid"] if "pod_uid" in k8s_extra else container_name,
                         container_stat,
-                        all_k8s_extra.get(container_name, {}),
+                        k8s_extra,
                     )
 
         return stats
