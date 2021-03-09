@@ -1,5 +1,23 @@
 # Release Notes
 
+## 2.1.19 "TBD" - TBD
+
+* This release adds support for capturing Kubernetes container names to the kubernetes monitor via log line attributes.
+  You can configure a container name as a Kubernetes log attribute using the ``${k8s_container_name}`` config template 
+  syntax.
+  
+  ```
+  "k8s_logs": [
+    {
+      "attributes": { "container_name": "${k8s_container_name}" }
+    }
+  ]
+  ```
+  
+  Instructions for how to add configuration to the Kubernetes agent can be found in the documentation [here.](https://app.scalyr.com/help/scalyr-agent-k8s?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--)
+  
+  Note, there will be charges for the extra bytes sent due to attaching the container name attribute.
+
 ## 2.1.16 "Lasso" - December 23, 2020
 
 * This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
