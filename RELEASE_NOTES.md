@@ -10,13 +10,13 @@
 
   Through CLI:
   
-      kubectl annotate pod <pod name> --overwrite log.config.scalyr.com/attributes.container_name=${k8s_container_name}
+      kubectl annotate pod <pod name> --overwrite log.config.scalyr.com/attributes.container_name=\$\{k8s_container_name\}
   
   Through YAML:
   
       metadata:
          annotations:
-            "log.config.scalyr.com/attributes.container_name": "${k8s_container_name}"
+            "log.config.scalyr.com/attributes.container_name": "\$\{k8s_container_name\}"
   
   Whichever pod has this annotation applied will then have the container name to the "container_name" field attached to 
   each log line.
