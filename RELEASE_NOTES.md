@@ -2,19 +2,24 @@
 
 ## 2.1.19 "StarTram" - March 9, 2021
 
-* This release adds support for capturing Kubernetes container names to the kubernetes monitor via log line attributes.
-  You can configure a container name as a Kubernetes log attribute using the ``${k8s_container_name}`` config template 
-  syntax.
+* This release add support for adding the Kubernetes container name as an attribute to all log lines ingested via the 
+  Kubernetes monitor. You can include the container name as a log line attribute using the ${k8s_container_name} config 
+  template syntax.
   
-  ```
-  "k8s_logs": [
-    {
-      "attributes": { "container_name": "${k8s_container_name}" }
-    }
-  ]
-  ```
+  One option to configure container name logging for a pod is through annotations, here is an example:
+
+  Through CLI:
   
-  Instructions for how to add configuration to the Kubernetes agent can be found in the documentation [here.](https://app.scalyr.com/help/scalyr-agent-k8s?teamToken=7bn1PMhjS%2F8335sB6vgDcQ--)
+      kubectl annotate pod <pod name> --overwrite log.config.scalyr.com/attributes.container_name=${k8s_container_name}
+  
+  Through YAML:
+  
+      metadata:
+         annotations:
+            "log.config.scalyr.com/attributes.container_name": "${k8s_container_name}"
+  
+  Whichever pod has this annotation applied will then have the container name to the "container_name" field attached to 
+  each log line.
   
   Note, there will be charges for the extra bytes sent due to attaching the container name attribute.
 
