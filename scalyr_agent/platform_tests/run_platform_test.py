@@ -42,19 +42,21 @@ from scalyr_agent import compat
 
 
 class WorkingDirectory:
-    """Context manager for changing the current working directory
-    From: https://stackoverflow.com/questions/431684/how-do-i-cd-in-python
+    """Simple abstraction with the context manager for changing the current working directory
     """
 
-    def __init__(self, newPath):
-        self.newPath = os.path.expanduser(newPath)
+    def __init__(self, new_path):
+        """
+        :param new_path: Path for the directory to switch during the context manager run.
+        """
+        self.new_path = os.path.expanduser(new_path)
 
     def __enter__(self):
-        self.savedPath = os.getcwd()
-        os.chdir(self.newPath)
+        self.previous_path = os.getcwd()
+        os.chdir(self.new_path)
 
-    def __exit__(self, etype=None, value=None, traceback=None):
-        os.chdir(self.savedPath)
+    def __exit__(self, exc_type=None, exc_value=None, traceback=None):
+        os.chdir(self.previous_path)
 
 
 class RunPlatformTests(unittest.TestCase):

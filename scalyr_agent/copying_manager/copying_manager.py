@@ -108,8 +108,8 @@ class CopyingManagerWorker(object):
                 # We use this process as a process for the worker session.
 
                 # change agent log path for the new worker session.
-                worker_agent_log_path = os.path.join(
-                    self.__config.agent_log_path, "agent-%s.log" % session_id
+                worker_agent_log_path = self.__config.get_worker_session_agent_log_path(
+                    session_id
                 )
 
                 # this initializer function will be invoked in the worker session's process.

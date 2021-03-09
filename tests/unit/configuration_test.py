@@ -323,7 +323,7 @@ class TestConfiguration(TestConfigurationBase):
             config.k8s_verify_kubelet_queries, True,
         )
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEquals(len(config.log_configs), 3)
         self.assertPathEquals(
             config.log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
         )
@@ -338,8 +338,13 @@ class TestConfiguration(TestConfigurationBase):
         )
         self.assertPathEquals(
             config.log_configs[1].get_string("path"),
-            "/var/log/scalyr-agent-2/agent*.log",
+            "/var/log/scalyr-agent-2/agent.log",
         )
+        self.assertPathEquals(
+            config.log_configs[2].get_string("path"),
+            "/var/log/scalyr-agent-2/agent-worker-session-*.log",
+        )
+
         self.assertFalse(config.log_configs[0].get_bool("ignore_stale_files"))
         self.assertEquals(
             config.log_configs[0].get_float("staleness_threshold_secs"), 300
@@ -361,11 +366,15 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(len(config.log_configs), 1)
+        self.assertEquals(len(config.log_configs), 2)
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent*.log",
+            "/var/log/scalyr-agent-2/agent.log",
+        )
+        self.assertPathEquals(
+            config.log_configs[1].get_string("path"),
+            "/var/log/scalyr-agent-2/agent-worker-session-*.log",
         )
 
     def test_overriding_basic_settings(self):
@@ -701,7 +710,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEquals(len(config.log_configs), 3)
         sampling_rules = config.log_configs[0].get_json_array("sampling_rules")
         self.assertEquals(len(sampling_rules), 2)
         self.assertEquals(
@@ -801,7 +810,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEquals(len(config.log_configs), 3)
         redaction_rules = config.log_configs[0].get_json_array("redaction_rules")
         self.assertEquals(len(redaction_rules), 3)
         self.assertEquals(
@@ -901,7 +910,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertTrue(additional_paths[0].endswith("apache.json"))
         self.assertTrue(additional_paths[1].endswith("nginx.json"))
 
-        self.assertEquals(len(config.log_configs), 4)
+        self.assertEquals(len(config.log_configs), 5)
         self.assertPathEquals(
             config.log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
         )
@@ -1002,7 +1011,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEquals(len(config.log_configs), 3)
 
     def test_extra_config_dir_absolute(self):
 
@@ -1089,7 +1098,7 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
 
         self.assertEquals(len(config.monitor_configs), 1)
-        self.assertEquals(len(config.log_configs), 1)
+        self.assertEquals(len(config.log_configs), 2)
         self.assertEquals(config.monitor_configs[0].get_string("module"), "httpPuller")
         self.assertEquals(
             config.monitor_configs[0].get_string("log_path"), "httpPuller.log"
@@ -1097,7 +1106,7 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertPathEquals(
             config.log_configs[0].get_string("path"),
-            "/var/log/scalyr-agent-2/agent*.log",
+            "/var/log/scalyr-agent-2/agent.log",
         )
 
     def test_parse_log_config(self):
@@ -2027,7 +2036,7 @@ class TestConfiguration(TestConfigurationBase):
         additional_paths.sort()
         self.assertTrue(additional_paths[0].endswith("nginx.json"))
 
-        self.assertEquals(len(config.log_configs), 3)
+        self.assertEquals(len(config.log_configs), 4)
         self.assertPathEquals(
             config.log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
         )

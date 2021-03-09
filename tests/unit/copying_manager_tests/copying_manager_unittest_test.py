@@ -734,25 +734,36 @@ class CopyingParamsTest(ScalyrTestCase):
 class CopyingManagerInitializationTest(ScalyrTestCase):
     def test_from_config_file(self):
         test_manager = self._create_test_instance([{"path": "/tmp/hi.log"}], [])
-        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(len(test_manager.log_matchers), 3)
         self.assertEquals(test_manager.log_matchers[0].config["path"], "/tmp/hi.log")
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+        ),
+
+        # test if there are implicit log configs for the worker session agent logs.
+        self.assertEquals(
+            test_manager.log_matchers[2].config["path"],
+            "/var/log/scalyr-agent-2" + os.sep + "agent-worker-session-*.log",
         )
 
     def test_from_monitors(self):
         test_manager = self._create_test_instance([], [{"path": "/tmp/hi_monitor.log"}])
-        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(len(test_manager.log_matchers), 3)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+        )
+        # test if there are implicit log configs for the worker session agent logs.
+        self.assertEquals(
+            test_manager.log_matchers[1].config["path"],
+            "/var/log/scalyr-agent-2" + os.sep + "agent-worker-session-*.log",
         )
         self.assertEquals(
-            test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
+            test_manager.log_matchers[2].config["path"], "/tmp/hi_monitor.log"
         )
         self.assertEquals(
-            test_manager.log_matchers[1].config["attributes"]["parser"], "agent-metrics"
+            test_manager.log_matchers[2].config["attributes"]["parser"], "agent-metrics"
         )
 
     def test_multiple_monitors_for_same_file(self):
@@ -764,33 +775,43 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
                 {"path": "/tmp/hi_second_monitor.log"},
             ],
         )
-        self.assertEquals(len(test_manager.log_matchers), 3)
+        self.assertEquals(len(test_manager.log_matchers), 4)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
+        )
+        # test if there are implicit log configs for the worker session agent logs.
+        self.assertEquals(
+            test_manager.log_matchers[1].config["path"],
+            "/var/log/scalyr-agent-2" + os.sep + "agent-worker-session-*.log",
         )
         self.assertEquals(
-            test_manager.log_matchers[1].config["path"], "/tmp/hi_monitor.log"
-        )
-        self.assertEquals(
-            test_manager.log_matchers[1].config["attributes"]["parser"], "agent-metrics"
-        )
-        self.assertEquals(
-            test_manager.log_matchers[2].config["path"], "/tmp/hi_second_monitor.log"
+            test_manager.log_matchers[2].config["path"], "/tmp/hi_monitor.log"
         )
         self.assertEquals(
             test_manager.log_matchers[2].config["attributes"]["parser"], "agent-metrics"
         )
+        self.assertEquals(
+            test_manager.log_matchers[3].config["path"], "/tmp/hi_second_monitor.log"
+        )
+        self.assertEquals(
+            test_manager.log_matchers[3].config["attributes"]["parser"], "agent-metrics"
+        )
 
     def test_monitor_log_config_updated(self):
         test_manager = self._create_test_instance([], [{"path": "hi_monitor.log"}])
-        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(len(test_manager.log_matchers), 3)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
-            "/var/log/scalyr-agent-2" + os.sep + "agent*.log",
+            "/var/log/scalyr-agent-2" + os.sep + "agent.log",
         )
+        # test if there are implicit log configs for the worker session agent logs.
         self.assertEquals(
             test_manager.log_matchers[1].config["path"],
+            "/var/log/scalyr-agent-2" + os.sep + "agent-worker-session-*.log",
+        )
+        self.assertEquals(
+            test_manager.log_matchers[2].config["path"],
             "/var/log/scalyr-agent-2" + os.sep + "hi_monitor.log",
         )
 
