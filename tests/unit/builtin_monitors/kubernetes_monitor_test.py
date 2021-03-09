@@ -46,7 +46,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
     ControlledCacheWarmer,
     ContainerChecker,
-    _ignore_old_dead_container,
+    _ignore_old_dead_container, construct_metrics_container_name,
 )
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
@@ -926,12 +926,12 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
     @mock.patch("scalyr_agent.builtin_monitors.kubernetes_monitor.docker")
     def test_cri_metrics(self, mock_docker):
         fake_pod_info = PodInfo(
-            name="test-pod-name",
-            namespace="test-namespace",
-            uid="8bda366a-8a44-4e00-8fca-f70ace82a6dc",
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
             node_name="test-node",
             labels={},
-            container_names=["test-container-name"],
+            container_names=["random-logger"],
             annotations={},
             controller=None,
         )
@@ -939,14 +939,15 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
         fake_containers = {
             "container1": {
                 "k8s_info": {
-                    "k8s_container_name": "test-container-name",
+                    "k8s_container_name": "random-logger",
                     "pod_info": fake_pod_info,
-                    "pod_name": "test-pod-name",
-                    "pod_namespace": "test-namespace",
-                    "pod_uid": "8bda366a-8a44-4e00-8fca-f70ace82a6dc",
+                    "pod_name": "loggen-58c5486566-fdmzf",
+                    "pod_namespace": "default",
+                    "pod_uid": "5ef12d19-d8e5-4280-9cdf-a80bae251c68",
                 },
                 "log_path": "/var/log/containers/test.log",
                 "name": "random-logger",
+                "metrics_name": construct_metrics_container_name("random-logger", "loggen-58c5486566-fdmzf", "default", "5ef12d19-d8e5-4280-9cdf-a80bae251c68")
             }
         }
 
@@ -958,7 +959,7 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
             self._KubernetesMonitor__namespaces_to_include = (
                 K8sNamespaceFilter.default_value()
             )
-            self._KubernetesMonitor__include_controller_info = None
+            self._KubernetesMonitor__include_controller_info = True
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
             self._KubernetesMonitor__metrics_controlled_warmer = None
@@ -1011,63 +1012,11 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
                     )
 
         self.emit_results = sorted(self.emit_results, key=lambda k: k["metric_name"])
-        self.assertEqual(
-            self.emit_results[0],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.cpu.total_usage",
-                "metric_value": 1378023167,
-                "monitor": None,
-            },
-        )
-        self.assertEqual(
-            self.emit_results[1],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.mem.stat.total_pgfault",
-                "metric_value": 90156,
-                "monitor": None,
-            },
-        )
-        self.assertEqual(
-            self.emit_results[2],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.mem.stat.total_pgmajfault",
-                "metric_value": 0,
-                "monitor": None,
-            },
-        )
-        self.assertEqual(
-            self.emit_results[3],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.mem.stat.total_rss",
-                "metric_value": 331776,
-                "monitor": None,
-            },
-        )
-        self.assertEqual(
-            self.emit_results[4],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.mem.usage",
-                "metric_value": 2183168,
-                "monitor": None,
-            },
-        )
-        self.assertEqual(
-            self.emit_results[5],
-            {
-                "monitor_id_override": "random-logger",
-                "extra_fields": {},
-                "metric_name": "docker.mem.workingSetBytes",
-                "metric_value": 2080768,
-                "monitor": None,
-            },
-        )
+
+        self.assertEqual(self.emit_results[0], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.cpu.total_usage', u'metric_value': 1378023167, u'monitor': None})
+        self.assertEqual(self.emit_results[1], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.mem.stat.total_pgfault', u'metric_value': 90156, u'monitor': None})
+        self.assertEqual(self.emit_results[2], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.mem.stat.total_pgmajfault', u'metric_value': 0, u'monitor': None})
+        self.assertEqual(self.emit_results[3], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.mem.stat.total_rss', u'metric_value': 331776, u'monitor': None})
+        self.assertEqual(self.emit_results[4], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.mem.usage', u'metric_value': 2183168, u'monitor': None})
+        self.assertEqual(self.emit_results[5], {u'monitor_id_override': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'extra_fields': {u'pod_uid': u'k8s_random-logger_loggen-58c5486566-fdmzf_default_5ef12d19-d8e5-4280-9cdf-a80bae251c68_0', u'k8s-cluster': u'TestCluster', u'k8s-controller': u'none'}, u'metric_name': u'docker.mem.workingSetBytes', u'metric_value': 2080768, u'monitor': None})
+
