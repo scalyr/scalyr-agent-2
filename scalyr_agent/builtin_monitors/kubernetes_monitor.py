@@ -2289,7 +2289,9 @@ class CRIEnumerator(ContainerEnumerator):
                 result[cid] = {
                     "name": cname,
                     # construct a pod name that is similar to what we see from labels in a docker runtime
-                    "metrics_name": construct_metrics_container_name(cname, pod_name, pod_namespace, k8s_info.get("pod_uid", "")),
+                    "metrics_name": construct_metrics_container_name(
+                        cname, pod_name, pod_namespace, k8s_info.get("pod_uid", "")
+                    ),
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
@@ -4037,12 +4039,19 @@ cluster.
                 if use_metrics_name:
                     # Construct a more unique name, same as we make "metrics_name" to ensure we use the right k8s_extra
                     pod_ref = pod.get("podRef", {})
-                    container_name = construct_metrics_container_name(container_name, pod_ref.get("name", ""), pod_ref.get("namespace", ""), pod_ref.get("uid", ""))
+                    container_name = construct_metrics_container_name(
+                        container_name,
+                        pod_ref.get("name", ""),
+                        pod_ref.get("namespace", ""),
+                        pod_ref.get("uid", ""),
+                    )
 
                 if container_name in containers_to_check:
                     k8s_extra = all_k8s_extra.get(container_name, {})
                     self.__log_cri_container_metrics(
-                        k8s_extra["pod_uid"] if "pod_uid" in k8s_extra else container_name,
+                        k8s_extra["pod_uid"]
+                        if "pod_uid" in k8s_extra
+                        else container_name,
                         container_stat,
                         k8s_extra,
                     )
