@@ -1,6 +1,6 @@
 # Release Notes
 
-## 2.1.19 "TBD" - TBD
+## 2.1.19 "StarTram" - March 9, 2021
 
 * This release adds support for capturing Kubernetes container names to the kubernetes monitor via log line attributes.
   You can configure a container name as a Kubernetes log attribute using the ``${k8s_container_name}`` config template 

@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.19 "TBD" - TBD
+## 2.1.19 "StarTram" - March 9, 2021
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Jan 29, 2021 14:00 -0800
+Packaged by Yan Shnayder <yan@scalyr.com> on Mar 9, 2021 14:00 -0800
 --->
 
 Improvements:
