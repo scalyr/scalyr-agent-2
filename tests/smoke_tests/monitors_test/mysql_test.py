@@ -48,7 +48,7 @@ def mysql_client():
 
     os.system("mysql < /init.sql")
 
-    time.sleep(3)
+    time.sleep(10)
 
     client = pymysql.connect(host=HOST, user=USERNAME, password=PASSWORD, db=DATABASE)
 
