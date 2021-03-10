@@ -44,6 +44,10 @@ DATABASE = "scalyr_test_db"
 
 @pytest.fixture()
 def mysql_client():
+    # we change owner of the mysql files to workaround the issue which happens with mysql server in docker.
+    # see: https://serverfault.com/a/872576
+    os.system("chown -R mysql:mysql /var/lib/mysql /var/run/mysqld")
+
     os.system("service mysql start")
 
     os.system("mysql < /init.sql")

@@ -1,5 +1,31 @@
 # Release Notes
 
+## 2.1.19 "StarTram" - March 9, 2021
+
+* This release add support for adding the Kubernetes container name as an attribute to all log lines ingested via the 
+  Kubernetes monitor. You can include the container name as a log line attribute using the ${k8s_container_name} config 
+  template syntax.
+  
+  One option to configure container name logging for a pod is through annotations, here is an example:
+
+  Through CLI:
+  
+      kubectl annotate pod <pod name> --overwrite log.config.scalyr.com/attributes.container_name=\$\{k8s_container_name\}
+  
+  Through YAML:
+  
+      metadata:
+         annotations:
+            "log.config.scalyr.com/attributes.container_name": "\$\{k8s_container_name\}"
+  
+  Whichever pod has this annotation applied will then have the container name to the "container_name" field attached to 
+  each log line.
+  If you want to apply this configuration to all pods the Agent tracks you will need to add the configuration to the
+  Agent deployment, instructions for this can be found [here](https://gist.github.com/yanscalyr/6f986f0475337509894bce03d0a81c11).
+  
+  
+  Note, there will be charges for the extra bytes sent due to attaching the container name attribute.
+
 ## 2.1.16 "Lasso" - December 23, 2020
 
 * This release fixes default permissions for the ``agent.json`` file and ``agent.d/`` directory
