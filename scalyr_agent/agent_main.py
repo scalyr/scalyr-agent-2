@@ -1942,7 +1942,15 @@ class ScalyrAgent(object):
             result.avg_bytes_produced_rate = (
                 total_bytes_produced - last_total_bytes_produced
             ) / self.__config.copying_manager_stats_log_interval
-            if result.total_bytes_skipped > self.__last_total_bytes_skipped:
+
+            # NOTE: If last_total_bytes_produced is 0 and total_bytes_skip is > 0 this
+            # indicates bytes were skipped for staleness reasons (skipForStaleness) aka agent was
+            # offline for a while or similar so we don't log the message in this case because
+            # we already have another place which logs skipForStalness.
+            if (
+                result.total_bytes_skipped > self.__last_total_bytes_skipped
+                and last_total_bytes_produced > 0
+            ):
                 if self.__config.parsed_max_send_rate_enforcement:
                     log.warning(
                         "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
