@@ -88,7 +88,7 @@ should be uploaded by script or already uploaded by Libloud. #}
 {% endwith %}
 
 # install Scalyr agent from package file.
-sudo rpm -iv install_package.rpm
+sudo rpm -ivv install_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export INSTALL_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "install_package.rpm" | sed "s/_.*//g")
 {% else -%}
@@ -188,7 +188,7 @@ wget -O upgrade_package.deb "{{ upgrade_package["source"] }}"
 {% include "partial/verify_rpm_files_ownership.sh.j2" %}
 {% endwith %}
 
-sudo rpm -FUv upgrade_package.rpm
+sudo rpm -FUvv upgrade_package.rpm
 sudo sed -i 's/REPLACE_THIS/{{scalyr_api_key}}/' /etc/scalyr-agent-2/agent.json
 export UPGRADE_PACKAGE_VERSION=$(rpm -qp --queryformat '%{VERSION}\n' "upgrade_package.rpm" | sed "s/_.*//g")
 {% else -%}
