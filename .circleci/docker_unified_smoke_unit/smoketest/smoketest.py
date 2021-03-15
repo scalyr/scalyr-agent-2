@@ -664,6 +664,8 @@ class DockerSmokeTestActor(SmokeTestActor):
          2. verifier: verifies data was uploaded by uploader
         """
 
+        print("\ninside Docker check\n")
+
         def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
             def _func():
                 process_name = self._get_process_name_for_suffix(contname_suffix)
@@ -1046,6 +1048,8 @@ class K8sActor(DockerSmokeTestActor):
          1. uploader: uploads data to Scalyr (can easily support multiple but for now, just 1)
          2. verifier: verifies data was uploaded by uploader
         """
+
+        print("\ninside k8s check\n")
 
         def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
             def _func():
