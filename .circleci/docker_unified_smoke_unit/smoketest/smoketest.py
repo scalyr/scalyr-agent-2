@@ -1127,20 +1127,6 @@ class K8sActor(DockerSmokeTestActor):
 
             return _func
 
-        suffixes_to_check = [NAME_SUFFIX_UPLOADER]
-        for count, suffix in enumerate(suffixes_to_check):
-            for stream_name in self._get_uploader_stream_names():
-                self.poll_until_max_wait(
-                    _query_scalyr_for_upload_activity(suffix, stream_name),
-                    "Querying server to verify upload: container[stream]='{}[{}].".format(
-                        self._get_process_name_for_suffix(suffix), stream_name
-                    ),
-                    "Upload verified for {}[{}].".format(suffix, stream_name),
-                    "Upload not verified for {}[{}].".format(suffix, stream_name),
-                    exit_on_success=False,
-                    exit_on_fail=True,
-                )
-
         metrics_to_check = [
             "docker.mem.max_usage",
             "docker.mem.usage",
@@ -1164,6 +1150,20 @@ class K8sActor(DockerSmokeTestActor):
                 exit_on_success=count == len(metrics_to_check),
                 exit_on_fail=True,
             )
+
+        suffixes_to_check = [NAME_SUFFIX_UPLOADER]
+        for count, suffix in enumerate(suffixes_to_check):
+            for stream_name in self._get_uploader_stream_names():
+                self.poll_until_max_wait(
+                    _query_scalyr_for_upload_activity(suffix, stream_name),
+                    "Sanity check again, in k8s: Querying server to verify upload: container[stream]='{}[{}].".format(
+                        self._get_process_name_for_suffix(suffix), stream_name
+                    ),
+                    "Upload verified for {}[{}].".format(suffix, stream_name),
+                    "Upload not verified for {}[{}].".format(suffix, stream_name),
+                    exit_on_success=False,
+                    exit_on_fail=True,
+                )
 
 
 class LogstashActor(DockerSmokeTestActor):
