@@ -1137,7 +1137,7 @@ class K8sActor(DockerSmokeTestActor):
                     ),
                     "Upload verified for {}[{}].".format(suffix, stream_name),
                     "Upload not verified for {}[{}].".format(suffix, stream_name),
-                    exit_on_success=count == len(suffixes_to_check),
+                    exit_on_success=False,
                     exit_on_fail=True,
                 )
 
