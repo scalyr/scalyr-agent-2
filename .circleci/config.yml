@@ -1504,7 +1504,7 @@ jobs:
           fail_only: true
           only_for_branches: master
 
-  smoke-k8s-containerd:
+  smoke-k8s-cri-o:
     working_directory: ~/scalyr-agent-2
     machine:
       image: circleci/classic:201808-01
@@ -1516,6 +1516,8 @@ jobs:
       MINIKUBE_WANTREPORTERRORPROMPT: false
       MINIKUBE_HOME: /home/circleci
       CHANGE_MINIKUBE_NONE_USER: true
+      OS: xUbuntu_18.04
+      CRIOVERSION: 1.17
     steps:
       - checkout
       - restore_cache:
@@ -1544,9 +1546,18 @@ jobs:
           command: |
             curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
       - run:
+          name: setup cri-o
+          command: |
+            sudo echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+            sudo echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/${CRIOVERSION}/${OS}/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:${CRIOVERSION}.list
+            sudo curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:${CRIOVERSION}/${OS}/Release.key | apt-key add -
+            sudo curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/${OS}/Release.key | apt-key add -
+            sudo apt-get update
+            sudo apt-get install cri-o cri-o-runc
+      - run:
           name: start minikube
           command: |
-            minikube start --container-runtime=containerd --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
+            minikube start --container-runtime=cri-o --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
       - run:
           name: wait for minikube
           command: |
@@ -2461,7 +2472,7 @@ workflows:
          context: scalyr-agent
      - smoke-k8s:
          context: scalyr-agent
-     - smoke-k8s-containerd:
+     - smoke-k8s-cri-o:
          context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
