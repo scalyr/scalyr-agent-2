@@ -1557,7 +1557,7 @@ jobs:
       - run:
           name: start minikube
           command: |
-            minikube start --container-runtime=cri-o --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
+            sudo minikube start --container-runtime=cri-o --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
       - run:
           name: wait for minikube
           command: |
