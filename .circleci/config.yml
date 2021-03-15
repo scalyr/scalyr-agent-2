@@ -1504,7 +1504,7 @@ jobs:
           fail_only: true
           only_for_branches: master
 
-  smoke-k8s-containerd:
+  smoke-k8s-cri-o:
     working_directory: ~/scalyr-agent-2
     machine:
       image: circleci/classic:201808-01
@@ -1546,7 +1546,7 @@ jobs:
       - run:
           name: start minikube
           command: |
-            sudo -E minikube start --vm-driver=none --container-runtime=containerd --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION} &> $HOME/minikube.log 2>&1 < /dev/null
+            sudo -E minikube start --vm-driver=none --container-runtime=cri-o --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION} &> $HOME/minikube.log 2>&1 < /dev/null
       - run:
           name: wait for minikube
           command: |
@@ -2461,7 +2461,7 @@ workflows:
          context: scalyr-agent
      - smoke-k8s:
          context: scalyr-agent
-     - smoke-k8s-containerd:
+     - smoke-k8s-cri-o:
          context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
