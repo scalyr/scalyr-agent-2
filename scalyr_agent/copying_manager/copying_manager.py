@@ -53,9 +53,12 @@ from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
-from scalyr_agent.copying_manager.common import write_checkpoint_state_to_file
+from scalyr_agent.copying_manager.common import (
+    update_checkpoint_state_in_file,
+    read_checkpoint_state_from_file,
+    write_checkpoint_state_to_file,
+)
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor
-
 
 import six
 
@@ -520,7 +523,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         return log_config
 
     def update_log_config(self, monitor_name, log_config):
-        """ Updates the log config of the log matcher that has the same
+        """Updates the log config of the log matcher that has the same
         path as the one specified in the log_config param
         """
         log_config = self.__config.parse_log_config(
@@ -619,8 +622,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def schedule_log_path_for_removal(self, monitor_name, log_path):
         """
-            Schedules a log path for removal.  The logger will only
-            be removed once the number of pending bytes reaches 0
+        Schedules a log path for removal.  The logger will only
+        be removed once the number of pending bytes reaches 0
         """
         self.__lock.acquire()
         try:
@@ -657,13 +660,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def dynamic_matchers_count(self):
         """
-            Used for testing - returns the number of dynamic matchers
+        Used for testing - returns the number of dynamic matchers
         """
         return len(self.__dynamic_matchers)
 
     def logs_pending_removal_count(self):
         """
-            Used for testing - returns the number of logs pending removal
+        Used for testing - returns the number of logs pending removal
         """
 
         self.__lock.acquire()
@@ -1042,8 +1045,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def __remove_logs_scheduled_for_deletion(self):
         """
-            Removes any logs scheduled for deletion, if there are 0 bytes left to copy and
-            the log file has been matched/processed at least once
+        Removes any logs scheduled for deletion, if there are 0 bytes left to copy and
+        the log file has been matched/processed at least once
         """
 
         # make a shallow copy of logs_pending_removal
@@ -1083,6 +1086,28 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
 
+    def _merge_checkpoints(self, checkpoints_to_merge):  # type: (List[Dict]) -> Dict
+        result = {}  # type: Dict
+        for states in checkpoints_to_merge:
+            for path, state in states.items():
+                state_time = state.get("time", 0)
+                result_state_time = result.get(path, {}).get("time", 0)
+                if state_time > result_state_time:
+                    result[path] = state
+
+        return result
+
+    def _get_closed_log_processor_checkpoints(self):
+        checkpoints_to_merge = []
+        for worker in self.__workers.values():
+            for worker_session in worker.sessions:
+                closed_checkpoints = worker_session.get_closed_files_checkpoints()
+                checkpoints_to_merge.append(closed_checkpoints)
+
+        result_checkpoints = self._merge_checkpoints(checkpoints_to_merge)
+
+        return result_checkpoints
+
     def __scan_for_pending_log_files(self):
         """
         Creates log processors for any recent, dynamically added log matchers
@@ -1105,7 +1130,18 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        checkpoints = self.__find_and_read_checkpoints()
+        file_checkpoints = self.__read_checkpoint_state(
+            self._consolidated_checkpoint_file_path
+        )
+        if file_checkpoints:
+            current_checkpoints = file_checkpoints["checkpoints"]
+        else:
+            current_checkpoints = {}
+        closed_checkpoints = self._get_closed_log_processor_checkpoints()
+        checkpoints = self._merge_checkpoints([current_checkpoints, closed_checkpoints])
+        write_checkpoint_state_to_file(
+            checkpoints, self._consolidated_checkpoint_file_path, time.time()
+        )
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
@@ -1310,6 +1346,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
         )
 
+    @property
+    def _consolidated_checkpoint_file_path(self):
+        return os.path.join(
+            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
+        )
+
     def __consolidate_checkpoints(self, checkpoints):
         # type: (Dict) -> None
         """
@@ -1320,8 +1362,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         consolidated_checkpoints_path = os.path.join(
             self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
-        write_checkpoint_state_to_file(
-            checkpoints, consolidated_checkpoints_path, time.time()
+        update_checkpoint_state_in_file(
+            checkpoints, consolidated_checkpoints_path, time.time(), self.__config, log
         )
 
         # clear data folder by removing all worker session checkpoint files.
@@ -1415,20 +1457,13 @@ class CopyingManager(StoppableThread, LogWatcher):
         @rtype: dict
         """
 
-        if not os.path.isfile(full_checkpoints_path):
-            return None
-
         # noinspection PyBroadException
         try:
-            full_checkpoints = scalyr_util.read_file_as_json(
-                full_checkpoints_path, strict_utf8=True
-            )
 
-            # the data in the file was somehow corrupted so it can not be read as dict.
-            if not isinstance(full_checkpoints, dict):
-                raise ValueError(
-                    "The checkpoint file data has to be de-serialized into dict."
-                )
+            # read the full checkpoints file
+            full_checkpoints = read_checkpoint_state_from_file(
+                full_checkpoints_path, log
+            )
 
             # get the path for the active checkpoints file
             parent_dir, filename = os.path.split(full_checkpoints_path)
@@ -1437,25 +1472,35 @@ class CopyingManager(StoppableThread, LogWatcher):
                 parent_dir, active_checkpoints_filename
             )
 
-            if os.path.isfile(active_checkpoints_path):
-                # if the active checkpoint file is newer, overwrite any checkpoint values with the
-                # updated full checkpoint
-                active_checkpoints = scalyr_util.read_file_as_json(
-                    active_checkpoints_path, strict_utf8=True
-                )
+            # read the active checkpoints file.
+            active_checkpoints = read_checkpoint_state_from_file(
+                active_checkpoints_path, log
+            )
 
+            if full_checkpoints and active_checkpoints:
+                # if there are both "full" and "active" checkpoint files we also have to check if the active checkpoint
+                # file is newer, and if so, overwrite any full checkpoint values with values from it.
                 if active_checkpoints["time"] > full_checkpoints["time"]:
                     full_checkpoints["time"] = active_checkpoints["time"]
                     full_checkpoints["checkpoints"].update(
                         active_checkpoints["checkpoints"]
                     )
 
-            return full_checkpoints
+                return full_checkpoints
 
+            elif not full_checkpoints and not active_checkpoints:
+                # there is no data from the both of the checkpoint file return noting.
+                return None
+            else:
+                # return anything which is not None.
+                return full_checkpoints or active_checkpoints
+
+        # Ignore any other errors and continue without checkpoints.
         except Exception:
             log.exception(
-                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
-                error_code="failedCheckpointRead",
+                "An unexpected error has occurred during during the read of the checkpoint file {0}".format(
+                    full_checkpoints_path
+                )
             )
             return None
 

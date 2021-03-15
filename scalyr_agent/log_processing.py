@@ -2212,6 +2212,8 @@ class LogFileProcessor(object):
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
 
+        self._saved_checkpoint = None
+
     def set_new_scalyr_client(self, new_scalyr_client):
         self._new_scalyr_client = new_scalyr_client
 
@@ -2637,8 +2639,9 @@ class LogFileProcessor(object):
                             close = True
 
                         if close:
-                            self.__log_file_iterator.close()
-                            self.__is_closed = True
+                            self._close()
+                            # self.__log_file_iterator.close()
+                            # self.__is_closed = True
 
                         return self.__is_closed, bytes_copied
 
@@ -2811,6 +2814,15 @@ class LogFileProcessor(object):
         self.__lock.release()
         return result
 
+    def _close(self):
+        if not self.__is_closed:
+            # save a checkpoint before we close a file iterator
+            # to be able to get the checkpoint of the closed processor.
+            self._saved_checkpoint = self.get_checkpoint()
+
+            self.__log_file_iterator.close()
+            self.__is_closed = True
+
     def close(self):
         """Closes the processor, closing all underlying file handles.
 
@@ -2818,13 +2830,17 @@ class LogFileProcessor(object):
         """
         try:
             self.__lock.acquire()
-            if not self.__is_closed:
-                self.__log_file_iterator.close()
-                self.__is_closed = True
+            self._close()
         finally:
             self.__lock.release()
 
     def get_checkpoint(self):
+
+        if self.__is_closed:
+            # return the saved checkpoint state of the log processor in case if it has been closed.
+            # We can't get the checkpoint from the log file iterator because all of its files have already been closed.
+            return self._saved_checkpoint.copy()
+
         return self.__log_file_iterator.get_mark_checkpoint()
 
     @staticmethod
