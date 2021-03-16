@@ -1539,6 +1539,16 @@ jobs:
           command: |
             wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz
             sudo tar xzf cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz -C /
+            sudo mkdir -p /etc/modules-load.d/
+            sudo mkdir -p /etc/sysctl.d/
+            sudo bash -c 'cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+            br_netfilter
+            EOF'
+            sudo bash -c 'cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+            net.bridge.bridge-nf-call-ip6tables = 1
+            net.bridge.bridge-nf-call-iptables = 1
+            EOF'
+            sudo sysctl --system
       - run:
           name: setup kubectl
           command: |
@@ -1551,6 +1561,7 @@ jobs:
             Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock"
             EOF'
             sudo systemctl daemon-reload
+            sudo systemctl enable kubelet.service
             sudo iptables -P FORWARD ACCEPT
             sudo mkdir -p /etc/cni/net.d/
       - run:
