@@ -1546,10 +1546,10 @@ jobs:
             mkdir -p ${HOME}/.kube
             touch ${HOME}/.kube/configcat
             sudo mkdir -p  /etc/systemd/system/kubelet.service.d/
-            sudo cat \<<EOF > /etc/systemd/system/kubelet.service.d/0-containerd.conf
+            sudo bash -c 'cat \<<EOF > /etc/systemd/system/kubelet.service.d/0-containerd.conf
             [Service]
             Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock"
-            EOF
+            EOF'
             sudo systemctl daemon-reload
             sudo iptables -P FORWARD ACCEPT
       - run:
