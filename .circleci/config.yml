@@ -1504,6 +1504,102 @@ jobs:
           fail_only: true
           only_for_branches: master
 
+  smoke-k8s-containerd:
+    working_directory: ~/scalyr-agent-2
+    machine:
+      image: circleci/classic:201808-01
+    environment:
+      K8S_VERSION: v1.13.0
+      KUBECONFIG: /home/circleci/.kube/config
+      MINIKUBE_VERSION: v1.17.1
+      MINIKUBE_WANTUPDATENOTIFICATION: false
+      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_HOME: /home/circleci
+      CHANGE_MINIKUBE_NONE_USER: true
+      CONTAINERD_VERSION: 1.1.0
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
+      - run:
+          name: "Install Python Dependencies"
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+            pip install "apache-libcloud==2.8.2"
+      - save_cache:
+          name: "Save Dependencies Cache"
+          key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+            - "~/.cache/pip"
+      - run:
+          name: setup kubectl
+          command: |
+            curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+      - run:
+          name: setup minikube
+          command: |
+            curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
+      - run:
+          name: setup containerd
+          command: |
+            wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz
+            tar xzf cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz -C /
+            systemctl enable containerd && systemctl start containerd
+      - run:
+          name: start minikube
+          command: |
+            sudo minikube start --driver=none --container-runtime=containerd --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
+      - run:
+          name: wait for minikube
+          command: |
+            JSONPATH='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}';
+            until kubectl get nodes -o jsonpath="$JSONPATH" 2>&1 | grep -q "Ready=True"; do
+              sleep 1;
+            done
+      - run:
+          name: fix RBAC
+          command: |
+            # make default account cluster-admin
+            kubectl create clusterrolebinding add-on-cluster-admin --clusterrole cluster-admin --serviceaccount=kube-system:default
+      - run:
+          name: dump cluster-info
+          command: |
+            kubectl cluster-info
+            kubectl get po --all-namespaces
+      - run:
+          name: Run Tests (with coverage)
+          command: |
+            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
+      - run:
+          name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
+          command: |
+            ls -la .coverage* || true
+
+            cp .circleci/.coveragerc_ci .coveragerc
+
+            source venv/bin/activate
+
+            # Ensure consistent paths for all the code coverage reports
+            sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+
+            # Submit it to codecov.io
+            ./venv/bin/coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            ./scripts/submit-codecov-data.sh
+
+            # Combine it and upload it to S3
+            ./venv/bin/coverage combine || true
+            export PYTHONPATH=.
+            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
+
+      - slack/status:
+          fail_only: true
+          only_for_branches: master
+
   smoke-k8s-helm:
     machine:
       image: circleci/classic:201808-01
