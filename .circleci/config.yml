@@ -1552,6 +1552,7 @@ jobs:
             EOF'
             sudo systemctl daemon-reload
             sudo iptables -P FORWARD ACCEPT
+            sudo mkdir -p /etc/cni/net.d/
       - run:
           name: setup minikube
           command: |
