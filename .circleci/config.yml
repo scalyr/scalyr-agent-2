@@ -1560,7 +1560,7 @@ jobs:
       - run:
           name: start minikube
           command: |
-            sudo minikube start --driver=none --container-runtime=containerd --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION}
+            sudo minikube start --driver=none --container-runtime=containerd --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION} --extra-config="apiserver.service-account-key-file=/var/lib/minikube/certs/sa.pub" --extra-config="apiserver.service-account-signing-key-file=/var/lib/minikube/certs/sa.key"
       - run:
           name: wait for minikube
           command: |
