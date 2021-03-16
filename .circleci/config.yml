@@ -1548,8 +1548,8 @@ jobs:
           name: setup containerd
           command: |
             wget https://storage.googleapis.com/cri-containerd-release/cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz
-            tar xzf cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz -C /
-            systemctl enable containerd && systemctl start containerd
+            sudo tar xzf cri-containerd-${CONTAINERD_VERSION}.linux-amd64.tar.gz -C /
+            sudo systemctl enable containerd && systemctl start containerd
       - run:
           name: start minikube
           command: |
