@@ -1039,6 +1039,143 @@ class K8sActor(DockerSmokeTestActor):
         """
         return "{}/k8s_{}*".format(self._get_mapped_logfile_prefix(), process_name)
 
+    def verify_logs_uploaded(self):
+        """
+        For docker agent, confirmation requires verification that all uploaders were able to uploaded.
+        There are 2 separate types of containers.
+         1. uploader: uploads data to Scalyr (can easily support multiple but for now, just 1)
+         2. verifier: verifies data was uploaded by uploader
+        """
+
+        def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
+            def _func():
+                process_name = self._get_process_name_for_suffix(contname_suffix)
+                resp = requests.get(
+                    self._make_query_url(
+                        self._get_extra_query_attributes(stream_name, process_name),
+                        override_serverHost=self._agent_hostname,
+                        override_log="{}/{}.log".format(
+                            self._get_mapped_logfile_prefix(), process_name
+                        ),
+                        override_log_regex=self._get_uploader_override_logfilename_regex(
+                            process_name
+                        ),
+                        message=self._serialize_row(
+                            {
+                                "verifier_type": self.VERIFIER_TYPE,  # pylint: disable=no-member
+                                "count": self._lines_to_upload,
+                                "line_stream": stream_name,
+                            }
+                        ),
+                    )
+                )
+                if resp.ok:
+                    data = json.loads(resp.content)
+                    if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
+                        return False
+                    matches = data["matches"]
+                    if len(matches) == 0:
+                        print("Found 0 matches")
+                        return False
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
+                    att = matches[0]["attributes"]
+                    return self._verify_queried_attributes(
+                        att, stream_name, process_name
+                    )
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_code))
+                print("Response text: %s" % (resp.text))
+                return False  # Non-ok response
+
+            return _func
+
+        def _query_scalyr_for_metrics(metrics):
+            def _func():
+                resp = requests.get(
+                    self._make_query_url(
+                        {"metric": "*"},
+                        override_serverHost=self._agent_hostname,
+                        override_log="/var/log/scalyr-agent-2/kubernetes_monitor.log",
+                    )
+                )
+                if resp.ok:
+                    data = json.loads(resp.content)
+                    if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
+                        return False
+                    matches = data["matches"]
+                    if len(matches) == 0:
+                        print("Found 0 matches")
+                        return False
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
+
+                    for expected_metric in metrics:
+                        found_match = False
+                        for match in matches:
+                            if match.get("metric", "") == expected_metric:
+                                found_match = True
+                                break
+                        if not found_match:
+                            print("Failed to find expected metric %s" % expected_metric)
+                            return False
+
+                    return True
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_code))
+                print("Response text: %s" % (resp.text))
+                return False  # Non-ok response
+
+            return _func
+
+        suffixes_to_check = [NAME_SUFFIX_UPLOADER]
+        for count, suffix in enumerate(suffixes_to_check):
+            for stream_name in self._get_uploader_stream_names():
+                self.poll_until_max_wait(
+                    _query_scalyr_for_upload_activity(suffix, stream_name),
+                    "Querying server to verify upload: container[stream]='{}[{}].".format(
+                        self._get_process_name_for_suffix(suffix), stream_name
+                    ),
+                    "Upload verified for {}[{}].".format(suffix, stream_name),
+                    "Upload not verified for {}[{}].".format(suffix, stream_name),
+                    exit_on_success=False,
+                    exit_on_fail=True,
+                )
+
+        metrics_to_check = [
+            "docker.mem.max_usage",
+            "docker.mem.usage",
+            "docker.mem.fail_cnt",
+            "docker.mem.limit",
+            "docker.cpu.usage_in_usermode",
+            "docker.cpu.total_usage",
+            "docker.cpu.usage_in_kernelmode",
+            "docker.cpu.throttling.periods",
+            "docker.cpu.throttling.throttled_periods",
+            "docker.cpu.throttling.throttled_time",
+            "docker.cpu.throttling.usageNanoCores"
+        ]
+
+        for count, metric in enumerate(metrics_to_check):
+            self.poll_until_max_wait(
+                _query_scalyr_for_metrics(metrics_to_check),
+                "Querying server to verify upload of metrics.",
+                "Upload verified for all metrics.",
+                "Upload not verified for all metrics.",
+                exit_on_success=True,
+                exit_on_fail=True,
+            )
+
 
 class LogstashActor(DockerSmokeTestActor):
     """

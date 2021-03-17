@@ -4193,6 +4193,11 @@ cluster.
         containers = None
         if self.__report_container_metrics:
             if self.__client:
+                self._logger.debug(
+                    "Retrieving k8s container list from Docker client.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="k8s-get-containers",
+                )
                 if (
                     self.__metrics_controlled_warmer is not None
                     and not self.__metrics_controlled_warmer.is_running()
@@ -4209,6 +4214,11 @@ cluster.
                     controlled_warmer=self.__metrics_controlled_warmer,
                 )
             else:
+                self._logger.debug(
+                    "Retrieving k8s container list from ContainerEnumerator.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="k8s-get-containers",
+                )
                 containers = self.__container_checker.get_containers()
         try:
             if containers:
@@ -4220,8 +4230,18 @@ cluster.
                         % len(containers),
                     )
                     if self.__metric_fetcher:
+                        self._logger.debug(
+                            "Retrieving k8s container metrics list from Docker API.",
+                            limit_once_per_x_secs=86400,
+                            limit_key="k8s-gather-metrics",
+                        )
                         self.__gather_metrics_from_api(containers, cluster_name)
                     else:
+                        self._logger.debug(
+                            "Retrieving k8s container metrics list from Kubelet API.",
+                            limit_once_per_x_secs=86400,
+                            limit_key="k8s-gather-metrics",
+                        )
                         stats = self.__gather_metrics_from_kubelet(
                             containers, self.__kubelet_api, cluster_name
                         )
