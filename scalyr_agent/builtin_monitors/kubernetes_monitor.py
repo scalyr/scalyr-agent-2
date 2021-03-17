@@ -81,6 +81,8 @@ from scalyr_agent.util import StoppableThread, HistogramTracker
 
 global_log = scalyr_logging.getLogger(__name__)
 
+from scalyr_agent import log_line_debug
+
 __monitor__ = __name__
 
 define_config_option(
@@ -3265,6 +3267,11 @@ class ContainerChecker(object):
 
             # everything else is added to the log_config result as is
             result[key] = value
+
+        # if pod name matches the current pod name, then save the container id
+        # which will be used to find the log file.
+        if log_line_debug.POD_NAME in rename_vars["pod_name"]:
+            log_line_debug.CONTAINER_ID = rename_vars["container_id"]
 
         # Perform variable substitution for rename_logfile
         if "rename_logfile" in result:

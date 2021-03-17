@@ -99,3 +99,6 @@ __all__ = [
     "define_log_field",
     "AutoFlushingRotatingFileHandler",
 ]
+
+# import this module to debug the log copying.
+from scalyr_agent import log_line_debug  # NOQA

@@ -2473,7 +2473,7 @@ class LogFileProcessor(object):
                     ) = self.__log_file_iterator.get_sequence()
 
                     # time_spent_serializing += fast_get_time()
-                    event = self.__create_events_object(line_object, sample_result)
+                    event = self._create_events_object(line_object, sample_result)
 
                     if self._log_stream:
                         import scalyr_ingestion_client.log_line as ingestion_client_line  # pylint: disable=import-error
@@ -2763,7 +2763,7 @@ class LogFileProcessor(object):
         self.__num_redaction_and_sampling_rules += 1
         self.__redacter.add_redaction_rule(match_expression, replacement, hash_salt)
 
-    def __create_events_object(self, line_object, sampling_rate):
+    def _create_events_object(self, line_object, sampling_rate):
         """Returns the events object that can be sent to the server for this log to insert the specified message.
 
         @param line_object: A LogLine containing a message, to be placed in attrs.message, plus an optional timestamp and attrs dict.
