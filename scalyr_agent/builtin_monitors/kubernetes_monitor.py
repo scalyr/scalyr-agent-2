@@ -978,6 +978,13 @@ def _ignore_old_dead_container(container, created_before=None):
     return False
 
 
+def construct_metrics_container_name(cname, pod_name, pod_namespace, pod_uid):
+    """
+        Returns a string in the same format as container names in Docker runtime Kubernetes.
+    """
+    return "k8s_%s_%s_%s_%s_0" % (cname, pod_name, pod_namespace, pod_uid)
+
+
 class ControlledCacheWarmer(StoppableThread):
     """A background thread that does a controlled warming of the pod cache.
 
@@ -2279,6 +2286,10 @@ class CRIEnumerator(ContainerEnumerator):
                 # add this container to the list of results
                 result[cid] = {
                     "name": cname,
+                    # construct a pod name that is similar to what we see from labels in a docker runtime
+                    "metrics_name": construct_metrics_container_name(
+                        cname, pod_name, pod_namespace, k8s_info.get("pod_uid", "")
+                    ),
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
@@ -3328,6 +3339,16 @@ class ContainerChecker(object):
                 "'automountServiceAccountToken' is set to True"
             )
 
+    def get_containers(self):
+        if self._container_runtime:
+            return self._container_enumerator.get_containers(
+                glob_list=self.__glob_list,
+                k8s_cache=self.k8s_cache,
+                k8s_include_by_default=self.__include_all,
+                k8s_namespaces_to_include=self.__namespaces_to_include,
+            )
+        return {}
+
 
 class KubernetesMonitor(
     ScalyrMonitor
@@ -3457,6 +3478,115 @@ container using annotations without updating the config yaml, and applying the u
 cluster.
     """
 
+    @staticmethod
+    def __build_metric_dict(prefix, names):
+        result = {}
+        for name in names:
+            result["%s%s" % (prefix, name)] = name
+        return result
+
+    # Metrics provided by the kubelet API.
+    __k8s_pod_network_metrics = {
+        "k8s.pod.network.rx_bytes": "rxBytes",
+        "k8s.pod.network.rx_errors": "rxErrors",
+        "k8s.pod.network.tx_bytes": "txBytes",
+        "k8s.pod.network.tx_errors": "txErrors",
+    }
+
+    # Metrics provide by the kubelet API.
+    __k8s_node_network_metrics = {
+        "k8s.node.network.rx_bytes": "rxBytes",
+        "k8s.node.network.rx_errors": "rxErrors",
+        "k8s.node.network.tx_bytes": "txBytes",
+        "k8s.node.network.tx_errors": "txErrors",
+    }
+
+    # All the docker. metrics are provided by the docker API.
+    __network_metrics = __build_metric_dict.__func__(
+        "docker.net.",
+        [
+            "rx_bytes",
+            "rx_dropped",
+            "rx_errors",
+            "rx_packets",
+            "tx_bytes",
+            "tx_dropped",
+            "tx_errors",
+            "tx_packets",
+        ],
+    )
+
+    __mem_stat_metrics = __build_metric_dict.__func__(
+        "docker.mem.stat.",
+        [
+            "total_pgmajfault",
+            "cache",
+            "mapped_file",
+            "total_inactive_file",
+            "pgpgout",
+            "rss",
+            "total_mapped_file",
+            "writeback",
+            "unevictable",
+            "pgpgin",
+            "total_unevictable",
+            "pgmajfault",
+            "total_rss",
+            "total_rss_huge",
+            "total_writeback",
+            "total_inactive_anon",
+            "rss_huge",
+            "hierarchical_memory_limit",
+            "total_pgfault",
+            "total_active_file",
+            "active_anon",
+            "total_active_anon",
+            "total_pgpgout",
+            "total_cache",
+            "inactive_anon",
+            "active_file",
+            "pgfault",
+            "inactive_file",
+            "total_pgpgin",
+        ],
+    )
+
+    __mem_metrics = __build_metric_dict.__func__(
+        "docker.mem.",
+        [
+            "max_usage",
+            "usage",
+            "fail_cnt",
+            "limit",
+            "workingSetBytes",
+            "availableBytes",
+        ],
+    )
+
+    __cpu_usage_metrics = __build_metric_dict.__func__(
+        "docker.cpu.", ["usage_in_usermode", "total_usage", "usage_in_kernelmode"]
+    )
+
+    __cpu_throttling_metrics = __build_metric_dict.__func__(
+        "docker.cpu.throttling.",
+        ["periods", "throttled_periods", "throttled_time", "usageNanoCores"],
+    )
+
+    __mem_cri_translation = {
+        "pageFaults": "total_pgfault",
+        "majorPageFaults": "total_pgmajfault",
+        "rssBytes": "total_rss",
+        "usageBytes": "usage",
+        # Other metrics that don't map to docker ones:
+        # "workingSetBytes", "availableBytes"
+    }
+
+    __cpu_usage_cri_translation = {
+        "usageCoreNanoSeconds": "total_usage"
+        # Other metrics that don't map to docker ones:
+        # "usageNanoCores"
+    }
+
     def _set_namespaces_to_include(self):
         """This function is separated out for better testability
         (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
@@ -3580,95 +3710,11 @@ cluster.
                 controlled_warmer=self.__logs_controlled_warmer,
             )
 
-        # Metrics provided by the kubelet API.
-        self.__k8s_pod_network_metrics = {
-            "k8s.pod.network.rx_bytes": "rxBytes",
-            "k8s.pod.network.rx_errors": "rxErrors",
-            "k8s.pod.network.tx_bytes": "txBytes",
-            "k8s.pod.network.tx_errors": "txErrors",
-        }
-
-        # Metrics provide by the kubelet API.
-        self.__k8s_node_network_metrics = {
-            "k8s.node.network.rx_bytes": "rxBytes",
-            "k8s.node.network.rx_errors": "rxErrors",
-            "k8s.node.network.tx_bytes": "txBytes",
-            "k8s.node.network.tx_errors": "txErrors",
-        }
-
-        # All the docker. metrics are provided by the docker API.
-        self.__network_metrics = self.__build_metric_dict(
-            "docker.net.",
-            [
-                "rx_bytes",
-                "rx_dropped",
-                "rx_errors",
-                "rx_packets",
-                "tx_bytes",
-                "tx_dropped",
-                "tx_errors",
-                "tx_packets",
-            ],
-        )
-
-        self.__mem_stat_metrics = self.__build_metric_dict(
-            "docker.mem.stat.",
-            [
-                "total_pgmajfault",
-                "cache",
-                "mapped_file",
-                "total_inactive_file",
-                "pgpgout",
-                "rss",
-                "total_mapped_file",
-                "writeback",
-                "unevictable",
-                "pgpgin",
-                "total_unevictable",
-                "pgmajfault",
-                "total_rss",
-                "total_rss_huge",
-                "total_writeback",
-                "total_inactive_anon",
-                "rss_huge",
-                "hierarchical_memory_limit",
-                "total_pgfault",
-                "total_active_file",
-                "active_anon",
-                "total_active_anon",
-                "total_pgpgout",
-                "total_cache",
-                "inactive_anon",
-                "active_file",
-                "pgfault",
-                "inactive_file",
-                "total_pgpgin",
-            ],
-        )
-
-        self.__mem_metrics = self.__build_metric_dict(
-            "docker.mem.", ["max_usage", "usage", "fail_cnt", "limit"]
-        )
-
-        self.__cpu_usage_metrics = self.__build_metric_dict(
-            "docker.cpu.", ["usage_in_usermode", "total_usage", "usage_in_kernelmode"]
-        )
-
-        self.__cpu_throttling_metrics = self.__build_metric_dict(
-            "docker.cpu.throttling.", ["periods", "throttled_periods", "throttled_time"]
-        )
-
     def set_log_watcher(self, log_watcher):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
         if self.__container_checker:
             self.__container_checker.set_log_watcher(log_watcher, self)
-
-    def __build_metric_dict(self, prefix, names):
-        result = {}
-        for name in names:
-            result["%s%s" % (prefix, name)] = name
-        return result
 
     def __verify_required_env_var(self, env_var_name):
         if len(compat.os_environ_unicode.get(env_var_name, "")) == 0:
@@ -3685,9 +3731,21 @@ cluster.
                 env_var_name,
             )
 
-    def __log_metrics(self, monitor_override, metrics_to_emit, metrics, extra=None):
+    def __log_metrics(
+        self,
+        monitor_override,
+        metrics_to_emit,
+        metrics,
+        extra=None,
+        name_translation=None,
+    ):
         if metrics is None:
             return
+
+        if name_translation is not None:
+            for key, value in six.iteritems(name_translation):
+                if key in metrics:
+                    metrics[value] = metrics[key]
 
         for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
@@ -3778,6 +3836,47 @@ cluster.
                 k8s_extra,
             )
 
+    def __log_memory_stats_cri_metrics(self, container, metrics, k8s_extra):
+        """ Logs memory stats metrics
+            This method expects the metrics to come from the `stats/summary` kubelet endpoint and so has a translation
+            to the metric names we expect from the docker client
+
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
+        """
+        self.__log_metrics(
+            container,
+            self.__mem_metrics,
+            metrics,
+            k8s_extra,
+            self.__mem_cri_translation,
+        )
+        self.__log_metrics(
+            container,
+            self.__mem_stat_metrics,
+            metrics,
+            k8s_extra,
+            self.__mem_cri_translation,
+        )
+
+    def __log_cpu_stats_cri_metrics(self, container, metrics, k8s_extra):
+        """ Logs cpu stats metrics
+            This method expects the metrics to come from the `stats/summary` kubelet endpoint and so has a translation
+            to the metric names we expect from the docker client
+
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
+        """
+        self.__log_metrics(
+            container,
+            self.__cpu_usage_metrics,
+            metrics,
+            k8s_extra,
+            self.__cpu_usage_cri_translation,
+        )
+
     def __log_json_metrics(self, container, metrics, k8s_extra):
         """ Log docker metrics based on the JSON response returned from querying the Docker API
 
@@ -3800,6 +3899,22 @@ cluster.
                 self.__log_memory_stats_metrics(container, value, k8s_extra)
             elif key == "cpu_stats":
                 self.__log_cpu_stats_metrics(container, value, k8s_extra)
+
+    def __log_cri_container_metrics(self, container, metrics, k8s_extra):
+        """ Log docker metrics based on the JSON response returned from querying the Docker API
+
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
+        """
+        for key, value in six.iteritems(metrics):
+            if value is None:
+                continue
+
+            if key == "memory":
+                self.__log_memory_stats_cri_metrics(container, value, k8s_extra)
+            elif key == "cpu":
+                self.__log_cpu_stats_cri_metrics(container, value, k8s_extra)
 
     def __gather_metrics_from_api_for_container(self, container, k8s_extra):
         """ Query the Docker API for container metrics
@@ -3877,6 +3992,70 @@ cluster.
                     k8s_extra = {}
             self.__gather_metrics_from_api_for_container(info["name"], k8s_extra)
 
+    def __gather_metrics_from_kubelet(self, containers, kubelet_api, cluster_name):
+        cluster_info = self.__get_cluster_info(cluster_name)
+
+        try:
+            stats = kubelet_api.query_stats()
+        except ConnectionError as e:
+            self._logger.warning(
+                "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
+                % six.text_type(e),
+                limit_once_per_x_secs=3600,
+                limit_key="kubelet-api-connection-stats",
+            )
+            return
+        except KubeletApiException as e:
+            self._logger.warning(
+                "Error querying kubelet API: %s" % six.text_type(e),
+                limit_once_per_x_secs=300,
+                limit_key="kubelet-api-query-stats",
+            )
+            return
+
+        all_k8s_extra = {}
+        containers_to_check = {}
+        use_metrics_name = False
+        for cid, info in six.iteritems(containers):
+            if "metrics_name" in info:
+                use_metrics_name = True
+            name = info["metrics_name"] if "metrics_name" in info else info["name"]
+            containers_to_check[name] = {}
+            if self.__include_controller_info:
+                k8s_extra = self.__get_k8s_controller_info(info)
+                if k8s_extra is not None:
+                    k8s_extra.update(cluster_info)
+                    k8s_extra.update({"pod_uid": name})
+                    all_k8s_extra[name] = k8s_extra
+
+        pods = stats.get("pods", [])
+
+        for pod in pods:
+            container_stats = pod.get("containers", {})
+            for container_stat in container_stats:
+                container_name = container_stat.get("name", "<unknown>")
+                if use_metrics_name:
+                    # Construct a more unique name, same as we make "metrics_name" to ensure we use the right k8s_extra
+                    pod_ref = pod.get("podRef", {})
+                    container_name = construct_metrics_container_name(
+                        container_name,
+                        pod_ref.get("name", ""),
+                        pod_ref.get("namespace", ""),
+                        pod_ref.get("uid", ""),
+                    )
+
+                if container_name in containers_to_check:
+                    k8s_extra = all_k8s_extra.get(container_name, {})
+                    self.__log_cri_container_metrics(
+                        k8s_extra["pod_uid"]
+                        if "pod_uid" in k8s_extra
+                        else container_name,
+                        container_stat,
+                        k8s_extra,
+                    )
+
+        return stats
+
     def __gather_k8s_metrics_for_node(self, node, extra):
         """
             Gathers metrics from a Kubelet API response for a specific pod
@@ -3917,7 +4096,9 @@ cluster.
                     pod_info.uid, self.__k8s_pod_network_metrics, metrics, extra
                 )
 
-    def __gather_k8s_metrics_from_kubelet(self, containers, kubelet_api, cluster_name):
+    def __gather_k8s_metrics_from_kubelet(
+        self, containers, kubelet_api, cluster_name, stats=None
+    ):
         """
             Gathers k8s metrics from a response to a stats query of the Kubelet API
 
@@ -3939,43 +4120,43 @@ cluster.
 
             pod_info[pod.uid] = pod
 
-        try:
-            stats = kubelet_api.query_stats()
-            node = stats.get("node", {})
+        if not stats:
+            try:
+                stats = kubelet_api.query_stats()
+            except ConnectionError as e:
+                self._logger.warning(
+                    "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
+                    % six.text_type(e),
+                    limit_once_per_x_secs=3600,
+                    limit_key="kubelet-api-connection-stats",
+                )
+            except KubeletApiException as e:
+                self._logger.warning(
+                    "Error querying kubelet API: %s" % six.text_type(e),
+                    limit_once_per_x_secs=300,
+                    limit_key="kubelet-api-query-stats",
+                )
+        node = stats.get("node", {})
 
-            if node:
-                self.__gather_k8s_metrics_for_node(node, cluster_info)
+        if node:
+            self.__gather_k8s_metrics_for_node(node, cluster_info)
 
-            pods = stats.get("pods", [])
+        pods = stats.get("pods", [])
 
-            # process pod stats, skipping any that are not in our list
-            # of pod_info
-            for pod in pods:
-                pod_ref = pod.get("podRef", {})
-                pod_uid = pod_ref.get("uid", "<invalid>")
-                if pod_uid not in pod_info:
-                    continue
+        # process pod stats, skipping any that are not in our list
+        # of pod_info
+        for pod in pods:
+            pod_ref = pod.get("podRef", {})
+            pod_uid = pod_ref.get("uid", "<invalid>")
+            if pod_uid not in pod_info:
+                continue
 
-                info = pod_info[pod_uid]
-                controller_info = {}
-                if self.__include_controller_info:
-                    controller_info = self.__build_k8s_controller_info(info)
-                    controller_info.update(cluster_info)
-                self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
-
-        except ConnectionError as e:
-            self._logger.warning(
-                "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
-                % six.text_type(e),
-                limit_once_per_x_secs=3600,
-                limit_key="kubelet-api-connection-stats",
-            )
-        except KubeletApiException as e:
-            self._logger.warning(
-                "Error querying kubelet API: %s" % six.text_type(e),
-                limit_once_per_x_secs=300,
-                limit_key="kubelet-api-query-stats",
-            )
+            info = pod_info[pod_uid]
+            controller_info = {}
+            if self.__include_controller_info:
+                controller_info = self.__build_k8s_controller_info(info)
+                controller_info.update(cluster_info)
+            self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
 
     def __get_k8s_cache(self):
         k8s_cache = None
@@ -4010,31 +4191,60 @@ cluster.
 
         # gather metrics
         containers = None
-        if self.__report_container_metrics and self.__client:
-            if (
-                self.__metrics_controlled_warmer is not None
-                and not self.__metrics_controlled_warmer.is_running()
-            ):
-                self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
-                self.__metrics_controlled_warmer.start()
-            containers = _get_containers(
-                self.__client,
-                ignore_container=None,
-                glob_list=self.__glob_list,
-                k8s_cache=k8s_cache,
-                k8s_include_by_default=self.__include_all,
-                k8s_namespaces_to_include=self.__namespaces_to_include,
-                controlled_warmer=self.__metrics_controlled_warmer,
-            )
+        if self.__report_container_metrics:
+            if self.__client:
+                self._logger.debug(
+                    "Retrieving k8s container list from Docker client.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="k8s-get-containers",
+                )
+                if (
+                    self.__metrics_controlled_warmer is not None
+                    and not self.__metrics_controlled_warmer.is_running()
+                ):
+                    self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
+                    self.__metrics_controlled_warmer.start()
+                containers = _get_containers(
+                    self.__client,
+                    ignore_container=None,
+                    glob_list=self.__glob_list,
+                    k8s_cache=k8s_cache,
+                    k8s_include_by_default=self.__include_all,
+                    k8s_namespaces_to_include=self.__namespaces_to_include,
+                    controlled_warmer=self.__metrics_controlled_warmer,
+                )
+            else:
+                self._logger.debug(
+                    "Retrieving k8s container list from ContainerEnumerator.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="k8s-get-containers",
+                )
+                containers = self.__container_checker.get_containers()
         try:
             if containers:
+                stats = None
                 if self.__report_container_metrics:
                     self._logger.log(
                         scalyr_logging.DEBUG_LEVEL_3,
                         "Attempting to retrieve metrics for %d containers"
                         % len(containers),
                     )
-                    self.__gather_metrics_from_api(containers, cluster_name)
+                    if self.__metric_fetcher:
+                        self._logger.debug(
+                            "Retrieving k8s container metrics list from Docker API.",
+                            limit_once_per_x_secs=86400,
+                            limit_key="k8s-gather-metrics",
+                        )
+                        self.__gather_metrics_from_api(containers, cluster_name)
+                    else:
+                        self._logger.debug(
+                            "Retrieving k8s container metrics list from Kubelet API.",
+                            limit_once_per_x_secs=86400,
+                            limit_key="k8s-gather-metrics",
+                        )
+                        stats = self.__gather_metrics_from_kubelet(
+                            containers, self.__kubelet_api, cluster_name
+                        )
 
                 if self.__report_k8s_metrics:
                     self._logger.log(
@@ -4042,7 +4252,7 @@ cluster.
                         "Attempting to retrieve k8s metrics %d" % len(containers),
                     )
                     self.__gather_k8s_metrics_from_kubelet(
-                        containers, self.__kubelet_api, cluster_name
+                        containers, self.__kubelet_api, cluster_name, stats=stats
                     )
         except Exception as e:
             self._logger.exception(
