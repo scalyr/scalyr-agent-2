@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.20 TBD - TBD
+## 2.1.20 "TBD" - TBD
 
 <!---
 Packaged by Yan Shnayder <yan@scalyr.com> on Mar 9, 2021 14:00 -0800
