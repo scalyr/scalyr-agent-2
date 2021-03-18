@@ -16,6 +16,8 @@
 #   SCALYR_SERVER
 #   READ_API_KEY (Read api key. 'SCALYR_' prefix intentionally omitted to suppress in status -v)
 #   CIRCLE_BUILD_NUM
+#   SMOKE_TESTS_SCRIPT_REPO
+#   SMOKE_TESTS_SCRIPT_BRANCH
 #
 # Expects following positional args:
 #   $1 : smoketest image tag
@@ -36,8 +38,10 @@ max_wait=$2
 # Flag indicating whether to delete pre-existing k8s objects
 delete_existing_objects=$3
 
-# Smoketest code (built into smoketest image)
-smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
+# Smoketest code
+SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o ${FILES}/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
+smoketest_script="${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
 
 
 # container names for all test containers
