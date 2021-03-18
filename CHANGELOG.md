@@ -11,8 +11,7 @@ Improvements:
 * Add support for collecting some metrics Kubernetes when running in a CRI runtime.
 
 Bug fixes:
-* Ensure pod digest which we calculate and use to determine if pod info in the Kubernetes
-  monitor has  changed is deterministic and doesn't depend on dictionary item ordering.
+* Ensure pod digest which we calculate and use to determine if pod info in the Kubernetes monitor has  changed is deterministic and doesn't depend on dictionary item ordering.
 
 ## 2.1.19 "StarTram" - March 9, 2021
 
