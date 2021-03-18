@@ -1166,15 +1166,14 @@ class K8sActor(DockerSmokeTestActor):
             "docker.cpu.throttling.usageNanoCores"
         ]
 
-        for count, metric in enumerate(metrics_to_check):
-            self.poll_until_max_wait(
-                _query_scalyr_for_metrics(metrics_to_check),
-                "Querying server to verify upload of metrics.",
-                "Upload verified for all metrics.",
-                "Upload not verified for all metrics.",
-                exit_on_success=True,
-                exit_on_fail=True,
-            )
+        self.poll_until_max_wait(
+            _query_scalyr_for_metrics(metrics_to_check),
+            "Querying server to verify upload of metrics.",
+            "Upload verified for all metrics.",
+            "Upload not verified for all metrics.",
+            exit_on_success=True,
+            exit_on_fail=True,
+        )
 
 
 class LogstashActor(DockerSmokeTestActor):

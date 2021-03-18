@@ -46,9 +46,9 @@ SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
 
 # Smoketest code
 SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
-DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o ${FILES}/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
+DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o /tmp/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
 smoketest_script="${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
-
+echo "Grabbing smoketest script from ${SMOKE_TESTS_SCRIPT_URL}"
 
 # container names for all test containers
 # The suffixes MUST be one of (agent, uploader, verifier) to match verify_upload::DOCKER_CONTNAME_SUFFIXES
