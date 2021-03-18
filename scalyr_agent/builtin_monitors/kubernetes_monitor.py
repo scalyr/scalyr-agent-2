@@ -4004,14 +4004,14 @@ cluster.
                 limit_once_per_x_secs=3600,
                 limit_key="kubelet-api-connection-stats",
             )
-            return
+            return None
         except KubeletApiException as e:
             self._logger.warning(
                 "Error querying kubelet API: %s" % six.text_type(e),
                 limit_once_per_x_secs=300,
                 limit_key="kubelet-api-query-stats",
             )
-            return
+            return None
 
         all_k8s_extra = {}
         containers_to_check = {}
@@ -4130,12 +4130,14 @@ cluster.
                     limit_once_per_x_secs=3600,
                     limit_key="kubelet-api-connection-stats",
                 )
+                return
             except KubeletApiException as e:
                 self._logger.warning(
                     "Error querying kubelet API: %s" % six.text_type(e),
                     limit_once_per_x_secs=300,
                     limit_key="kubelet-api-query-stats",
                 )
+                return
         node = stats.get("node", {})
 
         if node:
