@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.20 TBD - TBD
+
+<!---
+Packaged by Yan Shnayder <yan@scalyr.com> on Mar 9, 2021 14:00 -0800
+--->
+
+Improvements:
+* Add support for collecting some metrics Kubernetes when running in a CRI runtime.
+
 ## 2.1.19 "StarTram" - March 9, 2021
 
 <!---
