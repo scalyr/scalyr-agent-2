@@ -23,6 +23,7 @@ import time
 import warnings
 import platform
 from string import Template
+from collections import OrderedDict
 
 import sys
 
@@ -921,6 +922,61 @@ class ContainerCheckerTest(TestConfigurationBase):
         )
         assert "zzz_templ_container_name" in result["attributes"]
         assert "xxx_test_container" == result["attributes"]["zzz_templ_container_name"]
+
+    def test_pod_info_digest(self):
+        pod_info_1 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={"a": 1, "b": 2, "c": 3},
+            container_names=["a", "b", "c", "d"],
+            annotations={"a": 1, "b": 2, "c": 3},
+            controller=None,
+        )
+
+        pod_info_2 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={"b": 2, "c": 3, "a": 1},
+            container_names=["a", "c", "b", "d"],
+            annotations={"b": 2, "c": 3, "a": 1},
+            controller=None,
+        )
+
+        pod_info_3 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels=OrderedDict([("c", 3), ("b", 2), ("a", 1)]),
+            container_names=["a", "b", "c", "d"],
+            annotations=OrderedDict([("c", 3), ("b", 2), ("a", 1)]),
+            controller=None,
+        )
+
+        pod_info_4 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels=OrderedDict([("c", 3), ("b", 2), ("a", 5)]),
+            container_names=["a", "b", "c", "d"],
+            annotations=OrderedDict([("c", 3), ("b", 2), ("a", 1)]),
+            controller=None,
+        )
+
+        # Ensure that the digest is the same even if the dict item order is not the same
+        # (dict item ordering is not guaranteed)
+        self.assertEqual(pod_info_1.digest, pod_info_2.digest)
+        self.assertEqual(pod_info_1.digest, pod_info_3.digest)
+        self.assertEqual(pod_info_2.digest, pod_info_3.digest)
+
+        self.assertTrue(pod_info_1.digest != pod_info_4.digest)
+        self.assertTrue(pod_info_2.digest != pod_info_4.digest)
+        self.assertTrue(pod_info_3.digest != pod_info_4.digest)
 
 
 class KubernetesContainerMetricsTest(ScalyrTestCase):
