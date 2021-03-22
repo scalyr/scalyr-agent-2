@@ -86,6 +86,18 @@ kubectl create configmap scalyr-config \
 --from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-${CIRCLE_BUILD_NUM} \
 --from-literal=SCALYR_SERVER=${SCALYR_SERVER}
 
+# Create an extra configmap
+cat <<EOF >./config.json
+{
+  "k8s_logs": [
+    {
+      "attributes": { "container_name": "${k8s_container_name}" }
+    }
+  ]
+}
+EOF
+kubectl create configmap scalyr-exra-config --from-file=config.json
+
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
 
@@ -117,7 +129,30 @@ echo "=================================================="
 cp k8s/scalyr-agent-2.yaml .
 perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2.yaml
-kubectl create -f scalyr-agent-2.yaml
+cat <<EOF >./extraconfig.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+spec:
+  template:
+    spec:
+      containers:
+        - env:
+          - name: SCALYR_EXTRA_CONFIG_DIR
+            value: "/etc/scalyr-agent-2/agent-extra.d"
+        volumeMounts:
+        - mountPath: /etc/scalyr-agent-2/agent-extra.d
+          name: extraconfig
+      volumes:
+      - name: extraconfig
+        configMap:
+          name: scalyr-extra-config
+EOF
+cat <<EOF >./kustomization.yaml
+resources:
+- scalyr-agent-2.yaml
+- extraconfig.yaml
+EOF
+kubectl create -k .
 # Capture agent pod
 agent_hostname=$(kubectl get pods | fgrep scalyr-agent-2 | awk {'print $1'})
 echo "Agent pod == ${agent_hostname}"
