@@ -131,7 +131,7 @@ cp .circleci/scalyr-agent-2-with-extra-config.yaml .
 perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2.yaml
 
-kubectl create -f ./scalyr-agent-2.yaml
+kubectl create -f ./scalyr-agent-2-with-extra-config.yaml
 # Capture agent pod
 agent_hostname=$(kubectl get pods | fgrep scalyr-agent-2 | awk {'print $1'})
 echo "Agent pod == ${agent_hostname}"
