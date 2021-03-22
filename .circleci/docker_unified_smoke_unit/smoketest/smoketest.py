@@ -1026,7 +1026,8 @@ class K8sActor(DockerSmokeTestActor):
                 att.get("stream") in stream_name,
                 att.get("monitor") == "agentKubernetes",
                 process_name in att.get("pod_name"),
-                att.get("container_name") == "scalyr-agent",
+                "ci-agent-k8s" in att.get("container_name"),
+                "uploader" in att.get("container_name"),
             ]
         ):
             return False
