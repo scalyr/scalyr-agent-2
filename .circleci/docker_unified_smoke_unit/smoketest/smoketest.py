@@ -258,12 +258,13 @@ class SmokeTestActor(object):
         override_serverHost=None,
         override_log=None,
         override_log_regex=None,
+        override_max_count=1,
     ):
         """
         Make url for querying Scalyr server.  Any str filter values will be url-encoded
         """
 
-        base_params = sorted(self._get_base_query_params().items())
+        base_params = sorted(self._get_base_query_params(override_max_count).items())
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
         url += "{0}/api/query?queryType=log&{1}".format(
@@ -312,10 +313,10 @@ class SmokeTestActor(object):
             print("  curl command: curl -v '{0}'".format(url))
         return url
 
-    def _get_base_query_params(self):
+    def _get_base_query_params(self, max_count):
         """Get base query params (not including filter)"""
         params = {
-            "maxCount": 1,
+            "maxCount": max_count,
             "startTime": "10m",
             "token": self._read_api_key,
         }
@@ -1104,6 +1105,7 @@ class K8sActor(DockerSmokeTestActor):
                         {},
                         override_serverHost=self._agent_hostname,
                         override_log="/var/log/scalyr-agent-2/kubernetes_monitor.log",
+                        override_max_count=100,
                     )
                 )
                 if resp.ok:
@@ -1124,7 +1126,6 @@ class K8sActor(DockerSmokeTestActor):
                     for expected_metric in metrics:
                         found_match = False
                         for match in matches:
-                            print("Expecting: %s Saw: %s" % (expected_metric, match.get("attributes", {}).get("metric", "")))
                             if match.get("attributes", {}).get("metric", "") == expected_metric:
                                 found_match = True
                                 break
