@@ -88,11 +88,11 @@ kubectl create configmap scalyr-config \
 --from-literal=SCALYR_EXTRA_CONFIG_DIR=/etc/scalyr-agent-2/agent-extra.d
 
 # Create an extra configmap
-cat <<EOF >./config.json
+cat <<'EOF' >./config.json
 {
   "k8s_logs": [
     {
-      "attributes": { "container_name": "\$\{k8s_container_name\}" }
+      "attributes": { "container_name": "${k8s_container_name}" }
     }
   ]
 }
