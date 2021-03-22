@@ -1013,7 +1013,8 @@ class K8sActor(DockerSmokeTestActor):
                     "serverHost": "scalyr-agent-2-z5c8l",
                     "container_id": "6eb4215ac1589de13089419e90cdfe08c01262e6cfb821f18061a63ab4188a87",
                     "raw_timestamp": "2019-06-29T03:16:28.058676421Z",
-                    "pod_name": "ci-agent-k8s-7777-uploader-76bcb9cf9-cb96t"
+                    "pod_name": "ci-agent-k8s-7777-uploader-76bcb9cf9-cb96t",
+                    "container_name": "ci-agent-k8s-7777-uploader",
                 },
                 "thread": "default",
                 "message": "count=1000,line_stream=<stderr>,verifier_type=Kubernetes\n",
