@@ -1124,6 +1124,7 @@ class K8sActor(DockerSmokeTestActor):
                     for expected_metric in metrics:
                         found_match = False
                         for match in matches:
+                            print("Expecting: %s Saw: %s" % (expected_metric, match.get("attributes", {}).get("metric", "")))
                             if match.get("attributes", {}).get("metric", "") == expected_metric:
                                 found_match = True
                                 break
