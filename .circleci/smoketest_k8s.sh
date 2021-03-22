@@ -92,7 +92,7 @@ cat <<EOF >./config.json
 {
   "k8s_logs": [
     {
-      "attributes": { "container_name": "${k8s_container_name}" }
+      "attributes": { "container_name": "\$\{k8s_container_name\}" }
     }
   ]
 }
