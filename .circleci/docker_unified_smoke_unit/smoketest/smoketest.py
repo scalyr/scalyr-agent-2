@@ -1101,7 +1101,7 @@ class K8sActor(DockerSmokeTestActor):
             def _func():
                 resp = requests.get(
                     self._make_query_url(
-                        {"metric": "*"},
+                        {},
                         override_serverHost=self._agent_hostname,
                         override_log="/var/log/scalyr-agent-2/kubernetes_monitor.log",
                     )
