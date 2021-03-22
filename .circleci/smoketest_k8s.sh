@@ -127,13 +127,9 @@ echo "Customizing daemonset YAML & starting agent"
 echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
-cp k8s/scalyr-agent-2.yaml .
+cp .circleci/scalyr-agent-2-with-extra-config.yaml .
 perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2.yaml
-perl -pi.bak -e 's/volumeMounts\:\s+(\S+)/volumeMounts:\n        - mountPath\: \/etc\/scalyr-agent-2\/agent-extra.d\n          name\: extraconfig/' scalyr-agent-2.yaml
-perl -pi.bak -e 's/volumes\:\s+(\S+)/volumes:\n      - name\: extraconfig\n        configMap\:\n          name\: scalyr-extra-config/' scalyr-agent-2.yaml
-
-cat ./scalyr-agent-2.yaml
 
 kubectl create -f ./scalyr-agent-2.yaml
 # Capture agent pod
