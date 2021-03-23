@@ -2683,6 +2683,69 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         matched_config = lcm.get_config("test_somethingarbitrary:test")
         self.assertEqual("TestParser", matched_config["parser"])
 
+    def test_glob_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "unit": "test*test" }, parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config({"unit": "testtest"})
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config({"unit": "other_test"})
+        self.assertEqual("journald", matched_config["parser"])
+        matched_config = lcm.get_config({"unit": "test_somethingarbitrary:test"})
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_multiple_glob_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "unit": "test*test", "container": "f?obar" }, parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        # test matches both
+        matched_config = lcm.get_config({"unit": "testtest", "container": "frobar"})
+        self.assertEqual("TestParser", matched_config["parser"])
+
+        # test when matches one glob but not the other
+        matched_config = lcm.get_config({"unit": "testtest", "container": "foobaz"})
+        self.assertNotEqual("TestParser", matched_config["parser"])
+
+        # test when matches one glob, but other one missing
+        matched_config = lcm.get_config({"unit": "test_other_test"})
+        self.assertNotEqual("TestParser", matched_config["parser"])
+
+    def test_unit_regex_and_globs_both_defined(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "baz": "test*test", "container": "f?obar" }, parser: "TestParser", journald_unit: "scalyr" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        # self.assertRaises( BadMonitorConfiguration,
+        self.assertRaises(BadConfiguration, lambda: LogConfigManager(config, None))
+
     def test_big_config(self):
         self._write_file_with_separator_conversion(
             """ {

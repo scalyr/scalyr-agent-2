@@ -404,7 +404,7 @@ seconds and then polls again.
             self._max_log_size,
             self._max_log_rotations,
         )
-        self.log_config = self.log_manager.get_config(".*")
+        self.log_config = self.log_manager.get_config({"unit": ".*"})
 
     def run(self):
         self.log_manager.set_log_watcher(self._log_watcher)
@@ -542,11 +542,10 @@ seconds and then polls again.
         for entry in self._journal:
             try:
                 msg = entry.get("MESSAGE", "")
-                extra = self._get_extra_fields(entry)
-                unit = extra.get("unit", "")
-                logger = self.log_manager.get_logger(unit)
-                config = self.log_manager.get_config(unit)
-                logger.info(self.format_msg(msg, config, extra))
+                fields = self._get_extra_fields(entry)
+                logger = self.log_manager.get_logger(fields)
+                config = self.log_manager.get_config(fields)
+                logger.info(self.format_msg(msg, config, fields))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
