@@ -1546,8 +1546,8 @@ jobs:
             deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /
             EOF
 
-            apt-get update
-            apt-get install ca-certificates
+            sudo apt-get update
+            sudo apt-get install ca-certificates
             curl -Lo Release1.key https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key
             sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add Release1.key
             curl -Lo Release2.key https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/Release.key
