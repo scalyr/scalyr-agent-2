@@ -1538,6 +1538,8 @@ jobs:
       - run:
           name: setup CRI-O
           command: |
+            lsb_release -a
+
             sudo mkdir -p /etc/apt/sources.list.d
 
             cat \<<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
