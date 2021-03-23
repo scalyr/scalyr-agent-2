@@ -1509,7 +1509,8 @@ jobs:
     machine:
       image: circleci/classic:201808-01
     environment:
-      K8S_VERSION: v1.10.0
+      K8S_VERSION: v1.20.0
+      VERSION: 1.20
       KUBECONFIG: /home/circleci/.kube/config
       MINIKUBE_VERSION: v1.17.1
       MINIKUBE_WANTUPDATENOTIFICATION: false
