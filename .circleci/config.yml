@@ -1516,7 +1516,7 @@ jobs:
       MINIKUBE_WANTREPORTERRORPROMPT: false
       MINIKUBE_HOME: /home/circleci
       CHANGE_MINIKUBE_NONE_USER: true
-      OS: CentOS_8
+      OS: xUbuntu_18.04
     steps:
       - checkout
       - restore_cache:
@@ -1537,10 +1537,20 @@ jobs:
       - run:
           name: setup CRI-O
           command: |
-            sudo mkdir -p /etc/yum.repos.d
-            sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/devel:kubic:libcontainers:stable.repo
-            sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable:cri-o:$K8S_VERSION.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$K8S_VERSION/$OS/devel:kubic:libcontainers:stable:cri-o:$K8S_VERSION.repo
-            sudo yum install cri-o
+            sudo mkdir -p /etc/apt/sources.list.d
+
+            cat \<<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+            deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /
+            EOF
+            cat \<<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+            deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /
+            EOF
+
+            curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
+            curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
+
+            sudo apt-get update
+            sudo apt-get install cri-o cri-o-runc
             sudo systemctl daemon-reload
             sudo systemctl enable crio --now
       - run:
