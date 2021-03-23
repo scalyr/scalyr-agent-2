@@ -2470,6 +2470,8 @@ workflows:
          context: scalyr-agent
      - smoke-k8s:
          context: scalyr-agent
+     - smoke-k8s-cri:
+         context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
      - sonarcloud-scan:
