@@ -1507,7 +1507,7 @@ jobs:
   smoke-k8s-cri:
     working_directory: ~/scalyr-agent-2
     machine:
-      image: circleci/classic:201808-01
+      image: ubuntu-2004:202101-01
     environment:
       K8S_VERSION: v1.20.0
       VERSION: 1.20
@@ -1517,7 +1517,7 @@ jobs:
       MINIKUBE_WANTREPORTERRORPROMPT: false
       MINIKUBE_HOME: /home/circleci
       CHANGE_MINIKUBE_NONE_USER: true
-      OS: xUbuntu_18.04
+      OS: xUbuntu_20.04
     steps:
       - checkout
       - restore_cache:
