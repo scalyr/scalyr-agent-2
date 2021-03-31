@@ -28,10 +28,34 @@ from scalyr_agent.configuration import Configuration
 
 import six
 
+"""
+The main idea of the checkpoint files is to store the states of the currently running LogFileProcessors in files, so
+the agent can continue reading files from the point where it has stopped.
+
+Since the log copying activity is distributed among worker sessions, those sessions have their own checkpoint files.
+The overall state of the particular worker session is periodically written to the checkpoint file
+named "checkpoints-worker-<WORKER_SESSION_ID>.json". This file contains the checkpoint states for every log file processor
+in the worker session.
+
+Besides that file, there is also the "active-checkpoints" file. This file contains only checkpoint states for the log processors
+that have been active during the current worker session iteration. This is needed to save the latest progress as soon as
+possible to minimize the chance of data loss if something unexpected happens.
+
+Before the agent starts, it looks for all checkpoint files that may be left from the previous run, reads and writes them
+into a "consolidated" checkpoint file named "checkpoints.json" so, after that, worker sessions can start writing to their
+checkpoint files and their previous progress won't be lost. NOTE: The consolidated file is also created on the agent stop
+but that is not so reliable, since the agent may be stopped in non-gracefully manner.
+
+
+"""
+
 
 def read_checkpoint_state_from_file(
     file_path, logger
 ):  # type: (six.text_type, AgentLogger) -> Optional[Dict]
+    """
+    Read checkpoint file from the given path and handle some basic error, if occurred.
+    """
 
     if not os.path.exists(file_path):
         return None
@@ -87,7 +111,9 @@ def update_checkpoint_state_in_file(
 
 
 def write_checkpoint_state_to_file(checkpoints, file_path, current_time):
-
+    """
+    Write the the checkpoints collection to file.
+    """
     tmp_path = file_path + "~"
     state = {
         "time": current_time,

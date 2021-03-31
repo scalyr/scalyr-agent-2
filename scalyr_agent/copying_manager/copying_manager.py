@@ -53,7 +53,7 @@ from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.scalyr_client import ScalyrClientSessionStatus
-from scalyr_agent.copying_manager.common import (
+from scalyr_agent.copying_manager.checkpoints import (
     update_checkpoint_state_in_file,
     read_checkpoint_state_from_file,
     write_checkpoint_state_to_file,
@@ -1086,22 +1086,38 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
 
-    def _merge_checkpoints(self, checkpoints_to_merge):  # type: (List[Dict]) -> Dict
+    @staticmethod
+    def _merge_checkpoints(checkpoints_to_merge):  # type: (List[Dict]) -> Dict
+        """
+        Merge multiple collections of the checkpoints, which are given in the *checkpoints_to_merge* listand return
+        one result checkpoints collection.
+        """
         result = {}  # type: Dict
         for states in checkpoints_to_merge:
             for path, state in states.items():
+
+                # if there is a checkpoint state in the result and also another checkpoint state  for the same log path,
+                # then the state with the most recent 'time' field value if picked.
                 state_time = state.get("time", 0)
                 result_state_time = result.get(path, {}).get("time", 0)
+
                 if state_time > result_state_time:
                     result[path] = state
 
         return result
 
     def _get_closed_log_processor_checkpoints(self):
+        """
+        Get all checkpoint states for all closed log processors from all workers.
+        NOTE: In case if different worker sessions has checkpoints for the same log file processors, then the mosr
+        recent is picked.
+        """
         checkpoints_to_merge = []
         for worker in self.__workers.values():
             for worker_session in worker.sessions:
-                closed_checkpoints = worker_session.get_closed_files_checkpoints()
+                closed_checkpoints = (
+                    worker_session.get_and_reset_closed_files_checkpoints()
+                )
                 checkpoints_to_merge.append(closed_checkpoints)
 
         result_checkpoints = self._merge_checkpoints(checkpoints_to_merge)
@@ -1130,6 +1146,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
+        # Before we scan for the new log files for dynamically added log matchers, we have to prepare the checkpoints.
+        # Read previously saved checkpoints.
         file_checkpoints = self.__read_checkpoint_state(
             self._consolidated_checkpoint_file_path
         )
@@ -1137,8 +1155,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             current_checkpoints = file_checkpoints["checkpoints"]
         else:
             current_checkpoints = {}
+
+        # Get the closed checkpoints from all workers and also combine them with checkpoints from the file.
         closed_checkpoints = self._get_closed_log_processor_checkpoints()
         checkpoints = self._merge_checkpoints([current_checkpoints, closed_checkpoints])
+
+        # write the resulting checkpoints collection back to checkpoints file.
         write_checkpoint_state_to_file(
             checkpoints, self._consolidated_checkpoint_file_path, time.time()
         )
@@ -1348,6 +1370,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     @property
     def _consolidated_checkpoint_file_path(self):
+        """
+        Path for the current main checkpoint file.
+        """
         return os.path.join(
             self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
@@ -1362,6 +1387,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         consolidated_checkpoints_path = os.path.join(
             self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
+
         update_checkpoint_state_in_file(
             checkpoints, consolidated_checkpoints_path, time.time(), self.__config, log
         )

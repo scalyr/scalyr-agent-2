@@ -43,7 +43,7 @@ from scalyr_agent.scalyr_client import (
     ScalyrClientSession,
     ScalyrClientSessionStatus,
 )
-from scalyr_agent.copying_manager.common import (
+from scalyr_agent.copying_manager.checkpoints import (
     update_checkpoint_state_in_file,
     write_checkpoint_state_to_file,
 )
@@ -1034,6 +1034,10 @@ class CopyingManagerWorkerSession(
             processor.scan_for_new_bytes(current_time)
 
     def _remove_closed_log_processors_and_save_checkpoints(self):
+        """
+        Remove all log processors that are closed and also save their checkpoints, so they can be sent to
+        the main copying manager checkpoints file.
+        """
         new_log_processors = []
 
         for processor in self.__log_processors:
@@ -1050,16 +1054,21 @@ class CopyingManagerWorkerSession(
         with self._closed_files_checkpoints_lock:
             self._closed_files_checkpoints.update(checkpoints)
 
-    def get_closed_files_checkpoints(self):  # type: () -> Dict[six.text_type, Any]
+    def get_and_reset_closed_files_checkpoints(
+        self,
+    ):  # type: () -> Dict[six.text_type, Any]
         """
-        This method returns the full collection of the current log processor checkpoint states.
-        It also mainly designed to be called from the outside threads, so the checkpoint object should be protected
-        by the lock.
+        Return the collection of the checkpoints of the log processors that were closed after the previous call of this
+        method.
+        It also mainly designed to be called from the main copying manager thread to collect closed checkpoint states and
+        write them to the main checkpoints file.
         :return: the dict of the checkpoint states of the current log processors.
         """
 
         with self._closed_files_checkpoints_lock:
             result = self._closed_files_checkpoints
+
+            # Empty the collection, since the current collections have already been returned.
             self._closed_files_checkpoints = {}
 
         return result
@@ -1093,7 +1102,7 @@ class CopyingManagerWorkerSession(
 
         checkpoints = self._get_log_processors_checkpoints(log_processors, current_time)
 
-        for processor in self.__log_processors:
+        for processor in log_processors:
             # set this log processor inactive, so it won't be included into the "active" checkpoints
             # until it is marked as active again.
             processor.set_inactive()
@@ -1344,7 +1353,7 @@ WORKER_SESSION_PROXY_EXPOSED_METHODS = [
     six.ensure_str("schedule_new_log_processor"),
     six.ensure_str("get_log_processors"),
     six.ensure_str("create_and_schedule_new_log_processor"),
-    six.ensure_str("get_closed_files_checkpoints"),
+    six.ensure_str("get_and_reset_closed_files_checkpoints"),
 ]
 
 # create base proxy class for the worker session, here we also specify all its methods that may be called through proxy.

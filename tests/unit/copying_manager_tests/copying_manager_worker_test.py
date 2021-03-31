@@ -708,11 +708,11 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         assert self._wait_for_rpc_and_respond() == ["Third line"]
 
         # check if the collection of the checkpoints for the closed files is empty until some log processor is closed.
-        assert worker.get_closed_files_checkpoints() == {}
+        assert worker.get_and_reset_closed_files_checkpoints() == {}
 
         # close log processor and check if its checkpoint in the collection for the closed processors.
         processor.close()
         worker.wait_for_full_iteration()
-        closed_files_checkpoints = worker.get_closed_files_checkpoints()
+        closed_files_checkpoints = worker.get_and_reset_closed_files_checkpoints()
 
         assert processor.get_log_path() in closed_files_checkpoints
