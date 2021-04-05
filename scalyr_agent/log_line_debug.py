@@ -268,6 +268,9 @@ class DebugEvent(scalyr_client.Event, DebugMixin):
         )
 
 class DebugAddEventRequest(scalyr_client.AddEventsRequest, DebugMixin):
+
+    # pattern to find the threads list at the end of the payload. This will help to determine if needed container logs
+    # are presented in the current request payload
     SEARCH_PATTERN = re.compile(r"threads:\s+(\[.+\]),\s+client_time")
     def get_payload(self):
         global CONTAINER_ID
