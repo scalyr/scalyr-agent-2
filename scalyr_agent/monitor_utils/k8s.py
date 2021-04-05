@@ -411,33 +411,41 @@ class PodInfo(object):
         # generate a hash we can use to compare whether or not
         # any of the pod info has changed
         md5 = hashlib.md5()
-        md5.update(name)
-        md5.update(namespace)
-        md5.update(uid)
-        md5.update(node_name)
+        md5.update(name.encode("utf-8"))
+        md5.update(namespace.encode("utf-8"))
+        md5.update(uid.encode("utf-8"))
+        md5.update(node_name.encode("utf-8"))
+
+        # NOTE: Dictionary ordering is not guaranteed when not using OrderedDict so we need to sort
+        # them to ensure consistent and stable order and digest.
 
         # flatten the labels dict in to a single string because update
         # expects a string arg.  To avoid cases where the 'str' of labels is
         # just the object id, we explicitly create a flattened string of
         # key/value pairs
         flattened = []
-        for k, v in six.iteritems(labels):
-            flattened.append(k)
-            flattened.append(v)
-        md5.update("".join(flattened))
+
+        labels_dict_keys = sorted(labels.keys())
+        for key in labels_dict_keys:
+            flattened.append(key)
+            flattened.append(six.text_type(labels[key]))
+
+        md5.update("".join(flattened).encode("utf-8"))
 
         # flatten the container names
         # see previous comment for why flattening is necessary
-        md5.update("".join(container_names))
+        md5.update("".join(sorted(container_names)).encode("utf-8"))
 
         # flatten the annotations dict in to a single string
         # see previous comment for why flattening is necessary
         flattened = []
-        for k, v in six.iteritems(annotations):
-            flattened.append(k)
-            flattened.append(six.text_type(v))
 
-        md5.update("".join(flattened))
+        annotations_dict_keys = sorted(annotations.keys())
+        for key in annotations_dict_keys:
+            flattened.append(key)
+            flattened.append(six.text_type(annotations[key]))
+
+        md5.update("".join(flattened).encode("utf-8"))
 
         self.digest = md5.digest()
 
