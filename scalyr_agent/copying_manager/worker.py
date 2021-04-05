@@ -395,13 +395,10 @@ class CopyingManagerWorkerSession(
         self.__last_total_bytes_copied = 0
         self.__last_total_bytes_pending = 0
 
-        # the collection of the closed checkpoints that have to be used by the copying manager and stored in its
-        # checkpoint file.
+        # the collection of the closed checkpoints that have to be used by the copying manager and stored in
+        # its checkpoint file.
         self._closed_files_checkpoints = {}  # type: Dict
         self._closed_files_checkpoints_lock = threading.Lock()
-
-        # the list of the closed log file processors. All log processors are moved here after it has been closed and
-        self._closed_log_processors = []  # type: List
 
     @property
     def expanded_server_attributes(self):
@@ -510,8 +507,10 @@ class CopyingManagerWorkerSession(
 
                         # Collect log lines to send if we don't have one already.
                         if self.__pending_add_events_task is None:
-                            self.__pending_add_events_task = self.__get_next_add_events_task(
-                                copying_params.current_bytes_allowed_to_send
+                            self.__pending_add_events_task = (
+                                self.__get_next_add_events_task(
+                                    copying_params.current_bytes_allowed_to_send
+                                )
                             )
                         else:
                             log.log(
@@ -562,9 +561,11 @@ class CopyingManagerWorkerSession(
                                 # have to wait before we send the next request.
                                 pipeline_time = time.time()
                                 self.total_pipelined_requests += 1
-                                self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
-                                    copying_params.current_bytes_allowed_to_send,
-                                    for_pipelining=True,
+                                self.__pending_add_events_task.next_pipelined_task = (
+                                    self.__get_next_add_events_task(
+                                        copying_params.current_bytes_allowed_to_send,
+                                        for_pipelining=True,
+                                    )
                                 )
                             else:
                                 pipeline_time = 0.0
@@ -647,8 +648,10 @@ class CopyingManagerWorkerSession(
 
                             # Rate limit based on amount of copied log bytes in a successful request
                             if self.__rate_limiter:
-                                time_slept = self.__rate_limiter.block_until_charge_succeeds(
-                                    log_bytes_sent
+                                time_slept = (
+                                    self.__rate_limiter.block_until_charge_succeeds(
+                                        log_bytes_sent
+                                    )
                                 )
                                 self.__total_rate_limited_time += time_slept
                                 self.__rate_limited_time_since_last_status += time_slept
@@ -720,7 +723,7 @@ class CopyingManagerWorkerSession(
                         last_full_checkpoint_write = current_time
 
                     # remove all closed log processors
-                    self._remove_closed_log_processors_and_save_checkpoints()
+                    self._remove_closed_log_processors()
 
                     if pipeline_time < copying_params.current_sleep_interval:
                         self._sleep_but_awaken_if_stopped(
@@ -803,12 +806,9 @@ class CopyingManagerWorkerSession(
                     > self._last_attempt_time
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    result.health_check_result = (
-                        "Worker session '%s' failed, max time since last copy attempt (%s seconds) exceeded"
-                        % (
-                            self._id,
-                            self.__config.healthy_max_time_since_last_copy_attempt,
-                        )
+                    result.health_check_result = "Worker session '%s' failed, max time since last copy attempt (%s seconds) exceeded" % (
+                        self._id,
+                        self.__config.healthy_max_time_since_last_copy_attempt,
                     )
 
         finally:
@@ -978,15 +978,13 @@ class CopyingManagerWorkerSession(
             # TODO:  This might not be bullet proof here.  We copy __log_processors and then update it at the end
             # We could be susceptible to exceptions thrown in the middle of this method, though now should.
 
-            # Copy the processor list because we may need to remove some processors if they are done.
-            processor_list = self.__log_processors[:]
-            self.__log_processors = []
-
             add_events_request.close()
 
             total_bytes_copied = 0
 
-            for processor in processor_list:
+            self._closed_files_checkpoints_lock.acquire()
+
+            for processor in self.__log_processors:
                 # Iterate over all the processors, seeing if we had a callback for that particular processor.
                 if processor.unique_id in all_callbacks:
                     # noinspection PyCallingNonCallable
@@ -999,12 +997,16 @@ class CopyingManagerWorkerSession(
                 else:
                     keep_it = True
 
-                if keep_it:
-                    self.__log_processors.append(processor)
-                else:
+                if not keep_it:
+                    # Close the log processor. It will be filtered out at the end of the current iteration.
                     processor.close()
-                    self._closed_log_processors.append(processor)
+                    # Also save its checkpoint state, so it can be requested by the copying manager object (by calling
+                    # the 'get_and_reset_closed_files_checkpoints' method).
+                    self._closed_files_checkpoints[
+                        processor.get_log_path()
+                    ] = processor.get_checkpoint()
 
+            self._closed_files_checkpoints_lock.release()
 
             return total_bytes_copied
 
@@ -1037,26 +1039,17 @@ class CopyingManagerWorkerSession(
         for processor in self.__log_processors:
             processor.scan_for_new_bytes(current_time)
 
-    def _remove_closed_log_processors_and_save_checkpoints(self):
+    def _remove_closed_log_processors(self):
         """
-        Remove all log processors that are closed and also save their checkpoints, so they can be sent to
-        the main copying manager checkpoints file.
+        Remove all closed log file processors.
         """
         new_log_processors = []
 
         for processor in self.__log_processors:
-            if processor.is_closed():
-                self._closed_log_processors.append(processor)
-            else:
+            if not processor.is_closed():
                 new_log_processors.append(processor)
 
         self.__log_processors = new_log_processors
-
-        checkpoints = self._get_log_processors_checkpoints(
-            self._closed_log_processors, time.time()
-        )
-        with self._closed_files_checkpoints_lock:
-            self._closed_files_checkpoints.update(checkpoints)
 
     def get_and_reset_closed_files_checkpoints(
         self,
@@ -1102,11 +1095,11 @@ class CopyingManagerWorkerSession(
 
         """
 
-        log_processors = self.__log_processors + self._closed_log_processors
+        checkpoints = self._get_log_processors_checkpoints(
+            self.__log_processors, current_time
+        )
 
-        checkpoints = self._get_log_processors_checkpoints(log_processors, current_time)
-
-        for processor in log_processors:
+        for processor in self.__log_processors:
             # set this log processor inactive, so it won't be included into the "active" checkpoints
             # until it is marked as active again.
             processor.set_inactive()
@@ -1124,8 +1117,7 @@ class CopyingManagerWorkerSession(
         self.__write_active_checkpoint_state(current_time)
 
     def __write_active_checkpoint_state(self, current_time):
-        """Writes checkpoints only for logs that have been active since the last full checkpoint write
-        """
+        """Writes checkpoints only for logs that have been active since the last full checkpoint write"""
 
         log_processors = []
 
