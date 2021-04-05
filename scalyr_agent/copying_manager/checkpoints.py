@@ -45,8 +45,6 @@ Before the agent starts, it looks for all checkpoint files that may be left from
 into a "consolidated" checkpoint file named "checkpoints.json" so, after that, worker sessions can start writing to their
 checkpoint files and their previous progress won't be lost. NOTE: The consolidated file is also created on the agent stop
 but that is not so reliable, since the agent may be stopped in non-gracefully manner.
-
-
 """
 
 

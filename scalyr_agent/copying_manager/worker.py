@@ -395,9 +395,12 @@ class CopyingManagerWorkerSession(
         self.__last_total_bytes_copied = 0
         self.__last_total_bytes_pending = 0
 
+        # the collection of the closed checkpoints that have to be used by the copying manager and stored in its
+        # checkpoint file.
         self._closed_files_checkpoints = {}  # type: Dict
         self._closed_files_checkpoints_lock = threading.Lock()
 
+        # the list of the closed log file processors. All log processors are moved here after it has been closed and
         self._closed_log_processors = []  # type: List
 
     @property
@@ -1001,6 +1004,7 @@ class CopyingManagerWorkerSession(
                 else:
                     processor.close()
                     self._closed_log_processors.append(processor)
+
 
             return total_bytes_copied
 

@@ -2212,6 +2212,7 @@ class LogFileProcessor(object):
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
 
+        # this stores the checkpoint state when the log processor is closed.
         self._saved_checkpoint = None
 
     def set_new_scalyr_client(self, new_scalyr_client):
@@ -2640,8 +2641,6 @@ class LogFileProcessor(object):
 
                         if close:
                             self._close()
-                            # self.__log_file_iterator.close()
-                            # self.__is_closed = True
 
                         return self.__is_closed, bytes_copied
 
@@ -2815,6 +2814,10 @@ class LogFileProcessor(object):
         return result
 
     def _close(self):
+        """
+        Closes the processor, closing all underlying file handles.
+        This does nothing if the processor is already closed.
+        """
         if not self.__is_closed:
             # save a checkpoint before we close a file iterator
             # to be able to get the checkpoint of the closed processor.
@@ -2824,9 +2827,8 @@ class LogFileProcessor(object):
             self.__is_closed = True
 
     def close(self):
-        """Closes the processor, closing all underlying file handles.
-
-        This does nothing if the processor is already closed.
+        """
+        Does the same as '_close' method but guards that with lock to use it from other threads.
         """
         try:
             self.__lock.acquire()
@@ -2835,7 +2837,9 @@ class LogFileProcessor(object):
             self.__lock.release()
 
     def get_checkpoint(self):
-
+        """
+        Return current state of the log file processor or the state when it has been closed.
+        """
         if self.__is_closed:
             # return the saved checkpoint state of the log processor in case if it has been closed.
             # We can't get the checkpoint from the log file iterator because all of its files have already been closed.

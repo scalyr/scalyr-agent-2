@@ -199,7 +199,7 @@ class TestableCopyingManagerFlowController:
     RESPONDING = "RESPONDING"
 
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
-    WAIT_TIMEOUT = 5000.0
+    WAIT_TIMEOUT = 5.0
 
     def __init__(self, configuration):
         # type: (TestingConfiguration) -> None
