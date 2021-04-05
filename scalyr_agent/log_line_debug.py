@@ -7,10 +7,16 @@ from __future__ import unicode_literals
 
 from __future__ import absolute_import
 import io
+import logging
+import os
+import re
+import tempfile
 
 from scalyr_agent import scalyr_logging, line_matcher, log_processing, scalyr_client
 from scalyr_agent import configuration
 from scalyr_agent import compat
+
+from scalyr_agent.platform_controller import PlatformController
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -19,6 +25,24 @@ POD_NAME = "lwbi-exporter-"
 
 # the kubernetes monitor will write the id of the needed contained in this variable.
 CONTAINER_ID = None
+
+file_logger = None
+
+original_set_log_destination = scalyr_logging.set_log_destination
+
+def scalyr_logging_set_log_destination(*args, **kwargs):
+    global file_logger
+    original_set_log_destination(*args, **kwargs)
+    file_logger = logging.getLogger("PAYLOAD")
+
+    path = os.path.join(
+        tempfile.gettempdir(),
+        "debug_payload.log"
+    )
+    file_handler = logging.FileHandler(filename=path)
+    file_logger.addHandler(file_handler)
+
+scalyr_logging.set_log_destination = scalyr_logging_set_log_destination
 
 
 def create_message(method):
@@ -243,6 +267,29 @@ class DebugEvent(scalyr_client.Event, DebugMixin):
             "Event.serialize", log, line,
         )
 
+class DebugAddEventRequest(scalyr_client.AddEventsRequest, DebugMixin):
+    SEARCH_PATTERN = re.compile(r"threads:\s+(\[.+\]),\s+client_time")
+    def get_payload(self):
+        global CONTAINER_ID
+
+        result = super(DebugAddEventRequest, self).get_payload()
+
+        payload = result.decode("utf-8", "replace")
+
+        if CONTAINER_ID is None:
+            return result
+
+        m = type(self).SEARCH_PATTERN.search(payload)
+        if m:
+            threads_string, = m.groups(1)
+
+            if CONTAINER_ID in threads_string:
+                if file_logger:
+                    log_message(
+                        "AddEventsRequest.get_payload", file_logger, payload
+                    )
+
+        return result
 
 from scalyr_agent import line_matcher
 from scalyr_agent import log_processing
@@ -251,6 +298,7 @@ from scalyr_agent import scalyr_client
 
 # replace original classes with debug versions.
 configuration.Configuration = DebugConfiguration  # type: ignore
+scalyr_client.AddEventsRequest = DebugAddEventRequest  # type: ignore
 log_processing.Event = DebugEvent  # type: ignore
 scalyr_client.Event = DebugEvent  # type: ignore
 log_processing.LogFileIterator = DebugLogFileIterator  # type: ignore
