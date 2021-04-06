@@ -313,15 +313,6 @@ class SmokeTestActor(object):
             print("  curl command: curl -v '{0}'".format(url))
         return url
 
-    def _get_base_query_params(self, max_count):
-        """Get base query params (not including filter)"""
-        params = {
-            "maxCount": max_count,
-            "startTime": "10m",
-            "token": self._read_api_key,
-        }
-        return params
-
     def poll_until_max_wait(
         self,
         verify_func,
@@ -766,7 +757,7 @@ class DockerAPIActor(DockerSmokeTestActor):
         self._seen_matching_lines = set()
         self._last_seen_timestamp = 0
 
-    def _get_base_query_params(self):
+    def _get_base_query_params(self, max_count=100):
         # NOTE: We can't really use last timestamp based querying since sometimes data appears to
         # come in out of order so we miss messages that away
         if self._last_seen_timestamp:
@@ -775,7 +766,7 @@ class DockerAPIActor(DockerSmokeTestActor):
             start_time = "10m"
 
         params = {
-            "maxCount": 100,
+            "maxCount": max_count,
             "startTime": start_time,
             "token": self._read_api_key,
         }
