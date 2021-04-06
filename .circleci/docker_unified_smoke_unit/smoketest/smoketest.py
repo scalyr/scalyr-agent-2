@@ -313,6 +313,15 @@ class SmokeTestActor(object):
             print("  curl command: curl -v '{0}'".format(url))
         return url
 
+    def _get_base_query_params(self, max_count):
+        """Get base query params (not including filter)"""
+        params = {
+            "maxCount": max_count,
+            "startTime": "10m",
+            "token": self._read_api_key,
+        }
+        return params
+
     def poll_until_max_wait(
         self,
         verify_func,
