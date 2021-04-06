@@ -8,9 +8,13 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 import io
 import logging
+import logging.handlers
 import os
 import re
 import tempfile
+
+if False:
+    from typing import Optional
 
 from scalyr_agent import scalyr_logging, line_matcher, log_processing, scalyr_client
 from scalyr_agent import configuration
@@ -26,26 +30,37 @@ POD_NAME = "lwbi-exporter-"
 # the kubernetes monitor will write the id of the needed contained in this variable.
 CONTAINER_ID = None
 
-file_logger = None
+file_logger = None # type: Optional[logging.Logger]
 
+# Since we want to write the payload of the AddEventsRequest to the separate file, we need to somehow initiate the
+# appropriate logger.
+# TODO: get more consistent place to initialize to logger.
+# Wrap the original "scalyr_logging.set_log_destination".
 original_set_log_destination = scalyr_logging.set_log_destination
+
 
 def scalyr_logging_set_log_destination(*args, **kwargs):
     global file_logger
     original_set_log_destination(*args, **kwargs)
-    file_logger = logging.getLogger("PAYLOAD")
+    file_logger = logging.getLogger("AddEventsRequestLogger")
 
     path = os.path.join(
         tempfile.gettempdir(),
         "debug_payload.log"
     )
-    file_handler = logging.FileHandler(filename=path)
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=path,
+        maxBytes=1024*1024*50, # 50 MB
+        backupCount=3
+    )
     file_logger.addHandler(file_handler)
+    file_logger.propagate = False
+
 
 scalyr_logging.set_log_destination = scalyr_logging_set_log_destination
 
 
-def create_message(method):
+def create_method_message(method):
     """
 
     Create base message with the base fields.
@@ -56,18 +71,18 @@ def create_message(method):
     return data_str
 
 
-def log_message(method, logger, message):
+def log_method_message(method, logger, message):
     """
     Log custom message.
     """
-    logger.info(", ".join([create_message(method), message]))
+    logger.info(", ".join([create_method_message(method), message]))
 
 
 def print_line_data(method, logger, line, print_line=False, additional_data=None):
     """
     Log info about the log line.
     """
-    data_str = create_message(method)
+    data_str = create_method_message(method)
 
     count = len(line)
 
@@ -194,7 +209,7 @@ class DebugLogFileIterator(log_processing.LogFileIterator, DebugMixin):
         if self.is_not_debug_file:
             return result
 
-        log_message(
+        log_method_message(
             "LogFileIterator.readline",
             log,
             "PARSE_FORMAT: {0}".format(self._LogFileIterator__parse_format),
@@ -288,8 +303,16 @@ class DebugAddEventRequest(scalyr_client.AddEventsRequest, DebugMixin):
 
             if CONTAINER_ID in threads_string:
                 if file_logger:
-                    log_message(
-                        "AddEventsRequest.get_payload", file_logger, payload
+                    file_logger.info(
+                        "REQUEST BEGINS",
+                    )
+
+                    file_logger.info(
+                        payload
+                    )
+
+                    file_logger.info(
+                        "REQUEST ENDS"
                     )
 
         return result
