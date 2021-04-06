@@ -830,7 +830,11 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                                         global_log.log(
                                             scalyr_logging.DEBUG_LEVEL_1,
                                             "Failed to process single k8s event line due to following exception: %s, %s, %s"
-                                            % (repr(e), six.text_type(e), traceback.format_exc()),
+                                            % (
+                                                repr(e),
+                                                six.text_type(e),
+                                                traceback.format_exc(),
+                                            ),
                                         )
                                         continue
                                     if pod and pod.controller:
