@@ -113,10 +113,22 @@ python build_package.py docker_${log_mode}_builder --coverage
 agent_image="agent-ci/scalyr-agent-docker-${log_mode}:${fakeversion}"
 docker build -t ${agent_image} .
 
+# Create extra configuration expected in tests
+cat <<'EOF' >/tmp/config.json
+{
+  "k8s_logs": [
+    {
+      "attributes": { "container_name": "${k8s_container_name}" }
+    }
+  ]
+}
+EOF
+
 # Launch Agent container (which begins gathering stdout logs)
 docker run -d --name ${contname_agent} \
 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
 -v /var/run/docker.sock:/var/scalyr/docker.sock \
+-v /tmp/extra.json:/etc/scalyr-agent-2/agent.d/extra.json \
 ${jsonlog_containers_mount} ${syslog_driver_portmap} \
 ${agent_image}
 
