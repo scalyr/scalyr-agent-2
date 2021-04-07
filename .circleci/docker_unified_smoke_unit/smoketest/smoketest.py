@@ -887,6 +887,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                 % (str(self._seen_matching_lines))
             )
 
+        print("Expected lines seen so far:")
         for seen in self._seen_matching_lines:
             print(seen)
 
