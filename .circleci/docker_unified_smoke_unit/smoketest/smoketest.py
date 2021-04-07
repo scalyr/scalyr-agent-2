@@ -799,7 +799,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                         override_log_regex=self._get_uploader_override_logfilename_regex(
                             stream_name=stream_name, process_name=process_name
                         ),
-                        override_max_count=500,
+                        override_max_count=100,
                         message=None,
                     )
                 )
@@ -887,10 +887,6 @@ class DockerAPIActor(DockerSmokeTestActor):
                 "Found all the required log lines (%s)"
                 % (str(self._seen_matching_lines))
             )
-
-        print("Expected lines seen so far:")
-        for seen in self._seen_matching_lines:
-            print(seen)
 
         return success
 
