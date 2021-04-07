@@ -668,7 +668,6 @@ class DockerSmokeTestActor(SmokeTestActor):
         def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
             def _func():
                 process_name = self._get_process_name_for_suffix(contname_suffix)
-                print('Process name: %s' % process_name)
                 resp = requests.get(
                     self._make_query_url(
                         self._get_extra_query_attributes(stream_name, process_name),
@@ -887,6 +886,9 @@ class DockerAPIActor(DockerSmokeTestActor):
                 "Found all the required log lines (%s)"
                 % (str(self._seen_matching_lines))
             )
+
+        for seen in self._seen_matching_lines:
+            print(seen)
 
         return success
 
