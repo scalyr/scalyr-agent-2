@@ -1089,7 +1089,7 @@ class CopyingManager(StoppableThread, LogWatcher):
     @staticmethod
     def _merge_checkpoints(checkpoints_to_merge):  # type: (List[Dict]) -> Dict
         """
-        Merge multiple collections of the checkpoints, which are given in the *checkpoints_to_merge* listand return
+        Merge multiple collections of the checkpoints, which are given in the *checkpoints_to_merge* list and return
         one result checkpoints collection.
         """
         result = {}  # type: Dict
@@ -1109,7 +1109,7 @@ class CopyingManager(StoppableThread, LogWatcher):
     def _get_closed_log_processor_checkpoints(self):
         """
         Get all checkpoint states for all closed log processors from all workers.
-        NOTE: In case if different worker sessions has checkpoints for the same log file processors, then the mosr
+        NOTE: In case if different worker sessions has checkpoints for the same log file processors, then most
         recent is picked.
         """
         checkpoints_to_merge = []
@@ -1123,6 +1123,44 @@ class CopyingManager(StoppableThread, LogWatcher):
         result_checkpoints = self._merge_checkpoints(checkpoints_to_merge)
 
         return result_checkpoints
+
+    def _update_and_get_checkpoint_states(self):
+        """
+        This is used to get the most recent information about the available log file checkpoint states.
+        The checkpoints states from the previous agent run has to be read from the main "checkpoint.json" file,
+        but there are also may be log processors that have been closed during the current run. To handle this case,
+        we also have to poll all sessions from all workers and get the checkpoint states of the
+        recently closed log file processors. Before that, we just read all worker sessions checkpoint files but this
+        led to race condition.
+
+        NOTE: Since there is only one place where we have to get the checkpoints, it's OK to keep the fetching of the
+        checkpoints and the updating of the checkpoint file in the same method (because we don't have to read the
+        checkpoint file twice). But if there is a need to get the checkpoints multiple times in different places,
+        then it should be better the split the checkpoint reading and updating in different methods.
+        It's also worth mentioning that it's better to read and use the checkpoints collection "inplace" without
+        saving it in some "long-living" variable (e.g. instance attribute), since the checkpoint collection may be big
+        enough to affect the memory usage.
+        """
+
+        # Get the checkpoint states from the checkpoint file.
+        file_checkpoints = self.__read_checkpoint_state(
+            self._consolidated_checkpoint_file_path
+        )
+        if file_checkpoints:
+            current_checkpoints = file_checkpoints["checkpoints"]
+        else:
+            current_checkpoints = {}
+
+        # Get the closed checkpoints from all workers and also combine them with checkpoints from the file.
+        closed_checkpoints = self._get_closed_log_processor_checkpoints()
+        checkpoints = self._merge_checkpoints([current_checkpoints, closed_checkpoints])
+
+        # write the resulting checkpoints collection back to checkpoints file.
+        write_checkpoint_state_to_file(
+            checkpoints, self._consolidated_checkpoint_file_path, time.time()
+        )
+
+        return checkpoints
 
     def __scan_for_pending_log_files(self):
         """
@@ -1146,24 +1184,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        # Before we scan for the new log files for dynamically added log matchers, we have to prepare the checkpoints.
-        # Read previously saved checkpoints.
-        file_checkpoints = self.__read_checkpoint_state(
-            self._consolidated_checkpoint_file_path
-        )
-        if file_checkpoints:
-            current_checkpoints = file_checkpoints["checkpoints"]
-        else:
-            current_checkpoints = {}
-
-        # Get the closed checkpoints from all workers and also combine them with checkpoints from the file.
-        closed_checkpoints = self._get_closed_log_processor_checkpoints()
-        checkpoints = self._merge_checkpoints([current_checkpoints, closed_checkpoints])
-
-        # write the resulting checkpoints collection back to checkpoints file.
-        write_checkpoint_state_to_file(
-            checkpoints, self._consolidated_checkpoint_file_path, time.time()
-        )
+        # Before we scan for the new log files for dynamically added log matchers, we have to prepare the checkpoints,
+        # so the freshly matched files can be read from their previous positions.
+        checkpoints = self._update_and_get_checkpoint_states()
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []

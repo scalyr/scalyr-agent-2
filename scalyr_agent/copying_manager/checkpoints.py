@@ -41,10 +41,11 @@ Besides that file, there is also the "active-checkpoints" file. This file contai
 that have been active during the current worker session iteration. This is needed to save the latest progress as soon as
 possible to minimize the chance of data loss if something unexpected happens.
 
-Before the agent starts, it looks for all checkpoint files that may be left from the previous run, reads and writes them
-into a "consolidated" checkpoint file named "checkpoints.json" so, after that, worker sessions can start writing to their
-checkpoint files and their previous progress won't be lost. NOTE: The consolidated file is also created on the agent stop
-but that is not so reliable, since the agent may be stopped in non-gracefully manner.
+When the agent starts but before the individual workers start executing, the agent looks for all checkpoint files
+that may be left from the previous run, reads and writes them into a "consolidated" checkpoint file named "checkpoints.json"
+so, after that, worker sessions can start writing to their checkpoint files and their previous progress won't be lost.
+NOTE: The consolidated file is also created on the agent stop but that is not so reliable, since the agent may be
+stopped in non-gracefully manner.
 """
 
 
@@ -97,6 +98,9 @@ def update_checkpoint_state_in_file(
     # remove stale checkpoint states.
     for path, state in list(checkpoints.items()):
         state_timestamp = state.get("time")
+
+        # Keep the checkpoint state if it doesn't have a timestamp. This may occur when the checkpoint state is created
+        # by the prior versions of the agent.
         if state_timestamp is None:
             continue
 
