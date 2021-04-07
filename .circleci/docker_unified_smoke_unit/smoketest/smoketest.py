@@ -799,6 +799,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                         override_log_regex=self._get_uploader_override_logfilename_regex(
                             stream_name=stream_name, process_name=process_name
                         ),
+                        override_max_count=500,
                         message=None,
                     )
                 )
