@@ -979,29 +979,35 @@ class CopyingManagerWorkerSession(
 
             total_bytes_copied = 0
 
+            # Use the temporary dict for the closed checkpoint states, so we don't have to hold the closed checkpoints
+            # lock acquired throughout the whole loop.
+            closed_files_checkpoints = {}
+
+            for processor in self.__log_processors:
+                # Iterate over all the processors, seeing if we had a callback for that particular processor.
+                if processor.unique_id in all_callbacks:
+                    # noinspection PyCallingNonCallable
+                    # If we did have a callback for that processor, report the status and see if we callback is done.
+                    (closed_processor, bytes_copied) = all_callbacks[
+                        processor.unique_id
+                    ](result)
+                    keep_it = not closed_processor
+                    total_bytes_copied += bytes_copied
+                else:
+                    keep_it = True
+
+                if not keep_it:
+                    # Close the log processor. It will be filtered out at the end of the current iteration.
+                    processor.close()
+                    # Also save its checkpoint state, so it can be requested by the copying manager object (by
+                    # calling the 'get_and_reset_closed_files_checkpoints' method).
+                    closed_files_checkpoints[
+                        processor.get_log_path()
+                    ] = processor.get_checkpoint()
+
+            # add new closed checkpoints to the main closed checkpoints collection.
             with self._closed_files_checkpoints_lock:
-
-                for processor in self.__log_processors:
-                    # Iterate over all the processors, seeing if we had a callback for that particular processor.
-                    if processor.unique_id in all_callbacks:
-                        # noinspection PyCallingNonCallable
-                        # If we did have a callback for that processor, report the status and see if we callback is done.
-                        (closed_processor, bytes_copied) = all_callbacks[
-                            processor.unique_id
-                        ](result)
-                        keep_it = not closed_processor
-                        total_bytes_copied += bytes_copied
-                    else:
-                        keep_it = True
-
-                    if not keep_it:
-                        # Close the log processor. It will be filtered out at the end of the current iteration.
-                        processor.close()
-                        # Also save its checkpoint state, so it can be requested by the copying manager object (by
-                        # calling the 'get_and_reset_closed_files_checkpoints' method).
-                        self._closed_files_checkpoints[
-                            processor.get_log_path()
-                        ] = processor.get_checkpoint()
+                self._closed_files_checkpoints.update(closed_files_checkpoints)
 
             return total_bytes_copied
 
