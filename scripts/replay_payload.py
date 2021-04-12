@@ -49,11 +49,6 @@ from urllib.parse import quote_plus
 
 import requests
 
-from scalyr_agent.util import SUPPORTED_COMPRESSION_ALGORITHMS
-from scalyr_agent.util import COMPRESSION_TYPE_TO_DEFAULT_LEVEL
-from scalyr_agent.util import get_compress_and_decompress_func
-
-from benchmarks.micro.utils import generate_add_events_request
 from scalyr_agent import compat
 
 SCALYR_TOKEN = compat.os_getenv_unicode("SCALYR_TOKEN")
@@ -84,14 +79,16 @@ def reset_payload_timestamps(payload: dict):
     return payload
 
 
-def get_query_url(scalyr_url: str, params: dict = None, filters: List[str] = None) -> str:
+def get_query_url(
+    scalyr_url: str, params: dict = None, filters: List[str] = None
+) -> str:
     params = params or {}
     parsed_url = urlparse(SCALYR_URL)
 
     url = "%s://%s/api/query?queryType=log" % (parsed_url.scheme, parsed_url.netloc)
 
     if params:
-        url += ("&%s" % (urlencode(params)))
+        url += "&%s" % (urlencode(params))
 
     if filters:
         url += "&filter=%s" % ("+and+".join(filters))
@@ -99,9 +96,12 @@ def get_query_url(scalyr_url: str, params: dict = None, filters: List[str] = Non
     return url
 
 
-
-def main(path: str, reset_timestamps: bool = False, add_request_id: bool = False,
-         query: bool = False) -> None:
+def main(
+    path: str,
+    reset_timestamps: bool = False,
+    add_request_id: bool = False,
+    query: bool = False,
+) -> None:
     with open(path, "r") as fp:
         content = fp.read()
 
@@ -131,7 +131,7 @@ def main(path: str, reset_timestamps: bool = False, add_request_id: bool = False
         time.sleep(5)
 
         print("Search data")
-        filter_value = ('requestId==%s' % (quote_plus('"%s"' % (request_id))))
+        filter_value = "requestId==%s" % (quote_plus('"%s"' % (request_id)))
         params = {
             "maxCount": 100,
             "startTime": "12h",
@@ -145,6 +145,7 @@ def main(path: str, reset_timestamps: bool = False, add_request_id: bool = False
         print("Status code: %s" % (res.status_code))
         print("Response body")
         pprint(res.json())
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
