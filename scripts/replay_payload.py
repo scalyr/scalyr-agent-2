@@ -42,6 +42,7 @@ import datetime
 import argparse
 import time
 
+from io import open
 from pprint import pprint
 from urllib.parse import urlparse
 from urllib.parse import urlencode
