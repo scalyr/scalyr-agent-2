@@ -371,6 +371,60 @@ class ScalyrAgent(object):
         try:
             # Execute the command.
             if command == "start":
+
+                # the quick/durty hack to send the AddEventsRequest payload
+                if True:
+
+                    from scalyr_agent.scalyr_client import create_client
+                    import  re
+                    import time
+                    import datetime
+
+                    client = create_client(self.__config)
+
+                    # read  the file with the request payload
+                    with open("<set your path>", "rb") as f:
+                        payload = f.read().strip()
+
+
+                    # replace the original data with the information from the current session
+                    # change the token
+                    payload = re.sub(rb'"token":"([^"]+)"', '"token":"{}"'.format(self.__config.api_key).encode("ascii"), payload)
+                    # change the session
+                    payload = re.sub(rb'"session":"([^"]+)"', '"session":"{}"'.format(client.session_id).encode("ascii"), payload)
+
+                    # change the host name
+                    payload = re.sub(
+                        rb'"serverHost":"([^"]+)"',
+                        '"serverHost":"{}"'.format(
+                            self.__config.server_attributes["serverHost"]).encode("ascii"),
+                        payload
+                    )
+
+                    ts = int(time.time())
+                    ts_nano = ts * 1000000000
+
+                    dt = datetime.datetime.now().isoformat()
+
+                    # change the "ts" field in each event to the current timestamp
+                    payload = re.sub(rb'ts:"\d+"', 'ts:"{}"'.format(ts_nano).encode("ascii"), payload)
+                    # do the same with the 'raw_timestamp'
+                    payload = re.sub(rb'"raw_timestamp":"([^"]+)"', '"raw_timestamp":"{}"'.format(dt).encode("ascii"),
+                                     payload)
+
+                    # do the same with the 'client_time' value of the whole request
+                    payload = re.sub(rb'client_time: \d+', 'client_time: "{}"'.format(ts).encode("ascii"), payload)
+
+                    def generate_body():
+                        return payload
+
+                    client._ScalyrClientSession__send_request(
+                        "/addEvents", body_func=generate_body, block_on_response=True,
+                    )
+                    #client.send_payload(payload)
+
+                    return
+
                 return self.__start(quiet, no_check_remote)
             elif command == "inner_run_with_checks":
                 self.__perform_config_checks(no_check_remote)
@@ -1726,7 +1780,7 @@ class ScalyrAgent(object):
         """Logs the agent_requests message that we periodically write to the agent log to give overall request
         stats.
 
-        This includes such metrics the total bytes sent and received, failed requests, etc.
+        This includes such metrics the total bytes sent and received, failed requestsss, etc.
 
         @param overall_stats: The overall stats for the agent.
         @type overall_stats: OverallStats
