@@ -819,12 +819,24 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                                 if kind == "Pod":
                                     extra_fields["pod_name"] = name
                                     extra_fields["pod_namespace"] = namespace
-                                    pod = k8s_cache.pod(
-                                        namespace,
-                                        name,
-                                        current_time,
-                                        query_options=k8s_events_query_options,
-                                    )
+                                    try:
+                                        pod = k8s_cache.pod(
+                                            namespace,
+                                            name,
+                                            current_time,
+                                            query_options=k8s_events_query_options,
+                                        )
+                                    except k8s_utils.K8sApiNotFoundException as e:
+                                        global_log.log(
+                                            scalyr_logging.DEBUG_LEVEL_1,
+                                            "Failed to process single k8s event line due to following exception: %s, %s, %s"
+                                            % (
+                                                repr(e),
+                                                six.text_type(e),
+                                                traceback.format_exc(),
+                                            ),
+                                        )
+                                        continue
                                     if pod and pod.controller:
                                         extra_fields[
                                             "k8s-controller"
