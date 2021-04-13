@@ -96,6 +96,18 @@ define_config_option(
     "``database_hostport``, but not both.",
     convert_to=six.text_type,
 )
+define_config_option(
+    __monitor__,
+    "use_ssl",
+    "Whether or not to use SSL when connecting to the MySQL server.",
+    convert_to=bool,
+)
+define_config_option(
+    __monitor__,
+    "ca_cert",
+    "Location of the ca file to use for the SSL connection.",
+    convert_to=six.text_type,
+)
 
 # Metric definitions.
 define_metric(
@@ -365,18 +377,35 @@ class MysqlDB(object):
     def _connect(self):
         try:
             if self._type == "socket":
-                conn = pymysql.connect(
-                    unix_socket=self._sockfile,
-                    user=self._username,
-                    passwd=self._password,
-                )
+                if self._use_ssl:
+                    conn = pymysql.connect(
+                        unix_socket=self._sockfile,
+                        user=self._username,
+                        passwd=self._password,
+                        ssl={"ssl": {"ca": self._path_to_ca_file}},
+                    )
+                else:
+                    conn = pymysql.connect(
+                        unix_socket=self._sockfile,
+                        user=self._username,
+                        passwd=self._password,
+                    )
             else:
-                conn = pymysql.connect(
-                    host=self._host,
-                    port=self._port,
-                    user=self._username,
-                    passwd=self._password,
-                )
+                if self._use_ssl:
+                    conn = pymysql.connect(
+                        host=self._host,
+                        port=self._port,
+                        user=self._username,
+                        passwd=self._password,
+                        ssl={"ssl": {"ca": self._path_to_ca_file}},
+                    )
+                else:
+                    conn = pymysql.connect(
+                        host=self._host,
+                        port=self._port,
+                        user=self._username,
+                        passwd=self._password,
+                    )
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
@@ -904,6 +933,8 @@ class MysqlDB(object):
         username=None,
         password=None,
         logger=None,
+        use_ssl=False,
+        path_to_ca_file=None,
     ):
         """Constructor: handles both socket files as well as host/port connectivity.
 
@@ -926,6 +957,10 @@ class MysqlDB(object):
         self._logger = logger
         if self._logger is None:
             raise Exception("Logger required.")
+        self._use_ssl = use_ssl
+        if use_ssl:
+            self._path_to_ca_file = path_to_ca_file
+            #TODO: default ca file paths?
         if type == "socket":
             # if no socket file specified, attempt to find one locally
             if sockfile is None:
@@ -1082,6 +1117,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             raise Exception(
                 "database_username and database_password must be specified in the configuration."
             )
+        self._use_ssl = self._config.get("use_ssl", False)
+        self._path_to_ca_file = self._config.get("ca_file", None)
         self._db = None
 
     def _connect_to_db(self):
@@ -1102,6 +1139,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     username=self._database_user,
                     password=self._database_password,
                     logger=self._logger,
+                    use_ssl=self._use_ssl,
+                    path_to_ca_file=self._path_to_ca_file,
                 )
             else:
                 self._db = MysqlDB(
@@ -1112,6 +1151,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     username=self._database_user,
                     password=self._database_password,
                     logger=self._logger,
+                    use_ssl=self._use_ssl,
+                    path_to_ca_file=self._path_to_ca_file,
                 )
         except Exception as e:
             self._db = None
