@@ -42,6 +42,9 @@ AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit ma
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 
 MONITOR_FILES=$(find scalyr_agent/builtin_monitors -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
+export PYTHONPATH=${PYTHONPATH}:${SCRIPT_DIR}/../
+
+echo "Using PYTHONPATH: ${PYTHONPATH}"
 
 # shellcheck disable=SC2068
 for FILE in ${MONITOR_FILES[@]}; do
@@ -60,7 +63,7 @@ for FILE in ${MONITOR_FILES[@]}; do
     set +e
     grep "${AUTO_GENERATED_SECTION_MARKER}" "${DOC_FILE}" > /dev/null
     EXIT_CODE=$?
-    set +e
+    set -e
 
     if [ "${EXIT_CODE}" -eq 1 ]; then
         continue
