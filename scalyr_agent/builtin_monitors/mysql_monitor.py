@@ -36,6 +36,8 @@ from scalyr_agent import (
 )
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.__scalyr__ import get_install_root
+from scalyr_agent.configuration import Configuration
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -377,19 +379,11 @@ class MysqlDB(object):
     def _connect(self):
         try:
             if self._type == "socket":
-                if self._use_ssl:
-                    conn = pymysql.connect(
-                        unix_socket=self._sockfile,
-                        user=self._username,
-                        passwd=self._password,
-                        ssl={"ssl": {"ca": self._path_to_ca_file}},
-                    )
-                else:
-                    conn = pymysql.connect(
-                        unix_socket=self._sockfile,
-                        user=self._username,
-                        passwd=self._password,
-                    )
+                conn = pymysql.connect(
+                    unix_socket=self._sockfile,
+                    user=self._username,
+                    passwd=self._password,
+                )
             else:
                 if self._use_ssl:
                     conn = pymysql.connect(
@@ -958,9 +952,7 @@ class MysqlDB(object):
         if self._logger is None:
             raise Exception("Logger required.")
         self._use_ssl = use_ssl
-        if use_ssl:
-            self._path_to_ca_file = path_to_ca_file
-            #TODO: default ca file paths?
+        self._path_to_ca_file = path_to_ca_file
         if type == "socket":
             # if no socket file specified, attempt to find one locally
             if sockfile is None:
