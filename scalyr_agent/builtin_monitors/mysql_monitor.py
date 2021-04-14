@@ -36,8 +36,6 @@ from scalyr_agent import (
 )
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.__scalyr__ import get_install_root
-from scalyr_agent.configuration import Configuration
 
 global_log = scalyr_logging.getLogger(__name__)
 
