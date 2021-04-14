@@ -90,11 +90,11 @@ class MysqlAgentRunner(AgentRunner):
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
         config = super(MysqlAgentRunner, self)._agent_config
         mysql_monitor = {
-                "module": "scalyr_agent.builtin_monitors.mysql_monitor",
-                "id": "instance1",
-                "database_username": USERNAME,
-                "database_password": PASSWORD,
-            }
+            "module": "scalyr_agent.builtin_monitors.mysql_monitor",
+            "id": "instance1",
+            "database_username": USERNAME,
+            "database_password": PASSWORD,
+        }
         if self.use_socket:
             mysql_monitor["database_socket"] = "default"
         else:
@@ -230,15 +230,3 @@ def test_mysql_python2(request):
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python3(request):
     _test(request, python_version="python3", use_socket=False, use_ssl=True)
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python2(request):
-    _test(request, python_version="python2", use_socket=False, use_ssl=True, ca_file="notreal")
-
-
-@pytest.mark.usefixtures("agent_environment")
-@dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3(request):
-    _test(request, python_version="python3", use_socket=False, use_ssl=True, ca_file="notreal")
