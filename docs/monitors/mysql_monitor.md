@@ -74,6 +74,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 |||# ``database_hostport``||| Hostname (or IP address) and port number of the MySQL server, e.g. ``dbserver:3306``, or \
                               simply ``3306`` when connecting to the local machine. You should specify one of \
                               ``database_socket`` or ``database_hostport``, but not both.
+|||# ``use_ssl``          ||| Whether or not to use SSL when connecting to the MySQL server.
+|||# ``ca_cert``          ||| Location of the ca file to use for the SSL connection.
 
 ## Log reference
 
