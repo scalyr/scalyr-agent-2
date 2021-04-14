@@ -74,7 +74,7 @@ def mysql_cursor(mysql_client):
 
 
 class MysqlAgentRunner(AgentRunner):
-    def __init__(self):
+    def __init__(self, use_socket=True, use_ssl=False, ca_file=None):
         super(MysqlAgentRunner, self).__init__(
             enable_coverage=True, send_to_server=False
         )
@@ -82,19 +82,28 @@ class MysqlAgentRunner(AgentRunner):
         self.mysql_log_path = self.add_log_file(
             self.agent_logs_dir_path / "mysql_monitor.log"
         )
+        self.use_socket = use_socket
+        self.use_ssl = use_ssl
+        self.ca_file = ca_file
 
     @property
     def _agent_config(self):  # type: () -> Dict[six.text_type, Any]
         config = super(MysqlAgentRunner, self)._agent_config
-        config["monitors"].append(
-            {
+        mysql_monitor = {
                 "module": "scalyr_agent.builtin_monitors.mysql_monitor",
                 "id": "instance1",
-                "database_socket": "default",
                 "database_username": USERNAME,
                 "database_password": PASSWORD,
             }
-        )
+        if self.use_socket:
+            mysql_monitor["database_socket"] = "default"
+        else:
+            mysql_monitor["database_hostport"] = "127.0.0.1:3306"
+        if self.use_ssl:
+            mysql_monitor["use_ssl"] = True
+        if self.ca_file:
+            mysql_monitor["ca_file"] = self.ca_file
+        config["monitors"].append(mysql_monitor)
 
         return config
 
@@ -103,10 +112,10 @@ class MySqlLogReader(LogMetricReader):
     LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[mysql_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
 
 
-def _test(request, python_version):
+def _test(request, python_version, use_socket=True, use_ssl=False, ca_file=None):
     mysql_cursor = request.getfixturevalue("mysql_cursor")
 
-    runner = MysqlAgentRunner()
+    runner = MysqlAgentRunner(use_socket=use_socket, use_ssl=use_ssl, ca_file=ca_file)
 
     runner.start(executable=python_version)
 
@@ -197,3 +206,39 @@ def test_mysql_python2(request):
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python3(request):
     _test(request, python_version="python3")
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python2(request):
+    _test(request, python_version="python2", use_socket=False)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python3(request):
+    _test(request, python_version="python3", use_socket=False)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python2(request):
+    _test(request, python_version="python2", use_socket=False, use_ssl=True)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python3(request):
+    _test(request, python_version="python3", use_socket=False, use_ssl=True)
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python2(request):
+    _test(request, python_version="python2", use_socket=False, use_ssl=True, ca_file="notreal")
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(CommonMonitorBuilder, __file__)
+def test_mysql_python3(request):
+    _test(request, python_version="python3", use_socket=False, use_ssl=True, ca_file="notreal")
