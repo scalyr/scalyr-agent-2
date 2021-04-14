@@ -13,6 +13,9 @@ Improvements:
 Bug fixes:
 * Ensure pod digest which we calculate and use to determine if pod info in the Kubernetes monitor has  changed is deterministic and doesn't depend on dictionary item ordering.
 
+Other:
+* Changed the logging level of "not found" errors while querying pods from the Kubernetes API from ERROR to DEBUG, as these errors are always transient and result in no data loss.
+
 ## 2.1.19 "StarTram" - March 9, 2021
 
 <!---
