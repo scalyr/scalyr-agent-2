@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.1.20 "Tabeisshi" - April 19, 2021
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on April 19, 2021 21:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 19, 2021 21:00 -0800
 --->
 
 Improvements:
