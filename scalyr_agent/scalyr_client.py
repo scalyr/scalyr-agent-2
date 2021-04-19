@@ -90,10 +90,7 @@ def verify_server_certificate(config):
     :return:
     """
     is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
-    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
-        __scalyr__.DEV_INSTALL,
-        __scalyr__.MSI_INSTALL,
-    ]
+    is_dev_or_msi_install = is_dev_install or platform.platform().startswith("win")
 
     ca_file = config.ca_cert_path
     intermediate_certs_file = config.intermediate_certs_path

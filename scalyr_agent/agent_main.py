@@ -44,7 +44,6 @@ import os
 import sys
 import time
 import re
-import ssl
 from io import open
 
 if False:
@@ -64,13 +63,11 @@ try:
     from __scalyr__ import scalyr_init
     from __scalyr__ import INSTALL_TYPE
     from __scalyr__ import DEV_INSTALL
-    from __scalyr__ import MSI_INSTALL
 except ImportError:
     from scalyr_agent.__scalyr__ import SCALYR_VERSION
     from scalyr_agent.__scalyr__ import scalyr_init
     from scalyr_agent.__scalyr__ import INSTALL_TYPE
     from scalyr_agent.__scalyr__ import DEV_INSTALL
-    from scalyr_agent.__scalyr__ import MSI_INSTALL
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -101,7 +98,6 @@ scalyr_logging.set_log_destination(use_stdout=True)
 from optparse import OptionParser
 
 from scalyr_agent.profiler import ScalyrProfiler
-from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
@@ -118,8 +114,6 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
-from scalyr_agent import compat
-
 
 STATUS_FILE = "last_status"
 STATUS_FORMAT_FILE = "status_format"

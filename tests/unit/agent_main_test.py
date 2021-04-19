@@ -129,7 +129,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             self.assertTrue(create_client(config=config))
 
         # 2. MSI install (only intermediate_certs_path check should be skipped)
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.MSI_INSTALL):
+        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
