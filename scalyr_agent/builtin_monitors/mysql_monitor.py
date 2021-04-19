@@ -396,18 +396,19 @@ class MysqlDB(object):
                 )
             else:
                 if self._use_ssl:
+                    ssl = {"ssl": {}}
+                    if self._path_to_ca_file:
+                        ssl["ca"] = self._path_to_ca_file
+                    if self._path_to_key_file:
+                        ssl["key"] = self._path_to_key_file
+                    if self._path_to_cert_file:
+                        ssl["cert"] = self._path_to_cert_file
                     conn = pymysql.connect(
                         host=self._host,
                         port=self._port,
                         user=self._username,
                         passwd=self._password,
-                        ssl={
-                            "ssl": {
-                                "ca": self._path_to_ca_file,
-                                "key": self._path_to_key_file,
-                                "cert": self._path_to_cert_file,
-                            }
-                        },
+                        ssl=ssl,
                     )
                 else:
                     conn = pymysql.connect(
