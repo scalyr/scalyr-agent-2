@@ -106,6 +106,7 @@ from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
+from scalyr_agent.util import warn_on_python26
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
@@ -301,6 +302,8 @@ class ScalyrAgent(object):
         @return:  The exit status code to exit with, such as 0 for success.
         @rtype: int
         """
+        warn_on_python26()
+
         quiet = command_options.quiet
         verbose = command_options.verbose
         health_check = command_options.health_check

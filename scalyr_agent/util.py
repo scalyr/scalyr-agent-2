@@ -74,6 +74,7 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.compat import PY26
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -177,6 +178,20 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
 
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
+
+
+def warn_on_python26():
+    """
+    Emit a warning if running under Python 2.6 which we stopped oficially supporting in v2.1.21.
+    """
+    if PY26:
+        import scalyr_agent.scalyr_logging
+
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(
+            "scalyr-agent has removed support for Python 2.6. v2.1.21 is the last release which "
+            "still supports Python 2.6. If you still need to run the agent under Python 2.6 you "
+            "should use that or an older release."
+        )
 
 
 def get_json_implementation(lib_name):
