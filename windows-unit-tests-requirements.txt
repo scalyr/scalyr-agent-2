@@ -20,7 +20,7 @@ docker==4.1.0
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 requests==2.15.1
 ujson==1.35
-orjson==3.5.1; python_version >= '3.6'
+orjson==3.5.2; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1
