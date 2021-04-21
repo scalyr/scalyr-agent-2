@@ -8,7 +8,7 @@ Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
 --->
 
 Other:
-* Support for Python 2.6 has been removed. If you still need to run agent under Python 2.6 (we advise to avoid that if possible since Python 2.6 has been EOL for a long time now), you should use an older release.
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release or Python 2.7 which we will stop supporting in the near future.
 
 ## 2.1.20 "Tabeisshi" - April 19, 2021
 

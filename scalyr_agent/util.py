@@ -75,6 +75,7 @@ from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent.compat import PY26
+from scalyr_agent.compat import PY27
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -179,19 +180,44 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
 
+PYTHON26_EOL_WARNING = """
+Detected that the agent is running under Python 2.6 (%s) which has been EOL and officially
+unsupported by the core Python team since October 2013. v2.1.21 is the last agent release that
+still supports Python 2.6. Going forward you are strongly recommended to upgrade to a more recent
+and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
 
-def warn_on_python26():
+PYTHON27_EOL_WARNING = """
+Detected that the agent is running under Python 2.7 (%s) which has been EOL and officially
+unsupported by the core Python team since January, 2020. For the time being, agent still supports
+Python 2.7, but that support will be removed in the near future so you are strongly encouraged to
+upgrade to a more recent and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
+
+
+def warn_on_old_or_unsupported_python_version():
     """
-    Emit a warning if running under Python 2.6 which we stopped oficially supporting in v2.1.21.
+    Emit a warning if running under Python 2.6 which we stopped oficially supporting in v2.1.21
+    or Python 2.7 which we will stop supporting in teh future.
     """
+
     if PY26:
         import scalyr_agent.scalyr_logging
 
-        scalyr_agent.scalyr_logging.getLogger(__name__).warn(
-            "scalyr-agent has removed support for Python 2.6. v2.1.21 is the last release which "
-            "still supports Python 2.6. If you still need to run the agent under Python 2.6 you "
-            "should use that or an older release."
-        )
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON26_EOL_WARNING)
+
+    if PY27:
+        import scalyr_agent.scalyr_logging
+
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON27_EOL_WARNING)
 
 
 def get_json_implementation(lib_name):
