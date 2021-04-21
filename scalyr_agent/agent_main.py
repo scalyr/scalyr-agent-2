@@ -302,8 +302,6 @@ class ScalyrAgent(object):
         @return:  The exit status code to exit with, such as 0 for success.
         @rtype: int
         """
-        warn_on_old_or_unsupported_python_version()
-
         quiet = command_options.quiet
         verbose = command_options.verbose
         health_check = command_options.health_check
@@ -357,6 +355,9 @@ class ScalyrAgent(object):
                     "Could not parse configuration file at '%s'" % config_file_path,
                     file=sys.stderr,
                 )
+
+        if log_warnings:
+            warn_on_old_or_unsupported_python_version()
 
         self.__controller.consume_config(self.__config, config_file_path)
 
