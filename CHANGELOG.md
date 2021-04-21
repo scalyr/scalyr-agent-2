@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.21 "TBD" - April 30, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
+--->
+
+Other:
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release or Python 2.7 which we will stop supporting in the near future.
+
 ## 2.1.20 "Tabeisshi" - April 19, 2021
 
 <!---
