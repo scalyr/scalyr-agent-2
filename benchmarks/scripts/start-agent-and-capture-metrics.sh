@@ -27,7 +27,7 @@
 set -e
 
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "${SCRIPT_DIR}/common.sh"
 
 verify_mandatory_common_env_variables_are_set

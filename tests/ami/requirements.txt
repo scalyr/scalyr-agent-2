@@ -3,4 +3,4 @@
 # concurrently
 git+https://github.com/apache/libcloud.git@trunk#egg=apache-libcloud
 paramiko==2.7.2
-Jinja2==2.11.1
+Jinja2==2.11.3

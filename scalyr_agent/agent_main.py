@@ -106,6 +106,7 @@ from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
+from scalyr_agent.util import warn_on_old_or_unsupported_python_version
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
@@ -354,6 +355,9 @@ class ScalyrAgent(object):
                     "Could not parse configuration file at '%s'" % config_file_path,
                     file=sys.stderr,
                 )
+
+        if log_warnings:
+            warn_on_old_or_unsupported_python_version()
 
         self.__controller.consume_config(self.__config, config_file_path)
 
