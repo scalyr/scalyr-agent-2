@@ -99,25 +99,26 @@ define_config_option(
 define_config_option(
     __monitor__,
     "use_ssl",
-    "Whether or not to use SSL when connecting to the MySQL server.",
+    "Whether or not to use SSL when connecting to the MySQL server. Defaults to False.",
     convert_to=bool,
 )
 define_config_option(
     __monitor__,
     "ca_file",
-    "Location of the ca file to use for the SSL connection.",
+    "Location of the ca file to use for the SSL connection. Defaults to None, which means the validity of the server "
+    "will not be verified.",
     convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "key_file",
-    "Location of the key file to use for the SSL connection.",
+    "Location of the key file to use for the SSL connection. Defaults to None.",
     convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "cert_file",
-    "Location of the cert file to use for the SSL connection.",
+    "Location of the cert file to use for the SSL connection. Defaults to None",
     convert_to=six.text_type,
 )
 
