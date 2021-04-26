@@ -2300,6 +2300,7 @@ class CRIEnumerator(ContainerEnumerator):
                 limit_once_per_x_secs=300,
                 limit_key="query-cri-containers",
             )
+            return None
         return result
 
     def _get_containers_from_filesystem(self, k8s_namespaces_to_include):
@@ -3032,7 +3033,7 @@ class ContainerChecker(object):
         for log in docker_logs:
             if self.__log_watcher:
                 log["log_config"] = self.__log_watcher.add_log_config(
-                    self.__module.module_name, log["log_config"]
+                    self.__module.module_name, log["log_config"], force_add=True
                 )
 
             self.raw_logs.append(log)
