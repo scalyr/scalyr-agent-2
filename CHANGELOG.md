@@ -7,6 +7,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
 --->
 
+Bug fixes:
+* Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+
 Other:
 * Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release or Python 2.7 which we will stop supporting in the near future.
 
