@@ -75,7 +75,6 @@ from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent.compat import PY26
-from scalyr_agent.compat import PY27
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -214,10 +213,11 @@ def warn_on_old_or_unsupported_python_version():
 
         scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON26_EOL_WARNING)
 
-    if PY27:
-        import scalyr_agent.scalyr_logging
 
-        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON27_EOL_WARNING)
+# if PY27:
+#     import scalyr_agent.scalyr_logging
+#
+#     scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON27_EOL_WARNING)
 
 
 def get_json_implementation(lib_name):

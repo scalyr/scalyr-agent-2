@@ -11,7 +11,7 @@ Bug fixes:
 * Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
 
 Other:
-* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release or Python 2.7 which we will stop supporting in the near future.
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
 
 ## 2.1.20 "Tabeisshi" - April 19, 2021
 
