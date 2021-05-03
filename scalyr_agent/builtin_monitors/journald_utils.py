@@ -127,6 +127,10 @@ class LogConfigManager:
             if regex is None:
                 return None
 
+            # Special case where we bail out early if regex is .* aka match all
+            if journald_unit == ".*":
+                return matched_config
+
             unit = None
             if isinstance(fields, six.string_types):
                 unit = fields
