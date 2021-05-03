@@ -2417,7 +2417,7 @@ class TestConfiguration(TestConfigurationBase):
         config_object = JsonObject({"field1": "a"})
         field = "field1"
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             BadConfiguration,
             "is not a json object",
             config._Configuration__verify_required_attributes,
@@ -2445,7 +2445,7 @@ class TestConfiguration(TestConfigurationBase):
         config_object = JsonObject({"field1": JsonObject({"foo": JsonArray([])})})
         field = "field1"
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             BadConfiguration,
             "is not a string",
             config._Configuration__verify_required_attributes,
