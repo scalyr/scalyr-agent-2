@@ -4259,7 +4259,7 @@ class Configuration(object):
             error reporting to the user.
         """
         try:
-            value = config_object.get_json_object(field, none_if_missing=True)
+            value = config_object.get_json_object(field, none_if_missing=True) or {}
 
             for key in value.keys():
                 try:
