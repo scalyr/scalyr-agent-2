@@ -2769,10 +2769,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         # test when matches one glob but not the other
         matched_config = lcm.get_config({"unit": "testtest", "container": "foobaz"})
         self.assertNotEqual("TestParser", matched_config["parser"])
+        self.assertEqual("journald", matched_config["parser"])
 
         # test when matches one glob, but other one missing
         matched_config = lcm.get_config({"unit": "test_other_test"})
         self.assertNotEqual("TestParser", matched_config["parser"])
+        self.assertEqual("journald", matched_config["parser"])
+
+        # no matches, should use default parser
+        matched_config = lcm.get_config({"unit": "bar", "container": "bar"})
+        self.assertEqual("journald", matched_config["parser"])
 
     def test_unit_regex_and_globs_both_defined(self):
         self._write_file_with_separator_conversion(
