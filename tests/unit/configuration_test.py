@@ -2410,6 +2410,50 @@ class TestConfiguration(TestConfigurationBase):
             JsonObject(api_key="key4", id="fourth_key", sessions=3),
         ]
 
+    def test__verify_required_attributes(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Field is not a JSON object
+        config_object = JsonObject({"field1": "a"})
+        field = "field1"
+
+        self.assertRaisesRegex(
+            BadConfiguration,
+            "is not a json object",
+            config._Configuration__verify_required_attributes,
+            config_object=config_object,
+            field=field,
+            config_description="",
+        )
+        # 2. Field is not a JSON object
+        config_object = JsonObject({"field1": "a"})
+        field = "field2"
+
+        config._Configuration__verify_required_attributes(
+            config_object=config_object, field=field, config_description=""
+        )
+
+        # 3. Field is an object
+        config_object = JsonObject({"field1": JsonObject({})})
+        field = "field1"
+
+        config._Configuration__verify_required_attributes(
+            config_object=config_object, field=field, config_description=""
+        )
+
+        # 4. Field is an object, one field value can't be cast to string
+        config_object = JsonObject({"field1": JsonObject({"foo": JsonArray([])})})
+        field = "field1"
+
+        self.assertRaisesRegex(
+            BadConfiguration,
+            "is not a string",
+            config._Configuration__verify_required_attributes,
+            config_object=config_object,
+            field=field,
+            config_description="",
+        )
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):
