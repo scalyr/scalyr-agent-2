@@ -2996,8 +2996,6 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
             max_value=100,
         )
 
-        pass
-
     def test___verify_or_set_optional_string_with_valid_values(self):
         config = self._create_test_configuration_instance()
 

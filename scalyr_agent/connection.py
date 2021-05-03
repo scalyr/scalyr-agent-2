@@ -444,7 +444,17 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                 ssl_context.options |= ssl.OP_NO_TLSv1_1
                 ssl_context.verify_mode = ssl.CERT_REQUIRED
                 ssl_context.check_hostname = True
-                ssl_context.load_verify_locations(self.__ca_file)
+
+                try:
+                    ssl_context.load_verify_locations(self.__ca_file)
+                except Exception as e:
+                    # We throw a more user-friendly error on file not found (aka include the path)
+                    if getattr(e, "errno", None) == 2:
+                        raise e.__class__(
+                            "CA bundle path %s not found. Original error: %s"
+                            % (self.__ca_file, str(e))
+                        )
+                    raise e
 
                 self.sock = ssl_context.wrap_socket(
                     self.sock, do_handshake_on_connect=True, server_hostname=self.host
