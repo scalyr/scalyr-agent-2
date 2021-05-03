@@ -3339,8 +3339,11 @@ class Configuration(object):
                 )
             except BadConfiguration as e:
                 if self.__log_warnings:
-                    self.__logger.warn("Failed to parse journald_logs.journald_unit config "
-                                       "option, falling back to journald_logs.journald_globs: %s" % str(e))
+                    self.__logger.warn(
+                        "Failed to parse journald_logs.journald_unit config "
+                        "option, falling back to journald_logs.journald_globs: %s"
+                        % str(e)
+                    )
                 bad_config = True
 
             if bad_config:
