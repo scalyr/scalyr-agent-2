@@ -7,6 +7,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
 --->
 
+Improvements:
+* Allow journald monitor to be configured via globs on multiple fields via ``journald_logs.journald_globs`` config option. Contributed by @imron. #741
+
 Bug fixes:
 * Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
 
