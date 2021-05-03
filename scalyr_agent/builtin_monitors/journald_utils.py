@@ -4,12 +4,15 @@ from __future__ import absolute_import
 import os
 import re
 import copy
+import fnmatch
 import logging
+import operator
 from string import Template
 
 import six
 
 from scalyr_agent import scalyr_logging
+from scalyr_agent.configuration import BadConfiguration
 from scalyr_agent.json_lib import JsonObject
 
 # TODO: The plan for this LogConfigManager is to eventually have it as a base class without any of the journald specific
@@ -68,7 +71,7 @@ class LogConfigManager:
             config_matcher = self.create_config_matcher(config)
             config_matchers.append(config_matcher)
         # Add a catchall matcher at the end in case one was not configured
-        config_matchers.append(self.create_config_matcher({}))
+        config_matchers.append(self.create_config_matcher(JsonObject()))
 
         return config_matchers
 
@@ -82,13 +85,37 @@ class LogConfigManager:
         in data, None otherwise
         """
         config = copy.deepcopy(conf)
-        if "journald_unit" not in config:
-            config["journald_unit"] = ".*"
+
+        journald_unit = config.get("journald_unit", None, none_if_missing=True)
+        journald_globs = config.get("journald_globs", None, none_if_missing=True)
+
+        # User shouldn't be able to specify both `journald_unit` and
+        # `journald_globs`
+        if journald_unit is not None and journald_globs is not None:
+            raise BadConfiguration(
+                "Cannot specify both journald_unit and journald_globs",
+                "journald_unit",
+                "invalidConfigError",
+            )
+
+        # If neither is specified, default to journald_unit matching
+        # everything
+        if journald_unit is None and journald_globs is None:
+            journald_unit = ".*"
+            config["journald_unit"] = journald_unit
+
+        match_hash = "monitor"
+        regex = None
+        if journald_unit is not None:
+            match_hash = six.text_type(hash(journald_unit))
+            if journald_unit == ".*":
+                match_hash = "monitor"
+            regex = re.compile(journald_unit)
+        elif journald_globs is not None:
+            items = sorted(six.iteritems(journald_globs), key=operator.itemgetter(0))
+            match_hash = six.text_type(hash("%s" % items))
+
         file_template = Template("journald_${ID}.log")
-        regex = re.compile(config["journald_unit"])
-        match_hash = six.text_type(hash(config["journald_unit"]))
-        if config["journald_unit"] == ".*":
-            match_hash = "monitor"
         full_path = os.path.join(
             self._global_config.agent_log_path,
             file_template.safe_substitute({"ID": match_hash}),
@@ -96,33 +123,67 @@ class LogConfigManager:
         matched_config = JsonObject({"parser": "journald", "path": full_path})
         matched_config.update(config)
 
-        def config_matcher(unit):
-            if regex.match(unit) is not None:
+        def regex_matcher(fields):
+            if regex is None:
+                return None
+
+            # Special case where we bail out early if regex is .* aka match all
+            if journald_unit == ".*":
                 return matched_config
+
+            unit = None
+            if isinstance(fields, six.string_types):
+                unit = fields
+            else:
+                # regex only matches on unit
+                unit = fields.get("unit", "")
+
+            if unit is not None:
+                if regex.match(unit) is not None:
+                    return matched_config
+
             return None
 
-        return config_matcher
+        def glob_matcher(fields):
+            if journald_globs is None:
+                return None
 
-    def get_config(self, unit):
+            # journald_globs requires all fields
+            # to match
+            for key, glob in six.iteritems(journald_globs):
+                if key not in fields:
+                    return None
+
+                if not fnmatch.fnmatch(fields[key], glob):
+                    return None
+
+            return matched_config
+
+        if journald_globs is not None:
+            return glob_matcher
+
+        return regex_matcher
+
+    def get_config(self, fields):
         """ Get a log configuration that matches the passed in data based on the configured config matchers.
 
-        @param unit: Arbitrary data that the configured config matchers will attempt to match against
-        @return: Logger configuration if a config matcher matched on `unit`, None otherwise
+        @param fields: Fields that the configured config matchers will attempt to match against
+        @return: Logger configuration if a config matcher matched on `fields`, None otherwise
         """
         for matcher in self.__log_config_creators:
-            config = matcher(unit)
+            config = matcher(fields)
             if config is not None:
                 return config
         return None
 
-    def get_logger(self, unit):
+    def get_logger(self, fields):
         """ Get a logger that matches the passed in data based on the configured config matchers. This will create
         a logger if the configuration gets matched but no logger exists yet
 
-        @param unit: Arbitrary data that the configured config matchers will attempt to match against
-        @return: Logger who's configuration matched on `unit`, None if there was no match
+        @param fields: Fields that the configured config matchers will attempt to match against
+        @return: Logger who's configuration matched on `fields`, None if there was no match
         """
-        config = self.get_config(unit)
+        config = self.get_config(fields)
         if config is not None and "path" in config:
             if config["path"] not in self._loggers:
                 self.create_logger(config)
