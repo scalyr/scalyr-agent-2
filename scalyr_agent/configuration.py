@@ -3336,6 +3336,7 @@ class Configuration(object):
                     key="journald_unit",
                     config_file_path=file_path,
                     entry_index=i,
+                    logs_field="journald_logs",
                 )
             except BadConfiguration as e:
                 if self.__logger and self.__log_warnings:
@@ -3353,6 +3354,7 @@ class Configuration(object):
                     config_file_path=file_path,
                     entry_index=i,
                     key_type="object",
+                    logs_field="journald_logs",
                 )
 
             i += 1
