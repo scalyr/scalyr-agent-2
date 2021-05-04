@@ -2429,4 +2429,5 @@ workflows:
              only:
                - master
    jobs:
-     - ami-tests-stable
+     - ami-tests-stable:
+         context: scalyr-agent
