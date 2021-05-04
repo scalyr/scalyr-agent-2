@@ -4,10 +4,10 @@ import libmodernize
 
 class FixStructUnicode(BaseFix):
     """
-        This fixer searches for places where we are calling struct.pack or struct.unpack,
-        and replaces them with 'scalyr_agent.compat.struct_pack' or struct_unpack.
-        This is needed because struct library does not allow unicode format strings.
-        """
+    This fixer searches for places where we are calling struct.pack or struct.unpack,
+    and replaces them with 'scalyr_agent.compat.struct_pack' or struct_unpack.
+    This is needed because struct library does not allow unicode format strings.
+    """
 
     BM_compatible = True
     PATTERN = """

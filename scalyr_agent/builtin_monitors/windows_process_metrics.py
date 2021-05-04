@@ -158,7 +158,7 @@ def _gather_metric(method, attribute=None, transform=None):
         )
 
     def gather_metric(process):
-        """Dynamically Generated """
+        """Dynamically Generated"""
         errmsg = (
             "Only the 'psutil.Process' interface is supported currently; not {}".format
         )
@@ -504,15 +504,17 @@ def commandline_matcher(regex, flags=re.IGNORECASE):
 
 
 class ProcessMonitor(ScalyrMonitor):
-    """This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process on
+    # fmt: off
+    """
+    This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process on
     Windows system.
 
     You can use this plugin to record resource usage for a web server, database, or other application.
     """
+    # fmt: on
 
     def __init__(self, monitor_config, logger, **kw):
-        """TODO: Function documentation
-        """
+        """TODO: Function documentation"""
         if psutil is None:
             raise UnsupportedSystem(
                 "windows_process_metrics",
@@ -534,8 +536,7 @@ class ProcessMonitor(ScalyrMonitor):
         )
 
     def _select_target_process(self):
-        """TODO: Function documentation
-        """
+        """TODO: Function documentation"""
         process = None
         if "commandline" in self._config:
             matcher = commandline_matcher(self._config["commandline"])
@@ -550,8 +551,7 @@ class ProcessMonitor(ScalyrMonitor):
         self.__process = process
 
     def gather_sample(self):
-        """TODO: Function documentation
-        """
+        """TODO: Function documentation"""
         try:
             self._select_target_process()
             for idx, metric in enumerate(METRICS):

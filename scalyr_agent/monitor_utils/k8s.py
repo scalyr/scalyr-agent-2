@@ -108,9 +108,9 @@ FALLBACK_KUBELET_URL_TEMPLATE = Template("http://${host_ip}:10255")
 
 def cache(global_config):
     """
-        Returns the global k8s cache, configured using the options in `config`
-        @param config: The configuration
-        @type config: A Scalyr Configuration object
+    Returns the global k8s cache, configured using the options in `config`
+    @param config: The configuration
+    @type config: A Scalyr Configuration object
     """
     cache_config = _CacheConfig(
         api_url=global_config.k8s_api_url,
@@ -383,7 +383,7 @@ class QualifiedName(object):
 
 class PodInfo(object):
     """
-        A collection class that stores label and other information about a kubernetes pod
+    A collection class that stores label and other information about a kubernetes pod
     """
 
     def __init__(
@@ -451,19 +451,19 @@ class PodInfo(object):
 
     def exclude_pod(self, container_name=None, default=False):
         """
-            Returns whether or not this pod should be excluded based
-            on include/exclude annotations.  If an annotation 'exclude' exists
-            then this will be returned.  If an annotation 'include' exists, then
-            the boolean opposite of 'include' will be returned.  'include' will
-            always override 'exclude' if it exists.
+        Returns whether or not this pod should be excluded based
+        on include/exclude annotations.  If an annotation 'exclude' exists
+        then this will be returned.  If an annotation 'include' exists, then
+        the boolean opposite of 'include' will be returned.  'include' will
+        always override 'exclude' if it exists.
 
-            param: container_name - if specified, and container_name exists in
-              the pod annotations, then the container specific annotations will
-              also be checked.  These will supercede the pod level include/exclude
-              annotations
-            param: default - Boolean the default value if no annotations are found
+        param: container_name - if specified, and container_name exists in
+          the pod annotations, then the container specific annotations will
+          also be checked.  These will supercede the pod level include/exclude
+          annotations
+        param: default - Boolean the default value if no annotations are found
 
-            return Boolean - whether or not to exclude this pod
+        return Boolean - whether or not to exclude this pod
         """
 
         def exclude_status(annotations, default):
@@ -484,7 +484,7 @@ class PodInfo(object):
 
 class Controller(object):
     """
-        General class for all cached Controller objects
+    General class for all cached Controller objects
     """
 
     def __init__(
@@ -510,8 +510,7 @@ class Controller(object):
 
 
 class ApiQueryOptions(object):
-    """Options to use when querying the K8s Api server.
-    """
+    """Options to use when querying the K8s Api server."""
 
     def __init__(self, max_retries=3, return_temp_errors=True, rate_limiter=None):
         """
@@ -532,20 +531,20 @@ class ApiQueryOptions(object):
 
 class _K8sCache(object):
     """
-        A cached store of objects from a k8s api query
+    A cached store of objects from a k8s api query
 
-        This is a private class to this module.  See KubernetesCache which instantiates
-        instances of _K8sCache for querying different k8s API objects.
+    This is a private class to this module.  See KubernetesCache which instantiates
+    instances of _K8sCache for querying different k8s API objects.
 
-        This abstraction is thread-safe-ish, assuming objects returned
-        from querying the cache are never written to.
+    This abstraction is thread-safe-ish, assuming objects returned
+    from querying the cache are never written to.
     """
 
     def __init__(self, processor, object_type):
         """
-            Initialises a Kubernetes Cache
-            @param processor: a _K8sProcessor object for querying/processing the k8s api
-            @param object_type: a string containing a textual name of the objects being cached, for use in log messages
+        Initialises a Kubernetes Cache
+        @param processor: a _K8sProcessor object for querying/processing the k8s api
+        @param object_type: a string containing a textual name of the objects being cached, for use in log messages
         """
         # protects self._objects and self._objects_expired
         self._lock = threading.Lock()
@@ -664,7 +663,7 @@ class _K8sCache(object):
     def _lookup_object(
         self, namespace, name, current_time, allow_expired=True, query_options=None
     ):
-        """ Look to see if the object specified by the namespace and name exists within the cached data.
+        """Look to see if the object specified by the namespace and name exists within the cached data.
 
         Note: current_time should be provided (otherwise, access_time-based revalidation of cache won't work correctly,
         for example, manifesting as unnecessary re-queries of controller metadata)
@@ -789,19 +788,19 @@ class _K8sCache(object):
 
 class _K8sProcessor(object):
     """
-        An abstract interface used by _K8sCache for querying a specific type of
-        object from the k8s api, and generating python objects from the queried result JSON.
+    An abstract interface used by _K8sCache for querying a specific type of
+    object from the k8s api, and generating python objects from the queried result JSON.
     """
 
     def _get_managing_controller(self, items):
         """
-            Processes a list of items, searching to see if one of them
-            is a 'managing controller', which is determined by the 'controller' field
+        Processes a list of items, searching to see if one of them
+        is a 'managing controller', which is determined by the 'controller' field
 
-            @param items: an array containing 'ownerReferences' metadata for an object
-                            returned from the k8s api
+        @param items: an array containing 'ownerReferences' metadata for an object
+                        returned from the k8s api
 
-            @return: A dict containing the managing controller of type `kind` or None if no such controller exists
+        @return: A dict containing the managing controller of type `kind` or None if no such controller exists
         """
         for i in items:
             controller = i.get("controller", False)
@@ -828,10 +827,10 @@ class PodProcessor(_K8sProcessor):
 
     def _get_controller_from_owners(self, k8s, owners, namespace, query_options=None):
         """
-            Processes a list of owner references returned from a Pod's metadata to see
-            if it is eventually owned by a Controller, and if so, returns the Controller object
+        Processes a list of owner references returned from a Pod's metadata to see
+        if it is eventually owned by a Controller, and if so, returns the Controller object
 
-            @return Controller - a Controller object
+        @return Controller - a Controller object
         """
         controller = None
 
@@ -897,7 +896,7 @@ class PodProcessor(_K8sProcessor):
         return controller
 
     def process_object(self, k8s, obj, query_options=None):
-        """ Generate a PodInfo object from a JSON object
+        """Generate a PodInfo object from a JSON object
         @param k8s: a KubernetesApi object
         @param pod: The JSON object returned as a response to querying
             a specific pod from the k8s API
@@ -957,7 +956,7 @@ class PodProcessor(_K8sProcessor):
 
 class ControllerProcessor(_K8sProcessor):
     def process_object(self, k8s, obj, query_options=None):
-        """ Generate a Controller object from a JSON object
+        """Generate a Controller object from a JSON object
         @param k8s: a KubernetesApi object
         @param obj: The JSON object returned as a response to querying
             a specific controller from the k8s API
@@ -1030,7 +1029,7 @@ class _CacheConfig(object):
         self.global_config = global_config
 
     def __eq__(self, other):
-        """Equivalence method for _CacheConfig objects so == testing works """
+        """Equivalence method for _CacheConfig objects so == testing works"""
         for key, val in self.__dict__.items():
             if val != getattr(other, key):
                 return False
@@ -1260,7 +1259,7 @@ class KubernetesCache(object):
 
     def start(self):
         """
-            Starts the background thread that reads from the k8s cache
+        Starts the background thread that reads from the k8s cache
         """
         if self._thread is None:
             self._thread = StoppableThread(target=self.update_cache, name="K8S Cache")
@@ -1408,7 +1407,7 @@ class KubernetesCache(object):
 
     def update_cache(self, run_state):
         """
-            Main thread for updating the k8s cache
+        Main thread for updating the k8s cache
         """
 
         start_time = time.time()
@@ -1675,8 +1674,7 @@ class KubernetesCache(object):
 
 
 class KubernetesApi(object):
-    """Simple wrapper class for querying the k8s api
-    """
+    """Simple wrapper class for querying the k8s api"""
 
     @staticmethod
     def create_instance(
@@ -1815,28 +1813,26 @@ class KubernetesApi(object):
         )
 
     def _verify_connection(self):
-        """ Return whether or not to use SSL verification
-        """
+        """Return whether or not to use SSL verification"""
         if self._ca_file:
             return self._ca_file
         return False
 
     def _ensure_session(self):
-        """Create the session if it doesn't exist, otherwise do nothing
-        """
+        """Create the session if it doesn't exist, otherwise do nothing"""
         if not self._session:
             self._session = requests.Session()
             self._session.headers.update(self._standard_headers)
 
     def get_pod_name(self):
-        """ Gets the pod name of the pod running the scalyr-agent """
+        """Gets the pod name of the pod running the scalyr-agent"""
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
         return os_environ_unicode.get("SCALYR_K8S_POD_NAME") or os_environ_unicode.get(
             "HOSTNAME"
         )
 
     def get_node_name(self, pod_name):
-        """ Gets the node name of the node running the agent """
+        """Gets the node name of the node running the agent"""
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
         node = os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
         if not node:
@@ -1859,7 +1855,7 @@ class KubernetesApi(object):
         return version_map.get("gitVersion")
 
     def get_cluster_name(self):
-        """ Returns the name of the cluster running this agent.
+        """Returns the name of the cluster running this agent.
 
         There is no way to get this from the k8s API so we check the following:
 
@@ -2038,8 +2034,7 @@ class KubernetesApi(object):
                 raise K8sApiTemporaryError("Fake %s" % fake_response_code)
 
     def query_api(self, path, pretty=0, return_temp_errors=False, rate_limited=False):
-        """ Queries the k8s API at 'path', and converts OK responses to JSON objects
-        """
+        """Queries the k8s API at 'path', and converts OK responses to JSON objects"""
         self._ensure_session()
         pretty = "pretty=%d" % pretty
         if "?" in path:
@@ -2152,13 +2147,13 @@ class KubernetesApi(object):
                         )
 
     def query_object(self, kind, namespace, name, query_options=None):
-        """ Queries a single object from the k8s api based on an object kind, a namespace and a name
-            An empty dict is returned if the object kind is unknown, or if there is an error generating
-            an appropriate query string
-            @param kind: the kind of the object
-            @param namespace: the namespace to query in
-            @param name: the name of the object
-            @return - a dict returned by the query
+        """Queries a single object from the k8s api based on an object kind, a namespace and a name
+        An empty dict is returned if the object kind is unknown, or if there is an error generating
+        an appropriate query string
+        @param kind: the kind of the object
+        @param namespace: the namespace to query in
+        @param name: the name of the object
+        @return - a dict returned by the query
         """
         if kind not in _OBJECT_ENDPOINTS:
             global_log.warn(
@@ -2194,10 +2189,10 @@ class KubernetesApi(object):
         )
 
     def query_objects(self, kind, namespace=None, filter=None):
-        """ Queries a list of objects from the k8s api based on an object kind, optionally limited by
-            a namespace and a filter
-            A dict containing an empty 'items' array is returned if the object kind is unknown, or if there is an error generating
-            an appropriate query string
+        """Queries a list of objects from the k8s api based on an object kind, optionally limited by
+        a namespace and a filter
+        A dict containing an empty 'items' array is returned if the object kind is unknown, or if there is an error generating
+        an appropriate query string
         """
         if kind not in _OBJECT_ENDPOINTS:
             global_log.warn(
@@ -2289,7 +2284,7 @@ class KubernetesApi(object):
 
 class KubeletApi(object):
     """
-        A class for querying the kubelet API
+    A class for querying the kubelet API
     """
 
     def __init__(
@@ -2346,8 +2341,7 @@ class KubeletApi(object):
         self._kubelet_url = self._fallback_kubelet_url
 
     def _verify_connection(self):
-        """ Return whether or not to use SSL verification
-        """
+        """Return whether or not to use SSL verification"""
         if self._verify_https and self._ca_file:
             return self._ca_file
         return False
@@ -2356,8 +2350,7 @@ class KubeletApi(object):
         return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
-        """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
-        """
+        """Queries the kubelet API at 'path', and converts OK responses to JSON objects"""
         while True:
             url = self._kubelet_url + path
             # We suppress warnings here to avoid spam about an unverified connection going to stderr.
@@ -2385,16 +2378,12 @@ class KubeletApi(object):
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
-                    msg = (
-                        "Invalid response while querying the Kubelet API on %s. Falling back "
-                        "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n"
-                        % (
-                            url,
-                            self._fallback_kubelet_url,
-                            url,
-                            response.status_code,
-                            response.text,
-                        )
+                    msg = "Invalid response while querying the Kubelet API on %s. Falling back " "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n" % (
+                        url,
+                        self._fallback_kubelet_url,
+                        url,
+                        response.status_code,
+                        response.text,
                     )
 
                     global_log.warn(
@@ -2477,7 +2466,12 @@ class K8sConfigBuilder(object):
                 self._logger.log(
                     scalyr_logging.DEBUG_LEVEL_2,
                     "Ignoring k8s_log item %d because %s '%s' doesn't match '%s'"
-                    % (element, name, value, glob,),
+                    % (
+                        element,
+                        name,
+                        value,
+                        glob,
+                    ),
                 )
         return result
 
@@ -2734,8 +2728,7 @@ class DockerMetricFetcher(object):
             self.__idle_workers_count += 1
 
     def __worker(self):
-        """The body for the worker threads.
-        """
+        """The body for the worker threads."""
         while True:
             # Get the next container to fetch if there is one.
             container_id, is_stopped = self._get_fetch_task()
@@ -2805,7 +2798,7 @@ class DockerMetricFetcher(object):
 
 def _create_k8s_cache():
     """
-        creates a new k8s cache object
+    creates a new k8s cache object
     """
 
     return KubernetesCache(start_caching=False)

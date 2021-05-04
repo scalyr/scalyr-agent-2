@@ -213,8 +213,7 @@ class ScalyrMonitor(StoppableThread):
 
     @property
     def module_name(self):
-        """Returns the name of the module that will run this monitor.
-        """
+        """Returns the name of the module that will run this monitor."""
         return self._config["module"]
 
     def reported_lines(self):
@@ -242,8 +241,7 @@ class ScalyrMonitor(StoppableThread):
         return result
 
     def increment_counter(self, reported_lines=0, errors=0):
-        """Increment some of the counters pertaining to the performance of this monitor.
-        """
+        """Increment some of the counters pertaining to the performance of this monitor."""
         self.__lock.acquire()
         self.__reported_lines += reported_lines
         self.__errors += errors
@@ -406,8 +404,7 @@ class ScalyrMonitor(StoppableThread):
         self._sample_interval_secs = secs
 
     def set_log_watcher(self, log_watcher):
-        """Provides a log_watcher object that monitors can use to add/remove log files
-        """
+        """Provides a log_watcher object that monitors can use to add/remove log files"""
         pass
 
     def _get_log_rotation_configuration(self):
@@ -815,8 +812,7 @@ class MonitorInformation(object):
 
 
 class ConfigOption(object):
-    """Simple object to hold the fields for a single configuration option.
-    """
+    """Simple object to hold the fields for a single configuration option."""
 
     def __init__(self):
         # The name of the option.

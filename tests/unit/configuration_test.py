@@ -320,7 +320,8 @@ class TestConfiguration(TestConfigurationBase):
             "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
         )
         self.assertEquals(
-            config.k8s_verify_kubelet_queries, True,
+            config.k8s_verify_kubelet_queries,
+            True,
         )
 
         self.assertEquals(len(config.log_configs), 3)
@@ -2470,7 +2471,7 @@ class TestParseArrayOfStrings(TestConfigurationBase):
 
 class TestConvertConfigParam(TestConfigurationBase):
     def test_none_to_anything(self):
-        """"""
+        """ """
         self.assertRaises(
             BadConfiguration,
             lambda: convert_config_param("dummy_field", None, six.text_type),
@@ -2576,7 +2577,8 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
         del os.environ["SCALYR_SERVER_ATTRIBUTES"]
         self.assertEqual(
-            None, get_config_from_env("server_attributes", convert_to=JsonObject),
+            None,
+            get_config_from_env("server_attributes", convert_to=JsonObject),
         )
         os.environ["SCALYR_SERVER_ATTRIBUTES"] = '{"serverHost": "foo1.example.com"}'
         self.assertEqual(
@@ -2853,7 +2855,10 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger = lcm.get_logger("test")
         logger.info("Find this string")
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
@@ -2873,7 +2878,10 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger = lcm.get_logger("test")
         logger.info("Find this string")
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
@@ -2896,12 +2904,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + six.text_type(hash("TEST")) + ".log",
+            self._log_dir,
+            "journald_" + six.text_type(hash("TEST")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
@@ -2924,12 +2936,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + six.text_type(hash("test.*test")) + ".log",
+            self._log_dir,
+            "journald_" + six.text_type(hash("test.*test")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
@@ -3230,7 +3246,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 1
         assert config.worker_configs[0] == JsonObject(
-            api_key=config.api_key, id="default", sessions=4,
+            api_key=config.api_key,
+            id="default",
+            sessions=4,
         )
 
         (
@@ -3260,7 +3278,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 1
         assert config.worker_configs[0] == JsonObject(
-            api_key=config.api_key, id="default", sessions=4,
+            api_key=config.api_key,
+            id="default",
+            sessions=4,
         )
 
         (
@@ -3297,7 +3317,11 @@ class TestWorkersConfiguration(TestConfigurationBase):
             id="default",
             sessions=config.default_sessions_per_worker,
         )
-        assert workers[1] == JsonObject(api_key="key", id="second", sessions=1,)
+        assert workers[1] == JsonObject(
+            api_key="key",
+            id="second",
+            sessions=1,
+        )
 
     def test_second_default_api_key(self):
         self._write_file_with_separator_conversion(
@@ -3426,7 +3450,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
             sessions=1, api_key=config.api_key, id="default"
         )
         assert config.worker_configs[1] == JsonObject(
-            sessions=4, api_key="key2", id="second",
+            sessions=4,
+            api_key="key2",
+            id="second",
         )
 
         (

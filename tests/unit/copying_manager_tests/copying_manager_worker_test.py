@@ -194,7 +194,10 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         return test_files, self._instance  # type: ignore
 
     def _spawn_single_log_processor(
-        self, log_file, checkpoints=None, copy_at_index_zero=False,
+        self,
+        log_file,
+        checkpoints=None,
+        copy_at_index_zero=False,
     ):
         # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
         log_config = self._env_builder.get_log_config(log_file)  # type: ignore

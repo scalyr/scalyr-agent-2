@@ -1182,7 +1182,9 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_timestamp_doesnt_increases_monotonically(self):
         session = ScalyrClientSession(
-            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION,
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
         )
 
         session._ScalyrClientSession__connection = mock.Mock()
@@ -1334,9 +1336,10 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         serialized_data = add_events_request.get_payload()
 
-        (path, request,) = session._ScalyrClientSession__connection.post.call_args_list[
-            0
-        ]
+        (
+            path,
+            request,
+        ) = session._ScalyrClientSession__connection.post.call_args_list[0]
 
         _, decompress_func = scalyr_util.get_compress_and_decompress_func(
             compression_type

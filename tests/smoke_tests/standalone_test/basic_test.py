@@ -71,7 +71,9 @@ def _perform_workers_check(runner):
 def _stop_and_perform_checks(runner):
     # type: (AgentRunner) -> None
 
-    process, worker_pids, children, workers_processes = _perform_workers_check(runner,)
+    process, worker_pids, children, workers_processes = _perform_workers_check(
+        runner,
+    )
 
     logging.info("Stopping agent.")
 

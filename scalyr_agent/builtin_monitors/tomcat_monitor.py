@@ -320,6 +320,7 @@ def _convert_to_milliseconds(value):
 
 
 class TomcatMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Tomcat Monitor
 
@@ -382,10 +383,10 @@ file.  A typical fragment resembles:
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
 instance."""
+    # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
         global httpSourceAddress
 
         # Useful instance variables:
@@ -697,8 +698,7 @@ instance."""
         return result
 
     def gather_sample(self):
-        """Invoked once per sample interval to gather a statistic.
-        """
+        """Invoked once per sample interval to gather a statistic."""
 
         status = self._get_status(self._monitor_url)
         if status is not None:

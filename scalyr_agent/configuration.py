@@ -367,7 +367,10 @@ class Configuration(object):
             worker_session_agent_logs = None
             if self.implicit_agent_log_collection:
                 # set path as glob to handle log files from the multiprocess worker sessions.
-                config = JsonObject(path="agent.log", parser="scalyrAgentLog",)
+                config = JsonObject(
+                    path="agent.log",
+                    parser="scalyrAgentLog",
+                )
 
                 # add log config for the worker session agent log files.
                 worker_session_logs_config = JsonObject(
@@ -787,9 +790,9 @@ class Configuration(object):
     @staticmethod
     def get_session_ids_of_the_worker(worker_config):  # type: (Dict) -> List
         """
-            Generate the list of IDs of all sessions for the specified worker.
-            :param worker_config: config entry for the worker.
-            :return: List of worker session IDs.
+        Generate the list of IDs of all sessions for the specified worker.
+        :param worker_config: config entry for the worker.
+        :return: List of worker session IDs.
         """
         result = []
         for i in range(worker_config["sessions"]):
@@ -2016,7 +2019,11 @@ class Configuration(object):
         self.__verify_compression_level(self.compression_level)
 
         self.__verify_or_set_optional_attributes(
-            config, "server_attributes", description, apply_defaults, env_aware=True,
+            config,
+            "server_attributes",
+            description,
+            apply_defaults,
+            env_aware=True,
         )
         self.__verify_or_set_optional_string(
             config,
@@ -2951,7 +2958,11 @@ class Configuration(object):
             config, "disable_leak_bandwidth_stats", False, description, apply_defaults
         )
         self.__verify_or_set_optional_bool(
-            config, "disable_copy_manager_stats", False, description, apply_defaults,
+            config,
+            "disable_copy_manager_stats",
+            False,
+            description,
+            apply_defaults,
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -3362,7 +3373,9 @@ class Configuration(object):
         i = 0
         for log_entry in config.get_json_array("k8s_logs"):
             self.__verify_k8s_log_entry_and_set_defaults(
-                log_entry, config_file_path=file_path, entry_index=i,
+                log_entry,
+                config_file_path=file_path,
+                entry_index=i,
             )
             i += 1
 
@@ -3374,7 +3387,11 @@ class Configuration(object):
             i += 1
 
     def __verify_k8s_log_entry_and_set_defaults(
-        self, log_entry, description=None, config_file_path=None, entry_index=None,
+        self,
+        log_entry,
+        description=None,
+        config_file_path=None,
+        entry_index=None,
     ):
         """Verifies that the configuration for the specified k8s log entry.
 
@@ -3452,7 +3469,10 @@ class Configuration(object):
 
         # set default worker if it is not specified.
         self.__verify_or_set_optional_string(
-            log_entry, "worker_id", "default", description,
+            log_entry,
+            "worker_id",
+            "default",
+            description,
         )
 
     def __verify_log_entry_with_key_and_set_defaults(
@@ -3508,7 +3528,11 @@ class Configuration(object):
             )
 
         self.__verify_or_set_optional_array_of_strings(
-            log_entry, "exclude", [], description, apply_defaults=apply_defaults,
+            log_entry,
+            "exclude",
+            [],
+            description,
+            apply_defaults=apply_defaults,
         )
 
         # If a parser was specified, make sure it is a string.
@@ -4250,7 +4274,10 @@ class Configuration(object):
             )
 
     def __verify_required_attributes(
-        self, config_object, field, config_description,
+        self,
+        config_object,
+        field,
+        config_description,
     ):
         """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
         object.
