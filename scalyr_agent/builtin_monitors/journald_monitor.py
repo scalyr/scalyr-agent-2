@@ -257,6 +257,7 @@ class Checkpoint(object):
 
 
 class JournaldMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Journald Monitor
 
@@ -320,6 +321,7 @@ of that object.  The ``poll`` method is called with a 0 second timeout so it nev
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
     """
+    # fmt: on
 
     def _initialize(self):
         verify_systemd_library_is_available()

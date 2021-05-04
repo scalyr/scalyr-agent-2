@@ -1620,6 +1620,7 @@ class SyslogServer(object):
 
 
 class SyslogMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Syslog Monitor
 
@@ -1691,6 +1692,7 @@ specifies TCP.
 Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
 running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
     """
+    # fmt: on
 
     def _initialize(self):
         if self._config.get("mode") == "docker" and not docker_module_available:

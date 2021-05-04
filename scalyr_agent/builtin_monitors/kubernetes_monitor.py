@@ -3354,6 +3354,7 @@ class ContainerChecker(object):
 class KubernetesMonitor(
     ScalyrMonitor
 ):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Kubernetes Monitor
 
@@ -3478,6 +3479,7 @@ container is still running, there is currently no way to dynamically start/stop 
 container using annotations without updating the config yaml, and applying the updated config to the
 cluster.
     """
+    # fmt: on
 
     @staticmethod
     def __build_metric_dict(prefix, names):

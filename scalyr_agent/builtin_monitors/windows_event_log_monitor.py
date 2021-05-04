@@ -639,6 +639,7 @@ class NewApi(Api):
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Window Event Log Monitor
 
@@ -706,6 +707,7 @@ and System sources:
       }
     ]
     """
+    # fmt: on
 
     def _initialize(self):
         # get the checkpoint file

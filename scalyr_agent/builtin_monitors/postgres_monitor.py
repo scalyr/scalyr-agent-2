@@ -422,6 +422,7 @@ class PostgreSQLDb(object):
 
 
 class PostgresMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # PostgreSQL Monitor
 
@@ -464,6 +465,7 @@ A basic PostgreSQL monitor configuration entry might resemble:
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of PostgreSQL and will make it easier to filter on metrics specific to that
 instance."""
+    # fmt: on
 
     def _initialize(self):
         """Performs monitor-specific initialization.

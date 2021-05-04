@@ -2067,6 +2067,7 @@ class DockerOptions(object):
 
 
 class DockerMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Docker Monitor
 
@@ -2196,6 +2197,7 @@ If you wish to use labels and label configuration when using the syslog monitor 
 
 TODO:  Back fill the instructions here.
     """
+    # fmt: on
 
     def __get_socket_file(self):
         """Gets the Docker API socket file and validates that it is a UNIX socket

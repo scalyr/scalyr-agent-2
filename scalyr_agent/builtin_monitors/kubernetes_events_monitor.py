@@ -197,6 +197,7 @@ class EventLogFormatter(BaseFormatter):
 class KubernetesEventsMonitor(
     ScalyrMonitor
 ):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Kubernetes Events Monitor
 
@@ -295,6 +296,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
     kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
     ```
     """
+    # fmt: on
 
     def _initialize(self):
 

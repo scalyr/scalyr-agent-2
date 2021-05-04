@@ -135,6 +135,7 @@ class BindableHTTPHandler(six.moves.urllib.request.HTTPHandler):
 
 
 class NginxMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Nginx Monitor
 
@@ -243,6 +244,7 @@ running the nginx plugin. Use the {{menuRef:ServerHost}} dropdown to show data f
 See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
 
     """
+    # fmt: on
 
     def _initialize(self):
         global httpSourceAddress

@@ -591,13 +591,16 @@ define_log_field(__monitor__, "value", "The metric value.")
 
 
 class SystemMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records system metrics for Windows platforms.
+    # fmt: off
+    """
+    A Scalyr agent monitor that records system metrics for Windows platforms.
 
     This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
     the agent is running.
 
     There is no required configuration for this monitor and is generally automatically run by the agent.
     """
+    # fmt: on
 
     def __init__(self, config, logger, **kwargs):
         """TODO: Fucntion documentation

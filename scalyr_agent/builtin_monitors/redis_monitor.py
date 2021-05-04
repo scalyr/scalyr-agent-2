@@ -342,6 +342,7 @@ class RedisHost(object):
 
 
 class RedisMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Redis Monitor
 
@@ -417,6 +418,7 @@ Here is an example with two hosts with passwords:
     some log lines will be dropped.
 
     """
+    # fmt: on
 
     def _initialize(self):
         """Performs monitor-specific initialization."""

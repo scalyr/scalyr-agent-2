@@ -504,11 +504,14 @@ def commandline_matcher(regex, flags=re.IGNORECASE):
 
 
 class ProcessMonitor(ScalyrMonitor):
-    """This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process on
+    # fmt: off
+    """
+    This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process on
     Windows system.
 
     You can use this plugin to record resource usage for a web server, database, or other application.
     """
+    # fmt: on
 
     def __init__(self, monitor_config, logger, **kw):
         """TODO: Function documentation
