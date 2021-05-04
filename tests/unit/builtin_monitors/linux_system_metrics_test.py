@@ -113,8 +113,8 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
 
         self.assertEqual(mock_logger.error.call_count, 0)
 
-        seen_mount_points_without_filters = self._get_mount_point_names_from_mock_logger(
-            mock_logger.info
+        seen_mount_points_without_filters = (
+            self._get_mount_point_names_from_mock_logger(mock_logger.info)
         )
         ignore_mounts = list(seen_mount_points_without_filters)[:3]
 

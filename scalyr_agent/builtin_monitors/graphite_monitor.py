@@ -182,8 +182,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
     # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
         self.__only_accept_local = self._config.get("only_accept_local")
         self.__accept_plaintext = self._config.get("accept_plaintext")
         self.__accept_pickle = self._config.get("accept_pickle")

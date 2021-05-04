@@ -156,7 +156,7 @@ class DockerMonitorTest(ScalyrTestCase):
         return client
 
     def test_get_containers_no_include_no_exclude(self):
-        """ Test get containers when no glob filters are applied """
+        """Test get containers when no glob filters are applied"""
 
         expected_ids = [
             "87d533137e70601d17a4bf9d563b11d528ba81e31e2299eb8d4ab2ef5a54f0c0",
@@ -178,7 +178,7 @@ class DockerMonitorTest(ScalyrTestCase):
             self.assertTrue(cid in containers)
 
     def test_get_containers_include_no_exclude(self):
-        """ Test get_containers when an include filter but no exclude filter is applied """
+        """Test get_containers when an include filter but no exclude filter is applied"""
         expected_ids = [
             "e511aaf76add81d41c1536b2a93a17448d9f9d3c6a3f8a5abab1d9a582c397fc",
             "cfcb7f7d1481c805f91fd6c8c120300a586978fa2541a58026bd930eeeda3e36",
@@ -197,7 +197,7 @@ class DockerMonitorTest(ScalyrTestCase):
             self.assertTrue(cid in containers)
 
     def test_get_containers_no_include_exclude(self):
-        """ Test get_containers when no include filter is applied but an exclude filter is"""
+        """Test get_containers when no include filter is applied but an exclude filter is"""
         expected_ids = [
             "87d533137e70601d17a4bf9d563b11d528ba81e31e2299eb8d4ab2ef5a54f0c0",
             "84afc8ee4d726544e77dcfe22c6f5be04f36b115ea99c0510d612666f83da1ce",
@@ -218,7 +218,7 @@ class DockerMonitorTest(ScalyrTestCase):
             self.assertTrue(cid in containers)
 
     def test_get_containers_include_exclude(self):
-        """ Test get_containers when both an include and an exclude filter are applied"""
+        """Test get_containers when both an include and an exclude filter are applied"""
         expected_ids = [
             "b8757266fd6a9efcb40a2881215d8d3642e6f8a0cfdcbb941382d002f31dcca4",
             "343c05b55c1b0cebca6df0309a4892974c5ed3013731433461ffe7442223659a",

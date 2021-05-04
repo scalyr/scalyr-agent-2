@@ -386,8 +386,7 @@ instance."""
     # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
         global httpSourceAddress
 
         # Useful instance variables:
@@ -699,8 +698,7 @@ instance."""
         return result
 
     def gather_sample(self):
-        """Invoked once per sample interval to gather a statistic.
-        """
+        """Invoked once per sample interval to gather a statistic."""
 
         status = self._get_status(self._monitor_url)
         if status is not None:
@@ -722,4 +720,3 @@ instance."""
                     self._logger.emit_value(
                         "tomcat.memory_pools.%s" % heap[key][0], heap[key][1], extra
                     )
-

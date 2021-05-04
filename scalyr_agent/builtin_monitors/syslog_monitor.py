@@ -496,7 +496,10 @@ class SyslogRequestParser(object):
     """
 
     def __init__(
-        self, socket, max_buffer_size, message_size_can_exceed_tcp_buffer=False,
+        self,
+        socket,
+        max_buffer_size,
+        message_size_can_exceed_tcp_buffer=False,
     ):
         self._socket = socket
 
@@ -832,7 +835,8 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             )
         elif self.request_parser == "raw":
             request_stream = SyslogRawRequestParser(
-                socket=self.request, max_buffer_size=self.server.tcp_buffer_size,
+                socket=self.request,
+                max_buffer_size=self.server.tcp_buffer_size,
             )
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
@@ -882,8 +886,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 class SyslogUDPServer(
     six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.UDPServer
 ):
-    """Class that creates a UDP SocketServer on a specified port
-    """
+    """Class that creates a UDP SocketServer on a specified port"""
 
     def __init__(self, port, bind_address, verifier):
 
@@ -908,8 +911,7 @@ class SyslogUDPServer(
 class SyslogTCPServer(
     six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
 ):
-    """Class that creates a TCP SocketServer on a specified port
-    """
+    """Class that creates a TCP SocketServer on a specified port"""
 
     def __init__(
         self,
@@ -1201,8 +1203,7 @@ class SyslogHandler(object):
         return attributes
 
     def __create_log_file(self, cname, cid, log_config):
-        """create our own rotating logger which will log raw messages out to disk.
-        """
+        """create our own rotating logger which will log raw messages out to disk."""
         result = None
         try:
             result = AutoFlushingRotatingFile(
@@ -1422,7 +1423,7 @@ class SyslogHandler(object):
 
 class RequestVerifier(object):
     """Determines whether or not a request should be processed
-       based on the state of various config options
+    based on the state of various config options
     """
 
     def __init__(self, accept_remote, accept_ips, docker_logging):

@@ -265,8 +265,7 @@ class Metric(object):
 
 
 class MetricPrinter:
-    """Helper class that emits metrics for the specified monitor.
-    """
+    """Helper class that emits metrics for the specified monitor."""
 
     def __init__(self, logger, monitor_id):
         """Initializes the class.

@@ -262,8 +262,7 @@ class OldApi(Api):
             self._checkpoints[source] = event.RecordNumber
 
     def __log_event(self, source, event):
-        """ Emits information about an event to the logfile for this monintor
-        """
+        """Emits information about an event to the logfile for this monintor"""
         event_type = self.__event_types[event.EventType]
 
         # we need to get the root source e.g. Application in Application/MyApplication
@@ -322,10 +321,10 @@ class NewApi(Api):
 
     def _open_remote_session_if_necessary(self, server, config):
         """
-            Opens a session to a remote server if `server` is not localhost or None
-            @param server: string containing the server to connect to (can be None)
-            @param config: a log config object
-            @return: a valid session to a remote machine, or None if no remote session was needed
+        Opens a session to a remote server if `server` is not localhost or None
+        @param server: string containing the server to connect to (can be None)
+        @param config: a log config object
+        @return: a valid session to a remote machine, or None if no remote session was needed
         """
         session = None
 
@@ -363,9 +362,9 @@ class NewApi(Api):
 
     def _subscribe_to_events(self):
         """
-            Go through all channels, and create an event subscription to that channel.
-            If a bookmark exists for a given channel, start the events from that bookmark, otherwise subscribe
-            to future events only.
+        Go through all channels, and create an event subscription to that channel.
+        If a bookmark exists for a given channel, start the events from that bookmark, otherwise subscribe
+        to future events only.
         """
 
         for info in self.__channels:

@@ -246,8 +246,7 @@ define_log_field(__monitor__, "value", "The metric value.")
 
 
 class PostgreSQLDb(object):
-    """ Represents a PopstgreSQL database
-    """
+    """Represents a PopstgreSQL database"""
 
     _database_stats = {
         "pg_stat_database": {
@@ -468,8 +467,7 @@ instance."""
     # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
 
         # Useful instance variables:
         #   _sample_interval_secs:  The number of seconds between calls to gather_sample.
@@ -513,8 +511,7 @@ instance."""
         )
 
     def gather_sample(self):
-        """Invoked once per sample interval to gather a statistic.
-        """
+        """Invoked once per sample interval to gather a statistic."""
 
         def timestamp_ms(dt):
             epoch = datetime(1970, 1, 1, 0, 0, 0, 0)

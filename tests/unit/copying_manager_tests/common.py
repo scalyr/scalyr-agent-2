@@ -273,7 +273,9 @@ class TestableCopyingManagerFlowController:
         )
 
     def wait_for_full_iteration(self):
-        self.run_and_stop_at(TestableCopyingManagerWorkerSession.SLEEPING,)
+        self.run_and_stop_at(
+            TestableCopyingManagerWorkerSession.SLEEPING,
+        )
 
         self.run_and_stop_at(
             TestableCopyingManagerWorkerSession.SENDING,
@@ -438,8 +440,7 @@ class TestableCopyingManagerWorkerSession(
         self.saved_active_checkpoints = None
 
     def _sleep_but_awaken_if_stopped(self, seconds):
-        """Blocks the CopyingManagerWorkerSession thread until the controller tells it to proceed.
-        """
+        """Blocks the CopyingManagerWorkerSession thread until the controller tells it to proceed."""
 
         if self._disable_flow_control:
             # flow control is disabled. Just return.
@@ -471,7 +472,7 @@ class TestableCopyingManagerWorkerSession(
         if self._disable_flow_control:
             # flow control is disabled, just return a dummy response callback.
             def get_response():
-                """"""
+                """ """
                 return "success", 0, "fake"
 
             return get_response
@@ -682,9 +683,9 @@ class TestableCopyingManagerWorker(CopyingManagerWorker):
 
 class TestableLogMatcher(LogMatcher):
     """
-        The subclass of the LogMatcher class with helper functions.
-        This is used in the TestableCopying manager
-        instead of the regular LogMatcher.
+    The subclass of the LogMatcher class with helper functions.
+    This is used in the TestableCopying manager
+    instead of the regular LogMatcher.
     """
 
     @property
@@ -765,7 +766,8 @@ class TestableCopyingManager(CopyingManager, TestableCopyingManagerFlowControlle
             )
 
     def start_manager(
-        self, logs_initial_positions=None,
+        self,
+        logs_initial_positions=None,
     ):
         """
         Overrides base class method, to initialize "scalyr_client" by default.

@@ -134,8 +134,7 @@ def _thread_watcher():
 
 
 def _start_thread_watcher_if_necessary():
-    """Starts the thread watcher if it hasn't already been started.
-    """
+    """Starts the thread watcher if it hasn't already been started."""
     global __thread_watcher_started
 
     if not __thread_watcher_started:

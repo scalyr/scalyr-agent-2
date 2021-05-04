@@ -174,8 +174,10 @@ class DateUtilsTestCase(ScalyrTestCase):
         ]
 
         for input_str, expected_ts in zip(input_strs, expected_tss):
-            result_with_strptime = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_strptime(
-                input_str
+            result_with_strptime = (
+                date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_strptime(
+                    input_str
+                )
             )
             result_without_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
                 input_str

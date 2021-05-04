@@ -149,8 +149,7 @@ class NoRedirection(six.moves.urllib.request.HTTPErrorProcessor):
 
 # UrlMonitor implementation
 class UrlMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor which retrieves a specified URL, and records the response status and body.
-    """
+    """A Scalyr agent monitor which retrieves a specified URL, and records the response status and body."""
 
     def _initialize(self):
         # Fetch and validate our configuration options.

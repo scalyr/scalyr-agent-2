@@ -49,8 +49,7 @@ define_config_option(
 
 
 class RedisHost(object):
-    """Class that holds various information about a specific redis connection
-    """
+    """Class that holds various information about a specific redis connection"""
 
     def __init__(self, host, port, password, connection_timeout):
         # redis instance information

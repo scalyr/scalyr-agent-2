@@ -486,7 +486,13 @@ def main(
     driver = get_libcloud_driver()
 
     size = NodeSize(
-        distro_details["size_id"], distro_details["size_id"], 0, 0, 0, 0, driver,
+        distro_details["size_id"],
+        distro_details["size_id"],
+        0,
+        0,
+        0,
+        0,
+        driver,
     )
     image = NodeImage(
         distro_details["image_id"], distro_details["image_name"], driver, None

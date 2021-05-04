@@ -182,9 +182,7 @@ define_config_option(
 
 
 class EventLogFormatter(BaseFormatter):
-    """Formatter used for the logs produced by the event monitor.
-
-    """
+    """Formatter used for the logs produced by the event monitor."""
 
     def __init__(self):
         # TODO: It seems on Python 2.4 the filename and line number do not work correctly.  I think we need to
@@ -428,7 +426,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _check_if_alive(self, k8s, node):
         """
-            Checks to see if the node specified by `node` is alive
+        Checks to see if the node specified by `node` is alive
         """
         if node is None:
             return False
@@ -451,11 +449,11 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _get_oldest_node(self, nodes, ignore_master):
         """
-            Takes a list of nodes returned from querying the k8s api, and returns the name
-            of the node with the oldest creationTimestamp or None if nodes is empty or doesn't
-            contain Node objects.
+        Takes a list of nodes returned from querying the k8s api, and returns the name
+        of the node with the oldest creationTimestamp or None if nodes is empty or doesn't
+        contain Node objects.
 
-            if `ignore_master` is true, then any nodes with the label `node-role.kubernetes.io/master` are ignored.
+        if `ignore_master` is true, then any nodes with the label `node-role.kubernetes.io/master` are ignored.
         """
 
         oldest_time = datetime.datetime.utcnow()
@@ -489,11 +487,11 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _check_nodes_for_leader(self, k8s, query_fields=""):
         """
-            Checks all nodes on the cluster to see which one has the oldest creationTime
-            If `self._ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
-            is ignored.
-            @param k8s: a KubernetesApi object for querying the k8s api
-            @query_fields - optional query string appended to the node endpoint to allow for filtering
+        Checks all nodes on the cluster to see which one has the oldest creationTime
+        If `self._ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
+        is ignored.
+        @param k8s: a KubernetesApi object for querying the k8s api
+        @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
         response = k8s.query_api_with_retries(
             "/api/v1/nodes%s" % query_fields,
@@ -520,15 +518,15 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _get_current_leader(self, k8s):
         """
-            Queries the kubernetes api to see which node is the current leader node.
+        Queries the kubernetes api to see which node is the current leader node.
 
-            If there is currently a leader node, then only that node is polled to see if it still
-            exists.
+        If there is currently a leader node, then only that node is polled to see if it still
+        exists.
 
-            Check to see if the leader is specified as a node label.
-            If not, then if there is not a current leader node, or if the current leader node no longer exists
-            then query all nodes for the leader
-            @param k8s: a KubernetesApi object for querying the k8s api
+        Check to see if the leader is specified as a node label.
+        If not, then if there is not a current leader node, or if the current leader node no longer exists
+        then query all nodes for the leader
+        @param k8s: a KubernetesApi object for querying the k8s api
         """
 
         try:
@@ -615,8 +613,8 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _is_resource_expired(self, response):
         """
-            Checks to see if the resource identified in `response` is expired or not.
-            @param response: a response from querying the k8s api for a resource
+        Checks to see if the resource identified in `response` is expired or not.
+        @param response: a response from querying the k8s api for a resource
         """
         obj = response.get("object", dict())
 
@@ -629,10 +627,10 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _get_involved_object(self, obj):
         """
-            Processes an object returned from querying the k8s api, and determines whether the object
-            has an `involvedObject` and if so returns a tuple containing the kind, namespace and name of the involved object.
-            Otherwise returns (None, None, None)
-            @param obj: an object returned from querying th k8s api
+        Processes an object returned from querying the k8s api, and determines whether the object
+        has an `involvedObject` and if so returns a tuple containing the kind, namespace and name of the involved object.
+        Otherwise returns (None, None, None)
+        @param obj: an object returned from querying th k8s api
         """
         involved = obj.get("involvedObject", dict())
         kind = involved.get("kind", None)
@@ -646,8 +644,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         return (kind, namespace, name)
 
     def run(self):
-        """Begins executing the monitor, writing metric output to logger.
-        """
+        """Begins executing the monitor, writing metric output to logger."""
         if self.__disable_monitor:
             global_log.info(
                 "kubernetes_events_monitor exiting because it has been disabled."

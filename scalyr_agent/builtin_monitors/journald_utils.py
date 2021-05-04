@@ -64,8 +64,7 @@ class LogConfigManager:
         self.__log_config_creators = self.initialize()
 
     def initialize(self):
-        """ Generate the config matchers for this manager from the global config
-        """
+        """Generate the config matchers for this manager from the global config"""
         config_matchers = []
         for config in self._global_config.journald_log_configs:
             config_matcher = self.create_config_matcher(config)
@@ -76,7 +75,7 @@ class LogConfigManager:
         return config_matchers
 
     def create_config_matcher(self, conf):
-        """ Create a function that will return a log configuration when passed in data that matches that config.
+        """Create a function that will return a log configuration when passed in data that matches that config.
         Intended to be overwritten by users of LogConfigManager to match their own use case.
         If passed an empty dictionary in `conf` this should create a catchall matcher with default configuration.
 
@@ -165,7 +164,7 @@ class LogConfigManager:
         return regex_matcher
 
     def get_config(self, fields):
-        """ Get a log configuration that matches the passed in data based on the configured config matchers.
+        """Get a log configuration that matches the passed in data based on the configured config matchers.
 
         @param fields: Fields that the configured config matchers will attempt to match against
         @return: Logger configuration if a config matcher matched on `fields`, None otherwise
@@ -177,7 +176,7 @@ class LogConfigManager:
         return None
 
     def get_logger(self, fields):
-        """ Get a logger that matches the passed in data based on the configured config matchers. This will create
+        """Get a logger that matches the passed in data based on the configured config matchers. This will create
         a logger if the configuration gets matched but no logger exists yet
 
         @param fields: Fields that the configured config matchers will attempt to match against
@@ -199,7 +198,7 @@ class LogConfigManager:
         self.log_watcher = log_watcher
 
     def create_logger(self, log_config):
-        """ Create a logger with the given configuration.
+        """Create a logger with the given configuration.
 
         @param log_config: Configuration for this logger
         """
@@ -224,8 +223,7 @@ class LogConfigManager:
         self._loggers[log_config["path"]]["config"] = log_config
 
     def close(self):
-        """Close all log handlers currently managed by this LogConfigManager.
-        """
+        """Close all log handlers currently managed by this LogConfigManager."""
         for logger in self._loggers.values():
             logger["logger"].removeHandler(logger["handler"])
             logger["handler"].close()

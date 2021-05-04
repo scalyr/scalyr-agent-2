@@ -38,7 +38,7 @@ log = scalyr_logging.getLogger(__name__)
 
 
 class ConnectionFactory:
-    """ Factory class for creating connection objects using either Httplib or Requests
+    """Factory class for creating connection objects using either Httplib or Requests
     to handle the connection.
     """
 
@@ -53,7 +53,7 @@ class ConnectionFactory:
         quiet=False,
         proxies=None,
     ):
-        """ Create a new connection, with either Requests or Httplib, depending on the
+        """Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
         @param server: the server to connect to (scheme://domain:port)
@@ -94,12 +94,20 @@ class ConnectionFactory:
                     % six.text_type(e)
                 )
                 result = ScalyrHttpConnection(
-                    server, request_deadline, ca_file, intermediate_certs_file, headers,
+                    server,
+                    request_deadline,
+                    ca_file,
+                    intermediate_certs_file,
+                    headers,
                 )
                 use_requests = False
         else:
             result = ScalyrHttpConnection(
-                server, request_deadline, ca_file, intermediate_certs_file, headers,
+                server,
+                request_deadline,
+                ca_file,
+                intermediate_certs_file,
+                headers,
             )
 
         if not quiet:
@@ -112,7 +120,7 @@ class ConnectionFactory:
 
 
 class Connection(object):
-    """ Connection class
+    """Connection class
     An abstraction for dealing with different connection types Httplib or Requests
     """
 
@@ -150,7 +158,7 @@ class Connection(object):
         self.__connection = None
 
     def __check_ssl(self):
-        """ Helper function to check if ssl is available and enabled """
+        """Helper function to check if ssl is available and enabled"""
         if self._use_ssl and not self._ca_file:
             log.warn(
                 "Server certificate validation has been disabled while communicating with Scalyr. "
@@ -172,11 +180,11 @@ class Connection(object):
         self._get(request_path)
 
     def _post(self, request_path, body):
-        """Subclasses override to handle specifics of post requests """
+        """Subclasses override to handle specifics of post requests"""
         pass
 
     def _get(self, request_path):
-        """Subclasses override to handle specifics of get requests """
+        """Subclasses override to handle specifics of get requests"""
         pass
 
     def response(self):
@@ -206,7 +214,12 @@ class Connection(object):
 
 class ScalyrHttpConnection(Connection):
     def __init__(
-        self, server, request_deadline, ca_file, intermediate_certs_file, headers,
+        self,
+        server,
+        request_deadline,
+        ca_file,
+        intermediate_certs_file,
+        headers,
     ):
         super(ScalyrHttpConnection, self).__init__(
             server, request_deadline, ca_file, headers
@@ -222,7 +235,10 @@ class ScalyrHttpConnection(Connection):
         try:
             if self._use_ssl:
                 self.__connection = HTTPSConnectionWithTimeoutAndVerification(
-                    self._host, self._port, self._request_deadline, self._ca_file,
+                    self._host,
+                    self._port,
+                    self._request_deadline,
+                    self._ca_file,
                 )
                 self.__connection.connect()
             else:

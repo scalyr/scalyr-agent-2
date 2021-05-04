@@ -363,8 +363,10 @@ seconds and then polls again.
         self._extra_fields = self._config.get("journal_fields")
         if self._extra_fields is not None:
             for field_name in self._extra_fields:
-                fixed_field_name = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
-                    field_name, is_metric=False
+                fixed_field_name = (
+                    scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
+                        field_name, is_metric=False
+                    )
                 )
                 if field_name != fixed_field_name:
                     self._extra_fields[fixed_field_name] = self._extra_fields[
@@ -557,7 +559,10 @@ seconds and then polls again.
                 )
 
     def format_msg(
-        self, message, log_config, extra_fields=None,
+        self,
+        message,
+        log_config,
+        extra_fields=None,
     ):
         string_buffer = six.StringIO()
 

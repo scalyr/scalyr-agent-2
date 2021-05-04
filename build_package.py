@@ -252,7 +252,8 @@ def build_win32_installer_package(variant, version):
     shutil.copy(convert_path("scalyr_agent/__scalyr__.py"), "__scalyr__.py")
     shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION")
     shutil.copy(
-        make_path(agent_source_root, "VERSION"), convert_path("scalyr_agent/VERSION"),
+        make_path(agent_source_root, "VERSION"),
+        convert_path("scalyr_agent/VERSION"),
     )
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
@@ -297,7 +298,9 @@ def build_win32_installer_package(variant, version):
     # Copy the config file.
     agent_json_path = make_path(agent_source_root, "config/agent.json")
     cat_files(
-        [agent_json_path], "agent_config.tmpl", convert_newlines=True,
+        [agent_json_path],
+        "agent_config.tmpl",
+        convert_newlines=True,
     )
     # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
     # readable by others.
@@ -1387,7 +1390,10 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
             if command_name is not None:
                 print(
                     "Executing %s failed and returned a non-zero result of %d"
-                    % (command_name, return_code,),
+                    % (
+                        command_name,
+                        return_code,
+                    ),
                     file=sys.stderr,
                 )
             else:
@@ -1504,7 +1510,11 @@ def create_change_logs():
             print_release_notes(fp, release["notes"], ["  * ", "   - ", "     + "])
             print(
                 " -- %s <%s>  %s"
-                % (release["packager"], release["packager_email"], date_str,),
+                % (
+                    release["packager"],
+                    release["packager_email"],
+                    date_str,
+                ),
                 file=fp,
             )
     finally:
@@ -1874,7 +1884,10 @@ if __name__ == "__main__":
         set_build_info(options.build_info)
 
     artifact = build_package(
-        args[0], options.variant, options.no_versioned_file_name, options.coverage,
+        args[0],
+        options.variant,
+        options.no_versioned_file_name,
+        options.coverage,
     )
     print("Built %s" % artifact)
     sys.exit(0)

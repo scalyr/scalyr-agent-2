@@ -105,7 +105,7 @@ def _gather_metric(method, attribute=None, transform=None):
         doc = "Extract the {}().{} attribute from the given process object".format
 
     def gather_metric():
-        """Dynamically Generated """
+        """Dynamically Generated"""
         no_diskperf = False
         is_diskio_counters_method = method == "disk_io_counters"
 
@@ -603,8 +603,7 @@ class SystemMonitor(ScalyrMonitor):
     # fmt: on
 
     def __init__(self, config, logger, **kwargs):
-        """TODO: Fucntion documentation
-        """
+        """TODO: Fucntion documentation"""
         if psutil is None:
             raise UnsupportedSystem(
                 "windows_system_metrics",
@@ -619,8 +618,7 @@ class SystemMonitor(ScalyrMonitor):
         )
 
     def gather_sample(self):
-        """TODO: Fucntion documentation
-        """
+        """TODO: Fucntion documentation"""
         try:
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config["metric_name"]

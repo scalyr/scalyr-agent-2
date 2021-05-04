@@ -36,8 +36,7 @@ PLATFORM_INSTANCE = None
 
 class PlatformController(object):
     def __init__(self):
-        """Initializes a platform instance.
-        """
+        """Initializes a platform instance."""
         self._install_type = INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
@@ -47,7 +46,7 @@ class PlatformController(object):
     @staticmethod
     def __register_supported_platforms():
         """Adds all available platforms to the '__platforms_registered__' array.
-         a new platform class that could be instantiated during the 'new_platform' method.
+        a new platform class that could be instantiated during the 'new_platform' method.
         """
         if sys.platform == "win32":
             from scalyr_agent.platform_windows import WindowsPlatformController
@@ -377,15 +376,13 @@ class DefaultPaths(object):
 
 
 class AgentAlreadyRunning(Exception):
-    """Raised to signal the agent is already running.
-    """
+    """Raised to signal the agent is already running."""
 
     pass
 
 
 class AgentNotRunning(Exception):
-    """Raised to signal the agent is not running.
-    """
+    """Raised to signal the agent is not running."""
 
     pass
 
@@ -400,7 +397,6 @@ class CannotExecuteAsUser(Exception):
 
 
 class ChangeUserNotSupported(Exception):
-    """Raised to signal that this platform has not implemented the operation of changing its executing user.
-    """
+    """Raised to signal that this platform has not implemented the operation of changing its executing user."""
 
     pass
