@@ -1,10 +1,25 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.21 "TBD" - April 30, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
+--->
+
+Improvements:
+* Allow journald monitor to be configured via globs on multiple fields via ``journald_logs.journald_globs`` config option. Contributed by @imron. #741
+
+Bug fixes:
+* Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+
+Other:
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
+
 ## 2.1.20 "Tabeisshi" - April 19, 2021
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on April 19, 2021 21:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 19, 2021 21:00 -0800
 --->
 
 Improvements:

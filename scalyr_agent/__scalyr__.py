@@ -194,8 +194,7 @@ def __add_scalyr_package_to_path():
 
 
 def __determine_version():
-    """Returns the agent version number, read from the VERSION file.
-    """
+    """Returns the agent version number, read from the VERSION file."""
 
     file_names = ["VERSION"]
 

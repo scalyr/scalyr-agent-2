@@ -148,7 +148,8 @@ def download_artifact_file(artifact_info, output_path):
     :return:
     """
     artifact_output_path = os.path.join(
-        output_path, os.path.basename(artifact_info["path"]),
+        output_path,
+        os.path.basename(artifact_info["path"]),
     )
 
     resp = _do_request(
@@ -233,7 +234,9 @@ def discard_outdated_workflows(workflow_infos):
     return result
 
 
-def wait_for_pipeline(pipeline_number,):
+def wait_for_pipeline(
+    pipeline_number,
+):
     # type: (int) -> Dict
     """
     Wait for all workflows are finishedin the pipeline specified by 'pipeline number'.

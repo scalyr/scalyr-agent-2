@@ -150,6 +150,7 @@ class BindableHTTPHandler(six.moves.urllib.request.HTTPHandler):
 
 
 class ApacheMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Apache Monitor
 
@@ -253,6 +254,7 @@ running the Apache plugin. Use the {{menuRef:ServerHost}} dropdown to show data 
 
 See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
     """
+    # fmt: on
 
     def _initialize(self):
         global httpSourceAddress

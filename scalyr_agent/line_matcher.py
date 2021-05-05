@@ -30,7 +30,7 @@ import six
 
 
 class LineMatcher(object):
-    """ An abstraction for a Line Matcher.
+    """An abstraction for a Line Matcher.
     Reads an entire 'line' from a file like object (e.g. anything implementing Python's
     file interface such as StringIO).  By default it reads just a single line terminated
     by a newline, however subclasses can override the _readline method to provide their
@@ -143,7 +143,7 @@ class LineMatcher(object):
         return line
 
     def _readline(self, file_like, max_length=0):
-        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        """Takes a file_like object (e.g. anything conforming to python's file interface
         and returns either a full line, or a partial line.
         @param file_like: a file like object (e.g. StringIO)
         @param max_length: the maximum length to read from the file_like object
@@ -164,7 +164,7 @@ class LineMatcher(object):
 
 
 class LineMatcherCollection(LineMatcher):
-    """ A group of line matchers.
+    """A group of line matchers.
     Returns the line from the first line matcher that returns a non-empty line,
     or a single newline terminated line if no matches are found.
     """
@@ -177,7 +177,7 @@ class LineMatcherCollection(LineMatcher):
         self.__matchers.append(matcher)
 
     def _readline(self, file_like, max_length=0):
-        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        """Takes a file_like object (e.g. anything conforming to python's file interface
         and checks all self.__matchers to see if any of them match.  If so then return the
         first matching line, otherwise return a single newline terminated line from the input.
 
@@ -213,7 +213,7 @@ class LineMatcherCollection(LineMatcher):
 
 
 class LineGrouper(LineMatcher):
-    """ An abstraction for a LineMatcher that groups multiple lines as a single line.
+    """An abstraction for a LineMatcher that groups multiple lines as a single line.
     Most of the complexity of multiline matching is handled by this class, and subclasses
     are expected to override methods determining when a multiline begins, and whether the
     multiline should continue.
@@ -235,7 +235,7 @@ class LineGrouper(LineMatcher):
         self._continuation_pattern = re.compile(continuation_pattern)
 
     def _readline(self, file_like, max_length=0):
-        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        """Takes a file_like object (e.g. anything conforming to python's file interface
         and returns either a full line, or a partial line.
         @param file_like: a file like object (e.g. StringIO)
         @param max_length: the maximum length to read from the file_like object
@@ -342,19 +342,19 @@ class LineGrouper(LineMatcher):
         return line, partial
 
     def _match_single_line(self):
-        """ Returns whether or not the grouper can match a single line based on the start_pattern.
+        """Returns whether or not the grouper can match a single line based on the start_pattern.
         Defaults to false
         """
         return False
 
     def _continue_line(self, line):
-        """ Returns whether or not the grouper should continue matching a multiline.  Defaults to false
+        """Returns whether or not the grouper should continue matching a multiline.  Defaults to false
         @param line - the next line of input
         """
         return False
 
     def _start_line(self, line):
-        """ Returns whether or not the grouper should start matching a multiline.
+        """Returns whether or not the grouper should start matching a multiline.
         @param line - the next line of input
         @return bool - whether or not the start pattern finds a match in the input line
         """
@@ -362,7 +362,7 @@ class LineGrouper(LineMatcher):
 
 
 class ContinueThrough(LineGrouper):
-    """  A ContinueThrough multiline grouper.
+    """A ContinueThrough multiline grouper.
     If the start_pattern matches, then all consecutive lines matching the continuation pattern are included in the line.
     This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading whitespace)
     indicates that it is an extension of the preceeding line.
@@ -380,7 +380,7 @@ class ContinueThrough(LineGrouper):
 
 
 class ContinuePast(LineGrouper):
-    """ A ContinuePast multiline grouper.
+    """A ContinuePast multiline grouper.
     If the start pattern matches, then all consecutive lines matching the contuation pattern, plus one additional line,
     are included in the line.
     This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
@@ -437,7 +437,7 @@ class ContinuePast(LineGrouper):
 
 
 class HaltBefore(LineGrouper):
-    """ A HaltBefore line grouper.
+    """A HaltBefore line grouper.
     If the start pattern matches, then all consecutive lines not matching the contuation pattern are included in the line.
     This is useful where a log line contains a marker indicating that it begins a new message.
     """
@@ -471,7 +471,7 @@ class HaltBefore(LineGrouper):
 
 
 class HaltWith(LineGrouper):
-    """ A HaltWith line grouper.
+    """A HaltWith line grouper.
     If the start pattern matches, all consecutive lines, up to and including the first line matching the contuation pattern,
     are included in the line. This is useful where a log line ends with a termination marker, such as a semicolon.
     """

@@ -765,8 +765,7 @@ class TestScriptEscalator(ScalyrTestCase):
 
 
 class TestRedirectorServer(ScalyrTestCase):
-    """Tests the RedirectorServer code using fakes for stdout, stderr and the channel.
-    """
+    """Tests the RedirectorServer code using fakes for stdout, stderr and the channel."""
 
     def setUp(self):
         super(TestRedirectorServer, self).setUp()
@@ -842,8 +841,7 @@ class TestRedirectorServer(ScalyrTestCase):
 
 
 class TestRedirectorClient(ScalyrTestCase):
-    """Test the RedirectorClient by faking out the client channel and also the clock.
-    """
+    """Test the RedirectorClient by faking out the client channel and also the clock."""
 
     def setUp(self):
         super(TestRedirectorClient, self).setUp()
@@ -933,8 +931,7 @@ class TestRedirectorClient(ScalyrTestCase):
 
 
 class TestRedirectionService(ScalyrTestCase):
-    """Tests both the RedirectorServer and the RedirectorClient communicating together.
-    """
+    """Tests both the RedirectorServer and the RedirectorClient communicating together."""
 
     def setUp(self):
         super(TestRedirectionService, self).setUp()
@@ -1078,8 +1075,7 @@ class FakeSys(object):
 
 
 class TestHistogramTracker(ScalyrTestCase):
-    """Tests the HistogramTracker abstraction.
-    """
+    """Tests the HistogramTracker abstraction."""
 
     def setUp(self):
         super(TestHistogramTracker, self).setUp()

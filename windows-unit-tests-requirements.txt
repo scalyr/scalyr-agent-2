@@ -10,7 +10,9 @@ pytest-xdist==1.31.0
 coverage==4.5.4
 codecov==2.1.9
 decorator==4.4.1
-PyYAML==5.3
+PyYAML==5.4.1; python_version >= '3.6'
+PyYAML==5.3.1; python_version == '3.5'
+PyYAML==5.3.1; python_version <= '2.7'
 six==1.13.0
 docker==4.1.0
 # the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
@@ -18,7 +20,7 @@ docker==4.1.0
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 requests==2.15.1
 ujson==1.35
-orjson==3.5.1; python_version >= '3.6'
+orjson==3.5.2; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1

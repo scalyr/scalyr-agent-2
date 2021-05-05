@@ -93,6 +93,7 @@ __first_line_pattern__ = re.compile("[^\r\n]+")
 
 # ShellMonitor implementation
 class ShellMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Shell Monitor
 
@@ -130,6 +131,7 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
     """
+    # fmt: on
 
     def _initialize(self):
         # Fetch and validate our configuration options.

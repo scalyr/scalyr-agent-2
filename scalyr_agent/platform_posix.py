@@ -67,8 +67,7 @@ class PosixPlatformController(PlatformController):
     """
 
     def __init__(self, stdin="/dev/null", stdout="/dev/null", stderr="/dev/null"):
-        """Initializes the POSIX platform instance.
-        """
+        """Initializes the POSIX platform instance."""
         self.__stdin = stdin
         self.__stdout = stdout
         self.__stderr = stderr
@@ -1237,8 +1236,7 @@ class StatusReporter(object):
             assert self.__fp.fileno() != source_fp.fileno()
 
     def close(self):
-        """Closes the status reporter.  This must be invoked by all processes.
-        """
+        """Closes the status reporter.  This must be invoked by all processes."""
         self.__fp.close()
 
     def report_status(self, message):
