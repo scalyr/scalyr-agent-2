@@ -105,7 +105,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "ca_file",
-    "Location of the ca file to use for the SSL connection. Defaults to None, which means the validity of the server "
+    "Location of the ca file to use for the SSL connection. Defaults to None, which means serve certificate "
+    "verification won't be performed."
     "will not be verified.",
     convert_to=six.text_type,
 )

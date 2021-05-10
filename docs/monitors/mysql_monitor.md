@@ -75,8 +75,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                               simply ``3306`` when connecting to the local machine. You should specify one of \
                               ``database_socket`` or ``database_hostport``, but not both.
 |||# ``use_ssl``          ||| Whether or not to use SSL when connecting to the MySQL server. Defaults to False.
-|||# ``ca_file``          ||| Location of the ca file to use for the SSL connection. Defaults to None, which means the \
-                              validity of the server will not be verified.
+|||# ``ca_file``          ||| Location of the ca file to use for the SSL connection. Defaults to None, which means \
+                              serve certificate verification won't be performed.will not be verified.
 |||# ``key_file``         ||| Location of the key file to use for the SSL connection. Defaults to None.
 |||# ``cert_file``        ||| Location of the cert file to use for the SSL connection. Defaults to None
 
