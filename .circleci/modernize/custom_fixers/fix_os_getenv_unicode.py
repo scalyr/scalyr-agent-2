@@ -4,10 +4,10 @@ import libmodernize
 
 class FixOsGetenvUnicode(BaseFix):
     """
-        This fixer searches for places where we calling os.getenv,
-        and replaces them with 'scalyr_agent.compat.os_getenv_unicode'.
-        This is needed because os.getenv returns 'str' in python2 and we need unicode.
-        """
+    This fixer searches for places where we calling os.getenv,
+    and replaces them with 'scalyr_agent.compat.os_getenv_unicode'.
+    This is needed because os.getenv returns 'str' in python2 and we need unicode.
+    """
 
     BM_compatible = True
     PATTERN = """

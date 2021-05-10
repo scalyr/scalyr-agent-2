@@ -42,8 +42,7 @@ from scalyr_agent import compat
 
 
 class WorkingDirectory:
-    """Simple abstraction with the context manager for changing the current working directory
-    """
+    """Simple abstraction with the context manager for changing the current working directory"""
 
     def __init__(self, new_path):
         """

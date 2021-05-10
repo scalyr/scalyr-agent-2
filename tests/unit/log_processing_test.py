@@ -1545,7 +1545,10 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             "sometext.... secretoption=czerwin ,andsecret123=saurabh",
             "sometext.... secretczerwin =%s,andsecretsaurabh=%s"
-            % (md5_hexdigest("option"), md5_hexdigest("123"),),
+            % (
+                md5_hexdigest("option"),
+                md5_hexdigest("123"),
+            ),
             True,
         )
 

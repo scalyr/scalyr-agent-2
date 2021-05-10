@@ -384,8 +384,7 @@ __coms_to_report__ = (
 
 
 class MysqlDB(object):
-    """ Represents a MySQL database
-    """
+    """Represents a MySQL database"""
 
     def _connect(self):
         try:
@@ -758,7 +757,7 @@ class MysqlDB(object):
 
     def _derived_stat_connections_used_percentage(self, globalVars, globalStatusMap):
         """Calculate what percentage of the configured connections are used.  A high percentage can
-           indicate a an app is using more than the expected number / configured number of connections.
+        indicate a an app is using more than the expected number / configured number of connections.
         """
         pct = 100.0 * (
             float(globalStatusMap["global.max_used_connections"])
@@ -851,7 +850,7 @@ class MysqlDB(object):
 
     def _derived_stat_open_file_percentage(self, globalVars, globalStatusMap):
         """Calculate the percentage of files that are open compared to the allowed limit.
-           If no open file limit is configured, the value will be 0.
+        If no open file limit is configured, the value will be 0.
         """
         pct = 0.0
         if globalVars["vars.open_files_limit"] > 0:
@@ -898,8 +897,7 @@ class MysqlDB(object):
         return pct
 
     def gather_derived_stats(self, globalVars, globalStatusMap):
-        """Gather derived stats based on global variables and global status.
-        """
+        """Gather derived stats based on global variables and global status."""
         if not globalVars or not globalStatusMap:
             return None
         stats = [
@@ -1019,6 +1017,7 @@ class MysqlDB(object):
 
 
 class MysqlMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # MySQL Monitor
 
@@ -1072,10 +1071,10 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
 """
+    # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
 
         # Useful instance variables:
         #   _sample_interval_secs:  The number of seconds between calls to gather_sample.
@@ -1197,8 +1196,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             )
 
     def gather_sample(self):
-        """Invoked once per sample interval to gather a statistic.
-        """
+        """Invoked once per sample interval to gather a statistic."""
 
         # make sure we have a database connection
         if self._db is None:
@@ -1210,13 +1208,11 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             return
 
         def print_status_line(key, value, extra_fields):
-            """ Emit a status line.
-            """
+            """Emit a status line."""
             self._logger.emit_value("mysql.%s" % key, value, extra_fields=extra_fields)
 
         def print_status(status):
-            """print a status object, assumed to be a dictionary of key/values (and possibly extra fields).
-            """
+            """print a status object, assumed to be a dictionary of key/values (and possibly extra fields)."""
             if status is not None:
                 for entry in status:
                     field = entry["field"]

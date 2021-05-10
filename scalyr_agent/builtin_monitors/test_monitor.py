@@ -30,8 +30,7 @@ from scalyr_agent import ScalyrMonitor
 
 
 class RandomMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records random numbers.
-    """
+    """A Scalyr agent monitor that records random numbers."""
 
     def _initialize(self):
         """Performs monitor-specific initialization."""

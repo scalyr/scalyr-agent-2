@@ -34,7 +34,8 @@ from tests.image_builder.distributions.ubuntu1804 import UbuntuBuilder
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(
-    UbuntuBuilder, __file__,
+    UbuntuBuilder,
+    __file__,
 )
 def test_default_compression_algorithm(request):
     runner = AgentRunner(PACKAGE_INSTALL, send_to_server=False)

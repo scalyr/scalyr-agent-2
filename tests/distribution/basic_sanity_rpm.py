@@ -34,7 +34,8 @@ from tests.image_builder.distributions.amazonlinux2 import AmazonlinuxBuilder
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(
-    AmazonlinuxBuilder, __file__,
+    AmazonlinuxBuilder,
+    __file__,
 )
 def test_default_compression_algorithm(request):
     runner = AgentRunner(PACKAGE_INSTALL, send_to_server=False)

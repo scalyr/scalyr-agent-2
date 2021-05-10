@@ -168,8 +168,7 @@ def _is_int(string):
 
 
 def _process_annotation_items(items, hyphens_as_underscores):
-    """ Process annotation items after the scalyr config prefix has been stripped
-    """
+    """Process annotation items after the scalyr config prefix has been stripped"""
 
     def sort_annotation(pair):
         (key, value) = pair

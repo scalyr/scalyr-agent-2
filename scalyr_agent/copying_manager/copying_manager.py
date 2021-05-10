@@ -846,13 +846,10 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # For multi processing mode we also include pids of all the spawned processes
                 if self.__config.use_multiprocess_workers:
-                    msg = (
-                        "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s"
-                        % (
-                            worker_sessions_count,
-                            os.getpid(),
-                            ", ".join([str(pid) for pid in worker_session_process_ids]),
-                        )
+                    msg = "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s" % (
+                        worker_sessions_count,
+                        os.getpid(),
+                        ", ".join([str(pid) for pid in worker_session_process_ids]),
                     )
                 else:
                     msg = (
@@ -1397,7 +1394,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         Path for the current main checkpoint file.
         """
         return os.path.join(
-            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
+            self.__config.agent_data_path,
+            CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
 
     def __consolidate_checkpoints(self, checkpoints):
@@ -1408,7 +1406,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
 
         consolidated_checkpoints_path = os.path.join(
-            self.__config.agent_data_path, CONSOLIDATED_CHECKPOINTS_FILE_NAME,
+            self.__config.agent_data_path,
+            CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
 
         update_checkpoint_state_in_file(
@@ -1417,7 +1416,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # clear data folder by removing all worker session checkpoint files.
         checkpoints_glob = os.path.join(
-            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
+            self.__config.agent_data_path,
+            WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
         )
 
         for path in scalyr_util.match_glob(checkpoints_glob):
@@ -1426,7 +1426,8 @@ class CopyingManager(StoppableThread, LogWatcher):
             # also delete active checkpoint file.
             checkpoint_file_name = os.path.basename(path)
             active_checkpoint_path = os.path.join(
-                os.path.dirname(path), "active-{0}".format(checkpoint_file_name),
+                os.path.dirname(path),
+                "active-{0}".format(checkpoint_file_name),
             )
             if os.path.isfile(active_checkpoint_path):
                 os.unlink(active_checkpoint_path)
@@ -1449,7 +1450,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # search for all worker session checkpoint files.
         worker_checkpoints_glob = os.path.join(
-            self.__config.agent_data_path, WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
+            self.__config.agent_data_path,
+            WORKER_SESSION_CHECKPOINT_FILENAME_GLOB,
         )
 
         checkpoints_paths = scalyr_util.match_glob(worker_checkpoints_glob)
