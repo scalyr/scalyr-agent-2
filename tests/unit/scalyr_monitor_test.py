@@ -166,7 +166,8 @@ class MonitorConfigTest(ScalyrTestCase):
         test_array = ["a", 1, False]
         json_arr = JsonArray(*test_array)
         self.assertEquals(
-            self.get(list(json_arr), convert_to=JsonArray), JsonArray(*test_array),
+            self.get(list(json_arr), convert_to=JsonArray),
+            JsonArray(*test_array),
         )
 
         # list -> ArrayOfStrings not supported

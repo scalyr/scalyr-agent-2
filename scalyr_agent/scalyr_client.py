@@ -806,7 +806,9 @@ class ScalyrClientSession(object):
             return add_events_request.get_payload()
 
         return self.__send_request(
-            "/addEvents", body_func=generate_body, block_on_response=block_on_response,
+            "/addEvents",
+            body_func=generate_body,
+            block_on_response=block_on_response,
         )
 
     def close(self, current_time=None):
@@ -964,7 +966,11 @@ class ScalyrClientSession(object):
             and len(sessions_api_keys_tuple) == 3
             and sessions_api_keys_tuple[1] > 1
         ):
-            (worker_type, workers_count, api_keys_count,) = sessions_api_keys_tuple
+            (
+                worker_type,
+                workers_count,
+                api_keys_count,
+            ) = sessions_api_keys_tuple
 
             if worker_type == "multiprocess":
                 sharded_copy_manager_string = "mw-2|"
@@ -1000,8 +1006,7 @@ class ScalyrClientSession(object):
         return ";".join(map(six.text_type, parts))
 
     def perform_agent_version_check(self, track="stable"):
-        """Query the Scalyr API to determine if a newer version is available
-        """
+        """Query the Scalyr API to determine if a newer version is available"""
         url_path = (
             "/ajax?method=performAgentVersionCheck&installedVersion=%s&track=%s"
             % (self.__agent_version, track)
@@ -1435,8 +1440,7 @@ class AddEventsRequest(object):
         self.__event_sequencer.reset()
 
     class Position(object):
-        """Represents a position in the added events.
-        """
+        """Represents a position in the added events."""
 
         def __init__(self, events_added, buffer_size, postfix_buffer_position):
             self.events_added = events_added
@@ -1843,8 +1847,7 @@ class Event(object):
         self.__num_optimal_fields = 0
 
     def __set_attributes(self, thread_id, attributes):
-        """ Set the attributes and thread id of an Event.
-        """
+        """Set the attributes and thread id of an Event."""
         self.__thread_id = thread_id
         self.__attrs = attributes
         attributes_to_serialize = self.__get_attributes_to_serialize()
@@ -1900,7 +1903,7 @@ class Event(object):
         return result
 
     def add_attributes(self, attributes, overwrite_existing=False):
-        """ Adds items attributes to __attrs if the __parent_event doesn't
+        """Adds items attributes to __attrs if the __parent_event doesn't
         already have those attributes set.
 
         If overwrite_existing is False an attribute will not be added if the key already exists in __attrs.

@@ -285,8 +285,7 @@ class ConnectionIdleTooLong(Exception):
 
 
 class RequestSizeExceeded(Exception):
-    """Raised when an incoming request has exceeded the maximum allowed request size.
-    """
+    """Raised when an incoming request has exceeded the maximum allowed request size."""
 
     def __init__(self, request_size, max_request_size):
         Exception.__init__(
@@ -344,7 +343,7 @@ class ConnectionProcessor(object):
 
         @param current_time: If provided, uses the specified time as the current time. Used for testing.
 
-        @return: """
+        @return:"""
         if current_time is None:
             current_time = time.time()
 
@@ -365,8 +364,7 @@ class ConnectionProcessor(object):
 
 
 class ConnectionHandler(six.moves.socketserver.BaseRequestHandler):
-    """The handler class that is used by ServerProcess to handle incoming connections.
-    """
+    """The handler class that is used by ServerProcess to handle incoming connections."""
 
     # The bulk of the work for this class is actually implemented in ConnectionProcess to allow for
     # easier testing.
@@ -565,8 +563,7 @@ class RequestStream(object):
                 self.__quick_compaction()
 
     def at_end(self):
-        """Returns True if the underlying socket has been closed.
-        """
+        """Returns True if the underlying socket has been closed."""
         return self.__at_end
 
     def is_closed(self):
@@ -631,8 +628,7 @@ class RequestStream(object):
             return True
 
     def __full_compaction(self):
-        """Compacts the memory buffer by remove all bytes that have already been read.
-        """
+        """Compacts the memory buffer by remove all bytes that have already been read."""
         # Read the leftover data and write it into a new buffer.
         remaining_data = self.__buffer.read()
         self.__buffer.close()

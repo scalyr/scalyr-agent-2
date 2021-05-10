@@ -179,8 +179,7 @@ def _check_disabled(current_time, other_time, message):
 
 
 class ScalyrAgent(object):
-    """Encapsulates the entire Scalyr Agent 2 application.
-    """
+    """Encapsulates the entire Scalyr Agent 2 application."""
 
     def __init__(self, platform_controller):
         """Initialize the object.
@@ -1201,13 +1200,17 @@ class ScalyrAgent(object):
                 disable_config_reload_until = _update_disabled_until(
                     self.__config.disable_config_reload, current_time
                 )
-                disable_verify_config_create_monitors_manager_until = _update_disabled_until(
-                    self.__config.disable_verify_config_create_monitors_manager,
-                    current_time,
+                disable_verify_config_create_monitors_manager_until = (
+                    _update_disabled_until(
+                        self.__config.disable_verify_config_create_monitors_manager,
+                        current_time,
+                    )
                 )
-                disable_verify_config_create_copying_manager_until = _update_disabled_until(
-                    self.__config.disable_verify_config_create_copying_manager,
-                    current_time,
+                disable_verify_config_create_copying_manager_until = (
+                    _update_disabled_until(
+                        self.__config.disable_verify_config_create_copying_manager,
+                        current_time,
+                    )
                 )
 
                 config_change_check_interval = (
@@ -1275,7 +1278,8 @@ class ScalyrAgent(object):
                             > last_copy_manager_stats_report_time + log_stats_delta
                         ):
                             self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats, copy_manager_warnings=True,
+                                base_overall_stats,
+                                copy_manager_warnings=True,
                             )
                             self.__log_copy_manager_stats(self.__overall_stats)
                             last_copy_manager_stats_report_time = current_time
@@ -1479,13 +1483,17 @@ class ScalyrAgent(object):
                     disable_config_reload_until = _update_disabled_until(
                         self.__config.disable_config_reload, current_time
                     )
-                    disable_verify_config_create_monitors_manager_until = _update_disabled_until(
-                        self.__config.disable_verify_config_create_monitors_manager,
-                        current_time,
+                    disable_verify_config_create_monitors_manager_until = (
+                        _update_disabled_until(
+                            self.__config.disable_verify_config_create_monitors_manager,
+                            current_time,
+                        )
                     )
-                    disable_verify_config_create_copying_manager_until = _update_disabled_until(
-                        self.__config.disable_verify_config_create_copying_manager,
-                        current_time,
+                    disable_verify_config_create_copying_manager_until = (
+                        _update_disabled_until(
+                            self.__config.disable_verify_config_create_copying_manager,
+                            current_time,
+                        )
                     )
 
                 # Log the stats one more time before we terminate.
@@ -1510,8 +1518,7 @@ class ScalyrAgent(object):
             scalyr_logging.close_handlers()
 
     def __fail_if_already_running(self):
-        """If the agent is already running, prints an appropriate error message and exits the process.
-        """
+        """If the agent is already running, prints an appropriate error message and exits the process."""
         try:
             self.__controller.is_agent_running(fail_if_running=True)
         except AgentAlreadyRunning as e:
@@ -2062,8 +2069,7 @@ class ScalyrAgent(object):
 
 
 class WorkerThread(object):
-    """A thread used to run the log copier and the monitor manager.
-    """
+    """A thread used to run the log copier and the monitor manager."""
 
     def __init__(self, configuration, copying_manager, monitors):
         self.config = configuration

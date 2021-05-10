@@ -106,6 +106,7 @@ define_config_option(
 
 # TODO: Probably we should include this monitor for Windows builds, but currently we do not.
 class GarbageMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # GarbageMonitor
 
@@ -143,6 +144,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
       }
     ]
     """
+    # fmt: on
 
     def _initialize(self):
 

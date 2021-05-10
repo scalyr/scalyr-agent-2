@@ -49,8 +49,7 @@ define_config_option(
 
 
 class RedisHost(object):
-    """Class that holds various information about a specific redis connection
-    """
+    """Class that holds various information about a specific redis connection"""
 
     def __init__(self, host, port, password, connection_timeout):
         # redis instance information
@@ -342,6 +341,7 @@ class RedisHost(object):
 
 
 class RedisMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Redis Monitor
 
@@ -417,6 +417,7 @@ Here is an example with two hosts with passwords:
     some log lines will be dropped.
 
     """
+    # fmt: on
 
     def _initialize(self):
         """Performs monitor-specific initialization."""

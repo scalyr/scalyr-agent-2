@@ -623,7 +623,6 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             self._metric_name_blacklist = []
 
         def increment_counter(self, reported_lines=0, errors=0):
-            """Increment some of the counters pertaining to the performance of this monitor.
-            """
+            """Increment some of the counters pertaining to the performance of this monitor."""
             self.reported_lines += reported_lines
             self.errors += errors

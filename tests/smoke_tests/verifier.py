@@ -98,7 +98,7 @@ class AgentVerifier(object):
 
     def verify(self, timeout=2 * 60):
         # type: (int) -> bool
-        """"
+        """ "
         :param timeout: How to long to wait (in seconds) before timing out if no successful response is found.
         """
         self.prepare()

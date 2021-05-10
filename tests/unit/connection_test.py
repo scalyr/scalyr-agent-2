@@ -168,7 +168,10 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
 
             expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
             self.assertRaisesRegexp(
-                Exception, expected_msg, connection.get, request_path="/",
+                Exception,
+                expected_msg,
+                connection.get,
+                request_path="/",
             )
 
             # pylint: disable=no-member
@@ -190,7 +193,10 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
 
         connection = self._get_connection_cls(server="https://example.com:443")
         self.assertRaisesRegexp(
-            Exception, expected_msg, connection.get, request_path="/",
+            Exception,
+            expected_msg,
+            connection.get,
+            request_path="/",
         )
 
     def _get_connection_cls(self, server):

@@ -76,8 +76,10 @@ class LogReader(threading.Thread):
         for pattern, (compiled_pattern, message) in self._error_line_patterns.items():
             if compiled_pattern.match(line):
                 if not message:
-                    message = "Log file {0} contains error line: '{1}'. Pattern: {2}.".format(
-                        self._file_path, line, pattern
+                    message = (
+                        "Log file {0} contains error line: '{1}'. Pattern: {2}.".format(
+                            self._file_path, line, pattern
+                        )
                     )
                 raise LogReaderError(message)
 
@@ -90,8 +92,7 @@ class LogReader(threading.Thread):
         self._check_line_for_error(line)
 
     def _line_generator(self):  # type: () -> Generator
-        """Generator that reads all available lines.
-        """
+        """Generator that reads all available lines."""
         for line in self._file:
             line = line.strip("\n")
             self._new_line_callback(line)

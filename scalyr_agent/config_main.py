@@ -280,7 +280,10 @@ def write_config_fragment(config, file_name, field_description, config_json):
             else:
                 print(
                     "Error attempting to update the %s: %s"
-                    % (field_description, six.text_type(error),),
+                    % (
+                        field_description,
+                        six.text_type(error),
+                    ),
                     file=sys.stderr,
                 )
                 print(traceback.format_exc(), file=sys.stderr)
@@ -288,7 +291,10 @@ def write_config_fragment(config, file_name, field_description, config_json):
         except Exception as err:
             print(
                 "Error attempting to update the %s: %s"
-                % (field_description, six.text_type(err),),
+                % (
+                    field_description,
+                    six.text_type(err),
+                ),
                 file=sys.stderr,
             )
             print(traceback.format_exc(), file=sys.stderr)
@@ -310,7 +316,10 @@ def update_user_id(file_path, new_uid):
     except Exception as err:
         print(
             'Error attempting to update permission on file "%s": %s'
-            % (file_path, six.text_type(err),),
+            % (
+                file_path,
+                six.text_type(err),
+            ),
             file=sys.stderr,
         )
         print(traceback.format_exc(), file=sys.stderr)
@@ -334,7 +343,10 @@ def update_user_id_recursively(path, new_uid):
     except Exception as err:
         print(
             'Error attempting to update permissions on files in dir "%s": %s'
-            % (path, six.text_type(err),),
+            % (
+                path,
+                six.text_type(err),
+            ),
             file=sys.stderr,
         )
         print(traceback.format_exc(), file=sys.stderr)
@@ -684,7 +696,10 @@ def upgrade_windows_install(
 
         print(
             "Attempting to upgrade agent from version %s to version %s."
-            % (SCALYR_VERSION, data_payload["current_version"],)
+            % (
+                SCALYR_VERSION,
+                data_payload["current_version"],
+            )
         )
         url_path = data_payload["urls"]["win32"]
 
@@ -837,7 +852,10 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
             if command_name is not None:
                 print(
                     "Executing %s failed and returned a non-zero result of %d"
-                    % (command_name, return_code,),
+                    % (
+                        command_name,
+                        return_code,
+                    ),
                     file=sys.stderr,
                 )
             else:
@@ -889,8 +907,7 @@ def copy_dir_to_new_agent(old_install_dir, new_install_dir, directory):
 
 
 class UpgradeFailure(Exception):
-    """Raised when a failure occurs in the tarball upgrade process.
-    """
+    """Raised when a failure occurs in the tarball upgrade process."""
 
     pass
 
