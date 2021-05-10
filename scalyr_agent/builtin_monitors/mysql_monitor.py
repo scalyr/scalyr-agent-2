@@ -390,6 +390,13 @@ class MysqlDB(object):
 
     def _connect(self):
         try:
+            if self._use_ssl and not self._path_to_ca_file:
+                global_log.warning(
+                    "Connecting to MySql with the `ssl` option but no CA file configured. The server certificate "
+                    "will not be validated.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="mysql_connect_ssl_no_verification",
+                )
             ssl = {}
             if self._use_ssl:
                 ssl = {"ssl": {}}
