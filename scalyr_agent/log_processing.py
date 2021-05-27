@@ -1095,6 +1095,8 @@ class LogFileIterator(object):
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
+                if current_log_file.last_known_size > latest_size:
+                    a=10
                 if (
                     current_log_file.last_known_size > latest_size
                     or self.__file_system.trust_inodes
@@ -1216,25 +1218,37 @@ class LogFileIterator(object):
         @return Most recent file that matches copy truncate filename heuristic
         """
         dir_path = os.path.dirname(self.__path)
-        file_prefix = os.path.basename(self.__path)
-        file_prefix = file_prefix[:-4] if file_prefix.endswith(".log") else file_prefix
+        file_prefix, file_ext = os.path.splitext(os.path.basename(self.__path))
+
+        possible_copy_file_paths = []
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
-        possible_copy_filepaths = list(
-            six.moves.filter(
-                lambda f: os.path.basename(f).startswith(file_prefix)
-                and not f.endswith(".gz")
-                and f != self.__path
-                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
-                self.__file_system.list_files(dir_path),
-            )
-        )
+        for other_file in self.__file_system.list_files(dir_path):
+
+            if other_file.endswith(".gz"):
+                continue
+            if other_file == self.__path:
+                continue
+
+            basename = os.path.basename(other_file)
+            parts = basename.split(".")
+            prefix = parts[0]
+
+            # if skip if prefixes are not the same.
+            if file_prefix != prefix:
+                continue
+
+            if int(time.time()) - self.__file_system.stat(other_file).st_ctime >= 300:
+                continue
+
+            possible_copy_file_paths.append(other_file)
+
 
         most_recent_file = None
         most_recent_time = 0
-        for path in possible_copy_filepaths:
+        for path in possible_copy_file_paths:
             file_ctime = self.__file_system.stat(path).st_ctime
             if file_ctime > most_recent_time:
                 most_recent_time = file_ctime
