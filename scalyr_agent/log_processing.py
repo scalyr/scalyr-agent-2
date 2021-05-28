@@ -1232,7 +1232,7 @@ class LogFileIterator(object):
                 # we just looking for the files which have been rotated by the default logrotate settings.
                 # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
                 and (
-                    # if rotated file name ends with a new extension with number (.e.g foo.log.1).
+                    # if rotated file name ends with a new extension with number (e.g foo.log.1).
                     re.match(
                         r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
                     )
@@ -1245,7 +1245,7 @@ class LogFileIterator(object):
                         os.path.basename(f),
                     )
                     or
-                    # if rotated file name ends with the date without additional extension (e.g foo.log-20210527),
+                    # if rotated file name ends with the date without additional extension (e.g. foo.log-20210527),
                     # then the only thing that we can check is that the extension starts with original file's extension.
                     re.match(r"{0}.+".format(re.escape(file_name)), os.path.basename(f))
                 ),
