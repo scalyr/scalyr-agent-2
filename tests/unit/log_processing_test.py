@@ -29,6 +29,8 @@ import time
 import platform
 from io import open
 
+import pytest
+
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.scalyr_client import EventSequencer
@@ -520,9 +522,15 @@ class TestLogFileIterator(ScalyrTestCase):
         # Verify if only appropriate candidate for the copy file is selected..
         filename, ext = os.path.splitext(os.path.basename(self.__path))
 
-        similar_file_path = os.path.join(self.__tempdir, filename + "_and_something.txt")
-        similar_file_path_date = os.path.join(self.__tempdir, filename + "_and_something-20210101")
-        similar_file_path_ext = os.path.join(self.__tempdir, filename + "_and_something.txt.1")
+        similar_file_path = os.path.join(
+            self.__tempdir, filename + "_and_something.txt"
+        )
+        similar_file_path_date = os.path.join(
+            self.__tempdir, filename + "_and_something-20210101"
+        )
+        similar_file_path_ext = os.path.join(
+            self.__tempdir, filename + "_and_something.txt.1"
+        )
 
         copied_file = os.path.join(self.__tempdir, self.__path + ".1")
         self.write_file(copied_file, b"")

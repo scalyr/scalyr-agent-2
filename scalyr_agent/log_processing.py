@@ -1219,32 +1219,37 @@ class LogFileIterator(object):
         dir_path = os.path.dirname(self.__path)
         file_name = os.path.basename(self.__path)
         file_prefix, file_ext = os.path.splitext(file_name)
-        file_name_parts = file_name.split(os.path.extsep)
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
-
-        def check_file(f):
-            # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
-            # we just looking for the files which have been rotated by the default logrotate configuration.
-            # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
-            name_parts = f.split(".")
-            return (
-                os.path.basename(f).startswith(file_name) and
-                # if rotated file name ends with a new extension with number (.e.g foo.log.1).
-                len(name_parts) == len(file_name_parts) + 1 and re.match(r"\d+", name_parts[-1]) or
-                # if rotated file name name ends with the date without additional extension (e.g foo.log-20210527),
-                # then the only thing that we can check is that the extension starts with original file's extension.
-                len(name_parts) == len(file_name_parts) and name_parts[-1].startswith(file_ext)
-            )
 
         possible_copy_filepaths = list(
             six.moves.filter(
                 lambda f: not f.endswith(".gz")
                 and f != self.__path
                 and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
-                and check_file(f),
+                # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
+                # we just looking for the files which have been rotated by the default logrotate settings.
+                # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
+                and (
+                    # if rotated file name ends with a new extension with number (.e.g foo.log.1).
+                    re.match(
+                        r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                    or
+                    # the same but the number is located before  the extension ("extension" option in logrotate)
+                    re.match(
+                        r"{0}\.\d+{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # if rotated file name name ends with the date without additional extension (e.g foo.log-20210527),
+                    # then the only thing that we can check is that the extension starts with original file's extension.
+                    re.match(r"{0}.+".format(re.escape(file_name)), os.path.basename(f))
+                ),
                 self.__file_system.list_files(dir_path),
             )
         )
