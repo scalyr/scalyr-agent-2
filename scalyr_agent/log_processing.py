@@ -44,7 +44,6 @@ import threading
 import time
 import uuid
 from io import open
-import re
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util

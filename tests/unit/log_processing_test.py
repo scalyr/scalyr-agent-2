@@ -29,8 +29,6 @@ import time
 import platform
 from io import open
 
-import pytest
-
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.scalyr_client import EventSequencer
