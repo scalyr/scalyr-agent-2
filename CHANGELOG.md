@@ -12,6 +12,7 @@ Improvements:
 
 Bug fixes:
 * Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+* Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
 
 Other:
 * Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
