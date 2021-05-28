@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.21 "TBD" - April 30, 2021
+## 2.1.21 "Ultramarine" - May 29, 2021
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on May 29, 2021 21:00 -0800
 --->
 
 Improvements:
