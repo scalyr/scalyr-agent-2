@@ -1246,7 +1246,7 @@ class LogFileIterator(object):
                         os.path.basename(f),
                     )
                     or
-                    # if rotated file name name ends with the date without additional extension (e.g foo.log-20210527),
+                    # if rotated file name ends with the date without additional extension (e.g foo.log-20210527),
                     # then the only thing that we can check is that the extension starts with original file's extension.
                     re.match(r"{0}.+".format(re.escape(file_name)), os.path.basename(f))
                 ),
