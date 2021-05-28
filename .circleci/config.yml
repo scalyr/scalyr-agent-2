@@ -69,7 +69,7 @@ parameters:
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
-    default: "v13"
+    default: "v14"
   cache_version_py_dependencies:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
