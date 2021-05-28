@@ -1096,8 +1096,6 @@ class LogFileIterator(object):
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
-                if current_log_file.last_known_size > latest_size:
-                    a=10
                 if (
                     current_log_file.last_known_size > latest_size
                     or self.__file_system.trust_inodes
@@ -1219,37 +1217,41 @@ class LogFileIterator(object):
         @return Most recent file that matches copy truncate filename heuristic
         """
         dir_path = os.path.dirname(self.__path)
-        file_prefix, file_ext = os.path.splitext(os.path.basename(self.__path))
-
-        possible_copy_file_paths = []
+        file_name = os.path.basename(self.__path)
+        file_prefix, file_ext = os.path.splitext(file_name)
+        file_name_parts = file_name.split(os.path.extsep)
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
-        for other_file in self.__file_system.list_files(dir_path):
 
-            if other_file.endswith(".gz"):
-                continue
-            if other_file == self.__path:
-                continue
+        def check_file(f):
+            # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
+            # we just looking for the files which have been rotated by the default logrotate configuration.
+            # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
+            name_parts = f.split(".")
+            return (
+                os.path.basename(f).startswith(file_name) and
+                # if rotated file name ends with a new extension with number (.e.g foo.log.1).
+                len(name_parts) == len(file_name_parts) + 1 and re.match(r"\d+", name_parts[-1]) or
+                # if rotated file name name ends with the date without additional extension (e.g foo.log-20210527),
+                # then the only thing that we can check is that the extension starts with original file's extension.
+                len(name_parts) == len(file_name_parts) and name_parts[-1].startswith(file_ext)
+            )
 
-            basename = os.path.basename(other_file)
-            parts = basename.split(".")
-            prefix = parts[0]
-
-            # if skip if prefixes are not the same.
-            if file_prefix != prefix:
-                continue
-
-            if int(time.time()) - self.__file_system.stat(other_file).st_ctime >= 300:
-                continue
-
-            possible_copy_file_paths.append(other_file)
-
+        possible_copy_filepaths = list(
+            six.moves.filter(
+                lambda f: not f.endswith(".gz")
+                and f != self.__path
+                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
+                and check_file(f),
+                self.__file_system.list_files(dir_path),
+            )
+        )
 
         most_recent_file = None
         most_recent_time = 0
-        for path in possible_copy_file_paths:
+        for path in possible_copy_filepaths:
             file_ctime = self.__file_system.stat(path).st_ctime
             if file_ctime > most_recent_time:
                 most_recent_time = file_ctime
