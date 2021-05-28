@@ -1237,7 +1237,8 @@ class LogFileIterator(object):
                         r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
                     )
                     or
-                    # the same but the number is located before  the extension ("extension" option in logrotate)
+                    # the same but the number is located before the extension ("extension" option in logrotate)
+                    # (e.g. foo.1.log)
                     re.match(
                         r"{0}\.\d+{1}".format(
                             re.escape(file_prefix), re.escape(file_ext)
