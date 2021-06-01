@@ -563,6 +563,18 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
+    def test_find_copy_truncate_with_ext_dateext_option_filename(self):
+        # Test find_copy_truncate_file with date and extension rotation scheme
+        filename = os.path.join(self.__tempdir, "app.log")
+        self.write_file(filename, b"")
+        copied_file = os.path.join(self.__tempdir, "app-20210101.log")
+        self.write_file(copied_file, b"")
+        app_log_file = self._create_iterator({"path": filename})
+        located_copy_truncate_file = (
+            app_log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
     def test_find_copy_truncate_with_ext_and_dateext_option_filename(self):
         # Test find_copy_truncate_file with date rotation scheme
         filename = os.path.join(self.__tempdir, "app.log")
