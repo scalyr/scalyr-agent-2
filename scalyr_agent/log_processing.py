@@ -1237,7 +1237,7 @@ class LogFileIterator(object):
                         r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
                     )
                     or
-                    # the same but the number is located before the extension ("extension" option in logrotate)
+                    # the same but the number or date is located before the extension ("extension" option in logrotate)
                     # (e.g. foo.1.log)
                     re.match(
                         r"{0}\.\d+{1}".format(
@@ -1246,9 +1246,17 @@ class LogFileIterator(object):
                         os.path.basename(f),
                     )
                     or
+                    # (e.g.foo-20210527.log)
+                    re.match(
+                        r"{0}-\d{{8}}{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
                     # if rotated file name ends with the date without additional extension (e.g. foo.log-20210527),
                     # then the only thing that we can check is that the extension starts with original file's extension.
-                    re.match(r"{0}.+".format(re.escape(file_name)), os.path.basename(f))
+                    re.match(r"{0}-\d{{8}}".format(re.escape(file_name)), os.path.basename(f))
                 ),
                 self.__file_system.list_files(dir_path),
             )
