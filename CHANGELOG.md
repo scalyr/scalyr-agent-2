@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.21 "TBD" - April 30, 2021
+## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 <!---
-Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 30, 2021 21:00 -0800
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 1, 2021 21:00 -0800
 --->
 
 Improvements:
@@ -12,8 +12,10 @@ Improvements:
 
 Bug fixes:
 * Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+* Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
 
 Other:
+* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations. 
 * Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
 
 ## 2.1.20 "Tabeisshi" - April 19, 2021

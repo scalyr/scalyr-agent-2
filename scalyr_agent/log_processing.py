@@ -1216,18 +1216,50 @@ class LogFileIterator(object):
         @return Most recent file that matches copy truncate filename heuristic
         """
         dir_path = os.path.dirname(self.__path)
-        file_prefix = os.path.basename(self.__path)
-        file_prefix = file_prefix[:-4] if file_prefix.endswith(".log") else file_prefix
+        file_name = os.path.basename(self.__path)
+        file_prefix, file_ext = os.path.splitext(file_name)
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
+
         possible_copy_filepaths = list(
             six.moves.filter(
-                lambda f: os.path.basename(f).startswith(file_prefix)
-                and not f.endswith(".gz")
+                lambda f: not f.endswith(".gz")
                 and f != self.__path
-                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
+                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
+                # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
+                # we just looking for the files which have been rotated by the default logrotate settings.
+                # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
+                and (
+                    # if rotated file name ends with a new extension with number (e.g. foo.log.1).
+                    re.match(
+                        r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                    or
+                    # the same but the number or date is located before the extension ("extension" option in logrotate)
+                    # (e.g. foo.1.log)
+                    re.match(
+                        r"{0}\.\d+{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # (e.g.foo-20210527.log)
+                    re.match(
+                        r"{0}-\d{{8}}{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # if rotated file name ends with the date without additional extension (e.g. foo.log-20210527),
+                    # then the only thing that we can check is that the extension starts with original file's extension.
+                    re.match(
+                        r"{0}-\d{{8}}".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                ),
                 self.__file_system.list_files(dir_path),
             )
         )
