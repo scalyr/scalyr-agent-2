@@ -144,15 +144,12 @@ do
    TAG_OPTIONS="$TAG_OPTIONS -t $x"
 done
 
-run_docker_command "build $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
-
 if [ ! -z "$PUBLISH" ]; then
   report_progress "Publishing image(s)." "$QUIET";
-
-  for x in "${IMAGES[@]}"
-  do
-    run_docker_command "push $x" "$QUIET";
-  done
+  run_docker_command "buildx build --push --platform linux/arm64,linux/amd64 $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
+else
+  report_progress "Building to image(s) to local cache." "$QUIET";
+  run_docker_command "buildx build -o type=image --platform linux/arm64,linux/amd64 $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
 fi
 
 report_progress "Success." "$QUIET";
