@@ -144,6 +144,15 @@ do
    TAG_OPTIONS="$TAG_OPTIONS -t $x"
 done
 
+# Look for prescense of docker buildx instance, otherwise create one
+HAS_BUILD_X=$(docker buildx ls | grep 'docker-container')
+
+if [ -z "$HAS_BUILD_X" ]; then
+  report_progress "Adding Docker buildx instance" "$QUIET";
+  run_docker_command "buildx create --use" "$QUIET" || die "Failed to create new builder instance"
+fi
+
+# If publishing, push all images together; otherwise just put them in local cache
 if [ ! -z "$PUBLISH" ]; then
   report_progress "Publishing image(s)." "$QUIET";
   run_docker_command "buildx build --push --platform linux/arm64,linux/amd64 $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
