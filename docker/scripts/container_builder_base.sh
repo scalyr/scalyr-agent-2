@@ -144,7 +144,7 @@ do
    TAG_OPTIONS="$TAG_OPTIONS -t $x"
 done
 
-# Look for prescense of docker buildx instance, otherwise create one
+# Look for presence of docker buildx instance, otherwise create one
 # 'docker-container' is what the driver is called:
 # https://docs.docker.com/buildx/working-with-buildx/#build-multi-platform-images
 HAS_BUILD_X=$(docker buildx ls | grep 'docker-container' | cut -d ' ' -f 1)
@@ -153,7 +153,7 @@ if [ -z "$HAS_BUILD_X" ]; then
   report_progress "Adding Docker buildx instance" "$QUIET";
   run_docker_command "buildx create --use" "$QUIET" || die "Failed to create new builder instance"
 else
-  run_docker_command "buildx use $HAS_BUILD_X" "$QUIET" || die "Failed to create new builder instance"
+  run_docker_command "buildx use $HAS_BUILD_X" "$QUIET" || die "Failed to use $HAS_BUILD_X builder instance"
 fi
 
 # If publishing, push all images together; otherwise just put them in local cache
@@ -161,7 +161,7 @@ if [ ! -z "$PUBLISH" ]; then
   report_progress "Publishing image(s)." "$QUIET";
   run_docker_command "buildx build --push --platform linux/arm64,linux/amd64 $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
 else
-  report_progress "Building to image(s) to local cache." "$QUIET";
+  report_progress "Building image(s) to local cache." "$QUIET";
   run_docker_command "buildx build -o type=image --platform linux/arm64,linux/amd64 $TAG_OPTIONS ." "$QUIET" || die "Failed to build the container image"
 fi
 
