@@ -145,11 +145,15 @@ do
 done
 
 # Look for prescense of docker buildx instance, otherwise create one
-HAS_BUILD_X=$(docker buildx ls | grep 'docker-container')
+# 'docker-container' is what the driver is called:
+# https://docs.docker.com/buildx/working-with-buildx/#build-multi-platform-images
+HAS_BUILD_X=$(docker buildx ls | grep 'docker-container' | cut -d ' ' -f 1)
 
 if [ -z "$HAS_BUILD_X" ]; then
   report_progress "Adding Docker buildx instance" "$QUIET";
   run_docker_command "buildx create --use" "$QUIET" || die "Failed to create new builder instance"
+else
+  run_docker_command "buildx use $HAS_BUILD_X" "$QUIET" || die "Failed to create new builder instance"
 fi
 
 # If publishing, push all images together; otherwise just put them in local cache
