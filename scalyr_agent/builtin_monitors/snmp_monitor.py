@@ -77,6 +77,7 @@ define_log_field(__monitor__, "value", "The value reported by the device.")
 
 
 class SNMPMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # SNMP Monitor
 The SNMP Monitor polls SNMP-enabled devices on the network to collect values specified in the configuration
@@ -204,6 +205,7 @@ well as a list of OID groups to query. e.g.
 
         }
     """
+    # fmt: on
 
     def _initialize(self):
 

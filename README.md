@@ -37,6 +37,13 @@ We also welcome submissions from the community.
 For information on the agent architecture and code abstractions, please refer to the
 [architecture.md](docs/architecture.md) document.
 
+Some of the tests and checks depend on on fixture file from git submodule so you should make sure you
+also check out all the submodules:
+
+```bash
+git submodule update --recursive --init
+```
+
 ### Local Development Environment, Tests and Lint Checks
 
 This repository utilizes ``tox`` Python project for running various lint checks and tests in

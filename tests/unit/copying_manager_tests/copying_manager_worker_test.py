@@ -194,7 +194,10 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
         return test_files, self._instance  # type: ignore
 
     def _spawn_single_log_processor(
-        self, log_file, checkpoints=None, copy_at_index_zero=False,
+        self,
+        log_file,
+        checkpoints=None,
+        copy_at_index_zero=False,
     ):
         # type: (TestableLogFile, Optional[Dict], bool)-> LogFileProcessor
         log_config = self._env_builder.get_log_config(log_file)  # type: ignore
@@ -696,7 +699,7 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         # create new worker. Imitate third launch.
         # Now we also provide checkpoints from previous run, so it have to ignore "copy_at_index_zero".
         self._instance = worker = self._create_worker_session()
-        self._spawn_single_log_processor(
+        processor = self._spawn_single_log_processor(
             test_file, checkpoints=checkpoints, copy_at_index_zero=True
         )
 
@@ -706,3 +709,13 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
 
         # should be third line
         assert self._wait_for_rpc_and_respond() == ["Third line"]
+
+        # check if the collection of the checkpoints for the closed files is empty until some log processor is closed.
+        assert worker.get_and_reset_closed_files_checkpoints() == {}
+
+        # close log processor and check if its checkpoint in the collection for the closed processors.
+        processor.close()
+        worker.wait_for_full_iteration()
+        closed_files_checkpoints = worker.get_and_reset_closed_files_checkpoints()
+
+        assert processor.get_log_path() in closed_files_checkpoints

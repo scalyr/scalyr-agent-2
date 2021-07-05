@@ -96,6 +96,32 @@ define_config_option(
     "``database_hostport``, but not both.",
     convert_to=six.text_type,
 )
+define_config_option(
+    __monitor__,
+    "use_ssl",
+    "Whether or not to use SSL when connecting to the MySQL server. Defaults to False.",
+    convert_to=bool,
+)
+define_config_option(
+    __monitor__,
+    "ca_file",
+    "Location of the ca file to use for the SSL connection. Defaults to None, which means serve certificate "
+    "verification won't be performed."
+    "will not be verified.",
+    convert_to=six.text_type,
+)
+define_config_option(
+    __monitor__,
+    "key_file",
+    "Location of the key file to use for the SSL connection. Defaults to None.",
+    convert_to=six.text_type,
+)
+define_config_option(
+    __monitor__,
+    "cert_file",
+    "Location of the cert file to use for the SSL connection. Defaults to None",
+    convert_to=six.text_type,
+)
 
 # Metric definitions.
 define_metric(
@@ -359,24 +385,57 @@ __coms_to_report__ = (
 
 
 class MysqlDB(object):
-    """ Represents a MySQL database
-    """
+    """Represents a MySQL database"""
 
     def _connect(self):
         try:
+            if self._use_ssl and not self._path_to_ca_file:
+                global_log.warning(
+                    "Connecting to MySql with the `ssl` option but no CA file configured. The server certificate "
+                    "will not be validated.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="mysql_connect_ssl_no_verification",
+                )
+            ssl = {}
+            if self._use_ssl:
+                ssl = {"ssl": {}}
+                if self._path_to_ca_file:
+                    ssl["ca"] = self._path_to_ca_file
+                if self._path_to_key_file:
+                    ssl["key"] = self._path_to_key_file
+                if self._path_to_cert_file:
+                    ssl["cert"] = self._path_to_cert_file
+
             if self._type == "socket":
-                conn = pymysql.connect(
-                    unix_socket=self._sockfile,
-                    user=self._username,
-                    passwd=self._password,
-                )
+                if self._use_ssl:
+                    conn = pymysql.connect(
+                        unix_socket=self._sockfile,
+                        user=self._username,
+                        passwd=self._password,
+                        ssl=ssl,
+                    )
+                else:
+                    conn = pymysql.connect(
+                        unix_socket=self._sockfile,
+                        user=self._username,
+                        passwd=self._password,
+                    )
             else:
-                conn = pymysql.connect(
-                    host=self._host,
-                    port=self._port,
-                    user=self._username,
-                    passwd=self._password,
-                )
+                if self._use_ssl:
+                    conn = pymysql.connect(
+                        host=self._host,
+                        port=self._port,
+                        user=self._username,
+                        passwd=self._password,
+                        ssl=ssl,
+                    )
+                else:
+                    conn = pymysql.connect(
+                        host=self._host,
+                        port=self._port,
+                        user=self._username,
+                        passwd=self._password,
+                    )
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
@@ -706,7 +765,7 @@ class MysqlDB(object):
 
     def _derived_stat_connections_used_percentage(self, globalVars, globalStatusMap):
         """Calculate what percentage of the configured connections are used.  A high percentage can
-           indicate a an app is using more than the expected number / configured number of connections.
+        indicate a an app is using more than the expected number / configured number of connections.
         """
         pct = 100.0 * (
             float(globalStatusMap["global.max_used_connections"])
@@ -799,7 +858,7 @@ class MysqlDB(object):
 
     def _derived_stat_open_file_percentage(self, globalVars, globalStatusMap):
         """Calculate the percentage of files that are open compared to the allowed limit.
-           If no open file limit is configured, the value will be 0.
+        If no open file limit is configured, the value will be 0.
         """
         pct = 0.0
         if globalVars["vars.open_files_limit"] > 0:
@@ -846,8 +905,7 @@ class MysqlDB(object):
         return pct
 
     def gather_derived_stats(self, globalVars, globalStatusMap):
-        """Gather derived stats based on global variables and global status.
-        """
+        """Gather derived stats based on global variables and global status."""
         if not globalVars or not globalStatusMap:
             return None
         stats = [
@@ -904,6 +962,10 @@ class MysqlDB(object):
         username=None,
         password=None,
         logger=None,
+        use_ssl=False,
+        path_to_ca_file=None,
+        path_to_key_file=None,
+        path_to_cert_file=None,
     ):
         """Constructor: handles both socket files as well as host/port connectivity.
 
@@ -913,6 +975,9 @@ class MysqlDB(object):
         @param port: if host:port connection, the port to connect to
         @param username: username to connect with
         @param password: password to establish connection
+        @param path_to_ca_file: optional path to a ca file to use when connecting to mysql over ssl
+        @param path_to_key_file: optional path to a key file to use when connecting to mysql over ssl
+        @param path_to_cert_file: optional path to a cert file to use when connecting to mysql over ssl
         """
         self._default_socket_locations = [
             "/tmp/mysql.sock",  # MySQL's own default.
@@ -926,6 +991,10 @@ class MysqlDB(object):
         self._logger = logger
         if self._logger is None:
             raise Exception("Logger required.")
+        self._use_ssl = use_ssl
+        self._path_to_ca_file = path_to_ca_file
+        self._path_to_key_file = path_to_key_file
+        self._path_to_cert_file = path_to_cert_file
         if type == "socket":
             # if no socket file specified, attempt to find one locally
             if sockfile is None:
@@ -956,6 +1025,7 @@ class MysqlDB(object):
 
 
 class MysqlMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # MySQL Monitor
 
@@ -1009,10 +1079,10 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
 """
+    # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
 
         # Useful instance variables:
         #   _sample_interval_secs:  The number of seconds between calls to gather_sample.
@@ -1082,6 +1152,10 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             raise Exception(
                 "database_username and database_password must be specified in the configuration."
             )
+        self._use_ssl = self._config.get("use_ssl", False)
+        self._path_to_ca_file = self._config.get("ca_file", None)
+        self._path_to_key_file = self._config.get("key_file", None)
+        self._path_to_cert_file = self._config.get("cert_file", None)
         self._db = None
 
     def _connect_to_db(self):
@@ -1102,6 +1176,10 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     username=self._database_user,
                     password=self._database_password,
                     logger=self._logger,
+                    use_ssl=self._use_ssl,
+                    path_to_ca_file=self._path_to_ca_file,
+                    path_to_key_file=self._path_to_key_file,
+                    path_to_cert_file=self._path_to_cert_file,
                 )
             else:
                 self._db = MysqlDB(
@@ -1112,6 +1190,10 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     username=self._database_user,
                     password=self._database_password,
                     logger=self._logger,
+                    use_ssl=self._use_ssl,
+                    path_to_ca_file=self._path_to_ca_file,
+                    path_to_key_file=self._path_to_key_file,
+                    path_to_cert_file=self._path_to_cert_file,
                 )
         except Exception as e:
             self._db = None
@@ -1122,8 +1204,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             )
 
     def gather_sample(self):
-        """Invoked once per sample interval to gather a statistic.
-        """
+        """Invoked once per sample interval to gather a statistic."""
 
         # make sure we have a database connection
         if self._db is None:
@@ -1135,13 +1216,11 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             return
 
         def print_status_line(key, value, extra_fields):
-            """ Emit a status line.
-            """
+            """Emit a status line."""
             self._logger.emit_value("mysql.%s" % key, value, extra_fields=extra_fields)
 
         def print_status(status):
-            """print a status object, assumed to be a dictionary of key/values (and possibly extra fields).
-            """
+            """print a status object, assumed to be a dictionary of key/values (and possibly extra fields)."""
             if status is not None:
                 for entry in status:
                     field = entry["field"]

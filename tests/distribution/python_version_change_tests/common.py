@@ -97,7 +97,8 @@ def _mock_python_binary_version(python_binary_name, version):
     # this function was used previously delete old backup.
     if binary_path_backup_path.exists():
         shutil.copy(
-            six.text_type(binary_path_backup_path), six.text_type(binary_path),
+            six.text_type(binary_path_backup_path),
+            six.text_type(binary_path),
         )
         os.remove(six.text_type(binary_path_backup_path))
 

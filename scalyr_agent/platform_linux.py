@@ -49,8 +49,7 @@ class LinuxPlatformController(PosixPlatformController):
     """
 
     def __init__(self, stdin="/dev/null", stdout="/dev/null", stderr="/dev/null"):
-        """Initializes the POSIX platform instance.
-        """
+        """Initializes the POSIX platform instance."""
         PosixPlatformController.__init__(
             self, stdin=stdin, stdout=stdout, stderr=stderr
         )
@@ -110,7 +109,9 @@ class LinuxPlatformController(PosixPlatformController):
 
         if config.implicit_metric_monitor:
             result.append(
-                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics",)
+                JsonObject(
+                    module="scalyr_agent.builtin_monitors.linux_system_metrics",
+                )
             )
 
         if config.implicit_agent_process_metrics_monitor:

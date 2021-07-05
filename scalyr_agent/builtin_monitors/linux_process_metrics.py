@@ -265,8 +265,7 @@ class Metric(object):
 
 
 class MetricPrinter:
-    """Helper class that emits metrics for the specified monitor.
-    """
+    """Helper class that emits metrics for the specified monitor."""
 
     def __init__(self, logger, monitor_id):
         """Initializes the class.
@@ -1011,6 +1010,7 @@ class ProcessList(object):
 
 
 class ProcessMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Linux Process Metrics
 
@@ -1060,6 +1060,7 @@ The "agent" ID is used to report metrics for the Scalyr Agent itself.
 You can now return to the dashboard. Use the dropdowns near the top of the page to select the host and process
 you'd like to view.
     """
+    # fmt: on
 
     def _initialize(self):
         """Performs monitor-specific initialization."""
