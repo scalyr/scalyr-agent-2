@@ -49,12 +49,6 @@ import time
 
 from optparse import OptionParser
 
-try:
-    from __scalyr__ import scalyr_init
-except ImportError:
-    from scalyr_agent.__scalyr__ import scalyr_init
-
-scalyr_init()
 
 import six
 

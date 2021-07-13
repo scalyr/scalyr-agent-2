@@ -43,10 +43,7 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 
-from scalyr_agent import scalyr_init
 from scalyr_agent import util as scalyr_util
-
-scalyr_init()
 
 from scalyr_agent import scalyr_logging
 from tests.unit.copying_manager_tests.copying_manager_new_test import CopyingManagerTest

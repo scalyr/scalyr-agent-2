@@ -45,7 +45,9 @@ CORRECT_INIT_PRAGMA = """
 
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
-    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL)
+    @mock.patch(
+        "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.PACKAGE_INSTALL
+    )
     def test_create_client_ca_file_and_intermediate_certs_file_doesnt_exist(self):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
@@ -105,7 +107,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.platform_controller import PlatformController
 
         # 1. Dev install (boths checks should be skipped)
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL
+        ):
 
             # ca_cert_path file doesn't exist
             config = mock.Mock()
@@ -129,8 +133,12 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             self.assertTrue(create_client(config=config))
 
         # 2. MSI install (only intermediate_certs_path check should be skipped)
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL):
-
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE",
+            __scalyr__.InstallType.PACKAGE_INSTALL,
+        ), mock.patch(
+            "scalyr_agent.__scalyr__.PLATFORM_TYPE", __scalyr__.PlatformType.WINDOWS
+        ):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
             config.compression_level = 1
@@ -183,7 +191,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
 
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL
+        ):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"

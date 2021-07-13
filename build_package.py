@@ -1870,8 +1870,8 @@ if __name__ == "__main__":
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    if options.build_info is not None:
-        set_build_info(options.build_info)
+    if options.info_text is not None:
+        set_build_info(options.info_text)
 
     artifact = build_package(
         args[0], options.variant, options.no_versioned_file_name, options.coverage,

@@ -16,9 +16,12 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import threading
 
 __author__ = "czerwin@scalyr.com"
+
+import threading
+
+import requests
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
@@ -35,7 +38,6 @@ from scalyr_agent.monitor_utils.k8s import (
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.configuration import Configuration

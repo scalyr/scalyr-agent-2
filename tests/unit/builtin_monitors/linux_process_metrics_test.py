@@ -16,7 +16,6 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import os
-import sys
 import platform
 
 import mock
@@ -72,7 +71,8 @@ class LinuxProcessMetricsMonitorTest(ScalyrTestCase):
         monitor_config = {
             "module": "linux_process_metrics",
             "id": "my-id",
-            "commandline": ".*%s.*" % (" ".join(sys.argv)),
+            # just put the cmdline property of the current process, so the monitor will have to find it.
+            "commandline": ".*%s.*" % (" ".join(psutil.Process(os.getpid()).cmdline())),
         }
         mock_logger = mock.Mock()
         monitor = ProcessMonitor(monitor_config, mock_logger)

@@ -22,7 +22,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 
-from scalyr_agent.__scalyr__ import get_install_root, get_package_root, SCALYR_VERSION
+from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION
 from scalyr_agent.test_base import ScalyrTestCase
 
 
@@ -32,6 +32,3 @@ class TestUtil(ScalyrTestCase):
 
     def test_get_install_root(self):
         self.assertEquals(os.path.basename(get_install_root()), "scalyr-agent-2")
-
-    def test_get_package_root(self):
-        self.assertEquals(os.path.basename(get_package_root()), "scalyr_agent")

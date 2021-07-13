@@ -62,6 +62,7 @@ from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent import compat
+from scalyr_agent.platform_controller import PlatformController
 
 FILE_WRONG_OWNER_ERROR_MSG = """
 File \"%s\" is not readable by the current user (%s).
@@ -1793,27 +1794,12 @@ class Configuration(object):
     def default_ca_cert_path():
         """Returns the default configuration file path for the agent."""
         # TODO:  Support more platforms.
-        return Configuration.__resolve_to_install_location("certs", "ca_certs.crt")
+        return os.path.join(get_install_root(), "certs", "ca_certs.crt")
 
     @property
     def intermediate_certs_path(self):
         """Returns the intermediate certs path."""
-        return Configuration.__resolve_to_install_location(
-            "certs", "intermediate_certs.pem"
-        )
-
-    @staticmethod
-    def __resolve_to_install_location(*paths):
-        """Returns the absolute path created by joining the specified intermediate paths to
-        the install location for this package.
-
-        @param paths: The file components of the desired path. There can be multiple, starting with the outer directory
-            first and finishing with the last file.
-        """
-        result = get_install_root()
-        for path in paths:
-            result = os.path.join(result, path)
-        return result
+        return os.path.join(get_install_root(), "certs", "intermediate_certs.pem")
 
     def __get_parent_directory(self, file_path):
         """Returns the directory containing the specified file.

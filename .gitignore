@@ -14,6 +14,7 @@ build/
 cover/
 develop-eggs/
 dist/
+!.github/actions/cache-build-dependencies/dist
 eggs/
 lib/
 lib64/
@@ -25,6 +26,7 @@ var/
 *.egg
 scalyr-agent-2-*/
 /tests/config.yml
+debug
 
 # Installer logs
 pip-log.txt
@@ -57,7 +59,7 @@ coverage.xml
 *.pot
 
 # PyCharm
-*.idea
+#*.idea
 xunit.xml
 # Sphinx documentation
 docs/_build/

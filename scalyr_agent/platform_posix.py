@@ -35,6 +35,7 @@ from io import open
 
 import six
 
+from scalyr_agent import __scalyr__
 from scalyr_agent import scalyr_logging
 from scalyr_agent.platform_controller import (
     PlatformController,
@@ -43,13 +44,6 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 import scalyr_agent.util as scalyr_util
-
-from scalyr_agent.__scalyr__ import (
-    get_install_root,
-    TARBALL_INSTALL,
-    DEV_INSTALL,
-    PACKAGE_INSTALL,
-)
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -174,21 +168,21 @@ class PosixPlatformController(PlatformController):
         """
         # TODO: Change this to something that is not Linux-specific.  Maybe we should always just default
         # to the home directory location.
-        if self._install_type == PACKAGE_INSTALL:
+        if self._install_type == __scalyr__.InstallType.PACKAGE_INSTALL:
             return DefaultPaths(
                 "/var/log/scalyr-agent-2",
                 "/etc/scalyr-agent-2/agent.json",
                 "/var/lib/scalyr-agent-2",
             )
-        elif self._install_type == TARBALL_INSTALL:
-            install_location = get_install_root()
+        elif self._install_type == __scalyr__.InstallType.TARBALL_INSTALL:
+            install_location = __scalyr__.get_install_root()
             return DefaultPaths(
                 os.path.join(install_location, "log"),
                 os.path.join(install_location, "config", "agent.json"),
                 os.path.join(install_location, "data"),
             )
         else:
-            assert self._install_type == DEV_INSTALL
+            assert self._install_type == __scalyr__.InstallType.DEV_INSTALL
             # For developers only.  We default to a directory ~/scalyr-agent-dev for storing
             # all log/data information, and then require a log, config, and data subdirectory in each of those.
             base_dir = os.path.join(os.path.expanduser("~"), "scalyr-agent-dev")
@@ -659,6 +653,7 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
+        print("PPID", os.getpid())
         if fork:
             if not self.__daemonize():
                 return
@@ -700,6 +695,8 @@ class PosixPlatformController(PlatformController):
         """
         # Get the pid from the pidfile
         pid = self.__read_pidfile()
+
+        print("11", pid)
 
         if not pid:
             message = (

@@ -21,6 +21,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import re
+import traceback
 
 if False:  # NOSONAR
     from typing import Union
@@ -38,6 +39,7 @@ import locale
 import collections
 import subprocess
 import signal
+import importlib.util
 from io import open
 
 if sys.version_info < (3, 5):
@@ -65,15 +67,14 @@ import time
 import uuid
 import multiprocessing.managers
 
-try:
-    from __scalyr__ import SCALYR_VERSION
-except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+from scalyr_agent import __scalyr__
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.compat import PY26
+from scalyr_agent.compat import PY27
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -177,6 +178,45 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
 
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
+
+PYTHON26_EOL_WARNING = """
+Detected that the agent is running under Python 2.6 (%s) which has been EOL and officially
+unsupported by the core Python team since October 2013. v2.1.21 is the last agent release that
+still supports Python 2.6. Going forward you are strongly recommended to upgrade to a more recent
+and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
+
+PYTHON27_EOL_WARNING = """
+Detected that the agent is running under Python 2.7 (%s) which has been EOL and officially
+unsupported by the core Python team since January, 2020. For the time being, agent still supports
+Python 2.7, but that support will be removed in the near future so you are strongly encouraged to
+upgrade to a more recent and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
+
+
+def warn_on_old_or_unsupported_python_version():
+    """
+    Emit a warning if running under Python 2.6 which we stopped oficially supporting in v2.1.21
+    or Python 2.7 which we will stop supporting in teh future.
+    """
+
+    if PY26:
+        import scalyr_agent.scalyr_logging
+
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON26_EOL_WARNING)
+
+    if PY27:
+        import scalyr_agent.scalyr_logging
+
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON27_EOL_WARNING)
 
 
 def get_json_implementation(lib_name):
@@ -322,27 +362,26 @@ def set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-# Set default json library we will use. We start with the most efficient and falling back to less
-# efficient library as a fallback.
-# We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
-# encoding
-if six.PY3:
-    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
-else:
-    JSON_LIBS_TO_USE = ["ujson", "json"]
+def _determine_json_lib() -> str:
+    """
+    Determines default json library to use. We start with the most efficient and falling back to less
+    efficient library as a fallback.
+    """
+    json_libs_to_use = ["orjson", "ujson", "json"]
 
+    for json_lib_name in json_libs_to_use:
+        # if module is available, then the result of the function has to be not None.
+        json_spec = importlib.util.find_spec(json_lib_name)
+        if json_spec is not None:
+            return json_lib_name
+
+
+# Set default json library we will use.
 last_error = None
-for json_lib_to_use in JSON_LIBS_TO_USE:
-    try:
-        set_json_lib(json_lib_to_use)
-    except ImportError as e:
-        last_error = e
-    else:
-        last_error = None
-        break
 
-# Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-if last_error:
+_json_lib_to_use = _determine_json_lib()
+
+if _json_lib_to_use is None:
     # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
     print(
         "No default json library found which should be present in all Python >= 2.6. "
@@ -350,6 +389,17 @@ if last_error:
         file=sys.stderr,
     )
     sys.exit(1)
+
+try:
+    set_json_lib(_json_lib_to_use)
+except ImportError as e:
+    # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+    print(
+        "The json library '{}' is found but can not be imported. Error: ".format(_json_lib_to_use),
+        file=sys.stderr,
+    )
+    traceback.print_exc(file=sys.stderr)
+    exit(1)
 
 
 def get_json_lib():
@@ -2165,7 +2215,7 @@ def get_agent_start_up_message():
         "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
         "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
         % (
-            SCALYR_VERSION,
+            __scalyr__.SCALYR_VERSION,
             build_revision,
             get_pid_tid(),
             python_version_str,

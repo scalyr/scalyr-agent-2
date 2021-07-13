@@ -45,6 +45,7 @@ import sys
 import time
 import re
 from io import open
+import pathlib as pl
 
 if False:
     from typing import Optional
@@ -58,19 +59,13 @@ if False:
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
 
-try:
-    from __scalyr__ import SCALYR_VERSION
-    from __scalyr__ import scalyr_init
-    from __scalyr__ import INSTALL_TYPE
-    from __scalyr__ import DEV_INSTALL
-except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION
-    from scalyr_agent.__scalyr__ import scalyr_init
-    from scalyr_agent.__scalyr__ import INSTALL_TYPE
-    from scalyr_agent.__scalyr__ import DEV_INSTALL
+# Since this file can be executes as script, add the source root to the PYTHONPATH in case if it isn't there.
+# If it is not there, then the further import of the 'scalyr_agent' package will fail.
+print(pl.Path(os.path.realpath(__file__)).parent.parent)
+sys.path.append(str(pl.Path(os.path.realpath(__file__)).parent.parent))
 
-# We must invoke this since we are an executable script.
-scalyr_init()
+from scalyr_agent import __scalyr__
+from scalyr_agent.__scalyr__ import SCALYR_VERSION, InstallType
 
 import six
 
@@ -102,6 +97,7 @@ from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
+from scalyr_agent.util import warn_on_old_or_unsupported_python_version
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
@@ -348,6 +344,9 @@ class ScalyrAgent(object):
                     "Could not parse configuration file at '%s'" % config_file_path,
                     file=sys.stderr,
                 )
+
+        if log_warnings:
+            warn_on_old_or_unsupported_python_version()
 
         self.__controller.consume_config(self.__config, config_file_path)
 
@@ -1568,7 +1567,7 @@ class ScalyrAgent(object):
         @type config: Configuration
         """
 
-        if self.__controller.install_type == DEV_INSTALL:
+        if self.__controller.install_type == InstallType.DEV_INSTALL:
             # The agent is running from source, make sure that its directories exist.
             if not os.path.exists(config.agent_log_path):
                 os.makedirs(config.agent_log_path)
@@ -2146,10 +2145,30 @@ if __name__ == "__main__":
         "the background until it is successful.  This is useful if the network is not immediately "
         "available when the agent starts.",
     )
+
+    if __scalyr__.INSTALL_TYPE == __scalyr__.InstallType.TARBALL_INSTALL:
+        parser.add_option(
+            "",
+            "--check-frozen-binary",
+            action="store_true",
+            dest="check_frozen_binary",
+            help="NOTE: This option is intednded to be used by internal package scripts and there is no need to use it "
+                 "manually.\n "
+                 "This command is presented only in the Scalyr agent tarball package and it is used to diagnose "
+                 "if the current system is able to execute the frozen binary or it has to fallback to the source code. "
+                 "Its only purpose is to exit successfully (with zero code) and, thereby, "
+                 "to signal that the frozen binary is able to run on the current system. If the command fails, "
+                 "then, for some reason, the current system is not able to execute the frozen binary."
+        )
+
     my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()
     my_controller.consume_options(options)
+
+    if __scalyr__.INSTALL_TYPE == __scalyr__.InstallType.TARBALL_INSTALL:
+        if options.check_frozen_binary:
+            sys.exit(0)
 
     if len(args) < 1:
         print(
@@ -2189,6 +2208,7 @@ if __name__ == "__main__":
         )
     except Exception as mainExcept:
         print(six.text_type(mainExcept), file=sys.stderr)
+        traceback.print_exc()
         sys.exit(1)
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
