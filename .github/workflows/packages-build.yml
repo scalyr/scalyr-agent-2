@@ -19,12 +19,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Restore cached dependencies.
-        id: cache
-        uses: ./.github/actions/cache-build-dependencies
-        with:
-          package-type: "${{ matrix.package_type }}"
-          #cache-dir: "/tmp/build-cache"
+#      - name: Restore cached dependencies.
+#        id: cache
+#        uses: ./.github/actions/cache-build-dependencies
+#        with:
+#          package-type: "${{ matrix.package_type }}"
+#          #cache-dir: "/tmp/build-cache"
 
       - name: Create or restore the dependency cache.
         shell: bash
