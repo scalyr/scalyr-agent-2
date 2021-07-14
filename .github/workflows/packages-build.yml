@@ -1,0 +1,149 @@
+name: Packages build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04]
+        package_type: ["deb", "rpm"]
+        python-version: [3.8]
+        include:
+          - os: windows-2019
+            package_type: "msi"
+            python-version: "3.8"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Restore cached dependencies.
+        id: cache
+        uses: ./.github/actions/cache-build-dependencies
+        with:
+          package-type: "${{ matrix.package_type }}"
+          #cache-dir: "/tmp/build-cache"
+
+      - name: Create or restore the dependency cache.
+        shell: bash
+        run: |
+          python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --content-checksum-path checksum.txt
+          cat checksum.txt
+
+      - name: Restore cached dependensies if exist.
+        uses: actions/cache@v2
+        env:
+          cache-version: v1
+        with:
+          path: ~/dependencies_cache
+          key: ${{ runner.os }}-build-dependencies-${{ env.cache-version }}-${{ hashFiles('checksum.txt') }}
+
+      - name: Create or restore the dependency cache.
+        shell: bash
+        run: |
+          python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
+
+
+
+      - name: Build.
+        shell: bash
+        run: |
+          echo "eqwqwqww"
+          echo "$Env:Path"
+          echo "555555"
+          echo "$PATH"
+          python3 agent_build/build_package.py ${{ matrix.package_type }} build --output-dir agent-build-output
+          ls -al agent-build-output/${{ matrix.package_type }}
+          ls -al agent-build-output/${{ matrix.package_type }}/frozen_binary_test/
+          #mv agent-build-output/${{ matrix.package_type }}/frozen_binary_test/test_scalyr-agent agent-build-output/${{ matrix.package_type }}/frozen_binary_test/test_scalyr-agent${{ matrix.package_type }}
+
+
+
+
+
+#      - name: Save the package.
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: "package-${{ matrix.package_type }}"
+#          path: |
+#            agent-build-output/package/*.deb
+
+
+      - name: Save the package.
+        uses: actions/upload-artifact@v2
+        with:
+          name: "package-${{ matrix.package_type }}"
+          path: |
+            agent-build-output/${{ matrix.package_type }}/*.${{ matrix.package_type }}
+
+
+
+      - name: Save the frozen test script.
+        uses: actions/upload-artifact@v2
+        with:
+          name: "package-test-executor-${{ matrix.package_type }}"
+          path: |
+            agent-build-output/${{ matrix.package_type }}/frozen_binary_test/test_scalyr-agent*
+
+
+
+
+  test:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-20.04"]
+        docker-image: ["ubuntu:14.04", "ubuntu:16.04", "ubuntu:18.04", "ubuntu:20.04", "centos:7", "centos:8", "amazonlinux:2"]
+        package_type: ["deb"]
+        python-version: [3.8]
+        include:
+          - os: windows-2019
+            package_type: "msi"
+            python-version: "3.8"
+#          - os: ubuntu-20.04
+#            docker-image:
+#            package_type: "msi"
+#            python-version: "3.8"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Create requirements file
+        run: |
+            echo  "pytest" > pytest_requirments.txt
+
+      - name: Cache python dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-${{ hashFiles('pytest_requirments.txt') }}
+
+      - name: Install python dependencies
+        run: |
+          pip install -r pytest_requirments.txt
+          rm pytest_requirments.txt
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: "package-${{ matrix.package_type }}"
+          path: /tmp/packages
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: "package-test-executor-${{ matrix.package_type }}"
+          path: ~/test_executors
+
+      - name: Test.
+        shell: bash
+        run: |
+          ls -al ~/test_executors
+          chmod +x /tmp/test_executors/test_scalyr-agent
+          python3 tests/distribution_tests/run_test.py --docker-image "${{ matrix.docker-image }}" --package-path /tmp/packages/*.${{ matrix.package_type }} --test-executor-path ~/test_executors/test_scalyr-agent*
+
+
+

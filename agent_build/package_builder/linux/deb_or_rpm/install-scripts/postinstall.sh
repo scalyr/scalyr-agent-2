@@ -159,7 +159,7 @@ ensure_path_not_readable_by_others() {
   ensure_path_other_permissions "${file_path}" "0"
 }
 
-check_python_version
+#check_python_version
 
 config_owner=$(stat -c %U /etc/scalyr-agent-2/agent.json)
 script_owner=$(stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2)
@@ -170,7 +170,7 @@ script_owner=$(stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2)
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
   echo "Changing owner for /etc/scalyr-agent-2/agent.json file from $script_owner to $config_owner"
-  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
+  /usr/sbin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
 fi
 
 # Ensure /etc/scalyr-agent-2/agent.json file is not readable by others
