@@ -26,7 +26,7 @@ jobs:
 #          package-type: "${{ matrix.package_type }}"
 #          #cache-dir: "/tmp/build-cache"
 
-      - name: Create or restore the dependency cache.
+      - name: Calculate the checksum of the build dependencies.
         shell: bash
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --content-checksum-path checksum.txt
@@ -40,7 +40,7 @@ jobs:
           path: ~/dependencies_cache
           key: ${{ runner.os }}-build-dependencies-${{ env.cache-version }}-${{ hashFiles('checksum.txt') }}
 
-      - name: Create or restore the dependency cache.
+      - name: Prepare build environment.
         shell: bash
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
