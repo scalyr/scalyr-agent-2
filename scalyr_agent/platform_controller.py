@@ -27,7 +27,7 @@ if False:  # NOSONAR
 
 import sys
 
-from scalyr_agent.__scalyr__ import INSTALL_TYPE
+from scalyr_agent import __scalyr__
 
 # Holds a reference to the existing PlatformController instance which is populated when first
 # calling "PlatformController.existing_instance()".
@@ -36,8 +36,10 @@ PLATFORM_INSTANCE = None
 
 class PlatformController(object):
     def __init__(self):
-        """Initializes a platform instance."""
-        self._install_type = INSTALL_TYPE
+        """
+        Initializes a platform instance.
+        """
+        self._install_type = __scalyr__.INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
     __platform_classes__ = []  # type: List[Type[PlatformController]]

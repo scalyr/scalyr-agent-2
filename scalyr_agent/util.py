@@ -38,6 +38,7 @@ import locale
 import collections
 import subprocess
 import signal
+import importlib.util
 from io import open
 
 if sys.version_info < (3, 5):
@@ -65,10 +66,7 @@ import time
 import uuid
 import multiprocessing.managers
 
-try:
-    from __scalyr__ import SCALYR_VERSION
-except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+from scalyr_agent import __scalyr__
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
@@ -363,27 +361,26 @@ def set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-# Set default json library we will use. We start with the most efficient and falling back to less
-# efficient library as a fallback.
-# We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
-# encoding
-if six.PY3:
-    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
-else:
-    JSON_LIBS_TO_USE = ["ujson", "json"]
+def _determine_json_lib() -> str:
+    """
+    Determines default json library to use. We start with the most efficient and falling back to less
+    efficient library as a fallback.
+    """
+    json_libs_to_use = ["orjson", "ujson", "json"]
 
+    for json_lib_name in json_libs_to_use:
+        # if module is available, then the result of the function has to be not None.
+        json_spec = importlib.util.find_spec(json_lib_name)
+        if json_spec is not None:
+            return json_lib_name
+
+
+# Set default json library we will use.
 last_error = None
-for json_lib_to_use in JSON_LIBS_TO_USE:
-    try:
-        set_json_lib(json_lib_to_use)
-    except ImportError as e:
-        last_error = e
-    else:
-        last_error = None
-        break
 
-# Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-if last_error:
+_json_lib_to_use = _determine_json_lib()
+
+if _json_lib_to_use is None:
     # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
     print(
         "No default json library found which should be present in all Python >= 2.6. "
@@ -391,6 +388,16 @@ if last_error:
         file=sys.stderr,
     )
     sys.exit(1)
+
+try:
+    set_json_lib(_json_lib_to_use)
+except ImportError as e:
+    # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+    print(
+        "The json library '{}' is found but can not be imported. Error: ".format(_json_lib_to_use),
+        file=sys.stderr,
+    )
+    exit(1)
 
 
 def get_json_lib():
@@ -2196,15 +2203,19 @@ def get_agent_start_up_message():
         used_locale,
     ) = get_language_code_coding_and_locale()
 
-    msg = "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) " "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)" % (
-        SCALYR_VERSION,
-        build_revision,
-        get_pid_tid(),
-        python_version_str,
-        openssl_version,
-        sys.getfilesystemencoding(),
-        used_locale,
-        lang_env_var,
+    msg = (
+        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        % (
+            __scalyr__.SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+        )
     )
 
     return msg

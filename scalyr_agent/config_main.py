@@ -46,30 +46,10 @@ from optparse import OptionParser
 if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
-# pylint: disable=import-error
-from __scalyr__ import (
-    scalyr_init,
-    get_install_root,
-    TARBALL_INSTALL,
-    MSI_INSTALL,
-    SCALYR_VERSION,
-    PACKAGE_INSTALL,
-)
 
-# pylint: enable=import-error
-
-scalyr_init()
-
-# [start of 2->TODO]
-# Check for suitability.
-# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 import six
-from six.moves import input
-import six.moves.urllib.request
-import six.moves.urllib.parse
-import six.moves.urllib.error
 
-# [end of 2->TOD0]
+from scalyr_agent import __scalyr__
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -408,7 +388,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             my_default_paths = platform_controller.default_paths
 
             # Ensure that this is a tarball install
-            if platform_controller.install_type != TARBALL_INSTALL:
+            if platform_controller.install_type != __scalyr__.InstallType.TARBALL_INSTALL:
                 raise UpgradeFailure(
                     "The current agent was not installed using a tarball, so you may not use the "
                     "upgrade tarball command."
@@ -452,7 +432,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             tarball_directory = file_name[0:-7]
 
             # We will be installing in the same directory where scalyr-agent-2 is currently installed.
-            install_directory = os.path.dirname(get_install_root())
+            install_directory = os.path.dirname(__scalyr__.get_install_root())
 
             if not os.path.isdir(os.path.join(install_directory, "scalyr-agent-2")):
                 raise UpgradeFailure(
@@ -644,7 +624,7 @@ def upgrade_windows_install(
         my_default_paths = platform_controller.default_paths
 
         # Ensure agent was installed via MSI
-        if MSI_INSTALL != platform_controller.install_type:
+        if platform_controller.install_type != __scalyr__.InstallType.PACKAGE_INSTALL:
             raise UpgradeFailure(
                 "The current agent was not installed via MSI, so you may not use the upgrade windows "
                 "command."
@@ -671,7 +651,7 @@ def upgrade_windows_install(
         client = ScalyrClientSession(
             config.scalyr_server,
             config.api_key,
-            SCALYR_VERSION,
+            __scalyr__.SCALYR_VERSION,
             quiet=True,
             ca_file=config.ca_cert_path,
             intermediate_certs_file=config.intermediate_certs_path,
@@ -697,7 +677,7 @@ def upgrade_windows_install(
         print(
             "Attempting to upgrade agent from version %s to version %s."
             % (
-                SCALYR_VERSION,
+                __scalyr__.SCALYR_VERSION, 
                 data_payload["current_version"],
             )
         )
@@ -1180,11 +1160,11 @@ def create_custom_dockerfile(
     # by this current agent install.  We want the version of this install in order to make sure the new docker image
     # is as close to what is currently running as possible.
     dockerfile_path = os.path.join(
-        get_install_root(), "misc", "Dockerfile%s" % docker_config_name
+        __scalyr__.get_install_root(), "misc", "Dockerfile%s" % docker_config_name
     )
     fp = open(dockerfile_path)
     dockerfile_contents = fp.read().replace(
-        "/scalyr%s-agent:latest" % label, "/scalyr%s-agent:%s" % (label, SCALYR_VERSION)
+        "/scalyr%s-agent:latest" % label, "/scalyr%s-agent:%s" % (label, __scalyr__.SCALYR_VERSION)
     )
     fp.close()
 
@@ -1218,7 +1198,7 @@ def set_python_version(version):
     """Switch agent command main files to another version of python"""
     controller = PlatformController.new_platform()
     # this is only for package installation.
-    if controller.install_type != PACKAGE_INSTALL:
+    if controller.install_type != __scalyr__.InstallType.PACKAGE_INSTALL:
         raise RuntimeError(
             "This operation can not be performed because the Scalyr agent is not installed with package manager."
         )

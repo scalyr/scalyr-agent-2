@@ -84,27 +84,10 @@ except ImportError:
         "the following command:  pip install psutil"
     )
 
-# [start of 2->TODO]
-# Check for suitability.
-# This file can be executed as script and imported as module.
-if __name__ == "__main__":
-    # run as script, can not import __scalyr__.py as part of the package.
-    from __scalyr__ import get_install_root, scalyr_init
-else:
-    # run as package module.
-    # Python3 does not allow to import __scalyr__.py file within the same package just by its name. (PEP 328)
-    from scalyr_agent.__scalyr__ import get_install_root, scalyr_init
-# [end of 2->TOD0]
+import six
 
-scalyr_init()
 
-# [start of 2->TODO]
-# Check for suitability.
-# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
-from six.moves import input
-
-# [end of 2->TOD0]t
-
+from scalyr_agent import __scalyr__
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.util import RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.platform_controller import (
@@ -306,7 +289,7 @@ class WindowsPlatformController(PlatformController):
         """
         # NOTE: For this module, it is assumed that the 'install_type' is always PACKAGE_INSTALL
 
-        root = get_install_root()
+        root = __scalyr__.get_install_root()
         logdir = os.path.join(root, "log")
         libdir = os.path.join(root, "data")
         config = os.path.join(root, "config", "agent.json")
