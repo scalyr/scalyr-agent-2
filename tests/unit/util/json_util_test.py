@@ -233,41 +233,40 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
 
 @pytest.mark.json_lib
 class TestDefaultJsonLibrary(ScalyrTestCase):
+    def setUp(self):
+        super(TestDefaultJsonLibrary, self).setUp()
+        # Save original modules so we can restore them after tests.
+        self._original_modules = {}
+        for name in ["orjson", "ujson", "json"]:
+            if name in sys.modules:
+                self._original_modules[name] = sys.modules[name]
+
     def tearDown(self):
         super(TestDefaultJsonLibrary, self).tearDown()
-
-        for value in ["scalyr_agent.util", "orjson", "ujson", "json"]:
-            if value in sys.modules:
-                del sys.modules[value]
+        # Restore original modules.
+        for name, value in self._original_modules.items():
+            sys.modules[name] = value
 
     @skipIf(six.PY2, "Skipping under Python 2")
     def test_correct_default_json_library_is_used_python3(self):
-        sys.modules["orjson"] = mock.Mock()
 
-        import scalyr_agent.util
+        json_lib_mock_mock = mock.Mock()
 
-        reload(scalyr_agent.util)
+        json_lib_mock_mock.__spec__ = mock.Mock()
+        sys.modules["orjson"] = json_lib_mock_mock
 
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "orjson")
+        self.assertEqual(util._determine_json_lib(), "orjson")
 
         sys.modules["orjson"] = None
-        sys.modules["ujson"] = mock.Mock()
+        sys.modules["ujson"] = json_lib_mock_mock
 
-        import scalyr_agent.util
-
-        reload(scalyr_agent.util)
-
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
+        self.assertEqual(util._determine_json_lib(), "ujson")
 
         sys.modules["orjson"] = None
         sys.modules["ujson"] = None
-        sys.modules["json"] = mock.Mock()
+        sys.modules["json"] = json_lib_mock_mock
 
-        import scalyr_agent.util
-
-        reload(scalyr_agent.util)
-
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
+        self.assertEqual(util._determine_json_lib(), "json")
 
     @skipIf(six.PY3, "Skipping under Python 3")
     def test_correct_default_json_library_is_used_python2(self):

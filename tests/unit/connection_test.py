@@ -16,14 +16,11 @@
 
 from __future__ import absolute_import
 
-from scalyr_agent import scalyr_init
-
-scalyr_init()
-
 import os
 import sys
 import ssl
 import socket
+import re
 
 from scalyr_agent.compat import PY26
 from scalyr_agent.compat import PY_post_equal_279
@@ -188,11 +185,17 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             # [Errno 1] _ssl.c:498: error:14090086:SSL
             # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
             expected_msg = r"certificate verify failed"
-        else:
+        elif sys.version_info < (3, 7):
+            # The error message is different for Python <= 3.6
             expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        else:
+            expected_msg = re.escape(
+                "(\"bad handshake: Error([('SSL routines', 'tls_process_server_certificate', 'certificate verify failed')])\",)"
+            )
 
         connection = self._get_connection_cls(server="https://example.com:443")
-        self.assertRaisesRegexp(
+
+        self.assertRaisesRegex(
             Exception,
             expected_msg,
             connection.get,
