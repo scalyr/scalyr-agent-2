@@ -43,6 +43,7 @@ Expand-Archive -LiteralPath "$wix_installer_path" -DestinationPath "$wix_path"
 $old_path = (Get-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\Environment' -Name path).path
 
 #$paths = "$python_install_path;$wix_install_path;$git_install_path\bin;$git_install_path\usr\bin"
+
 $paths = "$wix_path"
 $new_path = "$old_path;$paths"
 

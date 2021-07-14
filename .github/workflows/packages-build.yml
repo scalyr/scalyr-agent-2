@@ -32,7 +32,7 @@ jobs:
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --content-checksum-path checksum.txt
           cat checksum.txt
 
-      - name: Restore cached dependensies if exist.
+      - name: Restore cached dependensies of the build environent if exist.
         uses: actions/cache@v2
         env:
           cache-version: v1
@@ -43,7 +43,11 @@ jobs:
       - name: Prepare build environment.
         shell: bash
         run: |
+          cat checksum.txt >> $GITHUB_PATH
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
+
+          # Remove checksum file
+          rm checksum.txt
 
 
 
