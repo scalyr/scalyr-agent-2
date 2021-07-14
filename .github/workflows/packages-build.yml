@@ -45,8 +45,13 @@ jobs:
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
 
-          cat ~/dependencies_cache/paths.txt
-          cat ~/dependencies_cache/paths.txt >> $GITHUB_PATH
+          # in some cases, the 'prepare-environment' command also generates file 'paths.txt'. This file contains paths
+          # to binaries of all tools that are needed for the build. Use this file to add those paths to the PATH env.
+          # variable to be able to use those tools.
+          if [ -f ~/dependencies_cache/paths.txt ]; then
+            cat ~/dependencies_cache/paths.txt
+            cat ~/dependencies_cache/paths.txt >> $GITHUB_PATH
+          fi
 
           # Remove checksum file
           rm checksum.txt
