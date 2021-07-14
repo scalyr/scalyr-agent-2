@@ -2078,7 +2078,7 @@ if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
     parser = OptionParser(
         usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
-        version="scalyr-agent v" + SCALYR_VERSION,
+        version="scalyr-agent v" + __scalyr__.SCALYR_VERSION,
     )
     parser.add_option(
         "-c",
