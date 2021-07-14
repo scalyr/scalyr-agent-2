@@ -20,11 +20,11 @@ import six.moves.urllib.request
 import six.moves.urllib.parse
 import six.moves.urllib.error
 from six.moves import range
+import requests
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 

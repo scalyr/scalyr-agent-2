@@ -18,6 +18,8 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+from requests.exceptions import ConnectionError
+
 from scalyr_agent import compat
 
 from scalyr_agent.monitor_utils.k8s import (
@@ -28,8 +30,6 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sNamespaceFilter,
 )
 import scalyr_agent.monitor_utils.k8s as k8s_utils
-
-from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 import datetime
 import re
