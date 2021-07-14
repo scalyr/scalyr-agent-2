@@ -31,7 +31,6 @@ jobs:
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --content-checksum-path checksum.txt
           cat checksum.txt
-          cat checksum.txt >> $GITHUB_PATH
 
       - name: Restore cached dependensies of the build environent if exist.
         uses: actions/cache@v2
@@ -45,6 +44,9 @@ jobs:
         shell: bash
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
+
+          cat ~/dependencies_cache/paths.txt
+          cat ~/dependencies_cache/paths.txt >> $GITHUB_PATH
 
           # Remove checksum file
           rm checksum.txt
