@@ -25,7 +25,7 @@ jobs:
       - name: Calculate the checksum of the build dependencies.
         shell: bash
         run: |
-          python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --content-checksum-path checksum.txt
+          python3 agent_build/build_package.py ${{ matrix.package_type }} dump-checksum checksum.txt
 
       - name: Restore cached dependensies of the build environent if exist.
         uses: actions/cache@v2
@@ -38,9 +38,9 @@ jobs:
       - name: Prepare build environment.
         shell: bash
         run: |
-          python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-environment --cache-dependencies-path ~/dependencies_cache
+          python3 agent_build/build_package.py ${{ matrix.package_type }} prepare-build-environment --cache-dir ~/dependencies_cache
 
-          # in some cases, the 'prepare-environment' command also generates file 'paths.txt'. This file contains paths
+          # in some cases, the 'prepare-build-environment' command also generates file 'paths.txt'. This file contains paths
           # to binaries of all tools that are needed for the build. Use this file to add those paths to the PATH env.
           # variable to be able to use those tools.
           if [ -f ~/dependencies_cache/paths.txt ]; then
@@ -48,7 +48,7 @@ jobs:
             cat ~/dependencies_cache/paths.txt >> $GITHUB_PATH
           fi
 
-          # Remove checksum file
+          # Remove checksum file, it is not needed anymore.
           rm checksum.txt
 
 
@@ -72,7 +72,7 @@ jobs:
       - name: Save the frozen test script.
         uses: actions/upload-artifact@v2
         with:
-          name: "package-test-executor-${{ matrix.package_type }}"
+          name: "package-test-${{ matrix.package_type }}"
           path: |
             agent-build-output/${{ matrix.package_type }}/frozen_binary_test/package_test*
 
@@ -116,23 +116,23 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: "package-${{ matrix.package_type }}"
-          path: ~/packages
+          path: ~/package
 
       - uses: actions/download-artifact@v2
         with:
-          name: "package-test-executor-${{ matrix.package_type }}"
-          path: ~/test_executors
+          name: "package-test-${{ matrix.package_type }}"
+          path: ~/package_test
 
       - name: Test.
         shell: bash
         run: |
-          ls -al ~/test_executors
-          chmod +x ~/test_executors/package_test*
-          ls ~/packages/*.${{ matrix.package_type }}*
-          python3 tests/distribution_tests/package_test_runner.py \
+          ls -al ~/package_test
+          chmod +x ~/package_test/package_test*
+          ls ~/package/*.${{ matrix.package_type }}*
+          python3 tests/package_tests/package_test_runner.py \
             --docker-image "${{ matrix.docker-image }}" \
-            --package-path ~/packages/*.${{ matrix.package_type }}* \
-            --test-executor-path ~/test_executors/package_test* \
+            --package-path ~/package/*.${{ matrix.package_type }}* \
+            --package-test-path ~/package_test/package_test* \
             --scalyr-api-key "0v7dW1EIPpglMcSjGywUdgY9xTNWQP/kas6qHEmiUG5w-"
 
 

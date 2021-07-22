@@ -34,7 +34,6 @@ PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 
 
-# TODO: change this explanation comment since now there's no the 'package_root' thing.
 # One of the main things this file does is correctly give the full path to the following directories regardless of
 # install type :
 #   install_root:  The top-level directory where Scalyr is currently installed.

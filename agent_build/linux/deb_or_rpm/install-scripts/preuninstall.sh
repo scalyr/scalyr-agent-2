@@ -39,8 +39,3 @@ if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
     done
   fi
 fi
-
-# Always remove the .pyc files and __pycache__ directories
-find /usr/share/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
-
-exit 0;
