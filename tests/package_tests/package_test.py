@@ -3,7 +3,7 @@
 import pathlib
 import pathlib as pl
 import argparse
-from textwrap import dedent
+import shlex
 import subprocess
 import json
 import time
@@ -11,29 +11,21 @@ import os
 import tarfile
 import re
 
-
-def run_command(command):
-    subprocess.check_call(command, shell=True)
-
+q = shlex.quote
 
 def install_deb_package():
-    env = os.environ.copy()
-    #original_ld_lib_path = os.environ['LD_LIBRARY_PATH']
-    #env["LD_LIBRARY_PATH"] = f"/lib/x86_64-linux-gnu:{original_ld_lib_path}"
     os.environ["LD_LIBRARY_PATH"] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
     subprocess.check_call(
-        f"dpkg -i {package_path}",
+        ["dpkg", "-i", q(str(package_path))],
         env=os.environ,
         shell=True
     )
 
 
 def install_rpm_package():
-    #env = os.environ.copy()
-    #env["LD_LIBRARY_PATH"] = f"/libx64"
     os.environ["LD_LIBRARY_PATH"] = "/libx64"
     subprocess.check_call(
-        f"rpm -i {package_path}",
+        ["rpm", "-i", q(str(package_path))],
         env=os.environ,
         shell=True
     )
@@ -44,13 +36,12 @@ def install_tarball():
     tar.extractall(pathlib.Path("~").expanduser())
     tar.close()
 
+
 def install_msi_package():
     subprocess.check_call(
-        #f"Start-Process msiexec.exe -Wait -ArgumentList '/I {package_path} /quiet'", shell=True
-        f"msiexec.exe /I {package_path} /quiet", shell=True
+        ["msiexec.exe", "/I", q(str(package_path)), "/quiet"],
+        shell=True
     )
-
-
 
 
 def install_package(package_type: str):
@@ -81,13 +72,14 @@ def start_agent():
             os.environ["PATH"] = f"{bin_path};{os.environ['PATH']}"
 
         subprocess.check_call(
-            f"scalyr-agent-2 start", shell=True, env=os.environ
+            ["scalyr-agent-2", "start"], shell=True, env=os.environ
         )
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 start", shell=True
+            [q(str(agent_binary_path)), "start"], shell=True
         )
 
 
@@ -99,8 +91,9 @@ def get_agent_status():
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 status -v", shell=True,
+            [q(str(agent_binary_path)), "status", "-v"], shell=True,
         )
 
 
@@ -112,8 +105,10 @@ def stop_agent():
     if package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
+
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 stop", shell=True
+            [q(str(agent_binary_path)), "stop"], shell=True
         )
 
 
@@ -128,7 +123,6 @@ def configure_agent(api_key: str):
         config_path = pl.Path(os.environ["programfiles(x86)"], "Scalyr", "config", "agent.json")
 
     config = {}
-    #api_key = "0v7dW1EIPpglMcSjGywUdgY9xTNWQP/kas6qHEmiUG5w-"
     config["api_key"] = api_key
 
     config["server_attributes"] = {"serverHost": "ARTHUR_TEST"}
@@ -138,22 +132,15 @@ def configure_agent(api_key: str):
 
 
 def remove_deb_package():
-    #env = os.environ.copy()
-    #original_ld_lib_path = os.environ['LD_LIBRARY_PATH']
-    #env["LD_LIBRARY_PATH"] = f"/lib/x86_64-linux-gnu:{original_ld_lib_path}"
     subprocess.check_call(
-        f"apt-get remove -y scalyr-agent-2",
-        #env=env,
+        ["apt-get", "remove", "-y", "scalyr-agent-2"],
         shell=True
     )
 
 
 def remove_rpm_package():
-    #env = os.environ.copy()
-    #env["LD_LIBRARY_PATH"] = f"/libx64"
     subprocess.check_call(
-        f"yum remove -y scalyr-agent-2",
-        #env=env,
+        ["yum", "remove", "-y", "scalyr-agent-2"],
         shell=True
     )
 

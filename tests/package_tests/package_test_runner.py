@@ -1,7 +1,6 @@
 import pathlib as pl
 import argparse
 import subprocess
-import sys
 
 _PARENT_DIR = pl.Path(__file__).parent
 
