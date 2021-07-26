@@ -71,3 +71,4 @@ if (!(Test-Path $pip_cache_path -PathType Container)) {
 }
 
 Add-Content "$cache_path\paths.txt" "$wix_path" -Encoding utf8
+#Add-Content "$cache_path\paths.txt" "$python_path" -Encoding utf8

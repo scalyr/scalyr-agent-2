@@ -23,7 +23,6 @@ import time
 import sys
 import stat
 import hashlib
-import shlex
 import uuid
 import io
 from typing import Union, Optional
@@ -38,7 +37,6 @@ from agent_build.common import cat_files, recursively_delete_files_by_name
 from agent_build import common
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
-
 
 class PackageBuilder(abc.ABC):
     """
@@ -170,7 +168,7 @@ class PackageBuilder(abc.ABC):
             command_argv[output_dir_index + 1] = "/tmp/build"
 
             # Join everything into one command string.
-            command = shlex.join(command_argv)
+            command = common.shlex_join(command_argv)
 
             image_name = f"scalyr-agent-{type(self).PACKAGE_TYPE}-builder".lower()
 
@@ -179,7 +177,7 @@ class PackageBuilder(abc.ABC):
             # because the the docker build caching mechanism will save out time when nothing in agent source is changed.
             # This can save time during the local debugging.
 
-            common.escaped_check_call(
+            subprocess.check_call(
                 [
                     "docker", "build", "-t", image_name,
                     "--build-arg", f"BASE_IMAGE_NAME={self._get_build_environment_docker_image_name()}",
@@ -193,22 +191,22 @@ class PackageBuilder(abc.ABC):
 
             # Remove the container wth the same name if exists.
             container_name = image_name
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "rm", "-f", container_name]
             )
 
             # Create the container.
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "create", "--name", container_name, image_name ]
             )
 
             # Copy package output from the container.
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "cp", "-a", f"{container_name}:/tmp/build/.", str(output_path)],
             )
 
             # Remove the container.
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "rm", "-f", container_name]
             )
 
@@ -236,11 +234,11 @@ class PackageBuilder(abc.ABC):
             # If cache directory is presented, then we pass it as an additional argument to the
             # 'prepare build environment' script, so it can use the cache too.
             if cache_dir:
-                command.append(str(cache_dir))
+                command.append(str(pl.Path(cache_dir)))
 
             # Run the 'prepare build environment' script in previously chosen shell.
-            common.escaped_check_call(
-                command
+            subprocess.check_call(
+                command,
             )
         else:
             # Instead of preparing the build environment on the current system, create the docker image and prepare the
@@ -252,7 +250,7 @@ class PackageBuilder(abc.ABC):
 
             # Before the build, check if there is already an image with the same name. The name contains the checksum
             # of all files which are used in it, so the name identity also guarantees the content identity.
-            output = common.escaped_check_output(
+            output = subprocess.check_output(
                 ["docker", "images", "-q", image_name]
             ).decode().strip()
 
@@ -269,7 +267,7 @@ class PackageBuilder(abc.ABC):
                 cached_image_path = cache_dir / image_name
                 if cached_image_path.is_file():
                     print("Cached image file has been found, loading and reusing it instead of building.")
-                    common.escaped_check_call(
+                    subprocess.check_call(
                         ["docker", "load", "-i", str(cached_image_path)]
                     )
                     return
@@ -291,7 +289,7 @@ class PackageBuilder(abc.ABC):
                 rel_used_path = pl.Path(used_path).relative_to(__SOURCE_ROOT__)
                 abs_host_path = __SOURCE_ROOT__ / rel_used_path
                 abs_container_path = container_root_path / rel_used_path
-                volumes_mappings.extend([["-v"], f"{abs_host_path}:{abs_container_path}"])
+                volumes_mappings.extend(["-v", f"{abs_host_path}:{abs_container_path}"])
 
             # Map the prepare environment script's path to the docker.
             container_prepare_env_script_path = pl.Path(
@@ -302,12 +300,12 @@ class PackageBuilder(abc.ABC):
             container_name = cls.__name__
 
             # Remove if such container exists.
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "rm", "-f", container_name]
             )
 
             # Create container and run the 'prepare environment' script in it.
-            common.escaped_check_call(
+            subprocess.check_call(
                 [
                     "docker", "run", "-i", "--name", container_name,
                     *volumes_mappings,
@@ -316,7 +314,7 @@ class PackageBuilder(abc.ABC):
             )
 
             # Save the current state of the container into image.
-            common.escaped_check_call(
+            subprocess.check_call(
                 ["docker", "commit", container_name, image_name]
             )
 
@@ -325,9 +323,12 @@ class PackageBuilder(abc.ABC):
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 cached_image_path = cache_dir / image_name
                 print(f"Saving '{image_name}' image file into cache.")
-                common.escaped_check_call(
-                    ["docker", "save", image_name, ">", str(cached_image_path)]
-                )
+                with cached_image_path.open("wb") as f:
+                    subprocess.check_call(
+                        ["docker", "save", image_name],
+                        stdout=f
+
+                    )
 
     @classmethod
     def dump_build_environment_files_content_checksum(
@@ -590,8 +591,9 @@ class FrozenBinaryPackageBuilder(PackageBuilder):
         self._frozen_binary_output = pyinstaller_output / "dist"
 
         # Run the PyInstaller.
-        common.escaped_check_call(
-            ["python", "-m", "PyInstaller", str(spec_file_path)],
+
+        subprocess.check_call(
+            [sys.executable, "-m", "PyInstaller", str(spec_file_path)],
             cwd=str(pyinstaller_output)
         )
 
@@ -604,8 +606,8 @@ class FrozenBinaryPackageBuilder(PackageBuilder):
 
         package_test_script_path = __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test.py"
 
-        common.escaped_check_call([
-            "python", "-m", "PyInstaller", str(package_test_script_path),
+        subprocess.check_call([
+            sys.executable, "-m", "PyInstaller", str(package_test_script_path),
             "--distpath", str(package_test_pyinstaller_output), "--onefile"
         ])
 
@@ -809,7 +811,7 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
         ]
 
         # Run fpm command and build the package.
-        common.escaped_check_call(
+        subprocess.check_call(
             fpm_command,
             cwd=str(self._build_output_path),
         )
@@ -1009,7 +1011,7 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         Prepare the build environment to be able to build the windows msi package.
         """
         prepare_environment_script_path = _AGENT_BUILD_PATH / "windows/prepare_build_environment.ps1"
-        common.escaped_check_call(
+        subprocess.check_call(
             ["powershell", str(prepare_environment_script_path), str(cache_dir)]
         )
 
@@ -1069,7 +1071,7 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         wxs_file_path = _AGENT_BUILD_PATH / "windows/scalyr_agent.wxs"
 
         # Compile WIX .wxs file.
-        common.escaped_check_call([
+        subprocess.check_call([
             "candle", "-nologo", "-out", str(wixobj_file_path), f'-dVERSION="{self._package_version}"',
             f'-dUPGRADECODE="{upgrade_code}"', f'-dPRODUCTCODE="{product_code}"',
             str(wxs_file_path)
@@ -1079,7 +1081,7 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         installer_path = self._build_output_path / installer_name
 
         # Link compiled WIX files into msi installer.
-        common.escaped_check_call([
+        subprocess.check_call([
             "light", "-nologo", "-ext", "WixUtilExtension.dll", "-ext", "WixUIExtension",
             "-out", str(installer_path), str(wixobj_file_path), "-v"],
             cwd=str(scalyr_dir.absolute().parent)

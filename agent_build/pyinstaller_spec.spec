@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Copyright 2014-2020 Scalyr Inc.
+# Copyright 2014-2021 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ def is_windows():
     return platform.platform().lower().startswith("win")
 
 def is_linux():
-    return platform.system().lower() == "linux"
+    return platform.system().lower().startswith("linux")
 
 block_cipher = None
 IS_DEBUG = False
@@ -56,6 +56,7 @@ if is_windows():
 
     HIDDEN_IMPORTS.extend(["win32timezone"])
 
+# add linux specific modules.
 elif is_linux():
     HIDDEN_IMPORTS.extend([
         "scalyr_agent.builtin_monitors.linux_system_metrics",
@@ -65,10 +66,9 @@ elif is_linux():
 
 datas=[
     (os.path.join("..", "VERSION"), "."),
-    # (os.path.join("..","licenses"), "third_party_licenses"),
-    # (os.path.join("..","build_info"), "."),
 ]
 
+# Add tcollectors.
 if is_linux():
     datas.extend([
         (
@@ -77,40 +77,37 @@ if is_linux():
         ),
     ])
 
-main_a = Analysis(
+agent_main_analysis = Analysis(
     [os.path.join("..", "scalyr_agent", "agent_main.py")],
     pathex=[
         os.path.join("..", "scalyr_agent"),
         os.path.join("..", "scalyr_agent", "builtin_monitors"),
-        #os.path.join("../..", "scalyr_agent", "third_party"),
     ],
     hiddenimports=HIDDEN_IMPORTS,
     datas=datas,
 )
 
-config_a = Analysis(
+agent_config_analysis = Analysis(
     [os.path.join("..", "scalyr_agent", "config_main.py")],
-    # pathex=[
-    #     os.path.join("..", "scalyr_agent", "third_party"),
-    # ],
+    pathex=[
+        os.path.join("..", "scalyr_agent"),
+        os.path.join("..", "scalyr_agent", "builtin_monitors"),
+    ],
     hiddenimports=HIDDEN_IMPORTS,
     datas=datas
 )
 
-windows_service_a = None
+windows_service_analysis = None
 
 if is_windows():
-    windows_service_a = Analysis(
+    windows_service_analysis = Analysis(
         [os.path.join("..", "scalyr_agent", "platform_windows.py")],
         pathex=[
-            os.path.join("..", "scalyr_agent", "third_party"),
+            os.path.join("..", "scalyr_agent"),
+            os.path.join("..", "scalyr_agent", "builtin_monitors"),
         ],
         hiddenimports=HIDDEN_IMPORTS,
-        datas=[
-            (os.path.join("..", "VERSION"), "."),
-            #(os.path.join("..", "scalyr_agent", "third_party", "licenses"), "third_party_licenses"),
-            #(os.path.join("..","build_info"), "."),
-        ],
+        datas=datas
     )
 
 WINDOWS_SERVICE_EXECUTABLE_NAME = "ScalyrAgentService.exe"
@@ -123,37 +120,24 @@ if is_windows():
     main_executable_name += ".exe"
     config_executable_name += ".exe"
 
-# objects_to_merge = [
-#     (main_a, "scalyr-agent-2", main_executable_name),
-#     (config_a, "scalyr-agent-2-config", config_executable_name),
-#
-# ]
 
-# if is_windows():
-#     objects_to_merge.extend([
-#         (windows_service_a, "ScalyrAgentService", WINDOWS_SERVICE_EXECUTABLE_NAME),
-#     ])
+main_pyz = PYZ(agent_main_analysis.pure, agent_main_analysis.zipped_data, cipher=block_cipher)
 
-#MERGE(*objects_to_merge)
-
-
-main_pyz = PYZ(main_a.pure, main_a.zipped_data, cipher=block_cipher)
-
-config_pyz = PYZ(config_a.pure, config_a.zipped_data, cipher=block_cipher)
+config_pyz = PYZ(agent_config_analysis.pure, agent_config_analysis.zipped_data, cipher=block_cipher)
 
 windows_service_pyz = None
 
 if is_windows():
-    windows_service_pyz = PYZ(windows_service_a.pure, windows_service_a.zipped_data, cipher=block_cipher)
+    windows_service_pyz = PYZ(windows_service_analysis.pure, windows_service_analysis.zipped_data, cipher=block_cipher)
 
 
 main_exe = EXE(
     main_pyz,
-    main_a.scripts,
-    main_a.binaries,
-    main_a.zipfiles,
-    main_a.datas,
-    #exclude_binaries=True,
+    agent_main_analysis.scripts,
+    agent_main_analysis.binaries,
+    agent_main_analysis.zipfiles,
+    agent_main_analysis.datas,
+    exclude_binaries=False,
     name=main_executable_name,
     debug=IS_DEBUG,
     bootloader_ignore_signals=False,
@@ -162,26 +146,13 @@ main_exe = EXE(
     console=True,
 )
 
-# config_exe = EXE(
-#     config_pyz,
-#     config_a.scripts,
-#     [],
-#     exclude_binaries=True,
-#     name=config_executable_name,
-#     debug=IS_DEBUG,
-#     bootloader_ignore_signals=False,
-#     strip=False,
-#     upx=True,
-#     console=True,
-# )
-
 config_exe = EXE(
     config_pyz,
-    config_a.scripts,
-    config_a.binaries,
-    config_a.zipfiles,
-    config_a.datas,
-    #exclude_binaries=False,
+    agent_config_analysis.scripts,
+    agent_config_analysis.binaries,
+    agent_config_analysis.zipfiles,
+    agent_config_analysis.datas,
+    exclude_binaries=False,
     name=config_executable_name,
     debug=IS_DEBUG,
     bootloader_ignore_signals=False,
@@ -195,11 +166,11 @@ windows_service_exe = None
 if is_windows():
     windows_service_exe = EXE(
         windows_service_pyz,
-        windows_service_a.scripts,
-        windows_service_a.binaries,
-        windows_service_a.zipfiles,
-        windows_service_a.datas,
-        #exclude_binaries=True,
+        windows_service_analysis.scripts,
+        windows_service_analysis.binaries,
+        windows_service_analysis.zipfiles,
+        windows_service_analysis.datas,
+        exclude_binaries=False,
         name=WINDOWS_SERVICE_EXECUTABLE_NAME,
         debug=False,
         bootloader_ignore_signals=False,
@@ -207,16 +178,3 @@ if is_windows():
         upx=True,
         console=True,
     )
-
-# if is_windows():
-#     objects_to_collect.extend([
-#         windows_service_exe,
-#         windows_service_a.binaries,
-#         windows_service_a.zipfiles,
-#         windows_service_a.datas,
-#     ])
-
-# coll = COLLECT(
-#     *objects_to_collect,
-#     name="scalyr-agent-2",
-# )

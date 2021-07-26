@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 
+# Copyright 2014-2021 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pathlib
 import pathlib as pl
 import argparse
-import shlex
 import subprocess
 import json
 import time
@@ -11,12 +24,11 @@ import os
 import tarfile
 import re
 
-q = shlex.quote
 
 def install_deb_package():
     os.environ["LD_LIBRARY_PATH"] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
     subprocess.check_call(
-        ["dpkg", "-i", q(str(package_path))],
+        f"dpkg -i {package_path}",
         env=os.environ,
         shell=True
     )
@@ -25,7 +37,7 @@ def install_deb_package():
 def install_rpm_package():
     os.environ["LD_LIBRARY_PATH"] = "/libx64"
     subprocess.check_call(
-        ["rpm", "-i", q(str(package_path))],
+        f"rpm -i {package_path}",
         env=os.environ,
         shell=True
     )
@@ -36,12 +48,12 @@ def install_tarball():
     tar.extractall(pathlib.Path("~").expanduser())
     tar.close()
 
-
 def install_msi_package():
     subprocess.check_call(
-        ["msiexec.exe", "/I", q(str(package_path)), "/quiet"],
-        shell=True
+        f"msiexec.exe /I {package_path} /quiet", shell=True
     )
+
+
 
 
 def install_package(package_type: str):
@@ -72,14 +84,13 @@ def start_agent():
             os.environ["PATH"] = f"{bin_path};{os.environ['PATH']}"
 
         subprocess.check_call(
-            ["scalyr-agent-2", "start"], shell=True, env=os.environ
+            f"scalyr-agent-2 start", shell=True, env=os.environ
         )
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
-        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            [q(str(agent_binary_path)), "start"], shell=True
+            f"{tarball_dir}/bin/scalyr-agent-2 start", shell=True
         )
 
 
@@ -91,9 +102,8 @@ def get_agent_status():
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
-        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            [q(str(agent_binary_path)), "status", "-v"], shell=True,
+            f"{tarball_dir}/bin/scalyr-agent-2 status -v", shell=True,
         )
 
 
@@ -105,10 +115,8 @@ def stop_agent():
     if package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
-        agent_binary_path = tarball_dir / "bin/scalyr-agent-2"
-
         subprocess.check_call(
-            [q(str(agent_binary_path)), "stop"], shell=True
+            f"{tarball_dir}/bin/scalyr-agent-2 stop", shell=True
         )
 
 
@@ -133,14 +141,14 @@ def configure_agent(api_key: str):
 
 def remove_deb_package():
     subprocess.check_call(
-        ["apt-get", "remove", "-y", "scalyr-agent-2"],
+        f"apt-get remove -y scalyr-agent-2",
         shell=True
     )
 
 
 def remove_rpm_package():
     subprocess.check_call(
-        ["yum", "remove", "-y", "scalyr-agent-2"],
+        f"yum remove -y scalyr-agent-2",
         shell=True
     )
 

@@ -16,6 +16,7 @@ import pathlib as pl
 import re
 import shlex
 import subprocess
+import sys
 import time
 from typing import Union, List
 
@@ -332,34 +333,9 @@ def parse_change_log():
     return releases
 
 
-def escaped_check_call(
-        args: List[str],
-        cwd=None
-):
-    """
-    Run subprocess.check_call but with shell-escaped arguments.
-    """
-
-    command = shlex.join(args)
-
-    return subprocess.check_call(
-        command,
-        shell=True,
-        cwd=cwd
-    )
-
-
-def escaped_check_output(
-        args: List[str],
-        cwd=None
-) -> bytes:
-    """
-    Run subprocess.check_output but with shell-escaped arguments.
-    """
-    command = shlex.join(args)
-
-    return subprocess.check_output(
-        command,
-        shell=True,
-        cwd=cwd
-    )
+# Implement shlex.join for Python < 3.8
+if sys.version_info < (3, 8):
+    def shlex_join(split_command):
+        return ' '.join(shlex.quote(arg) for arg in split_command)
+else:
+    shlex_join = shlex.join

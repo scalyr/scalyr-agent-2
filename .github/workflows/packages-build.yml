@@ -14,9 +14,9 @@ jobs:
           - os: ubuntu-20.04
             package_type: "tar"
             python-version: "3.8"
-          - os: windows-2019
-            package_type: "msi"
-            python-version: "3.8"
+#          - os: windows-2019
+#            package_type: "msi"
+#            python-version: "3.8"
 
     steps:
       - name: Checkout repository
@@ -27,7 +27,7 @@ jobs:
         run: |
           python3 agent_build/build_package.py ${{ matrix.package_type }} dump-checksum checksum.txt
 
-      - name: Restore cached dependensies of the build environent if exist.
+      - name: Restore cached dependensies of the build environment if exists.
         uses: actions/cache@v2
         env:
           cache-version: v1
@@ -56,7 +56,7 @@ jobs:
       - name: Build.
         shell: bash
         run: |
-          python3 agent_build/build_package.py ${{ matrix.package_type }} build --output-dir agent-build-output
+          python agent_build/build_package.py ${{ matrix.package_type }} build --output-dir agent-build-output
           ls -al agent-build-output/${{ matrix.package_type }}/*.${{ matrix.package_type }}*
 
 
@@ -105,9 +105,9 @@ jobs:
             package_type: "tar"
             docker-image: "ubuntu:14.04"
             python-version: "3.8"
-          - os: windows-2019
-            package_type: "msi"
-            python-version: "3.8"
+#          - os: windows-2019
+#            package_type: "msi"
+#            python-version: "3.8"
 
     steps:
       - name: Checkout repository
