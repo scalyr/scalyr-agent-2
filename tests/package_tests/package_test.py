@@ -87,8 +87,9 @@ def start_agent():
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 start", shell=True
+            [binary_path, "start"]
         )
 
 
@@ -100,8 +101,9 @@ def get_agent_status():
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 status -v", shell=True,
+            [binary_path, "status", "-v"]
         )
 
 
@@ -113,8 +115,9 @@ def stop_agent():
     if package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
+        binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call(
-            f"{tarball_dir}/bin/scalyr-agent-2 stop", shell=True
+            [binary_path, "stop"]
         )
 
 
