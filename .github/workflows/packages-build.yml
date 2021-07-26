@@ -14,9 +14,9 @@ jobs:
           - os: ubuntu-20.04
             package_type: "tar"
             python-version: "3.8"
-#          - os: windows-2019
-#            package_type: "msi"
-#            python-version: "3.8"
+          - os: windows-2019
+            package_type: "msi"
+            python-version: "3.8"
 
     steps:
       - name: Checkout repository
@@ -105,9 +105,9 @@ jobs:
             package_type: "tar"
             docker-image: "ubuntu:14.04"
             python-version: "3.8"
-#          - os: windows-2019
-#            package_type: "msi"
-#            python-version: "3.8"
+          - os: windows-2019
+            package_type: "msi"
+            python-version: "3.8"
 
     steps:
       - name: Checkout repository

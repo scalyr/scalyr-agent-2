@@ -28,18 +28,16 @@ import re
 def install_deb_package():
     os.environ["LD_LIBRARY_PATH"] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
     subprocess.check_call(
-        f"dpkg -i {package_path}",
+        ["dpkg", "-i", package_path],
         env=os.environ,
-        shell=True
     )
 
 
 def install_rpm_package():
     os.environ["LD_LIBRARY_PATH"] = "/libx64"
     subprocess.check_call(
-        f"rpm -i {package_path}",
+        ["rpm", "-i", package_path],
         env=os.environ,
-        shell=True
     )
 
 
