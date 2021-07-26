@@ -50,7 +50,7 @@ class PlatformController(object):
         """Adds all available platforms to the '__platforms_registered__' array.
         a new platform class that could be instantiated during the 'new_platform' method.
         """
-        if sys.platform == "win32":
+        if __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.WINDOWS:
             from scalyr_agent.platform_windows import WindowsPlatformController
 
             PlatformController.__platform_classes__.append(WindowsPlatformController)

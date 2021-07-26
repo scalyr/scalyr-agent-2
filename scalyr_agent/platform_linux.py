@@ -31,6 +31,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager.copying_manager import (
     WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX,
 )
+from scalyr_agent import __scalyr__
 
 
 class LinuxPlatformController(PosixPlatformController):
@@ -51,7 +52,7 @@ class LinuxPlatformController(PosixPlatformController):
         @return:  True if this platform instance can handle the current server.
         @rtype: bool
         """
-        return _platform.lower().startswith("linux")
+        return __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.LINUX
 
     def get_default_monitors(self, config):  # type: (Configuration) -> List
         """Returns the default monitors to use for this platform.

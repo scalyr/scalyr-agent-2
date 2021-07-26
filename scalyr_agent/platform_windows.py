@@ -278,7 +278,7 @@ class WindowsPlatformController(PlatformController):
         @return: True if this platform instance can handle the current server.
         @rtype: bool
         """
-        return "win32" == sys.platform
+        return __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.WINDOWS
 
     @property
     def default_paths(self):

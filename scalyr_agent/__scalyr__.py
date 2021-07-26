@@ -78,6 +78,7 @@ class PlatformType(enum.Enum):
     """
     WINDOWS = "windows"
     LINUX = "linux"
+    POSIX = "posix"
 
 
 def __determine_platform():
@@ -86,6 +87,8 @@ def __determine_platform():
         return PlatformType.WINDOWS
     elif system_name.startswith("linux"):
         return PlatformType.LINUX
+    else:
+        return PlatformType.POSIX
 
 
 PLATFORM_TYPE = __determine_platform()

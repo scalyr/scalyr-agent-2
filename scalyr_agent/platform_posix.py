@@ -92,9 +92,7 @@ class PosixPlatformController(PlatformController):
         @return:  True if this platform instance can handle the current server.
         @rtype: bool
         """
-        # TODO:  For now, we only support POSIX.  Once we get Windows support in, will need to change this to
-        # not return True when we should be using Windows.
-        return True
+        return __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.POSIX
 
     def add_options(self, options_parser):
         """Invoked by the main method to allow the platform to add in platform-specific options to the
