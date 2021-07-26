@@ -11,6 +11,9 @@ if ($args[0]) {
 
 New-Item -ItemType Directory -Force -Path "$cache_path"
 
+# TODO: We use pre-installed Python version in the github actions, but it provides only python3.7 in its windows runners,
+# so it would be great to install python3.8. The commented code works fine on fresh systems, but we have change it in
+# order to be able to install Python3.8 on Github Actions runner.
 
 # $python_installer_path = "$cache_path\python-3.8.10-amd64.exe"
 #
@@ -31,6 +34,9 @@ if (!(Test-Path $wix_installer_path -PathType Leaf)) {
 $wix_path = "C:\wix311"
 Expand-Archive -LiteralPath "$wix_installer_path" -DestinationPath "$wix_path"
 
+# Uncomment if there is no git on your machine. For now this is commented because there is a preinstalled git in the
+# Github Actions.
+
 # $git_installer_path = "$cache_path/git_install.exe"
 # if (!(Test-Path $git_installer_path -PathType Leaf)) {
 #     echo "Download git installer."
@@ -39,15 +45,12 @@ Expand-Archive -LiteralPath "$wix_installer_path" -DestinationPath "$wix_path"
 # $git_path = "C:\Git"
 # Start-Process "$git_installer_path" -ArgumentList "/VERYSILENT /DIR=$git_path" -wait
 
-#$old_path = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name path).path
-$old_path = (Get-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\Environment' -Name path).path
 
-#$paths = "$python_install_path;$wix_install_path;$git_install_path\bin;$git_install_path\usr\bin"
+$old_path = (Get-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\Environment' -Name path).path
 
 $paths = "$wix_path"
 $new_path = "$old_path;$paths"
 
-#Set-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name path -Value $new_path
 Set-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\Environment' -Name path -Value $new_path
 
 $Env:Path = "$Env:Path;$paths"
@@ -71,4 +74,3 @@ if (!(Test-Path $pip_cache_path -PathType Container)) {
 }
 
 Add-Content "$cache_path\paths.txt" "$wix_path" -Encoding utf8
-#Add-Content "$cache_path\paths.txt" "$python_path" -Encoding utf8
