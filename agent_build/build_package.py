@@ -1072,8 +1072,8 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
 
         # Compile WIX .wxs file.
         subprocess.check_call([
-            "candle", "-nologo", "-out", str(wixobj_file_path), f'-dVERSION="{self._package_version}"',
-            f'-dUPGRADECODE="{upgrade_code}"', f'-dPRODUCTCODE="{product_code}"',
+            "candle", "-nologo", "-out", str(wixobj_file_path), f'-dVERSION={self._package_version}',
+            f'-dUPGRADECODE={upgrade_code}', f'-dPRODUCTCODE={product_code}',
             str(wxs_file_path)
         ])
 
