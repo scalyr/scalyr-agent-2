@@ -50,6 +50,8 @@ __monitor__ = __name__
 DEFAULT_SOURCES = "Application, Security, System"
 DEFAULT_EVENTS = "All"
 
+DEFAULT_MAXIMUM_RECORDS_PER_SOURCE = 10000
+
 define_config_option(
     __monitor__,
     "module",
@@ -91,8 +93,8 @@ define_config_option(
     __monitor__,
     "maximum_records_per_source",
     "Optional (defaults to ``10000``). The maximum number of records to read from the end of each log source"
-    "per gather_sample.\n",
-    default="10000",
+    "per gather_sample. Only applicable when using old WEL API.\n",
+    default=DEFAULT_MAXIMUM_RECORDS_PER_SOURCE,
     convert_to=int,
 )
 
@@ -813,6 +815,19 @@ and System sources:
             self._logger.info("Using new Evt API")
         if isinstance(self.__api, OldApi):
             self._logger.info("Evt API not detected.  Using older EventLog API")
+
+            maximum_records = self._config.get("maximum_records_per_source")
+            if (
+                maximum_records is not None
+                and maximum_records != DEFAULT_MAXIMUM_RECORDS_PER_SOURCE
+            ):
+                # This option is only applicable when using old API so we emit a warning is this
+                # config option is set to a non default value when using a new API
+                self._logger.warn(
+                    '"maximum_records_per_source" config option is set to a '
+                    "non-default value (%s). This config option has no affect when using "
+                    "new evt API." % (maximum_records)
+                )
 
         ScalyrMonitor.run(self)
 

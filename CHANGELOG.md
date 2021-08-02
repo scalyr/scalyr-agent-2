@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.22 "TBD" - Aug 30, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Aug 30, 2021 21:00 -0800
+--->
+
+Other:
+* Update Windows Event Log monitor to emit a warning if "maxmimum_records_per_source" config option is set to a non-default value when using a new event API where that config option has no affect.
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 <!---
