@@ -15,10 +15,9 @@ import os
 import pathlib as pl
 import re
 import shlex
-import subprocess
 import sys
 import time
-from typing import Union, List
+from typing import Union
 
 __SOURCE_ROOT__ = pl.Path(__file__).parent.parent
 
@@ -31,15 +30,13 @@ def cat_files(file_paths, destination, convert_newlines=False):
     @param destination: The path of the file to write the contents to.
     @param convert_newlines: If True, the final file will use Windows newlines (i.e., CR LF).
     """
-    dest_fp = open(destination, "w")
-    for file_path in file_paths:
-        in_fp = open(file_path, "r")
-        for line in in_fp:
-            if convert_newlines:
-                line.replace("\n", "\r\n")
-            dest_fp.write(line)
-        in_fp.close()
-    dest_fp.close()
+    with pl.Path(destination).open("w") as dest_fp:
+        for file_path in file_paths:
+            with pl.Path(file_path).open("r") as in_fp:
+                for line in in_fp:
+                    if convert_newlines:
+                        line.replace("\n", "\r\n")
+                    dest_fp.write(line)
 
 
 def recursively_delete_files_by_name(
@@ -63,13 +60,11 @@ def recursively_delete_files_by_name(
     for root, dirs, files in os.walk(dir_path.absolute()):
         # See if any of the files at this level match any of the matchers.
         for file_path in files:
-            remove_it = False
             for matcher in matchers:
                 if matcher.match(file_path):
-                    remove_it = True
-            # Delete it if it did match.
-            if remove_it:
-                os.unlink(os.path.join(root, file_path))
+                    # Delete it if it did match.
+                    os.unlink(os.path.join(root, file_path))
+                    break
 
 
 class BadChangeLogFormat(Exception):

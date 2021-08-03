@@ -54,15 +54,6 @@ gem cleanup
 python3 -m pip install -r /scalyr-agent-2/agent_build/frozen-binary-builder-requirements.txt
 python3 -m pip install -r /scalyr-agent-2/agent_build/requirements.txt
 
-
-## Install agent's requirements.
-#RUN python3 -m pip install -r /tmp/requirements.txt
-
-## copy only installed things to a new stage to reduc the image size.
-#COPY --from=build /usr/local /usr/local
-#COPY --from=build /etc/ld.so.conf.d/local.conf /etc/ld.so.conf.d/local.conf
-#COPY --from=build /tmp/build/tarball_wheels /tmp/build/tarball_wheels
-
 yum install -y git rpm-build
 
 yum clean all

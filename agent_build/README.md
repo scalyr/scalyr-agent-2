@@ -14,7 +14,7 @@ Here is a list of available package types:
 * `tar` - Standalone tarball.
 * `msi` - Msi installer for Windows.
 
-The `deb`, `rpm` and `tar` packages are build in the docker by default, so there is no need
+The `deb`, `rpm` and `tar` packages are built in a docker by default, so there is no need
 to prepare the system by installing all tools that are required for the build. All that is needed is docker.
 
 For the `msi` package dockerized approach is not working yet, so it is needed to install all required tools 

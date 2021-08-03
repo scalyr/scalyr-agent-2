@@ -54,26 +54,33 @@ class PackageBuilder(abc.ABC):
             advantage from such mechanisms, this action also provides ability to specify the path to the cache and to
             save/reuse intermediate results.
 
-        3. 'dump-checksum' - Dump the checksum of files which are used during the previous
-                action.
-            Explanation: As it has been said, the second action can cache its intermediate results. But to guarantee
-            the integrity of the cache, there has to be a key which corresponds to the current content of the files
-            which are used in the second action. If content of used files is changed, then key is also changed and
-            cache has to be invalidated, very common Ci/CD logic.
-                This action calculates the SHA256 of all files which are used during the second action and dumps it
-            into the file which can be used by CI/CD caching mechanism.
+        3. 'dump-checksum' - Dump the checksum of files which are used during the 'prepare-build-environment' action.
+            This is important for CI/CD.
+
+    Here is an example of the usage of the those actions on some CI/CD platform:
+        1. Run the 'dump-checksum' action to calculate the checksum of all files that are somehow involved in the
+         'prepare-build-environment' action.
+        2. Use this checksum as a key for the CI/CD's cache to acquire a cache storage (some directory).
+        3. Run the 'prepare-build-environment' action and pass the cache directory to it. On the first run, the
+            'prepare-build-environment' action will have to perform everything since there is no cache hit, but it
+            will cache its results for the future. On the next runs, the action will reuse the cached results and it
+            will keep reusing them until some of the files, which are related to the the 'prepare-build-environment'
+            action, are changed. As a result of a change, the 'dump-checksum' action will start returning new checksum
+            and the old cache will be invalidated.
+        4. Build the package with the 'build' action.
 
     Package builder can be also configured to run its own copy in the docker instead of building directly on the system
     where the code runs. It may be very useful, because there is no need to prepare the current system to be able to
-    perform the build. That also provides more consistent build results, no mater what is the host system.
+    perform the build. That also provides more consistent build results, no matter what is the host system.
     """
 
-    # Path to the script which has to be executed to prepare the build environment (aka action 2) and install all tools
-    # and programs which are required by this package builder.
+    # Path to the script which has to be executed to prepare the build environment, and install all tools and programs
+    # which are required by this package builder. See 'prepare-build-environment' action. in the docstring of this
+    # class.
     PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH: Union[str, pl.Path] = None
 
     # The list of files which are somehow used during the preparation of the build environment. This is needed to
-    # calculate their checksum. (see action 3)
+    # calculate their checksum. (see action 'dump-checksum')
     FILES_USED_IN_BUILD_ENVIRONMENT: Union[str, pl.Path] = []
 
     # If this flag True, then the builder will run inside the docker.
@@ -138,7 +145,7 @@ class PackageBuilder(abc.ABC):
 
         # The package has to be build inside the docker.
         else:
-            # Make sure that the base image with build environment is build.
+            # Make sure that the base image with build environment is built.
             self.prepare_build_environment(
                 locally=locally
             )
@@ -219,7 +226,6 @@ class PackageBuilder(abc.ABC):
         """
         Prepare the build environment. For more info see 'prepare-build-environment' action in class docstring.
         """
-
         if locally or not cls.DOCKERIZED:
             # Prepare the build environment on the current system.
 
@@ -402,6 +408,10 @@ class PackageBuilder(abc.ABC):
         # Copy config
         shutil.copytree(config_source_path, output_path)
 
+        # Make sure config file has 640 permissions
+        config_file_path = output_path / "agent.json"
+        config_file_path.chmod(int("640", 8))
+
         # Make sure there is an agent.d directory regardless of the config directory we used.
         agent_d_path = output_path / "agent.d"
         agent_d_path.mkdir(exist_ok=True)
@@ -462,7 +472,7 @@ class PackageBuilder(abc.ABC):
 
         used_files = []
 
-        # The build environment praperetion script is also has to be included.
+        # The build environment praparation script is also has to be included.
         used_files.append(cls.PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH)
 
         # Since the 'FILES_USED_IN_BUILD_ENVIRONMENT' class attribute can also contain directories, look for them and
@@ -1111,9 +1121,8 @@ def main():
 
     parser.add_argument(
         "--locally", action="store_true",
-        help="Some of the packages by default are build inside the docker to provide consistent build environment. "
-             "Inside the docker, this script is executed once more, but with the '--locally' option, "
-             "so it's aware that it should build the package directly in the docker."
+        help="Perform the build on the current system which runs the script. Without that, some packages may be built "
+             "by default inside the docker."
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)

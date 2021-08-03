@@ -19,10 +19,8 @@ import pathlib
 
 from PyInstaller.building.build_main import Analysis  # pylint: disable=import-error
 from PyInstaller.building.api import (  # pylint: disable=import-error
-    MERGE,
     PYZ,
     EXE,
-    COLLECT,
 )
 
 
