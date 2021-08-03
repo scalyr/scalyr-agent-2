@@ -122,6 +122,7 @@ def main():
             token = SCALYR_TOKEN_PROD_US
 
         # 1. Test unauthenticated scenario (aka invalid / missing API key)
+        print("Using url: %s" % (url))
         print("Unauthenticated checks (expecting status code 401)")
         print("")
         verify_api_response_headers_and_status_code(
