@@ -97,7 +97,8 @@ def verify_api_response_headers_and_status_code(
             "Expected %s status code, got %s" % (expected_status_code, resp.status_code)
         )
 
-    actual_header_names = list(resp.headers.keys())
+    expected_headers = [key.lower() for key in expected_headers]
+    actual_header_names = [key.lower() for key in list(resp.headers.keys())]
 
     if set(actual_header_names) != set(expected_headers):
         raise ValueError(
