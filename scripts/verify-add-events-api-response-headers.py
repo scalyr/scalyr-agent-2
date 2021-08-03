@@ -37,7 +37,7 @@ EXPECTED_HEADER_NAMES_401 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Connection",
+    #"Connection",
 ]
 
 EXPECTED_HEADER_NAMES_200 = [
