@@ -54,7 +54,7 @@ def _copy_agent_source(src_path, dest_path):
 @six.add_metaclass(ABCMeta)
 class AgentImageBuilder(object):
     """
-     Abstraction to build docker images.
+    Abstraction to build docker images.
     """
 
     IMAGE_TAG = None  # type: six.text_type

@@ -1,6 +1,41 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.21 "Ultramarine" - Jun 1, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 1, 2021 21:00 -0800
+--->
+
+Improvements:
+* Allow journald monitor to be configured via globs on multiple fields via ``journald_logs.journald_globs`` config option. Contributed by @imron. #741
+
+Bug fixes:
+* Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+* Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
+
+Other:
+* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations. 
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
+
+## 2.1.20 "Tabeisshi" - April 19, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 19, 2021 21:00 -0800
+--->
+
+Improvements:
+* Add support for collecting some metrics Kubernetes when running in a CRI runtime.
+* Add support for SSL in the `mysql_monitor`. This can be enabled by setting `use_ssl` to True in the monitor configuration.
+
+Bug fixes:
+* Ensure pod digest which we calculate and use to determine if pod info in the Kubernetes monitor has  changed is deterministic and doesn't depend on dictionary item ordering.
+* Fix a race condition in the worker session checkpoint read/write logic, which was introduced with the ``multi-worker`` feature.
+
+
+Other:
+* Changed the logging level of "not found" errors while querying pods from the Kubernetes API from ERROR to DEBUG, as these errors are always transient and result in no data loss.
+
 ## 2.1.19 "StarTram" - March 9, 2021
 
 <!---

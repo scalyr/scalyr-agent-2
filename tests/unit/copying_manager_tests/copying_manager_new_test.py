@@ -93,7 +93,10 @@ class CopyingManagerTest(CopyingManagerCommonTest):
         super(CopyingManagerTest, self).teardown()
 
     def _init_test_environment(
-        self, use_pipelining=False, config_data=None, disable_flow_control=False,
+        self,
+        use_pipelining=False,
+        config_data=None,
+        disable_flow_control=False,
     ):
         pipeline_threshold = 1.1
         if use_pipelining:
@@ -394,7 +397,9 @@ class TestBasic(CopyingManagerTest):
         TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
     )
     @mock.patch.object(
-        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle(
         self, log_deletion_delay, max_new_log_detection_time
@@ -444,7 +449,9 @@ class TestBasic(CopyingManagerTest):
         TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
     )
     @mock.patch.object(
-        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle_with_glob(
         self, log_deletion_delay, max_new_log_detection_time
@@ -503,7 +510,9 @@ class TestBasic(CopyingManagerTest):
         TestingConfiguration, "log_deletion_delay", new_callable=PropertyMock
     )
     @mock.patch.object(
-        TestingConfiguration, "max_new_log_detection_time", new_callable=PropertyMock,
+        TestingConfiguration,
+        "max_new_log_detection_time",
+        new_callable=PropertyMock,
     )
     def test_log_processors_lifecycle_with_dynamic_matchers(
         self, log_deletion_delay, max_new_log_detection_time

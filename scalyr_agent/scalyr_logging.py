@@ -861,13 +861,10 @@ class BaseFormatter(logging.Formatter):
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
         if getattr(record, "rate_limited_dropped_records", 0) > 0:
-            result = (
-                ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
-                % (
-                    record.rate_limited_dropped_records,
-                    "monitor_log_write_rate",
-                    logging.Formatter.format(self, record),
-                )
+            result = ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s" % (
+                record.rate_limited_dropped_records,
+                "monitor_log_write_rate",
+                logging.Formatter.format(self, record),
             )
         else:
             result = logging.Formatter.format(self, record)
@@ -1007,7 +1004,7 @@ class RateLimiterLogFilter(object):
         @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
             bucket fill rate in the "leaky bucket" algorithm.
 
-        @return: """
+        @return:"""
         self.__rate_limiter = RateLimiter(
             bucket_size=max_write_burst, bucket_fill_rate=log_write_rate
         )
@@ -1047,8 +1044,7 @@ class StdoutFilter(object):
     """
 
     def __init__(self, no_fork, stdout_severity):
-        """Initializes the filter.
-        """
+        """Initializes the filter."""
         self.__no_fork = no_fork
 
         self.__stdout_severity = logging.getLevelName(stdout_severity.upper())
@@ -1082,12 +1078,10 @@ class StdoutFilter(object):
 
 
 class StderrFilter(object):
-    """A filter that includes any record if it has `force_stderr` as True
-    """
+    """A filter that includes any record if it has `force_stderr` as True"""
 
     def __init__(self):
-        """Initializes the filter.
-        """
+        """Initializes the filter."""
 
     def filter(self, record):
         """Performs the filtering.
@@ -1831,14 +1825,10 @@ class UnsupportedValueType(Exception):
                 % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
-            message = (
-                'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
-                "Only int, long, float, and str are supported."
-                % (
-                    six.text_type(type(metric_value)),
-                    six.text_type(metric_value),
-                    metric_name,
-                )
+            message = 'Unsupported metric value type of "%s" with value "%s" for metric="%s". ' "Only int, long, float, and str are supported." % (
+                six.text_type(type(metric_value)),
+                six.text_type(metric_value),
+                metric_name,
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (

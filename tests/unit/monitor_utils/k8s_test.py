@@ -51,8 +51,7 @@ from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):
-    """ Tests the _K8sCache
-    """
+    """Tests the _K8sCache"""
 
     NAMESPACE_1 = "namespace_1"
     POD_1 = "pod_1"
@@ -274,7 +273,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual(
             "/${container_runtime}/${container_name}.log", config["rename_logfile"]
@@ -304,7 +307,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual("match_pod", config["test"])
 
@@ -332,7 +339,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual("match_namespace", config["test"])
 
@@ -360,7 +371,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual("match_container", config["test"])
 
@@ -392,7 +407,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual("multi match", config["test"])
 
@@ -416,7 +435,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertFalse("test" in config)
 
@@ -444,7 +467,11 @@ class TestK8sConfigBuilder(TestConfigurationBase):
             config.k8s_log_configs, self.logger, rename_no_original=True
         )
 
-        config = builder.get_log_config(self.info, self.k8s_info, self.parser,)
+        config = builder.get_log_config(
+            self.info,
+            self.k8s_info,
+            self.parser,
+        )
 
         self.assertEqual(self.parser, config["parser"])
         self.assertEqual(self.info["log_path"], config["path"])
@@ -711,8 +738,7 @@ class TestKubernetesApiRateLimited(ScalyrTestCase):
 
 
 class TestDockerMetricFetcher(ScalyrTestCase):
-    """Tests the DockerMetricFetch abstraction.
-    """
+    """Tests the DockerMetricFetch abstraction."""
 
     def setUp(self):
         super(TestDockerMetricFetcher, self).setUp()
@@ -720,8 +746,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         self._fetcher = DockerMetricFetcher(self._faker, 5)
 
     def test_basic_prefetch(self):
-        """Tests the typical prefetch and then get_metrics path.. just for one container.
-        """
+        """Tests the typical prefetch and then get_metrics path.. just for one container."""
         self._fetcher.prefetch_metrics("foo")
         self.assertTrue(self._faker.wait_for_requests(1))
         self.assertEquals(0, self._fetcher.idle_workers())
@@ -731,8 +756,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         self.assertEqual(10, value)
 
     def test_multiple_prefetch(self):
-        """Tests the typical prefetch and then get_metrics path for multiple concurrent requests.
-        """
+        """Tests the typical prefetch and then get_metrics path for multiple concurrent requests."""
         self._fetcher.prefetch_metrics("foo")
         self._fetcher.prefetch_metrics("bar")
         self.assertTrue(self._faker.wait_for_requests(2))
@@ -784,8 +808,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         self.assertEquals(5, self._fetcher.idle_workers())
 
     def test_stopped(self):
-        """Tests that stopping the abstraction terminates any calls blocked on `get_metrics`.
-        """
+        """Tests that stopping the abstraction terminates any calls blocked on `get_metrics`."""
         self._fetcher.prefetch_metrics("foo")
         self.assertTrue(self._faker.wait_for_requests(1))
 
@@ -805,8 +828,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
 
 
 class TestK8sNamespaceFilter(ScalyrTestCase):
-    """Tests the DockerMetricFetch abstraction.
-    """
+    """Tests the DockerMetricFetch abstraction."""
 
     def test_basic_blacklist(self):
         test_filter = K8sNamespaceFilter(global_include=["*"], global_ignore=["kube"])
@@ -1171,8 +1193,7 @@ class FakeK8s(object):
             self.__lock.release()
 
     def stop(self):
-        """Wakes up anything waiting on a pending requests.  Called when the test is finished.
-        """
+        """Wakes up anything waiting on a pending requests.  Called when the test is finished."""
         self.__condition_var.acquire()
         try:
             if self.__pending_request is not None:
@@ -1313,8 +1334,7 @@ class FakeCache(object):
         )
 
     def stop(self):
-        """Stops the cache.  Called when the test is finished.
-        """
+        """Stops the cache.  Called when the test is finished."""
         self.k8s.stop()
 
     def set_response(self, namespace, name, **kwargs):

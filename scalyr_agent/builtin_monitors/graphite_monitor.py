@@ -138,6 +138,7 @@ define_log_field(__monitor__, "orig_time", "The Graphite timestamp.")
 
 
 class GraphiteMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Graphite Monitor
 
@@ -178,10 +179,10 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
     """
+    # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
         self.__only_accept_local = self._config.get("only_accept_local")
         self.__accept_plaintext = self._config.get("accept_plaintext")
         self.__accept_pickle = self._config.get("accept_pickle")

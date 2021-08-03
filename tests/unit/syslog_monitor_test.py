@@ -271,8 +271,8 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
 
 class TestSyslogMonitor(SyslogMonitor):
     """subclass of SyslogMonitor with overridden 'increment_counter'.
-        Provides ability to suspend test thread until written lines are handled by 'increment_counter' method.
-        """
+    Provides ability to suspend test thread until written lines are handled by 'increment_counter' method.
+    """
 
     __test__ = False
 

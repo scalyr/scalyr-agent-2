@@ -257,6 +257,7 @@ class Checkpoint(object):
 
 
 class JournaldMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Journald Monitor
 
@@ -320,6 +321,7 @@ of that object.  The ``poll`` method is called with a 0 second timeout so it nev
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
     """
+    # fmt: on
 
     def _initialize(self):
         verify_systemd_library_is_available()
@@ -361,8 +363,10 @@ seconds and then polls again.
         self._extra_fields = self._config.get("journal_fields")
         if self._extra_fields is not None:
             for field_name in self._extra_fields:
-                fixed_field_name = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
-                    field_name, is_metric=False
+                fixed_field_name = (
+                    scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
+                        field_name, is_metric=False
+                    )
                 )
                 if field_name != fixed_field_name:
                     self._extra_fields[fixed_field_name] = self._extra_fields[
@@ -404,7 +408,7 @@ seconds and then polls again.
             self._max_log_size,
             self._max_log_rotations,
         )
-        self.log_config = self.log_manager.get_config(".*")
+        self.log_config = self.log_manager.get_config({"unit": ".*"})
 
     def run(self):
         self.log_manager.set_log_watcher(self._log_watcher)
@@ -542,11 +546,10 @@ seconds and then polls again.
         for entry in self._journal:
             try:
                 msg = entry.get("MESSAGE", "")
-                extra = self._get_extra_fields(entry)
-                unit = extra.get("unit", "")
-                logger = self.log_manager.get_logger(unit)
-                config = self.log_manager.get_config(unit)
-                logger.info(self.format_msg(msg, config, extra))
+                fields = self._get_extra_fields(entry)
+                logger = self.log_manager.get_logger(fields)
+                config = self.log_manager.get_config(fields)
+                logger.info(self.format_msg(msg, config, fields))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
@@ -556,7 +559,10 @@ seconds and then polls again.
                 )
 
     def format_msg(
-        self, message, log_config, extra_fields=None,
+        self,
+        message,
+        log_config,
+        extra_fields=None,
     ):
         string_buffer = six.StringIO()
 

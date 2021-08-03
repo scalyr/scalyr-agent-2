@@ -213,8 +213,8 @@ class CPUProfiler(BaseProfiler):
 
     def _get_clock_type(self, clock_type, allowed, default_value):
         """
-            gets the clock type.  If clock type is `random` then
-            randomly choose from the first 2 elements of the `allowed` array.
+        gets the clock type.  If clock type is `random` then
+        randomly choose from the first 2 elements of the `allowed` array.
         """
         result = default_value
         if clock_type in allowed:

@@ -49,7 +49,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: scalyr/scalyr-k8s-agent:2.1.21
+        image: scalyr/scalyr-k8s-agent:2.1.19
         imagePullPolicy: Always
         name: scalyr-agent
         resources:
@@ -58,6 +58,8 @@ spec:
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
+        - mountPath: /etc/scalyr-agent-2/agent-extra.d
+          name: extraconfig
         - mountPath: /var/lib/docker/containers
           name: varlibdockercontainers
           readOnly: true
@@ -71,6 +73,14 @@ spec:
           name: dockersock
         - mountPath: /var/lib/scalyr-agent-2
           name: checkpoints
+        livenessProbe:
+          exec:
+            command:
+            - scalyr-agent-2
+            - status
+            - -H
+          initialDelaySeconds: 60
+          periodSeconds: 60
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -79,6 +89,9 @@ spec:
       serviceAccountName: scalyr-service-account
       terminationGracePeriodSeconds: 30
       volumes:
+      - name: extraconfig
+        configMap:
+          name: scalyr-extra-config
       - hostPath:
           path: /var/lib/docker/containers
           type: ""
@@ -101,4 +114,6 @@ spec:
         name: checkpoints
       # comment this section if you do not want to run on the master
       tolerations:
-      - operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists

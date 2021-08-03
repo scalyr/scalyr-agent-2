@@ -65,8 +65,8 @@ def _path_or_text(fn):
 
 class AgentRunner(object):
     """
-       Agent runner provides ability to launch Scalyr agent with needed configuration settings.
-       """
+    Agent runner provides ability to launch Scalyr agent with needed configuration settings.
+    """
 
     def __init__(
         self,

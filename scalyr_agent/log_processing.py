@@ -326,8 +326,8 @@ class LogFileIterator(object):
 
                 if "position" in checkpoint:
                     self.__position = checkpoint["position"]
-                    self.__extended_line_position = LogFileIterator.ExtendedLinePosition.from_checkpoint(
-                        checkpoint
+                    self.__extended_line_position = (
+                        LogFileIterator.ExtendedLinePosition.from_checkpoint(checkpoint)
                     )
                     for state in checkpoint["pending_files"]:
                         if not state["is_log_file"] or self.__file_system.trust_inodes:
@@ -642,8 +642,8 @@ class LogFileIterator(object):
         # Do we need more bytes to have at least max_line_bytes in available in the buffer.
         need_more_bytes_for_max_line = available_buffer_bytes < self.__max_line_length
         # If we are on an extended line, do we need more bytes in buffer to read the next fragment
-        need_more_bytes_for_fragment_position = not self.__have_buffer_for_fragment_position(
-            available_buffer_bytes
+        need_more_bytes_for_fragment_position = (
+            not self.__have_buffer_for_fragment_position(available_buffer_bytes)
         )
 
         if more_file_bytes_available and (
@@ -1216,18 +1216,50 @@ class LogFileIterator(object):
         @return Most recent file that matches copy truncate filename heuristic
         """
         dir_path = os.path.dirname(self.__path)
-        file_prefix = os.path.basename(self.__path)
-        file_prefix = file_prefix[:-4] if file_prefix.endswith(".log") else file_prefix
+        file_name = os.path.basename(self.__path)
+        file_prefix, file_ext = os.path.splitext(file_name)
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
+
         possible_copy_filepaths = list(
             six.moves.filter(
-                lambda f: os.path.basename(f).startswith(file_prefix)
-                and not f.endswith(".gz")
+                lambda f: not f.endswith(".gz")
                 and f != self.__path
-                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
+                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
+                # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
+                # we just looking for the files which have been rotated by the default logrotate settings.
+                # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
+                and (
+                    # if rotated file name ends with a new extension with number (e.g. foo.log.1).
+                    re.match(
+                        r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                    or
+                    # the same but the number or date is located before the extension ("extension" option in logrotate)
+                    # (e.g. foo.1.log)
+                    re.match(
+                        r"{0}\.\d+{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # (e.g.foo-20210527.log)
+                    re.match(
+                        r"{0}-\d{{8}}{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # if rotated file name ends with the date without additional extension (e.g. foo.log-20210527),
+                    # then the only thing that we can check is that the extension starts with original file's extension.
+                    re.match(
+                        r"{0}-\d{{8}}".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                ),
                 self.__file_system.list_files(dir_path),
             )
         )
@@ -1278,9 +1310,12 @@ class LogFileIterator(object):
             tmp = self.__buffer.read()
             new_buffer.write(tmp)
             if expected_bytes != new_buffer.tell():
-                assert expected_bytes == new_buffer.tell(), (
-                    'Failed to get the right number of left over bytes %d %d "%s"'
-                    % (expected_bytes, new_buffer.tell(), tmp,)
+                assert (
+                    expected_bytes == new_buffer.tell()
+                ), 'Failed to get the right number of left over bytes %d %d "%s"' % (
+                    expected_bytes,
+                    new_buffer.tell(),
+                    tmp,
                 )
 
         self.__buffer = new_buffer
@@ -2212,6 +2247,9 @@ class LogFileProcessor(object):
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
 
+        # this stores the checkpoint state when the log processor is closed.
+        self._saved_checkpoint = None
+
     def set_new_scalyr_client(self, new_scalyr_client):
         self._new_scalyr_client = new_scalyr_client
 
@@ -2593,8 +2631,10 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions(
-                            original_position, final_position
+                        bytes_between_positions = (
+                            self.__log_file_iterator.bytes_between_positions(
+                                original_position, final_position
+                            )
                         )
                         self.__total_bytes_skipped += (
                             bytes_between_positions - bytes_read
@@ -2637,8 +2677,7 @@ class LogFileProcessor(object):
                             close = True
 
                         if close:
-                            self.__log_file_iterator.close()
-                            self.__is_closed = True
+                            self._close()
 
                         return self.__is_closed, bytes_copied
 
@@ -2736,7 +2775,11 @@ class LogFileProcessor(object):
         self.__lock.release()
 
         log.warning(
-            msg, skipped_bytes, self.__path, message, error_code=error_code,
+            msg,
+            skipped_bytes,
+            self.__path,
+            message,
+            error_code=error_code,
         )
 
     def add_sampler(self, match_expression, sampling_rate):
@@ -2811,20 +2854,38 @@ class LogFileProcessor(object):
         self.__lock.release()
         return result
 
-    def close(self):
-        """Closes the processor, closing all underlying file handles.
-
+    def _close(self):
+        """
+        Closes the processor, closing all underlying file handles.
         This does nothing if the processor is already closed.
+        """
+        if not self.__is_closed:
+            # save a checkpoint before we close a file iterator
+            # to be able to get the checkpoint of the closed processor.
+            self._saved_checkpoint = self.get_checkpoint()
+
+            self.__log_file_iterator.close()
+            self.__is_closed = True
+
+    def close(self):
+        """
+        Does the same as '_close' method but guards that with lock to use it from other threads.
         """
         try:
             self.__lock.acquire()
-            if not self.__is_closed:
-                self.__log_file_iterator.close()
-                self.__is_closed = True
+            self._close()
         finally:
             self.__lock.release()
 
     def get_checkpoint(self):
+        """
+        Return current state of the log file processor or the state when it has been closed.
+        """
+        if self.__is_closed:
+            # return the saved checkpoint state of the log processor in case if it has been closed.
+            # We can't get the checkpoint from the log file iterator because all of its files have already been closed.
+            return self._saved_checkpoint.copy()
+
         return self.__log_file_iterator.get_mark_checkpoint()
 
     @staticmethod

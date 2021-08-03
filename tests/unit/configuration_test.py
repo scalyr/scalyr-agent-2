@@ -320,7 +320,8 @@ class TestConfiguration(TestConfigurationBase):
             "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
         )
         self.assertEquals(
-            config.k8s_verify_kubelet_queries, True,
+            config.k8s_verify_kubelet_queries,
+            True,
         )
 
         self.assertEquals(len(config.log_configs), 3)
@@ -2410,6 +2411,50 @@ class TestConfiguration(TestConfigurationBase):
             JsonObject(api_key="key4", id="fourth_key", sessions=3),
         ]
 
+    def test__verify_required_attributes(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Field is not a JSON object
+        config_object = JsonObject({"field1": "a"})
+        field = "field1"
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            "is not a json object",
+            config._Configuration__verify_required_attributes,
+            config_object=config_object,
+            field=field,
+            config_description="",
+        )
+        # 2. Field is not a JSON object
+        config_object = JsonObject({"field1": "a"})
+        field = "field2"
+
+        config._Configuration__verify_required_attributes(
+            config_object=config_object, field=field, config_description=""
+        )
+
+        # 3. Field is an object
+        config_object = JsonObject({"field1": JsonObject({})})
+        field = "field1"
+
+        config._Configuration__verify_required_attributes(
+            config_object=config_object, field=field, config_description=""
+        )
+
+        # 4. Field is an object, one field value can't be cast to string
+        config_object = JsonObject({"field1": JsonObject({"foo": JsonArray([])})})
+        field = "field1"
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            "is not a string",
+            config._Configuration__verify_required_attributes,
+            config_object=config_object,
+            field=field,
+            config_description="",
+        )
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):
@@ -2426,7 +2471,7 @@ class TestParseArrayOfStrings(TestConfigurationBase):
 
 class TestConvertConfigParam(TestConfigurationBase):
     def test_none_to_anything(self):
-        """"""
+        """ """
         self.assertRaises(
             BadConfiguration,
             lambda: convert_config_param("dummy_field", None, six.text_type),
@@ -2532,7 +2577,8 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
         del os.environ["SCALYR_SERVER_ATTRIBUTES"]
         self.assertEqual(
-            None, get_config_from_env("server_attributes", convert_to=JsonObject),
+            None,
+            get_config_from_env("server_attributes", convert_to=JsonObject),
         )
         os.environ["SCALYR_SERVER_ATTRIBUTES"] = '{"serverHost": "foo1.example.com"}'
         self.assertEqual(
@@ -2683,6 +2729,75 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         matched_config = lcm.get_config("test_somethingarbitrary:test")
         self.assertEqual("TestParser", matched_config["parser"])
 
+    def test_glob_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "unit": "test*test" }, parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config({"unit": "testtest"})
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config({"unit": "other_test"})
+        self.assertEqual("journald", matched_config["parser"])
+        matched_config = lcm.get_config({"unit": "test_somethingarbitrary:test"})
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_multiple_glob_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "unit": "test*test", "container": "f?obar" }, parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        # test matches both
+        matched_config = lcm.get_config({"unit": "testtest", "container": "frobar"})
+        self.assertEqual("TestParser", matched_config["parser"])
+
+        # test when matches one glob but not the other
+        matched_config = lcm.get_config({"unit": "testtest", "container": "foobaz"})
+        self.assertNotEqual("TestParser", matched_config["parser"])
+        self.assertEqual("journald", matched_config["parser"])
+
+        # test when matches one glob, but other one missing
+        matched_config = lcm.get_config({"unit": "test_other_test"})
+        self.assertNotEqual("TestParser", matched_config["parser"])
+        self.assertEqual("journald", matched_config["parser"])
+
+        # no matches, should use default parser
+        matched_config = lcm.get_config({"unit": "bar", "container": "bar"})
+        self.assertEqual("journald", matched_config["parser"])
+
+    def test_unit_regex_and_globs_both_defined(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_globs: { "baz": "test*test", "container": "f?obar" }, parser: "TestParser", journald_unit: "scalyr" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        # self.assertRaises( BadMonitorConfiguration,
+        self.assertRaises(BadConfiguration, lambda: LogConfigManager(config, None))
+
     def test_big_config(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2740,7 +2855,10 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger = lcm.get_logger("test")
         logger.info("Find this string")
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
@@ -2760,7 +2878,10 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger = lcm.get_logger("test")
         logger.info("Find this string")
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
@@ -2783,12 +2904,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + six.text_type(hash("TEST")) + ".log",
+            self._log_dir,
+            "journald_" + six.text_type(hash("TEST")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
@@ -2811,12 +2936,16 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + six.text_type(hash("test.*test")) + ".log",
+            self._log_dir,
+            "journald_" + six.text_type(hash("test.*test")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
 
-        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        expected_path = os.path.join(
+            self._log_dir,
+            "journald_monitor.log",
+        )
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
 
@@ -2888,8 +3017,6 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
             min_value=10,
             max_value=100,
         )
-
-        pass
 
     def test___verify_or_set_optional_string_with_valid_values(self):
         config = self._create_test_configuration_instance()
@@ -3119,7 +3246,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 1
         assert config.worker_configs[0] == JsonObject(
-            api_key=config.api_key, id="default", sessions=4,
+            api_key=config.api_key,
+            id="default",
+            sessions=4,
         )
 
         (
@@ -3149,7 +3278,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 1
         assert config.worker_configs[0] == JsonObject(
-            api_key=config.api_key, id="default", sessions=4,
+            api_key=config.api_key,
+            id="default",
+            sessions=4,
         )
 
         (
@@ -3186,7 +3317,11 @@ class TestWorkersConfiguration(TestConfigurationBase):
             id="default",
             sessions=config.default_sessions_per_worker,
         )
-        assert workers[1] == JsonObject(api_key="key", id="second", sessions=1,)
+        assert workers[1] == JsonObject(
+            api_key="key",
+            id="second",
+            sessions=1,
+        )
 
     def test_second_default_api_key(self):
         self._write_file_with_separator_conversion(
@@ -3315,7 +3450,9 @@ class TestWorkersConfiguration(TestConfigurationBase):
             sessions=1, api_key=config.api_key, id="default"
         )
         assert config.worker_configs[1] == JsonObject(
-            sessions=4, api_key="key2", id="second",
+            sessions=4,
+            api_key="key2",
+            id="second",
         )
 
         (
