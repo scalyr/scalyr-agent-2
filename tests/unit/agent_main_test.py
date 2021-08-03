@@ -225,7 +225,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                 self.assertLogFileContainsLineRegex(
                     ".*"
                     + re.escape(
-                        "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes. This may be due to max_send_rate_enforcement. Log upload has been delayed 0.0 seconds in the last 1.0 minutes  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+                        "Warning, skipping copying log lines.  Only copied 0.00001 MB/s log bytes when 0.00002 MB/s were generated over the last 1.0 minutes. This may be due to max_send_rate_enforcement. Log upload has been delayed 0.0 seconds in the last 1.0 minutes  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
                     )
                 )
 
@@ -277,7 +277,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                 self.assertLogFileContainsLineRegex(
                     ".*"
                     + re.escape(
-                        "Warning, skipping copying log lines.  Only copied 0.0 MB/s log bytes when 0.0 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
+                        "Warning, skipping copying log lines.  Only copied 0.00001 MB/s log bytes when 0.00003 MB/s were generated over the last 1.0 minutes.  This may be desired (due to excessive bytes from a problematic log file).  Please contact support@scalyr.com for additional help."
                     )
                 )
 
