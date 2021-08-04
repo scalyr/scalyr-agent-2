@@ -138,7 +138,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             __scalyr__.InstallType.PACKAGE_INSTALL,
         ), mock.patch(
             # Monkeypatch the platform to Windows to fool the test.
-            "scalyr_agent.__scalyr__.PLATFORM_TYPE", __scalyr__.PlatformType.WINDOWS
+            "scalyr_agent.__scalyr__.PLATFORM_TYPE",
+            __scalyr__.PlatformType.WINDOWS,
         ):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"

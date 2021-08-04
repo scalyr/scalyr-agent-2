@@ -388,7 +388,10 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             my_default_paths = platform_controller.default_paths
 
             # Ensure that this is a tarball install
-            if platform_controller.install_type != __scalyr__.InstallType.TARBALL_INSTALL:
+            if (
+                platform_controller.install_type
+                != __scalyr__.InstallType.TARBALL_INSTALL
+            ):
                 raise UpgradeFailure(
                     "The current agent was not installed using a tarball, so you may not use the "
                     "upgrade tarball command."
@@ -677,7 +680,7 @@ def upgrade_windows_install(
         print(
             "Attempting to upgrade agent from version %s to version %s."
             % (
-                __scalyr__.SCALYR_VERSION, 
+                __scalyr__.SCALYR_VERSION,
                 data_payload["current_version"],
             )
         )
@@ -1164,7 +1167,8 @@ def create_custom_dockerfile(
     )
     fp = open(dockerfile_path)
     dockerfile_contents = fp.read().replace(
-        "/scalyr%s-agent:latest" % label, "/scalyr%s-agent:%s" % (label, __scalyr__.SCALYR_VERSION)
+        "/scalyr%s-agent:latest" % label,
+        "/scalyr%s-agent:%s" % (label, __scalyr__.SCALYR_VERSION),
     )
     fp.close()
 

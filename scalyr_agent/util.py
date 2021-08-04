@@ -394,7 +394,9 @@ try:
 except ImportError as e:
     # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
     print(
-        "The json library '{}' is found but can not be imported. Error: ".format(_json_lib_to_use),
+        "The json library '{}' is found but can not be imported. Error: ".format(
+            _json_lib_to_use
+        ),
         file=sys.stderr,
     )
     exit(1)
@@ -2203,19 +2205,15 @@ def get_agent_start_up_message():
         used_locale,
     ) = get_language_code_coding_and_locale()
 
-    msg = (
-        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
-        % (
-            __scalyr__.SCALYR_VERSION,
-            build_revision,
-            get_pid_tid(),
-            python_version_str,
-            openssl_version,
-            sys.getfilesystemencoding(),
-            used_locale,
-            lang_env_var,
-        )
+    msg = "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) " "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)" % (
+        __scalyr__.SCALYR_VERSION,
+        build_revision,
+        get_pid_tid(),
+        python_version_str,
+        openssl_version,
+        sys.getfilesystemencoding(),
+        used_locale,
+        lang_env_var,
     )
 
     return msg

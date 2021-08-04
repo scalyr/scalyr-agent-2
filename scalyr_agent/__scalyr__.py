@@ -76,6 +76,7 @@ class PlatformType(enum.Enum):
     """
     The Enum class with possible types of the OS. Firstly, used for the 'P'
     """
+
     WINDOWS = "windows"
     LINUX = "linux"
     POSIX = "posix"
@@ -99,6 +100,7 @@ class InstallType(enum.Enum):
     """
     The enumeration of the Scalyr agent installation types. It is used for INSTALL_TYPE, a variable declared down below.
     """
+
     # Those package types contain Scalyr Agent as frozen binary.
     PACKAGE_INSTALL = "package"  # Indicates it was installed via a package manager such as RPM or Windows executable.
     TARBALL_INSTALL = "packageless"  # Indicates it was installed via a tarball.
@@ -112,7 +114,9 @@ def __read_install_type_from_type_file(path: pl.Path) -> InstallType:
     install_type = path.read_text().strip()
     # Check if the package type is one of the valid install types.
     if install_type not in [e.value for e in InstallType]:
-        raise ValueError(f"Can not determine the installation type. Unknown value: {install_type}")
+        raise ValueError(
+            f"Can not determine the installation type. Unknown value: {install_type}"
+        )
 
     return InstallType(install_type)
 
@@ -143,7 +147,9 @@ def __determine_install_root_and_type() -> Tuple[str, InstallType]:
                 f"Can not determine the package installation type. The file '{install_type_file_path}' is not found."
             )
 
-        return str(install_root), __read_install_type_from_type_file(install_type_file_path)
+        return str(install_root), __read_install_type_from_type_file(
+            install_type_file_path
+        )
 
     else:
         # The agent code is not frozen.

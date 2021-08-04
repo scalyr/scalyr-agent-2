@@ -38,6 +38,7 @@ from agent_build import common
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
+
 class PackageBuilder(abc.ABC):
     """
     The base abstraction for all Scalyr Agent package builders.
@@ -96,9 +97,9 @@ class PackageBuilder(abc.ABC):
     INSTALL_TYPE = None
 
     def __init__(
-            self,
-            variant: str = None,
-            no_versioned_file_name: bool = False,
+        self,
+        variant: str = None,
+        no_versioned_file_name: bool = False,
     ):
         """
         :param variant: Adds the specified string into the package's iteration name. This may be None if no additional
@@ -116,11 +117,7 @@ class PackageBuilder(abc.ABC):
         self._variant = variant
         self._no_versioned_file_name = no_versioned_file_name
 
-    def build(
-            self,
-            output_path: Union[str, pl.Path],
-            locally: bool = False
-    ):
+    def build(self, output_path: Union[str, pl.Path], locally: bool = False):
         """
         The function where the actual build of the package happens.
         :param output_path: Path to the directory where the resulting output has to be stored.
@@ -139,18 +136,14 @@ class PackageBuilder(abc.ABC):
         # If locally option is specified or builder class is not dockerized by default then just build the package
         # directly on this system.
         if locally or not type(self).DOCKERIZED:
-            self._build(
-                output_path=output_path
-            )
+            self._build(output_path=output_path)
 
         # The package has to be build inside the docker.
         else:
             # Make sure that the base image with build environment is built.
-            self.prepare_build_environment(
-                locally=locally
-            )
+            self.prepare_build_environment(locally=locally)
 
-            dockerfile_path = __PARENT_DIR__ / 'Dockerfile'
+            dockerfile_path = __PARENT_DIR__ / "Dockerfile"
 
             # Make changes to the existing command line arguments to pass them to the docker builder.
             command_argv = sys.argv[:]
@@ -160,7 +153,7 @@ class PackageBuilder(abc.ABC):
 
             container_builder_module_path = pl.Path(
                 "/scalyr-agent-2",
-                pl.Path(build_package_script_path).relative_to(__SOURCE_ROOT__)
+                pl.Path(build_package_script_path).relative_to(__SOURCE_ROOT__),
             )
 
             # Replace the 'host-specific' path of this script with 'docker-specific' path
@@ -186,11 +179,17 @@ class PackageBuilder(abc.ABC):
 
             subprocess.check_call(
                 [
-                    "docker", "build", "-t", image_name,
-                    "--build-arg", f"BASE_IMAGE_NAME={self._get_build_environment_docker_image_name()}",
-                    "--build-arg", f'BUILD_COMMAND=python3 {command}',
-                    "-f", str(dockerfile_path),
-                    str(__SOURCE_ROOT__)
+                    "docker",
+                    "build",
+                    "-t",
+                    image_name,
+                    "--build-arg",
+                    f"BASE_IMAGE_NAME={self._get_build_environment_docker_image_name()}",
+                    "--build-arg",
+                    f"BUILD_COMMAND=python3 {command}",
+                    "-f",
+                    str(dockerfile_path),
+                    str(__SOURCE_ROOT__),
                 ]
             )
 
@@ -198,30 +197,30 @@ class PackageBuilder(abc.ABC):
 
             # Remove the container wth the same name if exists.
             container_name = image_name
-            subprocess.check_call(
-                ["docker", "rm", "-f", container_name]
-            )
+            subprocess.check_call(["docker", "rm", "-f", container_name])
 
             # Create the container.
             subprocess.check_call(
-                ["docker", "create", "--name", container_name, image_name ]
+                ["docker", "create", "--name", container_name, image_name]
             )
 
             # Copy package output from the container.
             subprocess.check_call(
-                ["docker", "cp", "-a", f"{container_name}:/tmp/build/.", str(output_path)],
+                [
+                    "docker",
+                    "cp",
+                    "-a",
+                    f"{container_name}:/tmp/build/.",
+                    str(output_path),
+                ],
             )
 
             # Remove the container.
-            subprocess.check_call(
-                ["docker", "rm", "-f", container_name]
-            )
+            subprocess.check_call(["docker", "rm", "-f", container_name])
 
     @classmethod
     def prepare_build_environment(
-            cls,
-            cache_dir: Union[str, pl.Path] = None,
-            locally: bool = False
+        cls, cache_dir: Union[str, pl.Path] = None, locally: bool = False
     ):
         """
         Prepare the build environment. For more info see 'prepare-build-environment' action in class docstring.
@@ -256,13 +255,17 @@ class PackageBuilder(abc.ABC):
 
             # Before the build, check if there is already an image with the same name. The name contains the checksum
             # of all files which are used in it, so the name identity also guarantees the content identity.
-            output = subprocess.check_output(
-                ["docker", "images", "-q", image_name]
-            ).decode().strip()
+            output = (
+                subprocess.check_output(["docker", "images", "-q", image_name])
+                .decode()
+                .strip()
+            )
 
             if output:
                 # The image already exists, skip the build.
-                print(f"Image '{image_name}' already exists, skip the build and reuse it.")
+                print(
+                    f"Image '{image_name}' already exists, skip the build and reuse it."
+                )
                 return
 
             save_to_cache = False
@@ -272,7 +275,9 @@ class PackageBuilder(abc.ABC):
                 cache_dir = pl.Path(cache_dir)
                 cached_image_path = cache_dir / image_name
                 if cached_image_path.is_file():
-                    print("Cached image file has been found, loading and reusing it instead of building.")
+                    print(
+                        "Cached image file has been found, loading and reusing it instead of building."
+                    )
                     subprocess.check_call(
                         ["docker", "load", "-i", str(cached_image_path)]
                     )
@@ -300,29 +305,32 @@ class PackageBuilder(abc.ABC):
             # Map the prepare environment script's path to the docker.
             container_prepare_env_script_path = pl.Path(
                 container_root_path,
-                pl.Path(cls.PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH).relative_to(__SOURCE_ROOT__)
+                pl.Path(cls.PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH).relative_to(
+                    __SOURCE_ROOT__
+                ),
             )
 
             container_name = cls.__name__
 
             # Remove if such container exists.
-            subprocess.check_call(
-                ["docker", "rm", "-f", container_name]
-            )
+            subprocess.check_call(["docker", "rm", "-f", container_name])
 
             # Create container and run the 'prepare environment' script in it.
             subprocess.check_call(
                 [
-                    "docker", "run", "-i", "--name", container_name,
+                    "docker",
+                    "run",
+                    "-i",
+                    "--name",
+                    container_name,
                     *volumes_mappings,
                     cls.BASE_DOCKER_IMAGE,
-                    str(container_prepare_env_script_path)]
+                    str(container_prepare_env_script_path),
+                ]
             )
 
             # Save the current state of the container into image.
-            subprocess.check_call(
-                ["docker", "commit", container_name, image_name]
-            )
+            subprocess.check_call(["docker", "commit", container_name, image_name])
 
             # Save image if caching is enabled.
             if cache_dir and save_to_cache:
@@ -330,16 +338,11 @@ class PackageBuilder(abc.ABC):
                 cached_image_path = cache_dir / image_name
                 print(f"Saving '{image_name}' image file into cache.")
                 with cached_image_path.open("wb") as f:
-                    subprocess.check_call(
-                        ["docker", "save", image_name],
-                        stdout=f
-
-                    )
+                    subprocess.check_call(["docker", "save", image_name], stdout=f)
 
     @classmethod
     def dump_build_environment_files_content_checksum(
-            cls,
-            checksum_output_path: Union[str, pl.Path]
+        cls, checksum_output_path: Union[str, pl.Path]
     ):
         """
         Dump the checksum of the content of the file used during the 'prepare-build-environment' action.
@@ -355,7 +358,6 @@ class PackageBuilder(abc.ABC):
         checksum_output_path.parent.mkdir(exist_ok=True, parents=True)
         checksum_output_path.write_text(checksum)
 
-
     @property
     def _build_info(self) -> Optional[str]:
         """Returns a string containing the package build info."""
@@ -365,32 +367,45 @@ class PackageBuilder(abc.ABC):
         # We need to execute the git command in the source root.
         # Add in the e-mail address of the user building it.
         try:
-            packager_email = subprocess.check_output(
-                "git config user.email", shell=True, cwd=str(__SOURCE_ROOT__)
-            ).decode().strip()
+            packager_email = (
+                subprocess.check_output(
+                    "git config user.email", shell=True, cwd=str(__SOURCE_ROOT__)
+                )
+                .decode()
+                .strip()
+            )
         except subprocess.CalledProcessError:
             packager_email = "unknown"
 
         print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
         # Determine the last commit from the log.
-        commit_id = subprocess.check_output(
+        commit_id = (
+            subprocess.check_output(
                 "git log --summary -1 | head -n 1 | cut -d ' ' -f 2",
                 shell=True,
                 cwd=__SOURCE_ROOT__,
-        ).decode().strip()
+            )
+            .decode()
+            .strip()
+        )
 
         print("Latest commit: %s" % commit_id.strip(), file=build_info_buffer)
 
         # Include the branch just for safety sake.
-        branch = subprocess.check_output(
-            "git branch | cut -d ' ' -f 2", shell=True, cwd=__SOURCE_ROOT__
-        ).decode().strip()
+        branch = (
+            subprocess.check_output(
+                "git branch | cut -d ' ' -f 2", shell=True, cwd=__SOURCE_ROOT__
+            )
+            .decode()
+            .strip()
+        )
         print("From branch: %s" % branch.strip(), file=build_info_buffer)
 
         # Add a timestamp.
         print(
-            "Build time: %s" % str(time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())),
+            "Build time: %s"
+            % str(time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())),
             file=build_info_buffer,
         )
 
@@ -398,7 +413,7 @@ class PackageBuilder(abc.ABC):
 
     @staticmethod
     def _add_config(
-            config_source_path: Union[str, pl.Path], output_path: Union[str, pl.Path]
+        config_source_path: Union[str, pl.Path], output_path: Union[str, pl.Path]
     ):
         """
         Copy config folder from the specified path to the target path.
@@ -421,9 +436,7 @@ class PackageBuilder(abc.ABC):
 
     @staticmethod
     def _add_certs(
-            path: Union[str, pl.Path],
-            intermediate_certs=True,
-            copy_other_certs=True
+        path: Union[str, pl.Path], intermediate_certs=True, copy_other_certs=True
     ):
         """
         Create needed certificates files in the specified path.
@@ -508,10 +521,7 @@ class PackageBuilder(abc.ABC):
     def _get_build_environment_docker_image_name(cls):
         return f"package-builder-base-{cls._get_build_environment_files_checksum()}".lower()
 
-    def _build_package_files(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
         """
         Build the basic structure for all packages.
 
@@ -554,10 +564,7 @@ class PackageBuilder(abc.ABC):
         package_type_file_path.write_text(type(self).INSTALL_TYPE)
 
     @abc.abstractmethod
-    def _build(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build(self, output_path: Union[str, pl.Path]):
         """
         The implementation of the package build.
         :param output_path: Path for the build result.
@@ -576,13 +583,12 @@ class FrozenBinaryPackageBuilder(PackageBuilder):
     ]
 
     def __init__(
-            self,
-            variant: str = None,
-            no_versioned_file_name: bool = False,
+        self,
+        variant: str = None,
+        no_versioned_file_name: bool = False,
     ):
         super(FrozenBinaryPackageBuilder, self).__init__(
-            variant=variant,
-            no_versioned_file_name=no_versioned_file_name
+            variant=variant, no_versioned_file_name=no_versioned_file_name
         )
 
         self._frozen_binary_output: Optional[pl.Path] = None
@@ -604,7 +610,7 @@ class FrozenBinaryPackageBuilder(PackageBuilder):
 
         subprocess.check_call(
             [sys.executable, "-m", "PyInstaller", str(spec_file_path)],
-            cwd=str(pyinstaller_output)
+            cwd=str(pyinstaller_output),
         )
 
         # Make frozen binaries executable.
@@ -614,12 +620,21 @@ class FrozenBinaryPackageBuilder(PackageBuilder):
         # Also build the frozen binary for the package test script, they will be used to test the packages later.
         package_test_pyinstaller_output = self._build_output_path / "frozen_binary_test"
 
-        package_test_script_path = __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test.py"
+        package_test_script_path = (
+            __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test.py"
+        )
 
-        subprocess.check_call([
-            sys.executable, "-m", "PyInstaller", str(package_test_script_path),
-            "--distpath", str(package_test_pyinstaller_output), "--onefile"
-        ])
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "PyInstaller",
+                str(package_test_script_path),
+                "--distpath",
+                str(package_test_pyinstaller_output),
+                "--onefile",
+            ]
+        )
 
         # Make the package test frozen binaries executable
         for child_path in package_test_pyinstaller_output.iterdir():
@@ -630,20 +645,18 @@ class LinuxPackageBuilder(FrozenBinaryPackageBuilder):
     """
     The base package builder for all Linux packages.
     """
-    PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH = __PARENT_DIR__ / "linux" / "prepare_build_environment.sh"
+
+    PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH = (
+        __PARENT_DIR__ / "linux" / "prepare_build_environment.sh"
+    )
     BASE_DOCKER_IMAGE = "centos:7"
     DOCKERIZED = True
 
-    def _build_package_files(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
         """
         Add files to the agent's install root which are common for all linux packages.
         """
-        super(LinuxPackageBuilder, self)._build_package_files(
-            output_path=output_path
-        )
+        super(LinuxPackageBuilder, self)._build_package_files(output_path=output_path)
 
         # Add certificates.
         certs_path = output_path / "certs"
@@ -655,9 +668,7 @@ class LinuxPackageBuilder(FrozenBinaryPackageBuilder):
         # using a package.
         misc_path = output_path / "misc"
         misc_path.mkdir()
-        for f in [
-            "Dockerfile.custom_agent_config", "Dockerfile.custom_k8s_config"
-        ]:
+        for f in ["Dockerfile.custom_agent_config", "Dockerfile.custom_k8s_config"]:
             shutil.copy2(__SOURCE_ROOT__ / "docker" / f, misc_path / f)
 
 
@@ -669,10 +680,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
 
     INSTALL_TYPE = "package"
 
-    def _build_package_files(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
 
         # The install root is located in the usr/share/scalyr-agent-2.
         install_root = output_path / "usr/share/scalyr-agent-2"
@@ -692,8 +700,12 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
         usr_sbin_path = self._package_files_path / "usr/sbin"
         usr_sbin_path.mkdir(parents=True)
         for binary_path in bin_path.iterdir():
-            binary_symlink_path = self._package_files_path / "usr/sbin" / binary_path.name
-            symlink_target_path = pl.Path("..", "share", "scalyr-agent-2", "bin", binary_path.name)
+            binary_symlink_path = (
+                self._package_files_path / "usr/sbin" / binary_path.name
+            )
+            symlink_target_path = pl.Path(
+                "..", "share", "scalyr-agent-2", "bin", binary_path.name
+            )
             binary_symlink_path.symlink_to(symlink_target_path)
 
 
@@ -704,21 +716,17 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
     """
 
     def __init__(
-            self,
-            variant: str = None,
-            no_versioned_file_name: bool = False,
+        self,
+        variant: str = None,
+        no_versioned_file_name: bool = False,
     ):
         super(FpmBasedPackageBuilder, self).__init__(
-            variant=variant,
-            no_versioned_file_name=no_versioned_file_name
+            variant=variant, no_versioned_file_name=no_versioned_file_name
         )
         # Path to generated changelog files.
         self._package_changelogs_path: Optional[pl.Path] = None
 
-    def _build_package_files(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
         super(FpmBasedPackageBuilder, self)._build_package_files(
             output_path=output_path
         )
@@ -731,21 +739,19 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
         init_d_path.mkdir(parents=True)
         shutil.copy2(
             __PARENT_DIR__ / "linux/deb_or_rpm/files/init.d/scalyr-agent-2",
-            init_d_path / "scalyr-agent-2"
+            init_d_path / "scalyr-agent-2",
         )
 
     def _build(
-            self,
-            output_path: Union[str, pl.Path],
+        self,
+        output_path: Union[str, pl.Path],
     ):
         """
         Build the deb or rpm package using the 'fpm' pckager.
         :param output_path: The path where the result package is stored.
         """
 
-        self._build_package_files(
-            output_path=self._package_files_path
-        )
+        self._build_package_files(output_path=self._package_files_path)
 
         if self._variant is not None:
             iteration_arg = "--iteration 1.%s" % self._variant
@@ -761,6 +767,8 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
             "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics and "
             "log files and transmit them to Scalyr."
         )
+
+        # fmt: off
         fpm_command = [
             "fpm",
             "-s", "dir",
@@ -819,6 +827,7 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
             # "  --rpm-defattrdir 751"
             # "  -C root usr etc var",
         ]
+        # fmt: on
 
         # Run fpm command and build the package.
         subprocess.check_call(
@@ -878,7 +887,9 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
                     file=fp,
                 )
                 print("", file=fp)
-                print("Release: %s (%s)" % (release["version"], release["name"]), file=fp)
+                print(
+                    "Release: %s (%s)" % (release["version"], release["name"]), file=fp
+                )
                 print("", file=fp)
                 # Include the release notes, with the first level with no indent, an asterisk for the second level
                 # and a dash for the third.
@@ -897,7 +908,8 @@ class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
                     "%a, %d %b %Y %H:%M:%S %z", time.localtime(release["time"])
                 )
                 print(
-                    "scalyr-agent-2 (%s) stable; urgency=low" % release["version"], file=fp
+                    "scalyr-agent-2 (%s) stable; urgency=low" % release["version"],
+                    file=fp,
                 )
                 # Include release notes with an indented first level (using asterisk, then a dash for the next level,
                 # finally a plus sign.
@@ -929,18 +941,14 @@ class TarballPackageBuilder(LinuxPackageBuilder):
     """
     The builder for the tarball packages.
     """
+
     PACKAGE_TYPE = "tar"
     INSTALL_TYPE = "packageless"
     DOCKERIZED = True
 
-    def _build_package_files(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
 
-        super(TarballPackageBuilder, self)._build_package_files(
-            output_path=output_path
-        )
+        super(TarballPackageBuilder, self)._build_package_files(output_path=output_path)
 
         # Build the rest of the directories required for the tarball install.  Mainly, the log and data directories
         # in the tarball itself where the running process will store its state.
@@ -949,14 +957,9 @@ class TarballPackageBuilder(LinuxPackageBuilder):
         log_dir = output_path / "log"
         log_dir.mkdir()
 
-        self._add_config(
-            __SOURCE_ROOT__ / "config", output_path / "config"
-        )
+        self._add_config(__SOURCE_ROOT__ / "config", output_path / "config")
 
-    def _build(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build(self, output_path: Union[str, pl.Path]):
 
         self._build_package_files(
             output_path=self._package_files_path,
@@ -972,7 +975,10 @@ class TarballPackageBuilder(LinuxPackageBuilder):
         if self._variant is None:
             base_archive_name = "scalyr-agent-%s" % self._package_version
         else:
-            base_archive_name = "scalyr-agent-%s.%s" % (self._package_version, self._variant)
+            base_archive_name = "scalyr-agent-%s.%s" % (
+                self._package_version,
+                self._variant,
+            )
 
         output_name = (
             "%s.tar.gz" % base_archive_name
@@ -991,7 +997,9 @@ class TarballPackageBuilder(LinuxPackageBuilder):
 class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
     PACKAGE_TYPE = "msi"
     INSTALL_TYPE = "package"
-    PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH = _AGENT_BUILD_PATH / "windows/prepare_build_environment.ps1"
+    PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH = (
+        _AGENT_BUILD_PATH / "windows/prepare_build_environment.ps1"
+    )
     DOCKERIZED = False
 
     # A GUID representing Scalyr products, used to generate a per-version guid for each version of the Windows
@@ -1013,54 +1021,43 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         return base_version
 
     @classmethod
-    def _prepare_build_environment(
-        cls,
-        cache_dir: Union[str, pl.Path] = None
-    ):
+    def _prepare_build_environment(cls, cache_dir: Union[str, pl.Path] = None):
         """
         Prepare the build environment to be able to build the windows msi package.
         """
-        prepare_environment_script_path = _AGENT_BUILD_PATH / "windows/prepare_build_environment.ps1"
+        prepare_environment_script_path = (
+            _AGENT_BUILD_PATH / "windows/prepare_build_environment.ps1"
+        )
         subprocess.check_call(
             ["powershell", str(prepare_environment_script_path), str(cache_dir)]
         )
 
-    def _build(
-            self,
-            output_path: Union[str, pl.Path]
-    ):
+    def _build(self, output_path: Union[str, pl.Path]):
 
         scalyr_dir = self._package_files_path / "Scalyr"
 
         # Build common package files.
-        self._build_package_files(
-            output_path=scalyr_dir
-        )
+        self._build_package_files(output_path=scalyr_dir)
 
         # Add root certificates.
         certs_path = scalyr_dir / "certs"
-        self._add_certs(
-            certs_path,
-            intermediate_certs=False,
-            copy_other_certs=False
-        )
+        self._add_certs(certs_path, intermediate_certs=False, copy_other_certs=False)
 
         # Build frozen binaries and copy them into bin folder.
         self._build_frozen_binary()
         bin_path = scalyr_dir / "bin"
         shutil.copytree(self._frozen_binary_output, bin_path)
 
-        shutil.copy(
-            _AGENT_BUILD_PATH / "windows/files/ScalyrShell.cmd",
-            bin_path
-        )
+        shutil.copy(_AGENT_BUILD_PATH / "windows/files/ScalyrShell.cmd", bin_path)
 
         # Copy config template.
         config_templates_dir_path = pl.Path(scalyr_dir / "config" / "templates")
         config_templates_dir_path.mkdir(parents=True)
         config_template_path = config_templates_dir_path / "agent_config.tmpl"
         shutil.copy2(__SOURCE_ROOT__ / "config" / "agent.json", config_template_path)
-        config_template_path.write_text(config_template_path.read_text().replace("\n", "\r\n"))
+        config_template_path.write_text(
+            config_template_path.read_text().replace("\n", "\r\n")
+        )
 
         if self._variant is None:
             variant = "main"
@@ -1068,7 +1065,10 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
             variant = self._variant
 
         # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
-        product_code = uuid.uuid3(type(self)._scalyr_guid_, "ProductID:%s:%s" % (variant, self._package_version))
+        product_code = uuid.uuid3(
+            type(self)._scalyr_guid_,
+            "ProductID:%s:%s" % (variant, self._package_version),
+        )
         # The upgrade code identifies all families of versions that can be upgraded from one to the other.  So, this
         # should be a single number for all Scalyr produced ones.
         upgrade_code = uuid.uuid3(type(self)._scalyr_guid_, "UpgradeCode:%s" % variant)
@@ -1081,20 +1081,37 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         wxs_file_path = _AGENT_BUILD_PATH / "windows/scalyr_agent.wxs"
 
         # Compile WIX .wxs file.
-        subprocess.check_call([
-            "candle", "-nologo", "-out", str(wixobj_file_path), f'-dVERSION={self._package_version}',
-            f'-dUPGRADECODE={upgrade_code}', f'-dPRODUCTCODE={product_code}',
-            str(wxs_file_path)
-        ])
+        subprocess.check_call(
+            [
+                "candle",
+                "-nologo",
+                "-out",
+                str(wixobj_file_path),
+                f"-dVERSION={self._package_version}",
+                f"-dUPGRADECODE={upgrade_code}",
+                f"-dPRODUCTCODE={product_code}",
+                str(wxs_file_path),
+            ]
+        )
 
         installer_name = f"ScalyrAgentInstaller-{self._package_version}.msi"
         installer_path = self._build_output_path / installer_name
 
         # Link compiled WIX files into msi installer.
-        subprocess.check_call([
-            "light", "-nologo", "-ext", "WixUtilExtension.dll", "-ext", "WixUIExtension",
-            "-out", str(installer_path), str(wixobj_file_path), "-v"],
-            cwd=str(scalyr_dir.absolute().parent)
+        subprocess.check_call(
+            [
+                "light",
+                "-nologo",
+                "-ext",
+                "WixUtilExtension.dll",
+                "-ext",
+                "WixUIExtension",
+                "-out",
+                str(installer_path),
+                str(wixobj_file_path),
+                "-v",
+            ],
+            cwd=str(scalyr_dir.absolute().parent),
         )
 
 
@@ -1105,7 +1122,7 @@ package_types_to_builders = {
         DebPackageBuilder,
         RpmPackageBuilder,
         TarballPackageBuilder,
-        MsiWindowsPackageBuilder
+        MsiWindowsPackageBuilder,
     ]
 }
 
@@ -1117,12 +1134,14 @@ def main():
         "package_type",
         type=str,
         choices=list(package_types_to_builders.keys()),
-        help="Type of the package to build.")
+        help="Type of the package to build.",
+    )
 
     parser.add_argument(
-        "--locally", action="store_true",
+        "--locally",
+        action="store_true",
         help="Perform the build on the current system which runs the script. Without that, some packages may be built "
-             "by default inside the docker."
+        "by default inside the docker.",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1132,20 +1151,23 @@ def main():
         "--cache-dir",
         dest="cache_dir",
         help="Path to the directory which will be considered by the script is a cache. "
-             "All 'cachable' intermediate results will be stored in it."
+        "All 'cachable' intermediate results will be stored in it.",
     )
 
     dump_checksum_parser = subparsers.add_parser("dump-checksum")
     dump_checksum_parser.add_argument(
         "checksum_file_path",
-        help="The path of the output file with the checksum in it."
+        help="The path of the output file with the checksum in it.",
     )
 
     build_parser = subparsers.add_parser("build")
 
     build_parser.add_argument(
-        "--output-dir", required=True, type=str, dest="output_dir",
-        help="The directory where the result package has to be stored."
+        "--output-dir",
+        required=True,
+        type=str,
+        dest="output_dir",
+        help="The directory where the result package has to be stored.",
     )
 
     build_parser.add_argument(
@@ -1154,7 +1176,7 @@ def main():
         dest="no_versioned_file_name",
         default=False,
         help="If true, will not embed the version number in the artifact's file name.  This only "
-             "applies to the `tarball` and container builders artifacts.",
+        "applies to the `tarball` and container builders artifacts.",
     )
 
     build_parser.add_argument(
@@ -1163,8 +1185,8 @@ def main():
         dest="variant",
         default=None,
         help="An optional string that is included in the package name to identify a variant "
-             "of the main release created by a different packager.  "
-             "Most users do not need to use this option.",
+        "of the main release created by a different packager.  "
+        "Most users do not need to use this option.",
     )
 
     args = parser.parse_args()
@@ -1188,8 +1210,7 @@ def main():
     if args.command == "build":
         output_path = pl.Path(args.output_dir)
         builder = package_builder_cls(
-            variant=args.variant,
-            no_versioned_file_name=args.no_versioned_file_name
+            variant=args.variant, no_versioned_file_name=args.no_versioned_file_name
         )
 
         builder.build(
@@ -1198,5 +1219,5 @@ def main():
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

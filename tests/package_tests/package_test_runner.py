@@ -41,11 +41,11 @@ if args.docker_image:
         f"docker run -i --rm -v {package_test_path}:/package_test -v {package_path}:/{package_path.name} "
         f"--init {args.docker_image} /package_test --package-path /{package_path.name} "
         f"--scalyr-api-key {args.scalyr_api_key}",
-        shell=True
+        shell=True,
     )
 else:
     subprocess.check_call(
         f"{package_test_path} --package-path {package_path} "
         f"--scalyr-api-key {args.scalyr_api_key}",
-        shell=True
+        shell=True,
     )

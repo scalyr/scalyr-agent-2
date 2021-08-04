@@ -21,7 +21,9 @@ import platform
 import mock
 
 if platform.system() != "Windows":
-    from scalyr_agent.third_party.tcollector import tcollector  # pylint: disable=import-error
+    from scalyr_agent.third_party.tcollector import (
+        tcollector,
+    )  # pylint: disable=import-error
 else:
     tcollector = None  # type: ignore
 
@@ -30,7 +32,9 @@ from scalyr_agent.test_base import skipIf
 
 class TcollectorCollectorsTestCase(unittest.TestCase):
     @skipIf(platform.system() == "Windows", "Skipping Linux platform tests on Windows")
-    @mock.patch("scalyr_agent.third_party.tcollector.tcollector.set_nonblocking", mock.Mock())
+    @mock.patch(
+        "scalyr_agent.third_party.tcollector.tcollector.set_nonblocking", mock.Mock()
+    )
     @mock.patch("scalyr_agent.third_party.tcollector.tcollector.subprocess.Popen")
     def test_correct_python_binary_is_used_for_subprocess(self, mock_popen):
         col = mock.Mock()

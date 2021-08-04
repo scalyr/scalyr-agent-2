@@ -26,7 +26,9 @@ import re
 
 
 def install_deb_package():
-    os.environ["LD_LIBRARY_PATH"] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
+    os.environ[
+        "LD_LIBRARY_PATH"
+    ] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
     subprocess.check_call(
         ["dpkg", "-i", package_path],
         env=os.environ,
@@ -46,12 +48,9 @@ def install_tarball():
     tar.extractall(pathlib.Path("~").expanduser())
     tar.close()
 
+
 def install_msi_package():
-    subprocess.check_call(
-        f"msiexec.exe /I {package_path} /quiet", shell=True
-    )
-
-
+    subprocess.check_call(f"msiexec.exe /I {package_path} /quiet", shell=True)
 
 
 def install_package(package_type: str):
@@ -78,47 +77,35 @@ def start_agent():
 
         if package_type == "msi":
             # Add agent binaries to the PATH env. variable on windows.
-            bin_path = pl.Path(os.environ['programfiles(x86)'], "Scalyr", "bin")
+            bin_path = pl.Path(os.environ["programfiles(x86)"], "Scalyr", "bin")
             os.environ["PATH"] = f"{bin_path};{os.environ['PATH']}"
 
-        subprocess.check_call(
-            f"scalyr-agent-2 start", shell=True, env=os.environ
-        )
+        subprocess.check_call(f"scalyr-agent-2 start", shell=True, env=os.environ)
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
-        subprocess.check_call(
-            [binary_path, "start"]
-        )
+        subprocess.check_call([binary_path, "start"])
 
 
 def get_agent_status():
     if package_type in ["deb", "rpm", "msi"]:
-        subprocess.check_call(
-            f"scalyr-agent-2 status -v", shell=True
-        )
+        subprocess.check_call(f"scalyr-agent-2 status -v", shell=True)
     elif package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
-        subprocess.check_call(
-            [binary_path, "status", "-v"]
-        )
+        subprocess.check_call([binary_path, "status", "-v"])
 
 
 def stop_agent():
     if package_type in ["deb", "rpm", "msi"]:
-        subprocess.check_call(
-            f"scalyr-agent-2 stop", shell=True
-        )
+        subprocess.check_call(f"scalyr-agent-2 stop", shell=True)
     if package_type == "tar":
         tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
-        subprocess.check_call(
-            [binary_path, "stop"]
-        )
+        subprocess.check_call([binary_path, "stop"])
 
 
 def configure_agent(api_key: str):
@@ -127,9 +114,16 @@ def configure_agent(api_key: str):
     elif package_type == "tar":
         version = determine_version()
 
-        config_path = pl.Path("~").expanduser() / f"scalyr-agent-{version}" / "config" / "agent.json"
+        config_path = (
+            pl.Path("~").expanduser()
+            / f"scalyr-agent-{version}"
+            / "config"
+            / "agent.json"
+        )
     elif package_type == "msi":
-        config_path = pl.Path(os.environ["programfiles(x86)"], "Scalyr", "config", "agent.json")
+        config_path = pl.Path(
+            os.environ["programfiles(x86)"], "Scalyr", "config", "agent.json"
+        )
 
     config = {}
     config["api_key"] = api_key
@@ -141,17 +135,11 @@ def configure_agent(api_key: str):
 
 
 def remove_deb_package():
-    subprocess.check_call(
-        f"apt-get remove -y scalyr-agent-2",
-        shell=True
-    )
+    subprocess.check_call(f"apt-get remove -y scalyr-agent-2", shell=True)
 
 
 def remove_rpm_package():
-    subprocess.check_call(
-        f"yum remove -y scalyr-agent-2",
-        shell=True
-    )
+    subprocess.check_call(f"yum remove -y scalyr-agent-2", shell=True)
 
 
 def remove_package(package_type: str):
@@ -161,16 +149,12 @@ def remove_package(package_type: str):
         remove_rpm_package()
 
 
-AGENT_CONFIG_PATH ="/etc/scalyr-agent-2/agent.json"
+AGENT_CONFIG_PATH = "/etc/scalyr-agent-2/agent.json"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--package-path",
-        type=str,
-        required=True
-    )
+    parser.add_argument("--package-path", type=str, required=True)
 
     parser.add_argument("--scalyr-api-key", required=True)
 
@@ -210,9 +194,3 @@ if __name__ == '__main__':
     stop_agent()
 
     remove_package(package_type)
-
-
-
-
-
-

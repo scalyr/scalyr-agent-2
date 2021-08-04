@@ -40,8 +40,7 @@ def cat_files(file_paths, destination, convert_newlines=False):
 
 
 def recursively_delete_files_by_name(
-        dir_path: Union[str, pl.Path],
-        *file_names: Union[str, pl.Path]
+    dir_path: Union[str, pl.Path], *file_names: Union[str, pl.Path]
 ):
     """Deletes any files that are in the current working directory or any of its children whose file names
     match the specified regular expressions.
@@ -69,6 +68,7 @@ def recursively_delete_files_by_name(
 
 class BadChangeLogFormat(Exception):
     pass
+
 
 def parse_date(date_str):
     """Parses a date time string of the format MMM DD, YYYY HH:MM +ZZZZ and returns seconds past epoch.
@@ -330,7 +330,10 @@ def parse_change_log():
 
 # Implement shlex.join for Python < 3.8
 if sys.version_info < (3, 8):
+
     def shlex_join(split_command):
-        return ' '.join(shlex.quote(arg) for arg in split_command)
+        return " ".join(shlex.quote(arg) for arg in split_command)
+
+
 else:
     shlex_join = shlex.join
