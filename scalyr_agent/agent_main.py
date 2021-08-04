@@ -1974,8 +1974,8 @@ class ScalyrAgent(object):
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                             result.rate_limited_time_since_last_status,
                             self.__config.copying_manager_stats_log_interval / 60.0,
@@ -1988,8 +1988,8 @@ class ScalyrAgent(object):
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                         )
                     )
