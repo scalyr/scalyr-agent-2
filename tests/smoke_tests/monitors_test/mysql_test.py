@@ -206,10 +206,9 @@ def _test(
 
         agent_log_reader.go_to_end()
     except LogReaderError as e:
-        if (
-            not expected_exception
-            or expected_exception not in str(e)
-            or not re.search(expected_exception, str(e))
+        if not expected_exception or (
+            expected_exception not in str(e)
+            and not re.search(expected_exception, str(e))
         ):
             raise e
 
@@ -285,7 +284,7 @@ def test_mysql_python2_ssl_bad_hostname(request):
         use_socket=False,
         use_ssl=True,
         ca_file="/var/lib/mysql/ca.pem",
-        expected_exception="hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
+        expected_exception=r"hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
     )
 
 
@@ -298,5 +297,5 @@ def test_mysql_python3_ssl_bad_hostname(request):
         use_socket=False,
         use_ssl=True,
         ca_file="/var/lib/mysql/ca.pem",
-        expected_exception="hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
+        expected_exception=r"hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
     )
