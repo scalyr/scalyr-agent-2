@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.22 "TBD" - Aug 30, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Aug 30, 2021 21:00 -0800
+--->
+
+Bug fix:
+
+* Don't log "skipping copying log lines" messages in case number of last produced bytes is 0.
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 <!---
