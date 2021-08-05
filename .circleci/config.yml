@@ -1874,6 +1874,8 @@ jobs:
   # on master merge / push.
   send-benchmark-results-and-graphs-to-slack:
     working_directory: ~/scalyr-agent-2
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes. Needed some Slack blocks
+                             # some EC2 IP ranges
     docker:
       - image: circleci/python:3.5.9
     steps:
