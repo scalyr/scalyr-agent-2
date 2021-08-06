@@ -932,7 +932,7 @@ jobs:
 
       channel:
         type: string
-        default: ""
+        default: "#cloud-tech"
         description: >
           ID of channel if set, overrides webhook's default channel setting
     working_directory: ~/scalyr-agent-2
