@@ -732,6 +732,9 @@ commands:
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
 
+            # TODO: Re-enable once SSH access issue is resolved
+            exit 1
+
             # If testing type is "development" we use installer script which is built in another job.
             if [ "<< parameters.test_type >>" = "development" ]; then
               export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
