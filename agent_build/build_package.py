@@ -485,7 +485,7 @@ class PackageBuilder(abc.ABC):
 
         used_files = []
 
-        # The build environment praparation script is also has to be included.
+        # The build environment preparation script is also has to be included.
         used_files.append(cls.PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH)
 
         # Since the 'FILES_USED_IN_BUILD_ENVIRONMENT' class attribute can also contain directories, look for them and
