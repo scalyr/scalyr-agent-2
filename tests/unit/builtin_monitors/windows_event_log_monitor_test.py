@@ -34,6 +34,8 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         }
 
         # 1. OldApi - no warning emitted
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = None
+
         mock_logger = mock.Mock()
 
         self.assertEqual(mock_logger.info.call_count, 0)
