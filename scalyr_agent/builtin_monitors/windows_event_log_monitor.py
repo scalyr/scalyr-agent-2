@@ -811,6 +811,24 @@ and System sources:
 
     def run(self):
         self.__load_checkpoints()
+        self._check_and_emit_info_and_warning_messages()
+
+        ScalyrMonitor.run(self)
+
+    def stop(self, wait_on_join=True, join_timeout=5):
+        # stop the monitor
+        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
+        # stop any event monitoring
+        self.__api.stop()
+
+        # update checkpoints
+        self.__update_checkpoints()
+
+    def gather_sample(self):
+        self.__api.read_event_log()
+        self.__update_checkpoints()
+
+    def _check_and_emit_info_and_warning_messages(self):
         if isinstance(self.__api, NewApi):
             self._logger.info("Using new Evt API")
 
@@ -828,20 +846,3 @@ and System sources:
                 )
         elif isinstance(self.__api, OldApi):
             self._logger.info("Evt API not detected.  Using older EventLog API")
-
-        ScalyrMonitor.run(self)
-
-    def stop(self, wait_on_join=True, join_timeout=5):
-        # stop the monitor
-        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
-        # stop any event monitoring
-        self.__api.stop()
-
-        # update checkpoints
-        self.__update_checkpoints()
-
-    def gather_sample(self):
-
-        self.__api.read_event_log()
-
-        self.__update_checkpoints()
