@@ -813,21 +813,21 @@ and System sources:
         self.__load_checkpoints()
         if isinstance(self.__api, NewApi):
             self._logger.info("Using new Evt API")
-        if isinstance(self.__api, OldApi):
-            self._logger.info("Evt API not detected.  Using older EventLog API")
 
             maximum_records = self._config.get("maximum_records_per_source")
             if (
                 maximum_records is not None
                 and maximum_records != DEFAULT_MAXIMUM_RECORDS_PER_SOURCE
             ):
-                # This option is only applicable when using old API so we emit a warning is this
+                # This option is only applicable when using old API so we emit a warning if this
                 # config option is set to a non default value when using a new API
                 self._logger.warn(
                     '"maximum_records_per_source" config option is set to a '
                     "non-default value (%s). This config option has no affect when using "
                     "new evt API." % (maximum_records)
                 )
+        elif isinstance(self.__api, OldApi):
+            self._logger.info("Evt API not detected.  Using older EventLog API")
 
         ScalyrMonitor.run(self)
 
