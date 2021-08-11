@@ -103,6 +103,10 @@ def send_notification_to_slack(screenshots_directory):
     payload = BASE_PAYLOAD.copy()  # type: dict
 
     for image_url, image_filename in attachments_list:
+        # TODO: Upload attachments somewhere else since Slack has banned AWS IPs
+        # E.g. "Exception: Failed to upload screenshot: Network 52.0.0.0/10 (Amazon Technologies "
+        # "Inc.) is blocked from uploading files due to frequent abuse.
+        continue
         benchmark_name = os.path.splitext(image_filename)[0]
         attachment_item = {
             "type": "image",
