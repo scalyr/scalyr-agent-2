@@ -36,6 +36,7 @@ from io import open
 
 import os
 import sys
+import re
 import glob
 import json
 import requests
@@ -69,7 +70,9 @@ BASE_PAYLOAD = {
 }
 BASE_HEADERS = {"Content-Type": "application/json"}
 
-IMAGE_SERVICE_URL = "https://0x0.st"
+# 0x0 has banned AWS IPs
+# IMAGE_SERVICE_URL = "https://0x0.st"
+IMAGE_SERVICE_URL = "https://oshi.at"
 
 
 def upload_files(file_paths):
@@ -86,7 +89,17 @@ def upload_files(file_paths):
         if resp.status_code != 200:
             raise Exception("Failed to upload screenshot: %s" % (resp.text))
 
-        result.append((resp.text.strip(), os.path.basename(file_path)))
+        # 0x0.st
+        # result.append((resp.text.strip(), os.path.basename(file_path)))
+        response = resp.text.strip()
+        match = re.search(r"DL: (.*?)$", response)
+
+        if match:
+            image_url = match.groups()[0]
+        else:
+            raise ValueError("Failed to retrieve image URL from the response")
+
+        result.append((image_url, os.path.basename(file_path)))
 
     return result
 

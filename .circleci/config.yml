@@ -932,7 +932,7 @@ jobs:
 
       channel:
         type: string
-        default: ""
+        default: "#cloud-tech"
         description: >
           ID of channel if set, overrides webhook's default channel setting
     working_directory: ~/scalyr-agent-2
@@ -1874,6 +1874,8 @@ jobs:
   # on master merge / push.
   send-benchmark-results-and-graphs-to-slack:
     working_directory: ~/scalyr-agent-2
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes. Needed some Slack blocks
+                             # some EC2 IP ranges
     docker:
       - image: circleci/python:3.5.9
     steps:
@@ -2255,6 +2257,7 @@ jobs:
           path: artifacts
 
   ami-tests-stable:
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2267,6 +2270,7 @@ jobs:
           test_type: "stable"
 
   ami-tests-development:
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:

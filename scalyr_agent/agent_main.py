@@ -1933,18 +1933,29 @@ class ScalyrAgent(object):
             result.avg_bytes_produced_rate = (
                 total_bytes_produced - last_total_bytes_produced
             ) / self.__config.copying_manager_stats_log_interval
-            if result.total_bytes_skipped > self.__last_total_bytes_skipped:
+
+            # NOTE: If last_total_bytes_produced is 0 and total_bytes_skip is > 0 this
+            # indicates bytes were skipped for staleness reasons (skipForStaleness) aka agent was
+            # offline for a while or similar so we don't log the message in this case because
+            # we already have another place which logs skipForStalness.
+            if (
+                result.total_bytes_skipped > self.__last_total_bytes_skipped
+                and last_total_bytes_produced > 0
+            ):
+                # NOTE: Right now we also report very small rates (e.g. 0.0001 MB/s) which can be
+                # somewhat annoying and confusing. One option would be to just report the value in
+                # case it's larger than some value (e.g. 0.1 MB/s)
                 if self.__config.parsed_max_send_rate_enforcement:
                     log.warning(
-                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "Warning, skipping copying log lines.  Only copied %.5f MB/s log bytes when %.5f MB/s "
                         "were generated over the last %.1f minutes. This may be due to "
                         "max_send_rate_enforcement. Log upload has been delayed %.1f seconds in the last "
                         "%.1f minutes  This may be desired (due to excessive "
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                             result.rate_limited_time_since_last_status,
                             self.__config.copying_manager_stats_log_interval / 60.0,
@@ -1952,13 +1963,13 @@ class ScalyrAgent(object):
                     )
                 else:
                     log.warning(
-                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "Warning, skipping copying log lines.  Only copied %.5f MB/s log bytes when %.5f MB/s "
                         "were generated over the last %.1f minutes.  This may be desired (due to excessive "
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                         )
                     )

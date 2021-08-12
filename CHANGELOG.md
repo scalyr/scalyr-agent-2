@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.22 "Volans" - Aug 30, 2021
+
+<!---
+Packaged by Oliver Hsu <oliverhs@sentinelone.com> on Aug 11, 2021 21:00 -0800
+--->
+
+Bug fixes:
+* Don't log "skipping copying log lines" messages in case number of last produced bytes is 0.
+* Fix Kubernetes Agent DaemonSet liveness probe timeout too short and unhealthy agent pod not restarting when a liveness probe timeout occurs.
+
+Other:
+* Update Windows Event Log monitor to emit a warning if ``maximum_records_per_source`` config option is set to a non-default value when using a new event API where that config option has no affect.
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 <!---
