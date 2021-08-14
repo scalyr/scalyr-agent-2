@@ -84,6 +84,7 @@ while (( $# > 0)); do
       untar_tarball $0 || die "Failed to extract packages";
       cp $TMPDIR/Dockerfile ./ || die "Failed to copy the Dockerfile to current directory";
       cp $TMPDIR/requirements.txt ./ || die "Failed to copy the requirements.txt to current directory";
+      cp $TMPDIR/container_requirements.txt ./ || die "Failed to copy the agent requirements.txt to current directory";
       cp $TMPDIR/*.tar.gz ./ ||
         die "Failed to copy the source tarball to the current directory";
       exit 0;;

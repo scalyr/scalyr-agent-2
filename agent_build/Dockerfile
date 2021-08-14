@@ -11,6 +11,7 @@ ADD ./docker /scalyr-agent-2/docker
 ADD ./monitors /scalyr-agent-2/monitors
 ADD ./VERSION /scalyr-agent-2/VERSION
 ADD ./CHANGELOG.md /scalyr-agent-2/CHANGELOG.md
+ADD ./certs /scalyr-agent-2/certs
 
 # Also add the package test script, so the packager also can make the frozen binary for it.
 # This frozen binary later can be used to run package test on systems without python.

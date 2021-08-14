@@ -53,6 +53,7 @@ gem cleanup
 # Install pyinstaller and other possible requirements.
 python3 -m pip install -r /scalyr-agent-2/agent_build/frozen-binary-builder-requirements.txt
 python3 -m pip install -r /scalyr-agent-2/agent_build/requirements.txt
+python3 -m pip install -r /scalyr-agent-2/agent_build/monitors_requirements.txt
 
 yum install -y git rpm-build
 

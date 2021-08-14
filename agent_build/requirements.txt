@@ -1,8 +1,7 @@
 orjson==3.5.1
-
+# TODO: remove six from the code base.
 six==1.14.0
-redis==2.10.5
-requests==2.15.1
+requests==2.26.0
 
 
 psutil==5.7.0; platform_system == "Windows"

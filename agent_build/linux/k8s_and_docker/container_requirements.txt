@@ -1,0 +1,2 @@
+# dependencies for docker images.
+docker==4.1.0
