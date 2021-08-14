@@ -22,6 +22,7 @@ _PARENT_DIR = pl.Path(__file__).parent
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--package-path", required=True)
+parser.add_argument("--package-type", required=True)
 parser.add_argument("--package-test-path")
 parser.add_argument("--docker-image")
 parser.add_argument("--scalyr-api-key", required=True)
@@ -30,11 +31,19 @@ parser.add_argument("--scalyr-api-key", required=True)
 args = parser.parse_args()
 
 package_path = pl.Path(args.package_path)
+package_type = args.package_type
 
 if args.package_test_path:
     package_test_path = pl.Path(args.package_test_path)
 else:
-    package_test_path = _PARENT_DIR / "package_test.py"
+    if package_type in ["deb", "rpm", "msi", "tar"]:
+        package_test_path = _PARENT_DIR / "package_test.py"
+    elif package_type == "k8s":
+        package_test_path = _PARENT_DIR / "k8s_test.py"
+    elif package_type in ["docker-json"]:
+        package_test_path = _PARENT_DIR / "docker_test.py"
+    else:
+        raise ValueError(f"Wrong package type - {package_type}")
 
 if args.docker_image:
     subprocess.check_call(

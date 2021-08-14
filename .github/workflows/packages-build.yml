@@ -7,17 +7,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        package_type: ["deb", "rpm"]
-        python-version: [3.8]
-        os: [ubuntu-20.04]
         include:
-          - os: ubuntu-20.04
-            package_type: "tar"
+          - package_type: "deb"
+            package_name: "scalyr-agent-2_*.*.*_all.deb"
+            os: ubuntu-20.04
             python-version: "3.8"
-          - os: windows-2019
-            package_type: "msi"
+          - package_type: "rpm"
+            package_name: "scalyr-agent-2-*.*.*-*.noarch.rpm"
+            os: ubuntu-20.04
             python-version: "3.8"
-
+          - package_type: "tar"
+            package_name: "scalyr-agent-*.*.*.tar.gz"
+            os: ubuntu-20.04
+            python-version: "3.8"
+          - package_type: "msi"
+            package_name: "ScalyrAgentInstaller-*.*.*.msi"
+            os: windows-2019
+            python-version: "3.8"
+          - package_type: "k8s"
+            os: ubuntu-20.04
+            package_name: "scalyr-agent-k8s-*.*.*"
+            python-version: "3.8"
+          - package_type: "docker-json"
+            os: ubuntu-20.04
+            package_name: "scalyr-agent-docker-json-*.*.*"
+            python-version: "3.8"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -57,24 +71,23 @@ jobs:
         shell: bash
         run: |
           python agent_build/build_package.py ${{ matrix.package_type }} build --output-dir agent-build-output
-          ls -al agent-build-output/${{ matrix.package_type }}/*.${{ matrix.package_type }}*
-
 
       - name: Save the package.
         uses: actions/upload-artifact@v2
         with:
           name: "package-${{ matrix.package_type }}"
           path: |
-            agent-build-output/${{ matrix.package_type }}/*.${{ matrix.package_type }}*
+            agent-build-output/${{ matrix.package_name }}*
 
 
 
       - name: Save the frozen test script.
         uses: actions/upload-artifact@v2
+        if: matrix.package_type != 'k8s' && matrix.package_type != 'docker-json'
         with:
           name: "package-test-${{ matrix.package_type }}"
           path: |
-            agent-build-output/${{ matrix.package_type }}/frozen_binary_test/package_test*
+            agent-build-output/package_test_frozen_binary/package_test*
 
 
 
@@ -84,56 +97,89 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        package_type: ["deb"]
         os: ["ubuntu-20.04"]
         docker-image: ["ubuntu:14.04", "ubuntu:16.04", "ubuntu:18.04", "ubuntu:20.04"]
-        package_type: ["deb"]
         python-version: [3.8]
         include:
-          - os: ubuntu-20.04
+          - package_type: "rpm"
+            os: ubuntu-20.04
             docker-image: "centos:7"
-            package_type: "rpm"
             python-version: "3.8"
-          - os: ubuntu-20.04
+          - package_type: "rpm"
+            os: ubuntu-20.04
             docker-image: "centos:8"
-            package_type: "rpm"
             python-version: "3.8"
-          - os: ubuntu-20.04
+          - package_type: "rpm"
+            os: ubuntu-20.04
             docker-image: "amazonlinux:2"
-            package_type: "rpm"
             python-version: "3.8"
-          - os: ubuntu-20.04
-            package_type: "tar"
+          - package_type: "tar"
+            os: ubuntu-20.04
             docker-image: "ubuntu:14.04"
             python-version: "3.8"
-          - os: windows-2019
-            package_type: "msi"
+          - package_type: "msi"
+            os: windows-2019
+            python-version: "3.8"
+          - package_type: "k8s"
+            os: ubuntu-20.04
+            python-version: "3.8"
+          - package_type: "docker-json"
+            os: ubuntu-20.04
             python-version: "3.8"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - uses: actions/download-artifact@v2
+      - name: Download package.
+        uses: actions/download-artifact@v2
         with:
           name: "package-${{ matrix.package_type }}"
           path: ~/package
 
-      - uses: actions/download-artifact@v2
+      - name: Download package test (if presented).
+        uses: actions/download-artifact@v2
+        if: matrix.package_type != 'k8s' && matrix.package_type != 'docker-json'
         with:
           name: "package-test-${{ matrix.package_type }}"
           path: ~/package_test
 
-      - name: Test.
+      - name: Start minikube for the test of the kuberneter build.
+        if: ${{ matrix.package_type == 'k8s' }}
         shell: bash
         run: |
-          ls -al ~/package_test
+          minikube start
+
+      # All downloaded artifacts lose their permissions, so we have to make script executable once more.
+      - name: Make Kubernetes and docker package builder scripts executable.
+        if: matrix.package_type == 'k8s' || matrix.package_type == 'docker-json'
+        run: |
+          chmod +x ~/package/*
+
+      # All downloaded artifacts lose their permissions, so we have to make script executable once more.
+      - name: Make package test frozen binaries executable.
+        if: matrix.package_type != 'k8s' && matrix.package_type != 'docker-json'
+        run: |
           chmod +x ~/package_test/package_test*
-          ls ~/package/*.${{ matrix.package_type }}*
+
+      - name: Test.
+        shell: bash
+        env:
+          SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+        run: |
+          # Define the package_test_path option only if package test file is presented in artifacts.
+          package_test_path="$(ls ~/package_test/package_test* || true)"
+          if [ -f "${package_test_path}" ]; then
+            package_test_path_option="--package-test-path ${package_test_path}"
+          else
+            package_test_path_option=""
+          fi
+
+
           python3 tests/package_tests/package_test_runner.py \
+            --package-type ${{ matrix.package_type }} \
             --docker-image "${{ matrix.docker-image }}" \
-            --package-path ~/package/*.${{ matrix.package_type }}* \
-            --package-test-path ~/package_test/package_test* \
-            --scalyr-api-key "0v7dW1EIPpglMcSjGywUdgY9xTNWQP/kas6qHEmiUG5w-"
-
-
-
+            --package-path ~/package/* \
+            ${package_test_path_option} \
+            --scalyr-api-key "$SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN"
