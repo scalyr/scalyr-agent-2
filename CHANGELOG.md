@@ -1,7 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.22 "Volans" - Aug 30, 2021
+## 2.1.23 "Whipple" - Aug 15, 2021
+
+<!---
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Aug 12, 2021 16:00 -0800
+--->
+
+Bug fixes:
+* Fix docker container builder scripts to only use `buildx` if it is available.
+
+## 2.1.22 "Volans" - Aug 11, 2021
 
 <!---
 Packaged by Oliver Hsu <oliverhs@sentinelone.com> on Aug 11, 2021 21:00 -0800
