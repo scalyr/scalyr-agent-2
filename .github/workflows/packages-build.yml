@@ -145,7 +145,7 @@ jobs:
           name: "package-test-${{ matrix.package_type }}"
           path: ~/package_test
 
-      - name: Start minikube for the test of the kuberneter build.
+      - name: Start minikube for the test of the kubernetes build.
         if: ${{ matrix.package_type == 'k8s' }}
         shell: bash
         run: |

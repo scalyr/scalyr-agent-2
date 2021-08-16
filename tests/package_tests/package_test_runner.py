@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+#
+# This script is just a "wrapper" for all other test scripts in the folder.
+# The script accepts a package type, so it can pick an appropriate test script for this type for this package and run it.
+#
 import pathlib as pl
 import argparse
 import subprocess
@@ -46,15 +49,27 @@ else:
         raise ValueError(f"Wrong package type - {package_type}")
 
 if args.docker_image:
+    # Run the test inside the docker.
+    # fmt: off
     subprocess.check_call(
-        f"docker run -i --rm -v {package_test_path}:/package_test -v {package_path}:/{package_path.name} "
-        f"--init {args.docker_image} /package_test --package-path /{package_path.name} "
-        f"--scalyr-api-key {args.scalyr_api_key}",
-        shell=True,
+        [
+            "docker", "run", "-i", "--rm",
+            # map the test executable.
+            "-v", f"{package_test_path}:/package_test",
+            # map the package file.
+            "-v", f"{package_path}:/{package_path.name}", "--init",
+            # specify the image.
+            "args.docker_image",
+            # Command to run the test executable inside the container.
+            "/package_test", "--package-path", f"/{package_path.name}", "--scalyr-api-key", args.scalyr_api_key
+        ]
     )
+    # fmt: on
 else:
+    # Rus the test script.
     subprocess.check_call(
-        f"{package_test_path} --package-path {package_path} "
-        f"--scalyr-api-key {args.scalyr_api_key}",
-        shell=True,
+        [
+            str(package_test_path), "--package-path", str(package_path),
+            "--scalyr-api-key", args.scalyr_api_key
+        ]
     )

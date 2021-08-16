@@ -11,10 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import queue
-import threading
+import datetime
 import re
+import selectors
 from typing import IO
 
 AGENT_LOG_LINE_TIMESTAMP = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z"
@@ -36,33 +35,76 @@ class TestFail(Exception):
 
 class PipeReader:
     """
-    Simple reader to read process pipes. Since it's not possible to perform a non-blocking read from pipe,
-    we just read it in a separate thread and put it to the queue.
+    The reader for the file-like objects (for now, just for pipes), which uses the 'selectors' module to poll the
+    pip and to read from it in a non-blocking fashion.
     """
     def __init__(self, pipe: IO):
+        """
+        :param pipe: file_like object to read from.
+        """
         self._pipe = pipe
-        self._queue = queue.Queue()
-        self._started = False
-        self._thread = None
 
-    def read_pipe(self):
-        """
-        Reads lines from pipe. Runs in a separate thread.
-        """
-        while True:
-            line = self._pipe.readline()
-            if line == b'':
-                break
-            self._queue.put(line.decode())
+        # create a selector which will poll the pipe.
+        self._selector = selectors.DefaultSelector()
+
+        # register the needed events, for us, it's just all read events.
+        self._selector.register(pipe, selectors.EVENT_READ)
+
+        # Buffer with the part of the incomplete line which is remaining from a previous line read.
+        self._remaining_data = b""
 
     def next_line(self, timeout: int):
         """
-        Return lines from queue if presented.
+        Read the next line from the pipe or block until there is enough data.
+        :param timeout: Time in seconds to wait until the timeout error is raised.
         """
-        if not self._thread:
-            self._thread = threading.Thread(target=self.read_pipe)
-            self._thread.start()
-        return self._queue.get(timeout=timeout)
+        timeout_time = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+
+        # polling the pipe until there is a complete line, or throw a timeout error.
+        while True:
+            time_until_timeout = timeout_time - datetime.datetime.now()
+            if time_until_timeout.seconds <= 0:
+                raise TimeoutError("Can not read line. Time out.")
+
+            # look for the first line.
+            first_new_line_index = self._remaining_data.find(b"\n")
+
+            # There are no new lines, keep polling the pipe for new data.
+            if first_new_line_index == -1:
+
+                events = self._selector.select(
+                    timeout=time_until_timeout.seconds
+                )
+
+                # Add newly read data.
+                for _, _ in events:
+                    self._remaining_data = b"".join([self._remaining_data, self._pipe.read()])
+
+                continue
+
+            # Get the first line.
+            line = self._remaining_data[:first_new_line_index + 1]
+
+            # Update the remaining data.
+            self._remaining_data = self._remaining_data[first_new_line_index+1:]
+
+            return line.decode()
+
+    def close(self):
+        self._selector.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def check_agent_log_request_stats_in_line(line: str) -> bool:
@@ -84,7 +126,7 @@ def check_agent_log_request_stats_in_line(line: str) -> bool:
         return False
 
 
-def check_if_line_an_error(line: str):
+def assert_and_throw_if_line_an_error(line: str):
     """
     Check if the agent log line is error.
     """

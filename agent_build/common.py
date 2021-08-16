@@ -89,22 +89,14 @@ def recursively_delete_dirs_by_name(
 
     # Walk down the file tree, top down, allowing us to prune directories as we go.
     for root, dirs, files in os.walk(root_dir):
-        # The list of directories at the current level to delete.
-        to_remove = []
-
         # Examine all directories at this level, see if any get a match
         for dir_path in dirs:
-            remove_it = False
             for matcher in matchers:
                 if matcher.match(dir_path):
-                    remove_it = True
-            if remove_it:
-                to_remove.append(dir_path)
-
-        # Go back and delete it.  Also, remove it from dirs so that we don't try to walk down it.
-        for remove_dir_path in to_remove:
-            shutil.rmtree(os.path.join(root, remove_dir_path))
-            dirs.remove(remove_dir_path)
+                    shutil.rmtree(os.path.join(root, dir_path))
+                    # Also, remove it from dirs so that we don't try to walk down it.
+                    dirs.remove(dir_path)
+                    break
 
 
 class BadChangeLogFormat(Exception):

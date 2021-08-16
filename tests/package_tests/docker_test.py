@@ -19,11 +19,12 @@ import subprocess
 import sys
 import time
 import datetime
+import os
 from typing import Union
 
 sys.path.append(str(pl.Path(__file__).absolute().parent.parent.parent))
 
-from tests.package_tests.common import PipeReader, check_agent_log_request_stats_in_line, check_if_line_an_error
+from tests.package_tests.common import PipeReader, check_agent_log_request_stats_in_line, assert_and_throw_if_line_an_error
 from tests.package_tests.common import COMMON_TIMEOUT
 
 
@@ -64,18 +65,21 @@ def _test(scalyr_api_key: str):
         stdout=subprocess.PIPE
     )
 
-    # Read lines from agent.log.
+    # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
+    # Also set the mode for the process' std descriptor as non-blocking.
+    os.set_blocking(agent_log_tail_process.stdout.fileno(), False)
     pipe_reader = PipeReader(pipe=agent_log_tail_process.stdout)
 
     timeout_time = datetime.datetime.now() + datetime.timedelta(seconds=COMMON_TIMEOUT)
     try:
         while True:
 
-            seconds_until_timeout = timeout_time - datetime.datetime.now()
-            line = pipe_reader.next_line(timeout=seconds_until_timeout.seconds)
-            print(line)
+            seconds_until_timeout = (timeout_time - datetime.datetime.now()).seconds
+            if seconds_until_timeout <= 0:
+                raise TimeoutError("Test has timed out.")
+            line = pipe_reader.next_line(timeout=seconds_until_timeout)
             # Look for any ERROR message.
-            check_if_line_an_error(line)
+            assert_and_throw_if_line_an_error(line)
 
             # TODO: add more checks.
 
@@ -84,8 +88,7 @@ def _test(scalyr_api_key: str):
                 break
     finally:
         agent_log_tail_process.terminate()
-
-    agent_log_tail_process.communicate()
+        pipe_reader.close()
 
     print("Test passed!")
 
