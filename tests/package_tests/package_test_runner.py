@@ -59,7 +59,7 @@ if args.docker_image:
             # map the package file.
             "-v", f"{package_path}:/{package_path.name}", "--init",
             # specify the image.
-            "args.docker_image",
+            args.docker_image,
             # Command to run the test executable inside the container.
             "/package_test", "--package-path", f"/{package_path.name}", "--scalyr-api-key", args.scalyr_api_key
         ]
