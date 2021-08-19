@@ -115,7 +115,6 @@ def stop_agent(package_type: str):
         subprocess.check_call([binary_path, "stop"])
 
 
-
 def configure_agent(package_type: str, api_key: str):
     if package_type in ["deb", "rpm"]:
         config_path = pathlib.Path(AGENT_CONFIG_PATH)
@@ -123,13 +122,16 @@ def configure_agent(package_type: str, api_key: str):
         install_path = _get_tarball_install_path()
         config_path = install_path / "config/agent.json"
     elif package_type == "msi":
-        config_path = _get_msi_install_path() / "config", "agent.json"
+        config_path = _get_msi_install_path() / "config" / "agent.json"
 
     config = {}
     config["api_key"] = api_key
 
     config["server_attributes"] = {"serverHost": "ARTHUR_TEST"}
+
+    # TODO enable and test system and process monitors
     config["implicit_metric_monitor"] = False
+    config["implicit_agent_process_metrics_monitor"] = False
     config["verify_server_certificate"] = False
     config_path.write_text(json.dumps(config))
 
@@ -151,13 +153,14 @@ def remove_package(package_type: str):
 
 AGENT_CONFIG_PATH = "/etc/scalyr-agent-2/agent.json"
 
+
 def _get_logs_path(package_type: str) -> pl.Path:
     if package_type in ["deb", "rpm"]:
         return pl.Path("/var/log/scalyr-agent-2")
     elif package_type == "tar":
         return _get_tarball_install_path() / "log"
     elif package_type == "msi":
-        _get_msi_install_path() / "log"
+        return _get_msi_install_path() / "log"
 
 
 
@@ -192,6 +195,9 @@ def run(
 
         # Start agent.log file verification.
         agent_log_verifier.verify(timeout=300)
+
+        logging.info("Agent.log:")
+        logging.info(agent_log_path.read_text())
 
     get_agent_status(package_type)
 

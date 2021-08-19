@@ -9,28 +9,28 @@ jobs:
       matrix:
         include:
           - package_type: "deb"
-            package_name: "scalyr-agent-2_*.*.*_all.deb"
+            package_filename_glob: "scalyr-agent-2_*.*.*_all.deb"
             os: ubuntu-20.04
             python-version: "3.8"
           - package_type: "rpm"
-            package_name: "scalyr-agent-2-*.*.*-*.noarch.rpm"
+            package_filename_glob: "scalyr-agent-2-*.*.*-*.noarch.rpm"
             os: ubuntu-20.04
             python-version: "3.8"
           - package_type: "tar"
-            package_name: "scalyr-agent-*.*.*.tar.gz"
+            package_filename_glob: "scalyr-agent-*.*.*.tar.gz"
             os: ubuntu-20.04
             python-version: "3.8"
           - package_type: "msi"
-            package_name: "ScalyrAgentInstaller-*.*.*.msi"
+            package_filename_glob: "ScalyrAgentInstaller-*.*.*.msi"
             os: windows-2019
             python-version: "3.8"
           - package_type: "k8s"
             os: ubuntu-20.04
-            package_name: "scalyr-agent-k8s-*.*.*"
+            package_filename_glob: "scalyr-agent-k8s-*.*.*"
             python-version: "3.8"
           - package_type: "docker-json"
             os: ubuntu-20.04
-            package_name: "scalyr-agent-docker-json-*.*.*"
+            package_filename_glob: "scalyr-agent-docker-json-*.*.*"
             python-version: "3.8"
     steps:
       - name: Checkout repository
@@ -77,7 +77,7 @@ jobs:
         with:
           name: "package-${{ matrix.package_type }}"
           path: |
-            agent-build-output/${{ matrix.package_name }}*
+            agent-build-output/${{ matrix.package_filename_glob }}*
 
 
 
@@ -87,7 +87,7 @@ jobs:
         with:
           name: "package-test-${{ matrix.package_type }}"
           path: |
-            agent-build-output/package_test_frozen_binary/package_test*
+            agent-build-output/package_test_frozen_binary/package_test_runner*
 
 
 
@@ -161,7 +161,7 @@ jobs:
       - name: Make package test frozen binaries executable.
         if: matrix.package_type != 'k8s' && matrix.package_type != 'docker-json'
         run: |
-          chmod +x ~/package_test/package_test*
+          chmod +x ~/package_test/package_test_runner*
 
       - name: Test.
         shell: bash
@@ -169,7 +169,7 @@ jobs:
           SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
           # Define the package_test_path option only if package test file is presented in artifacts.
-          package_test_path="$(ls ~/package_test/package_test* || true)"
+          package_test_path="$(ls ~/package_test/package_test_runner* || true)"
           if [ -f "${package_test_path}" ]; then
             package_test_path_option="--package-test-path ${package_test_path}"
           else

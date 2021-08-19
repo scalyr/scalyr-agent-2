@@ -25,7 +25,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] [%(filename)s] %(message)s")
 
 
-_PARENT_DIR = pl.Path(__file__).parent
+_PARENT_DIR = pl.Path(__file__).parent.absolute().resolve()
 __SOURCE_ROOT__ = _PARENT_DIR.parent.parent
 
 # Add the source root to the PYTHONPATH. Since this is a script,this is required in order to be able to

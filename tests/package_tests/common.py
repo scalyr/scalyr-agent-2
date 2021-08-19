@@ -55,8 +55,10 @@ class LogVerifierCheck:
 
     def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
         """
-        Perform test or check of the line.
-        :param line: Line to check.
+        Perform test or check of the line. The check may be performed against new data of the whole data of the
+        log file.
+        :param new_text: new text that that has been added from the previous check.
+        :param whole_log_text: the whole text of the log file.
         """
         pass
 
