@@ -11,125 +11,245 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import datetime
-import re
-import selectors
-from typing import IO
 
+import pathlib as pl
+import datetime
+import enum
+import io
+import re
+import logging
+import time
+from typing import IO, Callable, List, Union, Tuple, Optional
+
+
+# Regex pattern for the timestamp of the agent.log file.
+# Example: 2021-08-18 23:25:41.825Z INFO [core] [scalyr-agent-2:1732] ...
 AGENT_LOG_LINE_TIMESTAMP = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z"
 
-# The pattern to match the periodic message lines with network request statistics. This message is written only when
-# all startup messages are written, so it's a good time to stop the verification of the agent.log file.
-AGENT_LOG_REQESTS_STATS_LINE_PATTERN = rf"{AGENT_LOG_LINE_TIMESTAMP} INFO \[core] \[scalyr-agent-2:\d+] " \
-                                       r"agent_requests requests_sent=(?P<requests_sent>\d+) " \
-                                       r"requests_failed=(?P<requests_failed>\d+) " \
-                                       r"bytes_sent=(?P<bytes_sent>\d+) " \
-                                       r".+"
+# Root of the source code.
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
 
-# 5 min.
-COMMON_TIMEOUT = 5 * 60
 
 class TestFail(Exception):
     pass
 
 
-class PipeReader:
+class LogVerifierCheckResult(enum.Enum):
     """
-    The reader for the file-like objects (for now, just for pipes), which uses the 'selectors' module to poll the
-    pip and to read from it in a non-blocking fashion.
+    Enum class which represents a result of the check process which is performed by the 'LogVerifierCheck' class.
     """
-    def __init__(self, pipe: IO):
+    SUCCESS = 0
+    FAIL = 1
+    RETRY = 2
+
+
+class LogVerifierCheck:
+    """
+    Abstraction which represents a small test ot check which is performed by the 'LogVerifier' class.
+    """
+    DESCRIPTION = None
+
+    @property
+    def description(self):
+        return type(self).DESCRIPTION
+
+    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
         """
-        :param pipe: file_like object to read from.
+        Perform test or check of the line.
+        :param line: Line to check.
         """
-        self._pipe = pipe
+        pass
 
-        # create a selector which will poll the pipe.
-        self._selector = selectors.DefaultSelector()
 
-        # register the needed events, for us, it's just all read events.
-        self._selector.register(pipe, selectors.EVENT_READ)
+class LogVerifier:
+    """
+    Abstraction to test the content of the log file. It performs set of smaller tests or "checks" which are represented
+        by the 'LogVerifierCheck' class. If at least one check fails, then the verifier fails too.
+    """
+    def __init__(self):
 
-        # Buffer with the part of the incomplete line which is remaining from a previous line read.
-        self._remaining_data = b""
+        # List of all instances of the 'LogVerifierCheck' class. The verification process will succeed only if all
+        # check instances from this list also succeed.
+        self._checks_required_to_pass: List[LogVerifierCheck] = []
 
-    def next_line(self, timeout: int):
+        # List with all check instances.
+        self._all_checks = []
+
+        self._content = ""
+
+        # Function which returns new content from the agent log.
+        # If the whole content of the log file is not available from the beginning (for example, the log file is read
+        # from the pipe), then this function can be used to fetch a new log data.
+        self._get_new_content: Optional[Callable] = None
+
+        # Since we can read log files from sources like pipes, there is a chance that the last line is incomplete,
+        # so it is stored in this variable until new data is read and the line is complete.
+        self._remaining_data: bytes = b""
+
+    def set_new_content_getter(self, get_new_data_fn: Callable[[], bytes]):
         """
-        Read the next line from the pipe or block until there is enough data.
-        :param timeout: Time in seconds to wait until the timeout error is raised.
+        Set callable object which wll be responsible for getting new content of the log file.
+        :param get_new_data_fn: Callable without arguments which returns new data from the log file.
+        """
+        self._get_new_content = get_new_data_fn
+
+    def add_line_check(self, check: LogVerifierCheck, required_to_pass=False):
+        """
+        Add new instance of the 'LogVerifierCheck' class, to perform some check during the run of the
+        'LogVerifier.verify' function. A new check has to pass or the whole verification will fail.
+        :param check: New instance of the check class.
+        :param required_to_pass: If True and a new check is failed, then the whole verification process is failed too.
+        """
+
+        if required_to_pass:
+            self._checks_required_to_pass.append(check)
+        self._all_checks.append(check)
+
+    def verify(self, timeout: int, retry_delay: int = 10):
+        """
+        The main function where all checks are done.
+        :param timeout: Time in seconds until the timeout error is raised.
+        :param retry_delay: Interval between reties in seconds.
         """
         timeout_time = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
 
-        # polling the pipe until there is a complete line, or throw a timeout error.
         while True:
-            time_until_timeout = timeout_time - datetime.datetime.now()
-            if time_until_timeout.seconds <= 0:
-                raise TimeoutError("Can not read line. Time out.")
+            # Protect this function from hanging by adding timeout.
+            if datetime.datetime.now() >= timeout_time:
+                descriptions = "\n".join([check.description for check in self._checks_required_to_pass])
+                raise TimeoutError(f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}")
 
-            # look for the first line.
-            first_new_line_index = self._remaining_data.find(b"\n")
+            # Get new content of the log file.
+            new_data = self._get_new_content()
 
-            # There are no new lines, keep polling the pipe for new data.
-            if first_new_line_index == -1:
-
-                events = self._selector.select(
-                    timeout=time_until_timeout.seconds
-                )
-
-                # Add newly read data.
-                for _, _ in events:
-                    self._remaining_data = b"".join([self._remaining_data, self._pipe.read()])
-
+            # There is no new data, skip and wait.
+            if not new_data:
+                time.sleep(retry_delay)
                 continue
 
-            # Get the first line.
-            line = self._remaining_data[:first_new_line_index + 1]
+            # There is a new content in the log file. Get only full lines from the new data.
 
-            # Update the remaining data.
-            self._remaining_data = self._remaining_data[first_new_line_index+1:]
+            # Join existing log data with a new.
+            self._remaining_data = b"".join([self._remaining_data, new_data])
 
-            return line.decode()
+            # Find the last new line character to separate complete lines from the last incomplete one.
+            last_new_line_index = self._remaining_data.rfind(b"\n")
 
-    def close(self):
-        self._selector.close()
+            # There's no any new line, wait until there is enough data for a line.
+            if last_new_line_index == -1:
+                time.sleep(retry_delay)
+                continue
+
+            # There is at least one complete log line.
+            # Separate data with only complete lines.
+            new_lines_data = self._remaining_data[:last_new_line_index+1:]
+            # Save last incomplete line.
+            self._remaining_data = self._remaining_data[last_new_line_index+1:]
+
+            # Decode new lines text.
+            new_lines_text = new_lines_data.decode()
+
+            self._content = "".join([self._content, new_lines_text])
+
+            for line_check in list(self._all_checks):
+                # apply check to the line and get the result of the check.
+                result = line_check.perform(
+                    new_text=new_lines_text,
+                    whole_log_text=self._content
+                )
+
+                # if the result is tuple, then the first element is a result and the second is an additional
+                # message.
+                if isinstance(result, tuple):
+                    result, message = result
+                else:
+                    message = None
+
+                # The check is successful.
+                if result == LogVerifierCheckResult.SUCCESS:
+                    # Print result message if presented.
+                    if message:
+                        logging.info(message)
+
+                    if line_check in self._checks_required_to_pass:
+                        # Remove the check instance to prevent further checks since it has been already checked
+                        # successfully.
+                        self._checks_required_to_pass.remove(line_check)
+                        self._all_checks.remove(line_check)
+
+                # The result has been failed. Stop the verifier with error.
+                elif result == LogVerifierCheckResult.FAIL:
+                    error_message = f"The check '{line_check.description}' has failed."
+                    if message:
+                        error_message = message
+                    raise TestFail(error_message)
+
+                # Leave the check for the next iteration to retry in once more.
+                elif result == LogVerifierCheckResult.RETRY:
+                    if message:
+                        logging.info(f"Retry check '{line_check.description}'. Reason: {message}")
+                else:
+                    raise ValueError("Unknown Test Check result.")
+
+            # All checks are successful, stop the verification as successful.
+            if len(self._checks_required_to_pass) == 0:
+                logging.info(f"All checks have passed.")
+                return
+            else:
+                # There is still at least one unfinished required check. Wait and repeat the verification once more.
+                logging.info(f"Not all checks have passed. Retry in {retry_delay} seconds.")
+                time.sleep(retry_delay)
+                continue
 
 
+# This check class is responsible for finding and validating the agent log message which contains network request
+# statistics.
+#
+# Line example: 2021-08-18 23:25:41.825Z INFO [core] [scalyr-agent-2:1732] agent_requests requests_sent=24 ...
+#
+class AgentLogRequestStatsLineCheck(LogVerifierCheck):
+    DESCRIPTION = "Find and validate the agent log line with request stats. (Starts with 'agent_requests')."
 
+    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
+        # Match new lines for the requests status message.
 
-
-
-
-
-
-
-
-
-
-
-
-def check_agent_log_request_stats_in_line(line: str) -> bool:
-    # Match for the requests status message.
-    m = re.match(AGENT_LOG_REQESTS_STATS_LINE_PATTERN, line)
-
-    if m:
-        # The requests status message is found.
-        # Also do a final check for a valid request stats.
-        md = m.groupdict()
-        requests_sent = int(md["requests_sent"])
-        bytes_sent = int(md["bytes_sent"])
-        if bytes_sent <= 0 and requests_sent <= 0:
-            raise TestFail(
-                "Agent log says that during the run the agent has sent zero bytes or requests."
+        for line in io.StringIO(new_text):
+            # The pattern to match the periodic message lines with network request statistics. This message is written only
+            # when all startup messages are written, so it's a good time to stop the verification of the agent.log file.
+            m = re.match(
+                rf"{AGENT_LOG_LINE_TIMESTAMP} INFO \[core] \[(agent_main\.py:\d+|scalyr-agent-2:\d+)] "
+                r"agent_requests requests_sent=(?P<requests_sent>\d+) "
+                r"requests_failed=(?P<requests_failed>\d+) "
+                r"bytes_sent=(?P<bytes_sent>\d+) "
+                r".+",
+                line
             )
-        return True
-    else:
-        return False
+
+            if m:
+                # The requests status message is found.
+                # Also do a final check for a valid request stats.
+                md = m.groupdict()
+                requests_sent = int(md["requests_sent"])
+                bytes_sent = int(md["bytes_sent"])
+                if bytes_sent <= 0:
+                    return LogVerifierCheckResult.FAIL, "Agent log says that during the run the agent has sent zero bytes."
+                if requests_sent <= 0:
+                    return LogVerifierCheckResult.FAIL, "Agent log says that during the run the agent has sent zero requests."
+
+                return LogVerifierCheckResult.SUCCESS, "Agent requests stats have been found and they are valid."
+
+        else:
+            # The matching line hasn't been found yet. Retry.
+            return LogVerifierCheckResult.RETRY
 
 
-def assert_and_throw_if_line_an_error(line: str):
-    """
-    Check if the agent log line is error.
-    """
-    if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*", line):
-        raise TestFail(f'The next line message is an error:\n"{line}"')
+class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
+    DESCRIPTION = "Check if the agent log line is not an error."
+
+    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
+        for line in io.StringIO(new_text):
+            if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*", line):
+                return LogVerifierCheckResult.FAIL, f"Agent log contains error line : {line}"
+
+        return LogVerifierCheckResult.SUCCESS
 

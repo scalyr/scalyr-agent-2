@@ -16,16 +16,20 @@
 
 import pathlib
 import pathlib as pl
-import argparse
 import subprocess
 import json
 import time
 import os
 import tarfile
-import re
+import logging
+
+from tests.package_tests.common import LogVerifier, AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck
 
 
-def install_deb_package():
+USER_HOME = pl.Path("~").expanduser()
+
+
+def install_deb_package(package_path: pl.Path):
     os.environ[
         "LD_LIBRARY_PATH"
     ] = f'/lib/x86_64-linux-gnu:{os.environ["LD_LIBRARY_PATH"]}'
@@ -35,7 +39,7 @@ def install_deb_package():
     )
 
 
-def install_rpm_package():
+def install_rpm_package(package_path: pl.Path):
     os.environ["LD_LIBRARY_PATH"] = "/libx64"
     subprocess.check_call(
         ["rpm", "-i", package_path],
@@ -43,87 +47,83 @@ def install_rpm_package():
     )
 
 
-def install_tarball():
+def install_tarball(package_path: pl.Path):
     tar = tarfile.open(package_path)
-    tar.extractall(pathlib.Path("~").expanduser())
+    tar.extractall(USER_HOME)
     tar.close()
 
 
-def install_msi_package():
+def _get_tarball_install_path() -> pl.Path:
+    matched_paths = list(USER_HOME.glob("scalyr-agent-*.*.*"))
+    if len(matched_paths) == 1:
+        return pl.Path(matched_paths[0])
+
+    raise ValueError("Can't find extracted tar file.")
+
+
+def install_msi_package(package_path: pl.Path):
     subprocess.check_call(f"msiexec.exe /I {package_path} /quiet", shell=True)
 
 
-def install_package(package_type: str):
+def install_package(package_type: str, package_path: pl.Path):
     if package_type == "deb":
-        install_deb_package()
+        install_deb_package(package_path)
     elif package_type == "rpm":
-        install_rpm_package()
+        install_rpm_package(package_path)
     elif package_type == "tar":
-        install_tarball()
+        install_tarball(package_path)
     elif package_type == "msi":
-        install_msi_package()
+        install_msi_package(package_path)
 
 
-def determine_version():
-    if package_type in ["deb", "rpm"]:
-        pass
-    elif package_type == "tar":
-        m = re.search(r"scalyr-agent-(\d+\.\d+\.\d+)", package_path.name)
-        return m.group(1)
+def _get_msi_install_path() -> pl.Path:
+    return pl.Path(os.environ["programfiles(x86)"]) / "Scalyr"
 
-
-def start_agent():
+def start_agent(package_type: str):
     if package_type in ["deb", "rpm", "msi"]:
 
         if package_type == "msi":
             # Add agent binaries to the PATH env. variable on windows.
-            bin_path = pl.Path(os.environ["programfiles(x86)"], "Scalyr", "bin")
+            bin_path = _get_msi_install_path() / "bin"
             os.environ["PATH"] = f"{bin_path};{os.environ['PATH']}"
 
         subprocess.check_call(f"scalyr-agent-2 start", shell=True, env=os.environ)
     elif package_type == "tar":
-        tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
+        tarball_dir = _get_tarball_install_path()
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call([binary_path, "start"])
 
 
-def get_agent_status():
+def get_agent_status(package_type: str):
     if package_type in ["deb", "rpm", "msi"]:
         subprocess.check_call(f"scalyr-agent-2 status -v", shell=True)
     elif package_type == "tar":
-        tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
+        tarball_dir = _get_tarball_install_path()
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call([binary_path, "status", "-v"])
 
 
-def stop_agent():
+def stop_agent(package_type: str):
     if package_type in ["deb", "rpm", "msi"]:
         subprocess.check_call(f"scalyr-agent-2 stop", shell=True)
     if package_type == "tar":
-        tarball_dir = list(pl.Path("~").expanduser().glob("scalyr-agent-*.*.*"))[0]
+        tarball_dir = _get_tarball_install_path()
 
         binary_path = tarball_dir / "bin/scalyr-agent-2"
         subprocess.check_call([binary_path, "stop"])
 
 
-def configure_agent(api_key: str):
+
+def configure_agent(package_type: str, api_key: str):
     if package_type in ["deb", "rpm"]:
         config_path = pathlib.Path(AGENT_CONFIG_PATH)
     elif package_type == "tar":
-        version = determine_version()
-
-        config_path = (
-            pl.Path("~").expanduser()
-            / f"scalyr-agent-{version}"
-            / "config"
-            / "agent.json"
-        )
+        install_path = _get_tarball_install_path()
+        config_path = install_path / "config/agent.json"
     elif package_type == "msi":
-        config_path = pl.Path(
-            os.environ["programfiles(x86)"], "Scalyr", "config", "agent.json"
-        )
+        config_path = _get_msi_install_path() / "config", "agent.json"
 
     config = {}
     config["api_key"] = api_key
@@ -151,46 +151,52 @@ def remove_package(package_type: str):
 
 AGENT_CONFIG_PATH = "/etc/scalyr-agent-2/agent.json"
 
+def _get_logs_path(package_type: str) -> pl.Path:
+    if package_type in ["deb", "rpm"]:
+        return pl.Path("/var/log/scalyr-agent-2")
+    elif package_type == "tar":
+        return _get_tarball_install_path() / "log"
+    elif package_type == "msi":
+        _get_msi_install_path() / "log"
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--package-path", type=str, required=True)
 
-    parser.add_argument("--scalyr-api-key", required=True)
 
-    args = parser.parse_args()
-
-    package_path = pl.Path(args.package_path)
-
-    scalyr_api_key = args.scalyr_api_key
-
+def run(
+        package_path: pl.Path,
+        package_type: str,
+        scalyr_api_key: str,
+):
     if not package_path.exists():
-        print("No package.")
+        logging.error("No package.")
         exit(1)
 
-    if package_path.name.endswith(".deb"):
-        package_type = "deb"
-    elif package_path.name.endswith(".rpm"):
-        package_type = "rpm"
-    elif package_path.name.endswith("tar.gz"):
-        package_type = "tar"
-    elif package_path.name.endswith(".msi"):
-        package_type = "msi"
-    else:
-        raise ValueError("Unknown package format.")
+    install_package(package_type, package_path)
 
-    install_package(package_type)
+    configure_agent(package_type, scalyr_api_key)
 
-    configure_agent(args.scalyr_api_key)
-
-    start_agent()
+    start_agent(package_type)
 
     time.sleep(2)
 
-    get_agent_status()
+    agent_log_path = _get_logs_path(package_type) / "agent.log"
+
+    with agent_log_path.open("rb") as f:
+        logging.info("Start verifying the agent.log file.")
+        agent_log_verifier = LogVerifier()
+        agent_log_verifier.set_new_content_getter(f.read)
+
+        # Add check for any ERROR messages to the verifier.
+        agent_log_verifier.add_line_check(AssertAgentLogLineIsNotAnErrorCheck())
+        # Add check for the request stats message.
+        agent_log_verifier.add_line_check(AgentLogRequestStatsLineCheck(), required_to_pass=True)
+
+        # Start agent.log file verification.
+        agent_log_verifier.verify(timeout=300)
+
+    get_agent_status(package_type)
 
     time.sleep(2)
 
-    stop_agent()
+    stop_agent(package_type)
 
     remove_package(package_type)

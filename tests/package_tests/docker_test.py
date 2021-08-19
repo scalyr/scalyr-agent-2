@@ -13,19 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import pathlib as pl
 import subprocess
-import sys
 import time
-import datetime
+import logging
 import os
 from typing import Union
 
-sys.path.append(str(pl.Path(__file__).absolute().parent.parent.parent))
-
-from tests.package_tests.common import PipeReader, check_agent_log_request_stats_in_line, assert_and_throw_if_line_an_error
-from tests.package_tests.common import COMMON_TIMEOUT
+from tests.package_tests.common import AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck, LogVerifier
 
 
 def build_agent_image(builder_path: pl.Path):
@@ -66,34 +61,35 @@ def _test(scalyr_api_key: str):
     )
 
     # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
+
     # Also set the mode for the process' std descriptor as non-blocking.
     os.set_blocking(agent_log_tail_process.stdout.fileno(), False)
-    pipe_reader = PipeReader(pipe=agent_log_tail_process.stdout)
 
-    timeout_time = datetime.datetime.now() + datetime.timedelta(seconds=COMMON_TIMEOUT)
     try:
-        while True:
+        logging.info("Start verifying the agent.log file.")
+        # Create verifier object for the agent.log file.
+        agent_log_tester = LogVerifier()
 
-            seconds_until_timeout = (timeout_time - datetime.datetime.now()).seconds
-            if seconds_until_timeout <= 0:
-                raise TimeoutError("Test has timed out.")
-            line = pipe_reader.next_line(timeout=seconds_until_timeout)
-            # Look for any ERROR message.
-            assert_and_throw_if_line_an_error(line)
+        # set the 'read' method of the 'stdout' pipe of the previously created tail process as a "content getter" for
+        # the log verifier, so it can fetch new data from the pipe when it is available.
+        agent_log_tester.set_new_content_getter(agent_log_tail_process.stdout.read)
 
-            # TODO: add more checks.
+        # Add check for any ERROR messages to the verifier.
+        agent_log_tester.add_line_check(AssertAgentLogLineIsNotAnErrorCheck())
+        # Add check for the request stats message.
+        agent_log_tester.add_line_check(AgentLogRequestStatsLineCheck(), required_to_pass=True)
 
-            if check_agent_log_request_stats_in_line(line):
-                # The requests status message is found. Stop the loop.
-                break
+        # Start agent.log file verification.
+        agent_log_tester.verify(timeout=300)
+
+        # TODO: add more checks.
     finally:
         agent_log_tail_process.terminate()
-        pipe_reader.close()
 
-    print("Test passed!")
+    logging.info("Test passed!")
 
 
-def main(
+def run(
     builder_path: Union[str, pl.Path],
     scalyr_api_key: str
 ):
@@ -105,15 +101,3 @@ def main(
         _test(scalyr_api_key)
     finally:
         _delete_agent_container()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--package-path", required=True)
-    parser.add_argument("--scalyr-api-key", required=True)
-
-    args = parser.parse_args()
-    main(
-        builder_path=args.package_path,
-        scalyr_api_key=args.scalyr_api_key
-    )

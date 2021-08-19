@@ -570,7 +570,7 @@ class PackageBuilder(abc.ABC):
         package_test_pyinstaller_output = self._build_output_path / "package_test_frozen_binary"
 
         package_test_script_path = (
-            __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test.py"
+            __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test_runner.py"
         )
 
         subprocess.check_call(

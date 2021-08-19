@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import datetime
 import os
 import re
 import subprocess
@@ -22,17 +20,12 @@ import pathlib as pl
 import tempfile
 import time
 import sys
+import logging
 from typing import Union
 
-__SOURCE_ROOT__ = pl.Path(__file__).absolute().parent.parent.parent
-sys.path.append(str(__SOURCE_ROOT__))
 
-
-# Timeout 5 minutes.
-from tests.package_tests.common import PipeReader, check_agent_log_request_stats_in_line, assert_and_throw_if_line_an_error
-from tests.package_tests.common import COMMON_TIMEOUT
-
-
+from tests.package_tests.common import SOURCE_ROOT
+from tests.package_tests.common import AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck, LogVerifier
 
 
 def build_agent_image(builder_path: pl.Path):
@@ -55,33 +48,41 @@ def build_agent_image(builder_path: pl.Path):
     )
 
 
-_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH = __SOURCE_ROOT__ / "k8s" / "scalyr-service-account.yaml"
+_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH = SOURCE_ROOT / "k8s" / "scalyr-service-account.yaml"
 
 
 def _delete_k8s_objects():
     # Delete previously created objects, if presented.
+
+    # Suppress output for the delete commands, unless it not DEBUG mode.
+    if logging.root.level == logging.DEBUG:
+        stdout = sys.stdout
+        stderr = sys.stderr
+    else:
+        stdout = subprocess.DEVNULL
+        stderr = subprocess.DEVNULL
     try:
         subprocess.check_call(
-            "kubectl delete daemonset scalyr-agent-2", shell=True
+            "kubectl delete daemonset scalyr-agent-2", shell=True, stdout=stdout, stderr=stderr
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            "kubectl delete secret scalyr-api-key", shell=True,
+            "kubectl delete secret scalyr-api-key", shell=True, stdout=stdout, stderr=stderr
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            "kubectl delete configmap scalyr-config", shell=True,
+            "kubectl delete configmap scalyr-config", shell=True, stdout=stdout, stderr=stderr
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            ["kubectl", "delete", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)],
-        )
+            ["kubectl", "delete", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)], stdout=stdout, stderr=stderr
+        ),
     except subprocess.CalledProcessError:
         pass
 
@@ -106,7 +107,7 @@ def _test(scalyr_api_key: str):
     )
 
     # Modify the manifest for the agent's daemonset.
-    scalyr_agent_manifest_source_path = __SOURCE_ROOT__ / "k8s/scalyr-agent-2.yaml"
+    scalyr_agent_manifest_source_path = SOURCE_ROOT / "k8s/scalyr-agent-2.yaml"
     scalyr_agent_manifest = scalyr_agent_manifest_source_path.read_text()
 
     # Change the production image name to the local one.
@@ -116,7 +117,7 @@ def _test(scalyr_api_key: str):
         scalyr_agent_manifest
     )
 
-    # Change image pull policy to be able to bull the local image.
+    # Change image pull policy to be able to pull the local image.
     scalyr_agent_manifest = re.sub(
         r"imagePullPolicy: \w+", "imagePullPolicy: Never", scalyr_agent_manifest
     )
@@ -148,36 +149,34 @@ def _test(scalyr_api_key: str):
         stdout=subprocess.PIPE
     )
     # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
+
     # Also set the mode for the process' std descriptor as non-blocking.
     os.set_blocking(agent_log_tail_process.stdout.fileno(), False)
-    pipe_reader = PipeReader(pipe=agent_log_tail_process.stdout)
-
-    timeout_time = datetime.datetime.now() + datetime.timedelta(seconds=COMMON_TIMEOUT)
 
     try:
-        while True:
-            seconds_until_timeout = (timeout_time - datetime.datetime.now()).seconds
-            if seconds_until_timeout <= 0:
-                raise TimeoutError("Test has timed out.")
-            line = pipe_reader.next_line(timeout=seconds_until_timeout)
-            # Look for any ERROR message.
-            assert_and_throw_if_line_an_error(line)
+        logging.info("Start verifying the agent.log file.")
+        # Create verifier object for the agent.log file.
+        agent_log_tester = LogVerifier()
 
-            # TODO: add more checks.
+        # set the 'read' method of the 'stdout' pipe of the previously created tail process as a "content getter" for
+        # the log verifier, so it can fetch new data from the pipe when it is available.
+        agent_log_tester.set_new_content_getter(agent_log_tail_process.stdout.read)
 
-            if check_agent_log_request_stats_in_line(line):
-                # The requests status message is found. Stop the loop.
-                break
+        # Add check for any ERROR messages to the verifier.
+        agent_log_tester.add_line_check(AssertAgentLogLineIsNotAnErrorCheck())
+        # Add check for the request stats message.
+        agent_log_tester.add_line_check(AgentLogRequestStatsLineCheck(), required_to_pass=True)
+
+        # Start agent.log file verification.
+        agent_log_tester.verify(timeout=300)
     finally:
         agent_log_tail_process.terminate()
-        pipe_reader.close()
+        tmp_dir.cleanup()
 
-    print("Test passed!")
-
-    tmp_dir.cleanup()
+    logging.info("Test passed!")
 
 
-def main(
+def run(
         builder_path: Union[str, pl.Path],
         scalyr_api_key: str
 ):
@@ -190,16 +189,5 @@ def main(
     try:
         _test(scalyr_api_key)
     finally:
+        logging.info("Clean up. Removing all kubernetes objects...")
         _delete_k8s_objects()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--package-path", required=True)
-    parser.add_argument("--scalyr-api-key", required=True)
-
-    args = parser.parse_args()
-    main(
-        builder_path=args.package_path,
-        scalyr_api_key=args.scalyr_api_key
-    )

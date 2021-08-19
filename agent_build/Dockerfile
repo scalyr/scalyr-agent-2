@@ -13,9 +13,9 @@ ADD ./VERSION /scalyr-agent-2/VERSION
 ADD ./CHANGELOG.md /scalyr-agent-2/CHANGELOG.md
 ADD ./certs /scalyr-agent-2/certs
 
-# Also add the package test script, so the packager also can make the frozen binary for it.
-# This frozen binary later can be used to run package test on systems without python.
-ADD ./tests/package_tests/package_test.py /scalyr-agent-2/tests/package_tests/package_test.py
+# Also add the package test module, so the packager also can make the frozen binary for the package tests.
+# This frozen binary later can be used to run package tests on systems without python.
+ADD ./tests/package_tests/ /scalyr-agent-2/tests/package_tests/
 
 ARG BUILD_COMMAND
 

@@ -12,14 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This script is just a "wrapper" for all other test scripts in the folder.
-# The script accepts a package type, so it can pick an appropriate test script for this type for this package and run it.
+# This script is just a "wrapper" for all other tests in the folder.
+# The script accepts a package type, so it can run an appropriate test for the package.
 #
+
 import pathlib as pl
 import argparse
 import subprocess
+import sys
+import logging
+
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] [%(filename)s] %(message)s")
+
 
 _PARENT_DIR = pl.Path(__file__).parent
+__SOURCE_ROOT__ = _PARENT_DIR.parent.parent
+
+# Add the source root to the PYTHONPATH. Since this is a script,this is required in order to be able to
+# import inner modules.
+sys.path.append(str(__SOURCE_ROOT__))
+
+# Import internal modules only after the PYTHONPATH is tweaked.
+from tests.package_tests import k8s_test, docker_test, package_test
 
 
 parser = argparse.ArgumentParser()
@@ -38,38 +52,51 @@ package_type = args.package_type
 
 if args.package_test_path:
     package_test_path = pl.Path(args.package_test_path)
-else:
-    if package_type in ["deb", "rpm", "msi", "tar"]:
-        package_test_path = _PARENT_DIR / "package_test.py"
-    elif package_type == "k8s":
-        package_test_path = _PARENT_DIR / "k8s_test.py"
-    elif package_type in ["docker-json"]:
-        package_test_path = _PARENT_DIR / "docker_test.py"
-    else:
-        raise ValueError(f"Wrong package type - {package_type}")
+
 
 if args.docker_image:
+
+    if args.package_test_path:
+        executable_mapping_args = ["-v", f"{args.package_test_path}:/tmp/test_executable"]
+        test_executable_path = "/tmp/test_executable"
+    else:
+        executable_mapping_args = []
+        test_executable_path = "/scalyr-agent-2/tests/package_tests/package_test_runner.py"
+
     # Run the test inside the docker.
     # fmt: off
     subprocess.check_call(
         [
-            "docker", "run", "-i", "--rm",
-            # map the test executable.
-            "-v", f"{package_test_path}:/package_test",
-            # map the package file.
-            "-v", f"{package_path}:/{package_path.name}", "--init",
+            "docker", "run", "-i", "--rm", "--init",
+            "-v", f"{__SOURCE_ROOT__}:/scalyr-agent-2",
+            "-v", f"{package_path}:/tmp/package",
+            *executable_mapping_args,
             # specify the image.
             args.docker_image,
             # Command to run the test executable inside the container.
-            "/package_test", "--package-path", f"/{package_path.name}", "--scalyr-api-key", args.scalyr_api_key
+            test_executable_path,
+            "--package-type", package_type,
+            "--package-path", f"/tmp/package", "--scalyr-api-key", args.scalyr_api_key
         ]
     )
     # fmt: on
 else:
-    # Rus the test script.
-    subprocess.check_call(
-        [
-            str(package_test_path), "--package-path", str(package_path),
-            "--scalyr-api-key", args.scalyr_api_key
-        ]
-    )
+
+    if package_type in ["deb", "rpm", "msi", "tar"]:
+        package_test.run(
+            package_path=package_path,
+            package_type=package_type,
+            scalyr_api_key=args.scalyr_api_key
+        )
+    elif package_type == "k8s":
+        k8s_test.run(
+            builder_path=package_path,
+            scalyr_api_key=args.scalyr_api_key
+        )
+    elif package_type in ["docker-json"]:
+        docker_test.run(
+            builder_path=package_path,
+            scalyr_api_key=args.scalyr_api_key
+        )
+    else:
+        raise ValueError(f"Wrong package type - {package_type}")
