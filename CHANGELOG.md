@@ -8,7 +8,7 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Aug 12, 2021 16:00 -0800
 --->
 
 Bug fixes:
-* Fix memory leak in the syslog monitor on Windows, which is caused by a bug in Python's TCP/UDP servers. Updated Python to the version where the bug is fixed.
+* Fix memory leak in the syslog monitor on Windows which is caused by a bug in Python's TCP/UDP servers. Updated Python to the version where the bug is fixed.
 
 ## 2.1.23 "Whipple" - Aug 15, 2021
 
