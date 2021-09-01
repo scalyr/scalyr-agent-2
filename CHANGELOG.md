@@ -1,15 +1,6 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.24 "TBD" - Aug 15, 2021
-
-<!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Aug 12, 2021 16:00 -0800
---->
-
-Bug fixes:
-* Fix memory leak in the syslog monitor on Windows which is caused by a bug in Python's TCP/UDP servers. Updated Python to the version where the bug is fixed.
-
 ## 2.1.23 "Whipple" - Aug 15, 2021
 
 <!---
@@ -18,6 +9,7 @@ Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Aug 12, 2021 16:00 -0
 
 Bug fixes:
 * Fix docker container builder scripts to only use `buildx` if it is available.
+* Fix memory leak in the Syslog monitor which is caused by a bug in standard TCP/UDP servers in Python 3 (https://bugs.python.org/issue37193). The version of Python for Windows was updated to 3.8.10. For Linux users, who use Scalyr Agent DEB or RPM packages with Python 3, it is also recommended to check if their Python installation is up to date and has appropriate bug fixes.
 
 ## 2.1.22 "Volans" - Aug 11, 2021
 
