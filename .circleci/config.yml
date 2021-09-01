@@ -512,8 +512,7 @@ commands:
         type: string
       cache-path:
         type: string
-      image-
-      -path:
+      image-builder-path:
         type: string
       python_executable_path:
         type: string
