@@ -512,7 +512,8 @@ commands:
         type: string
       cache-path:
         type: string
-      image-builder-path:
+      image-
+      -path:
         type: string
       python_executable_path:
         type: string
@@ -2113,10 +2114,10 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.8.12-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.8.12-amd64.exe https://www.python.org/ftp/python/3.8.12/python-3.8.12-amd64.exe
+            if (!(Test-Path .\python_installer\python-3.8.10-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.10-amd64.exe https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe
             }
-            python_installer\python-3.8.12-amd64.exe /quiet /passive
+            python_installer\python-3.8.10-amd64.exe /quiet /passive
 
       - save_cache:
           name: Save Wix Cache
