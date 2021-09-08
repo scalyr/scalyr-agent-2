@@ -16,7 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 #
-# Those test just the same test from previos copying manager, but adapted to the new copying manager.
+# Those test just the same test from previous copying manager, but adapted to the new copying manager.
 #
 
 from __future__ import unicode_literals

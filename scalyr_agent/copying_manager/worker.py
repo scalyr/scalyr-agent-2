@@ -1083,10 +1083,8 @@ class CopyingManagerWorkerSession(
         """
         checkpoints = {}
         for processor in log_processors:
-            state = processor.get_checkpoint()
+            state = processor.get_checkpoint(checkpoint_time=current_time)
 
-            # also add the timestamp to each state. This is needed to discard stale ones.
-            state["time"] = current_time
             checkpoints[processor.get_log_path()] = state
 
         return checkpoints

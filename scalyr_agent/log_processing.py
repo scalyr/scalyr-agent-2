@@ -2877,16 +2877,23 @@ class LogFileProcessor(object):
         finally:
             self.__lock.release()
 
-    def get_checkpoint(self):
+    def get_checkpoint(self, checkpoint_time=None):
         """
         Return current state of the log file processor or the state when it has been closed.
+        :param checkpoint_time: Unix time when the file checkpoint has been obtained. If None, then the current time
+            is used.
         """
         if self.__is_closed:
-            # return the saved checkpoint state of the log processor in case if it has been closed.
+            # Return the saved checkpoint state of the log processor in case if it has been closed.
             # We can't get the checkpoint from the log file iterator because all of its files have already been closed.
-            return self._saved_checkpoint.copy()
+            result = self._saved_checkpoint.copy()
+        else:
+            result = self.__log_file_iterator.get_mark_checkpoint()
 
-        return self.__log_file_iterator.get_mark_checkpoint()
+        # Add the timestamp. This is needed to discard stale checkpoints.
+        result["time"] = checkpoint_time or time.time()
+
+        return result
 
     @staticmethod
     def create_checkpoint(initial_position):
