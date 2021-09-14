@@ -10,6 +10,7 @@ Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Aug 12, 2021 16:00 -0
 Bug fixes:
 * Fix docker container builder scripts to only use `buildx` if it is available.
 * Fix memory leak in the Syslog monitor which is caused by a bug in standard TCP/UDP servers in Python 3 (https://bugs.python.org/issue37193). The version of Python for Windows was updated to 3.8.10. For Linux users, who run agent on Python 3 and use Syslog monitor, it is also recommended to check if their Python 3 installation is up to date and has appropriate bug fixes.
+* Fix bug in the copying manager which works with monitor (such as Docker or Syslog monitor). This bug might cause re-uploading of the old log messages in some edge cases. 
 
 ## 2.1.22 "Volans" - Aug 11, 2021
 
