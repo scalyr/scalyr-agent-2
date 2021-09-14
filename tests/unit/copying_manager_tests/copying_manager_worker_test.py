@@ -678,7 +678,11 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         assert test_file.str_path in checkpoints
 
         for path, state in checkpoints.items():
-            assert "time" in state, "Checkpoint state for the file {} does not have required 'time' field.".format(path)
+            assert (
+                "time" in state
+            ), "Checkpoint state for the file {} does not have required 'time' field.".format(
+                path
+            )
 
         # create new worker. Imitate second launch. Worker must start from beginning of the file.
         self._instance = worker = self._create_worker_session()
@@ -700,7 +704,11 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         assert test_file.str_path in checkpoints
 
         for path, state in checkpoints.items():
-            assert "time" in state, "Checkpoint state for the file {} does not have required 'time' field.".format(path)
+            assert (
+                "time" in state
+            ), "Checkpoint state for the file {} does not have required 'time' field.".format(
+                path
+            )
 
         # create new worker. Imitate third launch.
         # Now we also provide checkpoints from previous run, so it have to ignore "copy_at_index_zero".
@@ -725,6 +733,10 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
         closed_files_checkpoints = worker.get_and_reset_closed_files_checkpoints()
 
         for path, state in closed_files_checkpoints.items():
-            assert "time" in state, "Checkpoint state for the file {} does not have required 'time' field.".format(path)
+            assert (
+                "time" in state
+            ), "Checkpoint state for the file {} does not have required 'time' field.".format(
+                path
+            )
 
         assert processor.get_log_path() in closed_files_checkpoints
