@@ -1,0 +1,4 @@
+# Dependencies for agent's monitors. They are defined in a separate file to avoid their installation
+# in some specific build, such as for docker or kubernetes.
+redis==2.10.5
+# TODO: add other dependencies.

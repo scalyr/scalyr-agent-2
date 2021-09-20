@@ -17,6 +17,7 @@ import re
 import shlex
 import sys
 import time
+import shutil
 from typing import Union
 
 __SOURCE_ROOT__ = pl.Path(__file__).parent.parent
@@ -63,6 +64,38 @@ def recursively_delete_files_by_name(
                 if matcher.match(file_path):
                     # Delete it if it did match.
                     os.unlink(os.path.join(root, file_path))
+                    break
+
+
+def recursively_delete_dirs_by_name(
+        root_dir: Union[str, pl.Path], *dir_names: str
+):
+    """
+    Deletes any directories that are in the current working directory or any of its children whose file names
+    match the specified regular expressions.
+
+    This will recursively examine all children of the current working directory.
+
+    If a directory is found that needs to be deleted, all of it and its children are deleted.
+
+    @param dir_names: A variable number of strings containing regular expressions that should match the file names of
+        the directories that should be deleted.
+    """
+
+    # Compile the strings into actual regular expression match objects.
+    matchers = []
+    for dir_name in dir_names:
+        matchers.append(re.compile(dir_name))
+
+    # Walk down the file tree, top down, allowing us to prune directories as we go.
+    for root, dirs, files in os.walk(root_dir):
+        # Examine all directories at this level, see if any get a match
+        for dir_path in dirs:
+            for matcher in matchers:
+                if matcher.match(dir_path):
+                    shutil.rmtree(os.path.join(root, dir_path))
+                    # Also, remove it from dirs so that we don't try to walk down it.
+                    dirs.remove(dir_path)
                     break
 
 

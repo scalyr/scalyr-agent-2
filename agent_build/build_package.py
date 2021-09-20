@@ -24,6 +24,8 @@ import sys
 import stat
 import hashlib
 import uuid
+import os
+import re
 import io
 from typing import Union, Optional
 
@@ -82,7 +84,11 @@ class PackageBuilder(abc.ABC):
 
     # The list of files which are somehow used during the preparation of the build environment. This is needed to
     # calculate their checksum. (see action 'dump-checksum')
-    FILES_USED_IN_BUILD_ENVIRONMENT: Union[str, pl.Path] = []
+    FILES_USED_IN_BUILD_ENVIRONMENT: Union[str, pl.Path] = [
+        __SOURCE_ROOT__ / "agent_build" / "requirements.txt",
+        __SOURCE_ROOT__ / "agent_build" / "monitors_requirements.txt",
+        __SOURCE_ROOT__ / "agent_build" / "frozen-binary-builder-requirements.txt",
+    ]
 
     # If this flag True, then the builder will run inside the docker.
     DOCKERIZED = False
@@ -95,6 +101,10 @@ class PackageBuilder(abc.ABC):
 
     # The type of the installation. For more info, see the 'InstallType' in the scalyr_agent/__scalyr__.py
     INSTALL_TYPE = None
+
+    # Add agent source code as a bundled frozen binary if True, or
+    # add the source code as it is.
+    USE_FROZEN_BINARIES: bool = True
 
     def __init__(
         self,
@@ -109,6 +119,9 @@ class PackageBuilder(abc.ABC):
         """
         # The path where the build output will be stored.
         self._build_output_path: Optional[pl.Path] = None
+
+        # Folder with intermediate and temporary results of the build.
+        self._intermediate_results_path: Optional[pl.Path] = None
 
         # The path of the folder where all files of the package will be stored.
         # May be help full for the debug purposes.
@@ -130,12 +143,15 @@ class PackageBuilder(abc.ABC):
             shutil.rmtree(output_path)
 
         output_path.mkdir(parents=True)
-        self._build_output_path = pl.Path(output_path) / type(self).PACKAGE_TYPE
-        self._package_files_path = self._build_output_path / "package_root"
 
         # If locally option is specified or builder class is not dockerized by default then just build the package
         # directly on this system.
         if locally or not type(self).DOCKERIZED:
+            self._build_output_path = pl.Path(output_path)
+            self._package_files_path = self._build_output_path / "package_root"
+            self._package_files_path.mkdir()
+            self._intermediate_results_path = self._build_output_path / "intermediate_results"
+            self._intermediate_results_path.mkdir()
             self._build(output_path=output_path)
 
         # The package has to be build inside the docker.
@@ -195,7 +211,7 @@ class PackageBuilder(abc.ABC):
 
             # The image is build and package has to be fetched from it, so create the container...
 
-            # Remove the container wth the same name if exists.
+            # Remove the container with the same name if exists.
             container_name = image_name
             subprocess.check_call(["docker", "rm", "-f", container_name])
 
@@ -521,6 +537,58 @@ class PackageBuilder(abc.ABC):
     def _get_build_environment_docker_image_name(cls):
         return f"package-builder-base-{cls._get_build_environment_files_checksum()}".lower()
 
+    def _build_frozen_binary(self, output_path: Union[str, pl.Path]):
+        """
+        Build the frozen binary using the PyInstaller library.
+        """
+        output_path = pl.Path(output_path)
+
+        spec_file_path = __SOURCE_ROOT__ / "agent_build" / "pyinstaller_spec.spec"
+
+        # Create the special folder in the package output directory where the Pyinstaller's output will be stored.
+        # That may be useful during the debugging.
+        pyinstaller_output = self._intermediate_results_path / "frozen_binary"
+        pyinstaller_output.mkdir(parents=True, exist_ok=True)
+
+        frozen_binary_output = pyinstaller_output / "dist"
+
+        # Run the PyInstaller.
+
+        subprocess.check_call(
+            [sys.executable, "-m", "PyInstaller", str(spec_file_path)],
+            cwd=str(pyinstaller_output),
+        )
+
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Make frozen binaries executable and copy them into output folder.
+        for child_path in frozen_binary_output.iterdir():
+            child_path.chmod(child_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+            shutil.copy2(child_path, output_path)
+
+        # Also build the frozen binary for the package test script, they will be used to test the packages later.
+        package_test_pyinstaller_output = self._build_output_path / "package_test_frozen_binary"
+
+        package_test_script_path = (
+            __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test_runner.py"
+        )
+
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "PyInstaller",
+                str(package_test_script_path),
+                "--distpath",
+                str(package_test_pyinstaller_output),
+                "--onefile",
+            ]
+        )
+
+        # Make the package test frozen binaries executable.
+        for child_path in package_test_pyinstaller_output.iterdir():
+            child_path.chmod(child_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+
     def _build_package_files(self, output_path: Union[str, pl.Path]):
         """
         Build the basic structure for all packages.
@@ -563,6 +631,30 @@ class PackageBuilder(abc.ABC):
         package_type_file_path = output_path / "install_type"
         package_type_file_path.write_text(type(self).INSTALL_TYPE)
 
+        # Create bin directory with executables.
+        bin_path = output_path / "bin"
+        bin_path.mkdir()
+
+        if type(self).USE_FROZEN_BINARIES:
+            self._build_frozen_binary(bin_path)
+        else:
+            source_code_path = output_path / "py"
+
+            shutil.copytree(__SOURCE_ROOT__ / "scalyr_agent", source_code_path / "scalyr_agent")
+
+            agent_main_executable_path = bin_path / "scalyr-agent-2"
+            agent_main_executable_path.symlink_to(pl.Path("..", "py", "scalyr_agent", "agent_main.py"))
+
+            agent_config_executable_path = bin_path / "scalyr-agent-2-config"
+            agent_config_executable_path.symlink_to(pl.Path("..", "py", "scalyr_agent", "config_main.py"))
+
+            # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
+            common.recursively_delete_dirs_by_name(source_code_path, r"\.idea", "tests", "__pycache__")
+            recursively_delete_files_by_name(
+                source_code_path,
+                r".*\.pyc", r".*\.pyo", r".*\.pyd", r"all_tests\.py", r".*~"
+            )
+
     @abc.abstractmethod
     def _build(self, output_path: Union[str, pl.Path]):
         """
@@ -572,76 +664,7 @@ class PackageBuilder(abc.ABC):
         pass
 
 
-class FrozenBinaryPackageBuilder(PackageBuilder):
-    """
-    Package builder which is able to build the agent frozen binaries using the PyInstaller library..
-    """
-
-    FILES_USED_IN_BUILD_ENVIRONMENT = [
-        __SOURCE_ROOT__ / "agent_build" / "requirements.txt",
-        __SOURCE_ROOT__ / "agent_build" / "frozen-binary-builder-requirements.txt",
-    ]
-
-    def __init__(
-        self,
-        variant: str = None,
-        no_versioned_file_name: bool = False,
-    ):
-        super(FrozenBinaryPackageBuilder, self).__init__(
-            variant=variant, no_versioned_file_name=no_versioned_file_name
-        )
-
-        self._frozen_binary_output: Optional[pl.Path] = None
-
-    def _build_frozen_binary(self):
-        """
-        Build the frozen binary using the PyInstaller library.
-        """
-        spec_file_path = __SOURCE_ROOT__ / "agent_build" / "pyinstaller_spec.spec"
-
-        # Create the special folder in the package output directory where the Pyinstaller's output will be stored.
-        # That may be useful during the debugging.
-        pyinstaller_output = self._build_output_path / "frozen_binary"
-        pyinstaller_output.mkdir(parents=True)
-
-        self._frozen_binary_output = pyinstaller_output / "dist"
-
-        # Run the PyInstaller.
-
-        subprocess.check_call(
-            [sys.executable, "-m", "PyInstaller", str(spec_file_path)],
-            cwd=str(pyinstaller_output),
-        )
-
-        # Make frozen binaries executable.
-        for child_path in self._frozen_binary_output.iterdir():
-            child_path.chmod(child_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
-
-        # Also build the frozen binary for the package test script, they will be used to test the packages later.
-        package_test_pyinstaller_output = self._build_output_path / "frozen_binary_test"
-
-        package_test_script_path = (
-            __SOURCE_ROOT__ / "tests" / "package_tests" / "package_test.py"
-        )
-
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-m",
-                "PyInstaller",
-                str(package_test_script_path),
-                "--distpath",
-                str(package_test_pyinstaller_output),
-                "--onefile",
-            ]
-        )
-
-        # Make the package test frozen binaries executable
-        for child_path in package_test_pyinstaller_output.iterdir():
-            child_path.chmod(child_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
-
-
-class LinuxPackageBuilder(FrozenBinaryPackageBuilder):
+class LinuxPackageBuilder(PackageBuilder):
     """
     The base package builder for all Linux packages.
     """
@@ -691,12 +714,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
         pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
         pl.Path(output_path, "var/lib/scalyr-agent-2").mkdir(parents=True)
 
-        # Build frozen binaries.
-        self._build_frozen_binary()
         bin_path = install_root / "bin"
-        # Copy frozen binaries
-        shutil.copytree(self._frozen_binary_output, bin_path)
-        # Create symlink to the frozen binaries in the /usr/sbin folder.
         usr_sbin_path = self._package_files_path / "usr/sbin"
         usr_sbin_path.mkdir(parents=True)
         for binary_path in bin_path.iterdir():
@@ -707,6 +725,181 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
                 "..", "share", "scalyr-agent-2", "bin", binary_path.name
             )
             binary_symlink_path.symlink_to(symlink_target_path)
+
+
+class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
+    """
+    The base builder for all docker and kubernetes based images . It builds an executable script in the current working
+     directory that will build the container image for the various Docker and Kubernetes targets.
+     This script embeds all assets it needs in it so it can be a standalone artifact. The script is based on
+     `docker/scripts/container_builder_base.sh`. See that script for information on it can be used."
+    """
+    # Path to the configuration which should be used in this build.
+    CONFIG_PATH = None
+    # The file path for the Dockerfile to embed in the script, relative to the top of the agent source directory.
+    DOCKERFILE_PATH = None
+
+    # The name of the result image.
+    RESULT_IMAGE_NAME = None
+
+    # A list of repositories that should be added as tags to the image once it is built.
+    # Each repository will have two tags added -- one for the specific agent version and one for `latest`.
+    IMAGE_REPOS = None
+
+    USE_FROZEN_BINARIES = False
+
+    def _build_package_files(self, output_path: Union[str, pl.Path]):
+        super(ContainerPackageBuilder, self)._build_package_files(
+            output_path=output_path
+        )
+
+        # Need to create some docker specific directories.
+        pl.Path(output_path / "var/log/scalyr-agent-2/containers").mkdir()
+
+        # Copy config
+        self._add_config(type(self).CONFIG_PATH, self._package_files_path / "etc/scalyr-agent-2")
+
+    def _build(self, output_path: Union[str, pl.Path]):
+        self._build_package_files(
+            output_path=self._package_files_path
+        )
+
+        container_tarball_path = self._intermediate_results_path / "scalyr-agent.tar.gz"
+
+        # Do a manual walk over the contents of root so that we can use `addfile` to add the tarfile... which allows
+        # us to reset the owner/group to root.  This might not be that portable to Windows, but for now, Docker is
+        # mainly Posix.
+        with tarfile.open(container_tarball_path, "w:gz") as container_tar:
+
+            for root, dirs, files in os.walk(self._package_files_path):
+                to_copy = []
+                for name in dirs:
+                    to_copy.append(os.path.join(root, name))
+                for name in files:
+                    to_copy.append(os.path.join(root, name))
+
+                for x in to_copy:
+                    file_entry = container_tar.gettarinfo(
+                        x, arcname=str(pl.Path(x).relative_to(self._package_files_path))
+                    )
+                    file_entry.uname = "root"
+                    file_entry.gname = "root"
+                    file_entry.uid = 0
+                    file_entry.gid = 0
+
+                    if file_entry.isreg():
+                        with open(x, "rb") as fp:
+                            container_tar.addfile(file_entry, fp)
+                    else:
+                        container_tar.addfile(file_entry)
+
+        # Tar it up but hold the tarfile in memory.  Note, if the source tarball really becomes massive, might have to
+        # rethink this.
+        tar_out = io.BytesIO()
+        with tarfile.open("assets.tar.gz", "w|gz", tar_out) as tar:
+            # Add dockerfile.
+            tar.add(str(type(self).DOCKERFILE_PATH), arcname="Dockerfile")
+            # Add requirement files.
+            tar.add(str(__PARENT_DIR__ / "requirements.txt"), arcname="requirements.txt")
+            tar.add(
+                str(__PARENT_DIR__ / "linux/k8s_and_docker/container_requirements.txt"),
+                arcname="container_requirements.txt"
+            )
+            # Add container source tarball.
+            tar.add(container_tarball_path, arcname="scalyr-agent.tar.gz")
+
+        if self._variant is None:
+            version_string = self._package_version
+        else:
+            version_string = "%s.%s" % (self._package_version, self._variant)
+
+        builder_name = f"scalyr-agent-{type(self).PACKAGE_TYPE}"
+        if self._no_versioned_file_name:
+            output_name = builder_name
+        else:
+            output_name = "%s-%s" % (builder_name, version_string)
+
+        # Read the base builder script into memory
+        base_script_path = __SOURCE_ROOT__ / "docker/scripts/container_builder_base.sh"
+        base_script = base_script_path.read_text()
+
+        # The script has two lines defining environment variables (REPOSITORIES and TAGS) that we need to overwrite to
+        # set them to what we want.  We'll just do some regex replace to do that.
+        base_script = re.sub(
+            r"\n.*OVERRIDE_REPOSITORIES.*\n",
+            '\nREPOSITORIES="%s"\n' % ",".join(type(self).IMAGE_REPOS),
+            base_script,
+        )
+        base_script = re.sub(
+            r"\n.*OVERRIDE_TAGS.*\n",
+            '\nTAGS="%s"\n' % "%s,latest" % version_string,
+            base_script,
+        )
+
+        # Write one file that has the contents of the script followed by the contents of the tarfile.
+        builder_script_path = self._build_output_path / output_name
+        with builder_script_path.open("wb") as f:
+            f.write(base_script.encode("utf-8"))
+
+            f.write(tar_out.getvalue())
+
+        # Make the script executable.
+        st = builder_script_path.stat()
+        builder_script_path.chmod(st.st_mode | stat.S_IEXEC | stat.S_IXGRP)
+
+
+class K8sPackageBuilder(ContainerPackageBuilder):
+    """
+    An image for running the agent on Kubernetes.
+    """
+    PACKAGE_TYPE = "k8s"
+    TARBALL_NAME = "scalyr-k8s-agent.tar.gz"
+    CONFIG_PATH = __SOURCE_ROOT__ / "docker/k8s-config"
+    DOCKERFILE_PATH = __SOURCE_ROOT__ / "docker/Dockerfile.k8s"
+    RESULT_IMAGE_NAME = "scalyr-k8s-agent"
+    IMAGE_REPOS = ["scalyr/scalyr-k8s-agent"]
+
+
+class DockerJsonPackageBuilder(ContainerPackageBuilder):
+    """
+    An image for running on Docker configured to fetch logs via the file system (the container log
+    directory is mounted to the agent container.)  This is the preferred way of running on Docker.
+    This image is published to scalyr/scalyr-agent-docker-json.
+    """
+    PACKAGE_TYPE = "docker-json"
+    TARBALL_NAME = "scalyr-docker-agent.tar.gz"
+    CONFIG_PATH = __SOURCE_ROOT__ / "docker/docker-json-config"
+    DOCKERFILE_PATH = __SOURCE_ROOT__ / "docker/Dockerfile"
+    RESULT_IMAGE_NAME = "scalyr-docker-agent-json"
+    IMAGE_REPOS = ["scalyr/scalyr-agent-docker-json"]
+
+
+class DockerSyslogPackageBuilder(ContainerPackageBuilder):
+    """
+    An image for running on Docker configured to receive logs from other containers via syslog.
+    This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
+    backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
+    with the eventual migration.
+    """
+    PACKAGE_TYPE = "docker-syslog"
+    TARBALL_NAME = "scalyr-docker-agent.tar.gz"
+    CONFIG_PATH = __SOURCE_ROOT__ / "docker/docker-syslog-config"
+    DOCKERFILE_PATH = __SOURCE_ROOT__ / "docker/Dockerfile.syslog"
+    RESULT_IMAGE_NAME = "scalyr-docker-agent-syslog"
+    IMAGE_REPOS = ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"]
+
+
+class DockerApiPackageBuilder(ContainerPackageBuilder):
+    """
+    An image for running on Docker configured to fetch logs via the Docker API using docker_raw_logs: false
+    configuration option.
+    """
+    PACKAGE_TYPE = "docker-api"
+    TARBALL_NAME = "scalyr-docker-agent.tar.gz"
+    CONFIG_PATH = __SOURCE_ROOT__ / "docker/docker-api-config"
+    DOCKERFILE_PATH = __SOURCE_ROOT__ / "docker/Dockerfile"
+    RESULT_IMAGE_NAME = "scalyr-docker-agent-api"
+    IMAGE_REPOS = ["scalyr/scalyr-agent-docker-api"]
 
 
 class FpmBasedPackageBuilder(LinuxFhsBasedPackageBuilder):
@@ -966,11 +1159,8 @@ class TarballPackageBuilder(LinuxPackageBuilder):
         )
 
         # Build frozen binary.
-        self._build_frozen_binary()
-
         bin_path = self._package_files_path / "bin"
-        # Copy frozen binaries
-        shutil.copytree(self._frozen_binary_output, bin_path)
+        self._build_frozen_binary(bin_path)
 
         if self._variant is None:
             base_archive_name = "scalyr-agent-%s" % self._package_version
@@ -994,7 +1184,7 @@ class TarballPackageBuilder(LinuxPackageBuilder):
         tar.close()
 
 
-class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
+class MsiWindowsPackageBuilder(PackageBuilder):
     PACKAGE_TYPE = "msi"
     INSTALL_TYPE = "package"
     PREPARE_BUILD_ENVIRONMENT_SCRIPT_PATH = (
@@ -1044,9 +1234,8 @@ class MsiWindowsPackageBuilder(FrozenBinaryPackageBuilder):
         self._add_certs(certs_path, intermediate_certs=False, copy_other_certs=False)
 
         # Build frozen binaries and copy them into bin folder.
-        self._build_frozen_binary()
         bin_path = scalyr_dir / "bin"
-        shutil.copytree(self._frozen_binary_output, bin_path)
+        self._build_frozen_binary(bin_path)
 
         shutil.copy(_AGENT_BUILD_PATH / "windows/files/ScalyrShell.cmd", bin_path)
 
@@ -1123,6 +1312,10 @@ package_types_to_builders = {
         RpmPackageBuilder,
         TarballPackageBuilder,
         MsiWindowsPackageBuilder,
+        K8sPackageBuilder,
+        DockerJsonPackageBuilder,
+        DockerSyslogPackageBuilder,
+        DockerApiPackageBuilder
     ]
 }
 
@@ -1144,7 +1337,7 @@ def main():
         "by default inside the docker.",
     )
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     prepare_environment_parser = subparsers.add_parser("prepare-build-environment")
     prepare_environment_parser.add_argument(
