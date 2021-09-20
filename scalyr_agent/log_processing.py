@@ -750,6 +750,30 @@ class LogFileIterator(object):
                     result.timestamp = timestamp
                     if attrs:
                         result.attrs = attrs
+                while not result.line.endswith("\n"):
+                    next_line = self.__line_matcher.readline(self.__buffer, current_time)
+                    # Check to see if we allow for extended lines, and if so, then read more pages so that
+                    # we can parse an entire extended line.
+                    if (
+                        len(next_line) == 0
+                        and self.__max_extended_line_length > self.__max_line_length
+                    ):
+                        while (
+                            self.__available_buffer_bytes() < self.__max_extended_line_length
+                            and self.__more_file_bytes_available()
+                        ):
+                            if self.__append_page_to_buffer(
+                                self.__page_size, check_for_new_lines=True
+                            ):
+                                break
+                        next_line = self.__line_matcher.readline(self.__buffer, current_time)
+                    if len(next_line) == 0:
+                        break
+                    next_attrs = scalyr_util.json_decode(next_line.decode("utf-8", "replace"))
+                    line = next_attrs.pop(self.__json_log_key, None)
+                    if line is None:
+                        break
+                    result.line += line.encode("utf-8")
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
