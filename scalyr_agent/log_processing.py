@@ -271,6 +271,7 @@ class LogFileIterator(object):
         self.__json_log_key = log_config.get("json_message_field", "log")
         self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
         self.__include_raw_timestamp_field = config.include_raw_timestamp_field
+        self.__merge_json_parsed_lines = config.merge_json_parsed_lines
 
         if self.__parse_format == "json" or self.__parse_format == "cri":
             self.__max_extended_line_length = config.internal_parse_max_line_size
@@ -735,18 +736,19 @@ class LogFileIterator(object):
                     result.timestamp = timestamp
                     if attrs:
                         result.attrs = attrs
-                while not result.line.endswith("\n"):
-                    # Docker splits log lines at 16KB, we read lines until we hit a newline character and join them
-                    # so we can enforce our own max line length correctly.
-                    next_line = self.__read_extended_line(current_time)
-                    if len(next_line) == 0:
-                        # TODO: need to handle the final line being considered `partial` by the linematcher better
-                        break
-                    next_attrs = scalyr_util.json_decode(next_line.decode("utf-8", "replace"))
-                    line = next_attrs.pop(self.__json_log_key, None)
-                    if line is None:
-                        break
-                    result.line += line.encode("utf-8")
+                if self.__merge_json_parsed_lines:
+                    while not result.line.endswith("\n"):
+                        # Docker splits log lines at 16KB, we read lines until we hit a newline character and join them
+                        # so we can enforce our own max line length correctly.
+                        next_line = self.__read_extended_line(current_time)
+                        if len(next_line) == 0:
+                            # TODO: need to handle the final line being considered `partial` by the linematcher better
+                            break
+                        next_attrs = scalyr_util.json_decode(next_line.decode("utf-8", "replace"))
+                        line = next_attrs.pop(self.__json_log_key, None)
+                        if line is None:
+                            break
+                        result.line += line.encode("utf-8")
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
