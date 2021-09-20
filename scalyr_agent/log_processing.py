@@ -663,24 +663,9 @@ class LogFileIterator(object):
 
         original_buffer_position = self.__buffer.tell()
 
-        # read a complete line from our line_matcher
-        next_line = self.__line_matcher.readline(self.__buffer, current_time)
-
-        # Check to see if we allow for extended lines, and if so, then read more pages so that
-        # we can parse an entire extended line.
-        if (
-            len(next_line) == 0
-            and self.__max_extended_line_length > self.__max_line_length
-        ):
-            while (
-                self.__available_buffer_bytes() < self.__max_extended_line_length
-                and self.__more_file_bytes_available()
-            ):
-                if self.__append_page_to_buffer(
-                    self.__page_size, check_for_new_lines=True
-                ):
-                    break
-            next_line = self.__line_matcher.readline(self.__buffer, current_time)
+        # read a complete line from our line_matcher, with check to see if we allow for extended lines, and if so,
+        # then read more pages so that we can parse an entire extended line.
+        next_line = self.__read_extended_line(current_time)
 
         result = LogLine(line=next_line)
 
@@ -751,23 +736,11 @@ class LogFileIterator(object):
                     if attrs:
                         result.attrs = attrs
                 while not result.line.endswith("\n"):
-                    next_line = self.__line_matcher.readline(self.__buffer, current_time)
-                    # Check to see if we allow for extended lines, and if so, then read more pages so that
-                    # we can parse an entire extended line.
-                    if (
-                        len(next_line) == 0
-                        and self.__max_extended_line_length > self.__max_line_length
-                    ):
-                        while (
-                            self.__available_buffer_bytes() < self.__max_extended_line_length
-                            and self.__more_file_bytes_available()
-                        ):
-                            if self.__append_page_to_buffer(
-                                self.__page_size, check_for_new_lines=True
-                            ):
-                                break
-                        next_line = self.__line_matcher.readline(self.__buffer, current_time)
+                    # Docker splits log lines at 16KB, we read lines until we hit a newline character and join them
+                    # so we can enforce our own max line length correctly.
+                    next_line = self.__read_extended_line(current_time)
                     if len(next_line) == 0:
+                        # TODO: need to handle the final line being considered `partial` by the linematcher better
                         break
                     next_attrs = scalyr_util.json_decode(next_line.decode("utf-8", "replace"))
                     line = next_attrs.pop(self.__json_log_key, None)
@@ -833,6 +806,28 @@ class LogFileIterator(object):
             #                                              expected_size, actual_size)
 
         return result
+
+    def __read_extended_line(self, current_time):
+        # read a complete line from our line_matcher
+        next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
+        # Check to see if we allow for extended lines, and if so, then read more pages so that
+        # we can parse an entire extended line.
+        if (
+                len(next_line) == 0
+                and self.__max_extended_line_length > self.__max_line_length
+        ):
+            while (
+                    self.__available_buffer_bytes() < self.__max_extended_line_length
+                    and self.__more_file_bytes_available()
+            ):
+                if self.__append_page_to_buffer(
+                        self.__page_size, check_for_new_lines=True
+                ):
+                    break
+            next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
+        return next_line
 
     def __read_next_fragment_from_extended_line_buffer(self):
         """Return the next fragment from the extended line buffer for the current position.
