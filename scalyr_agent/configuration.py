@@ -2874,7 +2874,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "merge_json_parsed_lines",
-            True,
+            False,
             description,
             apply_defaults,
             env_aware=True,
