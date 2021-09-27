@@ -272,6 +272,8 @@ class LogFileIterator(object):
         self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
         self.__include_raw_timestamp_field = config.include_raw_timestamp_field
         self.__merge_json_parsed_lines = config.merge_json_parsed_lines
+        self.__merge_json_line_time = None
+        self.__line_completion_wait_time = config.line_completion_wait_time * 60
 
         if self.__parse_format == "json" or self.__parse_format == "cri":
             self.__max_extended_line_length = config.internal_parse_max_line_size
@@ -742,13 +744,29 @@ class LogFileIterator(object):
                         # so we can enforce our own max line length correctly.
                         next_line = self.__read_extended_line(current_time)
                         if len(next_line) == 0:
-                            # TODO: need to handle the final line being considered `partial` by the linematcher better
-                            break
+                            # If we fail to read a line ending in a newline, we want to seek back to before we started
+                            # building this merged line and hopefully get all the bits next time around. We have a timer
+                            # that uses the line_completion_wait_time configuration used in LineMatchers to output the
+                            # line if we take too long waiting for a newline.
+                            if self.__merge_json_line_time is None:
+                                self.__merge_json_line_time = current_time
+
+                            if (
+                                    current_time - self.__merge_json_line_time
+                                    < self.__line_completion_wait_time
+                            ):
+                                self.__buffer.seek(original_buffer_position)
+                                self.__position = self.__determine_mark_position(self.__buffer.tell())
+                                return LogLine(line=b"")
+                            else:
+                                self.__merge_json_line_time = None
+                                break
                         next_attrs = scalyr_util.json_decode(next_line.decode("utf-8", "replace"))
                         line = next_attrs.pop(self.__json_log_key, None)
                         if line is None:
                             break
                         result.line += line.encode("utf-8")
+                        self.__merge_json_line_time = None
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
