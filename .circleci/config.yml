@@ -8,7 +8,6 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
-        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -21,6 +20,7 @@ benchmarks_master_and_release_only: &benchmarks_master_and_release_only
       only:
         - master
         - release
+        - new_end_to_end_benchmark
 
 master_only: &master_only
   filters:
@@ -2428,6 +2428,10 @@ workflows:
          <<: *benchmarks_master_and_release_only
      - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
          <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
+         <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+         <<: *benchmarks_master_and_release_only
      - send-benchmark-results-and-graphs-to-slack:
          requires:
            - benchmarks-idle-agent-py-27
@@ -2440,6 +2444,8 @@ workflows:
            - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
            - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
            - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
+           - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
+           - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
          <<: *benchmarks_master_and_release_only
  weekly-circle-ci-usage-report:
    triggers:
