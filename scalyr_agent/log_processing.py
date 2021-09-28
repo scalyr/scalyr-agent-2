@@ -770,7 +770,7 @@ class LogFileIterator(object):
                         if line is None:
                             break
                         result.line += line.encode("utf-8")
-                        self.__merge_json_line_time = None
+                    self.__merge_json_line_time = None
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
