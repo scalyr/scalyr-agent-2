@@ -739,7 +739,7 @@ class LogFileIterator(object):
                     if attrs:
                         result.attrs = attrs
                 if self.__merge_json_parsed_lines:
-                    while not result.line.endswith("\n"):
+                    while result.line and not result.line.endswith(b"\n"):
                         # Docker splits log lines at 16KB, we read lines until we hit a newline character and join them
                         # so we can enforce our own max line length correctly.
                         next_line = self.__read_extended_line(current_time)
