@@ -329,8 +329,8 @@ class LogFileIterator(object):
 
                 if "position" in checkpoint:
                     self.__position = checkpoint["position"]
-                    self.__extended_line_position = LogFileIterator.ExtendedLinePosition.from_checkpoint(
-                        checkpoint
+                    self.__extended_line_position = (
+                        LogFileIterator.ExtendedLinePosition.from_checkpoint(checkpoint)
                     )
                     for state in checkpoint["pending_files"]:
                         if not state["is_log_file"] or self.__file_system.trust_inodes:
@@ -645,8 +645,8 @@ class LogFileIterator(object):
         # Do we need more bytes to have at least max_line_bytes in available in the buffer.
         need_more_bytes_for_max_line = available_buffer_bytes < self.__max_line_length
         # If we are on an extended line, do we need more bytes in buffer to read the next fragment
-        need_more_bytes_for_fragment_position = not self.__have_buffer_for_fragment_position(
-            available_buffer_bytes
+        need_more_bytes_for_fragment_position = (
+            not self.__have_buffer_for_fragment_position(available_buffer_bytes)
         )
 
         if more_file_bytes_available and (
@@ -1353,9 +1353,12 @@ class LogFileIterator(object):
             tmp = self.__buffer.read()
             new_buffer.write(tmp)
             if expected_bytes != new_buffer.tell():
-                assert expected_bytes == new_buffer.tell(), (
-                    'Failed to get the right number of left over bytes %d %d "%s"'
-                    % (expected_bytes, new_buffer.tell(), tmp,)
+                assert (
+                    expected_bytes == new_buffer.tell()
+                ), 'Failed to get the right number of left over bytes %d %d "%s"' % (
+                    expected_bytes,
+                    new_buffer.tell(),
+                    tmp,
                 )
 
         self.__buffer = new_buffer
@@ -2671,8 +2674,10 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions(
-                            original_position, final_position
+                        bytes_between_positions = (
+                            self.__log_file_iterator.bytes_between_positions(
+                                original_position, final_position
+                            )
                         )
                         self.__total_bytes_skipped += (
                             bytes_between_positions - bytes_read
@@ -2813,7 +2818,11 @@ class LogFileProcessor(object):
         self.__lock.release()
 
         log.warning(
-            msg, skipped_bytes, self.__path, message, error_code=error_code,
+            msg,
+            skipped_bytes,
+            self.__path,
+            message,
+            error_code=error_code,
         )
 
     def add_sampler(self, match_expression, sampling_rate):
