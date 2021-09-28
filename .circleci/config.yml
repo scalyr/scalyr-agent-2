@@ -1852,7 +1852,7 @@ jobs:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 5"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-5"
           run_time: 140
@@ -1868,7 +1868,7 @@ jobs:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 6"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-6"
           run_time: 140
