@@ -761,7 +761,7 @@ class LogFileIterator(object):
                                 )
                                 log.log(
                                     scalyr_logging.DEBUG_LEVEL_3,
-                                    'Incomplete merged line found in file %s, will reattempt reading.',
+                                    "Incomplete merged line found in file %s, will reattempt reading.",
                                     self.__path,
                                 )
                                 return LogLine(line=b"")
@@ -769,7 +769,7 @@ class LogFileIterator(object):
                                 self.__merge_json_line_time = None
                                 log.log(
                                     scalyr_logging.DEBUG_LEVEL_3,
-                                    'Reached max wait time for incomplete merged line in file %s, emitting line as-is.',
+                                    "Reached max wait time for incomplete merged line in file %s, emitting line as-is.",
                                     self.__path,
                                 )
                                 break
