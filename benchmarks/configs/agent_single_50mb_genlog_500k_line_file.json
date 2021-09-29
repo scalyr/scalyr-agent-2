@@ -1,0 +1,18 @@
+{
+  // We want to consume whole file from the beginning so we set max offset to 100 MB
+  max_log_offset_size: 104857600,
+
+  // 510 KB
+  max_line_size: 512000,
+  read_page_size: 512000,
+
+  logs: [
+     {
+         path: "/tmp/scalyr_genlog_500k_line_50_mb.log",
+         copy_from_start: true
+     }
+  ],
+
+  monitors: [
+  ]
+}
