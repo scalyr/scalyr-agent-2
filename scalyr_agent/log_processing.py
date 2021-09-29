@@ -761,7 +761,7 @@ class LogFileIterator(object):
                                 )
                                 log.log(
                                     scalyr_logging.DEBUG_LEVEL_3,
-                                    'Incomplete merged line found in file %s, will reattempt reading.',
+                                    "Incomplete merged line found in file %s, will reattempt reading.",
                                     self.__path,
                                 )
                                 return LogLine(line=b"")
@@ -769,21 +769,32 @@ class LogFileIterator(object):
                                 self.__merge_json_line_time = None
                                 log.log(
                                     scalyr_logging.DEBUG_LEVEL_3,
-                                    'Reached max wait time for incomplete merged line in file %s, emitting line as-is.',
+                                    "Reached max wait time for incomplete merged line in file %s, emitting line as-is.",
                                     self.__path,
                                 )
                                 break
                         next_attrs = scalyr_util.json_decode(
                             next_line.decode("utf-8", "replace")
                         )
-                        line = next_attrs.pop(self.__json_log_key, None)
-                        if line is None:
+                        next_line = next_attrs.pop(self.__json_log_key, None)
+                        if next_line is None:
+                            log.warning(
+                                "Key '%s' doesn't exist in json object for log %s. Appending full line. Please check the log's 'json_message_field' configuration"
+                                % (self.__json_log_key, self.__path),
+                                limit_once_per_x_secs=300,
+                                limit_key=(
+                                    "json-message-field-missing-%s" % self.__path
+                                ),
+                            )
+                            result.line += next_line.encode("utf-8")
+                            # We break out of the merging loop here since the final result will be incorrect at this point anyway
                             break
-                        result.line += line.encode("utf-8")
+                        result.line += next_line.encode("utf-8")
                     self.__merge_json_line_time = None
                 elif not result.line.endswith(b"\n"):
                     log.warning(
-                        "Detected partial line in log '%s', you may want to enable config option 'merge_json_parsed_lines' to join partial lines" % self.__path,
+                        "Detected partial line in log '%s', you may want to enable config option 'merge_json_parsed_lines' to join partial lines"
+                        % self.__path,
                         limit_once_per_x_secs=300,
                         limit_key=("partial-json-%s" % self.__path),
                     )
