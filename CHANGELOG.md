@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.24 "Xuntian" - Oct 1, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
+--->
+
+Improvements:
+* Implemented optional line merging when running in Docker based Kubernetes to work around Docker's own 16KB line length limit. Use the ``merge_json_parsed_lines`` config option to enable this functionality.
+
 ## 2.1.23 "Whipple" - Sept 16, 2021
 
 <!---
