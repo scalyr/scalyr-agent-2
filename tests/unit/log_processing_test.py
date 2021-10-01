@@ -1061,6 +1061,62 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline().line, b"L001")
         self.assertEquals(self.readline().line, b"L002")
 
+    def test_parse_as_json_with_merged_lines(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(max_line_length=100, page_size=500)
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L002\n")
+        self.assertEquals(self.readline().line, b"L003L004\n")
+
+    def test_parse_as_json_with_merged_lines_above_max_size(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(
+            max_line_length=5, page_size=500, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L")
+        self.assertEquals(self.readline().line, b"002\n")
+        self.assertEquals(self.readline().line, b"L003L")
+        self.assertEquals(self.readline().line, b"004\n")
+
+    def test_parse_as_json_with_merged_lines_timeout(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(max_line_length=100, page_size=500)
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L002\n")
+        self.assertEquals(self.readline().line, b"")
+        self.assertEquals(self.readline(time_advance=6 * 60).line, b"L003L004")
+
     def test_parse_as_json_timestamp_field(self):
         self.log_file.close()
         self.log_file = self._create_iterator(
