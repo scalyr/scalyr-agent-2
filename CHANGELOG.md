@@ -10,6 +10,9 @@ Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
 Improvements:
 * Implemented optional line merging when running in Docker based Kubernetes to work around Docker's own 16KB line length limit. Use the ``merge_json_parsed_lines`` config option or ``SCALYR_MERGE_JSON_PARSED_LINES`` environment variable to enable this functionality.
 
+Bug fixes:
+* Update agent to throw more user-friendly error when we fail to parse fragment file due to invalid content.
+
 ## 2.1.23 "Whipple" - Sept 16, 2021
 
 <!---

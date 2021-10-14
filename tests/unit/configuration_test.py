@@ -137,9 +137,18 @@ class TestConfigurationBase(ScalyrTestCase):
         )
 
         full_path = os.path.join(config_dir, file_path)
-        fp = open(full_path, "w")
-        fp.write(contents)
-        fp.close()
+
+        with open(full_path, "w") as fp:
+            fp.write(contents)
+
+    def _write_raw_config_fragment_file(self, file_path, contents, config_dir=None):
+        if config_dir is None:
+            config_dir = self._config_fragments_dir
+
+        full_path = os.path.join(config_dir, file_path)
+
+        with open(full_path, "w") as fp:
+            fp.write(contents)
 
     class LogObject(object):
         def __init__(self, config):
@@ -3862,3 +3871,24 @@ class TestWorkersConfiguration(TestConfigurationBase):
         assert "contains an invalid character" in err_info.value.message
 
         recreate("not_Invalid_key_anymore")
+
+    def test_parse_config_fragment_contains_invalid_content(self):
+        self._write_file_with_separator_conversion(
+            """ { api_key: "hi there"
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+            server_attributes: {  serverHost:"foo.com" }
+          }
+        """
+        )
+
+        self._write_raw_config_fragment_file(
+            "nginx.json", """[ { path: "/var/log/nginx/access.log" } ]"""
+        )
+
+        config = self._create_test_configuration_instance()
+
+        expected_msg = (
+            r'Invalid content inside configuration fragment file ".*nginx\.json". '
+            r"Expected JsonObject \(dictionary\), got JsonArray."
+        )
+        self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
