@@ -232,6 +232,15 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
 
+                if not isinstance(content, (dict, JsonObject)):
+                    raise BadConfiguration(
+                        'Invalid content inside configuration fragment file "%s". '
+                        "Expected JsonObject (dictionary), got %s."
+                        % (fp, type(content).__name__),
+                        "multiple",
+                        "invalidConfigFragmentType",
+                    )
+
                 # if deprecated key names are used, then replace them with their current versions.
                 for k, v in list(content.items()):
                     for (
