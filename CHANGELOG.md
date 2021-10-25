@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.24 "Xuntian" - Oct 1, 2021
+## 2.1.24 "Xuntian" - Oct 25, 2021
 
 <!---
 Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
