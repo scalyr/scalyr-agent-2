@@ -8,7 +8,6 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
-        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -1807,22 +1806,6 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
-  benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:3.5.9
-    steps:
-      - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 4"
-          codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
-          run_time: 140
-          agent_pre_run_command: "touch /tmp/random.log & touch /tmp/random2.log"
-          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
-          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-4"
-          capture_line_counts: true
-          cache_key_name: "agent_2-growing_logs-monitors-multiprocess-2-worker-py-35"
-
   benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -1843,6 +1826,54 @@ jobs:
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
+
+  benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 4"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log & touch /tmp/random2.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-4"
+          capture_line_counts: true
+          cache_key_name: "agent_2-growing_logs-monitors-multiprocess-2-worker-py-35"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 5"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-5"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 5"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-5"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27"
 
   benchmarks-micro-py-35:
     working_directory: ~/scalyr-agent-2
@@ -2113,10 +2144,10 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.8.7-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.8.7-amd64.exe https://www.python.org/ftp/python/3.8.7/python-3.8.7-amd64.exe
+            if (!(Test-Path .\python_installer\python-3.8.10-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.10-amd64.exe https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe
             }
-            python_installer\python-3.8.7-amd64.exe /quiet /passive
+            python_installer\python-3.8.10-amd64.exe /quiet /passive
 
       - save_cache:
           name: Save Wix Cache
@@ -2396,6 +2427,10 @@ jobs:
 #         <<: *benchmarks_master_and_release_only
 #     - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
 #         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+#         <<: *benchmarks_master_and_release_only
 #     - send-benchmark-results-and-graphs-to-slack:
 #         requires:
 #           - benchmarks-idle-agent-py-27
@@ -2408,6 +2443,8 @@ jobs:
 #           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
 #           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
 #           - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
+#           - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
+#           - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
 #         <<: *benchmarks_master_and_release_only
 # weekly-circle-ci-usage-report:
 #   triggers:

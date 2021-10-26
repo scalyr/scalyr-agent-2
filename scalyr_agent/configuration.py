@@ -232,6 +232,15 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
 
+                if not isinstance(content, (dict, JsonObject)):
+                    raise BadConfiguration(
+                        'Invalid content inside configuration fragment file "%s". '
+                        "Expected JsonObject (dictionary), got %s."
+                        % (fp, type(content).__name__),
+                        "multiple",
+                        "invalidConfigFragmentType",
+                    )
+
                 # if deprecated key names are used, then replace them with their current versions.
                 for k, v in list(content.items()):
                     for (
@@ -1056,6 +1065,14 @@ class Configuration(object):
         CRI line.  When parsing Docker or K8s logs, this represents the timestamp of the log
         message as recorded by those systems."""
         return self.__get_config().get_bool("include_raw_timestamp_field")
+
+    @property
+    def merge_json_parsed_lines(self):
+        """If True, and events are getting parsed with the parse_as_json feature, events with messages that do not
+        end in a newline character will be joined together until a newline character is found. This is to work around
+        Docker's logging message length limit of 16KB, which is usually well below our own max message size.
+        The final merged line will use the timestamp and other attributes of the first line."""
+        return self.__get_config().get_bool("merge_json_parsed_lines")
 
     @property
     def enable_profiling(self):
@@ -2859,6 +2876,15 @@ class Configuration(object):
             config,
             "include_raw_timestamp_field",
             True,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "merge_json_parsed_lines",
+            False,
             description,
             apply_defaults,
             env_aware=True,

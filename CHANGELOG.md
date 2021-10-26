@@ -1,14 +1,28 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.23 "Whipple" - Aug 15, 2021
+## 2.1.24 "Xuntian" - Oct 26, 2021
 
 <!---
-Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Aug 12, 2021 16:00 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
+--->
+
+Improvements:
+* Implemented optional line merging when running in Docker based Kubernetes to work around Docker's own 16KB line length limit. Use the ``merge_json_parsed_lines`` config option or ``SCALYR_MERGE_JSON_PARSED_LINES`` environment variable to enable this functionality.
+
+Bug fixes:
+* Update agent to throw more user-friendly error when we fail to parse fragment file due to invalid content.
+
+## 2.1.23 "Whipple" - Sept 16, 2021
+
+<!---
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Sep 16, 2021 10:10 -0800
 --->
 
 Bug fixes:
 * Fix docker container builder scripts to only use `buildx` if it is available.
+* Fix memory leak in the Syslog monitor which is caused by a bug in standard TCP/UDP servers in Python 3 (https://bugs.python.org/issue37193). The version of Python for Windows was updated to 3.8.10. For Linux users, who run agent on Python 3 and use Syslog monitor, it is also recommended to check if their Python 3 installation is up to date and has appropriate bug fixes.
+* Fix bug in the copying manager which works with monitor (such as Docker or Syslog monitor). This bug might cause re-uploading of the old log messages in some edge cases.
 
 ## 2.1.22 "Volans" - Aug 11, 2021
 

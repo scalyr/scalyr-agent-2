@@ -148,8 +148,8 @@ done
 # See if buildx is supported on the local docker.  If not, use legacy method.
 # NOTE: We need to support this until the Scalyr Jenkins-based builders have buildx
 # installed on the base AMIs.
-HAS_BUILD_X=$(docker --help | grep 'buildx')
-if [ ! -z "$HAS_BUILD_X" ]; then
+HAS_BUILD_X=$(docker buildx > /dev/null 2>&1 && echo "YES")
+if [ -z "$HAS_BUILD_X" ]; then
   # Legacy mechanism.
   # TODO: Delete this in favor of the buildx method when we can.  This is duplicated code.  
   report_progress "Docker does not support buildx.  Building only for local architecture." "$QUIET";   
