@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.25 "TBD" - Oct 26, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
+--->
+
+Other:
+* Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
+
 ## 2.1.24 "Xuntian" - Oct 26, 2021
 
 <!---
