@@ -9,8 +9,7 @@ Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
 
 Other:
 * Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
-* Update Kubernetes monitor to print a message that some container level metrics
-  won't be available when detected runtime is ``containerd`` and not ``docker``.
+* Update Kubernetes monitor to log a message under INFO log level that some container level metrics won't be available when detected runtime is ``containerd`` and not ``docker`` and container level metrics reporting is enabled.
 
 ## 2.1.24 "Xuntian" - Oct 26, 2021
 
