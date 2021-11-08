@@ -2707,12 +2707,17 @@ class ContainerChecker(object):
                 "Container runtime is '%s'" % (self._container_runtime),
             )
 
-            if self.__report_container_metrics and self._container_runtime == "containerd":
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_0,
-                                 "Detected containerd runtime, some container level metrics "
-                                 "such as docker.mem.limit and docker.cpu.throttling.* won't "
-                                 "be available, because they are not exposed by containerd "
-                                 "runtime.")
+            if (
+                self.__report_container_metrics
+                and self._container_runtime == "containerd"
+            ):
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Detected containerd runtime, some container level metrics "
+                    "such as docker.mem.limit and docker.cpu.throttling.* won't "
+                    "be available, because they are not exposed by containerd "
+                    "runtime.",
+                )
 
             if self.__always_use_docker or (
                 self._container_runtime == "docker" and not self.__always_use_cri
