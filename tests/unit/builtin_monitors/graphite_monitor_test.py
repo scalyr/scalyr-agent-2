@@ -18,9 +18,9 @@ from __future__ import absolute_import
 import time
 import socket
 import pickle
-import struct
 import random
 
+from scalyr_agent import compat
 from scalyr_agent.builtin_monitors.graphite_monitor import GraphiteMonitor
 from scalyr_agent.builtin_monitors.graphite_monitor import GraphiteTextServer
 from scalyr_agent.builtin_monitors.graphite_monitor import GraphitePickleServer
@@ -113,7 +113,7 @@ class GraphiteMonitorTestCase(ScalyrTestCase):
             mock_data.append(("system.loadavg_5min", (1603104000002, 10.2)))
             mock_data.append(("system.loadavg_15min", (1603104000003, 10.3)))
             mock_request = pickle.dumps(mock_data, 1)
-            mock_request_size = struct.pack("!L", len(mock_request))
+            mock_request_size = compat.struct_pack_unicode("!L", len(mock_request))
 
             self.assertEqual(mock_logger.emit_value.call_count, 0)
             self.assertEqual(mock_logger.warn.call_count, 0)
