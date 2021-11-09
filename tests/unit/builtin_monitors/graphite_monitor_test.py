@@ -149,6 +149,11 @@ class GraphiteMonitorTestCase(ScalyrTestCase):
 
 
 class GraphiteMonitorTextServerTestCase(ScalyrTestCase):
+    """
+    Test cases whre we don't start actual TCP server but just exercise the request / data parsing
+    code.
+    """
+
     def test_execute_request_mock_logger_success(self):
         mock_logger = mock.Mock()
         server = GraphiteTextServer(
@@ -193,6 +198,11 @@ class GraphiteMonitorTextServerTestCase(ScalyrTestCase):
 
 
 class GraphiteMonitorPickleServerTestCase(ScalyrTestCase):
+    """
+    Test cases whre we don't start actual TCP server but just exercise the request / data parsing
+    code.
+    """
+
     def test_execute_request_mock_logger_success(self):
         mock_logger = mock.Mock()
         server = GraphitePickleServer(
