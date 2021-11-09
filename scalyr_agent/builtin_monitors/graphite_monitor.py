@@ -250,6 +250,8 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
         else:
             pickle_server = None
 
+        # NOTE: We assign those variables so we can access them during the tests to verify
+        # corectness
         self.__text_server = text_server
         self.__pickle_server = pickle_server
 
