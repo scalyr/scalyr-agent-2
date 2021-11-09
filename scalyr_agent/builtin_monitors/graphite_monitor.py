@@ -349,6 +349,11 @@ class GraphiteTextServer(ServerProcessor):
 class GraphitePickleServer(ServerProcessor):
     """Accepts connections on a server socket and handles them using Graphite's pickle protocol format, emitting
     the received metrics to the log.
+
+    NOTE (Tomaz): Pickle can contain arbitrary Python object data so we should note in the docs that
+    accepting arbitrary pickle data could be very dangerous and advise users against using it -
+    and in case they do need to use it, the should have additonal step in between which sanitized
+    pickled data and ensures it's safe.
     """
 
     def __init__(
