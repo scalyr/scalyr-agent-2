@@ -218,6 +218,9 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             "monitor_log_flush_delay", convert_to=float, default=1.0, min_value=0
         )
 
+        self.__text_server = None
+        self.__pickle_server = None
+
     def run(self):
         # We have to (maybe) start up two servers.  Since each server requires its own thread, we may have
         # to create a new one (since we can use this thread to run one of the servers).
@@ -246,6 +249,9 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             )
         else:
             pickle_server = None
+
+        self.__text_server = text_server
+        self.__pickle_server = pickle_server
 
         if not self.__accept_plaintext:
             pickle_server.run()
