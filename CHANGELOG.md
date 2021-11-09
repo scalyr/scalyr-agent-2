@@ -1,20 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.25 "TBD" - Oct 26, 2021
+## 2.1.25 "TBD" - Nov 26, 2021
 
 <!---
-Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 26, 2021 14:10 -0800
 --->
 
 Other:
 * Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
 * Update Kubernetes monitor to log a message under INFO log level that some container level metrics won't be available when detected runtime is ``containerd`` and not ``docker`` and container level metrics reporting is enabled.
 
+Bug fixes:
+* Fix plaintext mode in the Graphite monitor.
+
 ## 2.1.24 "Xuntian" - Oct 26, 2021
 
 <!---
-Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 1, 2021 14:10 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 26, 2021 14:10 -0800
 --->
 
 Improvements:
