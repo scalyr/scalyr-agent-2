@@ -322,6 +322,8 @@ class GraphiteTextServer(ServerProcessor):
             # This is how the carbon graphite server parses the line.  We could be more forgiving but if it works
             # for them, then we can do it as well.
             metric, value, orig_timestamp = request.strip().split()
+            # Metric name can be of bytes type, but we need to make sure it's unicode type
+            metric = six.ensure_text(metric)
             value = float(value)
             orig_timestamp = float(orig_timestamp)
             # Include the time that the original graphite request said to associate with the metric value.
