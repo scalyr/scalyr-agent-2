@@ -2535,6 +2535,7 @@ class ContainerChecker(object):
         self.__always_use_docker = self._config.get("k8s_always_use_docker")
         self.__cri_query_filesystem = self._config.get("k8s_cri_query_filesystem")
         self.__sidecar_mode = self._config.get("k8s_sidecar_mode")
+        self.__report_container_metrics = self._config.get("report_container_metrics")
 
         self.__k8s_log_configs = self._global_config.k8s_log_configs
 
