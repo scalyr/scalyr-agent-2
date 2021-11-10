@@ -2464,7 +2464,7 @@ workflows:
  daily-stable-ami-package-install-tests:
    triggers:
      - schedule:
-         cron: "0 0 * * *"
+         cron: "0 2 * * *"
          filters:
            branches:
              only:
@@ -2472,3 +2472,33 @@ workflows:
    jobs:
      - ami-tests-stable:
          context: scalyr-agent
+     - unittest-27:
+         context: scalyr-agent
+     - unittest-35:
+         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-38-windows:
+         context: scalyr-agent
+     - build-linux-packages-and-installer-script
+     - build-windows-package
+     - package-test-rpm:
+         context: scalyr-agent
+     - package-test-deb:
+         context: scalyr-agent
+     - smoke-rpm-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-rpm-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-deb-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+     - smoke-deb-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
