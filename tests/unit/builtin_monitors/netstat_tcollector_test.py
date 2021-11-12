@@ -42,7 +42,9 @@ else:
 
 
 class NetStatTcollectorTestCase(unittest.TestCase):
-    @skipIf(not parse_and_print_metrics, "Skipping Linux only test on unsupported platform")
+    @skipIf(
+        not parse_and_print_metrics, "Skipping Linux only test on unsupported platform"
+    )
     @mock.patch("netstat.time.time", mock.Mock(return_value=100))
     def test_verify_proc_netstat_kernel_5_11(self):
         file_path_netstat = os.path.join(
