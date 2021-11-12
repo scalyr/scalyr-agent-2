@@ -61,6 +61,12 @@ jobs:
 
         sleep 10
 
+        docker logs scalyr-docker-agent
+
+        docker kill -f scalyr-docker-agent
+
+
+
 
 
 
