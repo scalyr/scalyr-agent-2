@@ -23,6 +23,8 @@ from io import open
 
 import mock
 
+from scalyr_agent.test_base import skipIf
+
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 MODULE_PATH = os.path.abspath(
@@ -33,11 +35,14 @@ sys.path.append(MODULE_PATH)
 
 # pylint: disable=import-error
 # type: ignore
-from netstat import parse_and_print_metrics
+if sys.platform.startswith("win"):
+    parse_and_print_metrics = None
+else:
+    from netstat import parse_and_print_metrics
 
 
 class NetStatTcollectorTestCase(unittest.TestCase):
-    @mock.patch("iostat.time.time", mock.Mock(return_value=100))
+    @skipIf(not parse_and_print_metrics, "Skipping Linux only test on unsupported platform")
     def test_verify_proc_netstat_kernel_5_11(self):
         file_path_netstat = os.path.join(
             FIXTURES_DIR, "netstat_ubuntu_20_04_kernel_5.11.0.txt"
