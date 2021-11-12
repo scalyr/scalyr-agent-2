@@ -13,7 +13,7 @@ ADD . /scalyr-agent-2
 WORKDIR /tmp/build
 
 # build container tarball.
-RUN python /scalyr-agent-2/build_package.py k8s_builder --only-container-tarball
+RUN python /scalyr-agent-2/build_package.py docker_json_builder --only-container-tarball
 
 RUN mkdir /tmp/build/source
 RUN tar -xf scalyr-k8s-agent.tar.gz -C /tmp/build/source

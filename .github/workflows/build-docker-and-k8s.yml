@@ -2,7 +2,10 @@ name: "Docker and K8s"
 
 on: push
 
+
+
 jobs:
+
   build:
     runs-on: ubuntu-latest
     services:
@@ -43,6 +46,22 @@ jobs:
     - name: Inspect
       run: |
         docker buildx imagetools inspect localhost:5000/scalyr/scalyr-agent-2:latest
+
+
+    - name: Test
+      env:
+        SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+      run: |
+        docker pull localhost:5000/scalyr/scalyr-agent-2:latest
+        docker run -d --name scalyr-docker-agent \
+        -e SCALYR_API_KEY=$SCALYR_API_KEY \
+        -v /var/run/docker.sock:/var/scalyr/docker.sock \
+        -v /var/lib/docker/containers:/var/lib/docker/containers \
+        localhost:5000/scalyr/scalyr-agent-2:latest
+
+        sleep 10
+
+
 
 
 #
