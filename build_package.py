@@ -142,6 +142,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "scalyr-docker-agent-json",
                 ["scalyr/scalyr-agent-docker-json"],
                 coverage_enabled=coverage_enabled,
+                build_only_container_tarball=build_only_container_tarball
             )
         elif package_type == "docker_api_builder":
             # An image for running on Docker configured to fetch logs via the Docker API using
@@ -169,7 +170,6 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "scalyr-k8s-agent",
                 ["scalyr/scalyr-k8s-agent"],
                 coverage_enabled=coverage_enabled,
-                build_only_container_tarball=build_only_container_tarball
             )
         else:
             assert package_type in ("deb", "rpm")
