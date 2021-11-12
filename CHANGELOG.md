@@ -13,6 +13,7 @@ Other:
 
 Bug fixes:
 * Fix plaintext mode in the Graphite monitor.
+* Update Linux system metric monitor so it doesn't print an error and ignores ``/proc/net/netstat`` lines we don't support metrics for.
 
 ## 2.1.24 "Xuntian" - Oct 26, 2021
 
