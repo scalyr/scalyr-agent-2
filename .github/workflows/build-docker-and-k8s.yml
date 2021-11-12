@@ -76,9 +76,6 @@ jobs:
         echo "arm64:"
         docker logs scalyr-docker-agent-arm64
 
-        docker kill -f scalyr-docker-agent-amd64
-        docker kill -f scalyr-docker-agent-arm64
-
 
 
 
