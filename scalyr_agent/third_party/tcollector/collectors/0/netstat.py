@@ -81,6 +81,27 @@ try:
 except ValueError:
     pass
 
+# Note: up until v2.6.37-rc2 most of the values were 32 bits.
+# The first value is pretty useless since it accounts for some
+# socket types but not others.  So we don't report it because it's
+# more confusing than anything else and it's not well documented
+# what type of sockets are or aren't included in this count.
+REGEXP = re.compile(
+    r"sockets: used \d+\n"
+    r"TCP: inuse (?P<tcp_inuse>\d+) orphan (?P<orphans>\d+)"
+    r" tw (?P<tw_count>\d+) alloc (?P<tcp_sockets>\d+)"
+    r" mem (?P<tcp_pages>\d+)\n"
+    r"UDP: inuse (?P<udp_inuse>\d+)"
+    # UDP memory accounting was added in v2.6.25-rc1
+    r"(?: mem (?P<udp_pages>\d+))?\n"
+    # UDP-Lite (RFC 3828) was added in v2.6.20-rc2
+    r"(?:UDPLITE: inuse (?P<udplite_inuse>\d+)\n)?"
+    r"RAW: inuse (?P<raw_inuse>\d+)\n"
+    r"FRAG: inuse (?P<ip_frag_nqueues>\d+)"
+    r" memory (?P<ip_frag_mem>\d+)\n"
+)
+
+
 
 def drop_privileges():
     """Drops privileges if running as root."""
@@ -96,50 +117,41 @@ def drop_privileges():
     os.setuid(ent.pw_uid)
 
 
-def main():
-    """Main loop"""
-    drop_privileges()
-    sys.stdin.close()
+def parse_and_print_metrics(f_netstat, f_sockstat, output_file_success=None,
+                            output_file_error=None):
+    """
+    Parse /proc/net/netstat and /proc/net/sockstat and print metrics to the provided file
+    handle.
 
-    interval = COLLECTION_INTERVAL
+    :param f_netstat: Open file handle to /proc/netstat/netstat file. That's done to avoid re-opening
+    the file on each function call / main loop iteration
+
+    :param f_sockstat: Open file handle to /proc/netstat/netstat file. That's done to avoid re-opening
+    the file on each function call / main loop iteration
+    """
+    output_file_success = output_file_success or sys.stdout
+    output_file_error = output_file_error or sys.stderr
+
     page_size = resource.getpagesize()
 
-    try:
-        sockstat = open("/proc/net/sockstat", encoding="utf-8")
-        netstat = open("/proc/net/netstat", encoding="utf-8")
-    except IOError as e:
-        print("Failed to open /proc/net/sockstat: %s" % e, file=sys.stderr)
-        return 13  # Ask tcollector to not re-start us.
+    def print_sockstat(metric, value, tags="", output_file_success=None):  # Note: tags must start with ' '
+        output_file_success = output_file_success or sys.stdout
 
-    # Note: up until v2.6.37-rc2 most of the values were 32 bits.
-    # The first value is pretty useless since it accounts for some
-    # socket types but not others.  So we don't report it because it's
-    # more confusing than anything else and it's not well documented
-    # what type of sockets are or aren't included in this count.
-    regexp = re.compile(
-        r"sockets: used \d+\n"
-        r"TCP: inuse (?P<tcp_inuse>\d+) orphan (?P<orphans>\d+)"
-        r" tw (?P<tw_count>\d+) alloc (?P<tcp_sockets>\d+)"
-        r" mem (?P<tcp_pages>\d+)\n"
-        r"UDP: inuse (?P<udp_inuse>\d+)"
-        # UDP memory accounting was added in v2.6.25-rc1
-        r"(?: mem (?P<udp_pages>\d+))?\n"
-        # UDP-Lite (RFC 3828) was added in v2.6.20-rc2
-        r"(?:UDPLITE: inuse (?P<udplite_inuse>\d+)\n)?"
-        r"RAW: inuse (?P<raw_inuse>\d+)\n"
-        r"FRAG: inuse (?P<ip_frag_nqueues>\d+)"
-        r" memory (?P<ip_frag_mem>\d+)\n"
-    )
-
-    def print_sockstat(metric, value, tags=""):  # Note: tags must start with ' '
         if value is not None:
-            print("net.sockstat.%s %d %s%s" % (metric, ts, value, tags))
+            print("net.sockstat.%s %d %s%s" % (metric, ts, value, tags), file=output_file_success)
 
     # If a line in /proc/net/netstat doesn't start with a word in that dict,
     # we'll ignore it.  We use the value to build the metric name.
     known_netstatstypes = {
         "TcpExt:": "tcp",
         "IpExt:": "ip",  # We don't collect anything from here for now.
+        "Ip:": "ip",  # We don't collect anything from here for now.
+        "Icmp:": "icmp",  # We don't collect anything from here for now.
+        "IcmpMsg:": "icmpmsg",  # We don't collect anything from here for now.
+        "Tcp:": "tcp",  # We don't collect anything from here for now.
+        "Udp:": "udp",
+        "UdpLite:": "udplite",  # We don't collect anything from here for now.
+        "Arista:": "arista",  # We don't collect anything from here for now.
     }
 
     # Any stat in /proc/net/netstat that doesn't appear in this dict will be
@@ -237,83 +249,118 @@ def main():
         # We received something but had to drop it because the socket's
         # receive queue was full.
         "TCPBacklogDrop": ("receive.queue.full", None),
+        # The number of TCP segments sent containing the RST flag
+        "OutRsts": ("resets", "direction=out"),
+        # The total number of segments received in error (for example, bad TCP checksums).
+        "InErrs": ("errors", "direction=in"),
     }
 
-    def print_netstat(statstype, metric, value, tags=""):
+    def print_netstat(statstype, metric, value, tags="", output_file_success=None):
+        output_file_success = output_file_success or sys.stdout
+
         if tags:
             space = " "
         else:
             tags = space = ""
-        print("net.stat.%s.%s %d %s%s%s" % (statstype, metric, ts, value, space, tags))
+        print("net.stat.%s.%s %d %s%s%s" % (statstype, metric, ts, value, space, tags),
+              file=output_file_success)
 
     statsdikt = {}
+
+    ts = int(time.time())
+
+    f_sockstat.seek(0)
+    f_netstat.seek(0)
+
+    data = f_sockstat.read()
+    stats = f_netstat.read()
+
+    m = re.match(REGEXP, data)
+    if not m:
+        print("Cannot parse sockstat: %r" % data, file=output_file_error)
+        return 13
+
+    # The difference between the first two values is the number of
+    # sockets allocated vs the number of sockets actually in use.
+    print_sockstat("num_sockets", m.group("tcp_sockets"), " type=tcp", output_file_success=output_file_success)
+    print_sockstat("num_timewait", m.group("tw_count"), output_file_success=output_file_success)
+    print_sockstat("sockets_inuse", m.group("tcp_inuse"), " type=tcp", output_file_success=output_file_success)
+    print_sockstat("sockets_inuse", m.group("udp_inuse"), " type=udp", output_file_success=output_file_success)
+    print_sockstat("sockets_inuse", m.group("udplite_inuse"), " type=udplite", output_file_success=output_file_success)
+    print_sockstat("sockets_inuse", m.group("raw_inuse"), " type=raw", output_file_success=output_file_success)
+
+    print_sockstat("num_orphans", m.group("orphans"), output_file_success=output_file_success)
+    print_sockstat("memory", int(m.group("tcp_pages")) * page_size, " type=tcp", output_file_success=output_file_success)
+    if m.group("udp_pages") is not None:
+        print_sockstat("memory", int(m.group("udp_pages")) * page_size, " type=udp", output_file_success=output_file_success)
+    print_sockstat("memory", m.group("ip_frag_mem"), " type=ipfrag")
+    print_sockstat("ipfragqueues", m.group("ip_frag_nqueues"), output_file_success=output_file_success)
+
+    # /proc/net/netstat has a retarded column-oriented format.  It looks
+    # like this:
+    #   Header: SomeMetric OtherMetric
+    #   Header: 1 2
+    #   OtherHeader: ThirdMetric FooBar
+    #   OtherHeader: 42 51
+    # We first group all the lines for each header together:
+    #   {"Header:": [["SomeMetric", "OtherHeader"], ["1", "2"]],
+    #    "OtherHeader:": [["ThirdMetric", "FooBar"], ["42", "51"]]}
+    # Then we'll create a dict for each type:
+    #   {"SomeMetric": "1", "OtherHeader": "2"}
+    for line in stats.splitlines():
+        line = line.split()
+
+        if line[0] == "MPTcpExt:":
+            # Ignore metrics we don't support
+            continue
+
+        if line[0] not in known_netstatstypes:
+            print(
+                "Unrecoginized line in /proc/net/netstat: %r (file=%r)"
+                % (line, stats),
+                file=output_file_error,
+            )
+            continue
+        statstype = line.pop(0)
+        statsdikt.setdefault(known_netstatstypes[statstype], []).append(line)
+    for statstype, stats in statsdikt.items():
+        # stats is now:
+        # [["SyncookiesSent", "SyncookiesRecv", ...], ["1", "2", ....]]
+        assert len(stats) == 2, repr(statsdikt)
+        stats = dict(list(zip(*stats)))
+        value = stats.get("ListenDrops")
+        if value is not None:  # Undo the kernel's double counting
+            stats["ListenDrops"] = int(value) - int(stats.get("ListenOverflows", 0))
+        for stat, (metric, tags) in known_netstats.items():
+            value = stats.get(stat)
+            if value is not None:
+                print_netstat(statstype, metric, value, tags, output_file_success=output_file_success)
+
+    stats.clear()
+    statsdikt.clear()
+
+
+def main():
+    """Main loop"""
+    drop_privileges()
+    sys.stdin.close()
+
+    interval = COLLECTION_INTERVAL
+
+    try:
+        f_sockstat = open("/proc/net/sockstat", encoding="utf-8")
+        f_netstat = open("/proc/net/netstat", encoding="utf-8")
+    except IOError as e:
+        print("Failed to open /proc/net/sockstat: %s" % e, file=sys.stderr)
+        return 13  # Ask tcollector to not re-start us.
+
     while True:
         # Scalyr edit to add in check for parent.  A ppid of 1 means our parent has died.
         if os.getppid() == 1:
             sys.exit(1)
 
-        ts = int(time.time())
-        sockstat.seek(0)
-        netstat.seek(0)
-        data = sockstat.read()
-        stats = netstat.read()
-        m = re.match(regexp, data)
-        if not m:
-            print("Cannot parse sockstat: %r" % data, file=sys.stderr)
-            return 13
-
-        # The difference between the first two values is the number of
-        # sockets allocated vs the number of sockets actually in use.
-        print_sockstat("num_sockets", m.group("tcp_sockets"), " type=tcp")
-        print_sockstat("num_timewait", m.group("tw_count"))
-        print_sockstat("sockets_inuse", m.group("tcp_inuse"), " type=tcp")
-        print_sockstat("sockets_inuse", m.group("udp_inuse"), " type=udp")
-        print_sockstat("sockets_inuse", m.group("udplite_inuse"), " type=udplite")
-        print_sockstat("sockets_inuse", m.group("raw_inuse"), " type=raw")
-
-        print_sockstat("num_orphans", m.group("orphans"))
-        print_sockstat("memory", int(m.group("tcp_pages")) * page_size, " type=tcp")
-        if m.group("udp_pages") is not None:
-            print_sockstat("memory", int(m.group("udp_pages")) * page_size, " type=udp")
-        print_sockstat("memory", m.group("ip_frag_mem"), " type=ipfrag")
-        print_sockstat("ipfragqueues", m.group("ip_frag_nqueues"))
-
-        # /proc/net/netstat has a retarded column-oriented format.  It looks
-        # like this:
-        #   Header: SomeMetric OtherMetric
-        #   Header: 1 2
-        #   OtherHeader: ThirdMetric FooBar
-        #   OtherHeader: 42 51
-        # We first group all the lines for each header together:
-        #   {"Header:": [["SomeMetric", "OtherHeader"], ["1", "2"]],
-        #    "OtherHeader:": [["ThirdMetric", "FooBar"], ["42", "51"]]}
-        # Then we'll create a dict for each type:
-        #   {"SomeMetric": "1", "OtherHeader": "2"}
-        for line in stats.splitlines():
-            line = line.split()
-            if line[0] not in known_netstatstypes:
-                print(
-                    "Unrecoginized line in /proc/net/netstat: %r (file=%r)"
-                    % (line, stats),
-                    file=sys.stderr,
-                )
-                continue
-            statstype = line.pop(0)
-            statsdikt.setdefault(known_netstatstypes[statstype], []).append(line)
-        for statstype, stats in statsdikt.items():
-            # stats is now:
-            # [["SyncookiesSent", "SyncookiesRecv", ...], ["1", "2", ....]]
-            assert len(stats) == 2, repr(statsdikt)
-            stats = dict(list(zip(*stats)))
-            value = stats.get("ListenDrops")
-            if value is not None:  # Undo the kernel's double counting
-                stats["ListenDrops"] = int(value) - int(stats.get("ListenOverflows", 0))
-            for stat, (metric, tags) in known_netstats.items():
-                value = stats.get(stat)
-                if value is not None:
-                    print_netstat(statstype, metric, value, tags)
-        stats.clear()
-        statsdikt.clear()
+        parse_and_print_metrics(file_path_netstat=f_netstat, f_sockstat=f_sockstat,
+                                statsdikt=statsdikt)
 
         sys.stdout.flush()
         time.sleep(interval)
