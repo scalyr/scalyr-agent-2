@@ -104,7 +104,6 @@ REGEXP = re.compile(
 )
 
 
-
 def drop_privileges():
     """Drops privileges if running as root."""
     try:
@@ -361,8 +360,7 @@ def main():
         if os.getppid() == 1:
             sys.exit(1)
 
-        parse_and_print_metrics(file_path_netstat=f_netstat, f_sockstat=f_sockstat,
-                                statsdikt=statsdikt)
+        parse_and_print_metrics(file_path_netstat=f_netstat, f_sockstat=f_sockstat)
 
         sys.stdout.flush()
         time.sleep(interval)
