@@ -80,7 +80,7 @@ PACKAGE_TYPES = [
 ]
 
 
-def build_package(package_type, variant, no_versioned_file_name, coverage_enabled):
+def build_package(package_type, variant, no_versioned_file_name, coverage_enabled, build_only_container_tarball=False):
     """Builds the scalyr-agent-2 package specified by the arguments.
 
     The package is left in the current working directory.  The file name of the
@@ -169,6 +169,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "scalyr-k8s-agent",
                 ["scalyr/scalyr-k8s-agent"],
                 coverage_enabled=coverage_enabled,
+                build_only_container_tarball=build_only_container_tarball
             )
         else:
             assert package_type in ("deb", "rpm")
@@ -628,6 +629,7 @@ def build_container_builder(
     image_name,
     image_repos,
     coverage_enabled=False,
+    build_only_container_tarball=False
 ):
     """Builds an executable script in the current working directory that will build the container image for the various
     Docker and Kubernetes targets.  This script embeds all assets it needs in it so it can be a standalone artifact.
@@ -654,6 +656,11 @@ def build_container_builder(
     @return: The file name of the built artifact.
     """
     build_container_tarball(source_tarball, base_configs=base_configs)
+
+    if build_only_container_tarball:
+        #shutil.copy(source_tarball, os.path.join(__source_root__))
+        return source_tarball
+
 
     agent_source_root = __source_root__
     # Make a copy of the right Dockerfile to embed in the script.
@@ -1855,6 +1862,15 @@ if __name__ == "__main__":
         help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
     )
 
+    parser.add_option(
+        "",
+        "--only-container-tarball",
+        dest="only_container_tarball",
+        action="store_true",
+        default=False,
+        help="Only works with docker/k8s.",
+    )
+
     (options, args) = parser.parse_args()
     # If we are just suppose to create the build_info, then do it and exit.  We do not bother to check to see
     # if they specified a package.
@@ -1888,6 +1904,7 @@ if __name__ == "__main__":
         options.variant,
         options.no_versioned_file_name,
         options.coverage,
+        build_only_container_tarball=options.only_container_tarball
     )
     print("Built %s" % artifact)
     sys.exit(0)
