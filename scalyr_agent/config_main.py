@@ -1579,10 +1579,6 @@ def parse_config_options(argv):
         )
 
     options = parser.parse_args(args=argv)
-    # if len(args) > 1:
-    #     print("Could not parse commandline arguments.", file=sys.stderr)
-    #     parser.print_help(sys.stderr)
-    #     sys.exit(1)
 
     controller = PlatformController.new_platform()
     default_paths = controller.default_paths
