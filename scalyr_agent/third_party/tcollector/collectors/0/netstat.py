@@ -360,7 +360,7 @@ def main():
         if os.getppid() == 1:
             sys.exit(1)
 
-        parse_and_print_metrics(file_path_netstat=f_netstat, f_sockstat=f_sockstat)
+        parse_and_print_metrics(f_netstat=f_netstat, f_sockstat=f_sockstat)
 
         sys.stdout.flush()
         time.sleep(interval)
