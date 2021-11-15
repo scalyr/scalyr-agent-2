@@ -41,18 +41,18 @@ class IOStatTcollectorTestCase(unittest.TestCase):
     @mock.patch("iostat.time.time", mock.Mock(return_value=100))
     def test_verify_proc_diskstats_parsing_kernel_pre_4_18(self):
         file_path = os.path.join(FIXTURES_DIR, "kernel_pre_4.18.txt")
-        output_file_sucess = io.StringIO()
+        output_file_success = io.StringIO()
         output_file_error = io.StringIO()
         f_diskstats = None
 
         try:
             f_diskstats = open(file_path, "r")
-            parse_and_print_metrics(f_diskstats, output_file_sucess, output_file_error)
+            parse_and_print_metrics(f_diskstats, output_file_success, output_file_error)
         finally:
             if f_diskstats:
                 f_diskstats.close()
 
-        output_success = output_file_sucess.getvalue()
+        output_success = output_file_success.getvalue()
         output_error = output_file_error.getvalue()
         output_success_lines = output_success.strip().split("\n")
 
@@ -68,18 +68,18 @@ class IOStatTcollectorTestCase(unittest.TestCase):
     @mock.patch("iostat.time.time", mock.Mock(return_value=104))
     def test_verify_proc_diskstats_parsing_kernel_post_4_18(self):
         file_path = os.path.join(FIXTURES_DIR, "kernel_post_4.18.txt")
-        output_file_sucess = io.StringIO()
+        output_file_success = io.StringIO()
         output_file_error = io.StringIO()
         f_diskstats = None
 
         try:
             f_diskstats = open(file_path, "r")
-            parse_and_print_metrics(f_diskstats, output_file_sucess, output_file_error)
+            parse_and_print_metrics(f_diskstats, output_file_success, output_file_error)
         finally:
             if f_diskstats:
                 f_diskstats.close()
 
-        output_success = output_file_sucess.getvalue()
+        output_success = output_file_success.getvalue()
         output_error = output_file_error.getvalue()
         output_success_lines = output_success.strip().split("\n")
 
@@ -96,18 +96,18 @@ class IOStatTcollectorTestCase(unittest.TestCase):
     @mock.patch("iostat.time.time", mock.Mock(return_value=101))
     def test_verify_proc_diskstats_parsing_kernel_4_4(self):
         file_path = os.path.join(FIXTURES_DIR, "kernel_4.4.0.txt")
-        output_file_sucess = io.StringIO()
+        output_file_success = io.StringIO()
         output_file_error = io.StringIO()
         f_diskstats = None
 
         try:
             f_diskstats = open(file_path, "r")
-            parse_and_print_metrics(f_diskstats, output_file_sucess, output_file_error)
+            parse_and_print_metrics(f_diskstats, output_file_success, output_file_error)
         finally:
             if f_diskstats:
                 f_diskstats.close()
 
-        output_success = output_file_sucess.getvalue()
+        output_success = output_file_success.getvalue()
         output_error = output_file_error.getvalue()
         output_success_lines = output_success.strip().split("\n")
 
@@ -123,18 +123,14 @@ class IOStatTcollectorTestCase(unittest.TestCase):
     @mock.patch("iostat.time.time", mock.Mock(return_value=102))
     def test_verify_proc_diskstats_parsing_kernel_5_5(self):
         file_path = os.path.join(FIXTURES_DIR, "kernel_5.5.7.txt")
-        output_file_sucess = io.StringIO()
+
+        output_file_success = io.StringIO()
         output_file_error = io.StringIO()
-        f_diskstats = None
 
-        try:
-            f_diskstats = open(file_path, "r")
-            parse_and_print_metrics(f_diskstats, output_file_sucess, output_file_error)
-        finally:
-            if f_diskstats:
-                f_diskstats.close()
+        with open(file_path, "r") as f_diskstats:
+            parse_and_print_metrics(f_diskstats, output_file_success, output_file_error)
 
-        output_success = output_file_sucess.getvalue()
+        output_success = output_file_success.getvalue()
         output_error = output_file_error.getvalue()
         output_success_lines = output_success.strip().split("\n")
 
@@ -151,18 +147,18 @@ class IOStatTcollectorTestCase(unittest.TestCase):
     @mock.patch("iostat.time.time", mock.Mock(return_value=101))
     def test_verify_proc_diskstats_parsing_invalid_content(self):
         file_path = os.path.join(FIXTURES_DIR, "invalid.txt")
-        output_file_sucess = io.StringIO()
+        output_file_success = io.StringIO()
         output_file_error = io.StringIO()
         f_diskstats = None
 
         try:
             f_diskstats = open(file_path, "r")
-            parse_and_print_metrics(f_diskstats, output_file_sucess, output_file_error)
+            parse_and_print_metrics(f_diskstats, output_file_success, output_file_error)
         finally:
             if f_diskstats:
                 f_diskstats.close()
 
-        output_success = output_file_sucess.getvalue()
+        output_success = output_file_success.getvalue()
         output_error = output_file_error.getvalue().strip()
 
         self.assertEqual(
