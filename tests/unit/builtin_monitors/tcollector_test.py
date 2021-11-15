@@ -36,6 +36,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
     return any errors.
     """
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_spawn_dfstat_module(self):
         dfstat_path = os.path.join(MODULE_PATH, "dfstat.py")
@@ -62,6 +63,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             "Did not find expected data in stdout (%s)" % (stdout),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_spawn_ifstat_module(self):
         dfstat_path = os.path.join(MODULE_PATH, "ifstat.py")
@@ -91,6 +93,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             "Did not find expected data in stdout (%s)" % (stdout),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_spawn_iostat_module(self):
         iostat_path = os.path.join(MODULE_PATH, "iostat.py")
@@ -117,6 +120,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             "Did not find expected data in stdout (%s)" % (stdout),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_spawn_netstat_module(self):
         netstat_path = os.path.join(MODULE_PATH, "netstat.py")
@@ -143,6 +147,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             "Did not find expected data in stdout (%s)" % (stdout),
         )
 
+    @skipIf(platform.system() == "Windows", "Skipping Linux Monitor tests on Windows")
     @skipIf(platform.system() == "Darwin", "Skipping Linux Monitor tests on OSX")
     def test_spawn_procstat_module(self):
         procstat_path = os.path.join(MODULE_PATH, "procstats.py")
