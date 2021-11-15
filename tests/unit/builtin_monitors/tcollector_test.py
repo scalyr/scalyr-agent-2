@@ -46,7 +46,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-        time.sleep(1.5)
+        time.sleep(1)
         dfstat_process.kill()
 
         stdout, stderr = dfstat_process.communicate()
@@ -75,7 +75,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             env=env,
         )
 
-        time.sleep(1.5)
+        time.sleep(1)
         ifstat_process.kill()
 
         stdout, stderr = ifstat_process.communicate()
@@ -101,7 +101,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-        time.sleep(1.5)
+        time.sleep(1)
         ifstat_process.kill()
 
         stdout, stderr = ifstat_process.communicate()
@@ -127,7 +127,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-        time.sleep(1.5)
+        time.sleep(1)
         netstat_process.kill()
 
         stdout, stderr = netstat_process.communicate()
@@ -153,7 +153,7 @@ class TCollectorSpawnTestCase(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-        time.sleep(1.5)
+        time.sleep(1)
         procstat_process.kill()
 
         stdout, stderr = procstat_process.communicate()
