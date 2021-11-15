@@ -8,4 +8,12 @@ mypy==0.0910
 types-six
 types-mock
 types-requests
+types-orjson
+types-PyMySQL
+types-redis
+types-backports
+types-cryptography
+types-PyYAML
+types-decorator
+types-ujson
 bandit==1.7.1
