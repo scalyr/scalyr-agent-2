@@ -38,6 +38,7 @@ import tempfile
 import traceback
 import errno
 import itertools
+import argparse
 from io import open
 
 from optparse import OptionParser
@@ -1372,17 +1373,16 @@ def configure_agent_service_for_systemd_management():
     )
 
 
-if __name__ == "__main__":
-    parser = OptionParser(usage="Usage: scalyr-agent-2-config [options]")
-    parser.add_option(
+def parse_config_options(argv):
+    parser = argparse.ArgumentParser(usage="Usage: scalyr-agent-2-config [options]")
+    parser.add_argument(
         "-c",
         "--config-file",
         dest="config_filename",
         help="Read configuration from FILE",
         metavar="FILE",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-key-from-stdin",
         action="store_true",
         dest="set_key_from_stdin",
@@ -1390,23 +1390,20 @@ if __name__ == "__main__":
         help="Update the configuration file with a new API key read from standard input.  "
         "The API key is used to authenticate requests to the Scalyr servers for the account.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-key",
         dest="api_key",
         help="Update the configuration file with the new API key."
         "The API key is used to authenticate requests to the Scalyr servers for the account.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-scalyr-server",
         dest="scalyr_server",
         help="Updates the configuration to send all log uploads to the specified server.  This will "
         "create a configuration file fragment `scalyr_server.json` in the config directory.  It "
         "will overwrite any existing file at that path.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-server-host",
         dest="server_host",
         help="Adds a new configuration file in the ``agent.d`` directory to set the serverHost "
@@ -1415,14 +1412,12 @@ if __name__ == "__main__":
         "must be sure the ``agent.json`` file nor any file in ``agent.d`` sets a value for "
         "``serverHost`` otherwise this might not work.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-user",
         dest="executing_user",
         help="Update which user account is used to run the agent.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--upgrade-tarball",
         dest="upgrade_tarball",
         help="Upgrade the agent to the new version contained in the specified tarball file."
@@ -1436,8 +1431,7 @@ if __name__ == "__main__":
         "which will be copied over to the new installation).  If you may have modified other files "
         "then use the --preserve-old-install option to prevent it from being deleted.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--preserve-old-install",
         action="store_true",
         dest="preserve_old_install",
@@ -1445,8 +1439,7 @@ if __name__ == "__main__":
         help="When performing a tarball upgrade, move the old install to a temporary directory "
         "instead of deleting it.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--import-config",
         dest="import_config",
         help="Extracts the agent configuration files from the provided gzipped tarball, overwriting the"
@@ -1456,16 +1449,14 @@ if __name__ == "__main__":
         "extracted files are reset to be the same owner/group of the current configuration file to "
         "avoid permission problems.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--export-config",
         dest="export_config",
         help="Creates a new gzipped tarball using the current agent configuration files stored in the "
         "`agent.json` file and the `agent.d` directory.  Pass `-` to write the tarball to stdout. "
         "Note, this only copies files that end in `.json`.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--docker-create-custom-dockerfile",
         dest="create_custom_dockerfile",
         help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
@@ -1475,8 +1466,7 @@ if __name__ == "__main__":
         "containers.  The option value should either be a path to write the tarball or `-` to "
         "write it to stdout.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--k8s-create-custom-dockerfile",
         dest="create_custom_k8s_dockerfile",
         help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
@@ -1488,16 +1478,14 @@ if __name__ == "__main__":
         "write it to stdout.",
     )
 
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--set-python",
         dest="set_python",
         choices=DEFAULT + [PYTHON2, PYTHON3],
         help="Switch current python interpreter. Can be selected from python2 and python3.",
     )
 
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--report-python-version",
         action="store_true",
         dest="report_python_version",
@@ -1507,24 +1495,21 @@ if __name__ == "__main__":
 
     # TODO: These options are only available on Windows platforms
     if sys.platform.startswith("win"):
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--upgrade-windows",
             dest="upgrade_windows",
             action="store_true",
             default=False,
             help="Upgrade the agent if a new version is available",
         )
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--release-track",
             dest="release_track",
             default="stable",
             help="The release track to use when upgrading using --upgrade-windows.  This defaults to "
             '"stable" and is what consumers should use.',
         )
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--upgrade-without-ui",
             dest="upgrade_windows_no_ui",
             action="store_true",
@@ -1534,16 +1519,14 @@ if __name__ == "__main__":
         )
         # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
         # beyond just Windows.
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--init-config",
             dest="init_config",
             action="store_true",
             default=False,
             help="Create an initial copy of the configuration file in the appropriate location.",
         )
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--no-error-if-config-exists",
             dest="init_config_ignore_exists",
             action="store_true",
@@ -1553,8 +1536,7 @@ if __name__ == "__main__":
         # These are a weird options we use to start the agent after the Windows install process finishes if there
         # was an agent running before.  If there was an agent, the write a special file
         # called the conditional restart marker.  So, if it exists, then we should start the agent.
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--mark-conditional-restart",
             dest="mark_conditional_restart",
             action="store_true",
@@ -1562,8 +1544,7 @@ if __name__ == "__main__":
             help="Creates the marker file to restart the agent next time --conditional-restart is "
             "specified if the agent is currently running.",
         )
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--conditional-restart",
             dest="conditional_restart",
             action="store_true",
@@ -1576,8 +1557,7 @@ if __name__ == "__main__":
         # to create initial config by the install which means we can't correctly set those
         # permissions inside the .wxs wix spec file.
         # Right now it can only be used with "--init-config" flag on Windows.
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--fix-config-permissions",
             dest="fix_config_permissions",
             action="store_true",
@@ -1590,8 +1570,7 @@ if __name__ == "__main__":
 
     # Add Linux specific options
     if sys.platform.startswith("linux"):
-        parser.add_option(
-            "",
+        parser.add_argument(
             "--systemd-managed",
             dest="systemd_managed",
             action="store_true",
@@ -1599,11 +1578,11 @@ if __name__ == "__main__":
             help="Configure the agent to be managed by systemd instead of init.d which is a default",
         )
 
-    (options, args) = parser.parse_args()
-    if len(args) > 1:
-        print("Could not parse commandline arguments.", file=sys.stderr)
-        parser.print_help(sys.stderr)
-        sys.exit(1)
+    options = parser.parse_args(args=argv)
+    # if len(args) > 1:
+    #     print("Could not parse commandline arguments.", file=sys.stderr)
+    #     parser.print_help(sys.stderr)
+    #     sys.exit(1)
 
     controller = PlatformController.new_platform()
     default_paths = controller.default_paths
@@ -1783,3 +1762,7 @@ if __name__ == "__main__":
         )
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    parse_config_options(sys.argv)

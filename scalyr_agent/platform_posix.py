@@ -21,6 +21,7 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
+import argparse
 import errno
 import fcntl
 import sys
@@ -94,21 +95,20 @@ class PosixPlatformController(PlatformController):
         """
         return __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.POSIX
 
-    def add_options(self, options_parser):
+    def add_options(self, options_parser: argparse.ArgumentParser):
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
         @param options_parser:
         @type options_parser: optparse.OptionParser
         """
-        options_parser.add_option(
+        options_parser.add_argument(
             "-p",
             "--pid-file",
             dest="pid_file",
             help="The path storing the running agent's process id.  Only used if config cannot be parsed.",
         )
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--no-change-user",
             action="store_true",
             dest="no_change_user",
@@ -118,7 +118,7 @@ class PosixPlatformController(PlatformController):
             "in changing to the correct user.  Users should not need to set this option.",
         )
 
-    def consume_options(self, options):
+    def consume_options(self, options: argparse.Namespace):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
@@ -282,6 +282,11 @@ class PosixPlatformController(PlatformController):
         # Do the first fork.
 
         debug_logger("Forking service")
+
+        # Flush standard outputs before the fork. If not flushed, then all output, that is done before fork,
+        # will be duplicated by child process.
+        sys.stdout.flush()
+        sys.stderr.flush()
         try:
             pid = os.fork()
             if pid > 0:

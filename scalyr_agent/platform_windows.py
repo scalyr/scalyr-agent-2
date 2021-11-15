@@ -18,7 +18,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-
+import argparse
 import atexit
 import errno
 
@@ -685,21 +685,19 @@ class WindowsPlatformController(PlatformController):
             else:
                 raise e
 
-    def add_options(self, options_parser):
+    def add_options(self, options_parser: argparse.ArgumentParser):
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
         @param options_parser:
         @type options_parser: optparse.OptionParser
         """
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--redirect-to-pipe",
             dest="redirect_pipe",
             help="Used to redirect stdin/stdout to a named pipe.  Used internally.",
         )
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--no-change-user",
             action="store_true",
             dest="no_change_user",
@@ -709,8 +707,7 @@ class WindowsPlatformController(PlatformController):
             "in changing to the correct user.  Users should not need to set this option.",
         )
 
-        options_parser.add_option(
-            "-n",
+        options_parser.add_argument(
             "--no-warn-escalation",
             action="store_true",
             dest="no_escalation_warning",
@@ -721,7 +718,7 @@ class WindowsPlatformController(PlatformController):
             "requires that dialog box to be presented.",
         )
 
-    def consume_options(self, options):
+    def consume_options(self, options: argparse.Namespace):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
@@ -906,10 +903,14 @@ class PipeRedirectorClient(RedirectorClient):
                 self.__pipe_handle = None
 
 
-if __name__ == "__main__":
+def parse_options():
     if len(sys.argv) == 1:
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(ScalyrAgentService)
         servicemanager.StartServiceCtrlDispatcher()
     else:
         win32serviceutil.HandleCommandLine(ScalyrAgentService)
+
+
+if __name__ == "__main__":
+    parse_options()

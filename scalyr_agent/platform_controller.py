@@ -20,6 +20,8 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import argparse
+
 if False:  # NOSONAR
     from typing import List
     from typing import Type
@@ -120,7 +122,7 @@ class PlatformController(object):
         """
         return False
 
-    def add_options(self, options_parser):
+    def add_options(self, options_parser: argparse.ArgumentParser):
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
@@ -132,7 +134,7 @@ class PlatformController(object):
         """
         pass
 
-    def consume_options(self, options):
+    def consume_options(self, options: argparse.Namespace):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
