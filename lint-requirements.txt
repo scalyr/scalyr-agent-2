@@ -16,4 +16,5 @@ types-cryptography
 types-PyYAML
 types-decorator
 types-ujson
+types-jinja2
 bandit==1.7.1

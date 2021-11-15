@@ -159,11 +159,13 @@ def _gather_metric(method, attribute=None, transform=None):
 
     def gather_metric(process):
         """Dynamically Generated"""
-        errmsg = (
-            "Only the 'psutil.Process' interface is supported currently; not {}".format
-        )
         proc_type = type(process)
-        assert proc_type is psutil.Process, errmsg(proc_type)
+        errmsg = (
+            "Only the 'psutil.Process' interface is supported currently; not {}".format(
+                proc_type
+            )
+        )
+        assert proc_type is psutil.Process, errmsg
         metric = methodcaller(method)  # pylint: disable=redefined-outer-name
         if attribute is not None:
             value = attrgetter(attribute)(metric(process))
@@ -207,7 +209,6 @@ METRIC_CONFIG = dict  # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
 
-# pylint: disable=bad-whitespace
 # =================================================================================
 # ============================    Process CPU    ==================================
 # =================================================================================
@@ -438,7 +439,6 @@ _PROCESS_DISK_IO_METRICS = [
     # TODO: Additional attributes for this section
     #  * ...
 ]
-# pylint: enable=bad-whitespace
 
 METRICS = (
     _PROCESS_CPU_METRICS

@@ -57,7 +57,9 @@ def initialize_logging(debug=False):
     else:
         log_level = logging.INFO
 
+    # pylint: disable=no-member
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]  # type: ignore
+    # pylint: enable=no-member
     for logger in loggers:
         logger.setLevel(log_level)
 

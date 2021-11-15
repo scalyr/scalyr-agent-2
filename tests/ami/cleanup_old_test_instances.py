@@ -27,9 +27,9 @@ import datetime
 
 from libcloud.utils.iso8601 import parse_date
 
-from packages_sanity_tests import INSTANCE_NAME_STRING
-from packages_sanity_tests import get_libcloud_driver
-from packages_sanity_tests import destroy_node_and_cleanup
+from .packages_sanity_tests import INSTANCE_NAME_STRING
+from .packages_sanity_tests import get_libcloud_driver
+from .packages_sanity_tests import destroy_node_and_cleanup
 
 #  from packages_sanity_tests import destroy_node_and_cleanup
 
