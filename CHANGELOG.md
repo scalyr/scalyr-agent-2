@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.25 "TBD" - Nov 26, 2021
+## 2.1.25 "Hamarus" - Nov 17, 2021
 
 <!---
-Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 26, 2021 14:10 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 --->
 
 Other:
