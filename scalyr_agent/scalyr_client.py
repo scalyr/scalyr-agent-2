@@ -23,6 +23,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import json
 import uuid
 
 __author__ = "czerwin@scalyr.com"
@@ -718,8 +719,9 @@ class ScalyrClientSession(object):
                 elif status == "error/client/badParam":
                     log.error(
                         "Request to '%s' failed due to a bad parameter value.  This may be caused by an "
-                        "invalid write logs api key in the configuration",
+                        "invalid write logs api key in the configuration. Response message: %s",
                         self.__full_address,
+                        json.loads(response).get("message"),
                         error_code="error/client/badParam",
                     )
                 else:
