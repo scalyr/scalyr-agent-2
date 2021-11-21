@@ -30,7 +30,7 @@ __all__ = ["OpenMetricsMonitorTestCase"]
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(BASE_DIR, "../fixtures/openmetrics_responses")
 
-MOCK_URL = "https://my.host:8080/metrics"
+MOCK_URL = six.text_type("https://my.host:8080/metrics")
 
 MOCK_RESPONSE_HEADERS_TEXT = {
     "Content-Type": "application/openmetrics-text; version=1.0.0; charset=utf-8",

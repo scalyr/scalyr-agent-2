@@ -79,6 +79,7 @@ define_config_option(
     __monitor__,
     "url",
     "URL to the OpenMetrics / Prometheus API endpoint (e.g. https://my.host:8080/metrics).",
+    convert_to=six.text_type,
 )
 
 define_config_option(
