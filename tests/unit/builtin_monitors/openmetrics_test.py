@@ -19,6 +19,7 @@ import unittest
 
 from io import open
 
+import six
 import mock
 import requests_mock
 
@@ -168,7 +169,10 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_name_whitelist": ["some.*", "traefik*"],
+            "metric_name_whitelist": [
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
         }
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
