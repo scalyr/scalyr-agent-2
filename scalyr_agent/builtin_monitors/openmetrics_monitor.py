@@ -86,7 +86,7 @@ define_config_option(
     "metric_name_whitelist",
     "List of globs for metric names to scrape (defaults to all)",
     convert_to=ArrayOfStrings,
-    default=["*"],
+    default=[u"*"],
 )
 
 # A list of metric types we currently support. Keep in mind that Scalyr doens't currently
