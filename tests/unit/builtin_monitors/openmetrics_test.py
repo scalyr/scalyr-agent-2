@@ -17,6 +17,8 @@ from __future__ import absolute_import
 import os
 import unittest
 
+from io import open
+
 import mock
 import requests_mock
 
