@@ -1,0 +1,10 @@
+# HELP kafka_server_replicafetchermanager_minfetchrate Attribute exposed for management (kafka.server<type=ReplicaFetcherManager, name=MinFetchRate, clientId=Replica><>Value)
+# TYPE kafka_server_replicafetchermanager_minfetchrate untyped
+kafka_server_replicafetchermanager_minfetchrate{clientId="Replica",} 0.0
+# HELP kafka_network_requestmetrics_totaltimems Attribute exposed for management (kafka.network<type=RequestMetrics, name=TotalTimeMs, request=OffsetFetch><>Count)
+# TYPE kafka_network_requestmetrics_totaltimems untyped
+kafka_network_requestmetrics_totaltimems{request="OffsetFetch",} 0.0
+kafka_network_requestmetrics_totaltimems{request="JoinGroup",} 0.0
+kafka_network_requestmetrics_totaltimems{request="DescribeGroups",} 0.0
+kafka_network_requestmetrics_totaltimems{request="LeaveGroup",} 0.0
+kafka_network_requestmetrics_totaltimems{request="GroupCoordinator",} 0.0
