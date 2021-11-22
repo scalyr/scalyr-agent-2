@@ -23,6 +23,7 @@ import six
 import mock
 import requests_mock
 
+from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.builtin_monitors.openmetrics_monitor import OpenMetricsMonitor
 
 __all__ = ["OpenMetricsMonitorTestCase"]
@@ -155,6 +156,8 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
     @requests_mock.Mocker()
     def test_gather_sample_success_mock_data_jmx_exporter_kafka_2(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_4, headers=MOCK_RESPONSE_HEADERS_TEXT)
+
+        # 1. No filters
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
@@ -195,6 +198,59 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
                 "topic": "sample-streams-KSTREAM-AGGREGATE-STATE-STORE-0000000002-repartition",
                 "partition": "0",
             },
+        )
+
+        # 2. Metric extra_field filters
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_extra_fields_whitelist": JsonObject(
+                {
+                    "kafka_log_log_numlogsegments": {"topic": ["connect-status"]},
+                    "kafka_server_fetcherlagmetrics_consumerlag": {
+                        "topic": ["connect-status"]
+                    },
+                    "kafka_log_log_logstartoffset": {"topic": ["connect-status"]},
+                    "kafka_cluster_partition_underreplicated": {
+                        "topic": ["connect-status"]
+                    },
+                }
+            ),
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 19)
+        self.assertEqual(mock_logger.emit_value.call_count, 20)
+
+        mock_logger.emit_value.assert_any_call(
+            "kafka_cluster_partition_underreplicated",
+            0.0,
+            extra_fields={
+                "topic": "connect-status",
+                "partition": "0",
+            },
+        )
+        mock_logger.emit_value.assert_any_call(
+            "kafka_server_fetcherlagmetrics_consumerlag",
+            0.0,
+            extra_fields={
+                "clientid": "ReplicaFetcherThread-0-3",
+                "partition": "0",
+                "topic": "connect-status",
+            },
+        )
+        mock_logger.emit_value.assert_any_call(
+            "kafka_log_log_numlogsegments",
+            1.0,
+            extra_fields={"topic": "connect-status", "partition": "0"},
+        )
+
+        mock_logger.emit_value.assert_any_call(
+            "kafka_log_log_logstartoffset",
+            0.0,
+            extra_fields={"topic": "connect-status", "partition": "3"},
         )
 
     @requests_mock.Mocker()

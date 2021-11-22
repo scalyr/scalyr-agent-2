@@ -58,6 +58,8 @@ if False:
     from typing import Tuple
     from typing import Any
     from typing import List
+    from typing import Dict
+    from typing import Optional
 
 import re
 import fnmatch
@@ -69,6 +71,7 @@ from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
 from scalyr_agent import define_log_field
 from scalyr_agent.json_lib.objects import ArrayOfStrings
+from scalyr_agent.json_lib import JsonObject
 
 __monitor__ = __name__
 
@@ -92,6 +95,23 @@ define_config_option(
     "List of globs for metric names to scrape (defaults to all)",
     convert_to=ArrayOfStrings,
     default=[u"*"],
+)
+
+# Maps metric_name to a dictionary where the key is extra_field key name and a value is a list of
+# globs for the value whitelist.
+#
+# For example:
+# {
+#    'kafka_log_log_logstartoffset': {'topic': ['connect-status', 'connect-test']},
+#    'kafka_server_fetcherlagmetrics_consumerlag': {'topic': ['connect-status', 'connect-test']}
+# }
+define_config_option(
+    __monitor__,
+    "metric_extra_fields_whitelist",
+    "List of globs for extra_field values to whitelist. Metrics which extra_fields don't match this "
+    "whitelist will be ignored (defaults to all)",
+    convert_to=JsonObject,
+    default=JsonObject({}),
 )
 
 # A list of metric types we currently support. Keep in mind that Scalyr doesn't currently
@@ -126,7 +146,25 @@ class OpenMetricsMonitor(ScalyrMonitor):
         else:
             self.__metric_name_whitelist = ["*"]
 
-        self.__include_all_metrics = "*" in self.__metric_name_whitelist
+        if self._config.get("metric_extra_fields_whitelist"):
+            # TODO: Perform value validation
+            if isinstance(
+                self._config.get("metric_extra_fields_whitelist"), JsonObject
+            ):
+                self.__metric_extra_fields_whitelist = self._config.get(
+                    "metric_extra_fields_whitelist"
+                )
+            else:
+                self.__metric_extra_fields_whitelist = self._config.get(
+                    "metric_extra_fields_whitelist"
+                )
+        else:
+            self.__metric_extra_fields_whitelist = {}
+
+        self.__include_all_metrics = (
+            "*" in self.__metric_name_whitelist
+            and not self.__metric_extra_fields_whitelist
+        )
 
     def gather_sample(self):
         # type: () -> None
@@ -245,7 +283,9 @@ class OpenMetricsMonitor(ScalyrMonitor):
                     )
                     continue
 
-            if not self._should_include_metric_name(metric_name):
+            if not self._should_include_metric(
+                metric_name=metric_name, extra_fields=extra_fields
+            ):
                 continue
 
             metric_type = metric_name_to_type_map.get(metric_name, None)
@@ -275,16 +315,37 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
         return result
 
-    def _should_include_metric_name(self, metric_name):
-        # type: (str) -> bool
+    def _should_include_metric(self, metric_name, extra_fields=None):
+        # type: (str, Optional[Dict[Any,Any]]) -> bool
+        """
+        Return True if the provided metirc should be included based on the configuration specified
+        filters.
+        """
+        extra_fields = extra_fields or {}
 
-        # Short circuit if glob indicates include all
+        # Short circuit if globs indicates include all
         if self.__include_all_metrics:
             return True
 
-        for glob_pattern in self.__metric_name_whitelist:
-            if fnmatch.fnmatch(metric_name, glob_pattern):
-                return True
+        # 1. Perform metric_name whitelist checks
+        if u"*" not in self.__metric_name_whitelist:
+            for glob_pattern in self.__metric_name_whitelist:
+                if fnmatch.fnmatch(metric_name, glob_pattern):
+                    return True
+
+        # 2. Perform extra_field whitelist checks
+        metric_extra_fields_whitelist = self.__metric_extra_fields_whitelist.get(
+            metric_name, {}
+        )
+        for (
+            extra_field_name,
+            extra_field_value_filters,
+        ) in metric_extra_fields_whitelist.items():
+            for glob_pattern in extra_field_value_filters:
+                extra_field_value = extra_fields.get(extra_field_name, None)
+
+                if fnmatch.fnmatch(extra_field_value, glob_pattern):
+                    return True
 
         return False
 
