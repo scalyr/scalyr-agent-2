@@ -414,21 +414,23 @@ class OpenMetricsMonitor(ScalyrMonitor):
         for metric_name, component_filters in value.items():
             if not isinstance(component_filters, dict):
                 raise BadMonitorConfiguration(
-                    "Value must be a dictionary",
+                    "Value must be a dictionary (got %s)" % (type(component_filters)),
                     field="metric_component_value_whitelist",
                 )
 
             for component_name, component_filter_globs in component_filters.items():
                 if not isinstance(component_filter_globs, (list, tuple)):
                     raise BadMonitorConfiguration(
-                        "Value must be a list of strings",
+                        "Value must be a list of strings (got %s)"
+                        % (type(component_filter_globs)),
                         field="metric_component_value_whitelist",
                     )
 
                 for filter_glob in component_filter_globs:
                     if not isinstance(filter_glob, six.text_type):
                         raise BadMonitorConfiguration(
-                            "Value must be a list of strings",
+                            "Value must be a list of strings (got list of %s)"
+                            % (type(filter_glob)),
                             field="metric_component_value_whitelist",
                         )
 

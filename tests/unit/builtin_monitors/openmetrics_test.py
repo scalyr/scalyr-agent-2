@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 import os
-import unittest
 
 from io import open
 
@@ -26,6 +25,7 @@ import requests_mock
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.builtin_monitors.openmetrics_monitor import OpenMetricsMonitor
+from scalyr_agent.test_base import ScalyrTestCase
 
 __all__ = ["OpenMetricsMonitorTestCase"]
 
@@ -82,7 +82,7 @@ with open(os.path.join(FIXTURES_DIR, "jmx_exporter_zookeeper_1.txt"), "r") as fp
     MOCK_DATA_5 = fp.read()
 
 
-class OpenMetricsMonitorTestCase(unittest.TestCase):
+class OpenMetricsMonitorTestCase(ScalyrTestCase):
     @requests_mock.Mocker()
     def test_gather_sample_success_mock_data_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
@@ -209,11 +209,11 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
                 {
                     "kafka_log_log_numlogsegments": {"topic": ["connect-status"]},
                     "kafka_server_fetcherlagmetrics_consumerlag": {
-                        "topic": ["connect-status"]
+                        "topic": [six.text_type("connect-status")]
                     },
                     "kafka_log_log_logstartoffset": {"topic": ["connect-status"]},
                     "kafka_cluster_partition_underreplicated": {
-                        "topic": ["connect-status"]
+                        "topic": [six.text_type("connect-status")]
                     },
                 }
             ),
@@ -470,7 +470,7 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
             "metric_component_value_whitelist": JsonObject(
-                {"metric": {"component": ["value"]}}
+                {"metric": {"component": [six.text_type("value")]}}
             ),
         }
         mock_logger = mock.Mock()
