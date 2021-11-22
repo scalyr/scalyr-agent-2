@@ -15,10 +15,35 @@
 """
 Monitor which scrapes metrics from OpenMetrics / Prometheus metrics API endpoint.
 
-Monitor support specifying a whitelist of metric names to scrape, but users are strongly encouraged
-to filter metrics at the source aka configure various Prometheus exporters (where applicable and
-possible) to only expose metrics you want to ingest (this way we can avoid additional filtering
-overhead in this monitor).
+Monitor support specifying a whitelist of metric names to scrape using metric name and metric
+component value filters using the configuration options described below:
+
+- ``metric_name_whitelist`` - A list of metric names to include. If not specified, we include all
+  the scraped metrics.
+
+  For example:
+
+      ``["my.metric1", "my.metric2"].
+
+- ``metric_component_value_whitelist`` - Dictionary where the key is a metric name and the value is
+  an object where a key is component name and the value is a list of globs for the component values.
+
+  For examples:
+
+      {
+        "kafka_log_log_numlogsegments": {"topic": "connect-status"},
+        "kafka_log_log_logstartoffset": {"topic": "connect-status"},
+      }
+
+  In this example, only metric with name ``kafka_log_log_numlogsegments`` and
+  ``kafka_log_log_logstartoffset`` where the ``topic`` component name is ``connect-status`` will
+  be included.
+
+``metric_name_whitelist`` has priority over ``metric_component_value_whitelist`` config option.
+
+Where possible you are strongly encouraged to filter metrics at the source aka configure various
+Prometheus exporters (where applicable and possible) to only expose metrics you want to ingest
+(this way we can avoid additional filtering overhead in this monitor).
 
 By default no filters are specified which means all the metric are included.
 
@@ -45,7 +70,6 @@ details.
 
 # TODO:
 
-- Add support for metric blacklist based on the extra field value
 - Add support for Protobuf format
 - If metric contains a description / help string, should we include this with every metric as part
   of the extra_fields? This could provide large increase in storage and little value so it may not
@@ -70,6 +94,7 @@ import requests
 from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
 from scalyr_agent import define_log_field
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.json_lib import JsonObject
 
@@ -92,7 +117,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "metric_name_whitelist",
-    "List of globs for metric names to scrape (defaults to all)",
+    "List of globs for metric names to scrape (defaults to all).",
     convert_to=ArrayOfStrings,
     default=[u"*"],
 )
@@ -107,9 +132,9 @@ define_config_option(
 # }
 define_config_option(
     __monitor__,
-    "metric_extra_fields_whitelist",
-    "List of globs for extra_field values to whitelist. Metrics which extra_fields don't match this "
-    "whitelist will be ignored (defaults to all)",
+    "metric_component_value_whitelist",
+    "List of globs for metric component values to whitelist. Metrics which extra_fields don't "
+    "match this whitelist will be ignored (defaults to all).",
     convert_to=JsonObject,
     default=JsonObject({}),
 )
@@ -146,24 +171,15 @@ class OpenMetricsMonitor(ScalyrMonitor):
         else:
             self.__metric_name_whitelist = ["*"]
 
-        if self._config.get("metric_extra_fields_whitelist"):
-            # TODO: Perform value validation
-            if isinstance(
-                self._config.get("metric_extra_fields_whitelist"), JsonObject
-            ):
-                self.__metric_extra_fields_whitelist = self._config.get(
-                    "metric_extra_fields_whitelist"
-                )
-            else:
-                self.__metric_extra_fields_whitelist = self._config.get(
-                    "metric_extra_fields_whitelist"
-                )
-        else:
-            self.__metric_extra_fields_whitelist = {}
+        self.__metric_component_value_whitelist = (
+            self._validate_metric_component_value_whitelist(
+                self._config.get("metric_component_value_whitelist", {})
+            )
+        )
 
         self.__include_all_metrics = (
             "*" in self.__metric_name_whitelist
-            and not self.__metric_extra_fields_whitelist
+            and not self.__metric_component_value_whitelist
         )
 
     def gather_sample(self):
@@ -334,13 +350,13 @@ class OpenMetricsMonitor(ScalyrMonitor):
                     return True
 
         # 2. Perform extra_field whitelist checks
-        metric_extra_fields_whitelist = self.__metric_extra_fields_whitelist.get(
+        metric_component_value_whitelist = self.__metric_component_value_whitelist.get(
             metric_name, {}
         )
         for (
             extra_field_name,
             extra_field_value_filters,
-        ) in metric_extra_fields_whitelist.items():
+        ) in metric_component_value_whitelist.items():
             for glob_pattern in extra_field_value_filters:
                 extra_field_value = extra_fields.get(extra_field_name, None)
 
@@ -387,3 +403,33 @@ class OpenMetricsMonitor(ScalyrMonitor):
             extra_fields[component_name] = component_value
 
         return metric_name, extra_fields
+
+    def _validate_metric_component_value_whitelist(self, value):
+        """
+        Validate that the "metric_component_value_whitelist" configuration options is in a correct
+        format (if specified).
+        """
+        value = value or {}
+
+        for metric_name, component_filters in value.items():
+            if not isinstance(component_filters, dict):
+                raise BadMonitorConfiguration(
+                    "Value must be a dictionary",
+                    field="metric_component_value_whitelist",
+                )
+
+            for component_name, component_filter_globs in component_filters.items():
+                if not isinstance(component_filter_globs, (list, tuple)):
+                    raise BadMonitorConfiguration(
+                        "Value must be a list of strings",
+                        field="metric_component_value_whitelist",
+                    )
+
+                for filter_glob in component_filter_globs:
+                    if not isinstance(filter_glob, six.text_type):
+                        raise BadMonitorConfiguration(
+                            "Value must be a list of strings",
+                            field="metric_component_value_whitelist",
+                        )
+
+        return value

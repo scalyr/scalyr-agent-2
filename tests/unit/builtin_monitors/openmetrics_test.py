@@ -24,6 +24,7 @@ import mock
 import requests_mock
 
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.builtin_monitors.openmetrics_monitor import OpenMetricsMonitor
 
 __all__ = ["OpenMetricsMonitorTestCase"]
@@ -204,7 +205,7 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_extra_fields_whitelist": JsonObject(
+            "metric_component_value_whitelist": JsonObject(
                 {
                     "kafka_log_log_numlogsegments": {"topic": ["connect-status"]},
                     "kafka_server_fetcherlagmetrics_consumerlag": {
@@ -403,3 +404,74 @@ class OpenMetricsMonitorTestCase(unittest.TestCase):
         self.assertEqual(mock_logger.debug.call_count, 0)
         self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
+
+    def test_metric_component_value_whitelist_config_option_value(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_component_value_whitelist": ["foo"],
+        }
+        mock_logger = mock.Mock()
+        self.assertRaisesRegexp(
+            BadMonitorConfiguration,
+            "Prohibited conversion",
+            OpenMetricsMonitor,
+            monitor_config=monitor_config,
+            logger=mock_logger,
+        )
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_component_value_whitelist": JsonObject({"metric": "bar"}),
+        }
+        mock_logger = mock.Mock()
+        self.assertRaisesRegexp(
+            BadMonitorConfiguration,
+            "Value must be a dictionary",
+            OpenMetricsMonitor,
+            monitor_config=monitor_config,
+            logger=mock_logger,
+        )
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_component_value_whitelist": JsonObject(
+                {"metric": {"component": "bar"}}
+            ),
+        }
+        mock_logger = mock.Mock()
+        self.assertRaisesRegexp(
+            BadMonitorConfiguration,
+            "Value must be a list of strings",
+            OpenMetricsMonitor,
+            monitor_config=monitor_config,
+            logger=mock_logger,
+        )
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_component_value_whitelist": JsonObject(
+                {"metric": {"component": [1, 2]}}
+            ),
+        }
+        mock_logger = mock.Mock()
+        self.assertRaisesRegexp(
+            BadMonitorConfiguration,
+            "Value must be a list of strings",
+            OpenMetricsMonitor,
+            monitor_config=monitor_config,
+            logger=mock_logger,
+        )
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_component_value_whitelist": JsonObject(
+                {"metric": {"component": ["value"]}}
+            ),
+        }
+        mock_logger = mock.Mock()
+        OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
