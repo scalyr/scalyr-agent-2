@@ -46,6 +46,9 @@ details.
 # TODO:
 
 - Add support for Protobuf format
+- If metric contains a description / help string, should we include this with every metric as part
+  of the extra_fields? This could provide large increase in storage and little value so it may not
+  be a good idea.
 """
 
 from __future__ import absolute_import
@@ -90,13 +93,17 @@ define_config_option(
     default=[u"*"],
 )
 
-# A list of metric types we currently support. Keep in mind that Scalyr doens't currently
+# A list of metric types we currently support. Keep in mind that Scalyr doesn't currently
 # support some metric types such as histograms and summaries.
 SUPPORTED_METRIC_TYPES = [
     "counter",
     "gauge",
     "untyped",
 ]
+
+# If more than this number of metrics are returned at once we log a warning since this could mean
+# misconfiguration on the user side (not filtering metrics at the source / on the monitor level).
+MAX_METRICS_PER_GATHER_WARN = 2000
 
 
 class OpenMetricsMonitor(ScalyrMonitor):
@@ -159,6 +166,8 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
         metric_name_to_type_map = {}
 
+        metrics_count = 0
+
         for line in lines:
             comment_metric_name = None
             comment_metric_type = None
@@ -185,7 +194,15 @@ class OpenMetricsMonitor(ScalyrMonitor):
             if not line.strip(""):
                 continue
 
-            split = re.split(r"\s+", line)
+            if "}" in line:
+                # Metric name contains extra components
+                char_index = line.find("}")
+                metric_name = line[0 : char_index + 1]
+                rest_of_the_line = line[char_index + 1 :].lstrip()
+                split_partial = re.split(r"\s+", rest_of_the_line)
+                split = [metric_name] + split_partial
+            else:
+                split = re.split(r"\s+", line)
 
             if len(split) < 2:
                 self._logger.warn(
@@ -193,7 +210,8 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 )
                 continue
 
-            metric_name, extra_fields = self._sanitize_metric_name(split[0])
+            metric_name = split[0]
+            metric_name, extra_fields = self._sanitize_metric_name(metric_name)
 
             if not metric_name:
                 self._logger.warn(
@@ -216,7 +234,15 @@ class OpenMetricsMonitor(ScalyrMonitor):
             if "." in metric_value:
                 metric_value = float(metric_value)  # type: ignore
             else:
-                metric_value = int(metric_value)  # type: ignore
+                # In some cases value may be NaN which we simply ignore
+                try:
+                    metric_value = int(metric_value)  # type: ignore
+                except ValueError as e:
+                    self._logger.warn(
+                        'Failed to cast metric "%s" value "%s" to int: %s'
+                        % (metric_name, metric_value, str(e))
+                    )
+                    continue
 
             if not self._should_include_metric_name(metric_name):
                 continue
@@ -229,8 +255,22 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 )
                 continue
 
+            metrics_count += 1
+
             item = (metric_name, extra_fields, metric_value)
             result.append(item)
+
+        if metrics_count > MAX_METRICS_PER_GATHER_WARN:
+            limit_key = self.__url
+            self._logger.warn(
+                "Parsed more than 2000 metrics (%s) for URL %s. You are strongly "
+                "encouraged to filter metrics at the source or set "
+                '"metric_name_blacklist" monitor configuration option to avoid '
+                "excessive number of metrics being ingested."
+                % (metrics_count, self.__url),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
 
         return result
 
@@ -273,7 +313,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         extra_fields = {}
 
         metric_components = split[1].replace("}", "")
-        metric_components_split = metric_components.split(",")
+        metric_components_split = metric_components.split('",')
 
         for component in metric_components_split:
             if not component:
