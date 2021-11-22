@@ -45,6 +45,7 @@ details.
 
 # TODO:
 
+- Add support for metric blacklist based on the extra field value
 - Add support for Protobuf format
 - If metric contains a description / help string, should we include this with every metric as part
   of the extra_fields? This could provide large increase in storage and little value so it may not
