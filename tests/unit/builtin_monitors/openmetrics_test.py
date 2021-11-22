@@ -207,11 +207,15 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "url": MOCK_URL,
             "metric_component_value_whitelist": JsonObject(
                 {
-                    "kafka_log_log_numlogsegments": {"topic": ["connect-status"]},
+                    "kafka_log_log_numlogsegments": {
+                        "topic": [six.text_type("connect-status")]
+                    },
                     "kafka_server_fetcherlagmetrics_consumerlag": {
                         "topic": [six.text_type("connect-status")]
                     },
-                    "kafka_log_log_logstartoffset": {"topic": ["connect-status"]},
+                    "kafka_log_log_logstartoffset": {
+                        "topic": [six.text_type("connect-status")]
+                    },
                     "kafka_cluster_partition_underreplicated": {
                         "topic": [six.text_type("connect-status")]
                     },
