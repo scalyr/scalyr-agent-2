@@ -43,20 +43,20 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
+import pathlib as pl
+import os
 import signal
 import sys
 import time
 
 from optparse import OptionParser
 
-try:
-    from __scalyr__ import scalyr_init
-except ImportError:
-    from scalyr_agent.__scalyr__ import scalyr_init
-
-scalyr_init()
-
 import six
+
+
+# Since this file can be executes as script, add the source root to the PYTHONPATH in case if it isn't there.
+# If it is not there, then the further import of the 'scalyr_agent' package will fail.
+sys.path.append(str(pl.Path(os.path.realpath(__file__)).parent.parent))
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util

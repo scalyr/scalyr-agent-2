@@ -24,6 +24,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import time
+import pathlib as pl
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
@@ -32,7 +33,7 @@ from scalyr_agent.util import StoppableThread
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 
-from scalyr_agent.__scalyr__ import get_package_root
+from scalyr_agent.__scalyr__ import get_install_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -338,13 +339,11 @@ class MonitorsManager(StoppableThread):
         # Augment the PYTHONPATH if requested to locate the module.
         paths_to_pass = []
 
-        # Also add in scalyr_agent/../monitors/local and scalyr_agent/../monitors/contrib to the Python path to search
-        # for monitors.  (They are always in the parent directory of the scalyr_agent package.
-        path_to_package_parent = os.path.dirname(get_package_root())
-        paths_to_pass.append(os.path.join(path_to_package_parent, "monitors", "local"))
-        paths_to_pass.append(
-            os.path.join(path_to_package_parent, "monitors", "contrib")
-        )
+        # Add the monitors/local and monitors/contrib folders from the install root to the Python path to search
+        # for monitors.
+        monitors_path = pl.Path(get_install_root(), "monitors")
+        paths_to_pass.append(str(monitors_path / "local"))
+        paths_to_pass.append(str(monitors_path / "contrib"))
 
         # Add in the additional paths.
         if additional_python_paths is not None and len(additional_python_paths) > 0:

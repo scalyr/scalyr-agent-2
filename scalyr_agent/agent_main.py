@@ -44,12 +44,14 @@ import os
 import sys
 import time
 import re
-import ssl
 from io import open
+import pathlib as pl
 
 if False:
     from typing import Optional
     from typing import Dict
+
+import six
 
 # Work around with a striptime race we see every now and then with docker monitor run() method.
 # That race would occur very rarely, since it depends on the order threads are started and when
@@ -59,28 +61,11 @@ if False:
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
 
-try:
-    from __scalyr__ import SCALYR_VERSION
-    from __scalyr__ import scalyr_init
-    from __scalyr__ import INSTALL_TYPE
-    from __scalyr__ import DEV_INSTALL
-    from __scalyr__ import MSI_INSTALL
-except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION
-    from scalyr_agent.__scalyr__ import scalyr_init
-    from scalyr_agent.__scalyr__ import INSTALL_TYPE
-    from scalyr_agent.__scalyr__ import DEV_INSTALL
-    from scalyr_agent.__scalyr__ import MSI_INSTALL
+# Since this file can be executes as script, add the source root to the PYTHONPATH in case if it isn't there.
+# If it is not there, then the further import of the 'scalyr_agent' package will fail.
+sys.path.append(str(pl.Path(os.path.realpath(__file__)).parent.parent))
 
-# We must invoke this since we are an executable script.
-scalyr_init()
-
-import six
-
-try:
-    import glob
-except ImportError:
-    import glob2 as glob  # type: ignore
+from scalyr_agent import __scalyr__
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -101,7 +86,6 @@ scalyr_logging.set_log_destination(use_stdout=True)
 from optparse import OptionParser
 
 from scalyr_agent.profiler import ScalyrProfiler
-from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
@@ -119,8 +103,6 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
-from scalyr_agent import compat
-
 
 STATUS_FILE = "last_status"
 STATUS_FORMAT_FILE = "status_format"
@@ -313,7 +295,7 @@ class ScalyrAgent(object):
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == "version":
-            print("The Scalyr Agent 2 version is %s" % SCALYR_VERSION)
+            print("The Scalyr Agent 2 version is %s" % __scalyr__.SCALYR_VERSION)
             return 0
 
         # Read the configuration file.  Fail if we can't read it, unless the command is stop or status.
@@ -1585,7 +1567,7 @@ class ScalyrAgent(object):
         @type config: Configuration
         """
 
-        if self.__controller.install_type == DEV_INSTALL:
+        if self.__controller.install_type == __scalyr__.InstallType.DEV_INSTALL:
             # The agent is running from source, make sure that its directories exist.
             if not os.path.exists(config.agent_log_path):
                 os.makedirs(config.agent_log_path)
@@ -1647,7 +1629,7 @@ class ScalyrAgent(object):
         result.launch_time = self.__start_time
         result.user = self.__controller.get_current_user()
         result.revision = get_build_revision()
-        result.version = SCALYR_VERSION
+        result.version = __scalyr__.SCALYR_VERSION
         result.server_host = self.__config.server_attributes["serverHost"]
         result.compression_type = self.__config.compression_type
         result.compression_level = self.__config.compression_level

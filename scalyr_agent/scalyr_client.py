@@ -41,6 +41,7 @@ from six.moves import map
 from six.moves import range
 import six.moves.http_client
 
+
 from scalyr_agent.util import verify_and_get_compress_func
 from scalyr_agent.configuration import Configuration
 
@@ -89,11 +90,10 @@ def verify_server_certificate(config):
     :param config:
     :return:
     """
-    is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
-    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
-        __scalyr__.DEV_INSTALL,
-        __scalyr__.MSI_INSTALL,
-    ]
+    is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.InstallType.DEV_INSTALL
+    is_dev_or_windows_install = (
+        is_dev_install or __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.WINDOWS
+    )
 
     ca_file = config.ca_cert_path
     intermediate_certs_file = config.intermediate_certs_path
@@ -108,7 +108,7 @@ def verify_server_certificate(config):
 
     # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
     # under the MSI / Windows install
-    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
+    if not is_dev_or_windows_install and not os.path.isfile(intermediate_certs_file):
         raise ValueError(
             'Invalid path "%s" specified for the '
             '"intermediate_certs_path" config '
@@ -997,7 +997,7 @@ class ScalyrClientSession(object):
             parts.append(sharded_copy_manager_string)
 
         if self.__use_requests:
-            import scalyr_agent.third_party.requests as requests
+            import requests
 
             parts.append("requests-%s" % (requests.__version__))
 

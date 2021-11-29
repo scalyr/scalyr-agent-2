@@ -27,7 +27,7 @@ if False:  # NOSONAR
 
 import sys
 
-from scalyr_agent.__scalyr__ import INSTALL_TYPE
+from scalyr_agent import __scalyr__
 
 # Holds a reference to the existing PlatformController instance which is populated when first
 # calling "PlatformController.existing_instance()".
@@ -36,8 +36,10 @@ PLATFORM_INSTANCE = None
 
 class PlatformController(object):
     def __init__(self):
-        """Initializes a platform instance."""
-        self._install_type = INSTALL_TYPE
+        """
+        Initializes a platform instance.
+        """
+        self._install_type = __scalyr__.INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
     __platform_classes__ = []  # type: List[Type[PlatformController]]
@@ -48,7 +50,7 @@ class PlatformController(object):
         """Adds all available platforms to the '__platforms_registered__' array.
         a new platform class that could be instantiated during the 'new_platform' method.
         """
-        if sys.platform == "win32":
+        if __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.WINDOWS:
             from scalyr_agent.platform_windows import WindowsPlatformController
 
             PlatformController.__platform_classes__.append(WindowsPlatformController)

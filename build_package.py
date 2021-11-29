@@ -50,22 +50,11 @@ from io import open
 from optparse import OptionParser
 from time import gmtime, strftime
 
-from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_init
+from scalyr_agent import __scalyr__
+from scalyr_agent import util as scalyr_util
 
-scalyr_init()
-
-import scalyr_agent.util as scalyr_util
-
-# [start of 2->TODO]
-# Check for suitability.
-# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 import six
 from six.moves import range
-
-# [end of 2->TOD0]
-
-# The root of the Scalyr repository should just be the parent of this file.
-__source_root__ = get_install_root()
 
 # All the different packages that this script can build.
 PACKAGE_TYPES = [
@@ -98,7 +87,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
     """
     original_cwd = os.getcwd()
 
-    version = SCALYR_VERSION
+    version = __scalyr__.SCALYR_VERSION
 
     # Create a temporary directory to build the package in.
     tmp_dir = tempfile.mkdtemp(prefix="build-scalyr-agent-packages")
@@ -238,7 +227,7 @@ def build_win32_installer_package(variant, version):
     make_directory("source_root")
     make_directory("data_files")
 
-    agent_source_root = __source_root__
+    agent_source_root = __scalyr__.get_install_root()
 
     # Populate source_root
     os.chdir("source_root")
@@ -655,7 +644,7 @@ def build_container_builder(
     """
     build_container_tarball(source_tarball, base_configs=base_configs)
 
-    agent_source_root = __source_root__
+    agent_source_root = __scalyr__.get_install_root()
     # Make a copy of the right Dockerfile to embed in the script.
     shutil.copy(make_path(agent_source_root, dockerfile), "Dockerfile")
     # copy requirements file with dependencies for docker builds.
@@ -990,7 +979,7 @@ def build_base_files(base_configs="config"):
         certs/ca_certs.pem         -- The trusted SSL CA root list.
         config/agent.json          -- The configuration file.
         bin/scalyr-agent-2         -- Symlink to the agent_main.py file to run the agent.
-        bin/scalyr-agent-2-config  -- Symlink to config_main.py to run the configuration tool
+        bin/scalyr-agent-2-config  -- Symlink to agent_config.py to run the configuration tool
         build_info                 -- A file containing the commit id of the latest commit included in this package,
                                       the time it was built, and other information.
 
@@ -1000,7 +989,7 @@ def build_base_files(base_configs="config"):
     original_dir = os.getcwd()
     # This will return the parent directory of this file.  We will use that to determine the path
     # to files like scalyr_agent/ to copy the source files
-    agent_source_root = __source_root__
+    agent_source_root = __scalyr__.get_install_root()
 
     make_directory("scalyr-agent-2/py")
     os.chdir("scalyr-agent-2")
@@ -1429,7 +1418,7 @@ def create_scriptlets():
     These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
     """
 
-    scripts_path = os.path.join(__source_root__, "installer", "scripts")
+    scripts_path = os.path.join(__scalyr__.get_install_root(), "installer", "scripts")
 
     shutil.copy(os.path.join(scripts_path, "preinstall.sh"), "preinstall.sh")
     shutil.copy(os.path.join(scripts_path, "preuninstall.sh"), "preuninstall.sh")
@@ -1633,7 +1622,7 @@ def parse_change_log():
         return result
 
     # Begin the real work here.  Read the change log.
-    change_log_fp = open(os.path.join(__source_root__, "CHANGELOG.md"), "r")
+    change_log_fp = open(os.path.join(__scalyr__.get_install_root(), "CHANGELOG.md"), "r")
 
     try:
         # Skip over the first two lines since it should be header.
@@ -1738,7 +1727,7 @@ def get_build_info():
 
     try:
         # We need to execute the git command in the source root.
-        os.chdir(__source_root__)
+        os.chdir(__scalyr__.get_install_root())
         # Add in the e-mail address of the user building it.
         (rc, packager_email) = run_command(
             "git config user.email", fail_quietly=True, command_name="git"
