@@ -9,6 +9,7 @@ Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 
 Other:
 * Update agent Docker image to include ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
+* Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
 
 ## 2.1.25 "Hamarus" - Nov 17, 2021
 
