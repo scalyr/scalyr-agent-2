@@ -1,3 +1,2 @@
-requests==2.15.1
 numpy==1.16.6
 psutil==5.7.0
