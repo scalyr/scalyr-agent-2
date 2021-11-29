@@ -33,3 +33,6 @@ pathlib2==2.3.5; python_version <= '2.7'
 # NOTE: Not supported on windows
 udatetime==0.0.16
 futures==3.3.0; python_version <= '2.7'
+# Newer versions don't support Python 3.5 anymore
+more-itertools==8.5.0; python_version >= '3.0'
+more-itertools==5.0.0; python_version <= '2.7'

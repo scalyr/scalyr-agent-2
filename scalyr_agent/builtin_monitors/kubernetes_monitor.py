@@ -2535,6 +2535,7 @@ class ContainerChecker(object):
         self.__always_use_docker = self._config.get("k8s_always_use_docker")
         self.__cri_query_filesystem = self._config.get("k8s_cri_query_filesystem")
         self.__sidecar_mode = self._config.get("k8s_sidecar_mode")
+        self.__report_container_metrics = self._config.get("report_container_metrics")
 
         self.__k8s_log_configs = self._global_config.k8s_log_configs
 
@@ -2706,6 +2707,18 @@ class ContainerChecker(object):
                 scalyr_logging.DEBUG_LEVEL_1,
                 "Container runtime is '%s'" % (self._container_runtime),
             )
+
+            if (
+                self.__report_container_metrics
+                and self._container_runtime == "containerd"
+            ):
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Detected containerd runtime, some container level metrics "
+                    "such as docker.mem.limit and docker.cpu.throttling.* won't "
+                    "be available, because they are not exposed by containerd "
+                    "runtime.",
+                )
 
             if self.__always_use_docker or (
                 self._container_runtime == "docker" and not self.__always_use_cri
