@@ -18,9 +18,8 @@ from __future__ import absolute_import
 
 import pytest
 
+from scalyr_agent import __scalyr__
 from tests.smoke_tests.common import _test_standalone_smoke
-from tests.utils.agent_runner import PACKAGE_INSTALL
-
 from tests.utils.dockerized import dockerized_case
 from tests.image_builder.distributions.amazonlinux2 import AmazonlinuxBuilder
 from tests.image_builder.distributions.ubuntu import UbuntuBuilder

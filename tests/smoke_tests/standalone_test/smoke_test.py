@@ -21,14 +21,14 @@ import sys
 
 import pytest
 
-from scalyr_agent.__scalyr__ import DEV_INSTALL
+from scalyr_agent import __scalyr__
 from tests.smoke_tests.common import _test_standalone_smoke
 
 
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 def test_standalone_smoke():
-    _test_standalone_smoke(DEV_INSTALL)
+    _test_standalone_smoke(__scalyr__.InstallType.DEV_INSTALL)
 
 
 @pytest.mark.skipif(
@@ -38,5 +38,5 @@ def test_standalone_smoke():
 @pytest.mark.timeout(300)
 def test_standalone_smoke_with_process_workers():
     _test_standalone_smoke(
-        DEV_INSTALL, workers_type="process", workers_sessions_count=2
+        __scalyr__.InstallType.DEV_INSTALL, workers_type="process", workers_sessions_count=2
     )

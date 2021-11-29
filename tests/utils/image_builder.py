@@ -20,6 +20,7 @@ import shutil
 import docker
 import argparse
 import hashlib
+import pathlib as pl
 
 if False:  # NOSONAR
     from typing import Optional
@@ -32,9 +33,14 @@ from abc import ABCMeta
 
 import six
 
-from scalyr_agent.__scalyr__ import get_package_root
+from scalyr_agent import __scalyr__
 from tests.utils.common import create_tmp_directory
 from tests.utils.compat import Path
+
+# This has to be a DEV installation so we can use install root as source root
+_SOURCE_ROOT = __scalyr__.get_install_root()
+
+_AGENT_PACKAGE_PATH = pl.Path(_SOURCE_ROOT, "scalyr_agent")
 
 
 def _copy_agent_source(src_path, dest_path):
@@ -84,7 +90,7 @@ class AgentImageBuilder(object):
 
         # copy agent course code if needed.
         if type(self).COPY_AGENT_SOURCE:
-            root_path = Path(get_package_root()).parent
+            root_path = Path(_AGENT_PACKAGE_PATH).parent
             self.add_to_build_context(
                 root_path, "agent_source", custom_copy_function=_copy_agent_source
             )

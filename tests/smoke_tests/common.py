@@ -20,11 +20,12 @@ import os
 import time
 from io import open
 import json
+import pathlib as pl
 
 import six
 
 from scalyr_agent import compat
-from scalyr_agent.__scalyr__ import DEV_INSTALL, get_package_root
+from scalyr_agent import __scalyr__
 from tests.smoke_tests.verifier import (
     AgentLogVerifier,
     DataJsonVerifier,
@@ -34,6 +35,11 @@ from tests.smoke_tests.verifier import (
     AgentWorkerSessionLogVerifier,
 )
 from tests.utils.agent_runner import AgentRunner
+
+# This has to be a DEV installation so we can use install root as source root
+_SOURCE_ROOT = __scalyr__.get_install_root()
+
+_AGENT_PACKAGE_PATH = pl.Path(_SOURCE_ROOT, "scalyr_agent")
 
 
 def _create_data_json_file(runner, data_json_verifier):
@@ -64,8 +70,8 @@ def _test_standalone_smoke(
     """
     Agent standalone test to run within the same machine.
     """
-    if agent_installation_type == DEV_INSTALL:
-        os.chdir(get_package_root())
+    if agent_installation_type == __scalyr__.InstallType.DEV_INSTALL:
+        os.chdir(_AGENT_PACKAGE_PATH)
 
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
