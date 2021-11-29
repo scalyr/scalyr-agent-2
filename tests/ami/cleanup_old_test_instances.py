@@ -27,11 +27,12 @@ import datetime
 
 from libcloud.utils.iso8601 import parse_date
 
-from .packages_sanity_tests import INSTANCE_NAME_STRING
-from .packages_sanity_tests import get_libcloud_driver
-from .packages_sanity_tests import destroy_node_and_cleanup
+# pylint: disable=import-error
+from packages_sanity_tests import INSTANCE_NAME_STRING
+from packages_sanity_tests import get_libcloud_driver
+from packages_sanity_tests import destroy_node_and_cleanup
 
-#  from packages_sanity_tests import destroy_node_and_cleanup
+# pylint: enable=import-error
 
 # We delete any old automated test nodes which are older than 4 hours
 DELETE_OLD_NODES_TIMEDELTA = datetime.timedelta(hours=4)
