@@ -283,7 +283,7 @@ class PosixPlatformController(PlatformController):
 
         debug_logger("Forking service")
 
-        # Flush standard outputs before the fork. If not flushed, then all output, that is done before fork,
+        # Flush standard outputs before the fork. If not flushed, then all output that is done before the fork
         # will be duplicated by child process.
         sys.stdout.flush()
         sys.stderr.flush()

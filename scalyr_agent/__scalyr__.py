@@ -34,13 +34,12 @@ PY2_pre_279 = PY2 and sys.version_info < (2, 7, 9)
 PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 
 
-
 # One of the main things this file does is correctly give the full path to the following directories regardless of
 # install type :
 #   install_root:  The top-level directory where Scalyr is currently installed.
 #
 # There are several different ways we can be running, and this files has to give the correct values for each of them.
-# For example, we could just be running out of the source tree as checked into github.  Or we can be running
+# For example, we could just be running out of the source tree as checked into github or we can be running
 # out of some package such as Deb, Rpm, Msi for Windows and etc. We handle of these cases.
 #
 # Example layouts for different install types:
@@ -57,13 +56,17 @@ PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 # Install using msi package for Windows:
 #   Here the install root is C:\Program Files (x86)\Scalyr\
 #
-# In spite of the package type, the internal structure of the package is common:
+# In spite of the package type, the internal structure of the package is the same:
 #   VERSION: The package version file.
-#   install_type: File which contains the type of the installed package. Agent reads this file during the start in order
-#       to find all essential paths on the system where it runs. Soo the 'InstallType' enum class to see its possible
-#       values.
-#   py/: Directory with the source code of the agent. Only used in the Kubernetes and Docker images, other build use
-#       frozen binaries.
+#   package_info.json: File which contains the type of the installed package. Agent looks for this file during the
+#       initialization in the directory of the "scalyr_agent" package in its source code. According to the type that has
+#       been read from the file, agent has to find its essential paths such logs, config, etc.
+#       This file is not presented in the repository and is generated during the build process.
+#       NOTE: When package uses a frozen binary, this file is embedded to the executable.
+#
+#   py/: Directory with the source code of the agent. Only used in the Kubernetes and Docker images to keep them
+#       architecture-independent. Other builds use frozen binaries.
+#
 #   bin/: The directory with executables. For the majority of the package types, it contains frozen binaries of the
 #       agent. In case of Kubernetes or Docker it contains symlinks to agent executable scripts in the source code which
 #       is located in the 'py' folder.
@@ -79,7 +82,7 @@ __is_frozen__ = hasattr(sys, "frozen")
 
 class PlatformType(enum.Enum):
     """
-    The Enum class with possible types of the OS. Firstly, used for the 'P'
+    The Enum class with possible types of the OS.
     """
 
     WINDOWS = "windows"
@@ -89,8 +92,7 @@ class PlatformType(enum.Enum):
 
 class InstallType(enum.Enum):
     """
-    The enumeration of the Scalyr agent installation types. It is used for INSTALL_TYPE variable in the __scalyr__
-    module.
+    The enumeration of the Scalyr agent installation types. It is used for INSTALL_TYPE variable.
     """
 
     # Those package types contain Scalyr Agent as frozen binary.
@@ -115,31 +117,14 @@ def __determine_platform():
 PLATFORM_TYPE = __determine_platform()
 
 
-# The enum  for INSTALL_TYPE, a variable declared down below.
-
-
-def __read_install_type_from_type_file(path: pl.Path) -> InstallType:
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Can not determine the package installation type. The file '{path}' is not found."
-        )
-    # Read the type of the package from the file.
-    install_type = path.read_text().strip()
-    # Check if the package type is one of the valid install types.
-    if install_type not in [e.value for e in InstallType]:
-        raise ValueError(
-            f"Can not determine the installation type. Unknown value: {install_type}"
-        )
-
-    return InstallType(install_type)
-
-
 def __determine_install_root_and_type() -> Tuple[str, InstallType]:
     """
     Determine the path for the install root and type of the installation.
     """
 
     source_root = pl.Path(__file__).absolute().parent.parent
+
+    #
     package_info_path = source_root / "scalyr_agent" / "package_info.json"
 
     # package_info file is not found, so it has to be no installation. (DEV_INSTALL)
@@ -184,7 +169,11 @@ __install_root__, INSTALL_TYPE = __determine_install_root_and_type()
 
 def get_install_root():
     """
-    The root of the agent installation.
+    Returns the absolute path to the root of the install location to scalyr-agent-2.  This
+    works for the different types of installation such as RPM and Debian, as well as when this
+    is running from the source tree.
+    For example, it will return '/usr/share/scalyr-agent-2', for Linux installs and
+    the top of the repository when running from the source tree.
     """
     return __install_root__
 

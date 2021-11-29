@@ -979,7 +979,7 @@ def build_base_files(base_configs="config"):
         certs/ca_certs.pem         -- The trusted SSL CA root list.
         config/agent.json          -- The configuration file.
         bin/scalyr-agent-2         -- Symlink to the agent_main.py file to run the agent.
-        bin/scalyr-agent-2-config  -- Symlink to agent_config.py to run the configuration tool
+        bin/scalyr-agent-2-config  -- Symlink to config_main.py to run the configuration tool
         build_info                 -- A file containing the commit id of the latest commit included in this package,
                                       the time it was built, and other information.
 
