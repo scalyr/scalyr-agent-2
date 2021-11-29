@@ -11,6 +11,7 @@ pytest-coverage
 pytest-timeout==1.3.4
 # transitive dependency of pytest-benchmark, pinned since pytest-benchmark
 # doesn't pin it and new version drops support for Python 3
+# NOTE: For snyk false positive, see https://github.com/scalyr/scalyr-agent-2/pull/791#issuecomment-981771502
 pygal==2.4.0
 pytest-benchmark==3.2.3
 pytest-xdist==1.31.0
