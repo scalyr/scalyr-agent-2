@@ -45,6 +45,8 @@ from six.moves.urllib.parse import quote_plus
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
 
+from requests.exceptions import ConnectionError
+
 from scalyr_agent import compat
 
 from scalyr_agent import (
@@ -74,7 +76,6 @@ from scalyr_agent.monitor_utils.k8s import (
     QualifiedName,
 )
 import scalyr_agent.monitor_utils.k8s as k8s_utils
-from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 from scalyr_agent.util import StoppableThread, HistogramTracker
 
