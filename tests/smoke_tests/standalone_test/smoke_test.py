@@ -38,5 +38,7 @@ def test_standalone_smoke():
 @pytest.mark.timeout(300)
 def test_standalone_smoke_with_process_workers():
     _test_standalone_smoke(
-        __scalyr__.InstallType.DEV_INSTALL, workers_type="process", workers_sessions_count=2
+        __scalyr__.InstallType.DEV_INSTALL,
+        workers_type="process",
+        workers_sessions_count=2,
     )

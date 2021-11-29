@@ -64,7 +64,10 @@ def pytest_generate_tests(metafunc):
         # if the OS is not Linux and python version > 2.7 then also do the multiprocess workers testing.
         # Windows and Mac systems can not work with multiprocess workers since their process method is 'spawn'
         # and the copying manager relies on 'fork'
-        if __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.LINUX and sys.version_info >= (2, 7):
+        if (
+            __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.LINUX
+            and sys.version_info >= (2, 7)
+        ):
             test_params.append("process")
 
         metafunc.parametrize("worker_type", test_params)

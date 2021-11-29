@@ -48,7 +48,7 @@ CORRECT_INIT_PRAGMA = """
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     @pytest.mark.skipif(
         __scalyr__.PLATFORM_TYPE != __scalyr__.PlatformType.POSIX,
-        reason="Both ca and intermediate cert files are checked only on Unix"
+        reason="Both ca and intermediate cert files are checked only on Unix",
     )
     @mock.patch(
         "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.PACKAGE_INSTALL
@@ -253,7 +253,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
 
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL):
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL
+        ):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
             config.server_attributes = {"serverHost": "test"}
@@ -302,7 +304,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.agent_main import ScalyrAgent
         from scalyr_agent.platform_controller import PlatformController
 
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL):
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.InstallType.DEV_INSTALL
+        ):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
             config.server_attributes = {"serverHost": "test"}

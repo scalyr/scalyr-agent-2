@@ -141,14 +141,13 @@ def __determine_install_root_and_type() -> Tuple[str, InstallType]:
         package_info = json.loads(package_info_path.read_text())
         install_type_str = package_info.get("install_type")
         if not install_type_str:
-            raise ValueError(f"The required 'install_type' field is not found in the '{package_info_path}' file.")
+            raise ValueError(
+                f"The required 'install_type' field is not found in the '{package_info_path}' file."
+            )
 
         install_type = InstallType(install_type_str)
 
-        if install_type in [
-            InstallType.PACKAGE_INSTALL,
-            InstallType.TARBALL_INSTALL
-        ]:
+        if install_type in [InstallType.PACKAGE_INSTALL, InstallType.TARBALL_INSTALL]:
             # The package has to contain frozen binary.
 
             if not __is_frozen__:

@@ -1622,7 +1622,9 @@ def parse_change_log():
         return result
 
     # Begin the real work here.  Read the change log.
-    change_log_fp = open(os.path.join(__scalyr__.get_install_root(), "CHANGELOG.md"), "r")
+    change_log_fp = open(
+        os.path.join(__scalyr__.get_install_root(), "CHANGELOG.md"), "r"
+    )
 
     try:
         # Skip over the first two lines since it should be header.
