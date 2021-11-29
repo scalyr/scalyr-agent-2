@@ -2361,7 +2361,7 @@ class KubeletApi(object):
                 with warnings.catch_warnings():
                     warnings.simplefilter(
                         "ignore",
-                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
+                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,  # pylint: disable=no-member
                     )
                     response = self._get(url, False)
                 if self._kubelet_url.startswith("https://"):

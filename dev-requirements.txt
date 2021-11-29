@@ -32,6 +32,10 @@ udatetime==0.0.16; platform_system != "Windows"
 git+https://github.com/apache/libcloud.git@trunk#egg=apache-libcloud; platform_system != "Windows"
 paramiko==2.7.2; platform_system != "Windows"
 
+# benchmarks dependencies
+numpy==1.16.6
+brotli
+
 
 #agent dependencies
 orjson==3.6.4
