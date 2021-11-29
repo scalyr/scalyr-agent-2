@@ -721,7 +721,7 @@ class ScalyrClientSession(object):
                         "Request to '%s' failed due to a bad parameter value.  This may be caused by an "
                         "invalid write logs api key in the configuration. Response message: %s",
                         self.__full_address,
-                        response_as_json.get("message", "empty"),
+                        response_as_json.get("message", None),
                         error_code="error/client/badParam",
                     )
                 else:
