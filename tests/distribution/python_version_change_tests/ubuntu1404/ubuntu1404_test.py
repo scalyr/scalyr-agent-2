@@ -18,6 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import pytest
 
+from scalyr_agent import __scalyr__
 from tests.image_builder.distributions.ubuntu1404 import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
@@ -30,13 +31,13 @@ from tests.distribution.python_version_change_tests.common import (
     common_version_test,
 )
 from tests.common import install_deb, install_next_version_deb, remove_deb
-from tests.utils.agent_runner import PACKAGE_INSTALL, AgentRunner
+from tests.utils.agent_runner import AgentRunner
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__, python_executable="python_for_tests")
 def test_ubuntu_test_versions(request):
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     common_version_test(
         runner,
         install_deb,

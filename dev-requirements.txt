@@ -19,6 +19,7 @@ six==1.14.0
 ujson==1.35
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1
+distro==1.6.0; platform_system != "Windows"
 
 # Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows

@@ -28,7 +28,6 @@ __author__ = "czerwin@scalyr.com"
 
 import sys
 import logging
-import platform
 import os
 import re
 

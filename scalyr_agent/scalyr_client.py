@@ -896,7 +896,9 @@ class ScalyrClientSession(object):
         platform_value = None
         # noinspection PyBroadException
         try:
-            distribution = platform.dist()
+            import distro  # pylint: disable=import-error
+
+            distribution = distro.linux_distribution()
             if len(distribution[0]) > 0:
                 platform_value = "Linux-%s-%s" % (distribution[0], distribution[1])
         except Exception:

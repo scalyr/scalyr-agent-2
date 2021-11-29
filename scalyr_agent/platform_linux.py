@@ -20,8 +20,6 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-from sys import platform as _platform
-
 if False:
     from typing import List
 

@@ -18,6 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import pytest
 
+from scalyr_agent import __scalyr__
 from tests.image_builder.distributions.centos8 import CentOSBuilder
 
 from tests.utils.dockerized import dockerized_case
@@ -34,13 +35,13 @@ from tests.distribution.python_version_change_tests.common import (
     common_version_test,
 )
 from tests.common import install_rpm, install_next_version_rpm, remove_rpm
-from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
+from tests.utils.agent_runner import AgentRunner
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__, file_paths_to_copy=["/scalyr-agent.rpm"])
 def test_centos_test_versions(request):
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     common_version_test(
         runner,
         install_rpm,

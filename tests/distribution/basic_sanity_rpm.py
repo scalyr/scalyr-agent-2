@@ -25,10 +25,10 @@ import time
 
 import pytest
 
+from scalyr_agent import __scalyr__
 from tests.common import install_rpm
 from tests.utils.dockerized import dockerized_case
 from tests.utils.agent_runner import AgentRunner
-from tests.utils.agent_runner import PACKAGE_INSTALL
 from tests.image_builder.distributions.amazonlinux2 import AmazonlinuxBuilder
 
 
@@ -38,7 +38,7 @@ from tests.image_builder.distributions.amazonlinux2 import AmazonlinuxBuilder
     __file__,
 )
 def test_default_compression_algorithm(request):
-    runner = AgentRunner(PACKAGE_INSTALL, send_to_server=False)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL, send_to_server=False)
 
     # deflate is the default
     install_rpm()

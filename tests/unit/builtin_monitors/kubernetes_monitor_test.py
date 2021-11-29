@@ -27,7 +27,9 @@ from collections import OrderedDict
 
 import sys
 
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
+    InsecureRequestWarning,
+)
 from six import StringIO
 
 from scalyr_agent import AgentLogger

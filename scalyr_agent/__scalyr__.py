@@ -21,8 +21,6 @@ __author__ = "czerwin@scalyr.com"
 
 import json
 import platform
-import re
-import subprocess
 import sys
 import pathlib as pl
 import enum

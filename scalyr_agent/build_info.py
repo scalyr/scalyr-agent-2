@@ -26,7 +26,6 @@ if False:  # NOSONAR
 
 import os
 import pathlib as pl
-from io import open
 
 import six
 

@@ -30,9 +30,10 @@ import pytest
 
 from scalyr_agent import compat
 
+from scalyr_agent import __scalyr__
 from tests.utils.compat import Path
 from tests.utils.common import get_shebang_from_file
-from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
+from tests.utils.agent_runner import AgentRunner
 from tests.common import PackageInstallationError
 from tests.common import install_deb, remove_deb
 
@@ -128,7 +129,7 @@ def _mock_binaries(python, python2, python3):
 
 
 def common_test_ubuntu_versions():
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     common_version_test(
         runner,
         install_deb,
@@ -244,7 +245,7 @@ def common_test_only_python_mapped_to_python2(
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
     time.sleep(1)
 
@@ -280,7 +281,7 @@ def common_test_only_python_mapped_to_python3(
     # 'scalyr-agent-2-config' command must be a symlink to config_main.py
     assert _get_current_config_script_name() == "config_main.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
     time.sleep(1)
 
@@ -321,7 +322,7 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     # 'scalyr-agent-2-config' command must be a symlink to config_main_py2.py
     assert _get_current_config_script_name() == "config_main_py2.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
 
     time.sleep(1)
@@ -361,7 +362,7 @@ def common_test_python3(install_package_fn, install_next_version_fn):
     # 'scalyr-agent-2-config' command must be a symlink to config_main_py3.py
     assert _get_current_config_script_name() == "config_main_py3.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
 
     runner.start()
     time.sleep(1)
@@ -394,7 +395,7 @@ def common_test_switch_default_to_python2(install_package_fn, install_next_versi
 
     assert _get_current_config_script_name() == "config_main.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
     time.sleep(1)
 
@@ -442,7 +443,7 @@ def common_test_switch_default_to_python3(install_package_fn, install_next_versi
 
     assert _get_current_config_script_name() == "config_main.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
     time.sleep(1)
 
@@ -485,7 +486,7 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
     """
     install_package_fn()
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
 
     # Make sure the config is not present
     agent_config_path = "/etc/scalyr-agent-2/agent.json"
@@ -585,7 +586,7 @@ def common_test_switch_python2_to_python3(install_package_fn, install_next_versi
     install_package_fn()
     assert _get_current_config_script_name() == "config_main_py2.py"
 
-    runner = AgentRunner(PACKAGE_INSTALL)
+    runner = AgentRunner(__scalyr__.InstallType.PACKAGE_INSTALL)
     runner.start()
     time.sleep(1)
 

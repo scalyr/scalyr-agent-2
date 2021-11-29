@@ -84,7 +84,7 @@ class AgentRunner(object):
         send_to_server=True,
         workers_type="thread",
         workers_session_count=1,
-    ):  # type: (int, bool, bool, bool, six.text_type, int) -> None
+    ):  # type: (__scalyr__.InstallType, bool, bool, bool, six.text_type, int) -> None
 
         if enable_coverage and installation_type != __scalyr__.InstallType.DEV_INSTALL:
             raise ValueError("Coverage is only supported for dev installs")

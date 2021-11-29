@@ -24,9 +24,6 @@ if False:  # NOSONAR
     from typing import List
     from typing import Type
 
-
-import sys
-
 from scalyr_agent import __scalyr__
 
 # Holds a reference to the existing PlatformController instance which is populated when first

@@ -33,17 +33,7 @@ import sys
 
 from optparse import OptionParser
 
-from scalyr_agent.__scalyr__ import scalyr_init
-
-scalyr_init()
-
-# [start of 2->TODO]
-# Check for suitability.
-# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 import six
-from six.moves import range
-
-# [end of 2->TOD0]
 
 from scalyr_agent.monitors_manager import load_monitor_class
 
