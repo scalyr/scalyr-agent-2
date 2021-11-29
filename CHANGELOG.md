@@ -1,10 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.25 "TBD" - Nov 26, 2021
+## 2.1.26 "TBW" - Dec 17, 2021
 
 <!---
-Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 26, 2021 14:10 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+--->
+
+Other:
+* Update agent Docker image to include ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
+
+## 2.1.25 "Hamarus" - Nov 17, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 --->
 
 Other:
@@ -13,6 +22,7 @@ Other:
 
 Bug fixes:
 * Fix plaintext mode in the Graphite monitor.
+* Update Linux system metric monitor so it doesn't print an error and ignores ``/proc/net/netstat`` lines we don't support metrics for.
 
 ## 2.1.24 "Xuntian" - Oct 26, 2021
 
@@ -64,7 +74,7 @@ Bug fixes:
 * Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
 
 Other:
-* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations. 
+* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations.
 * Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
 
 ## 2.1.20 "Tabeisshi" - April 19, 2021

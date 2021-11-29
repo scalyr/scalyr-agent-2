@@ -90,7 +90,9 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
                 continue
 
             self.assertTrue(
-                metric_name in seen_metrics, "metric %s not seen" % (metric_name)
+                metric_name in seen_metrics,
+                "metric %s not seen. All seen metrics: %s"
+                % (metric_name, str(seen_metrics)),
             )
 
     @skipIf(IS_FEDORA, "Skipping test on Fedora")
