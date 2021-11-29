@@ -205,7 +205,7 @@ class MiscUtilsTestCase(ScalyrTestCase):
         self.assertEqual(used_locale, "unable to retrieve locale")
 
     def test_get_agent_start_up_message(self):
-        from scalyr_agent.agent_main import SCALYR_VERSION
+        from scalyr_agent import __scalyr__
 
         msg = scalyr_util.get_agent_start_up_message()
 
@@ -216,7 +216,7 @@ class MiscUtilsTestCase(ScalyrTestCase):
         lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
 
         self.assertTrue("Starting scalyr agent..." in msg)
-        self.assertTrue("version=%s" % (SCALYR_VERSION) in msg)
+        self.assertTrue("version=%s" % (__scalyr__.SCALYR_VERSION) in msg)
         self.assertTrue("Python version: %s" % (python_version_str) in msg)
         self.assertTrue("OpenSSL version: %s" % (openssl_version) in msg)
         self.assertTrue(

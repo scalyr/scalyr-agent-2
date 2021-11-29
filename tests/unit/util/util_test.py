@@ -25,10 +25,6 @@ __author__ = "czerwin@scalyr.com"
 from io import open
 import re
 
-from scalyr_agent import scalyr_init
-
-scalyr_init()
-
 import sys
 import datetime
 import os
@@ -42,7 +38,6 @@ import six
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.util import (
-    JsonReadFileException,
     RateLimiter,
     FakeRunState,
     ScriptEscalator,
@@ -193,13 +188,17 @@ class TestUtil(ScalyrTestCase):
         self.assertEquals(json_object, JsonObject(a="hi"))
 
     def test_read_file_as_json_no_file(self):
-        self.assertRaises(JsonReadFileException, scalyr_util.read_file_as_json, "foo")
+        self.assertRaises(
+            scalyr_util.JsonReadFileException, scalyr_util.read_file_as_json, "foo"
+        )
 
     def test_read_file_as_json_with_bad_json(self):
         self.__create_file(self.__path, "{ a: hi}")
 
         self.assertRaises(
-            JsonReadFileException, scalyr_util.read_file_as_json, self.__path
+            scalyr_util.JsonReadFileException,
+            scalyr_util.read_file_as_json,
+            self.__path,
         )
 
     def test_read_file_as_json_with_strict_utf8_json(self):
@@ -208,7 +207,10 @@ class TestUtil(ScalyrTestCase):
             f.write(b'{ a: "\x96"}')
 
         self.assertRaises(
-            JsonReadFileException, scalyr_util.read_file_as_json, self.__path, True
+            scalyr_util.JsonReadFileException,
+            scalyr_util.read_file_as_json,
+            self.__path,
+            True,
         )
 
     def test_atomic_write_dict_as_json_file(self):

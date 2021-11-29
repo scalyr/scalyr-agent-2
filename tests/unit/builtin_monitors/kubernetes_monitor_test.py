@@ -27,6 +27,9 @@ from collections import OrderedDict
 
 import sys
 
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from six import StringIO
+
 from scalyr_agent import AgentLogger
 from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
@@ -35,10 +38,6 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sNamespaceFilter,
     PodInfo,
 )
-from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
-    InsecureRequestWarning,
-)
-from scalyr_agent.third_party.six import StringIO
 
 __author__ = "echee@scalyr.com"
 

@@ -35,6 +35,7 @@ except ImportError:
 import pytest
 
 from scalyr_agent import scalyr_logging
+from scalyr_agent import __scalyr__
 
 from tests.unit.copying_manager_tests.common import (
     CopyingManagerCommonTest,
@@ -67,8 +68,10 @@ def pytest_generate_tests(metafunc):
     """
     if "worker_type" in metafunc.fixturenames:
         test_params = [["thread", 1, 1], ["thread", 2, 2]]
-        # if the OS is not Windows and python version > 2.7 then also do the multiprocess workers testing.
-        if platform.system() != "Windows" and sys.version_info >= (2, 7):
+        # if the OS is not Linux and python version > 2.7 then also do the multiprocess workers testing.
+        # Windows and Mac systems can not work with multiprocess workers since their process method is 'spawn'
+        # and the copying manager relies on 'fork'
+        if __scalyr__.PLATFORM_TYPE == __scalyr__.PlatformType.LINUX and sys.version_info >= (2, 7):
             test_params.extend([["process", 1, 1], ["process", 2, 2]])
 
         metafunc.parametrize(
