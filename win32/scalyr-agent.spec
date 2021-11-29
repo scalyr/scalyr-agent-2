@@ -24,8 +24,12 @@ from PyInstaller.building.api import (  # pylint: disable=import-error
 
 
 block_cipher = None
+# pylint: disable=import-error
+from dynamic_modules import (
+    WINDOWS_MONITOR_MODULES_TO_INCLUDE,
+)
 
-from dynamic_modules import WINDOWS_MONITOR_MODULES_TO_INCLUDE  # pylint: disable=import-error
+# pylint: enable=import-error
 
 HIDDEN_IMPORTS = ["win32timezone"]
 
