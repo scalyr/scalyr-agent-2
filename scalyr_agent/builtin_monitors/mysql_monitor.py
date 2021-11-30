@@ -122,6 +122,21 @@ define_config_option(
     "Location of the cert file to use for the SSL connection. Defaults to None",
     convert_to=six.text_type,
 )
+define_config_option(
+    __monitor__,
+    "collect_replica_metrics",
+    (
+        "Set this value to true if the monitor is configured to connect to a MySQL replica / slave. "
+        "Setting it to false will cause monitor not to collect any replica / slave related metrics. "
+        "This means that when connecting to a primary / master, user which is used to authenticate only "
+        'needs "PROCESS" permission grant and nothing else. Keep in mind that you can also leave '
+        "this set to true when connecting to a master - in such case, the monitor will still try to query "
+        'for slave metrics and as such, require permissions to execute "SHOW SLAVE STATUS;" query. '
+        "For backward compatibility reasons, this value defaults to true."
+    ),
+    convert_to=bool,
+    default=True,
+)
 
 # Metric definitions.
 define_metric(
@@ -695,8 +710,19 @@ class MysqlDB(object):
         return d
 
     def gather_cluster_status(self):
+        if not self._collect_replica_metrics:
+            self._logger.debug(
+                '"collect_replica_metrics" configuration option is set to False '
+                "so replica / slave metrics won't be collected."
+            )
+            return None
+
         slave_status = self._query("SHOW SLAVE STATUS")
         if not slave_status:
+            self._logger.debug(
+                "SHOW SLAVE STATUS returned no result which indicates we are "
+                "running on a master. Slave metrics won't be collected."
+            )
             return None
         result = None
         slave_status = self._row_to_dict(slave_status[0])
@@ -966,6 +992,7 @@ class MysqlDB(object):
         path_to_ca_file=None,
         path_to_key_file=None,
         path_to_cert_file=None,
+        collect_replica_metrics=True,
     ):
         """Constructor: handles both socket files as well as host/port connectivity.
 
@@ -978,6 +1005,8 @@ class MysqlDB(object):
         @param path_to_ca_file: optional path to a ca file to use when connecting to mysql over ssl
         @param path_to_key_file: optional path to a key file to use when connecting to mysql over ssl
         @param path_to_cert_file: optional path to a cert file to use when connecting to mysql over ssl
+        @param collect_replica_metrics: set to true to try to collect replica (slave) related metrics.
+                                        Only applicable when connected to a replica.
         """
         self._default_socket_locations = [
             "/tmp/mysql.sock",  # MySQL's own default.
@@ -995,6 +1024,8 @@ class MysqlDB(object):
         self._path_to_ca_file = path_to_ca_file
         self._path_to_key_file = path_to_key_file
         self._path_to_cert_file = path_to_cert_file
+        self._collect_replica_metrics = collect_replica_metrics
+
         if type == "socket":
             # if no socket file specified, attempt to find one locally
             if sockfile is None:
@@ -1106,7 +1137,7 @@ Example below shows DDL you can use to create a new user with the needed permiss
     -- Or:
     -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor';
 
-    -- Or in  MariaDB:
+    -- Or in MariaDB:
     -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor';
     -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
 
@@ -1119,6 +1150,10 @@ Example below shows DDL you can use to create a new user with the needed permiss
 Keep in mind that there are some differences between different MySQL versions and implementations
 such as MariaDB so you may need to refer to the documentation for the version you are using to obtain
 the correct name of the grant which grants a permission for running ``SHOW SLAVE STATUS;`` command.
+
+If ``collect_replica_metrics`` monitor config option (available since scalyr agent v2.1.26) is set
+to ``False`` and monitor is configured to connect to a primary (master), user which is used to run
+the queries only needs the ``PROCESS`` permission and nothing else.
 
 If you grant those permissions after the agent has already been started and established connection
 to the MySQL server, you will need to restart the agent (which in turn will restart the monitor and
@@ -1218,6 +1253,10 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
         self._path_to_ca_file = self._config.get("ca_file", None)
         self._path_to_key_file = self._config.get("key_file", None)
         self._path_to_cert_file = self._config.get("cert_file", None)
+        self._collect_replica_metrics = self._config.get(
+            "collect_replica_metrics", True
+        )
+
         self._db = None
 
     def _connect_to_db(self):
@@ -1242,6 +1281,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     path_to_ca_file=self._path_to_ca_file,
                     path_to_key_file=self._path_to_key_file,
                     path_to_cert_file=self._path_to_cert_file,
+                    collect_replica_metrics=self._collect_replica_metrics,
                 )
             else:
                 self._db = MysqlDB(
@@ -1256,6 +1296,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     path_to_ca_file=self._path_to_ca_file,
                     path_to_key_file=self._path_to_key_file,
                     path_to_cert_file=self._path_to_cert_file,
+                    collect_replica_metrics=self._collect_replica_metrics,
                 )
         except Exception as e:
             self._db = None
