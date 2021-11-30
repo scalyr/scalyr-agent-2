@@ -46,6 +46,18 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Build and push image to the local registry
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: docker/Dockerfile.unified
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            localhost:5000/${{ matrix.image-name }}
+          build-args: |
+            BUILD_TYPE=${{ matrix.build-type }}
+
       - name: Build and push image from master branch.
         uses: docker/build-push-action@v2
         if: ${{ github.ref == 'refs/heads/master' }}
