@@ -109,7 +109,7 @@ echo "Building docker image"
 agent_image="agent-ci/scalyr-agent-docker-${log_mode}:${fakeversion}"
 
 # Build image by specifying image type through build args.
-docker build -t "$agent_image" -f docker/Dockerfile  --build-arg "BUILD_TYPE=docker-$log_mode" --build-arg MODE=with-coverage .
+docker build -t "$agent_image" -f docker/Dockerfile.unified  --build-arg "BUILD_TYPE=docker-$log_mode" --build-arg MODE=with-coverage .
 
 ## Extract and build agent docker image
 #./scalyr-docker-agent-${log_mode}-${fakeversion} --extract-packages
