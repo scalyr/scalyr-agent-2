@@ -16,18 +16,19 @@ ARG BUILD_TYPE
 
 RUN apt-get update && apt-get install -y build-essential git tar
 
+ADD docker/requirements.txt /tmp/requirments.txt
+
+# install python dependencies
+RUN pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirments.txt
+
 ADD . /scalyr-agent-2
 
-RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --output-dir /tmp/build
+RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --output-dir /tmp/build only-container-filesystem-tarball
 
 WORKDIR /tmp/container-fs
 RUN tar -xvf /tmp/build/scalyr-agent.tar.gz
 
 WORKDIR /
-
-# install python dependencies
-RUN pip --no-cache-dir install --root /tmp/dependencies -r /scalyr-agent-2/docker/requirements.txt
-
 
 # Copy result files to a new base stage.
 FROM python:3.8.10-slim as scalyr-base
