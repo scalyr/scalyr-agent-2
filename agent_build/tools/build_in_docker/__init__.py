@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # This is a helper module that helps to run custom command inside the docker build context.
-# Since we can deploy some of the deployments (agent_tools/environment_deployments/deployments.py) inside docker,
+# Since we can deploy some of the deployments (agent_build/tools/environment_deployments/deployments.py) inside docker,
 # Using 'docker build' is more beneficial that 'docker run' because of the docker caching.
 
 import subprocess

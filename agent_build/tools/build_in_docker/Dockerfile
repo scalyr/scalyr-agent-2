@@ -4,7 +4,7 @@
 ARG BASE_IMAGE_NAME
 ARG BUILD_STAGE
 
-# This stage is used in building deployment steps (agent_tools/environemt_deployments.py).
+# This stage is used in building deployment steps (agent_build/tools/environemt_deployments.py).
 # It expects that the base image contains all needed files to perform the step.
 FROM $BASE_IMAGE_NAME as stage-step-build
 # Do nothing all files have to be in the base image.
@@ -14,7 +14,6 @@ FROM $BASE_IMAGE_NAME as stage-step-build
 FROM $BASE_IMAGE_NAME as stage-build
 RUN rm -rf /scalyr-agent-2
 # Add all files that are involved in the package build process.
-ADD ./agent_tools /scalyr-agent-2/agent_tools
 ADD ./agent_build /scalyr-agent-2/agent_build
 ADD ./scalyr_agent /scalyr-agent-2/scalyr_agent
 ADD ./config /scalyr-agent-2/config
@@ -30,7 +29,6 @@ ADD ./build_package.py /scalyr-agent-2/build_package.py
 # This frozen binary later can be used to run package tests on systems without python.
 FROM $BASE_IMAGE_NAME as stage-test
 RUN rm -rf /scalyr-agent-2
-ADD ./agent_tools /scalyr-agent-2/agent_tools
 ADD ./agent_build /scalyr-agent-2/agent_build
 ADD ./tests/package_tests/ /scalyr-agent-2/tests/package_tests/
 

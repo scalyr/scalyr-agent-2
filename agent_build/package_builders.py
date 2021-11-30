@@ -126,7 +126,7 @@ class PackageBuilder(abc.ABC):
     """
         Base abstraction for all Scalyr agent package builders. it can perform build of the package directly on the
     current system or inside docker.
-        It also uses ':py:module:`agent_tools.environment_deployments` features to define and deploy its build
+        It also uses ':py:module:`agent_build.tools.environment_deployments` features to define and deploy its build
         environment in order to be able to perform the actual build.
     """
 

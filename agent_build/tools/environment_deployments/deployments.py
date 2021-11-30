@@ -283,7 +283,7 @@ class DeploymentStep:
 
 class DockerFileDeploymentStep(DeploymentStep):
     """
-    The deployment step which actions are defined in the Dockerfile. A implies, can be performed only in docker.
+    The deployment step which actions are defined in the Dockerfile. As implies, can be performed only in docker.
     """
 
     # Path the dockerfile.
@@ -336,7 +336,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
     The deployment step class which is a wrapper around some shell script.
     """
 
-    # Pat hto  the script file that has to be executed during the step.
+    # Path to  the script file that has to be executed during the step.
     SCRIPT_PATH: pl.Path
 
     def __init__(
@@ -361,13 +361,13 @@ class ShellScriptDeploymentStep(DeploymentStep):
         """
         Create list with the shell command line arguments that has to execute the shell script.
             Optionally also adds cache path to the shell script as additional argument.
-        :param source_path: PAth to the source root. Since this command can be executed in docker within
+        :param source_path: Path to the source root. Since this command can be executed in docker within
             different filesystem, then the source root also has to be different.
         :param cache_dir: Path to the cache dir.
         :return: String with shell command that can be executed to needed shell.
         """
 
-        # Determine deeded shell interpreter.
+        # Determine needed shell interpreter.
         if type(self).SCRIPT_PATH.suffix == ".ps1":
             shell = "powershell"
         else:
@@ -394,7 +394,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         """
         Run step locally by running the script on current system.
         :param cache_dir: Path of the cache directory. If specified, then the script may save or reuse some intermediate
-            result using it.
+            results in it.
         """
         command_args = self._get_command_line_args(
             source_path=_SOURCE_ROOT, cache_dir=cache_dir
@@ -408,9 +408,9 @@ class ShellScriptDeploymentStep(DeploymentStep):
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
     ):
         """
-        Run step in docker. It uses a special logic, which is implemented in 'agent_tools.build_in_docker' module,
-        that allows to execute custom command inside docker by using 'docker build' command. It differs from running
-        just in the container because we can benefit from the docker caching mechanism.
+        Run step in docker. It uses a special logic, which is implemented in 'agent_build/tools/tools.build_in_docker'
+        module,that allows to execute custom command inside docker by using 'docker build' command. It differs from
+        running just in the container because we can benefit from the docker caching mechanism.
         :param cache_dir: Path of the cache directory.
         :param locally: If we are already in docker, this has to be set as True, to avoid loop.
         """
@@ -437,7 +437,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         try:
             # Create container and copy all mounted files to the final path inside the container.
             # This is needed because if we just use mounted path, files become empty after container stops.
-            # There has to be some workaround by plying with mount typed, but for now the current approach has to be
+            # There has to be some workaround by playing with mount typed, but for now the current approach has to be
             # fine too.
             subprocess.check_call(
                 [
