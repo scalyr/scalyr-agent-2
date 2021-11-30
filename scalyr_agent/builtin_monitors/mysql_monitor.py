@@ -1031,8 +1031,8 @@ class MysqlMonitor(ScalyrMonitor):
 
 This agent monitor plugin records performance and usage data from a MySQL server.
 
-NOTE: the MySQL monitor requires Python 2.6 or higher. (This applies to the server on which the Scalyr Agent
-is running, which needn't necessarily be the same machine where the MySQL server is running.) If you need
+NOTE: The MySQL monitor requires Python 2.7 or higher as of agent release 2.0.52. (This applies to the server on which the Scalyr Agent
+is running, which needn't necessarily be the same machine where the MySQL server is running.). If you need
 to monitor MySQL from a machine running an older version of Python, [let us know](mailto:support@scalyr.com).
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
@@ -1043,8 +1043,9 @@ For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 To configure the MySQL monitor plugin, you will need the following information:
 
-- A MySQL username with administrative privileges. The user needs to be able to query the information_schema table,
-  as well as assorted global status information.
+- A MySQL user with administrative privileges. The user needs to be able to query the information_schema table,
+  as well as assorted global status information. See more information on which permissionsa are needed in the
+  section below.
 - The password for that user.
 
 Here is a sample configuration fragment:
@@ -1061,6 +1062,67 @@ Here is a sample configuration fragment:
 This configuration assumes that MySQL is running on the same server as the Scalyr Agent, and is using the default
 MySQL socket. If not, you will need to specify the server's socket file, or hostname (or IP address) and port number;
 see Configuration Reference.
+
+## MySQL User Permissions
+
+As part of the metric gathering process, monitor executes the following queries:
+
+* ``SHOW ENGINE INNODB STATUS;``
+* ``SHOW PROCESSLIST;``
+* ``SHOW SLAVE STATUS;``
+* ``SHOW /*!50000 GLOBAL */ STATUS;``
+* ``SHOW /*!50000 GLOBAL */ VARIABLES;``
+
+To be able to execute those queries, the user you use to authenticate needs a subset of administrative
+permissions which are documented below.
+
+You are strongly encouraged to create a dedicated user with a limited set of permissions for this purpose
+(e.g. user named ``scalyr-agent-monitor``).
+
+Example below shows DDL you can use to create a new user with the needed permissions.
+
+    -- Create user used for monitoring by the scalyr agent
+    -- In this case we allow that user to log in remotely from any host (@'%'), but depending
+    -- where the agent and MySQL server is running, you may want to limit this to 'localhost' (@'localhost')
+    CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'%' IDENTIFIED BY 'your super secret and long password';
+
+    -- Revoke all permissions
+    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor';
+
+    -- Grant necessary permissions
+    -- Needed for SHOW PROCESSLIST;
+    -- Needed for ENGINE INNODB STATUS;
+    -- Needed for SELECT VERSION();
+    -- Needed for SHOW /*!50000 GLOBAL */ STATUS;
+    -- Needed for SHOW /*!50000 GLOBAL */ VARIABLES;
+    GRANT PROCESS on *.* to 'scalyr-agent-monitor';
+
+    -- Needed for SHOW SLAVE STATUS;
+    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
+
+    -- Or in some versions of MySQL
+    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor';
+
+    -- Or:
+    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor';
+
+    -- Or in  MariaDB:
+    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor';
+    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
+
+    -- Flush priveleges
+    FLUSH PRIVILEGES;
+
+    -- Show permissions
+    SHOW GRANTS FOR 'scalyr-agent-monitor'@'%';
+
+Keep in mind that there are some differences between different MySQL versions and implementations
+such as MariaDB so you may need to refer to the documentation for the version you are using to obtain
+the correct name of the grant which grants a permission for running ``SHOW SLAVE STATUS;`` command.
+
+If you grant those permissions after the agent has already been started and established connection
+to the MySQL server, you will need to restart the agent (which in turn will restart the monitor and
+re-establish the connection) for the permission changes to take an affect.
 
 ## Viewing Data
 
