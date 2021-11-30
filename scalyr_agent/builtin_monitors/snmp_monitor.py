@@ -370,11 +370,17 @@ well as a list of OID groups to query. e.g.
             elif protocol == "des":
                 priv_protocol = hlapi.usmDESPrivProtocol
             elif protocol == "aes128":
-                priv_protocol = hlapi.usmAesCfb128PrivProtocol
+                priv_protocol = (
+                    hlapi.usmAesCfb128PrivProtocol  # pylint: disable=no-member
+                )
             elif protocol == "aes192":
-                priv_protocol = hlapi.usmAesCfb192PrivProtocol
+                priv_protocol = (
+                    hlapi.usmAesCfb192PrivProtocol  # pylint: disable=no-member
+                )
             elif protocol == "aes256":
-                priv_protocol = hlapi.usmAesCfb256PrivProtocol
+                priv_protocol = (
+                    hlapi.usmAesCfb256PrivProtocol  # pylint: disable=no-member
+                )
             elif protocol == "3des":
                 priv_protocol = hlapi.usm3DESEDEPrivProtocol
             else:

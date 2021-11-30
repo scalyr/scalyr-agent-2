@@ -482,7 +482,8 @@ class MysqlDB(object):
             (errcode, msg) = error.args
             if errcode != 2006:  # "MySQL server has gone away"
                 self._logger.exception(
-                    "Exception trying to execute query: %d '%s'" % (errcode, msg)
+                    "Exception trying to execute query: %d '%s'"  # pylint: disable=bad-string-format-type
+                    % (errcode, msg)
                 )
                 raise Exception(
                     "Database error -- "

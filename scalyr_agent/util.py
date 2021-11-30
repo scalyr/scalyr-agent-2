@@ -280,13 +280,17 @@ def get_json_implementation(lib_name):
 
             def dump():
                 if fp is not None:
-                    return orjson.dump(obj, fp, default=default)
+                    return orjson.dump(  # pylint: disable=no-member
+                        obj, fp, default=default
+                    )
                 else:
-                    return orjson.dumps(obj, default=default)
+                    return orjson.dumps(  # pylint: disable=no-member
+                        obj, default=default
+                    )
 
             try:
                 return dump()
-            except orjson.JSONEncodeError as e:
+            except orjson.JSONEncodeError as e:  # pylint: disable=no-member
                 # if there is an integer size error, fall back to native json
                 if str(e) == "Integer exceeds 64-bit range":
                     _, _json_dumps, _ = get_json_implementation("json")
@@ -301,7 +305,7 @@ def get_json_implementation(lib_name):
 
         def orjson_loads_custom(data, *args, **kwargs):
             try:
-                return orjson.loads(data, *args, **kwargs)
+                return orjson.loads(data, *args, **kwargs)  # pylint: disable=no-member
             except Exception as e:
                 if "leading surrogate" in str(e) or "surrogates not allowed" in str(e):
                     _, _, _json_loads = get_json_implementation("json")
