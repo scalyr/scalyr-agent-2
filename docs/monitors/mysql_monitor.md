@@ -9,8 +9,8 @@
 
 This agent monitor plugin records performance and usage data from a MySQL server.
 
-NOTE: the MySQL monitor requires Python 2.6 or higher. (This applies to the server on which the Scalyr Agent
-is running, which needn't necessarily be the same machine where the MySQL server is running.) If you need
+NOTE: The MySQL monitor requires Python 2.7 or higher as of agent release 2.0.52. (This applies to the server on which the Scalyr Agent
+is running, which needn't necessarily be the same machine where the MySQL server is running.). If you need
 to monitor MySQL from a machine running an older version of Python, [let us know](mailto:support@scalyr.com).
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
