@@ -799,6 +799,4 @@ DOCKER_API_CONTAINER_BUILDER = DockerApiPackageBuilder(
     config_path=_CONFIGS_PATH / "docker-api-config"
 )
 
-K8S_CONTAINER_BUILDER = K8sPackageBuilder(
-    config_path=_CONFIGS_PATH / "k8s-config"
-)
+K8S_CONTAINER_BUILDER = K8sPackageBuilder(config_path=_CONFIGS_PATH / "k8s-config")
