@@ -131,7 +131,7 @@ define_config_option(
         "This means that when connecting to a primary / master, user which is used to authenticate only "
         'needs "PROCESS" permission grant and nothing else. Keep in mind that you can also leave '
         "this set to true when connecting to a master - in such case, the monitor will still try to query "
-        'for slave metrics and as such, require permissions to execute "SHOW SLAVE STATUS;" query. '
+        'for replica metrics and as such, require permissions to execute "SHOW SLAVE STATUS;" query. '
         "For backward compatibility reasons, this value defaults to true."
     ),
     convert_to=bool,
@@ -1136,7 +1136,7 @@ Example below shows DDL you can use to create a new user with the needed permiss
     GRANT PROCESS on *.* to 'scalyr-agent-monitor';
 
     -- Permission grants below are only needed if collect_replica_metrics config option is True
-    -- and monitor is configured to connect to a replica and not primary.
+    -- and monitor is configured to connect to a replica and not a primary.
 
     -- Needed for SHOW SLAVE STATUS;
     GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
