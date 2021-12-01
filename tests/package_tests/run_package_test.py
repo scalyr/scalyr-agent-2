@@ -28,7 +28,6 @@ def get_option(name: str, default: str = None, type_: Union[Type[str], Type[list
 
     env_variable_name = name.upper()
     value = os.environ.get(env_variable_name, None)
-    print(f"{env_variable_name}:{value}")
     if value is not None:
         if type_ == list:
             value = value.split(",")

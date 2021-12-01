@@ -40,6 +40,12 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Start minikube for the test of the kubernetes build.
+        if: matrix.image-type == 'k8s'
+        shell: bash
+        run: |
+          minikube start
+
       - name: Run image test.
         env:
             SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
@@ -88,12 +94,6 @@ jobs:
         uses: docker/setup-buildx-action@v1
         with:
           driver-opts: network=host
-
-      - name: Start minikube for the test of the kubernetes build.
-        if: matrix.image-type == 'k8s'
-        shell: bash
-        run: |
-          minikube start
 
       - name: Push image from master branch.
         if: ${{ github.ref == 'refs/heads/master' }}
