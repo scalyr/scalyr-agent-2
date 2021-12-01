@@ -1120,12 +1120,16 @@ You are strongly encouraged to create a dedicated user with a limited set of per
 Example below shows DDL you can use to create a new user with the needed permissions.
 
     -- Create user used for monitoring by the scalyr agent
-    -- In this case we allow that user to log in remotely from any host (@'%'), but depending
-    -- where the agent and MySQL server is running, you may want to limit this to 'localhost' (@'localhost')
+    -- In this case we allow that user to log in remotely from any host (@'%') and localhost
+    -- (@'localhost'), but depending on where the agent and MySQL server is running, you want only want
+    -- to grant permissions to connect from localhost. In this case, you should remove the lines
+    -- which allow user to connect from any host (@'%').
+    CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'localhost' IDENTIFIED BY 'your super secret and long password';
     CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'%' IDENTIFIED BY 'your super secret and long password';
 
     -- Revoke all permissions
-    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor';
+    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor'@'localhost';
+    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor'@'%';
 
     -- Grant necessary permissions
     -- Needed for SHOW PROCESSLIST;
@@ -1133,28 +1137,35 @@ Example below shows DDL you can use to create a new user with the needed permiss
     -- Needed for SELECT VERSION();
     -- Needed for SHOW /*!50000 GLOBAL */ STATUS;
     -- Needed for SHOW /*!50000 GLOBAL */ VARIABLES;
-    GRANT PROCESS on *.* to 'scalyr-agent-monitor';
+    GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'localhost';
+    GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'%';
 
     -- Permission grants below are only needed if collect_replica_metrics config option is True
     -- and monitor is configured to connect to a replica and not a primary.
 
     -- Needed for SHOW SLAVE STATUS;
-    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
+    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'%';
 
     -- Or in some versions of MySQL
-    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor';
+    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor'@'%';
 
     -- Or:
-    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor';
+    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor'@'%';
 
     -- Or in MariaDB:
-    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor';
-    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';
+    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor'@'%';
+    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'%';
 
-    -- Flush priveleges
+    -- Flush privileges
     FLUSH PRIVILEGES;
 
     -- Show permissions
+    SHOW GRANTS FOR 'scalyr-agent-monitor'@'localhost';
     SHOW GRANTS FOR 'scalyr-agent-monitor'@'%';
 
 Keep in mind that there are some differences between different MySQL versions and implementations
