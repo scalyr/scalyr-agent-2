@@ -47,12 +47,15 @@ jobs:
           python3 tests/package_tests/run_package_test.py run-package-test ${{ matrix.image-type}}_x86_64
           python3 tests/package_tests/run_package_test.py run-package-test ${{ matrix.image-type}}_arm64
 
-      - name: Run docker smoke tests
-        if: startsWith( matrix.image-type, 'docker-')
-        env:
-          SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
-        run: |
-          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 150
+# TODO need to add READ_API_KEY secret from circleci
+#      - name: Run docker smoke tests
+#        if: startsWith( matrix.image-type, 'docker-')
+#        env:
+#          SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+#          READ_API_KEY: # Need to add to github
+#
+#        run: |
+#          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 150
 
 
   publish:
