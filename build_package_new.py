@@ -41,52 +41,101 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "package_name",
-        type=str,
-        choices=package_builders.ALL_PACKAGE_BUILDERS.keys(),
-        help="Type of the package to build.",
-    )
+    # Add subparsers for all packages except docker builders.
+    subparsers = parser.add_subparsers(dest="package_name", required=True)
 
-    parser.add_argument(
-        "--locally",
-        action="store_true",
-        help="Perform the build on the current system which runs the script. Without that, some packages may be built "
-        "by default inside the docker.",
-    )
+    for builder_name, builder  in package_builders.ALL_PACKAGE_BUILDERS.items():
+        package_parser = subparsers.add_parser(
+            name=builder_name
+        )
 
-    parser.add_argument(
-        "--output-dir",
-        required=True,
-        type=str,
-        dest="output_dir",
-        help="The directory where the result package has to be stored.",
-    )
+        # Define argument for all packages
+        package_parser.add_argument(
+            "--locally",
+            action="store_true",
+            help="Perform the build on the current system which runs the script. Without that, some packages may be built "
+            "by default inside the docker.",
+        )
 
-    parser.add_argument(
-        "--no-versioned-file-name",
-        action="store_true",
-        dest="no_versioned_file_name",
-        default=False,
-        help="If true, will not embed the version number in the artifact's file name.  This only "
-        "applies to the `tarball` and container builders artifacts.",
-    )
+        package_parser.add_argument(
+            "--no-versioned-file-name",
+            action="store_true",
+            dest="no_versioned_file_name",
+            default=False,
+            help="If true, will not embed the version number in the artifact's file name.  This only "
+            "applies to the `tarball` and container builders artifacts.",
+        )
 
-    parser.add_argument(
-        "-v",
-        "--variant",
-        dest="variant",
-        default=None,
-        help="An optional string that is included in the package name to identify a variant "
-        "of the main release created by a different packager.  "
-        "Most users do not need to use this option.",
-    )
+        package_parser.add_argument(
+            "-v",
+            "--variant",
+            dest="variant",
+            default=None,
+            help="An optional string that is included in the package name to identify a variant "
+            "of the main release created by a different packager.  "
+            "Most users do not need to use this option.",
+        )
+
+        # If that's a docker image builder, then add additional commands.
+        if isinstance(builder, package_builders.ContainerPackageBuilder):
+            # Add subparser for command that tell to the builder only to build the tarball with the image's filesystem
+            # This command is used by the source Dockerfile of the image to create agent's filesystem inside the image.
+
+            package_parser.add_argument(
+                "--only-filesystem-tarball",
+                dest="only_filesystem_tarball",
+                help="Build only the tarball with the filesystem of the agent. This argument has to accept"
+                     "path to the directory where the tarball is meant to be built. "
+                     "Used by the Dockerfile itself and does not required for the manual build."
+            )
+
+            package_parser.add_argument(
+                "--registry",
+                action="append",
+                help="Registry (or repository) name where to push the result image. Can be used multiple times."
+            )
+
+            package_parser.add_argument(
+                "--tag",
+                action="append",
+                help="The tag that will be applied to every registry that is specified. Can be used multiple times."
+            )
+
+            package_parser.add_argument(
+                "--push",
+                action="store_true",
+                help="Push the result docker image."
+            )
+
+        else:
+
+            # Add output dir argument. It is required only for non-docker image builds.
+            package_parser.add_argument(
+                "--output-dir",
+                required=True,
+                type=str,
+                dest="output_dir",
+                help="The directory where the result package has to be stored.",
+            )
 
     args = parser.parse_args()
 
     # Find the builder class.
     package_builder = package_builders.ALL_PACKAGE_BUILDERS[args.package_name]
 
-    logging.info(f"Build package '{args.package_name}'...")
+    # If that's a docker image builder handle their arguments too.
+    if isinstance(package_builder, package_builders.ContainerPackageBuilder):
+
+        if args.only_filesystem_tarball:
+            # Build only image filesystem.
+            package_builder.build(output_path=pl.Path(args.only_filesystem_tarball), locally=args.locally)
+            exit(0)
+
+        package_builder.build_image(
+            push=args.push,
+            registries=args.registry or [],
+            tags=args.tag or []
+        )
+        exit(0)
 
     package_builder.build(output_path=pl.Path(args.output_dir), locally=args.locally)

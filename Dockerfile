@@ -23,7 +23,7 @@ RUN pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirments.txt
 
 ADD . /scalyr-agent-2
 
-RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --output-dir /tmp/build only-container-filesystem-tarball
+RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
 
 WORKDIR /tmp/container-fs
 RUN tar -xvf /tmp/build/scalyr-agent.tar.gz

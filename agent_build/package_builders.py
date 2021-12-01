@@ -677,6 +677,9 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
     CONFIG_PATH = None
     USE_FROZEN_BINARIES = False
 
+    # Name of the result image that goes to dockerhub.
+    RESULT_IMAGE_NAME: str
+
     def __init__(
         self,
         config_path: pl.Path,
@@ -743,6 +746,110 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                     else:
                         container_tar.addfile(file_entry)
 
+    def build_image(
+            self,
+            image_name=None,
+            registries: List[str] = None,
+            tags: List[str] = None,
+            push: bool = False,
+            with_coverage: bool = False
+    ):
+        """
+        This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
+        It passes to dockerfile its own package type through docker build arguments, so the same package builder
+        will be executed inside the docker build to prepare inner container filesystem.
+        :param image_name: Is specified the name of result image. By default uses image name that is specified in the
+            package builder.
+        :param registries: List of registries to push to.
+        :param tags: List of tags.
+        :param push: If True, push result image to the registries that are specified in the 'registries' argument.
+            If False, then just export the result image to the local docker. NOTE: The local docker cannot handle
+            multi-platform images, so it will only get image for its  platform.
+        :param with_coverage: Makes docker image to run agent with enabled coverage measuring (Python 'coverage'
+            library). Used only for testing.
+        """
+
+        registries = registries or ['']
+        tags = tags or ['latest']
+
+        buildx_builder_name = "agent_image_buildx_builder"
+        # Create docker buildx builder instance. # Without it the result image won't be pushed correctly
+        # to the local registry.
+
+        # check if builder already exists.
+        ls_output = subprocess.check_output([
+            "docker",
+            "buildx",
+            "ls"
+        ]).decode().strip()
+
+        if buildx_builder_name not in ls_output:
+            # Build new buildx builder
+            subprocess.check_call([
+                "docker",
+                "buildx",
+                "create",
+                # This option is important, without it the image won't be pushed to the local registry.
+                "--driver-opt=network=host",
+                "--name",
+                buildx_builder_name
+            ])
+
+        # Use builder.
+        subprocess.check_call([
+            "docker",
+            "buildx",
+            "use",
+            buildx_builder_name,
+        ])
+
+        dockerfile_path = __SOURCE_ROOT__ / "Dockerfile"
+
+        tag_options = []
+
+        image_name = image_name or type(self).RESULT_IMAGE_NAME
+
+        for registry in registries:
+            for tag in tags:
+                tag_options.append("-t")
+                if registry:
+                    registry_prefix = f"{registry}/"
+                else:
+                    registry_prefix = ""
+                tag_options.append(f"{registry_prefix}{image_name}:{tag}")
+
+        command_options = [
+            "docker",
+            "buildx",
+            "build",
+            *tag_options,
+            "-f",
+            str(dockerfile_path),
+            "--build-arg",
+            f"BUILD_TYPE={self.PACKAGE_TYPE.value}",
+        ]
+
+        # If we need to push, then specify all platforms.
+        if push:
+            command_options.append("--platform")
+            command_options.append(constants.Architecture.X86_64.as_docker_platform.value)
+            command_options.append("--platform")
+            command_options.append(constants.Architecture.ARM64.as_docker_platform.value)
+
+        if with_coverage:
+            # Build image with enabled coverage measuring.
+            command_options.append("--build-arg")
+            command_options.append("MODE=with-coverage")
+
+        if push:
+            command_options.append("--push")
+        else:
+            command_options.append("--load")
+
+        command_options.append(str(__SOURCE_ROOT__))
+
+        subprocess.check_call(command_options)
+
 
 class K8sPackageBuilder(ContainerPackageBuilder):
     """
@@ -760,6 +867,7 @@ class DockerJsonPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
+    RESULT_IMAGE_NAME = "scalyr/scalyr-agent-docker-json"
 
 
 class DockerSyslogPackageBuilder(ContainerPackageBuilder):
@@ -788,7 +896,7 @@ _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"
 # Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
 # create the filesystem for the image.
 DOCKER_JSON_CONTAINER_BUILDER = DockerJsonPackageBuilder(
-    config_path=_CONFIGS_PATH / "docker-json-config"
+    config_path=_CONFIGS_PATH / "docker-json-config",
 )
 
 DOCKER_SYSLOG_CONTAINER_BUILDER = DockerSyslogPackageBuilder(
