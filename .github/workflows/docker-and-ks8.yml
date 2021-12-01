@@ -89,7 +89,6 @@ jobs:
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           python3 build_package_new.py ${{ matrix.image-type }} \
-            build-image \
             --push \
             --registry \
             localhost:5000
@@ -98,7 +97,6 @@ jobs:
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           python3 build_package_new.py ${{ matrix.image-type }} \
-            build-image \
             --push \
             --registry \
             localhost:5000
