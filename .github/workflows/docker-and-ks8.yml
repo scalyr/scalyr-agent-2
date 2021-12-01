@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image-type: [docker-json]
+        image-type: [docker-json, docker-syslog, docker-api, k8s]
 
     steps:
       - name: Checkout repository
@@ -44,8 +44,7 @@ jobs:
         env:
             SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
-          python3 tests/package_tests/run_package_test.py run-package-test ${{ matrix.image-type}}_x86_64
-          python3 tests/package_tests/run_package_test.py run-package-test ${{ matrix.image-type}}_arm64
+          python3 tests/package_tests/run_package_test.py run-package-test ${{ matrix.image-type}}_test
 
 # TODO need to add READ_API_KEY secret from circleci
 #      - name: Run docker smoke tests
@@ -59,12 +58,13 @@ jobs:
 
 
   publish:
-    if: ${{ github.ref == 'refs/heads/master' }} || ${{ github.ref_type == 'tag' }}
-    needs: ["test"]
+    needs: [test]
+    name: Publish image.
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image-type: [docker-json]
+        image-type: [docker-json, docker-syslog, docker-api, k8s]
 
 
     services:
@@ -92,22 +92,31 @@ jobs:
       - name: Push image from master branch.
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
+
           python3 build_package_new.py ${{ matrix.image-type }} \
             --push \
             --registry \
             localhost:5000 \
-            --tag latest \
-            --tag $(cat VERSION)
+            --tag ${{ github.sha }}
 
       - name: Push image using master branch commit hash.
         if: ${{ github.ref_type == 'tag' }}
         run: |
+
+          if [[ "${{ github.ref_name }}" == "v$(cat VERSION)" ]]; then
+            # if the this is a "release" tag with format "v*.*.*", then use version as tag
+            # also add the 'latest' tag.
+            tags="--tag $(cat VERSION) --tag latest"
+          else
+            # Just use GitHub tag as image tag.
+            tags="--tag ${{ github.ref_name }}"
+          fi
+
           python3 build_package_new.py ${{ matrix.image-type }} \
             --push \
             --registry \
             localhost:5000 \
-            --tag latest \
-            --tag $(cat VERSION)
+            $tags
 
 
 

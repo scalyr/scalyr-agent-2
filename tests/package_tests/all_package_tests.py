@@ -17,12 +17,13 @@ import collections
 import pathlib as pl
 import subprocess
 import sys
+import logging
 from typing import Dict, List, Type
 
 
 from agent_build.tools import constants
 from agent_build import package_builders
-from tests.package_tests.internals import docker_test
+from tests.package_tests.internals import docker_test, k8s_test
 from agent_build.tools.environment_deployments import deployments
 
 _PARENT_DIR = pl.Path(__file__).parent
@@ -46,7 +47,7 @@ class Test:
             self,
             base_name: str,
             package_builder: package_builders.PackageBuilder,
-            additional_deployment_steps: List[Type[deployments.DeploymentStep]],
+            additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
             deployment_architecture: constants.Architecture = None,
     ):
         """
@@ -60,6 +61,8 @@ class Test:
         self._base_name = base_name
         self.package_builder = package_builder
         self.architecture = deployment_architecture or package_builder.architecture
+
+        additional_deployment_steps = additional_deployment_steps or []
 
         # since there may be needed to build the package itself first, we have to also deploy the steps
         # from the package builder's deployment, to provide needed environment for the builder,
@@ -98,14 +101,14 @@ class DockerImagePackageTest(Test):
     """
     def __init__(
             self,
-            target_image_architecture: constants.Architecture,
+            target_image_architectures: List[constants.Architecture],
             base_name: str,
             package_builder: package_builders.ContainerPackageBuilder,
-            additional_deployment_steps: List[Type[deployments.DeploymentStep]],
+            additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
             deployment_architecture: constants.Architecture = None,
     ):
         """
-        :param target_image_architecture: Architecture in which to perform the image test.
+        :param target_image_architectures: List of architectures in which to perform the image tests.
         :param base_name: Base name of the test.
         :param package_builder: Builder instance to build the image.
         :param additional_deployment_steps: Additional deployment steps that may be needed to perform the test.
@@ -114,7 +117,7 @@ class DockerImagePackageTest(Test):
             by default it is an architecture of the package builder.
         """
 
-        self.target_image_architecture = target_image_architecture
+        self.target_image_architecture = target_image_architectures
 
         super().__init__(
             base_name,
@@ -128,7 +131,7 @@ class DockerImagePackageTest(Test):
 
     @property
     def unique_name(self) -> str:
-        return f"{self._base_name}_{self.target_image_architecture.value}"
+        return self._base_name
 
     def run_test(
             self,
@@ -148,11 +151,13 @@ class DockerImagePackageTest(Test):
         # Spin up local docker registry where to push the result image
 
         # first of all delete existing registry container.
+        logging.info("Remove registry container.")
         subprocess.check_call([
             "docker", "rm", "-f", registry_container_name
         ])
 
         # Run container with docker registry.
+        logging.info("Run new local docker registry in container.")
         subprocess.check_call([
             "docker",
             "run",
@@ -169,6 +174,8 @@ class DockerImagePackageTest(Test):
             # Build image and push it to the local registry.
             # Instead of calling the build function run the build_package script,
             # so it can also be tested.
+
+            logging.info("Build docker image")
             subprocess.check_call(
                 [
                     sys.executable,
@@ -189,45 +196,66 @@ class DockerImagePackageTest(Test):
 
             # Test that all tags has been pushed to the registry.
             for tag in ["latest", "test", "debug"]:
-                full_image_name = f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAME}:{tag}"
+                logging.info(f"Test that the tag '{tag}' is pushed to the registry '{registry_host}'")
 
-                # Remove the local image first, if exists.
-                subprocess.check_call([
-                    "docker", "image", "rm", "-f", full_image_name
-                ])
+                for image_name in self.package_builder.RESULT_IMAGE_NAMES:
+                    full_image_name = f"{registry_host}/{image_name}:{tag}"
 
-                # Login to the local registry.
-                subprocess.check_call([
-                    "docker",
-                    "login",
-                    "--password",
-                    "nopass",
-                    "--username",
-                    "nouser",
-                    registry_host
-                ])
-
-                # Pull the image
-                try:
+                    # Remove the local image first, if exists.
+                    logging.info("    Remove existing image.")
                     subprocess.check_call([
-                        "docker", "pull", full_image_name
+                        "docker", "image", "rm", "-f", full_image_name
                     ])
-                except subprocess.CalledProcessError as e:
-                    raise AssertionError("Can not pull the result image from local registry. "
-                                         f"Error: {e}")
 
-                # Remove the image once more.
-                subprocess.check_call([
-                    "docker", "image", "rm", "-f", full_image_name
-                ])
+                    logging.info("    Log in to the local registry.")
+                    # Login to the local registry.
+                    subprocess.check_call([
+                        "docker",
+                        "login",
+                        "--password",
+                        "nopass",
+                        "--username",
+                        "nouser",
+                        registry_host
+                    ])
 
-            local_registry_image_name = f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAME}"
+                    # Pull the image
+                    logging.info("    Pull the image.")
+                    try:
+                        subprocess.check_call([
+                            "docker", "pull", full_image_name
+                        ])
+                    except subprocess.CalledProcessError as e:
+                        logging.exception("    Can not pull the result image from local registry.")
 
-            # Start the test
-            docker_test.run(
-                image_name=local_registry_image_name,
-                scalyr_api_key=scalyr_api_key
-            )
+                    # Remove the image once more.
+                    logging.info("    Remove existing image.")
+                    subprocess.check_call([
+                        "docker", "image", "rm", "-f", full_image_name
+                    ])
+
+            # Use any of variants of the image name to test it.
+            local_registry_image_name = f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAMES[0]}"
+
+            # Start the tests for each architecture.
+            # TODO: Make tests run in parallel.
+            for arch in self.target_image_architecture:
+                logging.info(f"Start testing image '{local_registry_image_name}' with architecture "
+                             f"'{arch.as_docker_platform.value}'")
+
+                if isinstance(self.package_builder, package_builders.K8sPackageBuilder):
+                    k8s_test.run(
+                        image_name=local_registry_image_name,
+                        architecture=arch,
+                        scalyr_api_key=scalyr_api_key
+                    )
+                else:
+                    docker_test.run(
+                        image_name=local_registry_image_name,
+                        architecture=arch,
+                        scalyr_api_key=scalyr_api_key
+                    )
+
         finally:
             # Cleanup.
             # Removing registry container.
@@ -242,84 +270,25 @@ class DockerImagePackageTest(Test):
                 "docker", "image", "prune", "-f"
             ])
 
-    @staticmethod
-    def create_tests(
-            package_builder: package_builders.ContainerPackageBuilder,
-            additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
-            target_image_architectures: List[constants.Architecture] = None,
-    ) -> List['DockerImagePackageTest']:
-        """
-        The helper function that allows to create multiple tests for the agent docker image.
-            The number of result tests depends on how many architectures are specified and each test will test
-            test the particular architecture of the image.
 
-        :param package_builder: Builder instance that has to build the image.
-        :param additional_deployment_steps: Additional deployment steps that may be needed to perform the test.
-            They are additionally performed after the deployment steps of the package builder.
-        :param target_image_architectures: List of architectures in which to perform the image tests.
-        :return: List of tesult test instances. The order is the same as in the 'target_image_architectures' argument.
-        """
-        result_tests = []
-        target_image_architectures = target_image_architectures or []
-        additional_deployment_steps = additional_deployment_steps or []
+# Create tests for the all docker images (json/syslog/api) and for k8s image.
+_docker_image_tests = []
+for builder in [
+    package_builders.DOCKER_JSON_CONTAINER_BUILDER,
+    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER,
+    package_builders.DOCKER_API_CONTAINER_BUILDER,
+    package_builders.K8S_CONTAINER_BUILDER
+]:
+    test = DockerImagePackageTest(
+        base_name=f"{builder.name}_test",
+        # Specify the builder that has to build the image.
+        package_builder=builder,
+        # Specify which architectures of the result image has to be tested.
+        target_image_architectures=[
+            constants.Architecture.X86_64,
+            constants.Architecture.ARM64,
+        ]
+    )
+    _docker_image_tests.append(test)
 
-        for target_arch in target_image_architectures:
-
-            test_instance = DockerImagePackageTest(
-                base_name=package_builder.PACKAGE_TYPE.value,
-                target_image_architecture=target_arch,
-                package_builder=package_builder,
-
-                # since there may be needed to build the package itself first, we have to also deploy the steps
-                # from the package builder's deployment, to provide needed environment for the builder,
-                # so we add the steps from the builder's deployment first.
-                additional_deployment_steps=[
-                    *[type(step) for step in package_builder.deployment.steps],
-                    *additional_deployment_steps
-                ]
-            )
-
-            result_tests.append(test_instance)
-
-        return result_tests
-
-
-# Create tests for the all docker images (json/syslog/ api) and for k8s image.
-DockerImagePackageTest.create_tests(
-    # Specify the builder that has to build the image.
-    package_builder=package_builders.DOCKER_JSON_CONTAINER_BUILDER,
-
-    # Specify which architectures of the result image has to be tested.
-    target_image_architectures=[
-        constants.Architecture.X86_64,
-        constants.Architecture.ARM64,
-    ]
-)
-
-DockerImagePackageTest.create_tests(
-    package_builder=package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER,
-    target_image_architectures=[
-        constants.Architecture.X86_64,
-        constants.Architecture.ARM64,
-    ]
-)
-
-DockerImagePackageTest.create_tests(
-    package_builder=package_builders.DOCKER_API_CONTAINER_BUILDER,
-    target_image_architectures=[
-        constants.Architecture.X86_64,
-        constants.Architecture.ARM64,
-    ]
-)
-
-DockerImagePackageTest.create_tests(
-    package_builder=package_builders.K8S_CONTAINER_BUILDER,
-    target_image_architectures=[
-        constants.Architecture.X86_64,
-        constants.Architecture.ARM64,
-    ]
-)
-
-
-
-
+DOCKER_JSON_TEST, DOCKER_SYSLOG_TEST, DOCKER_API_TEST, K8S_TEST = _docker_image_tests

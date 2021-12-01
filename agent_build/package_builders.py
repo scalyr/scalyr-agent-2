@@ -677,8 +677,8 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
     CONFIG_PATH = None
     USE_FROZEN_BINARIES = False
 
-    # Name of the result image that goes to dockerhub.
-    RESULT_IMAGE_NAME: str
+    # Names of the result image that goes to dockerhub.
+    RESULT_IMAGE_NAMES: List[str]
 
     def __init__(
         self,
@@ -748,7 +748,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
     def build_image(
             self,
-            image_name=None,
+            image_names=None,
             registries: List[str] = None,
             tags: List[str] = None,
             push: bool = False,
@@ -758,7 +758,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
         It passes to dockerfile its own package type through docker build arguments, so the same package builder
         will be executed inside the docker build to prepare inner container filesystem.
-        :param image_name: Is specified the name of result image. By default uses image name that is specified in the
+        :param image_names: The list of image names. By default uses image names that are specified in the
             package builder.
         :param registries: List of registries to push to.
         :param tags: List of tags.
@@ -807,16 +807,17 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         tag_options = []
 
-        image_name = image_name or type(self).RESULT_IMAGE_NAME
+        image_names = image_names or type(self).RESULT_IMAGE_NAMES
 
-        for registry in registries:
-            for tag in tags:
-                tag_options.append("-t")
-                if registry:
-                    registry_prefix = f"{registry}/"
-                else:
-                    registry_prefix = ""
-                tag_options.append(f"{registry_prefix}{image_name}:{tag}")
+        for image_name in image_names:
+            for registry in registries:
+                for tag in tags:
+                    tag_options.append("-t")
+                    if registry:
+                        registry_prefix = f"{registry}/"
+                    else:
+                        registry_prefix = ""
+                    tag_options.append(f"{registry_prefix}{image_name}:{tag}")
 
         command_options = [
             "docker",
@@ -857,6 +858,7 @@ class K8sPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.K8S
+    RESULT_IMAGE_NAMES = ["scalyr/scalyr-k8s-agent"]
 
 
 class DockerJsonPackageBuilder(ContainerPackageBuilder):
@@ -867,7 +869,7 @@ class DockerJsonPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
-    RESULT_IMAGE_NAME = "scalyr/scalyr-agent-docker-json"
+    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-json"]
 
 
 class DockerSyslogPackageBuilder(ContainerPackageBuilder):
@@ -879,6 +881,7 @@ class DockerSyslogPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_SYSLOG
+    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"]
 
 
 class DockerApiPackageBuilder(ContainerPackageBuilder):
@@ -888,6 +891,7 @@ class DockerApiPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_API
+    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-api"]
 
 
 _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"

@@ -21,23 +21,11 @@ import tempfile
 import time
 import sys
 import logging
-from typing import Union
 
 
+from agent_build.tools import constants
 from tests.package_tests.internals.common import SOURCE_ROOT
 from tests.package_tests.internals.common import AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck, LogVerifier
-
-
-def build_agent_image(builder_path: pl.Path):
-    # Call the image builder script.
-    subprocess.check_call(
-        [str(builder_path), "--tags", "k8s_test"],
-    )
-
-    # Make image visible for the munikube cluster.
-    subprocess.check_call(
-        ["minikube", "image", "load", "scalyr/scalyr-k8s-agent:k8s_test"]
-    )
 
 
 _SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH = SOURCE_ROOT / "k8s" / "scalyr-service-account.yaml"
@@ -79,7 +67,11 @@ def _delete_k8s_objects():
         pass
 
 
-def _test(scalyr_api_key: str):
+def _test(
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str
+):
     # Create agent's service account.
     subprocess.check_call(
         ["kubectl", "create", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)]
@@ -105,7 +97,7 @@ def _test(scalyr_api_key: str):
     # Change the production image name to the local one.
     scalyr_agent_manifest = re.sub(
         r"image: scalyr/scalyr-k8s-agent:\d+\.\d+\.\d+",
-        "image: scalyr/scalyr-k8s-agent:k8s_test",
+        f"image: {image_name}",
         scalyr_agent_manifest
     )
 
@@ -169,17 +161,29 @@ def _test(scalyr_api_key: str):
 
 
 def run(
-        builder_path: Union[str, pl.Path],
-        scalyr_api_key: str
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str
 ):
-    builder_path = pl.Path(builder_path)
-
-    build_agent_image(builder_path)
+    """
+    :param image_name: Full name of the image to test.
+    :param architecture: Architecture of the image to test.
+    :param scalyr_api_key: Scalyr API key.
+    """
 
     _delete_k8s_objects()
 
+    # Make image visible for the munikube cluster.
+    subprocess.check_call(
+        ["minikube", "image", "load", image_name]
+    )
+
     try:
-        _test(scalyr_api_key)
+        _test(
+            image_name,
+            architecture,
+            scalyr_api_key
+        )
     finally:
         logging.info("Clean up. Removing all kubernetes objects...")
         _delete_k8s_objects()

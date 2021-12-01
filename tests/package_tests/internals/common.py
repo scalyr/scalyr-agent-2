@@ -27,7 +27,7 @@ from typing import Callable, List, Union, Tuple, Optional
 AGENT_LOG_LINE_TIMESTAMP = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z"
 
 # Root of the source code.
-SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.parent
 
 
 class TestFail(Exception):
