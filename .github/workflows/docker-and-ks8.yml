@@ -88,7 +88,7 @@ jobs:
       - name: Push image from master branch.
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          python3 build_package_new.py ${{ image-type }} \
+          python3 build_package_new.py ${{ matrix.image-type }} \
             build-image \
             --push \
             --registry \
@@ -97,7 +97,7 @@ jobs:
       - name: Push image using master branch commit hash.
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          python3 build_package_new.py ${{ image-type }} \
+          python3 build_package_new.py ${{ matrix.image-type }} \
             build-image \
             --push \
             --registry \
