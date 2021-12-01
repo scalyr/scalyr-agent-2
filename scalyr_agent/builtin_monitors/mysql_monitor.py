@@ -51,6 +51,12 @@ if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] 
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import pymysql  # pylint: disable=import-error
 
+ACCESS_DENIED_ERROR_MSG = """
+Received access denied error which indicates that the user which is used to connect to the database
+doesn't have sufficient permissions. For information on which permissions are needed by that user,
+please refer to the docs - https://app.scalyr.com/help/monitors/mysql. Original error: %s
+""".strip()
+
 __monitor__ = __name__
 
 define_config_option(
@@ -507,6 +513,13 @@ class MysqlDB(object):
                 )
             self._reconnect()
             return None
+        except pymysql.err.InternalError as error:
+            (errcode, msg) = error.args
+            if errcode == 1227 or "access denied" in str(error):
+                # Access denied
+                raise Exception(ACCESS_DENIED_ERROR_MSG % (str(error)))
+            raise error
+
         return self._cursor.fetchall()
 
     def _gather_db_information(self):
@@ -838,7 +851,7 @@ class MysqlDB(object):
         return pct
 
     def _derived_stat_write_percentage(self, globalVars, globalStatusMap):
-        """Calculate the percentate of queries that are writes."""
+        """Calculate the percentage of queries that are writes."""
         return self._derived_stat_read_write_percentage(
             globalVars, globalStatusMap, False
         )
@@ -1127,6 +1140,9 @@ Example below shows DDL you can use to create a new user with the needed permiss
     -- Needed for SHOW /*!50000 GLOBAL */ STATUS;
     -- Needed for SHOW /*!50000 GLOBAL */ VARIABLES;
     GRANT PROCESS on *.* to 'scalyr-agent-monitor';
+
+    -- Permission grants below are only needed if collect_replica_metrics config option is True
+    -- and monitor is configured to connect to a replica and not primary.
 
     -- Needed for SHOW SLAVE STATUS;
     GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor';

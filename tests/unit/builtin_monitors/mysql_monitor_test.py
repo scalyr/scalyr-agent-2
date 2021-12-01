@@ -21,6 +21,7 @@ from __future__ import print_function
 __author__ = "imron@scalyr.com"
 
 import mock
+import pymysql  # pylint: disable=import-error
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.builtin_monitors.mysql_monitor import MysqlDB
@@ -32,10 +33,11 @@ class TestMysqlDB(MysqlDB):
         self._cursor = mock.Mock()
         self._query = mock.Mock(return_value=None)
 
-    def __xinit__(self):
-        # do nothing, because we don't actually want to connect to a DB
-        # for this test
-        pass
+
+class TestMysqlDB2(MysqlDB):
+    def _connect(self):
+        self._db = mock.Mock()
+        self._cursor = mock.Mock()
 
 
 class MySqlMonitorTest(ScalyrTestCase):
@@ -76,3 +78,19 @@ class MySqlMonitorTest(ScalyrTestCase):
         )
         self.assertEqual(db._query.call_count, 0)
         self.assertIsNone(result)
+
+    def test_friendly_error_is_thrown_on_access_denied(self):
+        logger = mock.Mock()
+        db = TestMysqlDB2(
+            logger=logger, type="host:port", collect_replica_metrics=False
+        )
+        db.mock_query = False
+
+        db._cursor.execute.side_effect = pymysql.err.InternalError(
+            1227,
+            "Access denied; you need (at least one of) the PROCESS privilege(s) for this operation",
+        )
+
+        self.assertRaisesRegex(
+            Exception, "Received access denied error", db._query, "SELECT VERSION()"
+        )
