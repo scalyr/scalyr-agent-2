@@ -1,0 +1,17 @@
+name: 'Perform deployment.'
+description: |
+  Prepares current machine by perfroming the set of the deployments, which are defined in the 'agent_build/environment_deployers.deployers.py.' folder.
+  For more info, please look at the docs in the same file.'
+inputs:
+  deployment-name:
+    description: "Name of the deployer"
+    required: true
+
+  cache-version-suffix:
+    description: "Cache key suffix. Can be changed when it is needed to invalidate the cache."
+    required: false
+    default: v3
+
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
