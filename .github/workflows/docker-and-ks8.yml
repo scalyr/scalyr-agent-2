@@ -89,6 +89,12 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Start minikube for the test of the kubernetes build.
+        if: matrix.image-type == 'k8s'
+        shell: bash
+        run: |
+          minikube start
+
       - name: Push image from master branch.
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
