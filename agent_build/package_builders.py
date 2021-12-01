@@ -152,6 +152,9 @@ class PackageBuilder(abc.ABC):
     # See more in the "filename_glob" property of the class.
     RESULT_PACKAGE_FILENAME_GLOB: str
 
+    # Monitors that are no included to to the build. Makes effect only with frozen binaries.
+    EXCLUDED_MONITORS = []
+
     def __init__(
         self,
         architecture: constants.Architecture = constants.Architecture.UNKNOWN,
@@ -417,16 +420,21 @@ class PackageBuilder(abc.ABC):
         add_data = {str(package_info_file): "scalyr_agent"}
 
         # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
-        hidden_imports = [
-            "scalyr_agent.builtin_monitors.apache_monitor",
-            "scalyr_agent.builtin_monitors.graphite_monitor",
-            "scalyr_agent.builtin_monitors.mysql_monitor",
-            "scalyr_agent.builtin_monitors.nginx_monitor",
-            "scalyr_agent.builtin_monitors.shell_monitor",
-            "scalyr_agent.builtin_monitors.syslog_monitor",
-            "scalyr_agent.builtin_monitors.test_monitor",
-            "scalyr_agent.builtin_monitors.url_monitor",
+        all_builtin_monitor_module_names = [
+            mod_path.stem
+            for mod_path in pl.Path(__SOURCE_ROOT__, "scalyr_agent", "builtin_monitors").glob("*.py")
+            if mod_path.stem != "__init__"
         ]
+
+        hidden_imports = []
+
+        # We also have to filter platform dependent monitors.
+        for monitor_name in all_builtin_monitor_module_names:
+            if monitor_name in type(self).EXCLUDED_MONITORS:
+                continue
+            hidden_imports.append(
+                f"scalyr_agent.builtin_monitors.{monitor_name}"
+            )
 
         # Add packages to frozen binary paths.
         paths_to_include = [
@@ -436,13 +444,6 @@ class PackageBuilder(abc.ABC):
 
         # Add platform specific things.
         if platform.system().lower().startswith("linux"):
-            hidden_imports.extend(
-                [
-                    "scalyr_agent.builtin_monitors.linux_system_metrics",
-                    "scalyr_agent.builtin_monitors.linux_process_metrics",
-                ]
-            )
-
             tcollectors_path = pl.Path(
                 __SOURCE_ROOT__,
                 "scalyr_agent",
@@ -452,14 +453,6 @@ class PackageBuilder(abc.ABC):
             )
             add_data.update(
                 {tcollectors_path: tcollectors_path.relative_to(__SOURCE_ROOT__)}
-            )
-        elif platform.system().lower().startswith("win"):
-            hidden_imports.extend(
-                [
-                    "scalyr_agent.builtin_monitors.windows_event_log_monitor",
-                    "scalyr_agent.builtin_monitors.windows_system_metrics",
-                    "scalyr_agent.builtin_monitors.windows_process_metrics",
-                ]
             )
 
         # Create --add-data options from previously added files.
@@ -612,6 +605,12 @@ class LinuxPackageBuilder(PackageBuilder):
     """
     The base package builder for all Linux packages.
     """
+
+    EXCLUDED_MONITORS = [
+        "windows_event_log_monitor",
+        "windows_system_metrics",
+        "windows_process_metrics",
+    ]
 
     def _build_package_files(self, output_path: Union[str, pl.Path]):
         """
