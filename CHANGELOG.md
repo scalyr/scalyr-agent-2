@@ -17,6 +17,9 @@ Other:
 Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 --->
 
+Improvements:
+* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
+
 Other:
 * Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
 * Update Kubernetes monitor to log a message under INFO log level that some container level metrics won't be available when detected runtime is ``containerd`` and not ``docker`` and container level metrics reporting is enabled.
