@@ -56,6 +56,7 @@ jobs:
 
 
   publish:
+    if: ${{ github.ref == 'refs/heads/master' }} || ${{ github.ref_type == 'tag' }}
     needs: ["test"]
     runs-on: ubuntu-latest
     strategy:
@@ -91,15 +92,19 @@ jobs:
           python3 build_package_new.py ${{ matrix.image-type }} \
             --push \
             --registry \
-            localhost:5000
+            localhost:5000 \
+            --tag latest \
+            --tag $(cat VERSION)
 
       - name: Push image using master branch commit hash.
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref_type == 'tag' }}
         run: |
           python3 build_package_new.py ${{ matrix.image-type }} \
             --push \
             --registry \
-            localhost:5000
+            localhost:5000 \
+            --tag latest \
+            --tag $(cat VERSION)
 
 
 
