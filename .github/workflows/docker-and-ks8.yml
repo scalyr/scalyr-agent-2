@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image-type: [docker-json, docker-syslog, docker-api, k8s]
+        image-type: [docker-json, docker-syslog k8s]
 
 
     services:
