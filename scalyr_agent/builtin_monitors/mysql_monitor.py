@@ -29,7 +29,6 @@ import six
 
 from scalyr_agent import (
     ScalyrMonitor,
-    UnsupportedSystem,
     define_config_option,
     define_metric,
     define_log_field,
@@ -38,11 +37,6 @@ from scalyr_agent import (
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
-
-# We must require 2.6 or greater right now because PyMySQL requires it.  We are considering
-# forking PyMySQL and adding in support if there is enough customer demand.
-if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 7):
-    raise UnsupportedSystem("mysql_monitor", "Requires Python 2.7 or greater")
 
 # We import pymysql from the third_party directory.  This
 # relies on PYTHONPATH being set up correctly, which is done
