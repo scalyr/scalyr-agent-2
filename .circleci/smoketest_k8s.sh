@@ -110,7 +110,7 @@ echo "=================================================="
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 
 # Build image by specifying image type through build args.
-docker build -t local_k8s_image -f docker/Dockerfile.unified --build-arg "BUILD_TYPE=k8s" --build-arg MODE=with-coverage .
+docker build -t local_k8s_image -f Dockerfile --build-arg "BUILD_TYPE=k8s" --build-arg MODE=with-coverage .
 
 python build_package.py k8s_builder --coverage
 TARBALL=$(ls scalyr-k8s-agent-*)
@@ -165,7 +165,7 @@ echo ""
 echo "=================================================="
 echo "Starting verifier"
 echo "=================================================="
-kubectl run -it --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
+kubectl run -i --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
 ${contname_verifier} ${max_wait} \
 --mode verifier \
