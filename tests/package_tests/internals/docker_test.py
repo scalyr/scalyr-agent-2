@@ -20,7 +20,11 @@ import logging
 import os
 
 from agent_build.tools import constants
-from tests.package_tests.internals.common import AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck, LogVerifier
+from tests.package_tests.internals.common import (
+    AgentLogRequestStatsLineCheck,
+    AssertAgentLogLineIsNotAnErrorCheck,
+    LogVerifier,
+)
 
 
 def build_agent_image(builder_path: pl.Path):
@@ -31,13 +35,15 @@ def build_agent_image(builder_path: pl.Path):
 
 
 def _test(
-        image_name: str,
-        container_name: str,
-        architecture: constants.Architecture,
-        scalyr_api_key: str,
+    image_name: str,
+    container_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str,
 ):
 
-    logging.info(f"Start agent in docker from the image {image_name}")
+    logging.info(
+        f"Start agent in docker from the image {image_name} in the container {container_name}"
+    )
 
     # Run agent inside the container.
     subprocess.check_call(
@@ -53,22 +59,32 @@ def _test(
             "/var/run/docker.sock:/var/scalyr/docker.sock",
             "--platform",
             architecture.as_docker_platform.value,
-            image_name
+            image_name,
         ]
     )
 
-    # Wait a little.
-    logging.info("Wait for the docker agent to start...")
-    if architecture is not constants.Architecture.X86_64:
-        # Wait more if the platform is not native because emulation is pretty slow.
-        time.sleep(10)
-    else:
-        time.sleep(3)
+    docker_exec_command = [
+        "docker",
+        "exec",
+        "-i",
+        container_name,
+    ]
+
+    # Pre-create the agent log file so the tail command wont fail before the agent starts.
+    subprocess.check_call(
+        [*docker_exec_command, "touch", "/var/log/scalyr-agent-2/agent.log"]
+    )
 
     # Execute tail -f command on the agent.log inside the container to read its content.
     agent_log_tail_process = subprocess.Popen(
-        ["docker", "exec", "-i", container_name, "tail", "-f", "-n+1", "/var/log/scalyr-agent-2/agent.log"],
-        stdout=subprocess.PIPE
+        [
+            *docker_exec_command,
+            "tail",
+            "-f",
+            "-n+1",
+            "/var/log/scalyr-agent-2/agent.log",
+        ],
+        stdout=subprocess.PIPE,
     )
 
     # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
@@ -88,7 +104,9 @@ def _test(
         # Add check for any ERROR messages to the verifier.
         agent_log_tester.add_line_check(AssertAgentLogLineIsNotAnErrorCheck())
         # Add check for the request stats message.
-        agent_log_tester.add_line_check(AgentLogRequestStatsLineCheck(), required_to_pass=True)
+        agent_log_tester.add_line_check(
+            AgentLogRequestStatsLineCheck(), required_to_pass=True
+        )
 
         # Start agent.log file verification.
         agent_log_tester.verify(timeout=300)
@@ -103,22 +121,26 @@ def _test(
 def run(
     image_name: str,
     architecture: constants.Architecture,
-    scalyr_api_key: str
+    scalyr_api_key: str,
+    name_suffix: str,
 ):
     """
     :param image_name: Full name of the image to test.
     :param architecture: Architecture of the image to test.
     :param scalyr_api_key: Scalyr API key.
+    :param name_suffix: Additional suffix to the agent instance name.
     """
 
-    container_name = f"{image_name}-test_{architecture.value}".replace(":", "_").replace("/", "__")
+    container_name = f"{image_name}_{architecture.value}_test"
+
+    container_name = f"{container_name}{name_suffix}"
+
+    container_name = container_name.replace(":", "_").replace("/", "_")
 
     def _delete_agent_container():
 
         # Kill and remove the previous container, if exists.
-        subprocess.check_call(
-            ["docker", "rm", "-f", container_name]
-        )
+        subprocess.check_call(["docker", "rm", "-f", container_name])
 
     # Cleanup previous test run, if exists.
     _delete_agent_container()
@@ -129,7 +151,6 @@ def run(
             container_name=container_name,
             architecture=architecture,
             scalyr_api_key=scalyr_api_key,
-
         )
     finally:
         _delete_agent_container()

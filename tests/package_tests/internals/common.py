@@ -38,6 +38,7 @@ class LogVerifierCheckResult(enum.Enum):
     """
     Enum class which represents a result of the check process which is performed by the 'LogVerifierCheck' class.
     """
+
     SUCCESS = 0
     FAIL = 1
     RETRY = 2
@@ -47,13 +48,16 @@ class LogVerifierCheck:
     """
     Abstraction which represents a small test ot check which is performed by the 'LogVerifier' class.
     """
+
     DESCRIPTION = None
 
     @property
     def description(self):
         return type(self).DESCRIPTION
 
-    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
+    def perform(
+        self, new_text, whole_log_text
+    ) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
         """
         Perform test or check of the line. The check may be performed against new data of the whole data of the
         log file.
@@ -68,6 +72,7 @@ class LogVerifier:
     Abstraction to test the content of the log file. It performs set of smaller tests or "checks" which are represented
         by the 'LogVerifierCheck' class. If at least one check fails, then the verifier fails too.
     """
+
     def __init__(self):
 
         # List of all instances of the 'LogVerifierCheck' class. The verification process will succeed only if all
@@ -118,8 +123,12 @@ class LogVerifier:
         while True:
             # Protect this function from hanging by adding timeout.
             if datetime.datetime.now() >= timeout_time:
-                descriptions = "\n".join([check.description for check in self._checks_required_to_pass])
-                raise TimeoutError(f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}")
+                descriptions = "\n".join(
+                    [check.description for check in self._checks_required_to_pass]
+                )
+                raise TimeoutError(
+                    f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}"
+                )
 
             # Get new content of the log file.
             new_data = self._get_new_content()
@@ -144,9 +153,9 @@ class LogVerifier:
 
             # There is at least one complete log line.
             # Separate data with only complete lines.
-            new_lines_data = self._remaining_data[:last_new_line_index+1:]
+            new_lines_data = self._remaining_data[: last_new_line_index + 1 :]
             # Save last incomplete line.
-            self._remaining_data = self._remaining_data[last_new_line_index+1:]
+            self._remaining_data = self._remaining_data[last_new_line_index + 1 :]
 
             # Decode new lines text.
             new_lines_text = new_lines_data.decode()
@@ -156,8 +165,7 @@ class LogVerifier:
             for line_check in list(self._all_checks):
                 # apply check to the line and get the result of the check.
                 result = line_check.perform(
-                    new_text=new_lines_text,
-                    whole_log_text=self._content
+                    new_text=new_lines_text, whole_log_text=self._content
                 )
 
                 # if the result is tuple, then the first element is a result and the second is an additional
@@ -189,7 +197,9 @@ class LogVerifier:
                 # Leave the check for the next iteration to retry it once more.
                 elif result == LogVerifierCheckResult.RETRY:
                     if message:
-                        logging.info(f"Retry check '{line_check.description}'. Reason: {message}")
+                        logging.info(
+                            f"Retry check '{line_check.description}'. Reason: {message}"
+                        )
                 else:
                     raise ValueError("Unknown Test Check result.")
 
@@ -199,7 +209,9 @@ class LogVerifier:
                 return
             else:
                 # There is still at least one unfinished required check. Wait and repeat the verification once more.
-                logging.info(f"Not all checks have passed. Retry in {retry_delay} seconds.")
+                logging.info(
+                    f"Not all checks have passed. Retry in {retry_delay} seconds."
+                )
                 time.sleep(retry_delay)
                 continue
 
@@ -212,7 +224,9 @@ class LogVerifier:
 class AgentLogRequestStatsLineCheck(LogVerifierCheck):
     DESCRIPTION = "Find and validate the agent log line with request stats. (Starts with 'agent_requests')."
 
-    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
+    def perform(
+        self, new_text, whole_log_text
+    ) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
         # Match new lines for the requests status message.
 
         for line in io.StringIO(new_text):
@@ -224,7 +238,7 @@ class AgentLogRequestStatsLineCheck(LogVerifierCheck):
                 r"requests_failed=(?P<requests_failed>\d+) "
                 r"bytes_sent=(?P<bytes_sent>\d+) "
                 r".+",
-                line
+                line,
             )
 
             if m:
@@ -234,11 +248,20 @@ class AgentLogRequestStatsLineCheck(LogVerifierCheck):
                 requests_sent = int(md["requests_sent"])
                 bytes_sent = int(md["bytes_sent"])
                 if bytes_sent <= 0:
-                    return LogVerifierCheckResult.FAIL, "Agent log says that during the run the agent has sent zero bytes."
+                    return (
+                        LogVerifierCheckResult.FAIL,
+                        "Agent log says that during the run the agent has sent zero bytes.",
+                    )
                 if requests_sent <= 0:
-                    return LogVerifierCheckResult.FAIL, "Agent log says that during the run the agent has sent zero requests."
+                    return (
+                        LogVerifierCheckResult.FAIL,
+                        "Agent log says that during the run the agent has sent zero requests.",
+                    )
 
-                return LogVerifierCheckResult.SUCCESS, "Agent requests stats have been found and they are valid."
+                return (
+                    LogVerifierCheckResult.SUCCESS,
+                    "Agent requests stats have been found and they are valid.",
+                )
 
         else:
             # The matching line hasn't been found yet. Retry.
@@ -248,10 +271,14 @@ class AgentLogRequestStatsLineCheck(LogVerifierCheck):
 class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
     DESCRIPTION = "Check if the agent log line is not an error."
 
-    def perform(self, new_text, whole_log_text) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
+    def perform(
+        self, new_text, whole_log_text
+    ) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
         for line in io.StringIO(new_text):
             if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*", line):
-                return LogVerifierCheckResult.FAIL, f"Agent log contains error line : {line}"
+                return (
+                    LogVerifierCheckResult.FAIL,
+                    f"Agent log contains error line : {line}",
+                )
 
         return LogVerifierCheckResult.SUCCESS
-

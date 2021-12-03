@@ -582,10 +582,11 @@ ALL_DEPLOYMENTS: Dict[str, "Deployment"] = {}
 _STEPS_DIR = _PARENT_DIR / "steps"
 _HELPER_DEPLOYMENT_SCRIPTS_AND_LIBS = [
     # small bash library that allows to cache intermediate results of shell script steps.
-    _STEPS_DIR / "cache_lib.sh"
+    _STEPS_DIR
+    / "cache_lib.sh"
 ]
 
-_AGENT_REQUIREMENT_FILES_PATH = _SOURCE_ROOT/ "agent_build" / "requirement-files"
+_AGENT_REQUIREMENT_FILES_PATH = _SOURCE_ROOT / "agent_build" / "requirement-files"
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
@@ -593,7 +594,8 @@ class InstallTestRequirementsDeploymentStep(ShellScriptDeploymentStep):
     SCRIPT_PATH = _STEPS_DIR / "deploy-test-environment.sh"
     USED_FILES = [
         *_HELPER_DEPLOYMENT_SCRIPTS_AND_LIBS,
-        _AGENT_REQUIREMENT_FILES_PATH, _SOURCE_ROOT / "testing-requirements.txt"
+        _AGENT_REQUIREMENT_FILES_PATH,
+        _SOURCE_ROOT / "testing-requirements.txt",
     ]
 
 
@@ -603,5 +605,5 @@ COMMON_TEST_ENVIRONMENT = Deployment(
     # Call the local './.github/actions/perform-deployment' action with this name.
     "test_environment",
     step_classes=[InstallTestRequirementsDeploymentStep],
-    architecture=constants.Architecture.UNKNOWN
+    architecture=constants.Architecture.UNKNOWN,
 )

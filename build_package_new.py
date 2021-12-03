@@ -44,10 +44,8 @@ if __name__ == "__main__":
     # Add subparsers for all packages except docker builders.
     subparsers = parser.add_subparsers(dest="package_name", required=True)
 
-    for builder_name, builder  in package_builders.ALL_PACKAGE_BUILDERS.items():
-        package_parser = subparsers.add_parser(
-            name=builder_name
-        )
+    for builder_name, builder in package_builders.ALL_PACKAGE_BUILDERS.items():
+        package_parser = subparsers.add_parser(name=builder_name)
 
         # Define argument for all packages
         package_parser.add_argument(
@@ -85,26 +83,24 @@ if __name__ == "__main__":
                 "--only-filesystem-tarball",
                 dest="only_filesystem_tarball",
                 help="Build only the tarball with the filesystem of the agent. This argument has to accept"
-                     "path to the directory where the tarball is meant to be built. "
-                     "Used by the Dockerfile itself and does not required for the manual build."
+                "path to the directory where the tarball is meant to be built. "
+                "Used by the Dockerfile itself and does not required for the manual build.",
             )
 
             package_parser.add_argument(
                 "--registry",
                 action="append",
-                help="Registry (or repository) name where to push the result image. Can be used multiple times."
+                help="Registry (or repository) name where to push the result image. Can be used multiple times.",
             )
 
             package_parser.add_argument(
                 "--tag",
                 action="append",
-                help="The tag that will be applied to every registry that is specified. Can be used multiple times."
+                help="The tag that will be applied to every registry that is specified. Can be used multiple times.",
             )
 
             package_parser.add_argument(
-                "--push",
-                action="store_true",
-                help="Push the result docker image."
+                "--push", action="store_true", help="Push the result docker image."
             )
 
         else:
@@ -128,13 +124,13 @@ if __name__ == "__main__":
 
         if args.only_filesystem_tarball:
             # Build only image filesystem.
-            package_builder.build(output_path=pl.Path(args.only_filesystem_tarball), locally=args.locally)
+            package_builder.build(
+                output_path=pl.Path(args.only_filesystem_tarball), locally=args.locally
+            )
             exit(0)
 
         package_builder.build_image(
-            push=args.push,
-            registries=args.registry or [],
-            tags=args.tag or []
+            push=args.push, registries=args.registry or [], tags=args.tag or []
         )
         exit(0)
 

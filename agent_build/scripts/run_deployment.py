@@ -55,22 +55,32 @@ sys.path.append(str(_SOURCE_ROOT))
 from agent_build.tools.environment_deployments import deployments
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] [%(filename)s] %(message)s")
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="[%(levelname)s] [%(filename)s] %(message)s"
+    )
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     get_list_parser = subparsers.add_parser("list")
     deployment_subparser = subparsers.add_parser("deployment")
-    deployment_subparser.add_argument("deployment_name", choices=deployments.ALL_DEPLOYMENTS.keys())
-
-    deployment_subparsers = deployment_subparser.add_subparsers(dest="deployment_command", required=True)
-    deploy_parser = deployment_subparsers.add_parser("deploy")
-    deploy_parser.add_argument(
-        "--cache-dir", dest="cache_dir", help="Cache directory to save/reuse deployment results."
+    deployment_subparser.add_argument(
+        "deployment_name", choices=deployments.ALL_DEPLOYMENTS.keys()
     )
 
-    get_all_deployments_parser = deployment_subparsers.add_parser("get-deployment-all-cache-names")
+    deployment_subparsers = deployment_subparser.add_subparsers(
+        dest="deployment_command", required=True
+    )
+    deploy_parser = deployment_subparsers.add_parser("deploy")
+    deploy_parser.add_argument(
+        "--cache-dir",
+        dest="cache_dir",
+        help="Cache directory to save/reuse deployment results.",
+    )
+
+    get_all_deployments_parser = deployment_subparsers.add_parser(
+        "get-deployment-all-cache-names"
+    )
 
     args = parser.parse_args()
 

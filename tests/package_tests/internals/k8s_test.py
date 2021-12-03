@@ -25,10 +25,16 @@ import logging
 
 from agent_build.tools import constants
 from tests.package_tests.internals.common import SOURCE_ROOT
-from tests.package_tests.internals.common import AgentLogRequestStatsLineCheck, AssertAgentLogLineIsNotAnErrorCheck, LogVerifier
+from tests.package_tests.internals.common import (
+    AgentLogRequestStatsLineCheck,
+    AssertAgentLogLineIsNotAnErrorCheck,
+    LogVerifier,
+)
 
 
-_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH = SOURCE_ROOT / "k8s" / "scalyr-service-account.yaml"
+_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH = (
+    SOURCE_ROOT / "k8s" / "scalyr-service-account.yaml"
+)
 
 
 def _delete_k8s_objects():
@@ -43,35 +49,42 @@ def _delete_k8s_objects():
         stderr = subprocess.DEVNULL
     try:
         subprocess.check_call(
-            "kubectl delete daemonset scalyr-agent-2", shell=True, stdout=stdout, stderr=stderr
+            "kubectl delete daemonset scalyr-agent-2",
+            shell=True,
+            stdout=stdout,
+            stderr=stderr,
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            "kubectl delete secret scalyr-api-key", shell=True, stdout=stdout, stderr=stderr
+            "kubectl delete secret scalyr-api-key",
+            shell=True,
+            stdout=stdout,
+            stderr=stderr,
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            "kubectl delete configmap scalyr-config", shell=True, stdout=stdout, stderr=stderr
+            "kubectl delete configmap scalyr-config",
+            shell=True,
+            stdout=stdout,
+            stderr=stderr,
         )
     except subprocess.CalledProcessError:
         pass
     try:
         subprocess.check_call(
-            ["kubectl", "delete", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)], stdout=stdout, stderr=stderr
+            ["kubectl", "delete", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)],
+            stdout=stdout,
+            stderr=stderr,
         ),
     except subprocess.CalledProcessError:
         pass
 
 
-def _test(
-    image_name: str,
-    architecture: constants.Architecture,
-    scalyr_api_key: str
-):
+def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key: str):
     # Create agent's service account.
     subprocess.check_call(
         ["kubectl", "create", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)]
@@ -79,13 +92,23 @@ def _test(
 
     # Define API key
     subprocess.check_call(
-        ["kubectl", "create", "secret", "generic", "scalyr-api-key", f"--from-literal=scalyr-api-key={scalyr_api_key}"]
+        [
+            "kubectl",
+            "create",
+            "secret",
+            "generic",
+            "scalyr-api-key",
+            f"--from-literal=scalyr-api-key={scalyr_api_key}",
+        ]
     )
 
     # Create configmap
     subprocess.check_call(
         [
-            "kubectl", "create", "configmap", "scalyr-config",
+            "kubectl",
+            "create",
+            "configmap",
+            "scalyr-config",
             "--from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-",
         ]
     )
@@ -98,7 +121,7 @@ def _test(
     scalyr_agent_manifest = re.sub(
         r"image: scalyr/scalyr-k8s-agent:\d+\.\d+\.\d+",
         f"image: {image_name}",
-        scalyr_agent_manifest
+        scalyr_agent_manifest,
     )
 
     # Change image pull policy to be able to pull the local image.
@@ -114,23 +137,36 @@ def _test(
     scalyr_agent_manifest_path.write_text(scalyr_agent_manifest)
 
     # Create agent's daemonset.
-    subprocess.check_call([
-        "kubectl", "create", "-f", str(scalyr_agent_manifest_path)
-    ])
+    subprocess.check_call(["kubectl", "create", "-f", str(scalyr_agent_manifest_path)])
 
     # Get name of the created pod.
-    pod_name = subprocess.check_output(
-        "kubectl get pods --sort-by=.metadata.creationTimestamp -o jsonpath=\"{.items[-1].metadata.name}\"", shell=True
-    ).decode().strip()
+    pod_name = (
+        subprocess.check_output(
+            'kubectl get pods --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}"',
+            shell=True,
+        )
+        .decode()
+        .strip()
+    )
 
     # Wait a little.
     time.sleep(3)
 
     # Execute tail -f command on the agent.log inside the pod to read its content.
     agent_log_tail_process = subprocess.Popen(
-        ["kubectl", "exec", pod_name, "--container", "scalyr-agent", "--", "tail", "-f", "-n+1",
-         "/var/log/scalyr-agent-2/agent.log"],
-        stdout=subprocess.PIPE
+        [
+            "kubectl",
+            "exec",
+            pod_name,
+            "--container",
+            "scalyr-agent",
+            "--",
+            "tail",
+            "-f",
+            "-n+1",
+            "/var/log/scalyr-agent-2/agent.log",
+        ],
+        stdout=subprocess.PIPE,
     )
     # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
 
@@ -149,7 +185,9 @@ def _test(
         # Add check for any ERROR messages to the verifier.
         agent_log_tester.add_line_check(AssertAgentLogLineIsNotAnErrorCheck())
         # Add check for the request stats message.
-        agent_log_tester.add_line_check(AgentLogRequestStatsLineCheck(), required_to_pass=True)
+        agent_log_tester.add_line_check(
+            AgentLogRequestStatsLineCheck(), required_to_pass=True
+        )
 
         # Start agent.log file verification.
         agent_log_tester.verify(timeout=300)
@@ -160,11 +198,7 @@ def _test(
     logging.info("Test passed!")
 
 
-def run(
-    image_name: str,
-    architecture: constants.Architecture,
-    scalyr_api_key: str
-):
+def run(image_name: str, architecture: constants.Architecture, scalyr_api_key: str):
     """
     :param image_name: Full name of the image to test.
     :param architecture: Architecture of the image to test.
@@ -174,16 +208,10 @@ def run(
     _delete_k8s_objects()
 
     # Make image visible for the munikube cluster.
-    subprocess.check_call(
-        ["minikube", "image", "load", image_name]
-    )
+    subprocess.check_call(["minikube", "image", "load", image_name])
 
     try:
-        _test(
-            image_name,
-            architecture,
-            scalyr_api_key
-        )
+        _test(image_name, architecture, scalyr_api_key)
     finally:
         logging.info("Clean up. Removing all kubernetes objects...")
         _delete_k8s_objects()

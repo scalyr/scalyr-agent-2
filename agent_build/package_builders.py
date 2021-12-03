@@ -131,7 +131,7 @@ class PackageBuilder(abc.ABC):
     """
 
     # Type of the package to build.
-    PACKAGE_TYPE: constants.PackageType
+    PACKAGE_TYPE: constants.PackageType = None
 
     # Add agent source code as a bundled frozen binary if True, or
     # add the source code as it is.
@@ -422,7 +422,9 @@ class PackageBuilder(abc.ABC):
         # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
         all_builtin_monitor_module_names = [
             mod_path.stem
-            for mod_path in pl.Path(__SOURCE_ROOT__, "scalyr_agent", "builtin_monitors").glob("*.py")
+            for mod_path in pl.Path(
+                __SOURCE_ROOT__, "scalyr_agent", "builtin_monitors"
+            ).glob("*.py")
             if mod_path.stem != "__init__"
         ]
 
@@ -432,9 +434,7 @@ class PackageBuilder(abc.ABC):
         for monitor_name in all_builtin_monitor_module_names:
             if monitor_name in type(self).EXCLUDED_MONITORS:
                 continue
-            hidden_imports.append(
-                f"scalyr_agent.builtin_monitors.{monitor_name}"
-            )
+            hidden_imports.append(f"scalyr_agent.builtin_monitors.{monitor_name}")
 
         # Add packages to frozen binary paths.
         paths_to_include = [
@@ -746,12 +746,12 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                         container_tar.addfile(file_entry)
 
     def build_image(
-            self,
-            image_names=None,
-            registries: List[str] = None,
-            tags: List[str] = None,
-            push: bool = False,
-            with_coverage: bool = False
+        self,
+        image_names=None,
+        registries: List[str] = None,
+        tags: List[str] = None,
+        push: bool = False,
+        with_coverage: bool = False,
     ):
         """
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
@@ -768,39 +768,39 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             library). Used only for testing.
         """
 
-        registries = registries or ['']
-        tags = tags or ['latest']
+        registries = registries or [""]
+        tags = tags or ["latest"]
 
         buildx_builder_name = "agent_image_buildx_builder"
         # Create docker buildx builder instance. # Without it the result image won't be pushed correctly
         # to the local registry.
 
         # check if builder already exists.
-        ls_output = subprocess.check_output([
-            "docker",
-            "buildx",
-            "ls"
-        ]).decode().strip()
+        ls_output = subprocess.check_output(["docker", "buildx", "ls"]).decode().strip()
 
         if buildx_builder_name not in ls_output:
             # Build new buildx builder
-            subprocess.check_call([
-                "docker",
-                "buildx",
-                "create",
-                # This option is important, without it the image won't be pushed to the local registry.
-                "--driver-opt=network=host",
-                "--name",
-                buildx_builder_name
-            ])
+            subprocess.check_call(
+                [
+                    "docker",
+                    "buildx",
+                    "create",
+                    # This option is important, without it the image won't be pushed to the local registry.
+                    "--driver-opt=network=host",
+                    "--name",
+                    buildx_builder_name,
+                ]
+            )
 
         # Use builder.
-        subprocess.check_call([
-            "docker",
-            "buildx",
-            "use",
-            buildx_builder_name,
-        ])
+        subprocess.check_call(
+            [
+                "docker",
+                "buildx",
+                "use",
+                buildx_builder_name,
+            ]
+        )
 
         dockerfile_path = __SOURCE_ROOT__ / "Dockerfile"
 
@@ -826,15 +826,19 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             "-f",
             str(dockerfile_path),
             "--build-arg",
-            f"BUILD_TYPE={self.PACKAGE_TYPE.value}",
+            f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
         ]
 
         # If we need to push, then specify all platforms.
         if push:
             command_options.append("--platform")
-            command_options.append(constants.Architecture.X86_64.as_docker_platform.value)
+            command_options.append(
+                constants.Architecture.X86_64.as_docker_platform.value
+            )
             command_options.append("--platform")
-            command_options.append(constants.Architecture.ARM64.as_docker_platform.value)
+            command_options.append(
+                constants.Architecture.ARM64.as_docker_platform.value
+            )
 
         if with_coverage:
             # Build image with enabled coverage measuring.
@@ -880,7 +884,10 @@ class DockerSyslogPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_SYSLOG
-    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"]
+    RESULT_IMAGE_NAMES = [
+        "scalyr/scalyr-agent-docker-syslog",
+        "scalyr/scalyr-agent-docker",
+    ]
 
 
 class DockerApiPackageBuilder(ContainerPackageBuilder):

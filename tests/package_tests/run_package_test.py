@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import json
 import pathlib as pl
 import logging
@@ -21,7 +22,11 @@ else:
     config = {}
 
 
-def get_option(name: str, default: str = None, type_: Union[Type[str], Type[list]] = str, ):
+def get_option(
+    name: str,
+    default: str = None,
+    type_: Union[Type[str], Type[list]] = str,
+):
     global config
 
     name = name.lower()
@@ -49,8 +54,10 @@ def get_option(name: str, default: str = None, type_: Union[Type[str], Type[list
     )
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format="[%(levelname)s][%(module)s] %(message)s")
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="[%(levelname)s][%(module)s] %(message)s"
+    )
 
     parser = argparse.ArgumentParser()
 
@@ -58,18 +65,33 @@ if __name__ == '__main__':
     list_command_parser = subparsers.add_parser("list")
 
     package_test_parser = subparsers.add_parser("run-package-test")
-    package_test_parser.add_argument("test_name", choices=all_package_tests.ALL_PACKAGE_TESTS.keys())
+    package_test_parser.add_argument(
+        "test_name", choices=all_package_tests.ALL_PACKAGE_TESTS.keys()
+    )
 
-    package_test_parser.add_argument("--build-dir-path", dest="build_dir_path", required=False)
-    package_test_parser.add_argument("--package-path", dest="package_path", required=False)
+    package_test_parser.add_argument(
+        "--build-dir-path", dest="build_dir_path", required=False
+    )
+    package_test_parser.add_argument(
+        "--package-path", dest="package_path", required=False
+    )
     package_test_parser.add_argument(
         "--frozen-package-test-runner-path",
         dest="frozen_package_test_runner_path",
-        required=False
+        required=False,
     )
-    package_test_parser.add_argument("--scalyr-api-key", dest="scalyr_api_key", required=False)
+    package_test_parser.add_argument(
+        "--scalyr-api-key", dest="scalyr_api_key", required=False
+    )
+    package_test_parser.add_argument(
+        "--name-suffix",
+        dest="name_suffix",
+        help="Additional suffix for the name of the agent instances.",
+    )
 
-    get_tests_github_matrix_parser = subparsers.add_parser("get-package-builder-tests-github-matrix")
+    get_tests_github_matrix_parser = subparsers.add_parser(
+        "get-package-builder-tests-github-matrix"
+    )
     get_tests_github_matrix_parser.add_argument("package_name")
 
     args = parser.parse_args()
@@ -87,7 +109,9 @@ if __name__ == '__main__':
 
         if isinstance(package_test, all_package_tests.DockerImagePackageTest):
             package_test.run_test(
-                scalyr_api_key=scalyr_api_key
+                scalyr_api_key=scalyr_api_key,
+                name_suffix=get_option(
+                    "name_suffix", default=str(datetime.datetime.now().timestamp())
+                ),
             )
         exit(0)
-

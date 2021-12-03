@@ -31,11 +31,13 @@ __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
 
 # The global collection of all test. It is used by CI aimed scripts in order to be able to perform those test just
 # by knowing the name of needed test.
-ALL_PACKAGE_TESTS: Dict[str, 'Test'] = {}
+ALL_PACKAGE_TESTS: Dict[str, "Test"] = {}
 
 # Maps package test of some package to the builder of this package. Also needed for the GitHub Actions CI to
 # create a job matrix for a particular package tests.
-PACKAGE_BUILDER_TESTS: Dict[package_builders.PackageBuilder, List['Test']] = collections.defaultdict(list)
+PACKAGE_BUILDER_TESTS: Dict[
+    package_builders.PackageBuilder, List["Test"]
+] = collections.defaultdict(list)
 
 
 class Test:
@@ -43,12 +45,13 @@ class Test:
     Particular package test. If combines information about the package type, architecture,
     deployment and the system where test has to run.
     """
+
     def __init__(
-            self,
-            base_name: str,
-            package_builder: package_builders.PackageBuilder,
-            additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
-            deployment_architecture: constants.Architecture = None,
+        self,
+        base_name: str,
+        package_builder: package_builders.PackageBuilder,
+        additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
+        deployment_architecture: constants.Architecture = None,
     ):
         """
         :param base_name: Base name of the test.
@@ -69,18 +72,20 @@ class Test:
         # so we add the steps from the builder's deployment first.
         additional_deployment_steps = [
             *[type(step) for step in package_builder.deployment.steps],
-            *additional_deployment_steps
+            *additional_deployment_steps,
         ]
 
         self.deployment = deployments.Deployment(
             name=self.unique_name,
             step_classes=additional_deployment_steps,
             architecture=deployment_architecture or package_builder.architecture,
-            base_docker_image=package_builder.base_docker_image
+            base_docker_image=package_builder.base_docker_image,
         )
 
         if self.unique_name in ALL_PACKAGE_TESTS:
-            raise ValueError(f"The package test with name: {self.unique_name} already exists.")
+            raise ValueError(
+                f"The package test with name: {self.unique_name} already exists."
+            )
 
         # Add the current test to the global tests collection so it can be invoked from command line.
         ALL_PACKAGE_TESTS[self.unique_name] = self
@@ -99,13 +104,14 @@ class DockerImagePackageTest(Test):
     """
     Test for the agent docker images.
     """
+
     def __init__(
-            self,
-            target_image_architectures: List[constants.Architecture],
-            base_name: str,
-            package_builder: package_builders.ContainerPackageBuilder,
-            additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
-            deployment_architecture: constants.Architecture = None,
+        self,
+        target_image_architectures: List[constants.Architecture],
+        base_name: str,
+        package_builder: package_builders.ContainerPackageBuilder,
+        additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
+        deployment_architecture: constants.Architecture = None,
     ):
         """
         :param target_image_architectures: List of architectures in which to perform the image tests.
@@ -123,7 +129,7 @@ class DockerImagePackageTest(Test):
             base_name,
             package_builder,
             additional_deployment_steps,
-            deployment_architecture=deployment_architecture
+            deployment_architecture=deployment_architecture,
         )
 
         # Do the trick to help to static analyser.
@@ -133,15 +139,13 @@ class DockerImagePackageTest(Test):
     def unique_name(self) -> str:
         return self._base_name
 
-    def run_test(
-            self,
-            scalyr_api_key: str,
-    ):
+    def run_test(self, scalyr_api_key: str, name_suffix: str = None):
         """
         Run test for the agent docker image.
         First of all it builds an image, then pushes it to the local registry and does full test.
 
         :param scalyr_api_key:  Scalyr API key.
+        :param name_suffix: Additional suffix to the agent instance name.
         """
 
         registry_host = "localhost:5000"
@@ -152,23 +156,23 @@ class DockerImagePackageTest(Test):
 
         # first of all delete existing registry container.
         logging.info("Remove registry container.")
-        subprocess.check_call([
-            "docker", "rm", "-f", registry_container_name
-        ])
+        subprocess.check_call(["docker", "rm", "-f", registry_container_name])
 
         # Run container with docker registry.
         logging.info("Run new local docker registry in container.")
-        subprocess.check_call([
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "-p",
-            "5000:5000",
-            "--name",
-            registry_container_name,
-            "registry:2"
-        ])
+        subprocess.check_call(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-d",
+                "-p",
+                "5000:5000",
+                "--name",
+                registry_container_name,
+                "registry:2",
+            ]
+        )
 
         try:
             # Build image and push it to the local registry.
@@ -189,86 +193,89 @@ class DockerImagePackageTest(Test):
                     "test",
                     "--tag",
                     "debug",
-                    "--push"
+                    "--push",
                 ],
-                cwd=str(__SOURCE_ROOT__)
+                cwd=str(__SOURCE_ROOT__),
             )
 
             # Test that all tags has been pushed to the registry.
             for tag in ["latest", "test", "debug"]:
-                logging.info(f"Test that the tag '{tag}' is pushed to the registry '{registry_host}'")
+                logging.info(
+                    f"Test that the tag '{tag}' is pushed to the registry '{registry_host}'"
+                )
 
                 for image_name in self.package_builder.RESULT_IMAGE_NAMES:
                     full_image_name = f"{registry_host}/{image_name}:{tag}"
 
                     # Remove the local image first, if exists.
                     logging.info("    Remove existing image.")
-                    subprocess.check_call([
-                        "docker", "image", "rm", "-f", full_image_name
-                    ])
+                    subprocess.check_call(
+                        ["docker", "image", "rm", "-f", full_image_name]
+                    )
 
                     logging.info("    Log in to the local registry.")
                     # Login to the local registry.
-                    subprocess.check_call([
-                        "docker",
-                        "login",
-                        "--password",
-                        "nopass",
-                        "--username",
-                        "nouser",
-                        registry_host
-                    ])
+                    subprocess.check_call(
+                        [
+                            "docker",
+                            "login",
+                            "--password",
+                            "nopass",
+                            "--username",
+                            "nouser",
+                            registry_host,
+                        ]
+                    )
 
                     # Pull the image
                     logging.info("    Pull the image.")
                     try:
-                        subprocess.check_call([
-                            "docker", "pull", full_image_name
-                        ])
+                        subprocess.check_call(["docker", "pull", full_image_name])
                     except subprocess.CalledProcessError as e:
-                        logging.exception("    Can not pull the result image from local registry.")
+                        logging.exception(
+                            "    Can not pull the result image from local registry."
+                        )
 
                     # Remove the image once more.
                     logging.info("    Remove existing image.")
-                    subprocess.check_call([
-                        "docker", "image", "rm", "-f", full_image_name
-                    ])
+                    subprocess.check_call(
+                        ["docker", "image", "rm", "-f", full_image_name]
+                    )
 
             # Use any of variants of the image name to test it.
-            local_registry_image_name = f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAMES[0]}"
+            local_registry_image_name = (
+                f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAMES[0]}"
+            )
 
             # Start the tests for each architecture.
             # TODO: Make tests run in parallel.
             for arch in self.target_image_architecture:
-                logging.info(f"Start testing image '{local_registry_image_name}' with architecture "
-                             f"'{arch.as_docker_platform.value}'")
+                logging.info(
+                    f"Start testing image '{local_registry_image_name}' with architecture "
+                    f"'{arch.as_docker_platform.value}'"
+                )
 
                 if isinstance(self.package_builder, package_builders.K8sPackageBuilder):
                     k8s_test.run(
                         image_name=local_registry_image_name,
                         architecture=arch,
-                        scalyr_api_key=scalyr_api_key
+                        scalyr_api_key=scalyr_api_key,
                     )
                 else:
                     docker_test.run(
                         image_name=local_registry_image_name,
                         architecture=arch,
-                        scalyr_api_key=scalyr_api_key
+                        scalyr_api_key=scalyr_api_key,
+                        name_suffix=name_suffix,
                     )
 
         finally:
             # Cleanup.
             # Removing registry container.
-            subprocess.check_call([
-                "docker", "rm", "-f", registry_container_name
-            ])
-            subprocess.check_call([
-                "docker", "logout", registry_host
-            ])
+            subprocess.check_call(["docker", "rm", "-f", registry_container_name])
+            subprocess.check_call(["docker", "logout", registry_host])
 
-            subprocess.check_call([
-                "docker", "image", "prune", "-f"
-            ])
+            subprocess.check_call(["docker", "image", "prune", "-f"])
 
 
 # Create tests for the all docker images (json/syslog/api) and for k8s image.
@@ -277,7 +284,7 @@ for builder in [
     package_builders.DOCKER_JSON_CONTAINER_BUILDER,
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER,
     package_builders.DOCKER_API_CONTAINER_BUILDER,
-    package_builders.K8S_CONTAINER_BUILDER
+    package_builders.K8S_CONTAINER_BUILDER,
 ]:
     test = DockerImagePackageTest(
         base_name=f"{builder.name}_test",
@@ -287,7 +294,7 @@ for builder in [
         target_image_architectures=[
             constants.Architecture.X86_64,
             constants.Architecture.ARM64,
-        ]
+        ],
     )
     _docker_image_tests.append(test)
 
