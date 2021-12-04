@@ -90,7 +90,9 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
                 continue
 
             self.assertTrue(
-                metric_name in seen_metrics, "metric %s not seen" % (metric_name)
+                metric_name in seen_metrics,
+                "metric %s not seen. All seen metrics: %s"
+                % (metric_name, str(seen_metrics)),
             )
 
     @skipIf(IS_FEDORA, "Skipping test on Fedora")
@@ -113,8 +115,8 @@ class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
 
         self.assertEqual(mock_logger.error.call_count, 0)
 
-        seen_mount_points_without_filters = self._get_mount_point_names_from_mock_logger(
-            mock_logger.info
+        seen_mount_points_without_filters = (
+            self._get_mount_point_names_from_mock_logger(mock_logger.info)
         )
         ignore_mounts = list(seen_mount_points_without_filters)[:3]
 

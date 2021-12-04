@@ -138,6 +138,7 @@ define_log_field(__monitor__, "orig_time", "The Graphite timestamp.")
 
 
 class GraphiteMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # Graphite Monitor
 
@@ -178,10 +179,10 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
     """
+    # fmt: on
 
     def _initialize(self):
-        """Performs monitor-specific initialization.
-        """
+        """Performs monitor-specific initialization."""
         self.__only_accept_local = self._config.get("only_accept_local")
         self.__accept_plaintext = self._config.get("accept_plaintext")
         self.__accept_pickle = self._config.get("accept_pickle")
@@ -217,6 +218,9 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             "monitor_log_flush_delay", convert_to=float, default=1.0, min_value=0
         )
 
+        self.__text_server = None
+        self.__pickle_server = None
+
     def run(self):
         # We have to (maybe) start up two servers.  Since each server requires its own thread, we may have
         # to create a new one (since we can use this thread to run one of the servers).
@@ -245,6 +249,11 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
             )
         else:
             pickle_server = None
+
+        # NOTE: We assign those variables so we can access them during the tests to verify
+        # corectness
+        self.__text_server = text_server
+        self.__pickle_server = pickle_server
 
         if not self.__accept_plaintext:
             pickle_server.run()
@@ -321,6 +330,8 @@ class GraphiteTextServer(ServerProcessor):
             # This is how the carbon graphite server parses the line.  We could be more forgiving but if it works
             # for them, then we can do it as well.
             metric, value, orig_timestamp = request.strip().split()
+            # Metric name can be of bytes type, but we need to make sure it's unicode type
+            metric = six.ensure_text(metric)
             value = float(value)
             orig_timestamp = float(orig_timestamp)
             # Include the time that the original graphite request said to associate with the metric value.
@@ -346,6 +357,11 @@ class GraphiteTextServer(ServerProcessor):
 class GraphitePickleServer(ServerProcessor):
     """Accepts connections on a server socket and handles them using Graphite's pickle protocol format, emitting
     the received metrics to the log.
+
+    NOTE (Tomaz): Pickle can contain arbitrary Python object data so we should note in the docs that
+    accepting arbitrary pickle data could be very dangerous and advise users against using it -
+    and in case they do need to use it, the should have additonal step in between which sanitized
+    pickled data and ensures it's safe.
     """
 
     def __init__(

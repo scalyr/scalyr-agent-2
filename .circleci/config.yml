@@ -8,7 +8,6 @@ master_and_release_only: &master_and_release_only
       only:
         - master
         - release
-        - improve_coverage
         # Those short lived branches are automatically created by our StackStorm build automation
         # so we can ensure all the jobs (including the ones which only run on master) pass before
         # merging a PR.
@@ -69,7 +68,7 @@ parameters:
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
-    default: "v13"
+    default: "v14"
   cache_version_py_dependencies:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
@@ -846,7 +845,7 @@ jobs:
       - run:
           name: Install Dependencies
           command: |
-            eval "$(pyenv init -)"
+            eval "$(pyenv init --path)"
             pyenv local $PYTHON
             python -m pip install virtualenv
             python -m virtualenv venv
@@ -932,7 +931,7 @@ jobs:
 
       channel:
         type: string
-        default: ""
+        default: "#cloud-tech"
         description: >
           ID of channel if set, overrides webhook's default channel setting
     working_directory: ~/scalyr-agent-2
@@ -1209,20 +1208,6 @@ jobs:
           tox_target: "coverage"
           upload_coverage: true
 
-  unittest-26:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: dockershelf/python:2.6-dev
-    steps:
-      - unittest_tox:
-          python_version: "2.6"
-          tox_version: "2.9.1"
-          tox_target: "py2.6-unit-tests"
-          apt_dependencies: "procps"
-          # NOTE: We simply skip tests which depend on those dependencies since
-          # there appear to be broken upstream since May 20th, 2020
-          #apt_dependencies: "build-essential"
-
   smoke-standalone-27-tls12:
     docker:
       - image: circleci/python:2.7-jessie
@@ -1235,24 +1220,6 @@ jobs:
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=150 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
-
-      - slack/status:
-          fail_only: true
-          only_for_branches: master
-
-  smoke-standalone-26-tls12:
-    docker:
-      - image: circleci/python:2.7-jessie
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-      - run:
-          command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=150 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
 
       - slack/status:
@@ -1839,22 +1806,6 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
-  benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:3.5.9
-    steps:
-      - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 4"
-          codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
-          run_time: 140
-          agent_pre_run_command: "touch /tmp/random.log & touch /tmp/random2.log"
-          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
-          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-4"
-          capture_line_counts: true
-          cache_key_name: "agent_2-growing_logs-monitors-multiprocess-2-worker-py-35"
-
   benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -1875,6 +1826,54 @@ jobs:
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
+
+  benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 4"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log & touch /tmp/random2.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-4"
+          capture_line_counts: true
+          cache_key_name: "agent_2-growing_logs-monitors-multiprocess-2-worker-py-35"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 5"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-5"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 5"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-5"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27"
 
   benchmarks-micro-py-35:
     working_directory: ~/scalyr-agent-2
@@ -1906,6 +1905,8 @@ jobs:
   # on master merge / push.
   send-benchmark-results-and-graphs-to-slack:
     working_directory: ~/scalyr-agent-2
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes. Needed some Slack blocks
+                             # some EC2 IP ranges
     docker:
       - image: circleci/python:3.5.9
     steps:
@@ -1999,22 +2000,6 @@ jobs:
       - smoke-standalone-tox:
           python_version: "2.7"
           tox_target: "py2.7-smoke-tests"
-
-  smoke-standalone-26:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image:  dockershelf/python:2.6-dev
-    steps:
-      - smoke-standalone-tox:
-          python_version: "2.6"
-          tox_version: "2.9.1"
-          tox_target: "py2.6-smoke-tests"
-          # NOTE: This is needed otherwise it falls back to Circle CI git client
-          pre_checkout_apt_dependencies: "git openssh-client"
-          apt_dependencies: "procps"
-          # NOTE: We simply skip tests which depend on those dependencies since
-          # there appear to be broken upstream since May 20th, 2020
-          #apt_dependencies: "build-essential"
 
   package-test-rpm:
     working_directory: ~/scalyr-agent-2
@@ -2159,10 +2144,10 @@ jobs:
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.8.7-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.8.7-amd64.exe https://www.python.org/ftp/python/3.8.7/python-3.8.7-amd64.exe
+            if (!(Test-Path .\python_installer\python-3.8.10-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-3.8.10-amd64.exe https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe
             }
-            python_installer\python-3.8.7-amd64.exe /quiet /passive
+            python_installer\python-3.8.10-amd64.exe /quiet /passive
 
       - save_cache:
           name: Save Wix Cache
@@ -2303,6 +2288,7 @@ jobs:
           path: artifacts
 
   ami-tests-stable:
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2315,6 +2301,7 @@ jobs:
           test_type: "stable"
 
   ami-tests-development:
+    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -2338,8 +2325,6 @@ workflows:
    # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
    # Python 3 versions
    jobs:
-     - unittest-26:
-         context: scalyr-agent
      - unittest-27:
          context: scalyr-agent
      - unittest-35:
@@ -2351,17 +2336,11 @@ workflows:
  smoke-tests:
    <<: *skip_release_build_branch_push
    jobs:
-     - smoke-standalone-26:
-         context: scalyr-agent
      - smoke-standalone-27:
          context: scalyr-agent
      - smoke-standalone-35:
          context: scalyr-agent
      - smoke-standalone-35-rate-limit:
-         context: scalyr-agent
-     - smoke-standalone-26-tls12:
-         context: scalyr-agent
-     - smoke-standalone-27-tls12:
          context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
      - smoke-docker-json:
@@ -2448,19 +2427,25 @@ workflows:
          <<: *benchmarks_master_and_release_only
      - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
          <<: *benchmarks_master_and_release_only
-     - send-benchmark-results-and-graphs-to-slack:
-         requires:
-           - benchmarks-idle-agent-py-27
-           - benchmarks-idle-agent-py-35
-           - benchmarks-idle-agent-no-monitors-py-27
-           - benchmarks-idle-agent-no-monitors-py-35
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-           - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-           - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-           - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-           - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
+     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
          <<: *benchmarks_master_and_release_only
+     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+         <<: *benchmarks_master_and_release_only
+     # - send-benchmark-results-and-graphs-to-slack:
+     #     requires:
+     #       - benchmarks-idle-agent-py-27
+     #       - benchmarks-idle-agent-py-35
+     #       - benchmarks-idle-agent-no-monitors-py-27
+     #       - benchmarks-idle-agent-no-monitors-py-35
+     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+     #       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+     #       - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
+     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
+     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
+     #     <<: *benchmarks_master_and_release_only
  weekly-circle-ci-usage-report:
    triggers:
      - schedule:
@@ -2479,10 +2464,41 @@ workflows:
  daily-stable-ami-package-install-tests:
    triggers:
      - schedule:
-         cron: "0 0 * * *"
+         cron: "0 2 * * *"
          filters:
            branches:
              only:
                - master
    jobs:
-     - ami-tests-stable
+     - ami-tests-stable:
+         context: scalyr-agent
+     - unittest-27:
+         context: scalyr-agent
+     - unittest-35:
+         context: scalyr-agent
+     - unittest-35-osx:
+         context: scalyr-agent
+     - unittest-38-windows:
+         context: scalyr-agent
+     - build-linux-packages-and-installer-script
+     - build-windows-package
+     - package-test-rpm:
+         context: scalyr-agent
+     - package-test-deb:
+         context: scalyr-agent
+     - smoke-rpm-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-rpm-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-deb-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+     - smoke-deb-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-deb

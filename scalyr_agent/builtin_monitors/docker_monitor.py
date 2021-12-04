@@ -624,9 +624,9 @@ define_metric(
 
 
 class WrappedStreamResponse(CancellableStream):
-    """ Wrapper for generator returned by docker.Client._stream_helper
-        that gives us access to the response, and therefore the socket, so that
-        we can shutdown the socket from another thread if needed
+    """Wrapper for generator returned by docker.Client._stream_helper
+    that gives us access to the response, and therefore the socket, so that
+    we can shutdown the socket from another thread if needed
     """
 
     def __init__(self, client, response, decode):
@@ -642,9 +642,9 @@ class WrappedStreamResponse(CancellableStream):
 
 
 class WrappedRawResponse(CancellableStream):
-    """ Wrapper for generator returned by docker.Client._stream_raw_result
-        that gives us access to the response, and therefore the socket, so that
-        we can shutdown the socket from another thread if needed
+    """Wrapper for generator returned by docker.Client._stream_raw_result
+    that gives us access to the response, and therefore the socket, so that
+    we can shutdown the socket from another thread if needed
     """
 
     def __init__(self, client, response, chunk_size=8096):
@@ -660,9 +660,9 @@ class WrappedRawResponse(CancellableStream):
 
 
 class WrappedMultiplexedStreamResponse(CancellableStream):
-    """ Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
-        that gives us access to the response, and therefore the socket, so that
-        we can shutdown the socket from another thread if needed
+    """Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
+    that gives us access to the response, and therefore the socket, so that
+    we can shutdown the socket from another thread if needed
     """
 
     def __init__(self, client, response):
@@ -679,10 +679,10 @@ class WrappedMultiplexedStreamResponse(CancellableStream):
 
 
 class DockerClient(docker.APIClient):  # pylint: disable=no-member
-    """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
-        so that we can have access to the response object, which allows us to get the
-        socket in use, and shutdown the blocked socket from another thread (e.g. upon
-        shutdown
+    """Wrapper for docker.Client to return 'wrapped' versions of streamed responses
+    so that we can have access to the response object, which allows us to get the
+    socket in use, and shutdown the blocked socket from another thread (e.g. upon
+    shutdown
     """
 
     def _stream_helper(self, response, decode=False):
@@ -725,8 +725,7 @@ def _get_containers(
     include_log_path=False,
     get_labels=False,
 ):
-    """Gets a dict of running containers that maps container id to container name
-    """
+    """Gets a dict of running containers that maps container id to container name"""
     if logger is None:
         logger = global_log
 
@@ -830,15 +829,15 @@ def _get_containers(
 
 def get_attributes_and_config_from_labels(labels, docker_options):
     """
-        Takes a dict of labels and splits it in to two separate attributes and config dicts.
+    Takes a dict of labels and splits it in to two separate attributes and config dicts.
 
-        @param labels: All the Docker labels for a container
-        @param docker_options: Options for determining which labels to use for the attributes and config items
-        @type labels: dict
-        @type docker_options: DockerOptions
+    @param labels: All the Docker labels for a container
+    @param docker_options: Options for determining which labels to use for the attributes and config items
+    @type labels: dict
+    @type docker_options: DockerOptions
 
-        @return: A tuple with the first element containing a dict of attributes and the second element containing a JsonObject of config items
-        @rtype: (dict, JsonObject)
+    @return: A tuple with the first element containing a dict of attributes and the second element containing a JsonObject of config items
+    @rtype: (dict, JsonObject)
 
     """
     config = JsonObject({})
@@ -910,7 +909,7 @@ def get_parser_from_config(base_config, attributes, default_parser):
 
 class ContainerChecker(StoppableThread):
     """
-        Monitors containers to check when they start and stop running.
+    Monitors containers to check when they start and stop running.
     """
 
     def __init__(
@@ -1918,8 +1917,7 @@ class ContainerIdResolver:
             self.__lock.release()
 
     class Entry:
-        """Helper abstraction representing a single cache entry mapping a container id to its name.
-        """
+        """Helper abstraction representing a single cache entry mapping a container id to its name."""
 
         def __init__(self, container_id, container_name, labels, last_access_time):
             """
@@ -2020,15 +2018,12 @@ class DockerOptions(object):
         """
         String representation of a DockerOption
         """
-        return (
-            "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s"
-            % (
-                six.text_type(self.labels_as_attributes),
-                self.label_prefix,
-                six.text_type(self.label_include_globs),
-                six.text_type(self.label_exclude_globs),
-                six.text_type(self.use_labels_for_log_config),
-            )
+        return "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s" % (
+            six.text_type(self.labels_as_attributes),
+            self.label_prefix,
+            six.text_type(self.label_include_globs),
+            six.text_type(self.label_exclude_globs),
+            six.text_type(self.use_labels_for_log_config),
         )
 
     def configure_from_monitor(self, monitor):
@@ -2067,6 +2062,7 @@ class DockerOptions(object):
 
 
 class DockerMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Docker Monitor
 
@@ -2196,10 +2192,10 @@ If you wish to use labels and label configuration when using the syslog monitor 
 
 TODO:  Back fill the instructions here.
     """
+    # fmt: on
 
     def __get_socket_file(self):
-        """Gets the Docker API socket file and validates that it is a UNIX socket
-        """
+        """Gets the Docker API socket file and validates that it is a UNIX socket"""
         # make sure the API socket exists and is a valid socket
         api_socket = self._config.get("api_socket")
         try:
@@ -2352,8 +2348,7 @@ TODO:  Back fill the instructions here.
         self.__version_lock = threading.RLock()
 
     def set_log_watcher(self, log_watcher):
-        """Provides a log_watcher object that monitors can use to add/remove log files
-        """
+        """Provides a log_watcher object that monitors can use to add/remove log files"""
         if self.__container_checker:
             self.__container_checker.set_log_watcher(log_watcher, self)
 

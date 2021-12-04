@@ -74,6 +74,7 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.compat import PY26
 
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
@@ -177,6 +178,46 @@ COMPRESSION_TYPE_TO_VALID_LEVELS = {
 
 # Value used for testing that the compression works correctly
 COMPRESSION_TEST_STR = b"a" * 100
+
+PYTHON26_EOL_WARNING = """
+Detected that the agent is running under Python 2.6 (%s) which has been EOL and officially
+unsupported by the core Python team since October 2013. v2.1.21 is the last agent release that
+still supports Python 2.6. Going forward you are strongly recommended to upgrade to a more recent
+and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
+
+PYTHON27_EOL_WARNING = """
+Detected that the agent is running under Python 2.7 (%s) which has been EOL and officially
+unsupported by the core Python team since January, 2020. For the time being, agent still supports
+Python 2.7, but that support will be removed in the near future so you are strongly encouraged to
+upgrade to a more recent and officially supported version of Python 3 for running the agent.
+""".strip().replace(
+    "\n", " "
+) % (
+    sys.version.replace("\n", "")
+)
+
+
+def warn_on_old_or_unsupported_python_version():
+    """
+    Emit a warning if running under Python 2.6 which we stopped oficially supporting in v2.1.21
+    or Python 2.7 which we will stop supporting in teh future.
+    """
+
+    if PY26:
+        import scalyr_agent.scalyr_logging
+
+        scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON26_EOL_WARNING)
+
+
+# if PY27:
+#     import scalyr_agent.scalyr_logging
+#
+#     scalyr_agent.scalyr_logging.getLogger(__name__).warn(PYTHON27_EOL_WARNING)
 
 
 def get_json_implementation(lib_name):
@@ -378,8 +419,7 @@ def json_encode(obj, output=None, binary=False):
 
 
 def json_decode(text):
-    """Decodes text containing json and returns either a dict
-    """
+    """Decodes text containing json and returns either a dict"""
     return _json_decode(text)
 
 
@@ -955,8 +995,7 @@ class RunState(object):
 
 
 class FakeRunState(RunState):
-    """A RunState subclass that does not actually sleep when sleep_but_awaken_if_stopped that can be used for tests.
-    """
+    """A RunState subclass that does not actually sleep when sleep_but_awaken_if_stopped that can be used for tests."""
 
     def __init__(self):
         # The number of times this instance would have slept.
@@ -973,12 +1012,10 @@ class FakeRunState(RunState):
 
 
 class FakeClock(object):
-    """Used to simulate time and control threads waking up for sleep for tests.
-    """
+    """Used to simulate time and control threads waking up for sleep for tests."""
 
     def __init__(self):
-        """Constructs a new instance.
-        """
+        """Constructs a new instance."""
         # A lock/condition to protected _time.  It is notified whenever _time is changed.
         self._time_condition = threading.Condition()
         # The current time in seconds past epoch.
@@ -1068,8 +1105,7 @@ class FakeClock(object):
         self._waiting_condition.release()
 
     def wake_all_threads(self):
-        """Invoked to wake all threads currently blocked in `simulate_waiting`.
-        """
+        """Invoked to wake all threads currently blocked in `simulate_waiting`."""
         self.advance_time(increment_by=0.0)
 
     def _increment_waiting_count(self, increment):
@@ -1253,8 +1289,7 @@ class StoppableThread(threading.Thread):
         return self.__run_impl()
 
     def __run_impl(self):
-        """Internal run implementation.
-        """
+        """Internal run implementation."""
         # noinspection PyBroadException
         try:
             if self.__target is not None:
@@ -1373,12 +1408,12 @@ class RateLimiter(object):
     def __init__(self, bucket_size, bucket_fill_rate, current_time=None):
         """Creates a new bucket.
 
-          @param bucket_size: The bucket size, which should be the maximum number of bytes that can be consumed
-              in a burst.
-          @param bucket_fill_rate: The fill rate, expressed as bytes per second.  This should correspond to the
-              maximum desired steady state rate limit.
-          @param current_time:   If not none, the value to use as the current time, expressed in seconds past epoch.
-              This is used in testing.
+        @param bucket_size: The bucket size, which should be the maximum number of bytes that can be consumed
+            in a burst.
+        @param bucket_fill_rate: The fill rate, expressed as bytes per second.  This should correspond to the
+            maximum desired steady state rate limit.
+        @param current_time:   If not none, the value to use as the current time, expressed in seconds past epoch.
+            This is used in testing.
         """
         self.__bucket_contents = bucket_size
         self.__bucket_size = bucket_size
@@ -1713,8 +1748,7 @@ class RedirectorServer(object):
             pass
 
         def close(self):
-            """Closes the channel to the client.
-            """
+            """Closes the channel to the client."""
             pass
 
     class Redirector(object):
@@ -1748,8 +1782,7 @@ class RedirectorServer(object):
 
 
 class RedirectorError(Exception):
-    """Raised when an exception occurs with the RedirectionClient or RedirectionServer.
-    """
+    """Raised when an exception occurs with the RedirectionClient or RedirectionServer."""
 
     pass
 
@@ -1786,8 +1819,7 @@ class RedirectorClient(StoppableThread):
     CLIENT_CONNECT_TIMEOUT = 60.0
 
     def run_and_propagate(self):
-        """Invoked when the thread begins and performs the bulk of the work.
-        """
+        """Invoked when the thread begins and performs the bulk of the work."""
         # The timeline by which we must connect to the server and receiving all bytes.
         overall_deadline = self.__time() + RedirectorClient.CLIENT_CONNECT_TIMEOUT
 
@@ -1994,8 +2026,7 @@ class RedirectorClient(StoppableThread):
             pass
 
         def close(self):
-            """Closes the channel to the server.
-            """
+            """Closes the channel to the server."""
             pass
 
 
@@ -2159,21 +2190,21 @@ def get_agent_start_up_message():
     # easier for us to troubleshoot invalid locale related issues
     lang_env_var = compat.os_environ_unicode.get("LANG", "notset")
 
-    (language_code, encoding, used_locale,) = get_language_code_coding_and_locale()
+    (
+        language_code,
+        encoding,
+        used_locale,
+    ) = get_language_code_coding_and_locale()
 
-    msg = (
-        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
-        % (
-            SCALYR_VERSION,
-            build_revision,
-            get_pid_tid(),
-            python_version_str,
-            openssl_version,
-            sys.getfilesystemencoding(),
-            used_locale,
-            lang_env_var,
-        )
+    msg = "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) " "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)" % (
+        SCALYR_VERSION,
+        build_revision,
+        get_pid_tid(),
+        python_version_str,
+        openssl_version,
+        sys.getfilesystemencoding(),
+        used_locale,
+        lang_env_var,
     )
 
     return msg
@@ -2415,8 +2446,7 @@ class HistogramTracker(object):
         return self.__max
 
     def reset(self):
-        """Resets all the instance, discarding all information about all previously added samples.
-        """
+        """Resets all the instance, discarding all information about all previously added samples."""
         for i in range(0, len(self.__counts)):
             self.__counts[i] = 0
         self.__overflow = 0
@@ -2506,7 +2536,7 @@ class ProcessWatchDog(threading.Thread):
         :param on_stop_callback: Function that will be invoked by this
         abstraction once the parent is no longer running.
         out.
-         """
+        """
         self._on_stop_callback = on_stop_callback
         super(ProcessWatchDog, self).start()
 
@@ -2570,12 +2600,17 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
 
         # create and start a watchdog for  a parent process.
         self._watchdog = ProcessWatchDog(
-            parent_pid, poll_interval=parent_process_poll_interval,
+            parent_pid,
+            poll_interval=parent_process_poll_interval,
         )
         self._watchdog.start_watchdog(on_stop_callback=self._terminate)
 
     def start_shared_object_manager(
-        self, parent_pid, parent_process_poll_interval=5, initializer=None, initargs=(),
+        self,
+        parent_pid,
+        parent_process_poll_interval=5,
+        initializer=None,
+        initargs=(),
     ):
         # type: (int, int, Callable, Tuple) -> None
         """

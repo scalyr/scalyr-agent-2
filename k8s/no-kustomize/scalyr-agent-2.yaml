@@ -50,7 +50,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: scalyr/scalyr-k8s-agent:2.1.19
+        image: scalyr/scalyr-k8s-agent:2.1.25
         imagePullPolicy: Always
         name: scalyr-agent
         resources:
@@ -80,6 +80,7 @@ spec:
             - -H
           initialDelaySeconds: 60
           periodSeconds: 60
+          timeoutSeconds: 10
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -110,6 +111,4 @@ spec:
         name: checkpoints
       # comment this section if you do not want to run on the master
       tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists

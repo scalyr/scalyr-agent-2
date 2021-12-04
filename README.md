@@ -37,6 +37,13 @@ We also welcome submissions from the community.
 For information on the agent architecture and code abstractions, please refer to the
 [architecture.md](docs/architecture.md) document.
 
+Some of the tests and checks depend on on fixture file from git submodule so you should make sure you
+also check out all the submodules:
+
+```bash
+git submodule update --recursive --init
+```
+
 ### Local Development Environment, Tests and Lint Checks
 
 This repository utilizes ``tox`` Python project for running various lint checks and tests in
@@ -220,7 +227,7 @@ feel free to submit pull requests to the `master` branch and we will work with y
 
 ## Copyright, License, and Contributors Agreement
 
-Copyright 2014-2020 Scalyr, Inc.
+Copyright 2014-2021 Scalyr, Inc. Copyright 2021 SentinelOne, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this work except in
 compliance with the License. You may obtain a copy of the License in the [LICENSE](LICENSE.txt) file, or at:

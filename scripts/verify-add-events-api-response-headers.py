@@ -97,7 +97,8 @@ def verify_api_response_headers_and_status_code(
             "Expected %s status code, got %s" % (expected_status_code, resp.status_code)
         )
 
-    actual_header_names = list(resp.headers.keys())
+    expected_headers = sorted([key.lower() for key in expected_headers])
+    actual_header_names = sorted([key.lower() for key in list(resp.headers.keys())])
 
     if set(actual_header_names) != set(expected_headers):
         raise ValueError(
@@ -121,16 +122,34 @@ def main():
             token = SCALYR_TOKEN_PROD_US
 
         # 1. Test unauthenticated scenario (aka invalid / missing API key)
+        print("Using url: %s" % (url))
         print("Unauthenticated checks (expecting status code 401)")
         print("")
+
+        # Looks like logstaging.eu stopped returning Connection header at some point so for now we
+        # just skip this check
+        if "staging.eu" in url:
+            expected_headers_401 = EXPECTED_HEADER_NAMES_401.copy()
+            expected_headers_400 = EXPECTED_HEADER_NAMES_401.copy()
+            expected_headers_200 = EXPECTED_HEADER_NAMES_200.copy()
+            expected_headers_401.remove("Connection")
+            expected_headers_400.remove("Connection")
+            expected_headers_200.remove("Connection")
+            expected_headers_200.remove("Cache-Control")
+        else:
+            expected_headers_401 = EXPECTED_HEADER_NAMES_401
+            expected_headers_400 = EXPECTED_HEADER_NAMES_401
+            expected_headers_200 = EXPECTED_HEADER_NAMES_200
+
         verify_api_response_headers_and_status_code(
             url=url,
             data="{}",
             expected_status_code=401,
-            expected_headers=EXPECTED_HEADER_NAMES_401,
+            expected_headers=expected_headers_401,
         )
 
         # 2. Test authenticated scenario with a valid API key and invalid payload
+        print("")
         print("Authenticated checks (expecting status code 400)")
         print("")
         data = BASE_BODY.copy()
@@ -141,7 +160,7 @@ def main():
             url=url,
             data=json.dumps(data),
             expected_status_code=400,
-            expected_headers=EXPECTED_HEADER_NAMES_401,
+            expected_headers=expected_headers_400,
         )
 
         # 2. Test authenticated scenario with a valid API key and valid payload
@@ -153,7 +172,7 @@ def main():
             url=url,
             data=json.dumps(data),
             expected_status_code=200,
-            expected_headers=EXPECTED_HEADER_NAMES_200,
+            expected_headers=expected_headers_200,
         )
 
 

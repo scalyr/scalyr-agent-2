@@ -678,6 +678,7 @@ class WriterThread(StoppableThread):
 class SystemMetricsMonitor(
     ScalyrMonitor
 ):  # pylint: disable=monitor-not-included-for-win32
+    # fmt: off
     """
 # Linux System Metrics
 
@@ -698,6 +699,7 @@ this plugin in your configuration file.
 You can see an overview of this data in the System dashboard. Click the {{menuRef:Dashboards}} menu and select
 {{menuRef:System}}. Use the dropdown near the top of the page to select the host whose data you'd like to view.
     """
+    # fmt: on
 
     def _initialize(self):
         """Performs monitor-specific initialization."""

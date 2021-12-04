@@ -271,6 +271,9 @@ class LogFileIterator(object):
         self.__json_log_key = log_config.get("json_message_field", "log")
         self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
         self.__include_raw_timestamp_field = config.include_raw_timestamp_field
+        self.__merge_json_parsed_lines = config.merge_json_parsed_lines
+        self.__merge_json_line_time = None
+        self.__line_completion_wait_time = config.line_completion_wait_time * 60
 
         if self.__parse_format == "json" or self.__parse_format == "cri":
             self.__max_extended_line_length = config.internal_parse_max_line_size
@@ -326,8 +329,8 @@ class LogFileIterator(object):
 
                 if "position" in checkpoint:
                     self.__position = checkpoint["position"]
-                    self.__extended_line_position = LogFileIterator.ExtendedLinePosition.from_checkpoint(
-                        checkpoint
+                    self.__extended_line_position = (
+                        LogFileIterator.ExtendedLinePosition.from_checkpoint(checkpoint)
                     )
                     for state in checkpoint["pending_files"]:
                         if not state["is_log_file"] or self.__file_system.trust_inodes:
@@ -642,8 +645,8 @@ class LogFileIterator(object):
         # Do we need more bytes to have at least max_line_bytes in available in the buffer.
         need_more_bytes_for_max_line = available_buffer_bytes < self.__max_line_length
         # If we are on an extended line, do we need more bytes in buffer to read the next fragment
-        need_more_bytes_for_fragment_position = not self.__have_buffer_for_fragment_position(
-            available_buffer_bytes
+        need_more_bytes_for_fragment_position = (
+            not self.__have_buffer_for_fragment_position(available_buffer_bytes)
         )
 
         if more_file_bytes_available and (
@@ -663,24 +666,9 @@ class LogFileIterator(object):
 
         original_buffer_position = self.__buffer.tell()
 
-        # read a complete line from our line_matcher
-        next_line = self.__line_matcher.readline(self.__buffer, current_time)
-
-        # Check to see if we allow for extended lines, and if so, then read more pages so that
-        # we can parse an entire extended line.
-        if (
-            len(next_line) == 0
-            and self.__max_extended_line_length > self.__max_line_length
-        ):
-            while (
-                self.__available_buffer_bytes() < self.__max_extended_line_length
-                and self.__more_file_bytes_available()
-            ):
-                if self.__append_page_to_buffer(
-                    self.__page_size, check_for_new_lines=True
-                ):
-                    break
-            next_line = self.__line_matcher.readline(self.__buffer, current_time)
+        # read a complete line from our line_matcher, with check to see if we allow for extended lines, and if so,
+        # then read more pages so that we can parse an entire extended line.
+        next_line = self.__read_extended_line(current_time)
 
         result = LogLine(line=next_line)
 
@@ -750,6 +738,66 @@ class LogFileIterator(object):
                     result.timestamp = timestamp
                     if attrs:
                         result.attrs = attrs
+                if self.__merge_json_parsed_lines:
+                    while result.line and not result.line.endswith(b"\n"):
+                        # Docker splits log lines at 16KB, we read lines until we hit a newline character and join them
+                        # so we can enforce our own max line length correctly.
+                        next_line = self.__read_extended_line(current_time)
+                        if len(next_line) == 0:
+                            # If we fail to read a line ending in a newline, we want to seek back to before we started
+                            # building this merged line and hopefully get all the bits next time around. We have a timer
+                            # that uses the line_completion_wait_time configuration used in LineMatchers to output the
+                            # line if we take too long waiting for a newline.
+                            if self.__merge_json_line_time is None:
+                                self.__merge_json_line_time = current_time
+
+                            if (
+                                current_time - self.__merge_json_line_time
+                                < self.__line_completion_wait_time
+                            ):
+                                self.__buffer.seek(original_buffer_position)
+                                self.__position = self.__determine_mark_position(
+                                    self.__buffer.tell()
+                                )
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_3,
+                                    "Incomplete merged line found in file %s, will reattempt reading.",
+                                    self.__path,
+                                )
+                                return LogLine(line=b"")
+                            else:
+                                self.__merge_json_line_time = None
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_3,
+                                    "Reached max wait time for incomplete merged line in file %s, emitting line as-is.",
+                                    self.__path,
+                                )
+                                break
+                        next_attrs = scalyr_util.json_decode(
+                            next_line.decode("utf-8", "replace")
+                        )
+                        next_line = next_attrs.pop(self.__json_log_key, None)
+                        if next_line is None:
+                            log.warning(
+                                "Key '%s' doesn't exist in json object for log %s. Appending full line. Please check the log's 'json_message_field' configuration"
+                                % (self.__json_log_key, self.__path),
+                                limit_once_per_x_secs=300,
+                                limit_key=(
+                                    "json-message-field-missing-%s" % self.__path
+                                ),
+                            )
+                            result.line += next_line.encode("utf-8")
+                            # We break out of the merging loop here since the final result will be incorrect at this point anyway
+                            break
+                        result.line += next_line.encode("utf-8")
+                    self.__merge_json_line_time = None
+                elif not result.line.endswith(b"\n"):
+                    log.warning(
+                        "Detected partial line in log '%s', you may want to enable config option 'merge_json_parsed_lines' to join partial lines"
+                        % self.__path,
+                        limit_once_per_x_secs=300,
+                        limit_key=("partial-json-%s" % self.__path),
+                    )
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
@@ -809,6 +857,28 @@ class LogFileIterator(object):
             #                                              expected_size, actual_size)
 
         return result
+
+    def __read_extended_line(self, current_time):
+        # read a complete line from our line_matcher
+        next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
+        # Check to see if we allow for extended lines, and if so, then read more pages so that
+        # we can parse an entire extended line.
+        if (
+            len(next_line) == 0
+            and self.__max_extended_line_length > self.__max_line_length
+        ):
+            while (
+                self.__available_buffer_bytes() < self.__max_extended_line_length
+                and self.__more_file_bytes_available()
+            ):
+                if self.__append_page_to_buffer(
+                    self.__page_size, check_for_new_lines=True
+                ):
+                    break
+            next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
+        return next_line
 
     def __read_next_fragment_from_extended_line_buffer(self):
         """Return the next fragment from the extended line buffer for the current position.
@@ -1216,18 +1286,50 @@ class LogFileIterator(object):
         @return Most recent file that matches copy truncate filename heuristic
         """
         dir_path = os.path.dirname(self.__path)
-        file_prefix = os.path.basename(self.__path)
-        file_prefix = file_prefix[:-4] if file_prefix.endswith(".log") else file_prefix
+        file_name = os.path.basename(self.__path)
+        file_prefix, file_ext = os.path.splitext(file_name)
 
         # Files starting with the file prefix with create time within the last 5 minutes
         # gzip files are excluded
         # Use file with most recent creation date when there are multiple files
+
         possible_copy_filepaths = list(
             six.moves.filter(
-                lambda f: os.path.basename(f).startswith(file_prefix)
-                and not f.endswith(".gz")
+                lambda f: not f.endswith(".gz")
                 and f != self.__path
-                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300),
+                and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
+                # Since it's not a trivial task to handle all possible variants of the logrotate configuration,
+                # we just looking for the files which have been rotated by the default logrotate settings.
+                # TODO: Add ability to specify the pattern of the rotated files in the agent's config.
+                and (
+                    # if rotated file name ends with a new extension with number (e.g. foo.log.1).
+                    re.match(
+                        r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                    or
+                    # the same but the number or date is located before the extension ("extension" option in logrotate)
+                    # (e.g. foo.1.log)
+                    re.match(
+                        r"{0}\.\d+{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # (e.g.foo-20210527.log)
+                    re.match(
+                        r"{0}-\d{{8}}{1}".format(
+                            re.escape(file_prefix), re.escape(file_ext)
+                        ),
+                        os.path.basename(f),
+                    )
+                    or
+                    # if rotated file name ends with the date without additional extension (e.g. foo.log-20210527),
+                    # then the only thing that we can check is that the extension starts with original file's extension.
+                    re.match(
+                        r"{0}-\d{{8}}".format(re.escape(file_name)), os.path.basename(f)
+                    )
+                ),
                 self.__file_system.list_files(dir_path),
             )
         )
@@ -1278,9 +1380,12 @@ class LogFileIterator(object):
             tmp = self.__buffer.read()
             new_buffer.write(tmp)
             if expected_bytes != new_buffer.tell():
-                assert expected_bytes == new_buffer.tell(), (
-                    'Failed to get the right number of left over bytes %d %d "%s"'
-                    % (expected_bytes, new_buffer.tell(), tmp,)
+                assert (
+                    expected_bytes == new_buffer.tell()
+                ), 'Failed to get the right number of left over bytes %d %d "%s"' % (
+                    expected_bytes,
+                    new_buffer.tell(),
+                    tmp,
                 )
 
         self.__buffer = new_buffer
@@ -2596,8 +2701,10 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions(
-                            original_position, final_position
+                        bytes_between_positions = (
+                            self.__log_file_iterator.bytes_between_positions(
+                                original_position, final_position
+                            )
                         )
                         self.__total_bytes_skipped += (
                             bytes_between_positions - bytes_read
@@ -2738,7 +2845,11 @@ class LogFileProcessor(object):
         self.__lock.release()
 
         log.warning(
-            msg, skipped_bytes, self.__path, message, error_code=error_code,
+            msg,
+            skipped_bytes,
+            self.__path,
+            message,
+            error_code=error_code,
         )
 
     def add_sampler(self, match_expression, sampling_rate):
@@ -2836,16 +2947,23 @@ class LogFileProcessor(object):
         finally:
             self.__lock.release()
 
-    def get_checkpoint(self):
+    def get_checkpoint(self, checkpoint_time=None):
         """
         Return current state of the log file processor or the state when it has been closed.
+        :param checkpoint_time: Unix time when the file checkpoint has been obtained. If None, then the current time
+            is used.
         """
         if self.__is_closed:
-            # return the saved checkpoint state of the log processor in case if it has been closed.
+            # Return the saved checkpoint state of the log processor in case if it has been closed.
             # We can't get the checkpoint from the log file iterator because all of its files have already been closed.
-            return self._saved_checkpoint.copy()
+            result = self._saved_checkpoint.copy()
+        else:
+            result = self.__log_file_iterator.get_mark_checkpoint()
 
-        return self.__log_file_iterator.get_mark_checkpoint()
+        # Add the timestamp. This is needed to discard stale checkpoints.
+        result["time"] = checkpoint_time or time.time()
+
+        return result
 
     @staticmethod
     def create_checkpoint(initial_position):

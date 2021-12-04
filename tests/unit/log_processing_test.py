@@ -506,7 +506,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertTrue(self.log_file.at_end)
         restore_access()
 
-    def test_find_copy_trucate_file_number_ext(self):
+    def test_find_copy_truncate_file_number_ext(self):
         # Test find_copy_truncate_file with .1 name rotation scheme
         filename = os.path.basename(self.__path)
         copied_file = os.path.join(self.__tempdir, filename + ".1")
@@ -516,7 +516,32 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
-    def test_find_copy_trucate_file_date_ext(self):
+    def test_find_copy_truncate_file_selection(self):
+        # Verify if only appropriate candidate for the copy file is selected..
+        filename, ext = os.path.splitext(os.path.basename(self.__path))
+
+        similar_file_path = os.path.join(
+            self.__tempdir, filename + "_and_something.txt"
+        )
+        similar_file_path_date = os.path.join(
+            self.__tempdir, filename + "_and_something-20210101"
+        )
+        similar_file_path_ext = os.path.join(
+            self.__tempdir, filename + "_and_something.txt.1"
+        )
+
+        copied_file = os.path.join(self.__tempdir, self.__path + ".1")
+        self.write_file(copied_file, b"")
+
+        self.write_file(similar_file_path, b"")
+        self.write_file(similar_file_path_date, b"")
+        self.write_file(similar_file_path_ext, b"")
+        located_copy_truncate_file = (
+            self.log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_truncate_file_date_ext(self):
         # Test find_copy_truncate_file with .1 name rotation scheme
         filename = os.path.basename(self.__path)
         copied_file = os.path.join(self.__tempdir, filename + "-20210101")
@@ -526,7 +551,31 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.assertEqual(copied_file, located_copy_truncate_file)
 
-    def test_find_copy_trucate_with_ext_option_filename(self):
+    def test_find_copy_truncate_with_ext_option_filename(self):
+        # Test find_copy_truncate_file with date rotation scheme
+        filename = os.path.join(self.__tempdir, "app.log")
+        self.write_file(filename, b"")
+        copied_file = os.path.join(self.__tempdir, "app.1.log")
+        self.write_file(copied_file, b"")
+        app_log_file = self._create_iterator({"path": filename})
+        located_copy_truncate_file = (
+            app_log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_truncate_with_ext_dateext_option_filename(self):
+        # Test find_copy_truncate_file with date and extension rotation scheme
+        filename = os.path.join(self.__tempdir, "app.log")
+        self.write_file(filename, b"")
+        copied_file = os.path.join(self.__tempdir, "app-20210101.log")
+        self.write_file(copied_file, b"")
+        app_log_file = self._create_iterator({"path": filename})
+        located_copy_truncate_file = (
+            app_log_file._LogFileIterator__find_copy_truncate_file()
+        )
+        self.assertEqual(copied_file, located_copy_truncate_file)
+
+    def test_find_copy_truncate_with_ext_and_dateext_option_filename(self):
         # Test find_copy_truncate_file with date rotation scheme
         filename = os.path.join(self.__tempdir, "app.log")
         self.write_file(filename, b"")
@@ -1011,6 +1060,62 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.assertEquals(self.readline().line, b"L001")
         self.assertEquals(self.readline().line, b"L002")
+
+    def test_parse_as_json_with_merged_lines(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(max_line_length=100, page_size=500)
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L002\n")
+        self.assertEquals(self.readline().line, b"L003L004\n")
+
+    def test_parse_as_json_with_merged_lines_above_max_size(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(
+            max_line_length=5, page_size=500, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L")
+        self.assertEquals(self.readline().line, b"002\n")
+        self.assertEquals(self.readline().line, b"L003L")
+        self.assertEquals(self.readline().line, b"004\n")
+
+    def test_parse_as_json_with_merged_lines_timeout(self):
+        self.log_file.close()
+        extra = {"merge_json_parsed_lines": True}
+        config = _create_configuration(extra)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}, config=config
+        )
+        self.log_file.set_parameters(max_line_length=100, page_size=500)
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path,
+            b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004"}\n',
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001L002\n")
+        self.assertEquals(self.readline().line, b"")
+        self.assertEquals(self.readline(time_advance=6 * 60).line, b"L003L004")
 
     def test_parse_as_json_timestamp_field(self):
         self.log_file.close()
@@ -1545,7 +1650,10 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             "sometext.... secretoption=czerwin ,andsecret123=saurabh",
             "sometext.... secretczerwin =%s,andsecretsaurabh=%s"
-            % (md5_hexdigest("option"), md5_hexdigest("123"),),
+            % (
+                md5_hexdigest("option"),
+                md5_hexdigest("123"),
+            ),
             True,
         )
 

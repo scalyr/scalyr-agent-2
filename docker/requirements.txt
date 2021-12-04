@@ -1,8 +1,13 @@
 # dependencies for docker images.
 ujson==1.35
-orjson==3.5.1; python_version >= '3.6'
+orjson==3.5.2; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
+# Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
+# default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
+# end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
+# option)
 yappi==1.2.3
+pympler==0.8
 # the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.15.1

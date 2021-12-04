@@ -1182,7 +1182,9 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_timestamp_doesnt_increases_monotonically(self):
         session = ScalyrClientSession(
-            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION,
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
         )
 
         session._ScalyrClientSession__connection = mock.Mock()
@@ -1334,9 +1336,10 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         serialized_data = add_events_request.get_payload()
 
-        (path, request,) = session._ScalyrClientSession__connection.post.call_args_list[
-            0
-        ]
+        (
+            path,
+            request,
+        ) = session._ScalyrClientSession__connection.post.call_args_list[0]
 
         _, decompress_func = scalyr_util.get_compress_and_decompress_func(
             compression_type
@@ -1349,4 +1352,49 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         self.assertEqual(serialized_data, request["body"])
         self.assertTrue(
             "Content-Encoding" not in session._ScalyrClientSession__standard_headers
+        )
+
+    @mock.patch("scalyr_agent.scalyr_client.log")
+    def test_receive_response_includes_message_on_bad_param(self, mock_log):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            compression_type=None,
+        )
+
+        mock_response = '{"status": "error/client/badParam", "message": "foo bar"}'
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__connection.status_code.return_value = 200
+        session._ScalyrClientSession__connection.response.return_value = mock_response
+
+    @mock.patch("scalyr_agent.scalyr_client.log")
+    def test_receive_response_includes_message_on_bad_param_response_doesnt_include_message(
+        self, mock_log
+    ):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            compression_type=None,
+        )
+
+        mock_response = '{"status": "error/client/badParam"}'
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__connection.status_code.return_value = 200
+        session._ScalyrClientSession__connection.response.return_value = mock_response
+
+        body_str = ""
+        send_time = int(time.time())
+
+        self.assertEqual(mock_log.error.call_count, 0)
+        session._ScalyrClientSession__receive_response(
+            body_str=body_str, send_time=send_time
+        )
+        self.assertEqual(mock_log.error.call_count, 1)
+        mock_log.error.assert_called_with(
+            "Request to '%s' failed due to a bad parameter value.  This may be caused by an invalid write logs api key in the configuration. Response message: %s",
+            "https://dummserver.com",
+            None,
+            error_code="error/client/badParam",
         )

@@ -221,8 +221,8 @@ PRIVATE_KEY_PATH = get_env_throw_if_not_set("PRIVATE_KEY_PATH")
 PRIVATE_KEY_PATH = os.path.expanduser(PRIVATE_KEY_PATH)
 
 SECURITY_GROUPS_STR = get_env_throw_if_not_set(
-    "SECURITY_GROUPS", "allow-ssh-rdp"
-)  # sg-02efe05c115d41622
+    "SECURITY_GROUPS", "circleci-remote-access"
+)  # sg-075bf2191cf04c821
 SECURITY_GROUPS = SECURITY_GROUPS_STR.split(",")  # type: List[str]
 
 SCALYR_API_KEY = get_env_throw_if_not_set("SCALYR_API_KEY")
@@ -486,7 +486,13 @@ def main(
     driver = get_libcloud_driver()
 
     size = NodeSize(
-        distro_details["size_id"], distro_details["size_id"], 0, 0, 0, 0, driver,
+        distro_details["size_id"],
+        distro_details["size_id"],
+        0,
+        0,
+        0,
+        0,
+        driver,
     )
     image = NodeImage(
         distro_details["image_id"], distro_details["image_name"], driver, None

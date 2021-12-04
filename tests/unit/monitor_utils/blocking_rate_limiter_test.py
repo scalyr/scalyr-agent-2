@@ -41,8 +41,7 @@ def always_false():
 
 
 def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
-    """Returns a generator that maintains the rate at a constant level by balancing failures with successes
-    """
+    """Returns a generator that maintains the rate at a constant level by balancing failures with successes"""
     last = True
     consecutive_true = 0
     backoff_increase_ratio = float(backoff_rate) * increase_rate
@@ -331,8 +330,8 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             mock_get_next_ripe_time,
         ):
             """Examine rate-increasing behavior in the context of very high actual rates"""
-            mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_leads(
-                rl
+            mock_get_next_ripe_time.side_effect = (
+                _mock_get_next_ripe_time_actual_rate_leads(rl)
             )
 
             advancer = self.__create_fake_clock_advancer_thread(
@@ -372,8 +371,8 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         @patch.object(rl, "_get_next_ripe_time")
         def _case2_test_successes_actual_rate_lags_target_rate(mock_get_next_ripe_time):
             """Examine rate-increasing behavior in the context of very high actual rates"""
-            mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_lags(
-                rl
+            mock_get_next_ripe_time.side_effect = (
+                _mock_get_next_ripe_time_actual_rate_lags(rl)
             )
 
             advancer = self.__create_fake_clock_advancer_thread(
@@ -420,8 +419,8 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         @patch.object(rl, "_get_next_ripe_time")
         def _case3_test_failures_actual_rate_lags_target_rate(mock_get_next_ripe_time):
             """Examine rate-decreasing behavior in the context of very high actual rates"""
-            mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_lags(
-                rl
+            mock_get_next_ripe_time.side_effect = (
+                _mock_get_next_ripe_time_actual_rate_lags(rl)
             )
 
             advancer = self.__create_fake_clock_advancer_thread(
@@ -468,8 +467,8 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         @patch.object(rl, "_get_next_ripe_time")
         def _case4_test_failures_actual_rate_leads_target_rate(mock_get_next_ripe_time):
             """Examine rate-decreasing behavior in the context of very high actual rates"""
-            mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_leads(
-                rl
+            mock_get_next_ripe_time.side_effect = (
+                _mock_get_next_ripe_time_actual_rate_leads(rl)
             )
 
             advancer = self.__create_fake_clock_advancer_thread(

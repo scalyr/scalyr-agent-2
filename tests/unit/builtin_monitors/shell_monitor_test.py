@@ -162,7 +162,8 @@ class ShellMonitorTest(ScalyrTestCase):
 
         self.assertEqual(call_args, ("output", "stderr\n\nstdout\n"))
         self.assertEqual(
-            call_kwargs["extra_fields"]["command"], 'echo "stdout" ; >&2 echo "stderr"',
+            call_kwargs["extra_fields"]["command"],
+            'echo "stdout" ; >&2 echo "stderr"',
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 15)
         self.assertTrue(call_kwargs["extra_fields"]["duration"] <= 1)

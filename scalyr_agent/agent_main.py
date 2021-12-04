@@ -106,6 +106,7 @@ from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
+from scalyr_agent.util import warn_on_old_or_unsupported_python_version
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
@@ -178,8 +179,7 @@ def _check_disabled(current_time, other_time, message):
 
 
 class ScalyrAgent(object):
-    """Encapsulates the entire Scalyr Agent 2 application.
-    """
+    """Encapsulates the entire Scalyr Agent 2 application."""
 
     def __init__(self, platform_controller):
         """Initialize the object.
@@ -354,6 +354,9 @@ class ScalyrAgent(object):
                     "Could not parse configuration file at '%s'" % config_file_path,
                     file=sys.stderr,
                 )
+
+        if log_warnings:
+            warn_on_old_or_unsupported_python_version()
 
         self.__controller.consume_config(self.__config, config_file_path)
 
@@ -1197,13 +1200,17 @@ class ScalyrAgent(object):
                 disable_config_reload_until = _update_disabled_until(
                     self.__config.disable_config_reload, current_time
                 )
-                disable_verify_config_create_monitors_manager_until = _update_disabled_until(
-                    self.__config.disable_verify_config_create_monitors_manager,
-                    current_time,
+                disable_verify_config_create_monitors_manager_until = (
+                    _update_disabled_until(
+                        self.__config.disable_verify_config_create_monitors_manager,
+                        current_time,
+                    )
                 )
-                disable_verify_config_create_copying_manager_until = _update_disabled_until(
-                    self.__config.disable_verify_config_create_copying_manager,
-                    current_time,
+                disable_verify_config_create_copying_manager_until = (
+                    _update_disabled_until(
+                        self.__config.disable_verify_config_create_copying_manager,
+                        current_time,
+                    )
                 )
 
                 config_change_check_interval = (
@@ -1271,7 +1278,8 @@ class ScalyrAgent(object):
                             > last_copy_manager_stats_report_time + log_stats_delta
                         ):
                             self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats, copy_manager_warnings=True,
+                                base_overall_stats,
+                                copy_manager_warnings=True,
                             )
                             self.__log_copy_manager_stats(self.__overall_stats)
                             last_copy_manager_stats_report_time = current_time
@@ -1475,13 +1483,17 @@ class ScalyrAgent(object):
                     disable_config_reload_until = _update_disabled_until(
                         self.__config.disable_config_reload, current_time
                     )
-                    disable_verify_config_create_monitors_manager_until = _update_disabled_until(
-                        self.__config.disable_verify_config_create_monitors_manager,
-                        current_time,
+                    disable_verify_config_create_monitors_manager_until = (
+                        _update_disabled_until(
+                            self.__config.disable_verify_config_create_monitors_manager,
+                            current_time,
+                        )
                     )
-                    disable_verify_config_create_copying_manager_until = _update_disabled_until(
-                        self.__config.disable_verify_config_create_copying_manager,
-                        current_time,
+                    disable_verify_config_create_copying_manager_until = (
+                        _update_disabled_until(
+                            self.__config.disable_verify_config_create_copying_manager,
+                            current_time,
+                        )
                     )
 
                 # Log the stats one more time before we terminate.
@@ -1506,8 +1518,7 @@ class ScalyrAgent(object):
             scalyr_logging.close_handlers()
 
     def __fail_if_already_running(self):
-        """If the agent is already running, prints an appropriate error message and exits the process.
-        """
+        """If the agent is already running, prints an appropriate error message and exits the process."""
         try:
             self.__controller.is_agent_running(fail_if_running=True)
         except AgentAlreadyRunning as e:
@@ -1942,18 +1953,29 @@ class ScalyrAgent(object):
             result.avg_bytes_produced_rate = (
                 total_bytes_produced - last_total_bytes_produced
             ) / self.__config.copying_manager_stats_log_interval
-            if result.total_bytes_skipped > self.__last_total_bytes_skipped:
+
+            # NOTE: If last_total_bytes_produced is 0 and total_bytes_skip is > 0 this
+            # indicates bytes were skipped for staleness reasons (skipForStaleness) aka agent was
+            # offline for a while or similar so we don't log the message in this case because
+            # we already have another place which logs skipForStalness.
+            if (
+                result.total_bytes_skipped > self.__last_total_bytes_skipped
+                and last_total_bytes_produced > 0
+            ):
+                # NOTE: Right now we also report very small rates (e.g. 0.0001 MB/s) which can be
+                # somewhat annoying and confusing. One option would be to just report the value in
+                # case it's larger than some value (e.g. 0.1 MB/s)
                 if self.__config.parsed_max_send_rate_enforcement:
                     log.warning(
-                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "Warning, skipping copying log lines.  Only copied %.5f MB/s log bytes when %.5f MB/s "
                         "were generated over the last %.1f minutes. This may be due to "
                         "max_send_rate_enforcement. Log upload has been delayed %.1f seconds in the last "
                         "%.1f minutes  This may be desired (due to excessive "
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                             result.rate_limited_time_since_last_status,
                             self.__config.copying_manager_stats_log_interval / 60.0,
@@ -1961,13 +1983,13 @@ class ScalyrAgent(object):
                     )
                 else:
                     log.warning(
-                        "Warning, skipping copying log lines.  Only copied %.1f MB/s log bytes when %.1f MB/s "
+                        "Warning, skipping copying log lines.  Only copied %.5f MB/s log bytes when %.5f MB/s "
                         "were generated over the last %.1f minutes.  This may be desired (due to excessive "
                         "bytes from a problematic log file).  Please contact support@scalyr.com for additional "
                         "help."
                         % (
-                            result.avg_bytes_copied_rate / 1000000,
-                            result.avg_bytes_produced_rate / 1000000,
+                            result.avg_bytes_copied_rate / 1000000.0,
+                            result.avg_bytes_produced_rate / 1000000.0,
                             self.__config.copying_manager_stats_log_interval / 60.0,
                         )
                     )
@@ -2058,8 +2080,7 @@ class ScalyrAgent(object):
 
 
 class WorkerThread(object):
-    """A thread used to run the log copier and the monitor manager.
-    """
+    """A thread used to run the log copier and the monitor manager."""
 
     def __init__(self, configuration, copying_manager, monitors):
         self.config = configuration

@@ -92,7 +92,8 @@ Optional (defaults \
                                        to ``[ {"channel" : ["Application", "Security", "System"], "query": "*"}]
 
 |||# ``maximum_records_per_source``||| Optional (defaults to ``10000``). The maximum number of records to read from \
-                                       the end of each log sourceper gather_sample.
+                                       the end of each log sourceper gather_sample. Only applicable when using old WEL \
+                                       API.
 
 |||# ``error_repeat_interval``     ||| Optional (defaults to ``300``). The number of seconds to wait before logging \
                                        similar errors in the event log.

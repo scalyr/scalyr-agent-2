@@ -1,17 +1,100 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.20 "TBD" - TBD
+## 2.1.26 "TBW" - Dec 17, 2021
 
 <!---
-Packaged by Yan Shnayder <yan@scalyr.com> on Mar 9, 2021 14:00 -0800
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+--->
+
+Other:
+* Update agent Docker image to include ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
+* Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
+
+## 2.1.25 "Hamarus" - Nov 17, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+--->
+
+Improvements:
+* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
+
+Other:
+* Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
+* Update Kubernetes monitor to log a message under INFO log level that some container level metrics won't be available when detected runtime is ``containerd`` and not ``docker`` and container level metrics reporting is enabled.
+
+Bug fixes:
+* Fix plaintext mode in the Graphite monitor.
+* Update Linux system metric monitor so it doesn't print an error and ignores ``/proc/net/netstat`` lines we don't support metrics for.
+
+## 2.1.24 "Xuntian" - Oct 26, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 26, 2021 14:10 -0800
+--->
+
+Improvements:
+* Implemented optional line merging when running in Docker based Kubernetes to work around Docker's own 16KB line length limit. Use the ``merge_json_parsed_lines`` config option or ``SCALYR_MERGE_JSON_PARSED_LINES`` environment variable to enable this functionality.
+
+Bug fixes:
+* Update agent to throw more user-friendly error when we fail to parse fragment file due to invalid content.
+
+## 2.1.23 "Whipple" - Sept 16, 2021
+
+<!---
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Sep 16, 2021 10:10 -0800
+--->
+
+Bug fixes:
+* Fix docker container builder scripts to only use `buildx` if it is available.
+* Fix memory leak in the Syslog monitor which is caused by a bug in standard TCP/UDP servers in Python 3 (https://bugs.python.org/issue37193). The version of Python for Windows was updated to 3.8.10. For Linux users, who run agent on Python 3 and use Syslog monitor, it is also recommended to check if their Python 3 installation is up to date and has appropriate bug fixes.
+* Fix bug in the copying manager which works with monitor (such as Docker or Syslog monitor). This bug might cause re-uploading of the old log messages in some edge cases.
+
+## 2.1.22 "Volans" - Aug 11, 2021
+
+<!---
+Packaged by Oliver Hsu <oliverhs@sentinelone.com> on Aug 11, 2021 21:00 -0800
+--->
+
+Bug fixes:
+* Don't log "skipping copying log lines" messages in case number of last produced bytes is 0.
+* Fix Kubernetes Agent DaemonSet liveness probe timeout too short and unhealthy agent pod not restarting when a liveness probe timeout occurs.
+
+Other:
+* Update Windows Event Log monitor to emit a warning if ``maximum_records_per_source`` config option is set to a non-default value when using a new event API where that config option has no affect.
+
+## 2.1.21 "Ultramarine" - Jun 1, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Jun 1, 2021 21:00 -0800
+--->
+
+Improvements:
+* Allow journald monitor to be configured via globs on multiple fields via ``journald_logs.journald_globs`` config option. Contributed by @imron. #741
+
+Bug fixes:
+* Fix an issue where log lines may be duplicated or lost in the Kubernetes monitor when running under CRI with an unstable connection to the K8s API.
+* Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
+
+Other:
+* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations.
+* Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
+
+## 2.1.20 "Tabeisshi" - April 19, 2021
+
+<!---
+Packaged by Arthur Kamalov <arthur@scalyr.com> on Apr 19, 2021 21:00 -0800
 --->
 
 Improvements:
 * Add support for collecting some metrics Kubernetes when running in a CRI runtime.
+* Add support for SSL in the `mysql_monitor`. This can be enabled by setting `use_ssl` to True in the monitor configuration.
 
 Bug fixes:
 * Ensure pod digest which we calculate and use to determine if pod info in the Kubernetes monitor has  changed is deterministic and doesn't depend on dictionary item ordering.
+* Fix a race condition in the worker session checkpoint read/write logic, which was introduced with the ``multi-worker`` feature.
+
 
 Other:
 * Changed the logging level of "not found" errors while querying pods from the Kubernetes API from ERROR to DEBUG, as these errors are always transient and result in no data loss.

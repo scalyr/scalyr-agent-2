@@ -190,8 +190,7 @@ def _get_config_path_registry_entry(default_config_path):
 
 # noinspection PyPep8Naming
 class ScalyrAgentService(win32serviceutil.ServiceFramework):
-    """Implements the Windows service interface and exports the Scalyr Agent as a service.
-    """
+    """Implements the Windows service interface and exports the Scalyr Agent as a service."""
 
     # The following fields must be present for PyInstaller to detect this as a service implementation.
     _svc_name_ = _SCALYR_AGENT_SERVICE_
@@ -261,12 +260,10 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
 
 
 class WindowsPlatformController(PlatformController):
-    """A controller instance for Microsoft's Windows platforms
-    """
+    """A controller instance for Microsoft's Windows platforms"""
 
     def __init__(self):
-        """Initializes the Windows platform instance.
-        """
+        """Initializes the Windows platform instance."""
         # The method to invoke when termination is requested.
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
@@ -773,8 +770,7 @@ class PipeRedirectorServer(RedirectorServer):
         )
 
     class ServerChannel(RedirectorServer.ServerChannel):
-        """Provides the channel implementation for receiving client connections over a named pipe.
-        """
+        """Provides the channel implementation for receiving client connections over a named pipe."""
 
         def __init__(self, name):
             self.__full_pipe_name = name
@@ -817,8 +813,7 @@ class PipeRedirectorServer(RedirectorServer):
             win32file.WriteFile(self.__pipe_handle, content)
 
         def close(self):
-            """Closes the channel to the client.
-            """
+            """Closes the channel to the client."""
             try:
                 # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 win32file.WriteFile(
@@ -858,8 +853,7 @@ class PipeRedirectorClient(RedirectorClient):
         return self.__pipe_name
 
     class ClientChannel(object):
-        """Implements the client channel that connects to a named pipe and can receive data from it.
-        """
+        """Implements the client channel that connects to a named pipe and can receive data from it."""
 
         def __init__(self, full_pipe_name):
             self.__full_pipe_name = full_pipe_name
@@ -923,8 +917,7 @@ class PipeRedirectorClient(RedirectorClient):
                 )
 
         def close(self):
-            """Closes the channel to the server.
-            """
+            """Closes the channel to the server."""
             if self.__pipe_handle is not None:
                 win32file.CloseHandle(self.__pipe_handle)
                 self.__pipe_handle = None

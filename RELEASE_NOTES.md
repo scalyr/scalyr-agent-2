@@ -1,5 +1,18 @@
 # Release Notes
 
+## 2.1.21 "TBD" - April 2021, 2021
+
+* This is the last release that still supports Python 2.6. This version of the agent will emit a
+  warning if running under Python 2.6.
+
+  Python 2.6 has been officially EOL / unsupported for more than 7 years now so you are strongly
+  encouraged to use newer and supported version of Python 3. If you can't do that you can still
+  this or one of the older release.
+
+  Similar story for Python 2.7 which has been EOL for more than 1 year now. For the time being,
+  agent still supports Python 2.7, but that support will be removed in the near future so you are
+  strongly encouraged to upgrade to a more recent and supported Python 3 release.
+
 ## 2.1.19 "StarTram" - March 9, 2021
 
 * This release add support for adding the Kubernetes container name as an attribute to all log lines ingested via the 

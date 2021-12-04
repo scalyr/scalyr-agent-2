@@ -105,7 +105,7 @@ def _gather_metric(method, attribute=None, transform=None):
         doc = "Extract the {}().{} attribute from the given process object".format
 
     def gather_metric():
-        """Dynamically Generated """
+        """Dynamically Generated"""
         no_diskperf = False
         is_diskio_counters_method = method == "disk_io_counters"
 
@@ -591,17 +591,19 @@ define_log_field(__monitor__, "value", "The metric value.")
 
 
 class SystemMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records system metrics for Windows platforms.
+    # fmt: off
+    """
+    A Scalyr agent monitor that records system metrics for Windows platforms.
 
     This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
     the agent is running.
 
     There is no required configuration for this monitor and is generally automatically run by the agent.
     """
+    # fmt: on
 
     def __init__(self, config, logger, **kwargs):
-        """TODO: Fucntion documentation
-        """
+        """TODO: Fucntion documentation"""
         if psutil is None:
             raise UnsupportedSystem(
                 "windows_system_metrics",
@@ -616,8 +618,7 @@ class SystemMonitor(ScalyrMonitor):
         )
 
     def gather_sample(self):
-        """TODO: Fucntion documentation
-        """
+        """TODO: Fucntion documentation"""
         try:
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config["metric_name"]

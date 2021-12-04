@@ -17,7 +17,7 @@
 set -e
 
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "${SCRIPT_DIR}/common.sh"
 
 SEND_VALUE_SCRPT_PATH=$(realpath "${SCRIPT_DIR}/send_value_to_codespeed.py")

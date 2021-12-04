@@ -36,9 +36,19 @@ max_wait=$2
 # Flag indicating whether to delete pre-existing k8s objects
 delete_existing_objects=$3
 
-# Smoketest code (built into smoketest image)
-smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
+# We don't have an easy way to update base test docker images which come bundled
+# with the smoketest.py file
+# (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
+# /tmp/smoketest.py) so we simply download this file from the github before running the tests.
+# That's not great, but it works.
+FILES=/tmp
+SMOKE_TESTS_SCRIPT_BRANCH=${CIRCLE_BRANCH:-"master"}
+SMOKE_TESTS_SCRIPT_REPO=${CIRCLE_PROJECT_REPONAME:-"scalyr-agent-2"}
 
+SMOKE_TESTS_SCRIPT_URL="https://raw.githubusercontent.com/scalyr/${SMOKE_TESTS_SCRIPT_REPO}/${SMOKE_TESTS_SCRIPT_BRANCH}/.circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
+DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND="sudo curl -o ${FILES}/smoketest.py ${SMOKE_TESTS_SCRIPT_URL}"
+
+smoketest_script="${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
 
 # container names for all test containers
 # The suffixes MUST be one of (agent, uploader, verifier) to match verify_upload::DOCKER_CONTNAME_SUFFIXES
@@ -74,7 +84,20 @@ kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key=${SCA
 # Create configmap
 kubectl create configmap scalyr-config \
 --from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-${CIRCLE_BUILD_NUM} \
---from-literal=SCALYR_SERVER=${SCALYR_SERVER}
+--from-literal=SCALYR_SERVER=${SCALYR_SERVER} \
+--from-literal=SCALYR_EXTRA_CONFIG_DIR=/etc/scalyr-agent-2/agent-extra.d
+
+# Create an extra configmap
+cat <<'EOF' >./config.json
+{
+  "k8s_logs": [
+    {
+      "attributes": { "container_name": "${k8s_container_name}" }
+    }
+  ]
+}
+EOF
+kubectl create configmap scalyr-extra-config --from-file=config.json
 
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
@@ -104,10 +127,11 @@ echo "Customizing daemonset YAML & starting agent"
 echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
-cp k8s/scalyr-agent-2.yaml .
-perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2.yaml
-perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2.yaml
-kubectl create -f scalyr-agent-2.yaml
+cp .circleci/scalyr-agent-2-with-extra-config.yaml .
+perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2-with-extra-config.yaml
+perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-with-extra-config.yaml
+
+kubectl create -f ./scalyr-agent-2-with-extra-config.yaml
 # Capture agent pod
 agent_hostname=$(kubectl get pods | fgrep scalyr-agent-2 | awk {'print $1'})
 echo "Agent pod == ${agent_hostname}"

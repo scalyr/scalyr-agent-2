@@ -16,7 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 #
-# Those test just the same test from previos copying manager, but adapted to the new copying manager.
+# Those test just the same test from previous copying manager, but adapted to the new copying manager.
 #
 
 from __future__ import unicode_literals
@@ -451,7 +451,10 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
         for worker in self._manager.worker_sessions:
-            checkpoints, active_chp, = worker.get_checkpoints()
+            (
+                checkpoints,
+                active_chp,
+            ) = worker.get_checkpoints()
             checkpoints["time"] -= self._config.max_allowed_checkpoint_age + 1
             active_chp["time"] -= self._config.max_allowed_checkpoint_age + 1
             worker.write_checkpoints(worker.get_checkpoints_path(), checkpoints)
@@ -643,7 +646,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
             assert test_log.str_path in all_log_processors
 
     def test_logs_initial_positions(self):
-        controller = self.__create_test_instance(auto_start=False,)
+        controller = self.__create_test_instance(
+            auto_start=False,
+        )
 
         self.__append_log_lines(*"0123456789")
 

@@ -175,8 +175,7 @@ class DebugServer(StoppableThread):
         return None
 
     def __setup_server_socket(self):
-        """Create the server socket, binding to the appropriate address.
-        """
+        """Create the server socket, binding to the appropriate address."""
         if self.__server_socket is not None:
             return
 
@@ -195,8 +194,7 @@ class DebugServer(StoppableThread):
             self.__close_socket()
 
     def __close_socket(self):
-        """Close the underlying server socket.
-        """
+        """Close the underlying server socket."""
         if self.__server_socket is not None:
             try:
                 self.__server_socket.shutdown(socket.SHUT_RDWR)

@@ -88,8 +88,7 @@ class BaseAgentStatus(object):
 
 
 class AgentStatus(BaseAgentStatus):
-    """The main status container object, holding references to all other status elements.
-    """
+    """The main status container object, holding references to all other status elements."""
 
     def __init__(self):
         # The time (in seconds past epoch) when the agent process was launched.
@@ -140,8 +139,7 @@ class GCStatus(BaseAgentStatus):
 
 
 class OverallStats(AgentStatus):
-    """Used to track stats that are calculated over the lifetime of the agent.
-    """
+    """Used to track stats that are calculated over the lifetime of the agent."""
 
     def __init__(self):
         # The time in seconds past epoch when the agent was started.
@@ -643,7 +641,10 @@ def report_status(output, status, current_time):
     # the url.  Same goes for https://log.scalyr.com  -- it is really is just https://www.scalyr.com
     print(
         "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27"
-        % (server, quote_plus(status.server_host),),
+        % (
+            server,
+            quote_plus(status.server_host),
+        ),
         file=output,
     )
     print("", file=output)
@@ -850,7 +851,10 @@ def _report_worker_session(
     if worker_session.total_errors > 0:
         _indent_print(
             "Total responses with errors:               %d (see '%s' for details)"
-            % (worker_session.total_errors, agent_log_file_path,),
+            % (
+                worker_session.total_errors,
+                agent_log_file_path,
+            ),
             file=output,
             indent=indent,
         )
@@ -1073,7 +1077,12 @@ def __report_monitor_manager(output, manager_status, read_time):
         if entry.is_alive:
             print(
                 "%s%s: %d lines emitted, %d errors"
-                % (padding, entry.monitor_name, entry.reported_lines, entry.errors,),
+                % (
+                    padding,
+                    entry.monitor_name,
+                    entry.reported_lines,
+                    entry.errors,
+                ),
                 file=output,
             )
 
@@ -1087,6 +1096,10 @@ def __report_monitor_manager(output, manager_status, read_time):
             if not entry.is_alive:
                 print(
                     "  %s %d lines emitted, %d errors"
-                    % (entry.monitor_name, entry.reported_lines, entry.errors,),
+                    % (
+                        entry.monitor_name,
+                        entry.reported_lines,
+                        entry.errors,
+                    ),
                     file=output,
                 )

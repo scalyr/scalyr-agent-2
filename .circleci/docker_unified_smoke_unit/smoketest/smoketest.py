@@ -258,12 +258,13 @@ class SmokeTestActor(object):
         override_serverHost=None,
         override_log=None,
         override_log_regex=None,
+        override_max_count=1,
     ):
         """
         Make url for querying Scalyr server.  Any str filter values will be url-encoded
         """
 
-        base_params = sorted(self._get_base_query_params().items())
+        base_params = sorted(self._get_base_query_params(override_max_count).items())
 
         url = "https://" if not self._scalyr_server.startswith("http") else ""
         url += "{0}/api/query?queryType=log&{1}".format(
@@ -312,10 +313,10 @@ class SmokeTestActor(object):
             print("  curl command: curl -v '{0}'".format(url))
         return url
 
-    def _get_base_query_params(self):
+    def _get_base_query_params(self, max_count):
         """Get base query params (not including filter)"""
         params = {
-            "maxCount": 1,
+            "maxCount": max_count,
             "startTime": "10m",
             "token": self._read_api_key,
         }
@@ -765,7 +766,7 @@ class DockerAPIActor(DockerSmokeTestActor):
         self._seen_matching_lines = set()
         self._last_seen_timestamp = 0
 
-    def _get_base_query_params(self):
+    def _get_base_query_params(self, max_count=100):
         # NOTE: We can't really use last timestamp based querying since sometimes data appears to
         # come in out of order so we miss messages that away
         if self._last_seen_timestamp:
@@ -774,7 +775,7 @@ class DockerAPIActor(DockerSmokeTestActor):
             start_time = "10m"
 
         params = {
-            "maxCount": 100,
+            "maxCount": max_count,
             "startTime": start_time,
             "token": self._read_api_key,
         }
@@ -798,6 +799,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                         override_log_regex=self._get_uploader_override_logfilename_regex(
                             stream_name=stream_name, process_name=process_name
                         ),
+                        override_max_count=100,
                         message=None,
                     )
                 )
@@ -980,6 +982,55 @@ class K8sActor(DockerSmokeTestActor):
     """
 
     VERIFIER_TYPE = "Kubernetes"
+    EXPECTED_DOCKER_METRICS = [
+        "docker.cpu.throttling.throttled_time",
+        "docker.cpu.throttling.periods",
+        "docker.cpu.throttling.throttled_periods",
+        "docker.cpu.system_cpu_usage",
+        "docker.cpu.total_usage",
+        "docker.cpu.usage_in_usermode",
+        "docker.cpu.usage_in_kernelmode",
+        "docker.mem.limit",
+        "docker.mem.usage",
+        "docker.mem.max_usage",
+        "docker.mem.stat.active_file",
+        "docker.mem.stat.total_writeback",
+        "docker.mem.stat.active_anon",
+        "docker.mem.stat.total_pgpgout",
+        "docker.mem.stat.total_pgmajfault",
+        "docker.mem.stat.total_rss_huge",
+        "docker.mem.stat.total_inactive_file",
+        "docker.mem.stat.inactive_file",
+        "docker.mem.stat.pgfault",
+        "docker.mem.stat.total_cache",
+        "docker.mem.stat.total_pgfault",
+        "docker.mem.stat.total_mapped_file",
+        "docker.mem.stat.inactive_anon",
+        "docker.mem.stat.pgmajfault",
+        "docker.mem.stat.pgpgin",
+        "docker.mem.stat.rss_huge",
+        "docker.mem.stat.rss",
+        "docker.mem.stat.hierarchical_memory_limit",
+        "docker.mem.stat.unevictable",
+        "docker.mem.stat.total_unevictable",
+        "docker.mem.stat.cache",
+        "docker.mem.stat.mapped_file",
+        "docker.mem.stat.total_rss",
+        "docker.mem.stat.total_active_anon",
+        "docker.mem.stat.total_active_file",
+        "docker.mem.stat.writeback",
+        "docker.mem.stat.pgpgout",
+        "docker.mem.stat.total_inactive_anon",
+        "docker.mem.stat.total_pgpgin",
+        "docker.net.rx_packets",
+        "docker.net.tx_packets",
+        "docker.net.rx_bytes",
+        "docker.net.tx_errors",
+        "docker.net.rx_errors",
+        "docker.net.tx_bytes",
+        "docker.net.rx_dropped",
+        "docker.net.tx_dropped",
+    ]
 
     def _get_expected_agent_logfiles(self):
         return [
@@ -1013,7 +1064,8 @@ class K8sActor(DockerSmokeTestActor):
                     "serverHost": "scalyr-agent-2-z5c8l",
                     "container_id": "6eb4215ac1589de13089419e90cdfe08c01262e6cfb821f18061a63ab4188a87",
                     "raw_timestamp": "2019-06-29T03:16:28.058676421Z",
-                    "pod_name": "ci-agent-k8s-7777-uploader-76bcb9cf9-cb96t"
+                    "pod_name": "ci-agent-k8s-7777-uploader-76bcb9cf9-cb96t",
+                    "container_name": "ci-agent-k8s-7777-uploader",
                 },
                 "thread": "default",
                 "message": "count=1000,line_stream=<stderr>,verifier_type=Kubernetes\n",
@@ -1026,7 +1078,8 @@ class K8sActor(DockerSmokeTestActor):
                 att.get("stream") in stream_name,
                 att.get("monitor") == "agentKubernetes",
                 process_name in att.get("pod_name"),
-                att.get("container_name") == "scalyr-agent",
+                "ci-agent-k8s" in att.get("container_name"),
+                "uploader" in att.get("container_name"),
             ]
         ):
             return False
@@ -1038,6 +1091,131 @@ class K8sActor(DockerSmokeTestActor):
         The regex clause becomes: $logfile+matches+"/docker/k8s_ci-agent-k8s-7777-uploader.*"
         """
         return "{}/k8s_{}*".format(self._get_mapped_logfile_prefix(), process_name)
+
+    def verify_logs_uploaded(self):
+        """
+        For docker agent, confirmation requires verification that all uploaders were able to uploaded.
+        There are 2 separate types of containers.
+         1. uploader: uploads data to Scalyr (can easily support multiple but for now, just 1)
+         2. verifier: verifies data was uploaded by uploader
+        """
+
+        def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
+            def _func():
+                process_name = self._get_process_name_for_suffix(contname_suffix)
+                resp = requests.get(
+                    self._make_query_url(
+                        self._get_extra_query_attributes(stream_name, process_name),
+                        override_serverHost=self._agent_hostname,
+                        override_log="{}/{}.log".format(
+                            self._get_mapped_logfile_prefix(), process_name
+                        ),
+                        override_log_regex=self._get_uploader_override_logfilename_regex(
+                            process_name
+                        ),
+                        message=self._serialize_row(
+                            {
+                                "verifier_type": self.VERIFIER_TYPE,  # pylint: disable=no-member
+                                "count": self._lines_to_upload,
+                                "line_stream": stream_name,
+                            }
+                        ),
+                    )
+                )
+                if resp.ok:
+                    data = json.loads(resp.content)
+                    if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
+                        return False
+                    matches = data["matches"]
+                    if len(matches) == 0:
+                        print("Found 0 matches")
+                        return False
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
+                    att = matches[0]["attributes"]
+                    return self._verify_queried_attributes(
+                        att, stream_name, process_name
+                    )
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_code))
+                print("Response text: %s" % (resp.text))
+                return False  # Non-ok response
+
+            return _func
+
+        def _query_scalyr_for_metrics(metrics):
+            def _func():
+                resp = requests.get(
+                    self._make_query_url(
+                        {},
+                        override_serverHost=self._agent_hostname,
+                        override_log="/var/log/scalyr-agent-2/kubernetes_monitor.log",
+                        override_max_count=100,
+                    )
+                )
+                if resp.ok:
+                    data = json.loads(resp.content)
+                    if "matches" not in data:
+                        print('API response doesn\'t contain "matches" attribute')
+                        print("API response: %s" % (str(data)))
+                        return False
+                    matches = data["matches"]
+                    if len(matches) == 0:
+                        print("Found 0 matches")
+                        return False
+                    print("")
+                    print("Sample response for matches[0]")
+                    print(matches[0])
+                    print("")
+
+                    for expected_metric in metrics:
+                        found_match = False
+                        for match in matches:
+                            if match.get("attributes", {}).get("metric", "") == expected_metric:
+                                found_match = True
+                                break
+                        if not found_match:
+                            print("Failed to find expected metric %s" % expected_metric)
+                            return False
+
+                    return True
+
+                print("Received non-OK (200) response")
+                print("Response status code: %s" % (resp.status_code))
+                print("Response text: %s" % (resp.text))
+                return False  # Non-ok response
+
+            return _func
+
+        suffixes_to_check = [NAME_SUFFIX_UPLOADER]
+        for count, suffix in enumerate(suffixes_to_check):
+            for stream_name in self._get_uploader_stream_names():
+                self.poll_until_max_wait(
+                    _query_scalyr_for_upload_activity(suffix, stream_name),
+                    "Querying server to verify upload: container[stream]='{}[{}].".format(
+                        self._get_process_name_for_suffix(suffix), stream_name
+                    ),
+                    "Upload verified for {}[{}].".format(suffix, stream_name),
+                    "Upload not verified for {}[{}].".format(suffix, stream_name),
+                    exit_on_success=count == len(suffixes_to_check),
+                    exit_on_fail=True,
+                )
+
+        metrics_to_check = self.EXPECTED_DOCKER_METRICS  # TODO: if running in CRI use a different list
+
+        self.poll_until_max_wait(
+            _query_scalyr_for_metrics(metrics_to_check),
+            "Querying server to verify upload of metrics.",
+            "Upload verified for all metrics.",
+            "Upload not verified for all metrics.",
+            exit_on_success=True,
+            exit_on_fail=True,
+        )
 
 
 class LogstashActor(DockerSmokeTestActor):

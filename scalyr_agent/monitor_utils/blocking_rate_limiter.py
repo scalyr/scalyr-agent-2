@@ -256,8 +256,7 @@ class BlockingRateLimiter(object):
             self._cluster_rate_lock.release()
 
     def _get_actual_cluster_rate(self):
-        """Calculate actual rate based on recorded actions.  If fewer than 2 actions, returns None
-        """
+        """Calculate actual rate based on recorded actions.  If fewer than 2 actions, returns None"""
         self._cluster_rate_lock.acquire()
         try:
             if self._num_actions < 2:
@@ -272,8 +271,7 @@ class BlockingRateLimiter(object):
             self._cluster_rate_lock.release()
 
     def _record_actual_rate(self):
-        """Record a completed action in order to keep track of actual rate
-        """
+        """Record a completed action in order to keep track of actual rate"""
         self._cluster_rate_lock.acquire()
         try:
             t = self._time()

@@ -232,6 +232,15 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_config_file_as_json(fp)
 
+                if not isinstance(content, (dict, JsonObject)):
+                    raise BadConfiguration(
+                        'Invalid content inside configuration fragment file "%s". '
+                        "Expected JsonObject (dictionary), got %s."
+                        % (fp, type(content).__name__),
+                        "multiple",
+                        "invalidConfigFragmentType",
+                    )
+
                 # if deprecated key names are used, then replace them with their current versions.
                 for k, v in list(content.items()):
                     for (
@@ -367,7 +376,10 @@ class Configuration(object):
             worker_session_agent_logs = None
             if self.implicit_agent_log_collection:
                 # set path as glob to handle log files from the multiprocess worker sessions.
-                config = JsonObject(path="agent.log", parser="scalyrAgentLog",)
+                config = JsonObject(
+                    path="agent.log",
+                    parser="scalyrAgentLog",
+                )
 
                 # add log config for the worker session agent log files.
                 worker_session_logs_config = JsonObject(
@@ -787,9 +799,9 @@ class Configuration(object):
     @staticmethod
     def get_session_ids_of_the_worker(worker_config):  # type: (Dict) -> List
         """
-            Generate the list of IDs of all sessions for the specified worker.
-            :param worker_config: config entry for the worker.
-            :return: List of worker session IDs.
+        Generate the list of IDs of all sessions for the specified worker.
+        :param worker_config: config entry for the worker.
+        :return: List of worker session IDs.
         """
         result = []
         for i in range(worker_config["sessions"]):
@@ -1053,6 +1065,14 @@ class Configuration(object):
         CRI line.  When parsing Docker or K8s logs, this represents the timestamp of the log
         message as recorded by those systems."""
         return self.__get_config().get_bool("include_raw_timestamp_field")
+
+    @property
+    def merge_json_parsed_lines(self):
+        """If True, and events are getting parsed with the parse_as_json feature, events with messages that do not
+        end in a newline character will be joined together until a newline character is found. This is to work around
+        Docker's logging message length limit of 16KB, which is usually well below our own max message size.
+        The final merged line will use the timestamp and other attributes of the first line."""
+        return self.__get_config().get_bool("merge_json_parsed_lines")
 
     @property
     def enable_profiling(self):
@@ -2016,7 +2036,11 @@ class Configuration(object):
         self.__verify_compression_level(self.compression_level)
 
         self.__verify_or_set_optional_attributes(
-            config, "server_attributes", description, apply_defaults, env_aware=True,
+            config,
+            "server_attributes",
+            description,
+            apply_defaults,
+            env_aware=True,
         )
         self.__verify_or_set_optional_string(
             config,
@@ -2859,6 +2883,15 @@ class Configuration(object):
 
         self.__verify_or_set_optional_bool(
             config,
+            "merge_json_parsed_lines",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
             "enable_profiling",
             False,
             description,
@@ -2951,7 +2984,11 @@ class Configuration(object):
             config, "disable_leak_bandwidth_stats", False, description, apply_defaults
         )
         self.__verify_or_set_optional_bool(
-            config, "disable_copy_manager_stats", False, description, apply_defaults,
+            config,
+            "disable_copy_manager_stats",
+            False,
+            description,
+            apply_defaults,
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -3329,18 +3366,42 @@ class Configuration(object):
 
         i = 0
         for log_entry in config.get_json_array("journald_logs"):
-            self.__verify_log_entry_with_key_and_set_defaults(
-                log_entry,
-                key="journald_unit",
-                config_file_path=file_path,
-                entry_index=i,
-            )
+            bad_config = False
+            try:
+                self.__verify_log_entry_with_key_and_set_defaults(
+                    log_entry,
+                    key="journald_unit",
+                    config_file_path=file_path,
+                    entry_index=i,
+                    logs_field="journald_logs",
+                )
+            except BadConfiguration as e:
+                if self.__logger and self.__log_warnings:
+                    self.__logger.warn(
+                        "Failed to parse journald_logs.journald_unit config "
+                        "option, falling back to journald_logs.journald_globs: %s"
+                        % str(e)
+                    )
+                bad_config = True
+
+            if bad_config:
+                self.__verify_log_entry_with_key_and_set_defaults(
+                    log_entry,
+                    key="journald_globs",
+                    config_file_path=file_path,
+                    entry_index=i,
+                    key_type="object",
+                    logs_field="journald_logs",
+                )
+
             i += 1
 
         i = 0
         for log_entry in config.get_json_array("k8s_logs"):
             self.__verify_k8s_log_entry_and_set_defaults(
-                log_entry, config_file_path=file_path, entry_index=i,
+                log_entry,
+                config_file_path=file_path,
+                entry_index=i,
             )
             i += 1
 
@@ -3352,7 +3413,11 @@ class Configuration(object):
             i += 1
 
     def __verify_k8s_log_entry_and_set_defaults(
-        self, log_entry, description=None, config_file_path=None, entry_index=None,
+        self,
+        log_entry,
+        description=None,
+        config_file_path=None,
+        entry_index=None,
     ):
         """Verifies that the configuration for the specified k8s log entry.
 
@@ -3430,7 +3495,10 @@ class Configuration(object):
 
         # set default worker if it is not specified.
         self.__verify_or_set_optional_string(
-            log_entry, "worker_id", "default", description,
+            log_entry,
+            "worker_id",
+            "default",
+            description,
         )
 
     def __verify_log_entry_with_key_and_set_defaults(
@@ -3442,6 +3510,7 @@ class Configuration(object):
         entry_index=None,
         apply_defaults=True,
         logs_field="logs",
+        key_type="string",
     ):
         """Verifies that the configuration for the specified log meets all the required criteria and sets any defaults.
 
@@ -3459,6 +3528,8 @@ class Configuration(object):
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
         @param logs_field: The name of the field used for log configs
+        @param key_type: The type of key - defaults to string, but can also be `object` if the value is supposed to
+            be a json object
         """
         no_description_given = description is None
         if no_description_given:
@@ -3468,9 +3539,13 @@ class Configuration(object):
             )
         log = None
         if key is not None:
-            # Verify it has a `key` entry that is a string.
-            self.__verify_required_string(log_entry, key, description)
-            log = log_entry.get_string(key)
+            if key_type == "object":
+                self.__verify_required_attributes(log_entry, key, description)
+                log = key
+            else:
+                # Verify it has a `key` entry that is a string.
+                self.__verify_required_string(log_entry, key, description)
+                log = log_entry.get_string(key)
 
         if log is not None and no_description_given:
             description = (
@@ -3479,7 +3554,11 @@ class Configuration(object):
             )
 
         self.__verify_or_set_optional_array_of_strings(
-            log_entry, "exclude", [], description, apply_defaults=apply_defaults,
+            log_entry,
+            "exclude",
+            [],
+            description,
+            apply_defaults=apply_defaults,
         )
 
         # If a parser was specified, make sure it is a string.
@@ -3685,7 +3764,10 @@ class Configuration(object):
             )
 
         self.__verify_or_set_optional_string(
-            worker_entry, "server_url", default_value=self.scalyr_server, config_description=description % entry_index
+            worker_entry,
+            "server_url",
+            default_value=self.scalyr_server,
+            config_description=description % entry_index,
         )
 
         sessions_number = self.__config.get_int("default_sessions_per_worker")
@@ -4222,6 +4304,45 @@ class Configuration(object):
                 "Error is in %s" % (field, config_description),
                 field,
                 "notJsonArray",
+            )
+
+    def __verify_required_attributes(
+        self,
+        config_object,
+        field,
+        config_description,
+    ):
+        """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
+        object.
+
+        Raises an exception if the existing field is not a json object or if any of its values cannot be converted
+        to a string.
+
+        @param config_object: The JsonObject containing the configuration information.
+        @param field: The name of the field to check in config_object.
+        @param config_description: A description of where the configuration object was sourced from to be used in the
+            error reporting to the user.
+        """
+        try:
+            value = config_object.get_json_object(field, none_if_missing=True) or {}
+
+            for key in value.keys():
+                try:
+                    value.get_string(key)
+                except JsonConversionException:
+                    raise BadConfiguration(
+                        'The value for field "%s" in the json object for "%s" is not a '
+                        "string.  Error is in %s" % (key, field, config_description),
+                        field,
+                        "notString",
+                    )
+
+        except JsonConversionException:
+            raise BadConfiguration(
+                'The value for the field "%s" is not a json object.  '
+                "Error is in %s" % (field, config_description),
+                field,
+                "notJsonObject",
             )
 
     def __verify_required_regexp(self, config_object, field, config_description):
