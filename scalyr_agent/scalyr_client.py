@@ -123,7 +123,8 @@ def create_client(config, quiet=False, api_key=None, server_url=None):
     @param quiet: If true, only errors should be written to stdout.
     @type quiet: bool
     @param api_key: The Scalyr API key. If None, use default api_key from config
-    @param server_url: The URL to the Scalyr server. If None, use default api_key from config
+    @param server_url: The URL to the Scalyr server. If None, use default scalyr_server value from
+                       config
 
     @return: The client to use for sending requests to Scalyr, using the server address and API write logs
         key in the configuration file.
