@@ -7,6 +7,10 @@ Scalyr Agent 2 Changes By Release
 Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 --->
 
+Improvements:
+* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
+* Add support for specifying new ``server_url`` config option for each session worker. This allows user to configure different session workers to use different server urls (e.g. some workers send data to agent.scalyr.com and other send data to eu.scalyr.com).
+
 Other:
 * Update agent Docker image to include ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
 * Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
@@ -16,9 +20,6 @@ Other:
 <!---
 Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
 --->
-
-Improvements:
-* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
 
 Other:
 * Added a LetsEncrypt root certificate to the Agent's included certificate bundle.

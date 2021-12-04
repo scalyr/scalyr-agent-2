@@ -1215,7 +1215,10 @@ class CopyingManagerWorkerSession(
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
         else:
             self.__scalyr_client = create_client(
-                self.__config, quiet=quiet, api_key=api_key
+                self.__config,
+                quiet=quiet,
+                api_key=api_key,
+                server_url=self.__worker_config_entry["server_url"],
             )
 
     def log_worker_session_status(self):
