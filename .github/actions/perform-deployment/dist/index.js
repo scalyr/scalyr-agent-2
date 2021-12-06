@@ -58045,6 +58045,7 @@ async function performDeployment() {
 
 
 async function run() {
+    // Entry function. Just catch any error and pass it to GH Actions.
   try {
       await performDeployment()
   } catch (error) {
