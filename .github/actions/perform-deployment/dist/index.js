@@ -57913,14 +57913,94 @@ const buffer = __nccwpck_require__(4293)
 const readline = __nccwpck_require__(1058)
 
 
-async function run() {
-  try {
+async function checkAndGetCache(
+    name,
+    cacheDir,
+    cacheVersionSuffix
+) {
+    //
+    // Check if there is an existing cache for the given deployment step name.
+    //
+    const cachePath = path.join(cacheDir, name)
+    const key = `${name}-${cacheVersionSuffix}`
+
+    // try to restore the cache.
+    const result = await cache.restoreCache([cachePath], key)
+
+    if (typeof result !== "undefined") {
+        console.log(`Cache for the deployment ${name} is found.`)
+    } else {
+        console.log(`Cache for the deployment ${name} is not found.`)
+    }
+
+    // Return whether it is a hit or not.
+    return result
+}
+
+async function checkAndSaveCache(
+    name,
+    cacheDir,
+    isHit,
+    cacheVersionSuffix
+) {
+    //
+    // Save the cache directory for a particular deployment step if it hasn't been saved yet.
+    //
+
+    const fullPath = path.join(cacheDir, name)
+    const cacheKey = `${name}-${cacheVersionSuffix}`
+
+    // Skip files. Deployment cache can be only the directory.
+    if (!fs.lstatSync(fullPath).isDirectory()) {
+        return
+    }
+
+    // If there's no cache hit, then save directory to the cache now.
+    if (isHit) {
+        console.log(`Cache for the deployment ${name} has been hit. Skip saving.`)
+    }
+    else {
+        console.log(`Save cache for the deployment ${name}.`)
+
+        try {
+            await cache.saveCache([fullPath], cacheKey)
+        } catch (error) {
+            console.warn(
+                `Can not save deployment cache by key ${cacheKey}. 
+                It seems that seems that it has been saved somewhere else.\nOriginal message: ${error}`
+            )
+        }
+    }
+
+    // After the deployment, the deployer can leave a special file 'paths.txt'.
+    // This file contains paths of the tools that are needed to be added to the system's PATH.
+    const pathsFilePath = path.join(fullPath, "paths.txt")
+    if (fs.existsSync(pathsFilePath)) {
+
+        const lineReader = readline.createInterface({
+            input: fs.createReadStream(pathsFilePath)
+        });
+
+        lineReader.on('line', function (line) {
+            console.log(`Add path ${line}.`);
+            core.addPath(line)
+        });
+    }
+}
+
+async function performDeployment() {
+    // The main action function. It does the following:
+    // 1. Get all cache names of the steps of the given deployment and then try to load those caches by using that names.
+    // 2. Run the deployment. If there are cache hits that have been done previously, then the deployment will reuse them.
+    // 3. If there are deployment steps, which results haven't been found during the step 1, then the results of those
+    //    steps will be cached using their cache names.
+
     const deploymentName = core.getInput("deployment-name")
     const cacheVersionSuffix = core.getInput("cache-version-suffix")
     const cacheDir = "deployment_caches"
 
     // Get json list with names of all deployments which are needed for this deployment.
-    const deployment_helper_script_path = path.join("agent_build" ,"scripts", "run_deployment.py")
+    const deployment_helper_script_path = path.join("agent_build", "scripts", "run_deployment.py")
     // Run special github-related helper command which returns names for all deployments, which are used in the current
     // deployment.
     const code = child_process.execFileSync(
@@ -57932,24 +58012,15 @@ async function run() {
     const json_encoded_deployment_names = buffer.Buffer.from(code, 'utf8').toString()
     const deployer_cache_names = JSON.parse(json_encoded_deployment_names)
 
-    const cache_hits = {}
+    const cacheHits = {}
 
     // Run through deployment names and look if the is any existing cache for them.
     for (let name of deployer_cache_names) {
-
-        const cache_path = path.join(cacheDir, name)
-        const key = `${name}-${cacheVersionSuffix}`
-
-        // try to restore the cache.
-        const result = await cache.restoreCache([cache_path], key)
-
-        if(typeof result !== "undefined") {
-          console.log(`Cache for the deployment ${name} is found.`)
-        } else {
-          console.log(`Cache for the deployment ${name} is not found.`)
-        }
-        cache_hits[name] = result
-
+        cacheHits[name] = await checkAndGetCache(
+            name,
+            cacheDir,
+            cacheVersionSuffix
+        )
     }
 
     // Run the deployment. Also provide cache directory, if there are some found caches, then the deployer
@@ -57960,52 +58031,22 @@ async function run() {
         {stdio: 'inherit'}
     );
 
-    if ( fs.existsSync(cacheDir)) {
-      console.log("Cache directory is found.")
-
-      // Run through the cache folder and save any cached directory within, that is not yet cached.
-      const filenames = fs.readdirSync(cacheDir);
-      for (const name of filenames) {
-
-        const full_child_path = path.join(cacheDir, name)
-
-        // Skip files. Deployment cache can be only the directory.
-        if (fs.lstatSync(full_child_path).isDirectory()) {
-
-          const key = `${name}-${cacheVersionSuffix}`
-
-          if ( ! cache_hits[name] ) {
-            console.log(`Save cache for the deployment ${name}.`)
-            try {
-              await cache.saveCache([full_child_path], key)
-            } catch (error) {
-
-              console.warn(`Can not save deployment cache by key ${key}. It seems that seesm that it has been
-               saved somewhere else.\nOriginal message: ${error}`)
-            }
-          } else {
-            console.log(`Cache for the deployment ${name} has been hit. Skip saving.`)
-          }
-
-          // After the deployment, the deployer can leave a special file 'paths.txt'.
-          // This file contains paths of the tools that are needed to be added to the system's PATH.
-          const paths_file_path = path.join(full_child_path, "paths.txt")
-          if (fs.existsSync(paths_file_path)) {
-
-            var lineReader = readline.createInterface({
-              input: fs.createReadStream(paths_file_path)
-            });
-
-            lineReader.on('line', function (line) {
-              console.log('Line from file:', line);
-              core.addPath(line)
-            });
-          }
-        }
-      }
-    } else {
-      console.warn("Cache directory is not found.")
+    // Run through the cache folder and save any cached directory within, that is not yet cached.
+    const filenames = fs.readdirSync(cacheDir);
+    for (const name of filenames) {
+        await checkAndSaveCache(
+            name,
+            cacheDir,
+            cacheHits[name],
+            cacheVersionSuffix,
+        )
     }
+}
+
+
+async function run() {
+  try {
+      await performDeployment()
   } catch (error) {
     core.setFailed(error.message);
   }
