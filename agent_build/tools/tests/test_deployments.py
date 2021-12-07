@@ -10,14 +10,14 @@ def test_example_deployment(tmp_path):
     cache_path = tmp_path
 
     # Because the GitHub Actions CI/CD can not run the deployment directly from the code, it has to use
-    # a special helper command-line script 'scripts/cicd/run_deployment.py', so we also do the testing through
+    # a special helper command-line script '/agent_build/scripts/run_deployment.py', so we also do the testing through
     # that script to test that part too.
 
     # We use the instance if the example deployment only to get its name,
     # but we do not use that instance to perform the deployment itself.
     # Knowing the name, the helper script will find and perform the deployment.
     example_deployment_name = deployments.EXAMPLE_ENVIRONMENT.name
-    run_deployment_script_path = constants.SOURCE_ROOT / "scripts/cicd/run_deployment.py"
+    run_deployment_script_path = constants.SOURCE_ROOT / "agent_build/scripts/run_deployment.py"
 
     try:
         step_output = subprocess.check_output(
