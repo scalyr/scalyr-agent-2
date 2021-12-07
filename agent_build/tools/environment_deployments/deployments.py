@@ -617,8 +617,8 @@ _AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
 class InstallTestRequirementsDeploymentStep(ShellScriptDeploymentStep):
     SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
     USED_FILES = [
-        _AGENT_REQUIREMENT_FILES_PATH,
-        constants.SOURCE_ROOT / "testing-requirements.txt",
+        _AGENT_REQUIREMENT_FILES_PATH / "testing-requirements.txt",
+        _AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
     ]
 
 
