@@ -45,6 +45,10 @@ jobs:
         with:
           deployment-name: "test_environment"
 
+      - name: Do internal tools tests.
+        run: |
+          python3 -m pytest agent_build/tools/tests
+
       - name: Set up QEMU
         id: qemu
         uses: docker/setup-qemu-action@v1

@@ -16,20 +16,16 @@
 # This script is used by "ShellScriptDeploymentStep"
 # (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/deployments.py"
 
-set -e
-
-PARENT_DIR="$(dirname "$0")"
-SOURCE_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$PARENT_DIR")")")")
-source "$PARENT_DIR/cache_lib.sh"
-
 
 pip_cache_dir="$(python3 -m pip cache dir)"
 
 # Reuse cached pip cache if exists.
 restore_from_cache pip "$pip_cache_dir"
 
-python3 -m pip install -r "${SOURCE_ROOT}/agent_build/requirement-files/testing-requirements.txt"
-python3 -m pip install -r "${SOURCE_ROOT}/agent_build/requirement-files/compression-requirements.txt"
+REQUIREMENTS_PATH="$SOURCE_ROOT/agent_build/requirement-files"
+
+sh_c python3 -m pip install -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
+sh_c python3 -m pip install -r "${REQUIREMENTS_PATH}/compression-requirements.txt"
 
 # Save pip cache to reuse it in future.
 save_to_cache pip "$pip_cache_dir"

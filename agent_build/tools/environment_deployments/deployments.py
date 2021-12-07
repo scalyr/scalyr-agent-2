@@ -14,6 +14,7 @@
 
 
 import abc
+import os
 import pathlib as pl
 import shlex
 import shutil
@@ -21,14 +22,16 @@ import subprocess
 import hashlib
 import logging
 import re
-
 from typing import Union, Optional, List, Dict, Type
+
+from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools import build_in_docker
 
 
-_PARENT_DIR = pl.Path(__file__).parent.absolute()
-_SOURCE_ROOT = _PARENT_DIR.parent.parent
+_PARENT_DIR = pl.Path(__file__).parent.parent.absolute()
+_AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
+_DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools" / "environment_deployments" / "steps"
 
 
 class DeploymentStep:
@@ -87,8 +90,8 @@ class DeploymentStep:
             path = pl.Path(path)
 
             # match glob against source code root and include all matched paths.
-            relative_path = path.relative_to(_SOURCE_ROOT)
-            found = list(_SOURCE_ROOT.glob(str(relative_path)))
+            relative_path = path.relative_to(constants.SOURCE_ROOT)
+            found = list(constants.SOURCE_ROOT.glob(str(relative_path)))
 
             used_files.extend(found)
 
@@ -167,7 +170,7 @@ class DeploymentStep:
         sha256 = hashlib.sha256()
         for file_glob in self.used_files:
             for file_path in file_glob.parent.glob(file_glob.name):
-                sha256.update(str(file_path.relative_to(_SOURCE_ROOT)).encode())
+                sha256.update(str(file_path.relative_to(constants.SOURCE_ROOT)).encode())
                 sha256.update(str(file_path.stat().st_mode).encode())
                 sha256.update(file_path.read_bytes())
 
@@ -349,8 +352,14 @@ class ShellScriptDeploymentStep(DeploymentStep):
         )
 
         # Also add script to the used file collection, so it is included to the checksum calculation.
+        script_files = [
+            type(self).SCRIPT_PATH,
+            _DEPLOYMENT_STEPS_PATH / "step_runner.sh",
+
+        ]
+
         self.used_files = self._init_used_files(
-            self.used_files + [type(self).SCRIPT_PATH]
+            self.used_files + script_files
         )
 
     def _get_command_line_args(
@@ -367,18 +376,25 @@ class ShellScriptDeploymentStep(DeploymentStep):
         :return: String with shell command that can be executed to needed shell.
         """
 
+        # Get the absolute path of the shell script from the given source root.
+        final_script_path = source_path / type(self).SCRIPT_PATH.relative_to(
+            constants.SOURCE_ROOT
+        )
+
         # Determine needed shell interpreter.
         if type(self).SCRIPT_PATH.suffix == ".ps1":
-            shell = "powershell"
+            command_args = ["powershell", str(final_script_path)]
         else:
             shell = shutil.which("bash")
 
-        # Create final absolute path to the script.
-        final_script_path = source_path / type(self).SCRIPT_PATH.relative_to(
-            _SOURCE_ROOT
-        )
+            # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
+            # and also provides some helper functions such as caching.
+            step_runner_script_path = _DEPLOYMENT_STEPS_PATH / "step_runner.sh"
+            # Create final absolute path to the runner.
+            final_step_runner_path = source_path / step_runner_script_path.relative_to(constants.SOURCE_ROOT)
 
-        command_args = [shell, str(final_script_path)]
+            # To run the shell script of the step we run the 'step_runner' and pass the target script as its argument.
+            command_args = [shell, str(final_step_runner_path), str(final_script_path)]
 
         # If cache directory is presented, then we pass it as an additional argument to the
         # script, so it can use the cache too.
@@ -390,6 +406,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
     def _run_locally(
         self,
         cache_dir: Union[str, pl.Path] = None,
+        debug: bool = False
     ):
         """
         Run step locally by running the script on current system.
@@ -397,12 +414,26 @@ class ShellScriptDeploymentStep(DeploymentStep):
             results in it.
         """
         command_args = self._get_command_line_args(
-            source_path=_SOURCE_ROOT, cache_dir=cache_dir
+            source_path=constants.SOURCE_ROOT, cache_dir=cache_dir
         )
 
-        subprocess.check_call(
-            command_args,
-        )
+        env = os.environ.copy()
+        env["SOURCE_ROOT"] = str(constants.SOURCE_ROOT)
+
+        try:
+            common.output_suppressed_subprocess_check_call(
+                command_args,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"The deployment step '{type(self).__name__}' has failed to "
+                f"run its script - '{type(self).SCRIPT_PATH}'"
+            ) from None
+
+
+        # subprocess.check_call(
+        #     command_args,
+        # )
 
     def _run_in_docker(
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
@@ -424,8 +455,8 @@ class ShellScriptDeploymentStep(DeploymentStep):
         # All files, which are used in the build have to be mapped to the docker container filesystem.
         volumes_mappings = []
         for used_path in self.used_files:
-            rel_used_path = pl.Path(used_path).relative_to(_SOURCE_ROOT)
-            abs_host_path = _SOURCE_ROOT / rel_used_path
+            rel_used_path = pl.Path(used_path).relative_to(constants.SOURCE_ROOT)
+            abs_host_path = constants.SOURCE_ROOT / rel_used_path
             abs_container_path = mounted_container_root_path / rel_used_path
             volumes_mappings.extend(["-v", f"{abs_host_path}:{abs_container_path}"])
 
@@ -493,7 +524,7 @@ class Deployment:
         self,
         name: str,
         step_classes: List[Type[DeploymentStep]],
-        architecture: constants.Architecture,
+        architecture: constants.Architecture = constants.Architecture.UNKNOWN,
         base_docker_image: str = None,
     ):
         """
@@ -579,23 +610,15 @@ class Deployment:
 # crucial if we want to run it on the CI/CD.
 ALL_DEPLOYMENTS: Dict[str, "Deployment"] = {}
 
-_STEPS_DIR = _PARENT_DIR / "steps"
-_HELPER_DEPLOYMENT_SCRIPTS_AND_LIBS = [
-    # small bash library that allows to cache intermediate results of shell script steps.
-    _STEPS_DIR
-    / "cache_lib.sh"
-]
-
-_AGENT_REQUIREMENT_FILES_PATH = _SOURCE_ROOT / "agent_build" / "requirement-files"
+_AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
 class InstallTestRequirementsDeploymentStep(ShellScriptDeploymentStep):
-    SCRIPT_PATH = _STEPS_DIR / "deploy-test-environment.sh"
+    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
     USED_FILES = [
-        *_HELPER_DEPLOYMENT_SCRIPTS_AND_LIBS,
         _AGENT_REQUIREMENT_FILES_PATH,
-        _SOURCE_ROOT / "testing-requirements.txt",
+        constants.SOURCE_ROOT / "testing-requirements.txt",
     ]
 
 
@@ -605,5 +628,20 @@ COMMON_TEST_ENVIRONMENT = Deployment(
     # Call the local './.github/actions/perform-deployment' action with this name.
     "test_environment",
     step_classes=[InstallTestRequirementsDeploymentStep],
-    architecture=constants.Architecture.UNKNOWN,
+)
+
+
+# This is just an example of the deployment step. It is used only in tests.
+class ExampleStep(ShellScriptDeploymentStep):
+    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "example/install-requirements-and-download-webdriver.sh"
+    USED_FILES = [
+        _DEPLOYMENT_STEPS_PATH / "example/requirements-1.txt",
+        _DEPLOYMENT_STEPS_PATH / "example/requirements-2.txt",
+    ]
+
+
+# This is just an example of the deployment. It is used only for tests.
+EXAMPLE_ENVIRONMENT = Deployment(
+    name="example_environment",
+    step_classes=[ExampleStep],
 )

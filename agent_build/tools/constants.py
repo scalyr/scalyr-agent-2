@@ -14,6 +14,9 @@
 
 
 import enum
+import pathlib as pl
+
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 
 
 class DockerPlatform(enum.Enum):
