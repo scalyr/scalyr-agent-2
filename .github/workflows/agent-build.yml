@@ -16,11 +16,11 @@ jobs:
         # Because of the issue https://github.community/t/ref-head-in-reusable-workflows/203690
         # there's no way to specify local re-usable workflow. The branch of the workflow has to be specified manually and statically
         # To avoid confusion, run this check that will fail if the current branch does not match the branch of the workflow.
-        if: ${{ github.ref_type == 'branch' && github.ref_name != 'env.TARGET_BRANCH' }}
+        if: ${{ github.ref_type == 'branch' && github.ref_name != add-new-docker-image-build }}
         uses: actions/github-script@v3
         with:
           script: |
-              core.setFailed("The current branch is '${{ github.ref_name }}' but it has to be '${{ env.TARGET_BRANCH }}'")
+              core.setFailed("The current branch is '${{ github.ref_name }}' but it has to be 'add-new-docker-image-build'")
 
   docker-json:
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@add-new-docker-image-build
