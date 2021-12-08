@@ -171,7 +171,7 @@ trap print_debugging_info_on_exit EXIT
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
-docker run ${syslog_driver_option} -i --name ${contname_verifier} ${smoketest_image} \
+docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
 bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
