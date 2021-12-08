@@ -3,6 +3,9 @@ name: Scalyr Agent Build.
 
 on: [push]
 
+env:
+  TARGET_BRANCH: add-new-docker-image-build
+
 # Agent image tests.
 jobs:
   match-branches:
@@ -20,10 +23,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-              core.setFailed('The current branch is ${{ github.ref_name }} but it has to be ${{ env.TARGET_BRANCH }}')
+              core.setFailed("The current branch is '${{ github.ref_name }}' but it has to be '${{ env.TARGET_BRANCH }}'")
 
   docker-json:
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@add-new-docker-image-build
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@${{ github.ref_name }}
     with:
       image-type: docker-json
     secrets:
