@@ -3,9 +3,6 @@ name: Scalyr Agent Build.
 
 on: [push]
 
-env:
-  TARGET_BRANCH: add-new-docker-image-build
-
 # Agent image tests.
 jobs:
   match-branches:
