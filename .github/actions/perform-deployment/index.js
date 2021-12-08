@@ -80,7 +80,7 @@ async function checkAndSaveCache(
         }
     }
 
-    // After the deployment, the deployer can leave a special file 'paths.txt'.
+    // After the deployment, the deployment can leave a special file 'paths.txt'.
     // This file contains paths of the tools that are needed to be added to the system's PATH.
     const pathsFilePath = path.join(fullPath, "paths.txt")
     if (fs.existsSync(pathsFilePath)) {
@@ -118,12 +118,12 @@ async function performDeployment() {
 
     // Read and decode names from json.
     const json_encoded_deployment_names = buffer.Buffer.from(code, 'utf8').toString()
-    const deployer_cache_names = JSON.parse(json_encoded_deployment_names)
+    const deployment_cache_names = JSON.parse(json_encoded_deployment_names)
 
     const cacheHits = {}
 
     // Run through deployment names and look if the is any existing cache for them.
-    for (let name of deployer_cache_names) {
+    for (let name of deployment_cache_names) {
         cacheHits[name] = await checkAndGetCache(
             name,
             cacheDir,
@@ -131,7 +131,7 @@ async function performDeployment() {
         )
     }
 
-    // Run the deployment. Also provide cache directory, if there are some found caches, then the deployer
+    // Run the deployment. Also provide cache directory, if there are some found caches, then the deployment
     // has to reuse them.
     child_process.execFileSync(
         "python3",
