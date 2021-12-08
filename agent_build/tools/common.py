@@ -28,7 +28,7 @@ _ORIGINAL_POPEN = subprocess.Popen
 
 def output_suppressed_subprocess_check_call(*args, debug: bool = False, **kwargs):
     """
-    A wrapper for the 'subprocess.check_call' function which suppress output if it too long.
+    A wrapper for the 'subprocess.check_call' function which suppress output if it is too long.
 
     :param debug: If True, then just the output is not suppressed and normal 'check_output' is called.
     :param args: The same as for the 'subprocess.check_call'

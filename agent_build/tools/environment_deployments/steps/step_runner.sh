@@ -31,8 +31,12 @@ set -e
 PARENT_DIR="$(dirname "$0")"
 SOURCE_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$PARENT_DIR")")")")
 
+# Simple log function to make log message more noticeable and distinguishable form each other.
+# Accepts first optional arguments: '-nb' and '-ne'
+# -nb: The normal message starts with "# " prefix. this option removes it so it can be concatenated with a previous
+#   log message.
+# -ne: Do not add newline at the end of the message.
 function log() {
-
   other_args="$@"
   new_message_prefix=""
   new_line_option=""
@@ -50,12 +54,14 @@ function log() {
   >&2 echo "$new_line_option"  "$new_message_prefix" "${other_args[@]}"
 }
 
+# Function that runs given command from arguments in 'sh'
 function sh_c() {
-
   echo "sh -c '${*}'"
   sh -c "${*}" > /dev/null
 }
 
+# The same function to run the command but with preserved standard output from the given command,
+# so the output can be redirected.
 function sh_cs() {
   sh -c "${*}"
 }
@@ -133,8 +139,10 @@ function save_to_cache() {
   fi
 }
 
-
+# Export useful variables, so they can be used by the script.
 export SOURCE_ROOT
+
+# Run the script.
 source "${STEP_SCRIPT_PATH}"
 
 log "=========== The Deployment Step Script '$(basename "$STEP_SCRIPT_PATH")' is successfully ended ==========="

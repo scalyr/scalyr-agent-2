@@ -390,7 +390,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
             step_runner_script_path = _DEPLOYMENT_STEPS_PATH / "step_runner.sh"
-            # Create final absolute path to the runner.
+            # Create final absolute path for the runner.
             final_step_runner_path = source_path / step_runner_script_path.relative_to(constants.SOURCE_ROOT)
 
             # To run the shell script of the step we run the 'step_runner' and pass the target script as its argument.
@@ -406,7 +406,6 @@ class ShellScriptDeploymentStep(DeploymentStep):
     def _run_locally(
         self,
         cache_dir: Union[str, pl.Path] = None,
-        debug: bool = False
     ):
         """
         Run step locally by running the script on current system.
@@ -417,23 +416,15 @@ class ShellScriptDeploymentStep(DeploymentStep):
             source_path=constants.SOURCE_ROOT, cache_dir=cache_dir
         )
 
-        env = os.environ.copy()
-        env["SOURCE_ROOT"] = str(constants.SOURCE_ROOT)
-
         try:
             common.output_suppressed_subprocess_check_call(
-                command_args,
+                command_args
             )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
                 f"The deployment step '{type(self).__name__}' has failed to "
                 f"run its script - '{type(self).SCRIPT_PATH}'"
             ) from None
-
-
-        # subprocess.check_call(
-        #     command_args,
-        # )
 
     def _run_in_docker(
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
