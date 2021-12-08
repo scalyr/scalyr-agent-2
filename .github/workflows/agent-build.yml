@@ -26,7 +26,7 @@ jobs:
               core.setFailed("The current branch is '${{ github.ref_name }}' but it has to be '${{ env.TARGET_BRANCH }}'")
 
   docker-json:
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@${{ github.ref_name }}
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@add-new-docker-image-build
     with:
       image-type: docker-json
     secrets:
