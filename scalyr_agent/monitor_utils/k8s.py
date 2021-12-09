@@ -20,7 +20,7 @@ import six.moves.urllib.request
 import six.moves.urllib.parse
 import six.moves.urllib.error
 from six.moves import range
-import urllib3
+import urllib3  # pylint: disable=import-error
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
