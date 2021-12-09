@@ -20,6 +20,7 @@ import six.moves.urllib.request
 import six.moves.urllib.parse
 import six.moves.urllib.error
 from six.moves import range
+import urllib3
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
@@ -2361,7 +2362,7 @@ class KubeletApi(object):
                 with warnings.catch_warnings():
                     warnings.simplefilter(
                         "ignore",
-                        category=requests.packages.urllib3.exceptions.InsecureRequestWarning,
+                        category=urllib3.exceptions.InsecureRequestWarning,
                     )
                     response = self._get(url, False)
                 if self._kubelet_url.startswith("https://"):

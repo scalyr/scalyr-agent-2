@@ -42,7 +42,7 @@ from io import open
 import _strptime  # NOQA
 
 import six
-from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
+from urllib3.exceptions import (  # pylint: disable=import-error
     ProtocolError,
 )
 from docker.types.daemon import CancellableStream
