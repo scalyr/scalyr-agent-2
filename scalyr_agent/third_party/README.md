@@ -31,6 +31,10 @@ The following libraries are included:
   * [backports.ssl_match_hostname](#ssl_match_hostname)
   * [PySocks](#PySocks)
   * [glob2](#glob2)
+  * [certifi](#certifi)
+  * [idna](#idna)
+  * [chardet](#chardet)
+  * [urllib3](#urllib3)
 
 ## tcollector<a name="tcollector"> (LGPL v3)
 
@@ -136,3 +140,19 @@ PySocks library.  Used to enable SOCKS support for Requests.
 ## glob2<a name="glob2"> (BSD 2 clause)
 
 An extended version of Python's builtin glob module which adds support for recursive '**' globbing syntax. See project home [here](https://github.com/miracle2k/python-glob2).
+
+## certifi<a name="certifi"> (Mozilla Public License 2.0 (MPL 2.0) (MPL-2.0))
+
+A dependency of Requests.
+
+## idna<a name="idna"> (BSD License)
+
+A dependency of Requests.
+
+## chardet<a name="chardet"> (LGPL)
+
+A dependency of Requests.
+
+## urllib3<a name="urllib3"> (MIT)
+
+A dependency of Requests.
