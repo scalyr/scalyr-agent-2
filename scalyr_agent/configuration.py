@@ -675,6 +675,7 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "use_requests_lib",
             "use_multiprocess_workers",
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
