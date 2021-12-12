@@ -14,14 +14,13 @@
 
 
 import abc
-import os
 import pathlib as pl
 import shlex
 import shutil
-import subprocess
 import hashlib
-import logging
 import re
+import subprocess
+import logging
 from typing import Union, Optional, List, Dict, Type
 
 from agent_build.tools import common
@@ -212,7 +211,7 @@ class DeploymentStep:
         # Before the build, check if there is already an image with the same name. The name contains the checksum
         # of all files which are used in it, so the name identity also guarantees the content identity.
         output = (
-            subprocess.check_output(["docker", "images", "-q", self.result_image_name])
+            common.check_output_with_log(["docker", "images", "-q", self.result_image_name])
             .decode()
             .strip()
         )
@@ -235,7 +234,7 @@ class DeploymentStep:
                     f"Cached image {self.result_image_name} file for the deployment step '{self.name}' has been found, "
                     f"loading and reusing it instead of building."
                 )
-                subprocess.check_call(["docker", "load", "-i", str(cached_image_path)])
+                common.check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
                 return
             else:
                 # Cache is used but there is no suitable image file. Set the flag to signal that the built
@@ -256,7 +255,7 @@ class DeploymentStep:
                 f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
             )
             with cached_image_path.open("wb") as f:
-                subprocess.check_call(
+                common.check_call_with_log(
                     ["docker", "save", self.result_image_name], stdout=f
                 )
 

@@ -42,7 +42,6 @@ Usage:
 
 import sys
 import pathlib as pl
-import logging
 import argparse
 import json
 
@@ -53,12 +52,11 @@ _SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 sys.path.append(str(_SOURCE_ROOT))
 
 from agent_build.tools.environment_deployments import deployments
+from agent_build.tools import common
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO, format="[%(levelname)s] [%(filename)s] %(message)s"
-    )
+    common.init_logging()
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)

@@ -16,12 +16,13 @@
 # Since we can deploy some of the deployments (agent_build/tools/environment_deployments/deployments.py) inside docker,
 # Using 'docker build' is more beneficial that 'docker run' because of the docker caching.
 
-import subprocess
+
 import pathlib as pl
 import os
-from typing import Dict, List
+from typing import Dict
 
 from agent_build.tools import constants
+from agent_build.tools import common
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__.parent.parent
@@ -55,7 +56,7 @@ def run_docker_build(
         build_arg_options.append("--build-arg")
         build_arg_options.append(f"{name}={value}")
 
-    subprocess.check_call(
+    common.check_call_with_log(
         [
             "docker",
             "build",
@@ -112,18 +113,18 @@ def build_stage(
     if output_path_mappings:
         container_name = image_name
         # Remove the container with the same name if exists.
-        subprocess.check_call(["docker", "rm", "-f", container_name])
+        common.check_call_with_log(["docker", "rm", "-f", container_name])
         try:
 
             output_path_mappings = output_path_mappings or {}
 
             # Create the container.
-            subprocess.check_call(
+            common.check_call_with_log(
                 ["docker", "create", "--name", container_name, image_name]
             )
 
             for host_path, docker_path in output_path_mappings.items():
-                subprocess.check_call(
+                common.check_call_with_log(
                     [
                         "docker",
                         "cp",
@@ -137,4 +138,4 @@ def build_stage(
 
         finally:
             # Remove container.
-            subprocess.check_call(["docker", "rm", "-f", container_name])
+            common.check_call_with_log(["docker", "rm", "-f", container_name])

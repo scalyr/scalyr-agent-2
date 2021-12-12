@@ -28,16 +28,15 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(__SOURCE_ROOT__))
 
+from agent_build.tools import common
 from agent_build import package_builders
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
+common.init_logging()
+
 
 if __name__ == "__main__":
-
-    logging.basicConfig(
-        level=logging.INFO, format="[%(levelname)s][%(module)s] %(message)s"
-    )
 
     parser = argparse.ArgumentParser()
 
@@ -118,6 +117,8 @@ if __name__ == "__main__":
 
     # Find the builder class.
     package_builder = package_builders.ALL_PACKAGE_BUILDERS[args.package_name]
+
+    logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
 
     # If that's a docker image builder handle their arguments too.
     if isinstance(package_builder, package_builders.ContainerPackageBuilder):

@@ -1,8 +1,9 @@
-import subprocess
 import sys
+import subprocess
 
 from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
+from agent_build.tools import common
 
 
 def test_example_deployment(tmp_path):
@@ -20,7 +21,7 @@ def test_example_deployment(tmp_path):
     run_deployment_script_path = constants.SOURCE_ROOT / "agent_build/scripts/run_deployment.py"
 
     try:
-        step_output = subprocess.check_output(
+        step_output = common.check_output_with_log(
             [
                 sys.executable,
                 str(run_deployment_script_path),

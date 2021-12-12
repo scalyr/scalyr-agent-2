@@ -21,12 +21,18 @@ ADD docker/requirements.txt /tmp/requirments.txt
 # install python dependencies
 RUN pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirments.txt
 
+ARG CACHE_BUST=1
+ARG AGENT_BUILD_DEBUG
+# If specified then the package build command will produce additional debug logging.
+ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
+# Special env. variable that will enable addional logging info about that command runs in docker.
+ENV AGENT_BUILD_IN_DOCKER=1
 ADD . /scalyr-agent-2
 
 RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
 
 WORKDIR /tmp/container-fs
-RUN tar -xvf /tmp/build/scalyr-agent.tar.gz
+RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 
 WORKDIR /
 

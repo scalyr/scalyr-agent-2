@@ -17,26 +17,29 @@ This module defines all possible packages of the Scalyr Agent and how they can b
 """
 
 
+import datetime
 import json
 import pathlib as pl
 import shlex
 import tarfile
 import abc
 import shutil
-import subprocess
 import time
 import sys
 import stat
-import uuid
 import os
 import re
 import io
 import platform
+import subprocess
+import logging
 from typing import Union, Optional, List, Dict, Type
 
 from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
+from agent_build.tools import common
+
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__.parent
@@ -299,7 +302,7 @@ class PackageBuilder(abc.ABC):
         # Add in the e-mail address of the user building it.
         try:
             packager_email = (
-                subprocess.check_output(
+                common.check_output_with_log(
                     "git config user.email", shell=True, cwd=str(__SOURCE_ROOT__)
                 )
                 .decode()
@@ -312,7 +315,7 @@ class PackageBuilder(abc.ABC):
 
         # Determine the last commit from the log.
         commit_id = (
-            subprocess.check_output(
+            common.check_output_with_log(
                 "git log --summary -1 | head -n 1 | cut -d ' ' -f 2",
                 shell=True,
                 cwd=__SOURCE_ROOT__,
@@ -325,7 +328,7 @@ class PackageBuilder(abc.ABC):
 
         # Include the branch just for safety sake.
         branch = (
-            subprocess.check_output(
+            common.check_output_with_log(
                 "git branch | cut -d ' ' -f 2", shell=True, cwd=__SOURCE_ROOT__
             )
             .decode()
@@ -470,7 +473,7 @@ class PackageBuilder(abc.ABC):
         dist_path = pyinstaller_output / "dist"
 
         # Run the PyInstaller.
-        subprocess.check_call(
+        common.check_call_with_log(
             [
                 sys.executable,
                 "-m",
@@ -776,11 +779,12 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         # to the local registry.
 
         # check if builder already exists.
-        ls_output = subprocess.check_output(["docker", "buildx", "ls"]).decode().strip()
+        ls_output = common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
 
         if buildx_builder_name not in ls_output:
             # Build new buildx builder
-            subprocess.check_call(
+            logging.info(f"Create new buildx builder instance '{buildx_builder_name}'.")
+            common.check_call_with_log(
                 [
                     "docker",
                     "buildx",
@@ -793,7 +797,8 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             )
 
         # Use builder.
-        subprocess.check_call(
+        logging.info(f"Use buildx builder instance '{buildx_builder_name}'.")
+        common.check_call_with_log(
             [
                 "docker",
                 "buildx",
@@ -829,6 +834,13 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
         ]
 
+        if common.DEBUG:
+            # If debug, then also specify the debug mode inside the docker build.
+            command_options.extend([
+                "--build-arg",
+                f"AGENT_BUILD_DEBUG=1",
+            ])
+
         # If we need to push, then specify all platforms.
         if push:
             command_options.append("--platform")
@@ -841,6 +853,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             )
 
         if with_coverage:
+            logging.info("Code coverage enabled.")
             # Build image with enabled coverage measuring.
             command_options.append("--build-arg")
             command_options.append("MODE=with-coverage")
@@ -852,7 +865,19 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         command_options.append(str(__SOURCE_ROOT__))
 
-        subprocess.check_call(command_options)
+        build_log_message = f"Build images:  {image_names}"
+        if push:
+            build_log_message = f"{build_log_message} and push."
+        else:
+            build_log_message = f"{build_log_message} and load result image to local docker."
+
+        logging.info(build_log_message)
+
+        common.check_call_with_log(
+            command_options,
+            # This command runs partially runs the same code, so it would be nice to see the output.
+            debug=True
+        )
 
 
 class K8sPackageBuilder(ContainerPackageBuilder):
