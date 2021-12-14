@@ -45,7 +45,7 @@ jobs:
         with:
           deployment-name: "test_environment"
 
-      - name: Do internal tools tests.
+      - name: Sanity check deployments logic by running internal tests.
         run: |
           python3 -m pytest agent_build/tools/tests
 
@@ -67,13 +67,35 @@ jobs:
         run: |
           minikube start
 
+      - name: Get checksum of the base image files..
+        run: |
+          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
+
+
+      - name: Check for the docker buildx cache.
+        uses: actions/cache@v2
+        with:
+          path: ~/docker-test-image-build-cache
+          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
+
       - name: Run image test.
         env:
             SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
-          python3 tests/package_tests/run_package_test.py run-package-test \
+
+          mkdir -p ~/docker-test-image-build-cache
+          # If cache exists, then it goes to the input of the build.
+          mv ~/docker-test-image-build-cache ~/docker-test-image-build-cache-in
+          # If cache does not exist, then create a new epty cache directory,
+          # where a new build cache will be stored.
+          mkdir -p ~/docker-test-image-build-cache
+
+          python3 tests/package_tests/run_package_test.py package-test \
             ${{ inputs.image-type}}_test \
-            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}"
+            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+            --cache-from-dir ~/docker-test-image-build-cache-in \
+            --cache-to-dir ~/docker-test-image-build-cache
+
 
 
   publish:

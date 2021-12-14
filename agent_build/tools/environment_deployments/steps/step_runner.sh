@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Copyright 2014-2021 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,35 +43,19 @@ fi
 # -nb: The normal message starts with "# " prefix. this option removes it so it can be concatenated with a previous
 #   log message.
 # -ne: Do not add newline at the end of the message.
-function log() {
-  other_args="$@"
-  new_message_prefix=""
-  new_line_option=""
-  if [[ "$1" == "-nb" ]]; then
-    other_args="${@:2}"
-  else
-    new_message_prefix="# $in_docker_prefix"
-
-
-  fi
-
-  if [[ "$1" == "-ne" ]];then
-    new_line_option="-n"
-    other_args="${@:2}"
-  fi
-
-  >&2 echo "$new_line_option"  "$new_message_prefix" "${other_args[@]}"
+log() {
+  >&2 echo " # ${in_docker_prefix} ${*}"
 }
 
 # Function that runs given command from arguments in 'sh'
-function sh_c() {
-  >&2 echo "${in_docker_prefix} sh -c '${*}'"
+sh_c() {
+  >&2 echo " ${in_docker_prefix} sh -c '${*}'"
   sh -c "${*}" > /dev/null
 }
 
 # The same function to run the command but with preserved standard output from the given command,
 # so the output can be redirected.
-function sh_cs() {
+sh_cs() {
   >&2 echo "${in_docker_prefix} sh -c '${*}'"
   sh -c "${*}"
 }
@@ -94,7 +78,7 @@ fi
 
 
 # Function that restores data from cache if exists.
-function restore_from_cache() {
+restore_from_cache() {
   if ! $use_cache ; then
     log "Cache disabled."
     return 0
@@ -104,24 +88,24 @@ function restore_from_cache() {
 
   full_cache_path="${CACHE_DIR}/${cache_key}"
 
-  log -ne "Restore path '${path}' from cache key '${cache_key}'...  "
+  log "Restore path '${path}' from cache key '${cache_key}'...  "
 
   if [ -d "${full_cache_path}" ]; then
-    log -nb "found (directory)"
+    log "Cache found (directory)"
     mkdir -p "$(dirname "$path")"
     cp -a "${full_cache_path}/." "${path}"
   elif [ -f "${full_cache_path}" ]; then
-    log -nb "found (file)"
+    log "Cache found (file)"
     mkdir -p "$(dirname "$path")"
     cp -a "${full_cache_path}" "${path}"
   else
-    log -nb "not found."
+    log "Cache not found."
   fi
 }
 
 
 # Function that saves data to cache if needed.
-function save_to_cache() {
+save_to_cache() {
   cache_key=$1
   path=$2
 
@@ -155,6 +139,6 @@ function save_to_cache() {
 export SOURCE_ROOT
 
 # Run the script.
-source "${STEP_SCRIPT_PATH}"
+. "${STEP_SCRIPT_PATH}"
 
 log "=========== The Deployment Step Script '$(basename "$STEP_SCRIPT_PATH")' is successfully ended ==========="

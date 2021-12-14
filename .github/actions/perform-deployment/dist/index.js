@@ -57928,9 +57928,9 @@ async function checkAndGetCache(
     const result = await cache.restoreCache([cachePath], key)
 
     if (typeof result !== "undefined") {
-        console.log(`Cache for the deployment ${name} is found.`)
+        console.log(`Cache for the deployment step with key ${key} is found.`)
     } else {
-        console.log(`Cache for the deployment ${name} is not found.`)
+        console.log(`Cache for the deployment step with key ${key} is not found.`)
     }
 
     // Return whether it is a hit or not.
@@ -57957,10 +57957,10 @@ async function checkAndSaveCache(
 
     // If there's no cache hit, then save directory to the cache now.
     if (isHit) {
-        console.log(`Cache for the deployment ${name} has been hit. Skip saving.`)
+        console.log(`Cache for the deployment step with key ${cacheKey} has been hit. Skip saving.`)
     }
     else {
-        console.log(`Save cache for the deployment ${name}.`)
+        console.log(`Save cache for the deployment step with key ${cacheKey}.`)
 
         try {
             await cache.saveCache([fullPath], cacheKey)

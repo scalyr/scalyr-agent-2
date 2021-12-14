@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Copyright 2014-2021 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,8 +24,8 @@ restore_from_cache pip "$pip_cache_dir"
 
 REQUIREMENTS_PATH="$SOURCE_ROOT/agent_build/requirement-files"
 
-sh_c python3 -m pip install -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
-sh_c python3 -m pip install -r "${REQUIREMENTS_PATH}/compression-requirements.txt"
+sh_cs python3 -m pip install -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
+sh_cs python3 -m pip install -r "${REQUIREMENTS_PATH}/compression-requirements.txt"
 
 # Save pip cache to reuse it in future.
 save_to_cache pip "$pip_cache_dir"

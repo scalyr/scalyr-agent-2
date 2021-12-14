@@ -16,8 +16,6 @@
 import abc
 import pathlib as pl
 import shlex
-import shutil
-import hashlib
 import re
 import subprocess
 import logging
@@ -37,6 +35,19 @@ _DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools" / "environment_deployments"
 _REL_AGENT_BUILD_PATH = pl.Path("agent_build")
 _REL_AGENT_REQUIREMENT_FILES_PATH = _REL_AGENT_BUILD_PATH / "requirement-files"
 _REL_DEPLOYMENT_STEPS_PATH = pl.Path("agent_build/tools/environment_deployments/steps")
+
+
+def save_docker_image(image_name: str, output_path: pl.Path):
+    """
+    Serialize docker image into file by using 'docker save' command.
+    This is made as a separate function only for testing purposes.
+    :param image_name: Name of the image to save.
+    :param output_path: Result output file.
+    """
+    with output_path.open("wb") as f:
+        common.check_call_with_log(
+            ["docker", "save", image_name], stdout=f
+        )
 
 
 class DeploymentStepError(Exception):
@@ -257,10 +268,11 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
             logging.info(
                 f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
             )
-            with cached_image_path.open("wb") as f:
-                common.check_call_with_log(
-                    ["docker", "save", self.result_image_name], stdout=f
-                )
+            save_docker_image(
+                image_name=self.result_image_name,
+                output_path=cached_image_path
+            )
+
 
     @abc.abstractmethod
     def _run_locally(
@@ -376,7 +388,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         if type(self).SCRIPT_PATH.suffix == ".ps1":
             command_args = ["powershell", str(type(self).SCRIPT_PATH)]
         else:
-            shell = shutil.which("bash")
+            shell = "/bin/sh"
 
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
@@ -408,7 +420,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         try:
             output = common.run_command(
                 command_args,
-                debug=common.DEBUG,
+                debug=True,
             ).decode()
         except subprocess.CalledProcessError as e:
             raise DeploymentStepError(
@@ -479,7 +491,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                     image_name=self.result_image_name,
                     work_dir=container_source_root,
                     base_image_name=intermediate_image_name,
-                    debug=common.DEBUG
+                    debug=True
                 )
             except build_in_docker.RunDockerBuildError as e:
                 raise DeploymentStepError(stdout=e.stdout)
@@ -574,7 +586,9 @@ class Deployment:
             # NOTE: Those sub-folders are used by our special Github-Actions action that caches all such sub-folders to
             # the Github Actions cache. See more in ".github/actions/perform-deployment"
             if cache_dir:
-                step_cache_path = cache_dir / step.cache_key
+                step_cache_path = cache_dir.absolute() / step.cache_key
+                if not step_cache_path.is_dir():
+                    step_cache_path.mkdir(parents=True)
             else:
                 step_cache_path = None
 
