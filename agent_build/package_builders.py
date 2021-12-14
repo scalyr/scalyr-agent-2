@@ -39,6 +39,7 @@ from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
+from agent_build.tools import files_checksum_tracker
 
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
@@ -473,7 +474,7 @@ class PackageBuilder(abc.ABC):
         dist_path = pyinstaller_output / "dist"
 
         # Run the PyInstaller.
-        common.check_call_with_log(
+        common.run_command(
             [
                 sys.executable,
                 "-m",
@@ -667,7 +668,10 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
             binary_symlink_path.symlink_to(symlink_target_path)
 
 
-class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
+class ContainerPackageBuilder(
+    LinuxFhsBasedPackageBuilder,
+    files_checksum_tracker.FilesChecksumTracker
+):
     """
     The base builder for all docker and kubernetes based images . It builds an executable script in the current working
      directory that will build the container image for the various Docker and Kubernetes targets.
@@ -681,6 +685,11 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
     # Names of the result image that goes to dockerhub.
     RESULT_IMAGE_NAMES: List[str]
+
+    FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path] = [
+        pl.Path("Dockerfile"),
+        pl.Path("docker/requirements.txt")
+    ]
 
     def __init__(
         self,
@@ -700,7 +709,17 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             variant=variant,
             no_versioned_file_name=no_versioned_file_name,
         )
+
+        files_checksum_tracker.FilesChecksumTracker.__init__(self)
         self.config_path = config_path
+
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        return type(self).FILE_GLOBS_USED_IN_IMAGE_BUILD
+
+    @property
+    def used_files_checksum(self) -> str:
+        return self._get_files_checksum()
 
     def _build_package_files(self, output_path: Union[str, pl.Path]):
         super(ContainerPackageBuilder, self)._build_package_files(
@@ -754,6 +773,8 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         registries: List[str] = None,
         tags: List[str] = None,
         push: bool = False,
+        cache_from_path: str = None,
+        cache_to_path: str = None,
         with_coverage: bool = False,
     ):
         """
@@ -767,6 +788,10 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         :param push: If True, push result image to the registries that are specified in the 'registries' argument.
             If False, then just export the result image to the local docker. NOTE: The local docker cannot handle
             multi-platform images, so it will only get image for its  platform.
+        :param cache_from_path: Use given directory as a cache source by docker buildx (see more in '--cache-from'
+            in docker buildx docs)
+        :param cache_to_path: Use given directory as a cache destination by docker buildx (see more in
+            '--cache-to' in docker buildx docs)
         :param with_coverage: Makes docker image to run agent with enabled coverage measuring (Python 'coverage'
             library). Used only for testing.
         """
@@ -784,7 +809,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         if buildx_builder_name not in ls_output:
             # Build new buildx builder
             logging.info(f"Create new buildx builder instance '{buildx_builder_name}'.")
-            common.check_call_with_log(
+            common.run_command(
                 [
                     "docker",
                     "buildx",
@@ -798,7 +823,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         # Use builder.
         logging.info(f"Use buildx builder instance '{buildx_builder_name}'.")
-        common.check_call_with_log(
+        common.run_command(
             [
                 "docker",
                 "buildx",
@@ -832,7 +857,21 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             str(dockerfile_path),
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
+            "--build-arg",
+            # Pass current time to this build argument to ensure that all commands after this argument
+            #  won't use caching.
+            f"CACHE_BUST={datetime.datetime.now().isoformat()}"
         ]
+
+        # Add caching options if specified.
+        if cache_from_path:
+            command_options.append(
+                f"--cache-from=type=local,mode=max,src={cache_from_path}",
+            )
+        if cache_to_path:
+            command_options.append(
+                f"--cache-to=type=local,mode=max,dest={cache_to_path}",
+            )
 
         if common.DEBUG:
             # If debug, then also specify the debug mode inside the docker build.
@@ -873,7 +912,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         logging.info(build_log_message)
 
-        common.check_call_with_log(
+        common.run_command(
             command_options,
             # This command runs partially runs the same code, so it would be nice to see the output.
             debug=True

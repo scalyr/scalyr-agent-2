@@ -139,13 +139,21 @@ class DockerImagePackageTest(Test):
     def unique_name(self) -> str:
         return self._base_name
 
-    def run_test(self, scalyr_api_key: str, name_suffix: str = None):
+    def run_test(
+            self,
+            scalyr_api_key: str,
+            name_suffix: str = None,
+            cache_from_path: pl.Path = None,
+            cache_to_path: pl.Path = None
+    ):
         """
         Run test for the agent docker image.
         First of all it builds an image, then pushes it to the local registry and does full test.
 
         :param scalyr_api_key:  Scalyr API key.
         :param name_suffix: Additional suffix to the agent instance name.
+        :param cache_from_path: Use given directory as cache source for docker buildx
+        :param cache_to_path: Use given directory as cache destination for docker buildx
         """
 
         registry_host = "localhost:5000"
@@ -174,11 +182,23 @@ class DockerImagePackageTest(Test):
             ]
         )
 
+        caching_options = []
+        if cache_from_path:
+            caching_options.extend([
+                "--cache-from-dir",
+                str(cache_from_path)
+            ])
+
+        if cache_to_path:
+            caching_options.extend([
+                "--cache-to-dir",
+                str(cache_to_path)
+            ])
+
         try:
             # Build image and push it to the local registry.
             # Instead of calling the build function run the build_package script,
             # so it can also be tested.
-
             logging.info("Build docker image")
             subprocess.check_call(
                 [
@@ -194,6 +214,7 @@ class DockerImagePackageTest(Test):
                     "--tag",
                     "debug",
                     "--push",
+                    *caching_options
                 ],
                 cwd=str(__SOURCE_ROOT__),
             )

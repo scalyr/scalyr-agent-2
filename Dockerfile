@@ -12,8 +12,6 @@ ARG MODE="normal"
 FROM python:3.8.10-slim as scalyr-build
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-ARG BUILD_TYPE
-
 RUN apt-get update && apt-get install -y build-essential git tar
 
 ADD docker/requirements.txt /tmp/requirments.txt
@@ -27,6 +25,7 @@ ARG AGENT_BUILD_DEBUG
 ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 # Special env. variable that will enable addional logging info about that command runs in docker.
 ENV AGENT_BUILD_IN_DOCKER=1
+ARG BUILD_TYPE
 ADD . /scalyr-agent-2
 
 RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
