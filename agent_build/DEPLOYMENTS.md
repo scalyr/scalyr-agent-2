@@ -33,7 +33,7 @@ Let's have a look at more complex example and how we can achieve the same result
 We need to install Python dependencies from two requirement files and we also need to download browser driver for 
 Selenuim.
 
-To achieve that we have a Deployment object in the ``agent_build/tools/environment_deployments/deplyments.py`` file.
+To achieve that we have a Deployment object in the ``agent_build/tools/environment_deployments/deployments.py`` file.
 
 ```
 EXAMPLE_ENVIRONMENT = Deployment(

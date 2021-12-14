@@ -168,6 +168,8 @@ To learn how to develop plugins, please see the
 
 ### Building Packages
 
+NOTE: Docker image build instructions now in the [BUILD.md](BUILD.md)
+
 You can use the `build_packages.py` script to build your own RPM or Debian packages.  This is often desirable
 if your company has its own yum or apt repositories, or you have modified the Scalyr Agent 2 code to suit
 some particular need.  (Of course, if you are finding you need to modify the Scalyr Agent 2 code, we encourage you
