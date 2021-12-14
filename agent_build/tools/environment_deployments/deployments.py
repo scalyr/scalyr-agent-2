@@ -25,6 +25,7 @@ from typing import Union, Optional, List, Dict, Type
 
 from agent_build.tools import common
 from agent_build.tools import constants
+from agent_build.tools import files_checksum_tracker
 from agent_build.tools import build_in_docker
 
 
@@ -33,13 +34,30 @@ _AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
 _DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools" / "environment_deployments" / "steps"
 
 
-class DeploymentStep:
+_REL_AGENT_BUILD_PATH = pl.Path("agent_build")
+_REL_AGENT_REQUIREMENT_FILES_PATH = _REL_AGENT_BUILD_PATH / "requirement-files"
+_REL_DEPLOYMENT_STEPS_PATH = pl.Path("agent_build/tools/environment_deployments/steps")
+
+
+class DeploymentStepError(Exception):
+    """
+    Special exception class for the deployment step error.
+    """
+    _LAST_ERROR_LINES_NUMBER = 20
+
+    def __init__(self, stdout, add_list_lines=20):
+        self.stdout = stdout
+        last_lines = self.stdout.splitlines()[-add_list_lines:]
+        message = "Output: \n" + "\n".join(last_lines)
+        super(DeploymentStepError, self).__init__(message)
+
+
+class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
         for example for the build. The deployment step can be performed directly on the current machine or inside the
     docker. Results of the DeploymentStep can be cached. The caching is mostly aimed to reduce build time on the
         CI/CD such as Github Actions.
-
     """
 
     # Set of files that are somehow used during the step. Needed to calculate the checksum of the whole step, so it can
@@ -59,6 +77,8 @@ class DeploymentStep:
             image, and the step is also considered as a first step(without previous steps).
         """
 
+        super(DeploymentStep, self).__init__()
+
         self.architecture = architecture
 
         if isinstance(previous_step, DeploymentStep):
@@ -75,26 +95,9 @@ class DeploymentStep:
             self.base_docker_image = None
             self.previous_step = None
 
-        self.used_files = self._init_used_files(type(self).USED_FILES)
-
-    @staticmethod
-    def _init_used_files(file_globs: List[pl.Path]):
-        """
-        Get the list of all files which are used in the deployment.
-        This is basically needed to calculate their checksum.
-        """
-        used_files = []
-
-        for path in file_globs:
-            path = pl.Path(path)
-
-            # match glob against source code root and include all matched paths.
-            relative_path = path.relative_to(constants.SOURCE_ROOT)
-            found = list(constants.SOURCE_ROOT.glob(str(relative_path)))
-
-            used_files.extend(found)
-
-        return sorted(list(set(used_files)))
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        return type(self).USED_FILES
 
     @property
     def name(self) -> str:
@@ -165,19 +168,14 @@ class DeploymentStep:
         The checksum of the step. It is based on content of the used files + checksum of the previous step.
         """
 
-        # Calculate the sha256 for each file's content, filename and permissions.
-        sha256 = hashlib.sha256()
-        for file_glob in self.used_files:
-            for file_path in file_glob.parent.glob(file_glob.name):
-                sha256.update(str(file_path.relative_to(constants.SOURCE_ROOT)).encode())
-                sha256.update(str(file_path.stat().st_mode).encode())
-                sha256.update(file_path.read_bytes())
-
-        # Also include the checksum of the previous step.
         if self.previous_step:
-            sha256.update(self.previous_step.checksum.encode())
+            additional_seed = self.previous_step.checksum
+        else:
+            additional_seed = None
 
-        return sha256.hexdigest()
+        return self._get_files_checksum(
+            additional_seed=additional_seed
+        )
 
     def run(
         self,
@@ -193,12 +191,17 @@ class DeploymentStep:
             docker.
         """
 
-        if self.in_docker:
-            self.run_in_docker(cache_dir=cache_dir)
-        else:
-            self._run_locally(cache_dir=cache_dir)
+        def run_step():
+            if self.in_docker:
+                self._run_in_docker(cache_dir=cache_dir)
+            else:
+                self._run_locally(cache_dir=cache_dir)
 
-    def run_in_docker(
+        self._run_function_in_isolated_source_directory(
+            function=run_step
+        )
+
+    def _run_in_docker(
         self,
         cache_dir: Union[str, pl.Path] = None,
     ):
@@ -234,7 +237,7 @@ class DeploymentStep:
                     f"Cached image {self.result_image_name} file for the deployment step '{self.name}' has been found, "
                     f"loading and reusing it instead of building."
                 )
-                common.check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
+                common.run_command(["docker", "load", "-i", str(cached_image_path)])
                 return
             else:
                 # Cache is used but there is no suitable image file. Set the flag to signal that the built
@@ -246,7 +249,7 @@ class DeploymentStep:
             f"for the deployment step '{self.name}'."
         )
 
-        self._run_in_docker()
+        self._run_in_docker_impl()
 
         if cache_dir and save_to_cache:
             cache_dir.mkdir(parents=True, exist_ok=True)
@@ -272,7 +275,7 @@ class DeploymentStep:
         pass
 
     @abc.abstractmethod
-    def _run_in_docker(
+    def _run_in_docker_impl(
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
     ):
         """
@@ -317,7 +320,7 @@ class DockerFileDeploymentStep(DeploymentStep):
         # This step is in docker by definition.
         raise RuntimeError("The docker based step can not be performed locally.")
 
-    def _run_in_docker(
+    def _run_in_docker_impl(
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
     ):
         """
@@ -331,7 +334,6 @@ class DockerFileDeploymentStep(DeploymentStep):
             dockerfile_path=type(self).DOCKERFILE_PATH,
             build_context_path=type(self).DOCKERFILE_PATH.parent,
         )
-
 
 class ShellScriptDeploymentStep(DeploymentStep):
     """
@@ -350,50 +352,38 @@ class ShellScriptDeploymentStep(DeploymentStep):
             architecture=architecture, previous_step=previous_step
         )
 
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
         # Also add script to the used file collection, so it is included to the checksum calculation.
         script_files = [
             type(self).SCRIPT_PATH,
-            _DEPLOYMENT_STEPS_PATH / "step_runner.sh",
-
+            _REL_DEPLOYMENT_STEPS_PATH / "step_runner.sh",
         ]
-
-        self.used_files = self._init_used_files(
-            self.used_files + script_files
-        )
+        return super(ShellScriptDeploymentStep, self)._tracked_file_globs + script_files
 
     def _get_command_line_args(
         self,
-        source_path: pl.Path,
         cache_dir: Union[str, pl.Path] = None,
     ) -> List[str]:
         """
         Create list with the shell command line arguments that has to execute the shell script.
             Optionally also adds cache path to the shell script as additional argument.
-        :param source_path: Path to the source root. Since this command can be executed in docker within
-            different filesystem, then the source root also has to be different.
         :param cache_dir: Path to the cache dir.
         :return: String with shell command that can be executed to needed shell.
         """
 
-        # Get the absolute path of the shell script from the given source root.
-        final_script_path = source_path / type(self).SCRIPT_PATH.relative_to(
-            constants.SOURCE_ROOT
-        )
-
         # Determine needed shell interpreter.
         if type(self).SCRIPT_PATH.suffix == ".ps1":
-            command_args = ["powershell", str(final_script_path)]
+            command_args = ["powershell", str(type(self).SCRIPT_PATH)]
         else:
             shell = shutil.which("bash")
 
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
-            step_runner_script_path = _DEPLOYMENT_STEPS_PATH / "step_runner.sh"
-            # Create final absolute path for the runner.
-            final_step_runner_path = source_path / step_runner_script_path.relative_to(constants.SOURCE_ROOT)
+            step_runner_script_path = _REL_DEPLOYMENT_STEPS_PATH / "step_runner.sh"
 
             # To run the shell script of the step we run the 'step_runner' and pass the target script as its argument.
-            command_args = [shell, str(final_step_runner_path), str(final_script_path)]
+            command_args = [shell, str(step_runner_script_path), str(type(self).SCRIPT_PATH)]
 
         # If cache directory is presented, then we pass it as an additional argument to the
         # script, so it can use the cache too.
@@ -412,20 +402,22 @@ class ShellScriptDeploymentStep(DeploymentStep):
             results in it.
         """
         command_args = self._get_command_line_args(
-            source_path=constants.SOURCE_ROOT, cache_dir=cache_dir
+            cache_dir=cache_dir
         )
 
         try:
-            common.output_suppressed_subprocess_check_call(
-                command_args
-            )
+            output = common.run_command(
+                command_args,
+                debug=common.DEBUG,
+            ).decode()
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"The deployment step '{type(self).__name__}' has failed to "
-                f"run its script - '{type(self).SCRIPT_PATH}'"
+            raise DeploymentStepError(
+                stdout=e.stdout.decode()
             ) from None
 
-    def _run_in_docker(
+        return output
+
+    def _run_in_docker_impl(
         self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
     ):
         """
@@ -440,66 +432,62 @@ class ShellScriptDeploymentStep(DeploymentStep):
         # Instead of that, we'll create intermediate image with all files and use it as base image.
 
         # To create an intermediate image, first we create container, put all needed files and commit it.
-
-        mounted_container_root_path = pl.Path("/scalyr-agent-2-mount")
-        # All files, which are used in the build have to be mapped to the docker container filesystem.
-        volumes_mappings = []
-        for used_path in self.used_files:
-            rel_used_path = pl.Path(used_path).relative_to(constants.SOURCE_ROOT)
-            abs_host_path = constants.SOURCE_ROOT / rel_used_path
-            abs_container_path = mounted_container_root_path / rel_used_path
-            volumes_mappings.extend(["-v", f"{abs_host_path}:{abs_container_path}"])
-
-        intermediate_image_name = f"{self.result_image_name}-intermediate"
+        intermediate_image_name = f"agent-build-deployment-step-intermediate"
 
         # Remove if such intermediate container exists.
-        subprocess.check_call(["docker", "rm", "-f", intermediate_image_name])
+        common.run_command(["docker", "rm", "-f", intermediate_image_name])
 
         try:
-            # Create container and copy all mounted files to the final path inside the container.
-            # This is needed because if we just use mounted path, files become empty after container stops.
-            # There has to be some workaround by playing with mount typed, but for now the current approach has to be
-            # fine too.
-            subprocess.check_call(
+
+            # Create an intermediate container from the base image.
+            common.run_command(
                 [
                     "docker",
-                    "run",
+                    "create",
                     "--platform",
                     self.architecture.as_docker_platform.value,
-                    "-i",
                     "--name",
                     intermediate_image_name,
-                    *volumes_mappings,
-                    self.base_docker_image,
-                    "/bin/bash",
-                    "-c",
-                    f"cp -a {mounted_container_root_path}/. /scalyr-agent-2",
+                    self.base_docker_image
                 ],
             )
 
+            # Copy used files to the intermediate container.
+            container_source_root = pl.Path(f"/tmp/agent_source")
+            common.run_command([
+                "docker",
+                "cp",
+                "-a",
+                f"{self._isolated_source_root_path}/.",
+                f"{intermediate_image_name}:{container_source_root}"
+            ])
+
             # Commit intermediate container as image.
-            subprocess.check_call(
+            common.run_command(
                 ["docker", "commit", intermediate_image_name, intermediate_image_name]
             )
 
             # Get command that has to run shell script.
-            command_args = self._get_command_line_args(
-                source_path=pl.Path("/scalyr-agent-2"), cache_dir=cache_dir
-            )
+            command_args = self._get_command_line_args(cache_dir=cache_dir)
 
             # Run command in the previously created intermediate image.
-            build_in_docker.build_stage(
-                command=shlex.join(command_args),
-                stage_name="step-build",
-                architecture=self.architecture,
-                image_name=self.result_image_name,
-                base_image_name=intermediate_image_name,
-            )
+            try:
+                build_in_docker.build_stage(
+                    command=shlex.join(command_args),
+                    stage_name="step-build",
+                    architecture=self.architecture,
+                    image_name=self.result_image_name,
+                    work_dir=container_source_root,
+                    base_image_name=intermediate_image_name,
+                    debug=common.DEBUG
+                )
+            except build_in_docker.RunDockerBuildError as e:
+                raise DeploymentStepError(stdout=e.stdout)
 
         finally:
             # Remove intermediate container and image.
-            subprocess.check_call(["docker", "rm", "-f", intermediate_image_name])
-            subprocess.check_call(
+            common.run_command(["docker", "rm", "-f", intermediate_image_name])
+            common.run_command(
                 ["docker", "image", "rm", "-f", intermediate_image_name]
             )
 
@@ -600,15 +588,17 @@ class Deployment:
 # crucial if we want to run it on the CI/CD.
 ALL_DEPLOYMENTS: Dict[str, "Deployment"] = {}
 
-_AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
+
+def get_deployment_by_name(name: str) -> Deployment:
+    return ALL_DEPLOYMENTS[name]
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
 class InstallTestRequirementsDeploymentStep(ShellScriptDeploymentStep):
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
+    SCRIPT_PATH = _REL_DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
     USED_FILES = [
-        _AGENT_REQUIREMENT_FILES_PATH / "testing-requirements.txt",
-        _AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
+        _REL_AGENT_REQUIREMENT_FILES_PATH / "testing-requirements.txt",
+        _REL_AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
     ]
 
 
@@ -618,20 +608,4 @@ COMMON_TEST_ENVIRONMENT = Deployment(
     # Call the local './.github/actions/perform-deployment' action with this name.
     "test_environment",
     step_classes=[InstallTestRequirementsDeploymentStep],
-)
-
-
-# This is just an example of the deployment step. It is used only in tests.
-class ExampleStep(ShellScriptDeploymentStep):
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "example/install-requirements-and-download-webdriver.sh"
-    USED_FILES = [
-        _DEPLOYMENT_STEPS_PATH / "example/requirements-1.txt",
-        _DEPLOYMENT_STEPS_PATH / "example/requirements-2.txt",
-    ]
-
-
-# This is just an example of the deployment. It is used only for tests.
-EXAMPLE_ENVIRONMENT = Deployment(
-    name="example_environment",
-    step_classes=[ExampleStep],
 )

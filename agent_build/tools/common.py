@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 import sys
 import subprocess
 import shlex
@@ -44,53 +42,15 @@ def init_logging():
     )
 
 
-def output_suppressed_subprocess_check_call(
-        *args,
-        debug: bool = False,
-        show_on_error_lines_number: int = 20,
-        **kwargs
-):
-    """
-
-    Alternative implementation of the 'subprocess.check_call' function without output to reduce the logging noise.
-
-    :param args: Subprocess args.
-    :param debug: If True, then output is enabled.
-    :param show_on_error_lines_number: # Number of last lines to show if error has occurred.
-    :param kwargs: Subprocess kwargs.
-    """
-
-    # If debug, then just run the normal check_call.
-    if debug:
-        return subprocess.check_call(
-            *args, **kwargs
-        )
-
-    # Override outputs. Redirect stderr to stdout.
-    kwargs.pop("stdout", None)
-    kwargs.pop("stderr", None)
-
-    try:
-        # Run check_output instead to suppress standard output.
-        subprocess.check_output(*args, stderr=subprocess.STDOUT, **kwargs)
-    except subprocess.CalledProcessError as e:
-        # Show last n lines on error.
-        stdout_lines = e.stdout.decode().splitlines()
-        lines_to_print = stdout_lines[-show_on_error_lines_number:]
-
-        if lines_to_print:
-            stdout_to_print = "\n".join(lines_to_print)
-            print(stdout_to_print, file=sys.stderr)
-        raise
-
-
 def subprocess_command_run_with_log(func):
     """
     Wrapper for 'subprocess.check_call' and 'subprocess.check_output' function that also logs
     additional info when command is executed.
     :param func: Function to wrap.
     """
-    def wrapper(*args, **kwargs) -> bytes:
+
+    def wrapper(*args, **kwargs):
+
         global _COMMAND_COUNTER
 
         # Make info message with all command line arguments.
@@ -106,24 +66,20 @@ def subprocess_command_run_with_log(func):
         number = _COMMAND_COUNTER
         _COMMAND_COUNTER += 1
         logging.info(
-            f"RUN COMMAND #{number}: '{cmd_str}'.",
+            f" ### RUN COMMAND #{number}: '{cmd_str}'. ###",
             stacklevel=3
         )
-
         try:
-            result = func(
-                *args,
-                **kwargs
-            )
-        except subprocess.CalledProcessError:
+            result = func(*args, **kwargs)
+        except subprocess.CalledProcessError as e:
             logging.info(
-                f"COMMAND #{number} FAILED.\n",
+                f" ### COMMAND #{number} FAILED. ###\n",
                 stacklevel=3
             )
-            raise
+            raise e from None
         else:
             logging.info(
-                f"COMMAND #{number} ENDED.\n",
+                f" ### COMMAND #{number} ENDED. ###\n",
                 stacklevel=3
             )
             return result
@@ -131,5 +87,52 @@ def subprocess_command_run_with_log(func):
     return wrapper
 
 
-check_call_with_log = subprocess_command_run_with_log(output_suppressed_subprocess_check_call)
+@subprocess_command_run_with_log
+def run_command(*args, debug: bool = False, **kwargs):
+    """
+    Helper command that executes given commands. It combines subprocess' 'check_call' and 'check_output',
+    so it print to standard output and also returns that output.
+    :param args: The same as in the subprocess functions.
+    :param debug: Print standard output if True.
+    :param kwargs: The same as in the subprocess functions.
+    :return:
+    """
+
+    # Make info message with all command line arguments.
+    cmd_args = kwargs.get("args")
+    if cmd_args is None:
+        cmd_args = args[0]
+
+    kwargs.pop("stdout", None)
+    kwargs.pop("stderr", None)
+
+    process = subprocess.Popen(
+        *args,
+        stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE,
+        **kwargs
+    )
+
+    lines = []
+
+    for line in process.stdout:
+        lines.append(line)
+        if debug:
+            print(line.decode().strip(), file=sys.stderr)
+
+    process.wait()
+
+    stdout = b"\n".join(lines)
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(
+            returncode=process.returncode,
+            cmd=cmd_args,
+            output=stdout
+        )
+
+    return stdout
+
+
+# Also create alternative version of subprocess functions that can log additional messages.
+check_call_with_log = subprocess_command_run_with_log(subprocess.check_call)
 check_output_with_log = subprocess_command_run_with_log(subprocess.check_output)

@@ -28,8 +28,15 @@ CACHE_DIR="$2"
 
 set -e
 
-PARENT_DIR="$(dirname "$0")"
-SOURCE_ROOT=$(dirname "$(dirname "$(dirname "$(dirname "$PARENT_DIR")")")")
+# The root of the agent source. This variable has to be used in order to access agent files.
+SOURCE_ROOT=$(pwd)
+
+
+in_docker_prefix=""
+# If the special 'IN_DOCKER' variable is passed, then add additional prefix to all log messages.
+if [ -n "$IN_DOCKER" ]; then
+  in_docker_prefix="[IN_DOCKER]"
+fi
 
 # Simple log function to make log message more noticeable and distinguishable form each other.
 # Accepts first optional arguments: '-nb' and '-ne'
@@ -43,7 +50,9 @@ function log() {
   if [[ "$1" == "-nb" ]]; then
     other_args="${@:2}"
   else
-    new_message_prefix="# "
+    new_message_prefix="# $in_docker_prefix"
+
+
   fi
 
   if [[ "$1" == "-ne" ]];then
@@ -56,17 +65,20 @@ function log() {
 
 # Function that runs given command from arguments in 'sh'
 function sh_c() {
-  echo "sh -c '${*}'"
+  >&2 echo "${in_docker_prefix} sh -c '${*}'"
   sh -c "${*}" > /dev/null
 }
 
 # The same function to run the command but with preserved standard output from the given command,
 # so the output can be redirected.
 function sh_cs() {
+  >&2 echo "${in_docker_prefix} sh -c '${*}'"
   sh -c "${*}"
 }
 
 log "=========== Run Deployment Step Script'$(basename "$STEP_SCRIPT_PATH")' ==========="
+
+log "SOURCE_ROOT: ${SOURCE_ROOT}"
 
 # Check if the cache directory is specified. If it doesn't, then the caching has to be disabled.
 if [ -n "$CACHE_DIR" ]; then

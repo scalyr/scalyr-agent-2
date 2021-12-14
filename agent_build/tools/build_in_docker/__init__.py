@@ -19,6 +19,7 @@
 
 import pathlib as pl
 import os
+import subprocess
 from typing import Dict
 
 from agent_build.tools import constants
@@ -28,12 +29,18 @@ __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__.parent.parent
 
 
+class RunDockerBuildError(Exception):
+    def __init__(self, stdout):
+        self.stdout = stdout
+
+
 def run_docker_build(
     architecture: constants.Architecture,
     image_name: str,
     dockerfile_path: pl.Path,
     build_context_path: pl.Path,
     build_args: Dict[str, str] = None,
+    debug: bool = False,
 ):
     """
     Just a simple wrapper around "docker build" command.
@@ -42,6 +49,7 @@ def run_docker_build(
     :param dockerfile_path: Path to the Dockerfile.
     :param build_context_path: Build context path.
     :param build_args: Dockerfile build arguments (--build-arg).
+    :param debug: Enable output of True.
     """
 
     # Enable docker Buildkit.
@@ -56,23 +64,30 @@ def run_docker_build(
         build_arg_options.append("--build-arg")
         build_arg_options.append(f"{name}={value}")
 
-    common.check_call_with_log(
-        [
-            "docker",
-            "build",
-            "--platform",
-            architecture.as_docker_platform.value,
-            "-t",
-            image_name,
-            *build_arg_options,
-            "--label",
-            "scalyr-agent-build",
-            "-f",
-            str(dockerfile_path),
-            str(build_context_path),
-        ],
-        env=env,
-    )
+    try:
+        output = common.run_command(
+            [
+                "docker",
+                "build",
+                "--platform",
+                architecture.as_docker_platform.value,
+                "-t",
+                image_name,
+                *build_arg_options,
+                "--label",
+                "scalyr-agent-build",
+                "-f",
+                str(dockerfile_path),
+                str(build_context_path),
+            ],
+            env=env,
+            stderr=subprocess.STDOUT,
+            debug=debug
+        ).decode()
+    except subprocess.CalledProcessError as e:
+        raise RunDockerBuildError(stdout=e.stdout)
+
+    return output
 
 
 def build_stage(
@@ -81,7 +96,9 @@ def build_stage(
     architecture: constants.Architecture,
     image_name: str,
     base_image_name: str,
+    work_dir: pl.Path,
     output_path_mappings: Dict[pl.Path, pl.Path] = None,
+    debug:bool = False,
 ):
     """
     Run a custom command using the 'docker build' by specifying special Dockerfile which is located
@@ -92,9 +109,11 @@ def build_stage(
     :param architecture: Architecture of the build. Translated to the docker's '--platform' option.
     :param image_name: Name of the result image.
     :param base_image_name: Name of the base image to use.
+    :param work_dir: Set working directory.
     :param output_path_mappings: Dict with mapping of the host paths to the paths that are used inside the docker.
         After the build is completed, files or folders that are located inside the docker will be copied to the
         appropriate host paths.
+    :param debug: Enable output if True.
     """
     run_docker_build(
         architecture=architecture,
@@ -105,7 +124,9 @@ def build_stage(
             "BASE_IMAGE_NAME": base_image_name,
             "COMMAND": command,
             "BUILD_STAGE": stage_name,
+            "WORK_DIR": str(work_dir)
         },
+        debug=debug
     )
 
     # If there are output mapping specified, than we has to copy result files from the result build.
@@ -113,18 +134,18 @@ def build_stage(
     if output_path_mappings:
         container_name = image_name
         # Remove the container with the same name if exists.
-        common.check_call_with_log(["docker", "rm", "-f", container_name])
+        common.run_command(["docker", "rm", "-f", container_name])
         try:
 
             output_path_mappings = output_path_mappings or {}
 
             # Create the container.
-            common.check_call_with_log(
+            common.run_command(
                 ["docker", "create", "--name", container_name, image_name]
             )
 
             for host_path, docker_path in output_path_mappings.items():
-                common.check_call_with_log(
+                common.run_command(
                     [
                         "docker",
                         "cp",
@@ -138,4 +159,4 @@ def build_stage(
 
         finally:
             # Remove container.
-            common.check_call_with_log(["docker", "rm", "-f", container_name])
+            common.run_command(["docker", "rm", "-f", container_name])
