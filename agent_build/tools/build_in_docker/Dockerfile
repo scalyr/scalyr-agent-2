@@ -7,7 +7,7 @@ ARG BUILD_STAGE
 # This stage is used in building deployment steps (agent_build/tools/environemt_deployments.py).
 # It expects that the base image contains all needed files to perform the step.
 FROM $BASE_IMAGE_NAME as stage-step-build
-ARG WORK_DIR
+ARG WORK_DIR="/"
 WORKDIR $WORK_DIR
 # Set this special env. variable for additional logging.
 ENV IN_DOCKER=1

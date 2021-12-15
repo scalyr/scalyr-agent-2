@@ -38,7 +38,7 @@ def init_logging():
 
     logging.basicConfig(
         level=logging.INFO,
-        format=f"[%(levelname)s][%(module)s:%(lineno)s]{in_docker_field_format} %(message)s"
+        format=f"[%(levelname)s][%(module)s:%(lineno)s]{in_docker_field_format} %(message)s",
     )
 
 
@@ -65,23 +65,14 @@ def subprocess_command_run_with_log(func):
 
         number = _COMMAND_COUNTER
         _COMMAND_COUNTER += 1
-        logging.info(
-            f" ### RUN COMMAND #{number}: '{cmd_str}'. ###",
-            stacklevel=3
-        )
+        logging.info(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###", stacklevel=3)
         try:
             result = func(*args, **kwargs)
         except subprocess.CalledProcessError as e:
-            logging.info(
-                f" ### COMMAND #{number} FAILED. ###\n",
-                stacklevel=3
-            )
+            logging.info(f" ### COMMAND #{number} FAILED. ###\n", stacklevel=3)
             raise e from None
         else:
-            logging.info(
-                f" ### COMMAND #{number} ENDED. ###\n",
-                stacklevel=3
-            )
+            logging.info(f" ### COMMAND #{number} ENDED. ###\n", stacklevel=3)
             return result
 
     return wrapper
@@ -107,10 +98,7 @@ def run_command(*args, debug: bool = False, **kwargs):
     kwargs.pop("stderr", None)
 
     process = subprocess.Popen(
-        *args,
-        stderr=subprocess.STDOUT,
-        stdout=subprocess.PIPE,
-        **kwargs
+        *args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, **kwargs
     )
 
     lines = []
@@ -125,9 +113,7 @@ def run_command(*args, debug: bool = False, **kwargs):
     stdout = b"\n".join(lines)
     if process.returncode != 0:
         raise subprocess.CalledProcessError(
-            returncode=process.returncode,
-            cmd=cmd_args,
-            output=stdout
+            returncode=process.returncode, cmd=cmd_args, output=stdout
         )
 
     return stdout

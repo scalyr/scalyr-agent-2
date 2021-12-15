@@ -140,11 +140,11 @@ class DockerImagePackageTest(Test):
         return self._base_name
 
     def run_test(
-            self,
-            scalyr_api_key: str,
-            name_suffix: str = None,
-            cache_from_path: pl.Path = None,
-            cache_to_path: pl.Path = None
+        self,
+        scalyr_api_key: str,
+        name_suffix: str = None,
+        cache_from_path: pl.Path = None,
+        cache_to_path: pl.Path = None,
     ):
         """
         Run test for the agent docker image.
@@ -184,16 +184,10 @@ class DockerImagePackageTest(Test):
 
         caching_options = []
         if cache_from_path:
-            caching_options.extend([
-                "--cache-from-dir",
-                str(cache_from_path)
-            ])
+            caching_options.extend(["--cache-from-dir", str(cache_from_path)])
 
         if cache_to_path:
-            caching_options.extend([
-                "--cache-to-dir",
-                str(cache_to_path)
-            ])
+            caching_options.extend(["--cache-to-dir", str(cache_to_path)])
 
         try:
             # Build image and push it to the local registry.
@@ -214,7 +208,7 @@ class DockerImagePackageTest(Test):
                     "--tag",
                     "debug",
                     "--push",
-                    *caching_options
+                    *caching_options,
                 ],
                 cwd=str(__SOURCE_ROOT__),
             )

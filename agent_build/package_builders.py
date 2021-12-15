@@ -669,8 +669,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
 
 
 class ContainerPackageBuilder(
-    LinuxFhsBasedPackageBuilder,
-    files_checksum_tracker.FilesChecksumTracker
+    LinuxFhsBasedPackageBuilder, files_checksum_tracker.FilesChecksumTracker
 ):
     """
     The base builder for all docker and kubernetes based images . It builds an executable script in the current working
@@ -688,7 +687,7 @@ class ContainerPackageBuilder(
 
     FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path] = [
         pl.Path("Dockerfile"),
-        pl.Path("docker/requirements.txt")
+        pl.Path("docker/requirements.txt"),
     ]
 
     def __init__(
@@ -804,7 +803,9 @@ class ContainerPackageBuilder(
         # to the local registry.
 
         # check if builder already exists.
-        ls_output = common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
+        ls_output = (
+            common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
+        )
 
         if buildx_builder_name not in ls_output:
             # Build new buildx builder
@@ -860,7 +861,7 @@ class ContainerPackageBuilder(
             "--build-arg",
             # Pass current time to this build argument to ensure that all commands after this argument
             #  won't use caching.
-            f"CACHE_BUST={datetime.datetime.now().isoformat()}"
+            f"CACHE_BUST={datetime.datetime.now().isoformat()}",
         ]
 
         # Add caching options if specified.
@@ -875,10 +876,12 @@ class ContainerPackageBuilder(
 
         if common.DEBUG:
             # If debug, then also specify the debug mode inside the docker build.
-            command_options.extend([
-                "--build-arg",
-                f"AGENT_BUILD_DEBUG=1",
-            ])
+            command_options.extend(
+                [
+                    "--build-arg",
+                    f"AGENT_BUILD_DEBUG=1",
+                ]
+            )
 
         # If we need to push, then specify all platforms.
         if push:
@@ -908,14 +911,16 @@ class ContainerPackageBuilder(
         if push:
             build_log_message = f"{build_log_message} and push."
         else:
-            build_log_message = f"{build_log_message} and load result image to local docker."
+            build_log_message = (
+                f"{build_log_message} and load result image to local docker."
+            )
 
         logging.info(build_log_message)
 
         common.run_command(
             command_options,
             # This command runs partially runs the same code, so it would be nice to see the output.
-            debug=True
+            debug=True,
         )
 
 

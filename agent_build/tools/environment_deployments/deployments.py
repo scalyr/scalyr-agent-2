@@ -29,7 +29,9 @@ from agent_build.tools import build_in_docker
 
 _PARENT_DIR = pl.Path(__file__).parent.parent.absolute()
 _AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
-_DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools" / "environment_deployments" / "steps"
+_DEPLOYMENT_STEPS_PATH = (
+    _AGENT_BUILD_PATH / "tools" / "environment_deployments" / "steps"
+)
 
 
 _REL_AGENT_BUILD_PATH = pl.Path("agent_build")
@@ -45,15 +47,14 @@ def save_docker_image(image_name: str, output_path: pl.Path):
     :param output_path: Result output file.
     """
     with output_path.open("wb") as f:
-        common.check_call_with_log(
-            ["docker", "save", image_name], stdout=f
-        )
+        common.check_call_with_log(["docker", "save", image_name], stdout=f)
 
 
 class DeploymentStepError(Exception):
     """
     Special exception class for the deployment step error.
     """
+
     _LAST_ERROR_LINES_NUMBER = 20
 
     def __init__(self, stdout, add_list_lines=20):
@@ -187,9 +188,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         else:
             additional_seed = None
 
-        return self._get_files_checksum(
-            additional_seed=additional_seed
-        )
+        return self._get_files_checksum(additional_seed=additional_seed)
 
     def run(
         self,
@@ -211,9 +210,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
             else:
                 self._run_locally(cache_dir=cache_dir)
 
-        self._run_function_in_isolated_source_directory(
-            function=run_step
-        )
+        self._run_function_in_isolated_source_directory(function=run_step)
 
     def _run_in_docker(
         self,
@@ -228,7 +225,9 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         # Before the build, check if there is already an image with the same name. The name contains the checksum
         # of all files which are used in it, so the name identity also guarantees the content identity.
         output = (
-            common.check_output_with_log(["docker", "images", "-q", self.result_image_name])
+            common.check_output_with_log(
+                ["docker", "images", "-q", self.result_image_name]
+            )
             .decode()
             .strip()
         )
@@ -272,10 +271,8 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
                 f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
             )
             save_docker_image(
-                image_name=self.result_image_name,
-                output_path=cached_image_path
+                image_name=self.result_image_name, output_path=cached_image_path
             )
-
 
     @abc.abstractmethod
     def _run_locally(
@@ -350,6 +347,7 @@ class DockerFileDeploymentStep(DeploymentStep):
             build_context_path=type(self).DOCKERFILE_PATH.parent,
         )
 
+
 class ShellScriptDeploymentStep(DeploymentStep):
     """
     The deployment step class which is a wrapper around some shell script.
@@ -398,7 +396,11 @@ class ShellScriptDeploymentStep(DeploymentStep):
             step_runner_script_path = _REL_DEPLOYMENT_STEPS_PATH / "step_runner.sh"
 
             # To run the shell script of the step we run the 'step_runner' and pass the target script as its argument.
-            command_args = [shell, str(step_runner_script_path), str(type(self).SCRIPT_PATH)]
+            command_args = [
+                shell,
+                str(step_runner_script_path),
+                str(type(self).SCRIPT_PATH),
+            ]
 
         # If cache directory is presented, then we pass it as an additional argument to the
         # script, so it can use the cache too.
@@ -416,9 +418,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         :param cache_dir: Path of the cache directory. If specified, then the script may save or reuse some intermediate
             results in it.
         """
-        command_args = self._get_command_line_args(
-            cache_dir=cache_dir
-        )
+        command_args = self._get_command_line_args(cache_dir=cache_dir)
 
         try:
             output = common.run_command(
@@ -426,9 +426,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                 debug=True,
             ).decode()
         except subprocess.CalledProcessError as e:
-            raise DeploymentStepError(
-                stdout=e.stdout.decode()
-            ) from None
+            raise DeploymentStepError(stdout=e.stdout.decode()) from None
 
         return output
 
@@ -463,19 +461,21 @@ class ShellScriptDeploymentStep(DeploymentStep):
                     self.architecture.as_docker_platform.value,
                     "--name",
                     intermediate_image_name,
-                    self.base_docker_image
+                    self.base_docker_image,
                 ],
             )
 
             # Copy used files to the intermediate container.
             container_source_root = pl.Path(f"/tmp/agent_source")
-            common.run_command([
-                "docker",
-                "cp",
-                "-a",
-                f"{self._isolated_source_root_path}/.",
-                f"{intermediate_image_name}:{container_source_root}"
-            ])
+            common.run_command(
+                [
+                    "docker",
+                    "cp",
+                    "-a",
+                    f"{self._isolated_source_root_path}/.",
+                    f"{intermediate_image_name}:{container_source_root}",
+                ]
+            )
 
             # Commit intermediate container as image.
             common.run_command(
@@ -494,7 +494,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                     image_name=self.result_image_name,
                     work_dir=container_source_root,
                     base_image_name=intermediate_image_name,
-                    debug=True
+                    debug=True,
                 )
             except build_in_docker.RunDockerBuildError as e:
                 raise DeploymentStepError(stdout=e.stdout)
@@ -502,9 +502,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         finally:
             # Remove intermediate container and image.
             common.run_command(["docker", "rm", "-f", intermediate_image_name])
-            common.run_command(
-                ["docker", "image", "rm", "-f", intermediate_image_name]
-            )
+            common.run_command(["docker", "image", "rm", "-f", intermediate_image_name])
 
 
 class Deployment:

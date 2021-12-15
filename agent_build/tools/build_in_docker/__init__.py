@@ -82,7 +82,7 @@ def run_docker_build(
             ],
             env=env,
             stderr=subprocess.STDOUT,
-            debug=debug
+            debug=debug,
         ).decode()
     except subprocess.CalledProcessError as e:
         raise RunDockerBuildError(stdout=e.stdout)
@@ -96,9 +96,9 @@ def build_stage(
     architecture: constants.Architecture,
     image_name: str,
     base_image_name: str,
-    work_dir: pl.Path,
+    work_dir: pl.Path = None,
     output_path_mappings: Dict[pl.Path, pl.Path] = None,
-    debug:bool = False,
+    debug: bool = False,
 ):
     """
     Run a custom command using the 'docker build' by specifying special Dockerfile which is located
@@ -124,9 +124,9 @@ def build_stage(
             "BASE_IMAGE_NAME": base_image_name,
             "COMMAND": command,
             "BUILD_STAGE": stage_name,
-            "WORK_DIR": str(work_dir)
+            "WORK_DIR": str(work_dir),
         },
-        debug=debug
+        debug=debug,
     )
 
     # If there are output mapping specified, than we has to copy result files from the result build.

@@ -45,15 +45,15 @@ class FilesChecksumTracker:
             path = pl.Path(file_glob)
 
             if path.is_absolute():
-                raise ValueError(f"File '{path}' can not be absolute. Class: {type(self)}")
+                raise ValueError(
+                    f"File '{path}' can not be absolute. Class: {type(self)}"
+                )
 
             found = list(constants.SOURCE_ROOT.glob(str(file_glob)))
 
             self._original_files.extend(found)
 
-        self._original_files = sorted(list(set(
-            self._original_files
-        )))
+        self._original_files = sorted(list(set(self._original_files)))
 
         # Create temp directory to store only tracked files.
         self._isolated_source_tmp_dir = tempfile.TemporaryDirectory(
@@ -97,7 +97,9 @@ class FilesChecksumTracker:
 
         # Copy all tracked files to new isolated directory.
         for file_path in self._original_files:
-            dest_path = self._isolated_source_root_path / file_path.parent.relative_to(constants.SOURCE_ROOT)
+            dest_path = self._isolated_source_root_path / file_path.parent.relative_to(
+                constants.SOURCE_ROOT
+            )
             dest_path.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file_path, dest_path)
 
@@ -110,11 +112,11 @@ class FilesChecksumTracker:
         except Exception as e:
 
             globs = [str(g) for g in self._tracked_file_globs]
-            logging.error(f"'{type(self).__name__}' has failed. "
-                          "HINT: Make sure that you have specified all files. "
-                          f"For now, tracked files are: {globs}")
+            logging.error(
+                f"'{type(self).__name__}' has failed. "
+                "HINT: Make sure that you have specified all files. "
+                f"For now, tracked files are: {globs}"
+            )
             raise e from None
         finally:
             os.chdir(original_cwd)
-
-

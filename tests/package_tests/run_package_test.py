@@ -65,7 +65,9 @@ if __name__ == "__main__":
     list_command_parser = subparsers.add_parser("list")
 
     package_test_parser = subparsers.add_parser("package-test")
-    package_test_subparsers = package_test_parser.add_subparsers(dest="package_test_name", required=True)
+    package_test_subparsers = package_test_parser.add_subparsers(
+        dest="package_test_name", required=True
+    )
 
     for test_name, package_test in all_package_tests.ALL_PACKAGE_TESTS.items():
 

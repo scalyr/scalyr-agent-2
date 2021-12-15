@@ -10,7 +10,9 @@ from agent_build.tools import constants
 from agent_build.tools import common
 from agent_build.tools.environment_deployments import deployments
 
-_RUN_DEPLOYMENT_SCRIPT_PATH = constants.SOURCE_ROOT / "agent_build/scripts/run_deployment.py"
+_RUN_DEPLOYMENT_SCRIPT_PATH = (
+    constants.SOURCE_ROOT / "agent_build/scripts/run_deployment.py"
+)
 
 common.init_logging()
 
@@ -20,7 +22,10 @@ _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH = _PARENT_REL_DIR / "fixtures/example_steps"
 
 # This is just an example of the deployment step. It is used only in tests.
 class ExampleStep(deployments.ShellScriptDeploymentStep):
-    SCRIPT_PATH = _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-requirements-and-download-webdriver.sh"
+    SCRIPT_PATH = (
+        _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH
+        / "install-requirements-and-download-webdriver.sh"
+    )
     USED_FILES = [
         _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "requirements-*.txt",
     ]
@@ -49,7 +54,7 @@ def example_deployment(request):
             name=name,
             step_classes=[ExampleStep],
             architecture=constants.Architecture.X86_64,
-            base_docker_image="python:3.8"
+            base_docker_image="python:3.8",
         )
     else:
         name = "example_environment"
@@ -63,9 +68,7 @@ def example_deployment(request):
 
 
 @pytest.mark.parametrize(
-    ["example_deployment"],
-    [["locally"], ["in_docker"]],
-    indirect=True
+    ["example_deployment"], [["locally"], ["in_docker"]], indirect=True
 )
 def test_example_deployment(
     tmp_path,
@@ -81,13 +84,9 @@ def test_example_deployment(
     example_deployment_step = example_deployment.steps[0]
 
     if example_deployment.in_docker:
-        subprocess.check_call([
-            "docker",
-            "image",
-            "rm",
-            "-f",
-            example_deployment.result_image_name
-        ])
+        subprocess.check_call(
+            ["docker", "image", "rm", "-f", example_deployment.result_image_name]
+        )
 
     # mock real save docker image function to skip real image saving and to save time.
     def step_save_image_mock(image_name: str, output_path: pl.Path):
@@ -101,7 +100,9 @@ def test_example_deployment(
 
     if example_deployment.in_docker:
         # IF that's a in docker deployment, then look for a serialized docker result image.
-        cached_docker_image_path = deployment_step_cache_path / example_deployment_step.result_image_name
+        cached_docker_image_path = (
+            deployment_step_cache_path / example_deployment_step.result_image_name
+        )
         assert cached_docker_image_path.is_file()
     else:
         # If not in docker, then look for directories that were cached by shell script.
@@ -122,8 +123,11 @@ def test_deployment_step_with_untracked_file(caplog, capsys):
     """
     Run another invalid deployment that tries to access file that is not tracked.
     """
+
     class ExampleInvalidStepWithUntrackedFiles(deployments.ShellScriptDeploymentStep):
-        SCRIPT_PATH = _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-with-untracked-file.sh"
+        SCRIPT_PATH = (
+            _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-with-untracked-file.sh"
+        )
 
     deployment = deployments.Deployment(
         name="example_environment_untracked",

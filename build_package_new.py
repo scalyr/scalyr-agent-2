@@ -102,21 +102,15 @@ if __name__ == "__main__":
                 "--push", action="store_true", help="Push the result docker image."
             )
 
-            package_parser.add_argument(
-                "--cache-from-dir",
-                dest="cache_from_dir"
-            )
-            package_parser.add_argument(
-                "--cache-to-dir",
-                dest="cache_to_dir"
-            )
+            package_parser.add_argument("--cache-from-dir", dest="cache_from_dir")
+            package_parser.add_argument("--cache-to-dir", dest="cache_to_dir")
 
             package_parser.add_argument(
                 "--files-checksum",
                 dest="files_checksum",
                 action="store_true",
                 help="Only used in CI/CD. Prints checksum of files that are used to create the base of the docker "
-                     "image. Used to save docker buildx cache in the CI/CD's cache to reuse it in future."
+                "image. Used to save docker buildx cache in the CI/CD's cache to reuse it in future.",
             )
 
         else:
@@ -157,7 +151,7 @@ if __name__ == "__main__":
             registries=args.registry or [],
             tags=args.tag or [],
             cache_from_path=args.cache_from_dir,
-            cache_to_path=args.cache_to_dir
+            cache_to_path=args.cache_to_dir,
         )
         exit(0)
 
