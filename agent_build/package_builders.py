@@ -279,7 +279,7 @@ class PackageBuilder(abc.ABC):
             "--locally",
         ]
 
-        command = shlex.join(command_args)
+        command = shlex.join(command_args)  # pylint: disable=no-member
 
         # Run the docker build inside the result image of the deployment.
         base_image_name = self.deployment.result_image_name.lower()
