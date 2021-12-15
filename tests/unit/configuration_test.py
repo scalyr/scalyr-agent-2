@@ -1855,7 +1855,8 @@ class TestConfiguration(TestConfigurationBase):
 
         # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
         # sorted string value
-        expected_line = "\tsanitized_worker_configs: [{'sessions': 5, 'api_key': '********** MASKED **********', 'id': 'two'}, {'sessions': 2, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 5, 'api_key': '********** MASKED **********', 'id': 'two', 'server_url': '%s'}, {'sessions': 2, 'api_key': '********** MASKED **********', 'id': 'one', 'server_url': '%s'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default', 'server_url': '%s'}]"  # NOQA
+        expected_line = expected_line % ((config.scalyr_server,) * 3)
         logged_line = mock_logger.info.call_args_list[-1][0][0]
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
@@ -1922,7 +1923,8 @@ class TestConfiguration(TestConfigurationBase):
 
         # NOTE: We can't use OrderedDict since we still support Python 2.6 which means we assert on
         # sorted string value
-        expected_line = "\tsanitized_worker_configs: [{'sessions': 10, 'api_key': '********** MASKED **********', 'id': 'one'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default'}]"  # NOQA
+        expected_line = "\tsanitized_worker_configs: [{'sessions': 10, 'api_key': '********** MASKED **********', 'id': 'one', 'server_url': '%s'}, {'sessions': 1, 'api_key': '********** MASKED **********', 'id': 'default', 'server_url': '%s'}]"  # NOQA
+        expected_line = expected_line % ((config.scalyr_server,) * 2)
         logged_line = mock_logger.info.call_args_list[-1][0][0]
         self.assertEqual(sorted(expected_line), sorted(logged_line))
 
@@ -2347,8 +2349,15 @@ class TestConfiguration(TestConfigurationBase):
         # "api_keys" should become "worker_configs"
         assert config.worker_configs == [
             # "workers" field in workers entry should become "sessions"
-            JsonObject(api_key="hi there", id="default", sessions=2),
-            JsonObject(api_key="key", id="my_key", sessions=4),
+            JsonObject(
+                api_key="hi there",
+                id="default",
+                sessions=2,
+                server_url=config.scalyr_server,
+            ),
+            JsonObject(
+                api_key="key", id="my_key", sessions=4, server_url=config.scalyr_server
+            ),
         ]
         # "default_workers_per_api_key" should become "default_sessions_per_worker"
         assert config.default_sessions_per_worker == 2
@@ -2410,14 +2419,26 @@ class TestConfiguration(TestConfigurationBase):
                 api_key=config.api_key,
                 id="default",
                 sessions=config.default_sessions_per_worker,
+                server_url=config.scalyr_server,
             ),
             JsonObject(
                 api_key="key2",
                 id="second_key",
                 sessions=config.default_sessions_per_worker,
+                server_url=config.scalyr_server,
             ),
-            JsonObject(api_key="key3", id="third_key", sessions=3),
-            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+            JsonObject(
+                api_key="key3",
+                id="third_key",
+                sessions=3,
+                server_url=config.scalyr_server,
+            ),
+            JsonObject(
+                api_key="key4",
+                id="fourth_key",
+                sessions=3,
+                server_url=config.scalyr_server,
+            ),
         ]
 
     def test__verify_required_attributes(self):
@@ -3199,6 +3220,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
             api_key=config.api_key,
             id="default",
             sessions=config.default_sessions_per_worker,
+            server_url=config.scalyr_server,
         )
 
     def test_empty_workers_entry(self):
@@ -3226,6 +3248,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
             api_key=config.api_key,
             id="default",
             sessions=config.default_sessions_per_worker,
+            server_url=config.scalyr_server,
         )
 
         (
@@ -3243,7 +3266,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
                 api_key: "key"
                 workers: [
                     {
-                        "api_key": "key", id: "default", "sessions": 4
+                        "api_key": "key", id: "default", "sessions": 4, "server_url": "new_server",
                     }
                 ]
               }
@@ -3258,6 +3281,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
             api_key=config.api_key,
             id="default",
             sessions=4,
+            server_url="new_server",
         )
 
         (
@@ -3275,7 +3299,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
                 api_key: "key"
                 workers: [
                     {
-                        id: "default", "sessions": 4
+                        id: "default", "sessions": 4, "server_url": "new_server"
                     }
                 ]
               }
@@ -3287,9 +3311,7 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 1
         assert config.worker_configs[0] == JsonObject(
-            api_key=config.api_key,
-            id="default",
-            sessions=4,
+            api_key=config.api_key, id="default", sessions=4, server_url="new_server"
         )
 
         (
@@ -3325,11 +3347,10 @@ class TestWorkersConfiguration(TestConfigurationBase):
             api_key=config.api_key,
             id="default",
             sessions=config.default_sessions_per_worker,
+            server_url=config.scalyr_server,
         )
         assert workers[1] == JsonObject(
-            api_key="key",
-            id="second",
-            sessions=1,
+            api_key="key", id="second", sessions=1, server_url=config.scalyr_server
         )
 
     def test_second_default_api_key(self):
@@ -3456,12 +3477,13 @@ class TestWorkersConfiguration(TestConfigurationBase):
 
         assert len(config.worker_configs) == 2
         assert config.worker_configs[0] == JsonObject(
-            sessions=1, api_key=config.api_key, id="default"
+            sessions=1,
+            api_key=config.api_key,
+            id="default",
+            server_url=config.scalyr_server,
         )
         assert config.worker_configs[1] == JsonObject(
-            sessions=4,
-            api_key="key2",
-            id="second",
+            sessions=4, api_key="key2", id="second", server_url=config.scalyr_server
         )
 
         (
@@ -3716,14 +3738,26 @@ class TestWorkersConfiguration(TestConfigurationBase):
                 api_key=config.api_key,
                 id="default",
                 sessions=config.default_sessions_per_worker,
+                server_url=config.scalyr_server,
             ),
             JsonObject(
                 api_key="key2",
                 id="second_key",
                 sessions=config.default_sessions_per_worker,
+                server_url=config.scalyr_server,
             ),
-            JsonObject(api_key="key3", id="third_key", sessions=3),
-            JsonObject(api_key="key4", id="fourth_key", sessions=3),
+            JsonObject(
+                api_key="key3",
+                id="third_key",
+                sessions=3,
+                server_url=config.scalyr_server,
+            ),
+            JsonObject(
+                api_key="key4",
+                id="fourth_key",
+                sessions=3,
+                server_url=config.scalyr_server,
+            ),
         ]
 
     def test_k8s_and_journald_logs_workers(self):
@@ -3869,7 +3903,6 @@ class TestWorkersConfiguration(TestConfigurationBase):
             recreate("Invalid.key")
 
         assert "contains an invalid character" in err_info.value.message
-
         recreate("not_Invalid_key_anymore")
 
     def test_parse_config_fragment_contains_invalid_content(self):

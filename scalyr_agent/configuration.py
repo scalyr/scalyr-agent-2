@@ -675,6 +675,7 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "use_requests_lib",
             "use_multiprocess_workers",
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
@@ -3762,6 +3763,13 @@ class Configuration(object):
             self.__verify_required_string(
                 worker_entry, "api_key", description % entry_index
             )
+
+        self.__verify_or_set_optional_string(
+            worker_entry,
+            "server_url",
+            default_value=self.scalyr_server,
+            config_description=description % entry_index,
+        )
 
         sessions_number = self.__config.get_int("default_sessions_per_worker")
         self.__verify_or_set_optional_int(
