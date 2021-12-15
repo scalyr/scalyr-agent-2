@@ -246,7 +246,7 @@ class DockerImagePackageTest(Test):
                     logging.info("    Pull the image.")
                     try:
                         subprocess.check_call(["docker", "pull", full_image_name])
-                    except subprocess.CalledProcessError as e:
+                    except subprocess.CalledProcessError:
                         logging.exception(
                             "    Can not pull the result image from local registry."
                         )
