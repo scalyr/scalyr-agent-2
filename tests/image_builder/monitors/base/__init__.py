@@ -25,5 +25,6 @@ class BaseMonitorBuilder(AgentImageBuilder):
     IMAGE_TAG = "scalyr-agent-testings-monitor-base"
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
     INCLUDE_PATHS = [
+        Path(get_install_root(), "agent_build/requirement-files"),
         Path(get_install_root(), "dev-requirements.txt"),
     ]

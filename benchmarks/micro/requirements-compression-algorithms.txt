@@ -1,3 +1,2 @@
-zstandard
+-r ../../agent_build/requirement-files/compression-requirements.txt
 brotli
-lz4

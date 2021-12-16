@@ -430,6 +430,9 @@ if __name__ == "__main__":
         os.path.join(
             root, ".circleci/docker_unified_smoke_unit/smoketest/smoketest.py"
         ),
+        *glob.glob(os.path.join(root, "agent_build/**/*.py"), recursive=True),
+        *glob.glob(os.path.join(root, "tests/package_tests/**/*.py"), recursive=True),
+        os.path.join(root, "build_package_new.py"),
     }
 
     if not args.files:

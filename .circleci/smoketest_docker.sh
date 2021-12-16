@@ -57,12 +57,12 @@ smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketes
 syslog_driver_option=""
 syslog_driver_portmap=""
 jsonlog_containers_mount=""
-if [[ $log_mode == "syslog" ]]; then
+if [[ $log_mode == "docker-syslog" ]]; then
     syslog_driver_option="--log-driver=syslog --log-opt syslog-address=tcp://127.0.0.1:601"
     syslog_driver_portmap="-p 601:601"
-elif [[ $log_mode == "json" ]]; then
+elif [[ $log_mode == "docker-json" ]]; then
     jsonlog_containers_mount="-v /var/lib/docker/containers:/var/lib/docker/containers"
-elif [[ $log_mode == "api" ]]; then
+elif [[ $log_mode == "docker-api" ]]; then
     # Using Docker API mode aka docker_raw_logs: false
     echo ""
 else
@@ -72,9 +72,9 @@ fi
 
 # container names for all test containers
 # The suffixes MUST be one of (agent, uploader, verifier) to match verify_upload::DOCKER_CONTNAME_SUFFIXES
-contname_agent="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-agent"
-contname_uploader="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-uploader"
-contname_verifier="ci-agent-docker-${log_mode}-${CIRCLE_BUILD_NUM}-verifier"
+contname_agent="ci-agent-${log_mode}-${CIRCLE_BUILD_NUM}-agent"
+contname_uploader="ci-agent-${log_mode}-${CIRCLE_BUILD_NUM}-uploader"
+contname_verifier="ci-agent-${log_mode}-${CIRCLE_BUILD_NUM}-verifier"
 
 
 # Kill leftover containers
@@ -106,12 +106,10 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-python build_package.py docker_${log_mode}_builder --coverage
+agent_image="agent-ci/scalyr-agent-${log_mode}:${fakeversion}"
 
-# Extract and build agent docker image
-./scalyr-docker-agent-${log_mode}-${fakeversion} --extract-packages
-agent_image="agent-ci/scalyr-agent-docker-${log_mode}:${fakeversion}"
-docker build -t ${agent_image} .
+# Build image by specifying image type through build args.
+docker build -t "$agent_image" -f Dockerfile  --build-arg "BUILD_TYPE=$log_mode" --build-arg MODE=with-coverage .
 
 # Launch Agent container (which begins gathering stdout logs)
 docker run -d --name ${contname_agent} \
