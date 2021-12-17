@@ -59,9 +59,9 @@ def generate_random_line(length):
 
 
 def generate_add_events_request(
-    num_events, line_length, attributes_count, base_body=None
+    num_events, line_length, attributes_count, base_body=None, line_prefix=None, include_event_number=False,
 ):
-    # type: (int, int, int, Optional[dict]) -> AddEventsRequest
+    # type: (int, int, int, Optional[dict], Optional[str], Optional[bool]) -> AddEventsRequest
     """
     Generate AddEventsRequest object with the num_events number of events with the same payload
     payload (line length) size.
@@ -71,11 +71,22 @@ def generate_add_events_request(
 
     add_events_request = AddEventsRequest(base_body=base_body)
 
-    for _ in range(0, num_events):
-        line = generate_random_line(length=line_length)
+    for index in range(0, num_events):
+        generated_line = generate_random_line(length=line_length)
         attributes = generate_random_dict(keys_count=attributes_count)
 
         event = Event(thread_id=100)
+
+        line = b""
+
+        if line_prefix:
+            line += line_prefix.encode("utf-8") + b"-"
+
+        if include_event_number:
+            line += str(index).encode("utf-8") + b"-"
+
+        line += generated_line
+
         event.set_message(line)
         event.add_attributes(attributes)
 
