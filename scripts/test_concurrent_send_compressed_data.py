@@ -91,6 +91,7 @@ def main():
         data = compress_func(add_events_data)
 
         assert len(data) < len(add_events_data)
+        print(("Compression ratio: %.2f" % (len(add_events_data) / len (data))))
 
         res = requests.post(SCALYR_URL, headers=headers, data=data)
         print(("Status code: %s" % (res.status_code)))
