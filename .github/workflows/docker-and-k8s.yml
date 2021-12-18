@@ -1,4 +1,4 @@
-name: Build agent packages.
+name: Build Agent Images
 
 on:
   workflow_call:
@@ -96,7 +96,7 @@ jobs:
 
 #  publish:
 #    needs: [test]
-#    name: Publish image.
+#    name: Publish Docker Image
 #    if: ${{ inputs.publish == true &&  (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
 #    runs-on: ubuntu-latest
 #

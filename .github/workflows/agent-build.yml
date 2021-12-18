@@ -1,5 +1,5 @@
 # The main "setup" workflow, that calls other workflows.
-name: Scalyr Agent Build.
+name: Docker Images Build
 
 on: [push]
 
