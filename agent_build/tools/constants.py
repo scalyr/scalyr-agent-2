@@ -22,6 +22,8 @@ SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 class DockerPlatform(enum.Enum):
     AMD64 = "linux/amd64"
     ARM64 = "linux/arm64"
+    # For Raspberry Pi and other lowe armv7 based ARM platforms
+    ARM = "linux/arm"
 
 
 class Architecture(enum.Enum):
@@ -31,6 +33,7 @@ class Architecture(enum.Enum):
 
     X86_64 = "x86_64"
     ARM64 = "arm64"
+    ARM = "arm"
     UNKNOWN = "unknown"
 
     @property
@@ -42,6 +45,7 @@ class Architecture(enum.Enum):
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.X86_64: DockerPlatform.AMD64,
     Architecture.ARM64: DockerPlatform.ARM64,
+    Architecture.ARM: DockerPlatform.ARM,
     # Handle unknown architecture value as x86_64
     Architecture.UNKNOWN: DockerPlatform.AMD64,
 }
