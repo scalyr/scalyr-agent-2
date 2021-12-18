@@ -99,7 +99,9 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--reuse-local-cache", action="store_true", help="Set to true to enable cache re-use (e.g. when building locally and not on CI)."
+                "--reuse-local-cache",
+                action="store_true",
+                help="Set to true to enable cache re-use (e.g. when building locally and not on CI).",
             )
 
             package_parser.add_argument(

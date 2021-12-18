@@ -850,6 +850,11 @@ class ContainerPackageBuilder(
                         registry_prefix = f"{registry}/"
                     else:
                         registry_prefix = ""
+                    # NOTE: If we are using custom registry and image name already contains user
+                    # prefix, we remove that so it works corectly.
+                    # e.g. scalyr/scalyr-agent-2 -> scalyr-agent-2
+                    if "/" in image_name:
+                        image_name = image_name.split("/")[1]
                     tag_options.append(f"{registry_prefix}{image_name}:{tag}")
 
         command_options = [
