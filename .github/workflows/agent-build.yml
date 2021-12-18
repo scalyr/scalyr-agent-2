@@ -6,7 +6,7 @@ on: [push]
 # Agent Docker image tests
 jobs:
   docker-json:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-json
@@ -15,7 +15,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-syslog:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-syslog
@@ -24,7 +24,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-api:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-api
@@ -34,7 +34,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   k8s:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: k8s
