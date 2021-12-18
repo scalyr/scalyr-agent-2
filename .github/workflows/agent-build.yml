@@ -3,28 +3,10 @@ name: Scalyr Agent Build.
 
 on: [push]
 
-# Agent image tests.
+# Agent Docker image tests
 jobs:
-  match-branches:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Check branches.
-        env:
-          TARGET_BRANCH: master
-
-        # Because of the issue https://github.community/t/ref-head-in-reusable-workflows/203690
-        # there's no way to specify local re-usable workflow. The branch of the workflow has to be specified manually and statically
-        # To avoid confusion, run this check that will fail if the current branch does not match the branch of the workflow.
-        # TODO: Create pre-commit hook that verifies branch name and changes it if needed. That may be a good workaround
-        # until Github add needed feature.
-        if: ${{ github.ref_type == 'branch' && github.ref_name != 'master' && github.ref_name != 'armv7_docker_support' }}
-        uses: actions/github-script@v3
-        with:
-          script: |
-              core.setFailed("The current branch is '${{ github.ref_name }}' but it has to be 'master'")
-
   docker-json:
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-json
@@ -33,6 +15,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-syslog:
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-syslog
@@ -41,6 +24,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-api:
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-api
@@ -50,6 +34,7 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   k8s:
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: k8s
