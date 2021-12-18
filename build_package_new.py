@@ -99,6 +99,10 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
+                "--reuse-local-cache", action="store_true", help="Set to true to enable cache re-use (e.g. when building locally and not on CI)."
+            )
+
+            package_parser.add_argument(
                 "--push", action="store_true", help="Push the result docker image."
             )
 
@@ -152,6 +156,7 @@ if __name__ == "__main__":
             tags=args.tag or [],
             cache_from_path=args.cache_from_dir,
             cache_to_path=args.cache_to_dir,
+            reuse_local_cache=args.reuse_local_cache,
         )
         exit(0)
 

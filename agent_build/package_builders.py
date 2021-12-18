@@ -775,6 +775,7 @@ class ContainerPackageBuilder(
         cache_from_path: str = None,
         cache_to_path: str = None,
         with_coverage: bool = False,
+        reuse_local_cache: bool = False,
     ):
         """
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
@@ -793,6 +794,8 @@ class ContainerPackageBuilder(
             '--cache-to' in docker buildx docs)
         :param with_coverage: Makes docker image to run agent with enabled coverage measuring (Python 'coverage'
             library). Used only for testing.
+        :param reuse_local_cache: Set to True to re-use local cache and not pass CACHE_BUST build arg
+            to the docker command. Useful for local (non-CI) builds.
         """
 
         registries = registries or [""]
@@ -858,11 +861,17 @@ class ContainerPackageBuilder(
             str(dockerfile_path),
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
-            "--build-arg",
-            # Pass current time to this build argument to ensure that all commands after this argument
-            #  won't use caching.
-            f"CACHE_BUST={datetime.datetime.now().isoformat()}",
         ]
+
+        if not reuse_local_cache:
+            command_options.extend(
+                [
+                    "--build-arg",
+                    # Pass current time to this build argument to ensure that all commands after this argument
+                    # won't use caching.
+                    f"CACHE_BUST={datetime.datetime.now().isoformat()}",
+                ]
+            )
 
         # Add caching options if specified.
         if cache_from_path:
