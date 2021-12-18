@@ -24,7 +24,8 @@ class DockerPlatform(enum.Enum):
     ARM64 = "linux/arm64"
     # For Raspberry Pi and other lower powered armv7 based ARM platforms
     ARM = "linux/arm"
-    ARM = "linux/armv7"
+    ARMv7 = "linux/armv7"
+    ARMv8 = "linux/armv8"
 
 
 class Architecture(enum.Enum):
