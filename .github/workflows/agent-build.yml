@@ -18,7 +18,7 @@ jobs:
         # To avoid confusion, run this check that will fail if the current branch does not match the branch of the workflow.
         # TODO: Create pre-commit hook that verifies branch name and changes it if needed. That may be a good workaround
         # until Github add needed feature.
-        if: ${{ github.ref_type == 'branch' && github.ref_name != 'master' }}
+        if: ${{ github.ref_type == 'branch' && github.ref_name != 'master' && github.ref_name != 'armv7_docker_support' }}
         uses: actions/github-script@v3
         with:
           script: |

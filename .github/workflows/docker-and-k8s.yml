@@ -26,7 +26,6 @@ on:
 env:
   DOCKER_BUILDKIT: 1
 
-
 jobs:
   # TODO move here tests from the CicleCi.
   test:
@@ -71,7 +70,6 @@ jobs:
         run: |
           python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
 
-
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
@@ -95,8 +93,6 @@ jobs:
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
-
-
 
 #  publish:
 #    needs: [test]
@@ -127,6 +123,3 @@ jobs:
 #          python3 build_package_new.py ${{ inputs.image-type }} \
 #            --push \
 #            --tag ${{ github.sha }}
-
-
-
