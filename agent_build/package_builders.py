@@ -776,6 +776,7 @@ class ContainerPackageBuilder(
         cache_to_path: str = None,
         with_coverage: bool = False,
         reuse_local_cache: bool = False,
+        remove_image_name_prefix: bool = False,
     ):
         """
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
@@ -796,6 +797,8 @@ class ContainerPackageBuilder(
             library). Used only for testing.
         :param reuse_local_cache: Set to True to re-use local cache and not pass CACHE_BUST build arg
             to the docker command. Useful for local (non-CI) builds.
+        :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
+            For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
         """
 
         registries = registries or [""]
@@ -851,9 +854,10 @@ class ContainerPackageBuilder(
                     else:
                         registry_prefix = ""
                     # NOTE: If we are using custom registry and image name already contains user
-                    # prefix, we remove that so it works corectly.
+                    # prefix, we remove it in case remove_image_prefix argument is provided (
+                    # this is desired in a lot of cases when using custom registry)
                     # e.g. scalyr/scalyr-agent-2 -> scalyr-agent-2
-                    if "/" in image_name:
+                    if remove_image_name_prefix and "/" in image_name:
                         image_name = image_name.split("/")[1]
                     tag_options.append(f"{registry_prefix}{image_name}:{tag}")
 
