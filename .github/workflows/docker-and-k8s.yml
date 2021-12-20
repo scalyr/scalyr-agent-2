@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       image-type:
-        description: "Name of the image build type."
+        description: "Name of the image build type (docker-json, docker-syslog, docker-api, k8s)."
         required: true
         type: string
       python-version:
@@ -97,7 +97,7 @@ jobs:
 #  publish:
 #    needs: [test]
 #    name: Publish Docker Image
-#    if: ${{ inputs.publish == true &&  (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+#    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
 #    runs-on: ubuntu-latest
 #
 #    steps:
