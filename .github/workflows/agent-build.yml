@@ -6,25 +6,28 @@ on: [push]
 # Agent Docker image tests
 jobs:
   docker-json:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-json
+      publish: true
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   docker-syslog:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-syslog
+      publish: true
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   docker-api:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-api
@@ -32,12 +35,16 @@ jobs:
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   k8s:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'armv7_docker_support' }}
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: k8s
+      publish: true
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
