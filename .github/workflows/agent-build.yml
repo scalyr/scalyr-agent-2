@@ -6,8 +6,7 @@ on: [push]
 # Agent Docker image tests
 jobs:
   docker-json:
-    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-json
       publish: true
@@ -18,8 +17,7 @@ jobs:
       DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   docker-syslog:
-    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-syslog
       publish: true
@@ -30,8 +28,7 @@ jobs:
       DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   docker-api:
-    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: docker-api
       publish: false
@@ -42,8 +39,7 @@ jobs:
       DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
   k8s:
-    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
     with:
       image-type: k8s
       publish: true

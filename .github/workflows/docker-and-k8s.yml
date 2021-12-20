@@ -101,8 +101,7 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test') }}
-    # if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
     runs-on: ubuntu-latest
 
     steps:
