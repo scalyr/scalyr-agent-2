@@ -141,7 +141,7 @@ jobs:
           mkdir -p ~/docker-image-build-cache
           # If cache exists, then it goes to the input of the build.
           mv ~/docker-image-build-cache ~/docker-image-build-cache-in
-          # If cache does not exist, then create a new epty cache directory,
+          # If cache does not exist, then create a new empty cache directory,
           # where a new build cache will be stored.
           mkdir -p ~/docker-image-build-cache
 
