@@ -99,6 +99,23 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
+                "--reuse-local-cache",
+                action="store_true",
+                help="Enable Docker image cache re-use (e.g. when building locally and not on CI).",
+            )
+
+            package_parser.add_argument(
+                "--remove-image-name-prefix",
+                action="store_true",
+                help=(
+                    "True to remove user / org name prefix from the image name when using a custom registry. This "
+                    "is usually a desired behavior when using a custom registry url where the user or "
+                    "the organization name doesn't match one specified in the Docker image name. E.g. "
+                    "scalyr/scalyr-k8s-agent -> scalyr-k8s-agent."
+                ),
+            )
+
+            package_parser.add_argument(
                 "--push", action="store_true", help="Push the result docker image."
             )
 
@@ -152,6 +169,8 @@ if __name__ == "__main__":
             tags=args.tag or [],
             cache_from_path=args.cache_from_dir,
             cache_to_path=args.cache_to_dir,
+            reuse_local_cache=args.reuse_local_cache,
+            remove_image_name_prefix=args.remove_image_name_prefix,
         )
         exit(0)
 

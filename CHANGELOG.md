@@ -12,8 +12,12 @@ Improvements:
 * Add support for specifying new ``server_url`` config option for each session worker. This allows user to configure different session workers to use different server urls (e.g. some workers send data to agent.scalyr.com and other send data to eu.scalyr.com).
 
 Other:
-* Update agent Docker image to include ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
 * Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
+
+Docker Images:
+* Docker images now utilize Python 3.8 (in the past they used Python 2.7).
+* Docker images are now also produced and pushed to the registry for the ``linux/arm64`` and ``linux/arm/v7`` architecture.
+* Docker image now includes ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
 
 ## 2.1.25 "Hamarus" - Nov 17, 2021
 

@@ -1,4 +1,4 @@
-name: Build agent packages.
+name: Build Agent Images
 
 on:
   workflow_call:
@@ -25,7 +25,6 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
-
 
 jobs:
   # TODO move here tests from the CicleCi.
@@ -71,7 +70,6 @@ jobs:
         run: |
           python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
 
-
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
@@ -96,11 +94,9 @@ jobs:
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
 
-
-
 #  publish:
 #    needs: [test]
-#    name: Publish image.
+#    name: Publish Docker Image
 #    if: ${{ inputs.publish == true &&  (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
 #    runs-on: ubuntu-latest
 #
@@ -127,6 +123,3 @@ jobs:
 #          python3 build_package_new.py ${{ inputs.image-type }} \
 #            --push \
 #            --tag ${{ github.sha }}
-
-
-

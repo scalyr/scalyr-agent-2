@@ -1,7 +1,14 @@
 # dependencies for docker images.
-ujson==1.35
-orjson==3.5.2; python_version >= '3.6'
-orjson==2.0.11; python_version == '3.5'
+# NOTE: ujson and orjson don't include pre-built wheels for ARMv7 so we don't
+# include those for armv7 builds and simply fall back to json.
+# Alernative would be to install rust + arm toolchain in the build docker image
+# and instead of using pre-built wheel we would compile wheel in docker image
+# (slow)
+# Keep in mind that wheels are available for ARM64 (e.g. graviton) so we do use
+# those on linux/arm64
+ujson==1.35; 'armv7' not in platform_machine
+orjson==3.5.2; python_version >= '3.6' and 'armv7' not in platform_machine
+orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine
 # Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
 # default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
 # end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
@@ -12,3 +19,5 @@ pympler==0.8
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.20.0
 docker==4.1.0
+zstandard==0.16.0; python_version >= '3.5'
+zstandard==0.14.1; python_version < '3.5'

@@ -775,6 +775,8 @@ class ContainerPackageBuilder(
         cache_from_path: str = None,
         cache_to_path: str = None,
         with_coverage: bool = False,
+        reuse_local_cache: bool = False,
+        remove_image_name_prefix: bool = False,
     ):
         """
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
@@ -793,6 +795,10 @@ class ContainerPackageBuilder(
             '--cache-to' in docker buildx docs)
         :param with_coverage: Makes docker image to run agent with enabled coverage measuring (Python 'coverage'
             library). Used only for testing.
+        :param reuse_local_cache: Set to True to re-use local cache and not pass CACHE_BUST build arg
+            to the docker command. Useful for local (non-CI) builds.
+        :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
+            For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
         """
 
         registries = registries or [""]
@@ -847,6 +853,12 @@ class ContainerPackageBuilder(
                         registry_prefix = f"{registry}/"
                     else:
                         registry_prefix = ""
+                    # NOTE: If we are using custom registry and image name already contains user
+                    # prefix, we remove it in case remove_image_prefix argument is provided (
+                    # this is desired in a lot of cases when using custom registry)
+                    # e.g. scalyr/scalyr-agent-2 -> scalyr-agent-2
+                    if remove_image_name_prefix and "/" in image_name:
+                        image_name = image_name.split("/")[1]
                     tag_options.append(f"{registry_prefix}{image_name}:{tag}")
 
         command_options = [
@@ -858,11 +870,17 @@ class ContainerPackageBuilder(
             str(dockerfile_path),
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
-            "--build-arg",
-            # Pass current time to this build argument to ensure that all commands after this argument
-            #  won't use caching.
-            f"CACHE_BUST={datetime.datetime.now().isoformat()}",
         ]
+
+        if not reuse_local_cache:
+            command_options.extend(
+                [
+                    "--build-arg",
+                    # Pass current time to this build argument to ensure that all commands after this argument
+                    # won't use caching.
+                    f"CACHE_BUST={datetime.datetime.now().isoformat()}",
+                ]
+            )
 
         # Add caching options if specified.
         if cache_from_path:
@@ -893,7 +911,8 @@ class ContainerPackageBuilder(
             command_options.append(
                 constants.Architecture.ARM64.as_docker_platform.value
             )
-
+            command_options.append("--platform")
+            command_options.append(constants.Architecture.ARM.as_docker_platform.value)
         if with_coverage:
             logging.info("Code coverage enabled.")
             # Build image with enabled coverage measuring.
