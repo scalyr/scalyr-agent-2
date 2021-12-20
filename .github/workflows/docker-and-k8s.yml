@@ -126,7 +126,8 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-      - name: Push image useing the master branch commit SHA.
+      - name: Push image using the master branch commit SHA.
+        if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           # NOTE: --remove-image-name-prefix is needed in case Docker hub
           # usename is not scalyr
@@ -135,3 +136,15 @@ jobs:
             --remove-image-name-prefix \
             --push \
             --tag ${{ github.sha }}
+
+      - name: Push image using the tag.
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+
+          tag_options=$(python3 scripts/cicd/verify_and_image_publish_tag.py ${{ github.ref_name }})
+
+          python3 build_package_new.py ${{ inputs.image-type }} \
+            --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
+            --remove-image-name-prefix \
+            --push \
+            $tag_options
