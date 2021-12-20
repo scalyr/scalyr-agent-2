@@ -129,7 +129,10 @@ jobs:
 
       - name: Push image useing the master branch commit SHA.
         run: |
+          # NOTE: --remove-image-name-prefix is needed in case Docker hub
+          # usename is not scalyr
           python3 build_package_new.py ${{ inputs.image-type }} \
-            --registry "${{ secrets.DOCKER_HUB_USERNAME}}"
+            --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
+            --remove-image-name-prefix \
             --push \
             --tag ${{ github.sha }}
