@@ -19,4 +19,5 @@ pympler==0.8
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.20.0
 docker==4.1.0
-zstandard==0.16.0
+zstandard==0.16.0; python_version >= '3.5'
+zstandard==0.14.1; python_version < '3.5'
