@@ -27,4 +27,5 @@ class BaseMonitorBuilder(AgentImageBuilder):
     INCLUDE_PATHS = [
         Path(get_install_root(), "agent_build/requirement-files"),
         Path(get_install_root(), "dev-requirements.txt"),
+        Path(get_install_root(), "agent_build"),
     ]

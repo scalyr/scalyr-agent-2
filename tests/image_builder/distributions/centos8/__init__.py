@@ -33,6 +33,7 @@ class CentOSBuilderBase(AgentImageBuilder):
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
     INCLUDE_PATHS = [
         Path(get_install_root(), "dev-requirements.txt"),
+        Path(get_install_root(), "agent_build"),
     ]
 
 

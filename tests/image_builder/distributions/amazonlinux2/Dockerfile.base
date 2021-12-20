@@ -3,6 +3,7 @@ RUN yum install -y initscripts python2 python3 gcc
 RUN yum install -y python2-pip python2-devel python3-pip python3-devel
 
 COPY dev-requirements.txt dev-requirements.txt
+ADD agent_build/requirement-files agent_build/requirement-files
 
 RUN python -m pip install -r dev-requirements.txt
 # We need newer version of pip since old version don't support manylinux wheels
