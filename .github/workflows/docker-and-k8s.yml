@@ -141,7 +141,7 @@ jobs:
         if: ${{ github.ref_type == 'tag' }}
         run: |
 
-          tag_options=$(python3 scripts/cicd/verify_and_image_publish_tag.py ${{ github.ref_name }})
+          tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py.py ${{ github.ref_name }})
 
           python3 build_package_new.py ${{ inputs.image-type }} \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
