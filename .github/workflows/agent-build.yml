@@ -6,8 +6,8 @@ on: [push]
 # Agent Docker image tests
 jobs:
   docker-json:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
     with:
       image-type: docker-json
     secrets:
@@ -15,8 +15,8 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-syslog:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
     with:
       image-type: docker-syslog
     secrets:
@@ -24,8 +24,8 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   docker-api:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
     with:
       image-type: docker-api
       publish: false
@@ -34,8 +34,8 @@ jobs:
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
 
   k8s:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_name == 'master' || github.ref_name == 'docker_image_push_test' }}
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    if: ${{ github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test' || github.ref_name == 'docker_image_push_test' }}
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@docker_image_push_test
     with:
       image-type: k8s
     secrets:

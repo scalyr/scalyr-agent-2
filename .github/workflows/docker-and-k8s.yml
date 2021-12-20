@@ -34,17 +34,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install python.
+      - name: Install python
         uses: actions/setup-python@v2
         with:
           python-version: ${{ inputs.python-version }}
 
-      - name: Perform the deployment of the test environment.
+      - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
           deployment-name: "test_environment"
 
-      - name: Sanity check deployments logic by running internal tests.
+      - name: Sanity check deployments logic by running internal tests
         run: |
           python3 -m pytest agent_build/tools/tests
 
@@ -60,13 +60,13 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Start minikube for the test of the kubernetes build.
+      - name: Start minikube for the test of the kubernetes build
         if: inputs.image-type == 'k8s'
         shell: bash
         run: |
           minikube start
 
-      - name: Get checksum of the base image files..
+      - name: Get checksum of the base image files
         run: |
           python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
 
@@ -76,7 +76,7 @@ jobs:
           path: ~/docker-test-image-build-cache
           key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
 
-      - name: Run image test.
+      - name: Run image test
         env:
             SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
