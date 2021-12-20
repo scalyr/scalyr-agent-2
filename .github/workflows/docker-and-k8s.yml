@@ -32,74 +32,74 @@ env:
 
 jobs:
   # TODO move here tests from the CicleCi.
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Install python
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
-        with:
-          deployment-name: "test_environment"
-
-      - name: Sanity check deployments logic by running internal tests
-        run: |
-          python3 -m pytest agent_build/tools/tests
-
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v1
-        with:
-          image: tonistiigi/binfmt:qemu-v6.1.0
-          platforms: all
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          driver-opts: network=host
-
-      - name: Start minikube for the test of the kubernetes build
-        if: inputs.image-type == 'k8s'
-        shell: bash
-        run: |
-          minikube start
-
-      - name: Get checksum of the base image files
-        run: |
-          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
-
-      - name: Check for the docker buildx cache.
-        uses: actions/cache@v2
-        with:
-          path: ~/docker-test-image-build-cache
-          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
-
-      - name: Run image test
-        env:
-            SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
-        run: |
-
-          mkdir -p ~/docker-test-image-build-cache
-          # If cache exists, then it goes to the input of the build.
-          mv ~/docker-test-image-build-cache ~/docker-test-image-build-cache-in
-          # If cache does not exist, then create a new epty cache directory,
-          # where a new build cache will be stored.
-          mkdir -p ~/docker-test-image-build-cache
-
-          python3 tests/package_tests/run_package_test.py package-test \
-            ${{ inputs.image-type}}_test \
-            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
-            --cache-from-dir ~/docker-test-image-build-cache-in \
-            --cache-to-dir ~/docker-test-image-build-cache
+#  test:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v2
+#
+#      - name: Install python
+#        uses: actions/setup-python@v2
+#        with:
+#          python-version: ${{ inputs.python-version }}
+#
+#      - name: Perform the deployment of the test environment
+#        uses: ./.github/actions/perform-deployment
+#        with:
+#          deployment-name: "test_environment"
+#
+#      - name: Sanity check deployments logic by running internal tests
+#        run: |
+#          python3 -m pytest agent_build/tools/tests
+#
+#      - name: Set up QEMU
+#        id: qemu
+#        uses: docker/setup-qemu-action@v1
+#        with:
+#          image: tonistiigi/binfmt:qemu-v6.1.0
+#          platforms: all
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v1
+#        with:
+#          driver-opts: network=host
+#
+#      - name: Start minikube for the test of the kubernetes build
+#        if: inputs.image-type == 'k8s'
+#        shell: bash
+#        run: |
+#          minikube start
+#
+#      - name: Get checksum of the base image files
+#        run: |
+#          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
+#
+#      - name: Check for the docker buildx cache.
+#        uses: actions/cache@v2
+#        with:
+#          path: ~/docker-test-image-build-cache
+#          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
+#
+#      - name: Run image test
+#        env:
+#            SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+#        run: |
+#
+#          mkdir -p ~/docker-test-image-build-cache
+#          # If cache exists, then it goes to the input of the build.
+#          mv ~/docker-test-image-build-cache ~/docker-test-image-build-cache-in
+#          # If cache does not exist, then create a new epty cache directory,
+#          # where a new build cache will be stored.
+#          mkdir -p ~/docker-test-image-build-cache
+#
+#          python3 tests/package_tests/run_package_test.py package-test \
+#            ${{ inputs.image-type}}_test \
+#            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+#            --cache-from-dir ~/docker-test-image-build-cache-in \
+#            --cache-to-dir ~/docker-test-image-build-cache
 
   publish:
-    needs: [test]
+#    needs: [test]
     name: Publish Docker Image
     if: ${{ inputs.publish == true && (github.ref == 'refs/heads/add-images-prod-push' || github.ref_type == 'tag') }}
     runs-on: ubuntu-latest
@@ -135,16 +135,17 @@ jobs:
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --remove-image-name-prefix \
             --push \
-            --tag ${{ github.sha }}
+            --tag ${{ github.sha }} \
+            --cache-to-dir /tmp/prod_build_cache
 
       - name: Push image using the tag.
         if: ${{ github.ref_type == 'tag' }}
         run: |
-
           tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py ${{ github.ref_name }})
 
           python3 build_package_new.py ${{ inputs.image-type }} \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --remove-image-name-prefix \
             --push \
+            --cache-from-dir /tmp/prod_build_cache
             $tag_options
