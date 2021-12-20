@@ -124,12 +124,12 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
-          username: ${{ DOCKER_HUB_USERNAME }}
-          password: ${{ DOCKER_HUB_PASSWORD }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
       - name: Push image useing the master branch commit SHA.
         run: |
           python3 build_package_new.py ${{ inputs.image-type }} \
-            --registry "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}"
+            --registry "${{ secrets.DOCKER_HUB_USERNAME}}"
             --push \
             --tag ${{ github.sha }}
