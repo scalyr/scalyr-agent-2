@@ -101,7 +101,7 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/add-images-prod-push' || github.ref_type == 'tag') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -127,7 +127,7 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
       - name: Push image using the master branch commit SHA.
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref == 'refs/heads/add-images-prod-push' }}
         run: |
           # NOTE: --remove-image-name-prefix is needed in case Docker hub
           # usename is not scalyr
