@@ -22,6 +22,10 @@ on:
         required: true
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY:
         required: true
+      DOCKER_HUB_USERNAME:
+        required: true
+      DOCKER_HUB_PASSWORD:
+        required: true
 
 env:
   DOCKER_BUILDKIT: 1
@@ -120,8 +124,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
+          username: ${{ DOCKER_HUB_USERNAME }}
+          password: ${{ DOCKER_HUB_PASSWORD }}
 
       - name: Push image useing the master branch commit SHA.
         run: |
