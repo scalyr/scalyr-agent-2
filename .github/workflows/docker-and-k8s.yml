@@ -15,7 +15,7 @@ on:
         description: "If true, then the result image will be published on master branch or any tag."
         type: boolean
         required: false
-        default: true
+        default: false
 
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN:
@@ -97,7 +97,7 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ (github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/docker_image_push_test' || github.ref_name == 'docker_image_push_test') }}
     # if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
     runs-on: ubuntu-latest
 
