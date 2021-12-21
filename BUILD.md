@@ -54,7 +54,7 @@ python3 build_package_new.py <build_name> --push --registry my-dockerhub-user --
 
 * Right now we provide Debian buster-slim and Alpine linux based images for the following platforms:
   * ``linux/amd64``
-  * `` linux/arm64``
+  * ``linux/arm64``
   * ``linux/arm/v7``
 
   Alpine based Linux images are around 50% smaller in size than Debian based ones and can be recognized
