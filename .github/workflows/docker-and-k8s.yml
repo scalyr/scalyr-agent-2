@@ -158,7 +158,7 @@ jobs:
           mkdir -p ~/docker-image-build-cache
 
       - name: Push image using the master branch commit SHA.
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/docker_image_alpine') }}
         run: |
           # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
           python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" \
