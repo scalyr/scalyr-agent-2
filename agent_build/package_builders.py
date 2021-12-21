@@ -1042,12 +1042,6 @@ DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
     config_path=_CONFIGS_PATH / "docker-api-config",
     dockerfile_path=pl.Path("Dockerfile.buster"),
 )
-
-DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
-    name="docker-api-alpine",
-    config_path=_CONFIGS_PATH / "docker-api-config",
-    dockerfile_path=pl.Path("Dockerfile.alpine"),
-)
 DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     name="docker-api-alpine",
     config_path=_CONFIGS_PATH / "docker-api-config",
