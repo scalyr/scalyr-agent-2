@@ -38,7 +38,7 @@ RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup 
 RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup target add x86_64-unknown-linux-musl; fi
 #RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup target add armv7-unknown-linux-musleabihf; fi
 
-ADD docker/requirements.txt /tmp/requirements.txt
+ADD docker/requirements-alpine.txt /tmp/requirements.txt
 
 # install python dependencies
 RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi

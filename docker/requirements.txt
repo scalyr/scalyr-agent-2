@@ -1,4 +1,4 @@
-# dependencies for docker images.
+# Python dependencies for docker images.
 # NOTE: orjson and zstandard dependencies don't include pre-built wheels for ARMv7 for glibc and
 # musl.
 # To avoid very slow cross architecture builds using QEMU on CI we don't (for now) include orjso
