@@ -73,13 +73,13 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
-          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
+          python3 build_package_new.py "${{ inputs.image-type }}-buster" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
           path: ~/docker-test-image-build-cache
-          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
+          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-buster-${{ hashFiles('image_files_checksum.txt') }}
 
       - name: Run image test
         env:
@@ -94,7 +94,7 @@ jobs:
           mkdir -p ~/docker-test-image-build-cache
 
           python3 tests/package_tests/run_package_test.py package-test \
-            ${{ inputs.image-type }}_test \
+           "${{ inputs.image-type }}_buster_test" \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
@@ -109,9 +109,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile_name: "Dockerfile"
+          - image_distro_name: "buster"
             image_tag_suffix: ""
-          - dockerfile_name: "Dockerfile.alpine"
+          - image_distro_name: "alpine"
             image_tag_suffix: "-alpine"
 
     steps:
@@ -139,7 +139,7 @@ jobs:
       - name: Push image useing the master branch commit SHA.
         run: |
           # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
-          python3 build_package_new.py ${{ inputs.image-type }} \
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --dockerfile-name "${{ matrix.dockerfile_name }}" \
             --remove-image-name-prefix \
