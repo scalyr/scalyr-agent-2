@@ -302,6 +302,7 @@ for builder in [
     package_builders.K8S_CONTAINER_BUILDER_BUSTER,
     package_builders.DOCKER_JSON_CONTAINER_BUILDER_ALPINE,
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
+    package_builders.DOCKER_API_CONTAINER_BUILDER_ALPINE,
     package_builders.K8S_CONTAINER_BUILDER_ALPINE,
 ]:
     test = DockerImagePackageTest(
@@ -323,5 +324,6 @@ for builder in [
     K8S_TEST_BUSTER,
     DOCKER_JSON_TEST_ALPINE,
     DOCKER_SYSLOG_TEST_ALPINE,
+    DOCKER_API_TEST_ALPINE,
     K8S_TEST_BUSTER_ALPINE,
 ) = _docker_image_tests
