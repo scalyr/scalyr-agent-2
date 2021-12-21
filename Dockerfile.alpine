@@ -25,7 +25,6 @@ RUN apk update && apk add --virtual build-dependencies \
     git
 
 ARG TARGETPLATFORM
-RUN echo "I'm building for $TARGETPLATFORM"
 
 # Install Rust and Cargo which is needed to build some Python wheels such as orjson
 # NOTE: Right now rustup doesn't support armv7 musl yet so we don't install rust on armv7
