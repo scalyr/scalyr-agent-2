@@ -369,6 +369,11 @@ class PackageBuilder(abc.ABC):
         # readable by others.
         agent_d_path.chmod(int("741", 8))
 
+        # Also iterate through all files in the agent.d and set appropriate permissions.
+        for child_path in agent_d_path.iterdir():
+            if child_path.is_file():
+                child_path.chmod(int("640", 8))
+
     @staticmethod
     def _add_certs(
         path: Union[str, pl.Path], intermediate_certs=True, copy_other_certs=True
