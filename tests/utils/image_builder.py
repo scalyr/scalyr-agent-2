@@ -17,9 +17,9 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import shutil
-import docker
 import argparse
 import hashlib
+from abc import ABCMeta
 
 if False:  # NOSONAR
     from typing import Optional
@@ -28,8 +28,7 @@ if False:  # NOSONAR
     from typing import Dict
     from typing import Callable
 
-from abc import ABCMeta
-
+import docker
 import six
 
 from scalyr_agent.__scalyr__ import get_package_root

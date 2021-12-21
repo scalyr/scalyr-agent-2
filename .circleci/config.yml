@@ -72,7 +72,7 @@ parameters:
   cache_version_py_dependencies:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
-    default: "v4"
+    default: "v6"
   is_release_build:
     description: "Only true when the pipeline is triggered for the release."
     type: boolean

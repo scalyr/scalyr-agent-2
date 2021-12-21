@@ -432,6 +432,7 @@ if __name__ == "__main__":
         ),
         *glob.glob(os.path.join(root, "agent_build/**/*.py"), recursive=True),
         *glob.glob(os.path.join(root, "tests/package_tests/**/*.py"), recursive=True),
+        *glob.glob(os.path.join(root, "scripts/cicd/*.py"), recursive=True),
         os.path.join(root, "build_package_new.py"),
     }
 
