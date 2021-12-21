@@ -43,7 +43,6 @@ jobs:
           - image_distro_name: "buster"
           - image_distro_name: "alpine"
 
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
