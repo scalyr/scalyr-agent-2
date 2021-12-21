@@ -122,8 +122,11 @@ jobs:
           # on Alpine Linux
           - image_distro_name: "buster"
             image_tag_suffix: ""
+            image_tag_suffix_full: ""
+          # NOTE: For non empty suffixes, "image_tag_suffix_full" version needs to contain leading "-"
           - image_distro_name: "alpine"
             image_tag_suffix: "alpine"
+            image_tag_suffix_full: "-alpine"
 
     steps:
       - name: Checkout repository
@@ -175,14 +178,14 @@ jobs:
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --remove-image-name-prefix \
             --push \
-            --tag "${{ github.sha }}-${{ matrix.image_tag_suffix }}" \
+            --tag "${{ github.sha }}${{ matrix.image_tag_suffix_full }}" \
             --cache-from-dir ~/docker-image-build-cache-in \
             --cache-to-dir ~/docker-image-build-cache
 
       - name: Push image using the tag.
         if: ${{ github.ref_type == 'tag' }}
         run: |
-          tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py "${{ github.ref_name }})"
+          tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py "${{ github.ref_name }})" --sufix "${{ matrix.image_tag_suffix }}"
 
           python3 build_package_new.py ${{ inputs.image-type }} \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
