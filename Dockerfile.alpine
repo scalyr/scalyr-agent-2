@@ -66,7 +66,7 @@ ENV AGENT_BUILD_IN_DOCKER=1
 # e.g. k8s, docker-json
 ARG BUILD_TYPE
 # e.g. k8s-buster, docker-json-buster, k8s-alpine
-ARG BUILDER_NAME
+ARG BUILDER_NAME=alpine
 
 ADD . /scalyr-agent-2
 

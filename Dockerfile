@@ -43,7 +43,7 @@ ENV AGENT_BUILD_IN_DOCKER=1
 # e.g. k8s, docker-json
 ARG BUILD_TYPE
 # e.g. k8s-buster, docker-json-buster, k8s-alpine
-ARG BUILDER_NAME
+ARG BUILDER_NAME=buster
 ADD . /scalyr-agent-2
 
 RUN python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build
