@@ -52,10 +52,13 @@ python3 build_package_new.py <build_name> --push --registry my-dockerhub-user --
 
 ## Supported Images and Architectures
 
- Right now we provide Debian buster-slim and Alpine linux based images for the following platforms:
+Right now we provide Debian buster-slim and Alpine linux based images for the following platforms:
   * ``linux/amd64``
   * ``linux/arm64``
   * ``linux/arm/v7``
 
 Alpine based Linux images are around 50% smaller in size than Debian based ones and can be recognized
 using ``-alpine`` tag name suffix (e.g. ``latest-alpine``).
+
+Since cross compilation in emulated environments (QEMU) is very slow and pre-built ARM musl wheels
+are not available, we don't bundle orjson and zstandard dependency in Alpine ARMv7 images.
