@@ -41,7 +41,7 @@ RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup 
 ADD docker/requirements.txt /tmp/requirements.txt
 
 # install python dependencies
-RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi
+RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi
 RUN if [[ ${TARGETPLATFORM} = "linux/arm/v7" ]]; then pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi
 
 ARG CACHE_BUST=1
