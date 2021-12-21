@@ -53,7 +53,8 @@ ENV AGENT_BUILD_IN_DOCKER=1
 ARG BUILD_TYPE
 ADD . /scalyr-agent-2
 
-RUN . ~/.cargo/env && python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
+RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build; fi
+RUN if [[ ${TARGETPLATFORM} = "linux/arm/v7" ]]; then python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build; fi
 
 WORKDIR /tmp/container-fs
 RUN tar -xf /tmp/build/scalyr-agent.tar.gz
