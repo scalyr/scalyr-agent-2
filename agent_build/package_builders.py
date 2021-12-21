@@ -912,7 +912,9 @@ class ContainerPackageBuilder(
                 constants.Architecture.ARM64.as_docker_platform.value
             )
             command_options.append("--platform")
-            command_options.append(constants.Architecture.ARM.as_docker_platform.value)
+            command_options.append(
+                constants.Architecture.ARMV7.as_docker_platform.value
+            )
         if with_coverage:
             logging.info("Code coverage enabled.")
             # Build image with enabled coverage measuring.

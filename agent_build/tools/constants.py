@@ -24,8 +24,8 @@ class DockerPlatform(enum.Enum):
     ARM64 = "linux/arm64"
     # For Raspberry Pi and other lower powered armv7 based ARM platforms
     ARM = "linux/arm"
-    ARMv7 = "linux/armv7"
-    ARMv8 = "linux/armv8"
+    ARMV7 = "linux/arm/v7"
+    ARMV8 = "linux/arm/v8"
 
 
 class Architecture(enum.Enum):
@@ -36,6 +36,8 @@ class Architecture(enum.Enum):
     X86_64 = "x86_64"
     ARM64 = "arm64"
     ARM = "arm"
+    ARMV7 = "armv7"
+    ARMV8 = "armv8"
     UNKNOWN = "unknown"
 
     @property
@@ -48,6 +50,8 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.X86_64: DockerPlatform.AMD64,
     Architecture.ARM64: DockerPlatform.ARM64,
     Architecture.ARM: DockerPlatform.ARM,
+    Architecture.ARMV7: DockerPlatform.ARMV7,
+    Architecture.ARMV8: DockerPlatform.ARMV8,
     # Handle unknown architecture value as x86_64
     Architecture.UNKNOWN: DockerPlatform.AMD64,
 }
