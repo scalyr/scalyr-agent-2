@@ -300,6 +300,9 @@ for builder in [
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER,
     package_builders.DOCKER_API_CONTAINER_BUILDER_BUSTER,
     package_builders.K8S_CONTAINER_BUILDER_BUSTER,
+    package_builders.DOCKER_JSON_CONTAINER_BUILDER_ALPINE,
+    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
+    package_builders.K8S_CONTAINER_BUILDER_ALPINE,
 ]:
     test = DockerImagePackageTest(
         base_name=f"{builder.name}_test",
@@ -313,4 +316,12 @@ for builder in [
     )
     _docker_image_tests.append(test)
 
-DOCKER_JSON_TEST, DOCKER_SYSLOG_TEST, DOCKER_API_TEST, K8S_TEST = _docker_image_tests
+(
+    DOCKER_JSON_TEST_BUSTER,
+    DOCKER_SYSLOG_TEST_BUSTER,
+    DOCKER_API_TEST_BUSTER,
+    K8S_TEST_BUSTER,
+    DOCKER_JSON_TEST_ALPINE,
+    DOCKER_SYSLOG_TEST_ALPINE,
+    K8S_TEST_BUSTER_ALPINE,
+) = _docker_image_tests
