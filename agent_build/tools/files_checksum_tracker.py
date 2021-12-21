@@ -80,7 +80,6 @@ class FilesChecksumTracker:
         for file_path in self._original_files:
             logging.debug(f"Adding file {file_path} for checksum calculation")
             sha256.update(str(file_path.relative_to(constants.SOURCE_ROOT)).encode())
-            sha256.update(str(file_path.stat().st_mode).encode())
             sha256.update(file_path.read_bytes())
 
         if additional_seed:
