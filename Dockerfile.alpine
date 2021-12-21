@@ -40,9 +40,22 @@ RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup 
 
 ADD docker/requirements-alpine.txt /tmp/requirements.txt
 
+# Workaround so we can use pre-built orjson wheel for musl. We need to pin pip to older version for
+# manylinux2014 wheel format to work.
+# See https://github.com/ijl/orjson/issues/8 for details.
+# If we don't that and we include orjson and zstandard, we need rust chain and building the image
+# will be very slow due to cross compilation in emulated environment (QEMU)
+RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py
+RUN pip install "pip==20.2.2" --user
+
 # install python dependencies
 RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi
 RUN if [[ ${TARGETPLATFORM} = "linux/arm/v7" ]]; then pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; fi
+
+# Clean up files which were installed to use manylinux2014 workaround
+RUN pip uninstall -y pip
+RUN pip --version
+RUN rm /usr/local/lib/python3.8/_manylinux.py
 
 ARG CACHE_BUST=1
 ARG AGENT_BUILD_DEBUG

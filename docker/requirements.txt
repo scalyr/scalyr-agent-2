@@ -1,7 +1,7 @@
 # Python dependencies for docker images.
 # NOTE: orjson and zstandard dependencies don't include pre-built wheels for ARMv7 for glibc and
 # musl.
-# To avoid very slow cross architecture builds using QEMU on CI we don't (for now) include orjso
+# To avoid very slow cross architecture builds using QEMU on CI we don't (for now) include orjson
 # and zstandard dependencies. Both of those dependencies are optional.
 # Keep in mind that pre-built wheels are available for ARM64 (e.g. graviton) so we do use those on
 # linux/arm64
