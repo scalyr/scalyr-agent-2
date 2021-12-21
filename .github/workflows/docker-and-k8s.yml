@@ -81,6 +81,7 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum --debug
           python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
@@ -148,6 +149,7 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum --debug
           python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
