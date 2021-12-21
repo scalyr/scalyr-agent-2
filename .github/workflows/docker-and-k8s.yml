@@ -141,7 +141,6 @@ jobs:
           # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
           python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
-            --dockerfile-name "${{ matrix.dockerfile_name }}" \
             --remove-image-name-prefix \
             --push \
             --tag "${{ github.sha }}${{ matrix.image_tag_suffix }}"
