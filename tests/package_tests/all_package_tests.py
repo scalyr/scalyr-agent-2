@@ -296,10 +296,10 @@ class DockerImagePackageTest(Test):
 # Create tests for the all docker images (json/syslog/api) and for k8s image.
 _docker_image_tests = []
 for builder in [
-    package_builders.DOCKER_JSON_CONTAINER_BUILDER,
-    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER,
-    package_builders.DOCKER_API_CONTAINER_BUILDER,
-    package_builders.K8S_CONTAINER_BUILDER,
+    package_builders.DOCKER_JSON_CONTAINER_BUILDER_BUSTER,
+    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER,
+    package_builders.DOCKER_API_CONTAINER_BUILDER_BUSTER,
+    package_builders.K8S_CONTAINER_BUILDER_BUSTER,
 ]:
     test = DockerImagePackageTest(
         base_name=f"{builder.name}_test",

@@ -150,7 +150,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Find the builder class.
-    package_builder = package_builders.ALL_PACKAGE_BUILDERS[args.package_name]
+    builder_name = args.package_name
+    package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
 
     logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
 
@@ -177,7 +178,6 @@ if __name__ == "__main__":
             cache_to_path=args.cache_to_dir,
             reuse_local_cache=args.reuse_local_cache,
             remove_image_name_prefix=args.remove_image_name_prefix,
-            dockerfile_name=args.dockerfile_name,
         )
         exit(0)
 

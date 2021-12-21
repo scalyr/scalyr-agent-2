@@ -40,10 +40,13 @@ ARG AGENT_BUILD_DEBUG
 ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 # Special env. variable that will enable addional logging info about that command runs in docker.
 ENV AGENT_BUILD_IN_DOCKER=1
+# e.g. k8s, docker-json
 ARG BUILD_TYPE
+# e.g. k8s-buster, docker-json-buster, k8s-alpine
+ARG BUILDER_NAME
 ADD . /scalyr-agent-2
 
-RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
+RUN python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build
 
 WORKDIR /tmp/container-fs
 RUN tar -xf /tmp/build/scalyr-agent.tar.gz

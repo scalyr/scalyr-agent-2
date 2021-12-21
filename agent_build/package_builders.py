@@ -685,24 +685,33 @@ class ContainerPackageBuilder(
     # Names of the result image that goes to dockerhub.
     RESULT_IMAGE_NAMES: List[str]
 
-    FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path] = [
-        pl.Path("Dockerfile"),
-        pl.Path("docker/requirements.txt"),
-    ]
+    FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path]
 
     def __init__(
         self,
         config_path: pl.Path,
+        name: str,
+        dockerfile_path: pl.Path = pl.Path("Dockerfile"),
         variant: str = None,
         no_versioned_file_name: bool = False,
     ):
         """
         :param config_path: Path to the configuration directory which will be copied to the image.
+        :param dockerfile_path: Path to the Dockerfile to use. Defaults to Dockerfile.
         :param variant: Adds the specified string into the package's iteration name. This may be None if no additional
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
         :param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
         """
+        self._name = name
+        self.dockerfile_path = dockerfile_path
+
+        # NOTE: This variable must be defined here as class instance variable since it's value is
+        # dynamic and based on the dockerfile_path value.
+        self.FILE_GLOBS_USED_IN_IMAGE_BUILD = []
+        self.FILE_GLOBS_USED_IN_IMAGE_BUILD.append(pl.Path("docker/requirements.txt"))
+        self.FILE_GLOBS_USED_IN_IMAGE_BUILD.append(self.dockerfile_path)
+
         super(ContainerPackageBuilder, self).__init__(
             architecture=constants.Architecture.UNKNOWN,
             variant=variant,
@@ -713,8 +722,14 @@ class ContainerPackageBuilder(
         self.config_path = config_path
 
     @property
+    def name(self) -> str:
+        # Container builders are special since we have an instance per Dockerfile since different
+        # Dockerfile represents a different builder
+        return self._name
+
+    @property
     def _tracked_file_globs(self) -> List[pl.Path]:
-        return type(self).FILE_GLOBS_USED_IN_IMAGE_BUILD
+        return self.FILE_GLOBS_USED_IN_IMAGE_BUILD
 
     @property
     def used_files_checksum(self) -> str:
@@ -777,10 +792,9 @@ class ContainerPackageBuilder(
         with_coverage: bool = False,
         reuse_local_cache: bool = False,
         remove_image_name_prefix: bool = False,
-        dockerfile_name: str = "Dockerfile",
     ):
         """
-        This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
+        This function builds Agent docker image by using the specified dockerfile (defaults to "Dockerfile").
         It passes to dockerfile its own package type through docker build arguments, so the same package builder
         will be executed inside the docker build to prepare inner container filesystem.
         :param image_names: The list of image names. By default uses image names that are specified in the
@@ -800,8 +814,6 @@ class ContainerPackageBuilder(
             to the docker command. Useful for local (non-CI) builds.
         :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
             For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
-        :param dockerfile_name: Name of the Dockerfile in the repository root to use. Defaults to
-            "Dockerfile".
         """
 
         registries = registries or [""]
@@ -842,7 +854,7 @@ class ContainerPackageBuilder(
             ]
         )
 
-        dockerfile_path = __SOURCE_ROOT__ / dockerfile_name
+        dockerfile_path = __SOURCE_ROOT__ / self.dockerfile_path
 
         if not os.path.isfile(dockerfile_path):
             raise ValueError(f"File path {dockerfile_path} doesn't exist")
@@ -876,6 +888,8 @@ class ContainerPackageBuilder(
             str(dockerfile_path),
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
+            "--build-arg",
+            f"BUILDER_NAME={self.name}",
         ]
 
         if not reuse_local_cache:
@@ -1001,16 +1015,41 @@ _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"
 
 # Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
 # create the filesystem for the image.
-DOCKER_JSON_CONTAINER_BUILDER = DockerJsonPackageBuilder(
+DOCKER_JSON_CONTAINER_BUILDER_BUSTER = DockerJsonPackageBuilder(
+    name="docker-json-buster",
     config_path=_CONFIGS_PATH / "docker-json-config",
+    dockerfile_path=pl.Path("Dockerfile"),
+)
+DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
+    name="docker-json-alpine",
+    config_path=_CONFIGS_PATH / "docker-json-config",
+    dockerfile_path=pl.Path("Dockerfile.alpine"),
 )
 
-DOCKER_SYSLOG_CONTAINER_BUILDER = DockerSyslogPackageBuilder(
-    config_path=_CONFIGS_PATH / "docker-syslog-config"
+DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER = DockerSyslogPackageBuilder(
+    name="docker-syslog-buster",
+    config_path=_CONFIGS_PATH / "docker-syslog-config",
+    dockerfile_path=pl.Path("Dockerfile"),
+)
+DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
+    name="docker-syslog-alpine",
+    config_path=_CONFIGS_PATH / "docker-syslog-config",
+    dockerfile_path=pl.Path("Dockerfile.alpine"),
 )
 
-DOCKER_API_CONTAINER_BUILDER = DockerApiPackageBuilder(
-    config_path=_CONFIGS_PATH / "docker-api-config"
+DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
+    name="docker-api-buster",
+    config_path=_CONFIGS_PATH / "docker-api-config",
+    dockerfile_path=pl.Path("Dockerfile.alpine"),
 )
 
-K8S_CONTAINER_BUILDER = K8sPackageBuilder(config_path=_CONFIGS_PATH / "k8s-config")
+K8S_CONTAINER_BUILDER_BUSTER = K8sPackageBuilder(
+    name="k8s-buster",
+    config_path=_CONFIGS_PATH / "k8s-config",
+    dockerfile_path=pl.Path("Dockerfile"),
+)
+K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
+    name="k8s-alpine",
+    config_path=_CONFIGS_PATH / "k8s-config",
+    dockerfile_path=pl.Path("Dockerfile.alpine"),
+)
