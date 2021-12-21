@@ -1,8 +1,8 @@
 # Python dependencies for docker images.
 # At the moment we don't include orjson and zstandard in Alpine based ARM images since pre-built wheels
 # are not available and that requires cross compilation using QEMU which is slow.
-orjson==3.6.5; 'arm' not in platform_machine
-zstandard==0.16.0; 'arm' not in platform_machine
+orjson==3.6.5; 'arm' not in platform_machine and 'aarch64' not in platform_machine
+zstandard==0.16.0; 'arm' not in platform_machine and 'aarch64' not in platform_machine
 # Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
 # default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
 # end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
