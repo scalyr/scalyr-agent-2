@@ -109,6 +109,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # We build 2 type of images - one based on Debian Buster Slim image and another set based
+          # on Alpine Linux
           - image_distro_name: "buster"
             image_tag_suffix: ""
           - image_distro_name: "alpine"
