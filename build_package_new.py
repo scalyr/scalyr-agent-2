@@ -99,6 +99,12 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
+                "--dockerfile-name",
+                default="Dockerfile",
+                help="Name of the Dockerfile in the repo root to use. Defaults to Dockerfile.",
+            )
+
+            package_parser.add_argument(
                 "--reuse-local-cache",
                 action="store_true",
                 help="Enable Docker image cache re-use (e.g. when building locally and not on CI).",
@@ -171,6 +177,7 @@ if __name__ == "__main__":
             cache_to_path=args.cache_to_dir,
             reuse_local_cache=args.reuse_local_cache,
             remove_image_name_prefix=args.remove_image_name_prefix,
+            dockerfile_name=args.dockerfile_name,
         )
         exit(0)
 

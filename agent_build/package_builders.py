@@ -777,6 +777,7 @@ class ContainerPackageBuilder(
         with_coverage: bool = False,
         reuse_local_cache: bool = False,
         remove_image_name_prefix: bool = False,
+        dockerfile_name: str = "Dockerfile",
     ):
         """
         This function builds Agent docker image by using the dockerfile - 'docker/Docker.unified'.
@@ -799,6 +800,8 @@ class ContainerPackageBuilder(
             to the docker command. Useful for local (non-CI) builds.
         :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
             For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
+        :param dockerfile_name: Name of the Dockerfile in the repository root to use. Defaults to
+            "Dockerfile".
         """
 
         registries = registries or [""]
@@ -839,7 +842,10 @@ class ContainerPackageBuilder(
             ]
         )
 
-        dockerfile_path = __SOURCE_ROOT__ / "Dockerfile"
+        dockerfile_path = __SOURCE_ROOT__ / dockerfile_name
+
+        if not os.path.isfile(dockerfile_path):
+            raise ValueError(f"File path {dockerfile_path} doesn't exist")
 
         tag_options = []
 
