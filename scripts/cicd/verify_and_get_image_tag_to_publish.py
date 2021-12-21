@@ -26,17 +26,14 @@ import sys
 
 _SOURCE_PATH = pl.Path(__file__).parent.parent.parent.absolute()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("tag")
     args = parser.parse_args()
 
     production_tag_pattern = r"^v(\d+\.\d+\.\d+)$"
 
-    m = re.match(
-        production_tag_pattern,
-        args.tag
-    )
+    m = re.match(production_tag_pattern, args.tag)
 
     # if given tag does not match production tag (e.g. v2.1.25), then just push
     # the image by the same, unchanged tag.
@@ -55,12 +52,10 @@ if __name__ == '__main__':
         print(
             f"Error. New version tag {args.tag} does not match "
             f"current version {current_version}.",
-            file=sys.stderr
+            file=sys.stderr,
         )
         exit(1)
 
     # Version is valid print version as a tag and  also add the 'latest' tag.
     print(f"--tag {tag_version} --tag latest")
     exit(0)
-
-
