@@ -24,6 +24,8 @@ from typing import List
 
 from agent_build.tools import constants
 
+LOG = logging.getLogger(__name__)
+
 
 class FilesChecksumTracker:
     """
@@ -78,8 +80,8 @@ class FilesChecksumTracker:
         # Calculate the sha256 for each file's content, filename and permissions.
         sha256 = hashlib.sha256()
         for file_path in self._original_files:
+            LOG.debug(f"Adding file {file_path} for checksum calculation")
             sha256.update(str(file_path.relative_to(constants.SOURCE_ROOT)).encode())
-            sha256.update(str(file_path.stat().st_mode).encode())
             sha256.update(file_path.read_bytes())
 
         if additional_seed:
@@ -112,7 +114,7 @@ class FilesChecksumTracker:
         except Exception as e:
 
             globs = [str(g) for g in self._tracked_file_globs]
-            logging.error(
+            LOG.error(
                 f"'{type(self).__name__}' has failed. "
                 "HINT: Make sure that you have specified all files. "
                 f"For now, tracked files are: {globs}"

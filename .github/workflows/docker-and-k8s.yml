@@ -32,8 +32,17 @@ env:
 
 jobs:
   # TODO move here tests from the CicleCi.
+
   test:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image_distro_name: "buster"
+          - image_distro_name: "alpine"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -72,13 +81,14 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
-          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum --debug
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
           path: ~/docker-test-image-build-cache
-          key: agent-docker-test-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
+          key: agent-docker-test-image-buildx-cache-${{ inputs.image-type }}-${{ matrix.image_distro_name }}-${{ hashFiles('image_files_checksum.txt') }}
 
       - name: Run image test
         env:
@@ -93,7 +103,7 @@ jobs:
           mkdir -p ~/docker-test-image-build-cache
 
           python3 tests/package_tests/run_package_test.py package-test \
-            ${{ inputs.image-type}}_test \
+           "${{ inputs.image-type }}-${{ matrix.image_distro_name }}_test" \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
@@ -101,8 +111,19 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/docker_image_alpine') }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # We build 2 type of images - one based on Debian Buster Slim image and another set based
+          # on Alpine Linux
+          - image_distro_name: "buster"
+            image_tag_suffix: ""
+          - image_distro_name: "alpine"
+            image_tag_suffix: "alpine"
 
     steps:
       - name: Checkout repository
@@ -128,13 +149,14 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
-          python3 build_package_new.py ${{ inputs.image-type }} --files-checksum > image_files_checksum.txt
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum --debug
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
           path: ~/docker-image-build-cache
-          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ hashFiles('image_files_checksum.txt') }}
+          key: agent-docker-image-buildx-cache-${{ inputs.image-type }}-${{ matrix.image_distro_name }}-${{ hashFiles('image_files_checksum.txt') }}
 
       - name: Prepare build cache directories.
         run: |
@@ -146,22 +168,21 @@ jobs:
           mkdir -p ~/docker-image-build-cache
 
       - name: Push image using the master branch commit SHA.
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/docker_image_alpine') }}
         run: |
-          # NOTE: --remove-image-name-prefix is needed in case Docker hub
-          # usename is not scalyr
-          python3 build_package_new.py ${{ inputs.image-type }} \
+          # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --remove-image-name-prefix \
             --push \
-            --tag ${{ github.sha }} \
+            --tag "${{ github.sha }}-${{ matrix.image_tag_suffix }}" \
             --cache-from-dir ~/docker-image-build-cache-in \
             --cache-to-dir ~/docker-image-build-cache
 
       - name: Push image using the tag.
         if: ${{ github.ref_type == 'tag' }}
         run: |
-          tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py ${{ github.ref_name }})
+          tag_options=$(python3 scripts/cicd/verify_and_get_image_tag_to_publish.py "${{ github.ref_name }})"
 
           python3 build_package_new.py ${{ inputs.image-type }} \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
@@ -169,4 +190,4 @@ jobs:
             --push \
             --cache-from-dir ~/docker-image-build-cache-in \
             --cache-to-dir ~/docker-image-build-cache \
-            $tag_options
+            ${tag_options}

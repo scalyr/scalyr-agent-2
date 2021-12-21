@@ -16,10 +16,10 @@
 # usage:
 #       build_package_new.py <name of the package> --output-dir <output directory>
 
+import logging
 import pathlib as pl
 import argparse
 import sys
-import logging
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__
@@ -71,6 +71,12 @@ if __name__ == "__main__":
             help="An optional string that is included in the package name to identify a variant "
             "of the main release created by a different packager.  "
             "Most users do not need to use this option.",
+        )
+
+        package_parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Enable debug mode with additional logging.",
         )
 
         # If that's a docker image builder, then add additional commands.
@@ -143,10 +149,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Find the builder class.
-    package_builder = package_builders.ALL_PACKAGE_BUILDERS[args.package_name]
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+        loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        for logger in loggers:
+            logger.setLevel(logging.DEBUG)
 
-    logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
+    # Find the builder class.
+    builder_name = args.package_name
+    package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
+
+    if not args.files_checksum:
+        logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
 
     # If that's a docker image builder handle their arguments too.
     if isinstance(package_builder, package_builders.ContainerPackageBuilder):

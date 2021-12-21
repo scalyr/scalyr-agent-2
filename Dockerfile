@@ -1,5 +1,5 @@
-# base image that creates all necessary dependencies for
-# the scalyr-agent
+# Base image that creates all necessary dependencies for the scalyr-agent based on Debian Buster
+# (slim).
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
 # Type of the image build, e.g: docker-json, docker-syslog, k8s
@@ -12,12 +12,27 @@ ARG MODE="normal"
 FROM python:3.8.10-slim as scalyr-build
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-RUN apt-get update && apt-get install -y build-essential git tar
+RUN apt-get update && apt-get install -y build-essential git tar curl
 
-ADD docker/requirements.txt /tmp/requirments.txt
+ADD docker/requirements.txt /tmp/requirements.txt
+
+# NOTE: There is a bug in some specific environments with rust and orjson
+# - https://github.com/WeblateOrg/docker/issues/968
+# - https://github.com/JonasAlfredsson/docker-nginx-certbot/commit/e941b81b784cf7fd13eadaa6b388f021d3d6613a#diff-f7c91877446336ef59ebfaacb472e50e4e40bbe54938f232b0fd54617eb6e7dcR24
+# So for the time being we don't install rust + cargo and don't try to build
+# orjson wheel.
+# Install Rust and Cargo which is needed to build some Python wheels such as
+# orjson
+# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Install Rust nightly
+# RUN . ~/.cargo/env && rustup toolchain install nightly
+# RUN . ~/.cargo/env && rustup default nightly
+# RUN . ~/.cargo/env && rustup target add x86_64-unknown-linux-gnu
 
 # install python dependencies
-RUN pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirments.txt
+# RUN . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt
+RUN pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt
 
 ARG CACHE_BUST=1
 ARG AGENT_BUILD_DEBUG
@@ -25,10 +40,13 @@ ARG AGENT_BUILD_DEBUG
 ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 # Special env. variable that will enable addional logging info about that command runs in docker.
 ENV AGENT_BUILD_IN_DOCKER=1
+# e.g. k8s, docker-json
 ARG BUILD_TYPE
+# e.g. k8s-buster, docker-json-buster, k8s-alpine
+ARG BUILDER_NAME
 ADD . /scalyr-agent-2
 
-RUN python3 /scalyr-agent-2/build_package_new.py $BUILD_TYPE --only-filesystem-tarball /tmp/build
+RUN python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build
 
 WORKDIR /tmp/container-fs
 RUN tar -xf /tmp/build/scalyr-agent.tar.gz
@@ -86,5 +104,3 @@ CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/a
 # Use stage with needed mode as a final image.
 FROM scalyr-$MODE as scalyr
 MAINTAINER Scalyr Inc <support@scalyr.com>
-
-
