@@ -35,6 +35,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image_distro_name: "buster"
+          - image_distro_name: "alpine"
+
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -73,13 +82,13 @@ jobs:
 
       - name: Get checksum of the base image files
         run: |
-          python3 build_package_new.py "${{ inputs.image-type }}-buster" --files-checksum > image_files_checksum.txt
+          python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" --files-checksum > image_files_checksum.txt
 
       - name: Check for the docker buildx cache.
         uses: actions/cache@v2
         with:
           path: ~/docker-test-image-build-cache
-          key: agent-docker-test-image-buildx-cache-${{ inputs.image-type }}-buster-${{ hashFiles('image_files_checksum.txt') }}
+          key: agent-docker-test-image-buildx-cache-${{ inputs.image-type }}-${{ matrix.image_distro_name }}-${{ hashFiles('image_files_checksum.txt') }}
 
       - name: Run image test
         env:
@@ -94,7 +103,7 @@ jobs:
           mkdir -p ~/docker-test-image-build-cache
 
           python3 tests/package_tests/run_package_test.py package-test \
-           "${{ inputs.image-type }}-buster_test" \
+           "${{ inputs.image-type }}-${{ matrix.image_distro_name }}_test" \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
