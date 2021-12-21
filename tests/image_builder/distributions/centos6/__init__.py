@@ -34,6 +34,7 @@ class CentOSBuilderBase(AgentImageBuilder):
     INCLUDE_PATHS = [
         Path(get_install_root(), "dev-requirements.txt"),
         Path(get_install_root(), "py26-unit-tests-requirements.txt"),
+        Path(get_install_root(), "agent_build"),
     ]
 
 
