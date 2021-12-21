@@ -32,6 +32,7 @@ env:
 
 jobs:
   # TODO move here tests from the CicleCi.
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -93,7 +94,7 @@ jobs:
           mkdir -p ~/docker-test-image-build-cache
 
           python3 tests/package_tests/run_package_test.py package-test \
-            ${{ inputs.image-type}}_test \
+            ${{ inputs.image-type }}_test \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
@@ -101,8 +102,17 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/docker_image_alpine') }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile_name: "Dockerfile"
+            image_tag_suffix: ""
+          - dockerfile_name: "Dockerfile.alpine"
+            image_tag_suffix: "-alpine"
 
     steps:
       - name: Checkout repository
@@ -128,10 +138,10 @@ jobs:
 
       - name: Push image useing the master branch commit SHA.
         run: |
-          # NOTE: --remove-image-name-prefix is needed in case Docker hub
-          # usename is not scalyr
+          # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
           python3 build_package_new.py ${{ inputs.image-type }} \
             --registry "${{ secrets.DOCKER_HUB_USERNAME }}" \
+            --dockerfile-name "${{ matrix.dockerfile_name }}" \
             --remove-image-name-prefix \
             --push \
-            --tag ${{ github.sha }}
+            --tag "${{ github.sha }}${{ matrix.image_tag_suffix }}"
