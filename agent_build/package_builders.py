@@ -1040,7 +1040,7 @@ DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
 DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
     name="docker-api-buster",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    dockerfile_path=pl.Path("Dockerfile.buster"),
+    dockerfile_path=pl.Path("Dockerfile"),
 )
 DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     name="docker-api-alpine",
