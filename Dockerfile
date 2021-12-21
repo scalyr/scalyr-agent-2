@@ -1,5 +1,5 @@
-# base image that creates all necessary dependencies for
-# the scalyr-agent
+# Base image that creates all necessary dependencies for the scalyr-agent based on Debian Buster
+# (slim).
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
 # Type of the image build, e.g: docker-json, docker-syslog, k8s
