@@ -367,7 +367,12 @@ class PackageBuilder(abc.ABC):
         agent_d_path.mkdir(exist_ok=True)
         # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
         # readable by others.
-        agent_d_path.chmod(int("741", 8))
+        agent_d_path.chmod(int("640", 8))
+
+        # Also iterate through all files in the agent.d and set appropriate permissions.
+        for child_path in agent_d_path.iterdir():
+            if child_path.is_file():
+                child_path.chmod(int("640", 8))
 
     @staticmethod
     def _add_certs(
