@@ -94,7 +94,7 @@ jobs:
           mkdir -p ~/docker-test-image-build-cache
 
           python3 tests/package_tests/run_package_test.py package-test \
-           "${{ inputs.image-type }}_buster_test" \
+           "${{ inputs.image-type }}-buster_test" \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
             --cache-from-dir ~/docker-test-image-build-cache-in \
             --cache-to-dir ~/docker-test-image-build-cache
