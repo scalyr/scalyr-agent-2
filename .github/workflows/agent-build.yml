@@ -20,7 +20,7 @@ on: [push]
 #    And the "Push image" step conditional to:
 #        if: ${{ github.ref == 'refs/heads/YOUR_BRANCH_NAME' }}
 #
-# For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/b51f55bb5dd12d60c7d9516c77ad13c39ee902e7
+# For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
   docker-json:
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@use_self_hosted_runners
