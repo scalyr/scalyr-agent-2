@@ -130,7 +130,7 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/use_self_hosted_runners') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
     runs-on: self-hosted
 
     strategy:
