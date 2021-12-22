@@ -4,6 +4,19 @@ name: Docker Images Build
 on: [push]
 
 # Agent Docker image tests
+#
+# To test this workflow with your branch, make the following changes:
+#
+# 1. In this workflow, change ``@master`` to ``@your_branch_name`` - e.g. ``@docker_image_alpine``
+
+# 2. In this workflow, change docker hub secrets to utilize testing and not prod account so images
+#    get pushed to testing account. Change ``_PROD_` in the secret name to ``_TEST``,
+#    e.g. ``DOCKER_HUB_USERNAME_TEST_ACCOUNT`` ``DOCKER_HUB_PASSWORD_TEST_ACCOUNT``
+#
+# 3. Inside .github/workflows/docker-and-k8s.yml workflow, change if ``publish`` job conditional to:
+#    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/YOUR_BRANCH_NAME') }}
+#
+# For example:
 jobs:
   docker-json:
     uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
