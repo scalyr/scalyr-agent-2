@@ -194,3 +194,7 @@ jobs:
             --cache-from-dir ~/docker-image-build-cache-in \
             --cache-to-dir ~/docker-image-build-cache \
             ${tag_options}
+
+          # Check the cache directory size post build
+          du -hs ~/docker-image-build-cache
+          ls -lah ~/docker-image-build-cache
