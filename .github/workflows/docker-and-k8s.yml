@@ -33,8 +33,27 @@ env:
 jobs:
   # TODO move here tests from the CicleCi.
 
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    # NOTE: We intentionally run this job on cloud so it can always run and cancel any other jobs.
+    # If we use self-hosted runner, it may be queued behind other jobs if there are no free runners
+    # available which defeats the purpose of this job.
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@ea548f2a2a08c55dcb111418ca62181f7887e297 # v3.3.0
+        with:
+          github_token: ${{ github.token }}
+
   test:
     runs-on: self-hosted
+
+    needs: pre_job
+    # NOTE: We always want to run this job on master
+    if: ${{ needs.pre_job.outputs.should_skip == 'false' || github.ref == 'refs/heads/master' }}
 
     strategy:
       fail-fast: false
