@@ -34,7 +34,7 @@ jobs:
   # TODO move here tests from the CicleCi.
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     strategy:
       fail-fast: false
@@ -112,7 +112,7 @@ jobs:
     needs: [test]
     name: Publish Docker Image
     if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     strategy:
       fail-fast: false
