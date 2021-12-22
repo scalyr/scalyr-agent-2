@@ -111,7 +111,7 @@ jobs:
   publish:
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag') }}
+    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/use_self_hosted_runners') }}
     runs-on: self-hosted
 
     strategy:
@@ -171,7 +171,7 @@ jobs:
           mkdir -p ~/docker-image-build-cache
 
       - name: Push image using the master branch commit SHA.
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref == 'refs/heads/use_self_hosted_runners' }}
         run: |
           # NOTE: --remove-image-name-prefix is needed in case Docker hub usename is not scalyr
           python3 build_package_new.py "${{ inputs.image-type }}-${{ matrix.image_distro_name }}" \
