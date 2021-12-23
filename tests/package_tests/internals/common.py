@@ -189,6 +189,8 @@ class LogVerifier:
 
                 # The result has been failed. Stop the verifier with error.
                 elif result == LogVerifierCheckResult.FAIL:
+                    # TODO:  Retry on temporary connection errors or similar, e.g.
+                    #  Agent log contains error line : 2021-12-22 12:14:31.879Z ERROR [core] [scalyr_logging.py:621] [error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to exception.  Exception was "timed out".  Closing connection, will re-attempt :stack_trace:
                     error_message = f"The check '{line_check.description}' has failed."
                     if message:
                         error_message = message
