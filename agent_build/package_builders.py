@@ -175,14 +175,14 @@ class PackageBuilder(abc.ABC):
         :param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
         """
         # The path where the build output will be stored.
-        self._build_output_path: Optional[pl.Path] = None
-
+        self._build_output_path: Optional[pl.Path] = constants.PACKAGE_BUILDER_OUTPUT / self.name
         # Folder with intermediate and temporary results of the build.
-        self._intermediate_results_path: Optional[pl.Path] = None
-
+        self._intermediate_results_path = (
+                self._build_output_path / "intermediate_results"
+        )
         # The path of the folder where all files of the package will be stored.
-        # May be help full for the debug purposes.
-        self._package_files_path: Optional[pl.Path] = None
+        # Also may be helpful for the debug purposes.
+        self._package_root_path = self._build_output_path / "package_root"
 
         self._variant = variant
         self._no_versioned_file_name = no_versioned_file_name
@@ -234,31 +234,16 @@ class PackageBuilder(abc.ABC):
             arch=package_specific_arch_name
         )
 
-    def build(self, output_path: Union[str, pl.Path], locally: bool = False):
+    def build(self, locally: bool = False):
         """
         The function where the actual build of the package happens.
-        :param output_path: Path to the directory where the resulting output has to be stored.
         :param locally: Force builder to build the package on the current system, even if meant to be done inside
             docker. This is needed to avoid loop when it is already inside the docker.
         """
 
-        output_path = pl.Path(output_path).absolute()
-
-        if output_path.exists():
-            shutil.rmtree(output_path)
-
-        output_path.mkdir(parents=True)
-
         # Build right here.
         if locally or not self.deployment.in_docker:
-            self._build_output_path = pl.Path(output_path)
-            self._package_files_path = self._build_output_path / "package_root"
-            self._package_files_path.mkdir()
-            self._intermediate_results_path = (
-                self._build_output_path / "intermediate_results"
-            )
-            self._intermediate_results_path.mkdir()
-            self._build(output_path=output_path)
+            self._build()
             return
 
         # Build in docker.
@@ -290,7 +275,7 @@ class PackageBuilder(abc.ABC):
             architecture=self.architecture,
             image_name=f"agent-builder-{self.name}-{base_image_name}".lower(),
             base_image_name=base_image_name,
-            output_path_mappings={output_path: pl.Path("/tmp/build")},
+            output_path_mappings={self._build_output_path: pl.Path("/tmp/build")},
         )
 
     @property
@@ -526,9 +511,33 @@ class PackageBuilder(abc.ABC):
         output_path.mkdir(parents=True, exist_ok=True)
         shutil.copy2(frozen_binary_path, output_path)
 
-    def _build_package_files(self, output_path: Union[str, pl.Path]):
+    @property
+    def _agent_install_root_path(self) -> pl.Path:
         """
-        Build the basic structure for all packages.
+        The path to the root directory with all agent-related files.
+        By the default, the install root of the agent is the same as the root of the whole package.
+        """
+        return self._package_root_path
+
+    def _build_package_files(self):
+        """
+        This method builds all files of the package.
+        """
+
+        # Clear previously used build folder, if exists.
+        if self._build_output_path.exists():
+            shutil.rmtree(self._build_output_path)
+
+        self._build_output_path.mkdir(parents=True)
+        self._intermediate_results_path.mkdir()
+        self._package_root_path.mkdir()
+
+        # Build files in the agent's install root.
+        self._build_agent_install_root()
+
+    def _build_agent_install_root(self):
+        """
+        Build the basic structure of the install root.
 
             This creates a directory and then populates it with the basic structure required by most of the packages.
 
@@ -543,36 +552,33 @@ class PackageBuilder(abc.ABC):
                 VERSION                    -- File with current version of the agent.
                 install_type               -- File with type of the installation.
 
-
-        :param output_path: The output path where the result files are stored.
         """
-        output_path = pl.Path(output_path)
 
-        if output_path.exists():
-            shutil.rmtree(output_path)
+        if self._agent_install_root_path.exists():
+            shutil.rmtree(self._agent_install_root_path)
 
-        output_path.mkdir(parents=True)
+        self._agent_install_root_path.mkdir(parents=True)
 
         # Write build_info file.
-        build_info_path = output_path / "build_info"
+        build_info_path = self._agent_install_root_path / "build_info"
         build_info_path.write_text(self._build_info)
 
         # Copy the monitors directory.
-        monitors_path = output_path / "monitors"
+        monitors_path = self._agent_install_root_path / "monitors"
         shutil.copytree(__SOURCE_ROOT__ / "monitors", monitors_path)
-        recursively_delete_files_by_name(output_path / monitors_path, "README.md")
+        recursively_delete_files_by_name(self._agent_install_root_path / monitors_path, "README.md")
 
         # Add VERSION file.
-        shutil.copy2(__SOURCE_ROOT__ / "VERSION", output_path / "VERSION")
+        shutil.copy2(__SOURCE_ROOT__ / "VERSION", self._agent_install_root_path / "VERSION")
 
         # Create bin directory with executables.
-        bin_path = output_path / "bin"
+        bin_path = self._agent_install_root_path / "bin"
         bin_path.mkdir()
 
         if type(self).USE_FROZEN_BINARIES:
             self._build_frozen_binary(bin_path)
         else:
-            source_code_path = output_path / "py"
+            source_code_path = self._agent_install_root_path / "py"
 
             shutil.copytree(
                 __SOURCE_ROOT__ / "scalyr_agent", source_code_path / "scalyr_agent"
@@ -602,10 +608,9 @@ class PackageBuilder(abc.ABC):
             )
 
     @abc.abstractmethod
-    def _build(self, output_path: Union[str, pl.Path]):
+    def _build(self):
         """
         The implementation of the package build.
-        :param output_path: Path for the build result.
         """
         pass
 
@@ -621,21 +626,21 @@ class LinuxPackageBuilder(PackageBuilder):
         "windows_process_metrics",
     ]
 
-    def _build_package_files(self, output_path: Union[str, pl.Path]):
+    def _build_agent_install_root(self):
         """
         Add files to the agent's install root which are common for all linux packages.
         """
-        super(LinuxPackageBuilder, self)._build_package_files(output_path=output_path)
+        super(LinuxPackageBuilder, self)._build_agent_install_root()
 
         # Add certificates.
-        certs_path = output_path / "certs"
+        certs_path = self._agent_install_root_path / "certs"
         self._add_certs(certs_path)
 
         # Misc extra files needed for some features.
         # This docker file is needed by the `scalyr-agent-2-config --docker-create-custom-dockerfile` command.
         # We put it in all distributions (not just the docker_tarball) in case a customer creates an image
         # using a package.
-        misc_path = output_path / "misc"
+        misc_path = self._agent_install_root_path / "misc"
         misc_path.mkdir()
         for f in ["Dockerfile.custom_agent_config", "Dockerfile.custom_k8s_config"]:
             shutil.copy2(__SOURCE_ROOT__ / "docker" / f, misc_path / f)
@@ -650,22 +655,25 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
 
     INSTALL_TYPE = "package"
 
-    def _build_package_files(self, output_path: Union[str, pl.Path]):
-        # The install root is located in the usr/share/scalyr-agent-2.
-        install_root = output_path / "usr/share/scalyr-agent-2"
-        super(LinuxFhsBasedPackageBuilder, self)._build_package_files(
-            output_path=install_root
-        )
+    @property
+    def _agent_install_root_path(self) -> pl.Path:
+        # The install root for FHS based packages is located in the usr/share/scalyr-agent-2.
+        original_install_root = super(LinuxFhsBasedPackageBuilder, self)._agent_install_root_path
+        return original_install_root / "usr/share/scalyr-agent-2"
 
-        pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
-        pl.Path(output_path, "var/lib/scalyr-agent-2").mkdir(parents=True)
+    def _build_package_files(self):
 
-        bin_path = install_root / "bin"
-        usr_sbin_path = self._package_files_path / "usr/sbin"
+        super(LinuxFhsBasedPackageBuilder, self)._build_package_files()
+
+        pl.Path(self._package_root_path, "var/log/scalyr-agent-2").mkdir(parents=True)
+        pl.Path(self._package_root_path, "var/lib/scalyr-agent-2").mkdir(parents=True)
+
+        bin_path = self._agent_install_root_path / "bin"
+        usr_sbin_path = self._package_root_path / "usr/sbin"
         usr_sbin_path.mkdir(parents=True)
         for binary_path in bin_path.iterdir():
             binary_symlink_path = (
-                self._package_files_path / "usr/sbin" / binary_path.name
+                    self._package_root_path / "usr/sbin" / binary_path.name
             )
             symlink_target_path = pl.Path(
                 "..", "share", "scalyr-agent-2", "bin", binary_path.name
@@ -673,9 +681,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
             binary_symlink_path.symlink_to(symlink_target_path)
 
 
-class ContainerPackageBuilder(
-    LinuxFhsBasedPackageBuilder, files_checksum_tracker.FilesChecksumTracker
-):
+class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
     """
     The base builder for all docker and kubernetes based images . It builds an executable script in the current working
      directory that will build the container image for the various Docker and Kubernetes targets.
@@ -690,40 +696,35 @@ class ContainerPackageBuilder(
     # Names of the result image that goes to dockerhub.
     RESULT_IMAGE_NAMES: List[str]
 
-    FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path]
+    FILE_GLOBS_USED_IN_IMAGE_BUILD: List[pl.Path] = []
 
     def __init__(
         self,
         config_path: pl.Path,
         name: str,
-        dockerfile_path: pl.Path = pl.Path("Dockerfile"),
+        base_image_deployment_step_cls: Type[deployments.BuildDockerBaseImageStep],
         variant: str = None,
         no_versioned_file_name: bool = False,
     ):
         """
         :param config_path: Path to the configuration directory which will be copied to the image.
-        :param dockerfile_path: Path to the Dockerfile to use. Defaults to Dockerfile.
         :param variant: Adds the specified string into the package's iteration name. This may be None if no additional
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
         :param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
         """
         self._name = name
-        self.dockerfile_path = dockerfile_path
-
-        # NOTE: This variable must be defined here as class instance variable since it's value is
-        # dynamic and based on the dockerfile_path value.
-        self.FILE_GLOBS_USED_IN_IMAGE_BUILD = []
-        self.FILE_GLOBS_USED_IN_IMAGE_BUILD.append(pl.Path("docker/requirements.txt"))
-        self.FILE_GLOBS_USED_IN_IMAGE_BUILD.append(self.dockerfile_path)
+        self.dockerfile_path = __SOURCE_ROOT__ / "agent_build/docker/Dockerfile"
 
         super(ContainerPackageBuilder, self).__init__(
             architecture=constants.Architecture.UNKNOWN,
             variant=variant,
             no_versioned_file_name=no_versioned_file_name,
+            deployment_step_classes=[base_image_deployment_step_cls]
         )
 
-        files_checksum_tracker.FilesChecksumTracker.__init__(self)
+        self.base_image_deployment_step_cls = base_image_deployment_step_cls
+
         self.config_path = config_path
 
     @property
@@ -732,30 +733,20 @@ class ContainerPackageBuilder(
         # Dockerfile represents a different builder
         return self._name
 
-    @property
-    def _tracked_file_globs(self) -> List[pl.Path]:
-        return self.FILE_GLOBS_USED_IN_IMAGE_BUILD
-
-    @property
-    def used_files_checksum(self) -> str:
-        return self._get_files_checksum()
-
-    def _build_package_files(self, output_path: Union[str, pl.Path]):
-        super(ContainerPackageBuilder, self)._build_package_files(
-            output_path=output_path
-        )
+    def _build_package_files(self):
+        super(ContainerPackageBuilder, self)._build_package_files()
 
         # Need to create some docker specific directories.
-        pl.Path(output_path / "var/log/scalyr-agent-2/containers").mkdir()
+        pl.Path(self._package_root_path / "var/log/scalyr-agent-2/containers").mkdir()
 
         # Copy config
         self._add_config(
             config_source_path=self.config_path,
-            output_path=self._package_files_path / "etc/scalyr-agent-2",
+            output_path=self._package_root_path / "etc/scalyr-agent-2",
         )
 
-    def _build(self, output_path: Union[str, pl.Path]):
-        self._build_package_files(output_path=self._package_files_path)
+    def _build(self):
+        self._build_package_files()
 
         container_tarball_path = self._build_output_path / "scalyr-agent.tar.gz"
 
@@ -764,7 +755,7 @@ class ContainerPackageBuilder(
         # mainly Posix.
         with tarfile.open(container_tarball_path, "w:gz") as container_tar:
 
-            for root, dirs, files in os.walk(self._package_files_path):
+            for root, dirs, files in os.walk(self._package_root_path):
                 to_copy = []
                 for name in dirs:
                     to_copy.append(os.path.join(root, name))
@@ -773,7 +764,7 @@ class ContainerPackageBuilder(
 
                 for x in to_copy:
                     file_entry = container_tar.gettarinfo(
-                        x, arcname=str(pl.Path(x).relative_to(self._package_files_path))
+                        x, arcname=str(pl.Path(x).relative_to(self._package_root_path))
                     )
                     file_entry.uname = "root"
                     file_entry.gname = "root"
@@ -786,22 +777,37 @@ class ContainerPackageBuilder(
                     else:
                         container_tar.addfile(file_entry)
 
-    def build_image(
+    def build_filesystem_tarball(self, output_path: pl.Path):
+        super(ContainerPackageBuilder, self).build(
+            locally=True
+        )
+
+        # Also copy result tarball to the given path.
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        shutil.copy2(self._build_output_path / "scalyr-agent.tar.gz", output_path)
+
+    def build(
         self,
         image_names=None,
         registries: List[str] = None,
         tags: List[str] = None,
         push: bool = False,
-        cache_from_path: str = None,
-        cache_to_path: str = None,
-        with_coverage: bool = False,
-        reuse_local_cache: bool = False,
+        use_test_version: bool = False,
         remove_image_name_prefix: bool = False,
     ):
         """
         This function builds Agent docker image by using the specified dockerfile (defaults to "Dockerfile").
         It passes to dockerfile its own package type through docker build arguments, so the same package builder
         will be executed inside the docker build to prepare inner container filesystem.
+
+        The result image is built upon the base image that has to be built by the deployment of this builder.
+            Since it's not a trivial task to "transfer" a multi-platform image from one place to another, the image is
+            pushed to a local registry in the container, and the root of that registry is transferred instead.
+
+        Registry's root in /var/lib/registry is exposed to the host by using docker's mount feature and saved in the
+            deployment's output directory. This builder then spins up another local registry container and mounts root
+            of the saved registry. Now builder can refer to this local registry in order to get the base image.
+
         :param image_names: The list of image names. By default uses image names that are specified in the
             package builder.
         :param registries: List of registries to push to.
@@ -809,24 +815,22 @@ class ContainerPackageBuilder(
         :param push: If True, push result image to the registries that are specified in the 'registries' argument.
             If False, then just export the result image to the local docker. NOTE: The local docker cannot handle
             multi-platform images, so it will only get image for its  platform.
-        :param cache_from_path: Use given directory as a cache source by docker buildx (see more in '--cache-from'
-            in docker buildx docs)
-        :param cache_to_path: Use given directory as a cache destination by docker buildx (see more in
-            '--cache-to' in docker buildx docs)
-        :param with_coverage: Makes docker image to run agent with enabled coverage measuring (Python 'coverage'
-            library). Used only for testing.
-        :param reuse_local_cache: Set to True to re-use local cache and not pass CACHE_BUST build arg
-            to the docker command. Useful for local (non-CI) builds.
+        :param use_test_version: Makes testing docker image that runs agent with enabled coverage measuring (Python
+            'coverage' library). Must not be enabled in production images.
         :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
             For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
         """
 
-        registries = registries or [""]
-        tags = tags or ["latest"]
+        if not common.IN_CICD:
+            # If there's not a CI/CD then the deployment has to be done explicitly.
+            # If there is an CI/CD, then the deployment has to be already done.
 
-        buildx_builder_name = "agent_image_buildx_builder"
+            # The ready deployment is required because it builds the base image of out result image.
+            self.deployment.deploy()
+
         # Create docker buildx builder instance. # Without it the result image won't be pushed correctly
         # to the local registry.
+        buildx_builder_name = "agent_image_buildx_builder"
 
         # check if builder already exists.
         ls_output = (
@@ -859,10 +863,21 @@ class ContainerPackageBuilder(
             ]
         )
 
-        dockerfile_path = __SOURCE_ROOT__ / self.dockerfile_path
+        logging.info("Build base image.")
 
-        if not os.path.isfile(dockerfile_path):
-            raise ValueError(f"File path {dockerfile_path} doesn't exist")
+        base_image_tag_suffix = self.base_image_deployment_step_cls.BASE_DOCKER_IMAGE_TAG_SUFFIX
+
+        if use_test_version:
+            logging.info("Build testing image version.")
+            base_image_tag_suffix = f"{base_image_tag_suffix}-testing"
+
+        base_image_name = f"agent_base_image:{base_image_tag_suffix}"
+
+        registries = registries or [""]
+        tags = tags or ["latest"]
+
+        if not os.path.isfile(self.dockerfile_path):
+            raise ValueError(f"File path {self.dockerfile_path} doesn't exist")
 
         tag_options = []
 
@@ -890,32 +905,14 @@ class ContainerPackageBuilder(
             "build",
             *tag_options,
             "-f",
-            str(dockerfile_path),
+            str(self.dockerfile_path),
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
             "--build-arg",
             f"BUILDER_NAME={self.name}",
+            "--build-arg",
+            f"BASE_IMAGE=localhost:5000/{base_image_name}"
         ]
-
-        if not reuse_local_cache:
-            command_options.extend(
-                [
-                    "--build-arg",
-                    # Pass current time to this build argument to ensure that all commands after this argument
-                    # won't use caching.
-                    f"CACHE_BUST={datetime.datetime.now().isoformat()}",
-                ]
-            )
-
-        # Add caching options if specified.
-        if cache_from_path:
-            command_options.append(
-                f"--cache-from=type=local,mode=max,src={cache_from_path}",
-            )
-        if cache_to_path:
-            command_options.append(
-                f"--cache-to=type=local,mode=max,dest={cache_to_path}",
-            )
 
         if common.DEBUG:
             # If debug, then also specify the debug mode inside the docker build.
@@ -928,23 +925,14 @@ class ContainerPackageBuilder(
 
         # If we need to push, then specify all platforms.
         if push:
-            command_options.append("--platform")
-            command_options.append(
-                constants.Architecture.X86_64.as_docker_platform.value
-            )
-            command_options.append("--platform")
-            command_options.append(
-                constants.Architecture.ARM64.as_docker_platform.value
-            )
-            command_options.append("--platform")
-            command_options.append(
-                constants.Architecture.ARMV7.as_docker_platform.value
-            )
-        if with_coverage:
-            logging.info("Code coverage enabled.")
-            # Build image with enabled coverage measuring.
+            for plat in constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
+                command_options.append("--platform")
+                command_options.append(plat.value)
+
+        if use_test_version:
+            # Pass special build argument to produce testing image.
             command_options.append("--build-arg")
-            command_options.append("MODE=with-coverage")
+            command_options.append("MODE=testing")
 
         if push:
             command_options.append("--push")
@@ -963,11 +951,23 @@ class ContainerPackageBuilder(
 
         logging.info(build_log_message)
 
-        common.run_command(
-            command_options,
-            # This command runs partially runs the same code, so it would be nice to see the output.
-            debug=True,
+        registry_data_path = self.deployment.output_path / "output_registry"
+
+        # Create container with local image registry. And mount existing registry root with base images.
+        registry_container = build_in_docker.LocalRegistryContainer(
+            name="output_registry_path",
+            registry_port=5000,
+            registry_data_path=registry_data_path
         )
+
+        # Start registry and run build of the final docker image. Build process will refer the the
+        # base image in the local registry.
+        with registry_container:
+            common.run_command(
+                command_options,
+                # This command runs partially runs the same code, so it would be nice to see the output.
+                debug=True,
+            )
 
 
 class K8sPackageBuilder(ContainerPackageBuilder):
@@ -1016,50 +1016,50 @@ class DockerApiPackageBuilder(ContainerPackageBuilder):
 
 
 _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"
-
+_AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
 
 # Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
 # create the filesystem for the image.
 DOCKER_JSON_CONTAINER_BUILDER_BUSTER = DockerJsonPackageBuilder(
     name="docker-json-buster",
     config_path=_CONFIGS_PATH / "docker-json-config",
-    dockerfile_path=pl.Path("Dockerfile"),
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
 )
 DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
     name="docker-json-alpine",
     config_path=_CONFIGS_PATH / "docker-json-config",
-    dockerfile_path=pl.Path("Dockerfile.alpine"),
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
 )
 
 DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER = DockerSyslogPackageBuilder(
     name="docker-syslog-buster",
     config_path=_CONFIGS_PATH / "docker-syslog-config",
-    dockerfile_path=pl.Path("Dockerfile"),
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
 )
 DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
     name="docker-syslog-alpine",
     config_path=_CONFIGS_PATH / "docker-syslog-config",
-    dockerfile_path=pl.Path("Dockerfile.alpine"),
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
 )
 
 DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
     name="docker-api-buster",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    dockerfile_path=pl.Path("Dockerfile"),
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
 )
 DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     name="docker-api-alpine",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    dockerfile_path=pl.Path("Dockerfile.alpine"),
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
 )
 
 K8S_CONTAINER_BUILDER_BUSTER = K8sPackageBuilder(
     name="k8s-buster",
     config_path=_CONFIGS_PATH / "k8s-config",
-    dockerfile_path=pl.Path("Dockerfile"),
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
 )
 K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
     name="k8s-alpine",
     config_path=_CONFIGS_PATH / "k8s-config",
-    dockerfile_path=pl.Path("Dockerfile.alpine"),
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
 )
