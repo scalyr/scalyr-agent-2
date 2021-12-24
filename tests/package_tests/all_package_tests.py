@@ -286,7 +286,8 @@ for builder in [
         # Specify which architectures of the result image has to be tested.
         target_image_architectures=[
             constants.Architecture.X86_64,
-            #constants.Architecture.ARM64,
+            constants.Architecture.ARM64,
+            constants.Architecture.ARMV7,
         ],
     )
     _docker_image_tests.append(test)
