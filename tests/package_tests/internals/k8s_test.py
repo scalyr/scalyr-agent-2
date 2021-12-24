@@ -150,7 +150,7 @@ def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key:
     )
 
     # Wait a little.
-    time.sleep(3)
+    time.sleep(10)
 
     # Execute tail -f command on the agent.log inside the pod to read its content.
     agent_log_tail_process = subprocess.Popen(
