@@ -1,0 +1,6 @@
+# NOTE: orjson don't include pre-built wheels for ARMv7 for glibc and
+# musl.
+orjson==3.6.5; python_version >= '3.6' and 'armv7' not in platform_machine
+orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine
+
+requests==2.20.0
