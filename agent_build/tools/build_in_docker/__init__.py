@@ -20,7 +20,7 @@
 import pathlib as pl
 import os
 import subprocess
-from typing import Dict
+from typing import Dict, List
 
 from agent_build.tools import constants
 from agent_build.tools import common
@@ -160,3 +160,83 @@ def build_stage(
         finally:
             # Remove container.
             common.run_command(["docker", "rm", "-f", container_name])
+
+
+class DockerContainer:
+    """
+    Simple wrapper around docker container that allows to use context manager to clean up when container is not
+    needed anymore.
+    NOTE: The 'docker' library is not used on purpose, since there's only one abstraction that is needed. Using
+    docker through the docker CLI is much easier and does not require the "docker" lib as dependency.
+    """
+    def __init__(
+            self,
+            name: str,
+            image_name: str,
+            ports: List[str] = None,
+            mounts: List[str] = None,
+    ):
+        self.name = name
+        self.image_name = image_name
+        self.mounts = mounts or []
+        self.ports = ports or []
+
+    def start(self):
+
+        # Kill the previously run container, if exists.
+        self.kill()
+
+        command_args = [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            self.name,
+        ]
+
+        for port in self.ports:
+            command_args.append("-p")
+            command_args.append(port)
+
+        for mount in self.mounts:
+            command_args.append("-v")
+            command_args.append(mount)
+
+        command_args.append(self.image_name)
+
+        common.check_call_with_log(
+            command_args
+        )
+
+    def kill(self):
+        common.run_command(["docker", "rm", "-f", self.name])
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.kill()
+
+
+class LocalRegistryContainer(DockerContainer):
+    """
+    Container start runs local docker registry inside.
+    """
+    def __init__(
+            self,
+            name: str,
+            registry_port: int,
+            registry_data_path: pl.Path = None
+    ):
+        """
+        :param name: Name of the container.
+        :param registry_port: Host port that will be mapped to the registry's port.
+        :param registry_data_path: Host directory that will be mapped to the registry's data root.
+        """
+        super(LocalRegistryContainer, self).__init__(
+            name=name,
+            image_name="registry:2",
+            ports=[f"{registry_port}:5000"],
+            mounts=[f"{registry_data_path}:/var/lib/registry"],
+        )

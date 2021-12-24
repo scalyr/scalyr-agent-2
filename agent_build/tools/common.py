@@ -23,6 +23,9 @@ DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
 # If this env. variable is set, then the code runs inside the docker.
 IN_DOCKER = bool(os.environ.get("AGENT_BUILD_IN_DOCKER"))
 
+# If this env. variable is set, than the code runs in CI/CD (e.g. Github actions)
+IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
+
 # A counter for all commands that have been executed since start of the program.
 # Just for more informative logging.
 _COMMAND_COUNTER = 0
@@ -112,6 +115,9 @@ def run_command(*args, debug: bool = False, **kwargs):
 
     stdout = b"\n".join(lines)
     if process.returncode != 0:
+        if not debug:
+            # Even if it's not debug print output on error.
+            print(stdout.decode(), file=sys.stderr)
         raise subprocess.CalledProcessError(
             returncode=process.returncode, cmd=cmd_args, output=stdout
         )
