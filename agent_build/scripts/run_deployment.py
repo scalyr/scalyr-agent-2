@@ -24,16 +24,15 @@ Usage:
 
     Perform some deployment (used by Github Action CI):
 
-        run_deployment.py deployment <deployment_name> deploy  [--cache-dir <cache_dir>]
+        run_deployment.py deployment <deployment_name> deploy
 
-        The '--cache-dir' option provides path where steps of the deployment store their cached results. Each step
-            has its own unique cache name, so our local GutHub action can cache step's results to its own, separate
-            cache in the Github Actions. That means that the step that is used by many deployments will be cached only
-            once and will be reused by those deployments.
-
-    Get names of all caches of all steps of the deployment.
+    Get names of all caches of all steps of the deployment (used by Github Action CI).
 
         run_deployment.py deployment <deployment_name> get-deployment-all-cache-names
+
+        Each step has its own unique cache name, so our local GutHub action can cache step's results to its own,
+        separate cache in the Github Actions. That means that the step that is used by many deployments will be cached
+        only once and will be reused by those deployments.
 
         Also a utility command for the Github Action CI to perform the trick with caching, that has been described
             above. The local GitHub action uses those names as cache keys for GitHub Action cache.
@@ -52,6 +51,7 @@ _SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 sys.path.append(str(_SOURCE_ROOT))
 
 from agent_build.tools.environment_deployments import deployments
+from agent_build import package_builders
 from agent_build.tools import common
 
 
@@ -70,11 +70,6 @@ if __name__ == "__main__":
         dest="deployment_command", required=True
     )
     deploy_parser = deployment_subparsers.add_parser("deploy")
-    deploy_parser.add_argument(
-        "--cache-dir",
-        dest="cache_dir",
-        help="Cache directory to save/reuse deployment results.",
-    )
 
     get_all_deployments_parser = deployment_subparsers.add_parser(
         "get-deployment-all-cache-names"
@@ -87,16 +82,9 @@ if __name__ == "__main__":
         deployment = deployments.ALL_DEPLOYMENTS[args.deployment_name]
         if args.deployment_command == "deploy":
             # Perform the deployment with specified name.
-
-            cache_dir = None
-
-            if args.cache_dir:
-                cache_dir = pl.Path(args.cache_dir)
-
-            deployment.deploy(
-                cache_dir=cache_dir,
-            )
+            deployment.deploy()
             exit(0)
+
         if args.deployment_command == "get-deployment-all-cache-names":
             # A special command which is needed to perform the Github action located in
             # '.github/actions/perform-deployment'. The command provides names of the caches of the deployment's steps,

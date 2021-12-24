@@ -105,12 +105,6 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--reuse-local-cache",
-                action="store_true",
-                help="Enable Docker image cache re-use (e.g. when building locally and not on CI).",
-            )
-
-            package_parser.add_argument(
                 "--remove-image-name-prefix",
                 action="store_true",
                 help=(
@@ -122,18 +116,9 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--push", action="store_true", help="Push the result docker image."
-            )
-
-            package_parser.add_argument("--cache-from-dir", dest="cache_from_dir")
-            package_parser.add_argument("--cache-to-dir", dest="cache_to_dir")
-
-            package_parser.add_argument(
-                "--files-checksum",
-                dest="files_checksum",
+                "--push",
                 action="store_true",
-                help="Only used in CI/CD. Prints checksum of files that are used to create the base of the docker "
-                "image. Used to save docker buildx cache in the CI/CD's cache to reuse it in future.",
+                help="Push the result docker image."
             )
 
         else:
@@ -159,33 +144,22 @@ if __name__ == "__main__":
     builder_name = args.package_name
     package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
 
-    if not args.files_checksum:
-        logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
-
     # If that's a docker image builder handle their arguments too.
     if isinstance(package_builder, package_builders.ContainerPackageBuilder):
 
         if args.only_filesystem_tarball:
             # Build only image filesystem.
-            package_builder.build(
-                output_path=pl.Path(args.only_filesystem_tarball), locally=args.locally
+            package_builder.build_filesystem_tarball(
+                output_path=pl.Path(args.only_filesystem_tarball)
             )
             exit(0)
 
-        if args.files_checksum:
-            checksum = package_builder.used_files_checksum
-            print(checksum)
-            exit(0)
-
-        package_builder.build_image(
+        package_builder.build(
             push=args.push,
             registries=args.registry or [],
             tags=args.tag or [],
-            cache_from_path=args.cache_from_dir,
-            cache_to_path=args.cache_to_dir,
-            reuse_local_cache=args.reuse_local_cache,
             remove_image_name_prefix=args.remove_image_name_prefix,
         )
         exit(0)
 
-    package_builder.build(output_path=pl.Path(args.output_dir), locally=args.locally)
+    package_builder.build(locally=args.locally)
