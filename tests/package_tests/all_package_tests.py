@@ -25,6 +25,7 @@ from agent_build.tools import constants
 from agent_build import package_builders
 from tests.package_tests.internals import docker_test, k8s_test
 from agent_build.tools.environment_deployments import deployments
+from agent_build.tools import build_in_docker
 
 _PARENT_DIR = pl.Path(__file__).parent
 __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
@@ -143,8 +144,6 @@ class DockerImagePackageTest(Test):
         self,
         scalyr_api_key: str,
         name_suffix: str = None,
-        cache_from_path: pl.Path = None,
-        cache_to_path: pl.Path = None,
     ):
         """
         Run test for the agent docker image.
@@ -152,66 +151,18 @@ class DockerImagePackageTest(Test):
 
         :param scalyr_api_key:  Scalyr API key.
         :param name_suffix: Additional suffix to the agent instance name.
-        :param cache_from_path: Use given directory as cache source for docker buildx
-        :param cache_to_path: Use given directory as cache destination for docker buildx
         """
-
-        registry_host = "localhost:5000"
-
-        registry_container_name = "agent_images_registry"
-
-        # Spin up local docker registry where to push the result image
-
-        # first of all delete existing registry container.
-        logging.info("Remove registry container.")
-        subprocess.check_call(["docker", "rm", "-f", registry_container_name])
 
         # Run container with docker registry.
         logging.info("Run new local docker registry in container.")
-        subprocess.check_call(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "-d",
-                "-p",
-                "5000:5000",
-                "--name",
-                registry_container_name,
-                "registry:2",
-            ]
+        registry_container = build_in_docker.LocalRegistryContainer(
+            name="agent_images_registry",
+            registry_port=5050
         )
 
-        caching_options = []
-        if cache_from_path:
-            caching_options.extend(["--cache-from-dir", str(cache_from_path)])
+        registry_host = "localhost:5050"
 
-        if cache_to_path:
-            caching_options.extend(["--cache-to-dir", str(cache_to_path)])
-
-        try:
-            # Build image and push it to the local registry.
-            # Instead of calling the build function run the build_package script,
-            # so it can also be tested.
-            logging.info("Build docker image")
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    "build_package_new.py",
-                    self.package_builder.name,
-                    "--registry",
-                    registry_host,
-                    "--tag",
-                    "latest",
-                    "--tag",
-                    "test",
-                    "--tag",
-                    "debug",
-                    "--push",
-                    *caching_options,
-                ],
-                cwd=str(__SOURCE_ROOT__),
-            )
+        def _test_pushed_image():
 
             # Test that all tags has been pushed to the registry.
             for tag in ["latest", "test", "debug"]:
@@ -284,10 +235,33 @@ class DockerImagePackageTest(Test):
                         name_suffix=name_suffix,
                     )
 
+        try:
+            with registry_container:
+                # Build image and push it to the local registry.
+                # Instead of calling the build function run the build_package script,
+                # so it can also be tested.
+                logging.info("Build docker image")
+                subprocess.check_call(
+                    [
+                        sys.executable,
+                        "build_package_new.py",
+                        self.package_builder.name,
+                        "--registry",
+                        registry_host,
+                        "--tag",
+                        "latest",
+                        "--tag",
+                        "test",
+                        "--tag",
+                        "debug",
+                        "--push",
+                    ],
+                    cwd=str(__SOURCE_ROOT__),
+                )
+                _test_pushed_image()
         finally:
             # Cleanup.
             # Removing registry container.
-            subprocess.check_call(["docker", "rm", "-f", registry_container_name])
             subprocess.check_call(["docker", "logout", registry_host])
 
             subprocess.check_call(["docker", "image", "prune", "-f"])
@@ -312,7 +286,7 @@ for builder in [
         # Specify which architectures of the result image has to be tested.
         target_image_architectures=[
             constants.Architecture.X86_64,
-            constants.Architecture.ARM64,
+            #constants.Architecture.ARM64,
         ],
     )
     _docker_image_tests.append(test)

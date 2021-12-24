@@ -93,14 +93,6 @@ if __name__ == "__main__":
             help="Additional suffix for the name of the agent instances.",
         )
 
-        if isinstance(package_test, all_package_tests.DockerImagePackageTest):
-            run_package_test_parser.add_argument(
-                "--cache-from-dir",
-            )
-            run_package_test_parser.add_argument(
-                "--cache-to-dir",
-            )
-
     get_tests_github_matrix_parser = subparsers.add_parser(
         "get-package-builder-tests-github-matrix"
     )
@@ -122,8 +114,6 @@ if __name__ == "__main__":
                 scalyr_api_key=scalyr_api_key,
                 name_suffix=get_option(
                     "name_suffix", default=str(datetime.datetime.now().timestamp())
-                ),
-                cache_from_path=args.cache_from_dir,
-                cache_to_path=args.cache_to_dir,
+                )
             )
         exit(0)
