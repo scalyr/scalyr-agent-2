@@ -1,0 +1,81 @@
+# Base image that creates all necessary dependencies for the scalyr-agent docker image.
+# NOTE: multi-stage builds require Docker 17.05 or greater
+
+# Suffix for the python dockerhub image. For now can be:
+#   - 'slim' for buster based image
+#   - 'alpine' for alpine based image.
+ARG BASE_IMAGE_SUFFIX
+
+# Install dependency packages for buster.
+FROM python:3.8.10-slim as scalyr-dependencies-slim
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apt-get update && apt-get install -y build-essential git tar curl
+
+
+# Install dependency packages for alpine.
+FROM python:3.8.10-alpine as scalyr-dependencies-alpine
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apk update && apk add --virtual build-dependencies \
+    binutils \
+    build-base \
+    gcc \
+    g++ \
+    make \
+    curl \
+    python3-dev \
+    patchelf \
+    git
+
+# Install rust and cargo. It is needed to build some of the Python dependencies of the agent.
+FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust-
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup toolchain install nightly
+RUN rustup default nightly
+
+# There's no precompiled rust installation for armv7 so we replase the previous stage with this and do nothing.
+FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust-v7
+# Do nothing
+
+# Use one of the two previous stages according to the TARGETVARIANT suffix.
+# if TARGETVARIANT is 'v7', then we use stage without rust.
+# IMPORTANT: that may be needed to revise if new architectres are added.
+FROM scalyr-dependencies-rust-$TARGETVARIANT as scalyr-dependencies
+
+ARG TARGETVARIANT
+ARG COVERAGE_VERSION
+
+ADD agent_build/requirement-files/docker-image-requirements.txt agent_build/requirement-files/docker-image-requirements.txt
+ADD agent_build/requirement-files/compression-requirements.txt agent_build/requirement-files/compression-requirements.txt
+ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
+
+# Install agent dependencies.
+RUN pip3 install --upgrade pip
+RUN pip3 --no-cache-dir install --root /tmp/dependencies -r agent_build/requirement-files/docker-image-requirements.txt
+
+# Install coverage if its version if specified. Only used in testing.
+RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
+
+
+# Install packages and tools that will be required during the final image build.
+
+# Install tools for alpine
+FROM python:3.8.10-alpine as ready-base-alpine
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apk update && apk add --virtual curl git
+
+# Install tools for buster.
+FROM python:3.8.10-slim as ready-base-slim
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apt-get update && apt-get install -y git tar curl
+
+# Create a final base stage from one of the prefious OS-specific stages.
+FROM ready-base-$BASE_IMAGE_SUFFIX
+
+# Copy Agent's Python dependencies, so they also can be used in the final image build.
+COPY --from=scalyr-dependencies  /tmp/dependencies/ /tmp/dependencies/
+WORKDIR /
