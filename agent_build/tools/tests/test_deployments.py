@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import shutil
 import subprocess
 import pathlib as pl
+from typing import List
 
 import mock
 import pytest
@@ -22,10 +22,6 @@ import pytest
 from agent_build.tools import constants
 from agent_build.tools import common
 from agent_build.tools.environment_deployments import deployments
-
-_RUN_DEPLOYMENT_SCRIPT_PATH = (
-    constants.SOURCE_ROOT / "agent_build/scripts/run_deployment.py"
-)
 
 common.init_logging()
 
@@ -35,12 +31,15 @@ _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH = _PARENT_REL_DIR / "fixtures/example_steps"
 
 # This is just an example of the deployment step. It is used only in tests.
 class ExampleStep(deployments.ShellScriptDeploymentStep):
-    SCRIPT_PATH = (
-        _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH
-        / "install-requirements-and-download-webdriver.sh"
-    )
-    USED_FILES = [
-        _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "requirements-*.txt",
+    @property
+    def script_path(self) -> pl.Path:
+        return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-requirements-and-download-webdriver.sh"
+
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        return [
+            *super(ExampleStep, self)._tracked_file_globs,
+            _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "requirements-*.txt",
     ]
 
 
@@ -67,21 +66,28 @@ def example_deployment(request):
     deployments.ALL_DEPLOYMENTS.pop(name)
 
 
+@pytest.fixture
+def in_ci_cd(request):
+    original_in_ci_cd = common.IN_CICD
+    common.IN_CICD = request.param
+    yield
+    common.IN_CICD = original_in_ci_cd
+
+
 @pytest.mark.parametrize(
     ["example_deployment"], [["locally"], ["in_docker"]], indirect=True
 )
+@pytest.mark.parametrize(
+    ["in_ci_cd"], [[True]], indirect=True
+)
 def test_example_deployment(
-    tmp_path,
     example_deployment: deployments.Deployment,
+    in_ci_cd: bool
 ):
-    # Create cache directory. The deployment will store the cached results of its steps in it.
-    cache_path = tmp_path
-
-    # Because the GitHub Actions CI/CD can not run the deployment directly from the code, it has to use
-    # a special helper command-line script '/agent_build/scripts/run_deployment.py', so we also do the testing through
-    # that script to test that part too.
-
     example_deployment_step = example_deployment.steps[0]
+    deployment_step_cache_path = example_deployment_step.cache_directory
+    if deployment_step_cache_path.exists():
+        shutil.rmtree(deployment_step_cache_path)
 
     if example_deployment.in_docker:
         subprocess.check_call(
@@ -93,11 +99,9 @@ def test_example_deployment(
         output_path.touch()
 
     with mock.patch.object(deployments, "save_docker_image", step_save_image_mock):
-        example_deployment.deploy(cache_dir=cache_path)
+        example_deployment.deploy()
 
     # Check if the deployment created all needed cache directories.
-    deployment_step_cache_path = cache_path / example_deployment_step.cache_key
-
     if example_deployment.in_docker:
         # IF that's a in docker deployment, then look for a serialized docker result image.
         cached_docker_image_path = (
@@ -125,9 +129,9 @@ def test_deployment_step_with_untracked_file(caplog, capsys):
     """
 
     class ExampleInvalidStepWithUntrackedFiles(deployments.ShellScriptDeploymentStep):
-        SCRIPT_PATH = (
-            _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-with-untracked-file.sh"
-        )
+        @property
+        def script_path(self) -> pl.Path:
+            return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-with-untracked-file.sh"
 
     deployment = deployments.Deployment(
         name="example_environment_untracked",
