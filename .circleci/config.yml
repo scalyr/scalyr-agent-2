@@ -2312,193 +2312,193 @@ jobs:
     steps:
       - ami-tests:
           test_type: "development"
-
-workflows:
- version: 2
- static-analysis:
-   <<: *skip_release_build_branch_push
-   jobs:
-     - lint-checks:
-         context: scalyr-agent
- unit-tests:
-   <<: *skip_release_build_branch_push
-   # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
-   # Python 3 versions
-   jobs:
-     - unittest-27:
-         context: scalyr-agent
-     - unittest-35:
-         context: scalyr-agent
-     - unittest-35-osx:
-         context: scalyr-agent
-     - unittest-38-windows:
-         context: scalyr-agent
- smoke-tests:
-   <<: *skip_release_build_branch_push
-   jobs:
-     - smoke-standalone-27:
-         context: scalyr-agent
-     - smoke-standalone-35:
-         context: scalyr-agent
-     - smoke-standalone-35-rate-limit:
-         context: scalyr-agent
-      # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-json:
-         context: scalyr-agent
-     - smoke-docker-api-raw-logs-disabled:
-         context: scalyr-agent
-     - smoke-docker-syslog:
-         context: scalyr-agent
-     - smoke-k8s:
-         context: scalyr-agent
-     - smoke-monitors-tests:
-         context: scalyr-agent
-     - sonarcloud-scan:
-         requires:
-           # NOTE: This is not ideal, but Circle CI doesn't support cross
-           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
-           # slowest jobs
-           - smoke-docker-json
-           - smoke-docker-api-raw-logs-disabled
-           - smoke-docker-syslog
-           - smoke-k8s
-           - smoke-monitors-tests
- package-tests:
-   <<: *skip_release_build_branch_push
-   jobs:
-     - build-linux-packages-and-installer-script
-     - build-windows-package
-     - package-test-rpm:
-         context: scalyr-agent
-         <<: *master_and_release_only
-     - package-test-deb:
-         context: scalyr-agent
-         <<: *master_and_release_only
-     - smoke-rpm-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-         <<: *master_and_release_only
-     - smoke-rpm-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-         <<: *master_and_release_only
-     - smoke-deb-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-         <<: *master_and_release_only
-     - smoke-deb-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-         <<: *master_and_release_only
-     - ami-tests-development:
-          context: scalyr-agent
-          requires:
-            - build-windows-package
-            - build-linux-packages-and-installer-script
-     - ami-tests-stable:
-          context: scalyr-agent
-          <<: *master_and_release_only
- benchmarks:
-   <<: *skip_release_build_branch_push
-   jobs:
-     - benchmarks-micro-py-27
-     - benchmarks-micro-py-35
-     - benchmarks-idle-agent-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-idle-agent-no-monitors-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
-         <<: *benchmarks_master_and_release_only
-     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
-         <<: *benchmarks_master_and_release_only
-     # - send-benchmark-results-and-graphs-to-slack:
-     #     requires:
-     #       - benchmarks-idle-agent-py-27
-     #       - benchmarks-idle-agent-py-35
-     #       - benchmarks-idle-agent-no-monitors-py-27
-     #       - benchmarks-idle-agent-no-monitors-py-35
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-     #       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-     #       - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
-     #     <<: *benchmarks_master_and_release_only
- weekly-circle-ci-usage-report:
-   triggers:
-     - schedule:
-         cron: "0 0 * * 0"
-         filters:
-           branches:
-             only:
-               - master
-   jobs:
-     - send-circle-ci-usage-report
-
- # We run AMI based package install tests which utilize installer script on
- # daily basis.
- # This helps us detect various installer script and other potential upstream
- # issues.
- daily-stable-ami-package-install-tests:
-   triggers:
-     - schedule:
-         cron: "0 2 * * *"
-         filters:
-           branches:
-             only:
-               - master
-   jobs:
-     - ami-tests-stable:
-         context: scalyr-agent
-     - unittest-27:
-         context: scalyr-agent
-     - unittest-35:
-         context: scalyr-agent
-     - unittest-35-osx:
-         context: scalyr-agent
-     - unittest-38-windows:
-         context: scalyr-agent
-     - build-linux-packages-and-installer-script
-     - build-windows-package
-     - package-test-rpm:
-         context: scalyr-agent
-     - package-test-deb:
-         context: scalyr-agent
-     - smoke-rpm-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-     - smoke-rpm-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-     - smoke-deb-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-     - smoke-deb-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
+#
+#workflows:
+# version: 2
+# static-analysis:
+#   <<: *skip_release_build_branch_push
+#   jobs:
+#     - lint-checks:
+#         context: scalyr-agent
+# unit-tests:
+#   <<: *skip_release_build_branch_push
+#   # NOTE: To avoid massive and inflated build matrix, we currently don't run tests under multiple
+#   # Python 3 versions
+#   jobs:
+#     - unittest-27:
+#         context: scalyr-agent
+#     - unittest-35:
+#         context: scalyr-agent
+#     - unittest-35-osx:
+#         context: scalyr-agent
+#     - unittest-38-windows:
+#         context: scalyr-agent
+# smoke-tests:
+#   <<: *skip_release_build_branch_push
+#   jobs:
+#     - smoke-standalone-27:
+#         context: scalyr-agent
+#     - smoke-standalone-35:
+#         context: scalyr-agent
+#     - smoke-standalone-35-rate-limit:
+#         context: scalyr-agent
+#      # NOTE: smoke test jobs below still use old smoke tests framework
+#     - smoke-docker-json:
+#         context: scalyr-agent
+#     - smoke-docker-api-raw-logs-disabled:
+#         context: scalyr-agent
+#     - smoke-docker-syslog:
+#         context: scalyr-agent
+#     - smoke-k8s:
+#         context: scalyr-agent
+#     - smoke-monitors-tests:
+#         context: scalyr-agent
+#     - sonarcloud-scan:
+#         requires:
+#           # NOTE: This is not ideal, but Circle CI doesn't support cross
+#           # workflow dependencies (we can't wait on unittest-27 here) so we just wait on the
+#           # slowest jobs
+#           - smoke-docker-json
+#           - smoke-docker-api-raw-logs-disabled
+#           - smoke-docker-syslog
+#           - smoke-k8s
+#           - smoke-monitors-tests
+# package-tests:
+#   <<: *skip_release_build_branch_push
+#   jobs:
+#     - build-linux-packages-and-installer-script
+#     - build-windows-package
+#     - package-test-rpm:
+#         context: scalyr-agent
+#         <<: *master_and_release_only
+#     - package-test-deb:
+#         context: scalyr-agent
+#         <<: *master_and_release_only
+#     - smoke-rpm-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#         <<: *master_and_release_only
+#     - smoke-rpm-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#         <<: *master_and_release_only
+#     - smoke-deb-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#         <<: *master_and_release_only
+#     - smoke-deb-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#         <<: *master_and_release_only
+#     - ami-tests-development:
+#          context: scalyr-agent
+#          requires:
+#            - build-windows-package
+#            - build-linux-packages-and-installer-script
+#     - ami-tests-stable:
+#          context: scalyr-agent
+#          <<: *master_and_release_only
+# benchmarks:
+#   <<: *skip_release_build_branch_push
+#   jobs:
+#     - benchmarks-micro-py-27
+#     - benchmarks-micro-py-35
+#     - benchmarks-idle-agent-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-idle-agent-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-idle-agent-no-monitors-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-idle-agent-no-monitors-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
+#         <<: *benchmarks_master_and_release_only
+#     - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
+#         <<: *benchmarks_master_and_release_only
+#     # - send-benchmark-results-and-graphs-to-slack:
+#     #     requires:
+#     #       - benchmarks-idle-agent-py-27
+#     #       - benchmarks-idle-agent-py-35
+#     #       - benchmarks-idle-agent-no-monitors-py-27
+#     #       - benchmarks-idle-agent-no-monitors-py-35
+#     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
+#     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
+#     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
+#     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
+#     #       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
+#     #       - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
+#     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
+#     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
+#     #     <<: *benchmarks_master_and_release_only
+# weekly-circle-ci-usage-report:
+#   triggers:
+#     - schedule:
+#         cron: "0 0 * * 0"
+#         filters:
+#           branches:
+#             only:
+#               - master
+#   jobs:
+#     - send-circle-ci-usage-report
+#
+# # We run AMI based package install tests which utilize installer script on
+# # daily basis.
+# # This helps us detect various installer script and other potential upstream
+# # issues.
+# daily-stable-ami-package-install-tests:
+#   triggers:
+#     - schedule:
+#         cron: "0 2 * * *"
+#         filters:
+#           branches:
+#             only:
+#               - master
+#   jobs:
+#     - ami-tests-stable:
+#         context: scalyr-agent
+#     - unittest-27:
+#         context: scalyr-agent
+#     - unittest-35:
+#         context: scalyr-agent
+#     - unittest-35-osx:
+#         context: scalyr-agent
+#     - unittest-38-windows:
+#         context: scalyr-agent
+#     - build-linux-packages-and-installer-script
+#     - build-windows-package
+#     - package-test-rpm:
+#         context: scalyr-agent
+#     - package-test-deb:
+#         context: scalyr-agent
+#     - smoke-rpm-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#     - smoke-rpm-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#     - smoke-deb-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#     - smoke-deb-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
