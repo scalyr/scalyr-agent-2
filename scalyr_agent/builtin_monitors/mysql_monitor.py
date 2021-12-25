@@ -29,7 +29,6 @@ import six
 
 from scalyr_agent import (
     ScalyrMonitor,
-    UnsupportedSystem,
     define_config_option,
     define_metric,
     define_log_field,
@@ -39,17 +38,18 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
 
-# We must require 2.6 or greater right now because PyMySQL requires it.  We are considering
-# forking PyMySQL and adding in support if there is enough customer demand.
-if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 7):
-    raise UnsupportedSystem("mysql_monitor", "Requires Python 2.7 or greater")
-
 # We import pymysql from the third_party directory.  This
 # relies on PYTHONPATH being set up correctly, which is done
 # in both agent_main.py and config_main.py
 #
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import pymysql  # pylint: disable=import-error
+
+ACCESS_DENIED_ERROR_MSG = """
+Received access denied error which indicates that the user which is used to connect to the database
+doesn't have sufficient permissions. For information on which permissions are needed by that user,
+please refer to the docs - https://app.scalyr.com/help/monitors/mysql. Original error: %s
+""".strip()
 
 __monitor__ = __name__
 
@@ -121,6 +121,21 @@ define_config_option(
     "cert_file",
     "Location of the cert file to use for the SSL connection. Defaults to None",
     convert_to=six.text_type,
+)
+define_config_option(
+    __monitor__,
+    "collect_replica_metrics",
+    (
+        "Set this value to true if the monitor is configured to connect to a MySQL replica / slave. "
+        "Setting it to false will cause monitor not to collect any replica / slave related metrics. "
+        "This means that when connecting to a primary / master, user which is used to authenticate only "
+        'needs "PROCESS" permission grant and nothing else. Keep in mind that you can also leave '
+        "this set to true when connecting to a master - in such case, the monitor will still try to query "
+        'for replica metrics and as such, require permissions to execute "SHOW SLAVE STATUS;" query. '
+        "For backward compatibility reasons, this value defaults to true."
+    ),
+    convert_to=bool,
+    default=True,
 )
 
 # Metric definitions.
@@ -482,7 +497,8 @@ class MysqlDB(object):
             (errcode, msg) = error.args
             if errcode != 2006:  # "MySQL server has gone away"
                 self._logger.exception(
-                    "Exception trying to execute query: %d '%s'" % (errcode, msg)
+                    "Exception trying to execute query: %d '%s'"  # pylint: disable=bad-string-format-type
+                    % (errcode, msg)
                 )
                 raise Exception(
                     "Database error -- "
@@ -492,6 +508,13 @@ class MysqlDB(object):
                 )
             self._reconnect()
             return None
+        except pymysql.err.InternalError as error:
+            (errcode, msg) = error.args
+            if errcode == 1227 or "access denied" in str(error):
+                # Access denied
+                raise Exception(ACCESS_DENIED_ERROR_MSG % (str(error)))
+            raise error
+
         return self._cursor.fetchall()
 
     def _gather_db_information(self):
@@ -695,8 +718,19 @@ class MysqlDB(object):
         return d
 
     def gather_cluster_status(self):
+        if not self._collect_replica_metrics:
+            self._logger.debug(
+                '"collect_replica_metrics" configuration option is set to False '
+                "so replica / slave metrics won't be collected."
+            )
+            return None
+
         slave_status = self._query("SHOW SLAVE STATUS")
         if not slave_status:
+            self._logger.debug(
+                "SHOW SLAVE STATUS returned no result which indicates we are "
+                "running on a master. Slave metrics won't be collected."
+            )
             return None
         result = None
         slave_status = self._row_to_dict(slave_status[0])
@@ -812,7 +846,7 @@ class MysqlDB(object):
         return pct
 
     def _derived_stat_write_percentage(self, globalVars, globalStatusMap):
-        """Calculate the percentate of queries that are writes."""
+        """Calculate the percentage of queries that are writes."""
         return self._derived_stat_read_write_percentage(
             globalVars, globalStatusMap, False
         )
@@ -966,6 +1000,7 @@ class MysqlDB(object):
         path_to_ca_file=None,
         path_to_key_file=None,
         path_to_cert_file=None,
+        collect_replica_metrics=True,
     ):
         """Constructor: handles both socket files as well as host/port connectivity.
 
@@ -978,6 +1013,8 @@ class MysqlDB(object):
         @param path_to_ca_file: optional path to a ca file to use when connecting to mysql over ssl
         @param path_to_key_file: optional path to a key file to use when connecting to mysql over ssl
         @param path_to_cert_file: optional path to a cert file to use when connecting to mysql over ssl
+        @param collect_replica_metrics: set to true to try to collect replica (slave) related metrics.
+                                        Only applicable when connected to a replica.
         """
         self._default_socket_locations = [
             "/tmp/mysql.sock",  # MySQL's own default.
@@ -995,6 +1032,8 @@ class MysqlDB(object):
         self._path_to_ca_file = path_to_ca_file
         self._path_to_key_file = path_to_key_file
         self._path_to_cert_file = path_to_cert_file
+        self._collect_replica_metrics = collect_replica_metrics
+
         if type == "socket":
             # if no socket file specified, attempt to find one locally
             if sockfile is None:
@@ -1031,8 +1070,8 @@ class MysqlMonitor(ScalyrMonitor):
 
 This agent monitor plugin records performance and usage data from a MySQL server.
 
-NOTE: the MySQL monitor requires Python 2.6 or higher. (This applies to the server on which the Scalyr Agent
-is running, which needn't necessarily be the same machine where the MySQL server is running.) If you need
+NOTE: The MySQL monitor requires Python 2.7 or higher as of agent release 2.0.52. (This applies to the server on which the Scalyr Agent
+is running, which needn't necessarily be the same machine where the MySQL server is running.). If you need
 to monitor MySQL from a machine running an older version of Python, [let us know](mailto:support@scalyr.com).
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
@@ -1043,8 +1082,9 @@ For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 To configure the MySQL monitor plugin, you will need the following information:
 
-- A MySQL username with administrative privileges. The user needs to be able to query the information_schema table,
-  as well as assorted global status information.
+- A MySQL user with administrative privileges. The user needs to be able to query the information_schema table,
+  as well as assorted global status information. See more information on which permissionsa are needed in the
+  section below.
 - The password for that user.
 
 Here is a sample configuration fragment:
@@ -1061,6 +1101,85 @@ Here is a sample configuration fragment:
 This configuration assumes that MySQL is running on the same server as the Scalyr Agent, and is using the default
 MySQL socket. If not, you will need to specify the server's socket file, or hostname (or IP address) and port number;
 see Configuration Reference.
+
+## MySQL User Permissions
+
+As part of the metric gathering process, monitor executes the following queries:
+
+* ``SHOW ENGINE INNODB STATUS;``
+* ``SHOW PROCESSLIST;``
+* ``SHOW SLAVE STATUS;``
+* ``SHOW /*!50000 GLOBAL */ STATUS;``
+* ``SHOW /*!50000 GLOBAL */ VARIABLES;``
+
+To be able to execute those queries, the user you use to authenticate needs a subset of administrative
+permissions which are documented below.
+
+You are strongly encouraged to create a dedicated user with a limited set of permissions for this purpose
+(e.g. user named ``scalyr-agent-monitor``).
+
+Example below shows DDL you can use to create a new user with the needed permissions.
+
+    -- Create user used for monitoring by the scalyr agent
+    -- In this case we allow that user to log in remotely from any host (@'%') and localhost
+    -- (@'localhost'), but depending on where the agent and MySQL server is running, you want only want
+    -- to grant permissions to connect from localhost. In this case, you should remove the lines
+    -- which allow user to connect from any host (@'%').
+    CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'localhost' IDENTIFIED BY 'your super secret and long password';
+    CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'%' IDENTIFIED BY 'your super secret and long password';
+
+    -- Revoke all permissions
+    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor'@'localhost';
+    REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor'@'%';
+
+    -- Grant necessary permissions
+    -- Needed for SHOW PROCESSLIST;
+    -- Needed for ENGINE INNODB STATUS;
+    -- Needed for SELECT VERSION();
+    -- Needed for SHOW /*!50000 GLOBAL */ STATUS;
+    -- Needed for SHOW /*!50000 GLOBAL */ VARIABLES;
+    GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'localhost';
+    GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'%';
+
+    -- Permission grants below are only needed if collect_replica_metrics config option is True
+    -- and monitor is configured to connect to a replica and not a primary.
+
+    -- Needed for SHOW SLAVE STATUS;
+    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'%';
+
+    -- Or in some versions of MySQL
+    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT REPLICATION SLAVE, SLAVE MONITOR ON `%`.* TO 'scalyr-agent-monitor'@'%';
+
+    -- Or:
+    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT BINLOG MONITOR *.* TO 'scalyr-agent-monitor'@'%';
+
+    -- Or in MariaDB:
+    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT REPLICA MONITOR ON *.* TO 'scalyr-agent-monitor'@'%';
+    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'localhost';
+    -- GRANT SUPER, REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'%';
+
+    -- Flush privileges
+    FLUSH PRIVILEGES;
+
+    -- Show permissions
+    SHOW GRANTS FOR 'scalyr-agent-monitor'@'localhost';
+    SHOW GRANTS FOR 'scalyr-agent-monitor'@'%';
+
+Keep in mind that there are some differences between different MySQL versions and implementations
+such as MariaDB so you may need to refer to the documentation for the version you are using to obtain
+the correct name of the grant which grants a permission for running ``SHOW SLAVE STATUS;`` command.
+
+If ``collect_replica_metrics`` monitor config option (available since scalyr agent v2.1.26) is set
+to ``False`` and monitor is configured to connect to a primary (master), user which is used to run
+the queries only needs the ``PROCESS`` permission and nothing else.
+
+If you grant those permissions after the agent has already been started and established connection
+to the MySQL server, you will need to restart the agent (which in turn will restart the monitor and
+re-establish the connection) for the permission changes to take an affect.
 
 ## Viewing Data
 
@@ -1156,6 +1275,10 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
         self._path_to_ca_file = self._config.get("ca_file", None)
         self._path_to_key_file = self._config.get("key_file", None)
         self._path_to_cert_file = self._config.get("cert_file", None)
+        self._collect_replica_metrics = self._config.get(
+            "collect_replica_metrics", True
+        )
+
         self._db = None
 
     def _connect_to_db(self):
@@ -1180,6 +1303,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     path_to_ca_file=self._path_to_ca_file,
                     path_to_key_file=self._path_to_key_file,
                     path_to_cert_file=self._path_to_cert_file,
+                    collect_replica_metrics=self._collect_replica_metrics,
                 )
             else:
                 self._db = MysqlDB(
@@ -1194,6 +1318,7 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
                     path_to_ca_file=self._path_to_ca_file,
                     path_to_key_file=self._path_to_key_file,
                     path_to_cert_file=self._path_to_cert_file,
+                    collect_replica_metrics=self._collect_replica_metrics,
                 )
         except Exception as e:
             self._db = None

@@ -1,0 +1,135 @@
+# Base image that creates all necessary dependencies for the scalyr-agent based on Alpine Linux.
+# NOTE: multi-stage builds require Docker 17.05 or greater
+
+# Type of the image build, e.g: docker-json, docker-syslog, k8s
+ARG BUILD_TYPE
+
+# Agent run mode. Can be 'normal' or 'coverage' to enable code coverage tool.
+ARG MODE="normal"
+
+# Build image files and dependencies.
+FROM python:3.8.10-alpine as scalyr-build
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+#RUN apt-get update && apt-get install -y build-essential git tar
+RUN apk update && apk add --virtual build-dependencies \
+    binutils \
+    build-base \
+    gcc \
+    g++ \
+    make \
+    curl \
+    python3-dev \
+    patchelf \
+    git
+
+ARG TARGETPLATFORM
+
+# Install Rust and Cargo which is needed to build some Python wheels such as orjson
+# NOTE: Right now rustup doesn't support armv7 musl yet so we don't install rust on armv7
+# See https://doc.rust-lang.org/rustc/platform-support.html for details.
+# Install Rust nightly and target for musl
+RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . ~/.cargo/env && rustup toolchain install nightly && \
+    . ~/.cargo/env && rustup default nightly && \
+    . ~/.cargo/env && rustup component list && \
+    . ~/.cargo/env && rustup target add x86_64-unknown-linux-musl; \
+    fi
+
+#RUN if [[ ${TARGETPLATFORM} != "linux/arm/v7" ]]; then . ~/.cargo/env && rustup target add armv7-unknown-linux-musleabihf; fi
+
+ADD docker/requirements-alpine.txt /tmp/requirements.txt
+
+# Workaround so we can use pre-built orjson wheel for musl. We need to pin pip to older version for
+# manylinux2014 wheel format to work.
+# See https://github.com/ijl/orjson/issues/8 for details.
+# If we don't that and we include orjson and zstandard, we need rust chain and building the image
+# will be very slow due to cross compilation in emulated environment (QEMU)
+RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py && pip install "pip==20.2.2" --user
+
+# install python dependencies
+RUN if [[ ${TARGETPLATFORM} = "linux/arm/v7" ]]; then \
+        pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; \
+    else \
+        . ~/.cargo/env && pip --no-cache-dir install --root /tmp/dependencies -r /tmp/requirements.txt; \
+    fi
+
+# Clean up files which were installed to use manylinux2014 workaround
+RUN pip uninstall -y pip && pip --version && rm /usr/local/lib/python3.8/_manylinux.py
+
+ARG CACHE_BUST=1
+ARG AGENT_BUILD_DEBUG
+# If specified then the package build command will produce additional debug logging.
+ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
+# Special env. variable that will enable addional logging info about that command runs in docker.
+ENV AGENT_BUILD_IN_DOCKER=1
+# e.g. k8s, docker-json
+ARG BUILD_TYPE
+# e.g. k8s-buster, docker-json-buster, k8s-alpine
+ARG BUILDER_NAME
+
+ADD . /scalyr-agent-2
+
+RUN if [[ ${TARGETPLATFORM} == "linux/arm/v7" ]]; then \
+        python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build; \
+    else \
+        . ~/.cargo/env && python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build; \
+    fi
+
+WORKDIR /tmp/container-fs
+RUN tar -xf /tmp/build/scalyr-agent.tar.gz
+
+WORKDIR /
+
+# Copy result files to a new base stage.
+FROM python:3.8.10-alpine as scalyr-base
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+COPY --from=scalyr-build  /tmp/dependencies/ /
+COPY --from=scalyr-build /tmp/container-fs /
+
+
+# Optional stage for docker json.
+FROM scalyr-base as build-docker-json
+MAINTAINER Scalyr Inc <support@scalyr.com>
+# Nothing to add
+
+# Optional stage for docker api.
+FROM scalyr-base as build-docker-api
+MAINTAINER Scalyr Inc <support@scalyr.com>
+# Nothing to add
+
+
+# Optional stage for docker syslog.
+FROM scalyr-base as build-docker-syslog
+MAINTAINER Scalyr Inc <support@scalyr.com>
+# expose syslog ports
+EXPOSE 601/tcp
+# Please note Syslog UDP 1024 max packet length (rfc3164)
+EXPOSE 514/udp
+
+
+# Optional stage for k8s.
+FROM scalyr-base as build-k8s
+MAINTAINER Scalyr Inc <support@scalyr.com>
+ENV SCALYR_STDOUT_SEVERITY ERROR
+
+
+# Noraml result image
+FROM build-$BUILD_TYPE as scalyr-normal
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
+
+
+# Result image with enabled coverage (for tests).
+FROM build-$BUILD_TYPE as scalyr-with-coverage
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN python3 -m pip install coverage==4.5.4
+CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", "--no-fork", "--no-change-user", "start"]
+
+# Use stage with needed mode as a final image.
+FROM scalyr-$MODE as scalyr
+MAINTAINER Scalyr Inc <support@scalyr.com>

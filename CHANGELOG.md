@@ -1,6 +1,26 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.26 "TBW" - Dec 17, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+--->
+
+Improvements:
+* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
+* Add support for specifying new ``server_url`` config option for each session worker. This allows user to configure different session workers to use different server urls (e.g. some workers send data to agent.scalyr.com and other send data to eu.scalyr.com).
+
+Other:
+* Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
+
+Docker Images:
+* Docker images now utilize Python 3.8 (in the past they used Python 2.7).
+* Docker images are now also produced and pushed to the registry for the ``linux/arm64`` and ``linux/arm/v7`` architecture.
+* Docker image now includes ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
+* ``ujson`` dependency has been removed from the Docker image in favor of ``orjson`` which is more performant and now used by default.
+* Alpine based Docker images which are 50% small than regular Debian buster-slim based ones are now available. Alpine based images contains ``-alpine`` tag name suffix.
+
 ## 2.1.25 "Hamarus" - Nov 17, 2021
 
 <!---
@@ -65,7 +85,7 @@ Bug fixes:
 * Fix an issue where LogFileIterator during the copy-truncate process picks wrong pending file with a similar name causing loss of the log and showing negative bytes in agent status.
 
 Other:
-* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations. 
+* The discovery logic of the log files, which have been rotated with copy truncate method, now can handle only default rogrotate configurations.
 * Agent now emits a warning if running under Python 2.6 which we will stop supporting in the next release.
 
 ## 2.1.20 "Tabeisshi" - April 19, 2021

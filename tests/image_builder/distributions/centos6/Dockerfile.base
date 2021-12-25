@@ -22,6 +22,7 @@ RUN ln -sf /usr/bin/python3.5 /usr/bin/python3
 
 COPY py26-unit-tests-requirements.txt py26-unit-tests-requirements.txt
 COPY dev-requirements.txt dev-requirements.txt
+ADD agent_build/requirement-files agent_build/requirement-files
 
 RUN pip install -r py26-unit-tests-requirements.txt
 

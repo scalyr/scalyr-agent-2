@@ -35,7 +35,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sNamespaceFilter,
     PodInfo,
 )
-from scalyr_agent.third_party.requests.packages.urllib3.exceptions import (
+from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
 from scalyr_agent.third_party.six import StringIO

@@ -1,0 +1,67 @@
+# The main "setup" workflow, that calls other workflows.
+name: Docker Images Build
+
+on: [push]
+
+# Agent Docker image tests
+#
+# To test this workflow with your branch, make the following changes:
+#
+# 1. In this workflow, change ``@master`` to ``@your_branch_name`` - e.g. ``@docker_image_alpine``
+
+# 2. In this workflow, change docker hub secrets to utilize testing and not prod account so images
+#    get pushed to testing account. Change ``_PROD_` in the secret name to ``_TEST``,
+#    e.g. ``DOCKER_HUB_USERNAME_TEST_ACCOUNT`` ``DOCKER_HUB_PASSWORD_TEST_ACCOUNT``.
+#    Images for test account will get pushed to https://hub.docker.com/r/test4scalyr/.
+#
+# 3. Inside .github/workflows/docker-and-k8s.yml workflow, change if ``publish`` job conditional to:
+#    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/YOUR_BRANCH_NAME') }}
+#
+#    And the "Push image" step conditional to:
+#        if: ${{ github.ref == 'refs/heads/YOUR_BRANCH_NAME' }}
+#
+# For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
+jobs:
+  docker-json:
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    with:
+      image-type: docker-json
+      publish: true
+    secrets:
+      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
+
+  docker-syslog:
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    with:
+      image-type: docker-syslog
+      publish: true
+    secrets:
+      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
+
+  docker-api:
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    with:
+      image-type: docker-api
+      publish: false
+    secrets:
+      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
+
+  k8s:
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@master
+    with:
+      image-type: k8s
+      publish: true
+    secrets:
+      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}

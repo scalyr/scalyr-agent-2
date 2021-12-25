@@ -1038,7 +1038,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "requests-2.15.1")
+        self.assertEqual(split[-1], "requests-2.20.0")
         self.assertEqual(split[-4], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
@@ -1352,4 +1352,49 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         self.assertEqual(serialized_data, request["body"])
         self.assertTrue(
             "Content-Encoding" not in session._ScalyrClientSession__standard_headers
+        )
+
+    @mock.patch("scalyr_agent.scalyr_client.log")
+    def test_receive_response_includes_message_on_bad_param(self, mock_log):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            compression_type=None,
+        )
+
+        mock_response = '{"status": "error/client/badParam", "message": "foo bar"}'
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__connection.status_code.return_value = 200
+        session._ScalyrClientSession__connection.response.return_value = mock_response
+
+    @mock.patch("scalyr_agent.scalyr_client.log")
+    def test_receive_response_includes_message_on_bad_param_response_doesnt_include_message(
+        self, mock_log
+    ):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            compression_type=None,
+        )
+
+        mock_response = '{"status": "error/client/badParam"}'
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__connection.status_code.return_value = 200
+        session._ScalyrClientSession__connection.response.return_value = mock_response
+
+        body_str = ""
+        send_time = int(time.time())
+
+        self.assertEqual(mock_log.error.call_count, 0)
+        session._ScalyrClientSession__receive_response(
+            body_str=body_str, send_time=send_time
+        )
+        self.assertEqual(mock_log.error.call_count, 1)
+        mock_log.error.assert_called_with(
+            "Request to '%s' failed due to a bad parameter value.  This may be caused by an invalid write logs api key in the configuration. Response message: %s",
+            "https://dummserver.com",
+            None,
+            error_code="error/client/badParam",
         )

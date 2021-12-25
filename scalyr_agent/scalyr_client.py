@@ -116,13 +116,15 @@ def verify_server_certificate(config):
         )
 
 
-def create_client(config, quiet=False, api_key=None):
-    # type: (Configuration, bool, six.text_type) -> ScalyrClientSession
+def create_client(config, quiet=False, api_key=None, server_url=None):
+    # type: (Configuration, bool, six.text_type, six.text_type) -> ScalyrClientSession
     """Creates and returns a new client to the Scalyr servers.
 
     @param quiet: If true, only errors should be written to stdout.
-    @:param api_key: The Scalyr API key. If None, use default api_key from config
     @type quiet: bool
+    @param api_key: The Scalyr API key. If None, use default api_key from config
+    @param server_url: The URL to the Scalyr server. If None, use default scalyr_server value from
+                       config
 
     @return: The client to use for sending requests to Scalyr, using the server address and API write logs
         key in the configuration file.
@@ -137,7 +139,7 @@ def create_client(config, quiet=False, api_key=None):
         intermediate_certs_file = None
     use_requests_lib = config.use_requests_lib
     return ScalyrClientSession(
-        config.scalyr_server,
+        server_url or config.scalyr_server,
         api_key or config.api_key,
         __scalyr__.SCALYR_VERSION,
         quiet=quiet,
@@ -718,8 +720,9 @@ class ScalyrClientSession(object):
                 elif status == "error/client/badParam":
                     log.error(
                         "Request to '%s' failed due to a bad parameter value.  This may be caused by an "
-                        "invalid write logs api key in the configuration",
+                        "invalid write logs api key in the configuration. Response message: %s",
                         self.__full_address,
+                        response_as_json.get("message", None),
                         error_code="error/client/badParam",
                     )
                 else:
@@ -896,7 +899,7 @@ class ScalyrClientSession(object):
         platform_value = None
         # noinspection PyBroadException
         try:
-            distribution = platform.dist()
+            distribution = platform.dist()  # pylint: disable=no-member
             if len(distribution[0]) > 0:
                 platform_value = "Linux-%s-%s" % (distribution[0], distribution[1])
         except Exception:

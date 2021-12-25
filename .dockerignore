@@ -1,0 +1,17 @@
+debug
+build
+.vagrant
+.idea
+.run
+tests
+.tox
+.dockerignore
+__pycache__
+**/__pycache__
+
+.pytest_cache
+**/.pytest_cache
+
+venv*/
+**/node_modules
+**/.DS_Store
