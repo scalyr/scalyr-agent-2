@@ -1780,7 +1780,7 @@ class KubernetesApi(object):
             # a recent version of python for various 3rd party libs
             f = open(token_file, "r")
             try:
-                self.token = f.read()
+                self.token = f.read().strip()
             finally:
                 f.close()
         except IOError:
@@ -1793,7 +1793,7 @@ class KubernetesApi(object):
             # a recent version of python for various 3rd party libs
             f = open(namespace_file, "r")
             try:
-                self.namespace = f.read()
+                self.namespace = f.read().strip()
             finally:
                 f.close()
         except IOError:
