@@ -288,6 +288,11 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
             if "." in metric_value:
                 metric_value = float(metric_value)  # type: ignore
+            elif "e+" in metric_value:
+                # Special case for values in scientific notation which we first need to cast to
+                # float
+                metric_value = float(metric_value)  # type: ignore
+                metric_value = int(metric_value)  # type: ignore
             else:
                 # In some cases value may be NaN which we simply ignore
                 try:
