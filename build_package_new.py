@@ -21,6 +21,9 @@ import pathlib as pl
 import argparse
 import sys
 
+if sys.version_info < (3, 8, 0):
+    raise ValueError("This script requires Python 3.8 or above")
+
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__
 
