@@ -451,7 +451,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled"
         )
 
-        scrape_protocol = pod.annotations.get("prometheus.io/protocol", "http")
+        scrape_scheme = pod.annotations.get("prometheus.io/scheme", "http")
         scrape_port = pod.annotations.get("prometheus.io/port", None)
         scrape_path = pod.annotations.get("prometheus.io/path", "/metrics")
         node_ip = pod.ips[0] if pod.ips else None
@@ -462,9 +462,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
             return None
 
-        if scrape_protocol not in ["http", "https"]:
+        if scrape_scheme not in ["http", "https"]:
             self._logger.warn(
-                f'Invalid scrape protocol "{scrape_protocol}" specified for pod {pod.namespace}/{pod.name} ({pod.uid})'
+                f'Invalid scrape scheme "{scrape_scheme}" specified for pod {pod.namespace}/{pod.name} ({pod.uid})'
             )
             return None
 
@@ -489,5 +489,5 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         if scrape_path.startswith("/"):
             scrape_path = scrape_path[1:]
 
-        scrape_url = f"{scrape_protocol}://{node_ip}:{scrape_port}/{scrape_path}"
+        scrape_url = f"{scrape_scheme}://{node_ip}:{scrape_port}/{scrape_path}"
         return scrape_url
