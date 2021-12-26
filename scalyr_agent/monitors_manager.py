@@ -24,6 +24,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import time
+import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
@@ -73,6 +74,9 @@ class MonitorsManager(StoppableThread):
         self.__running_monitors = []
         self.__user_agent_callback = None
         self._user_agent_refresh_interval = configuration.user_agent_refresh_interval
+
+        # Lock which is used when manipulating self.__monitors and self.__running_monitors variables
+        self.__lock = threading.Lock()
 
     def find_monitor(self, module_name):
         """Finds a monitor with a specific name
@@ -320,6 +324,65 @@ class MonitorsManager(StoppableThread):
                 )
             )
         return result
+
+    def add_monitor(self, monitor_config, global_config, log_config=None):
+        """
+        Dynamically add start a new monitor during run time.
+
+        :param monitor_config: Dictionary with the monitor config.
+        :param global_config: Scalyr global configuration object.
+        :param log_config: Optional dictionary with the monitor "log_config" attribute values. This
+                           allows overriding values such as log config path, etc.
+        """
+        log.debug("Adding new monitor with config: %s" % (str(monitor_config)))
+
+        monitor = MonitorsManager.build_monitor(
+            monitor_config=monitor_config,
+            additional_python_paths=global_config.additional_monitor_module_paths,
+            default_sample_interval_secs=global_config.global_monitor_sample_interval,
+            global_config=global_config,
+        )
+
+        if log_config:
+            monitor.log_config.update(log_config)
+
+        with self.__lock:
+            self.__monitors.append(monitor)
+            monitor.open_metric_log()
+            monitor.config_from_monitors(self)
+            log.info("Starting monitor %s", monitor.monitor_name)
+            monitor.start()
+            self.__running_monitors.append(monitor)
+
+        return monitor
+
+    def remove_monitor(self, monitor_uid):
+        """
+        Dynamically remove and stop an existing running monitor.
+        """
+        log.info("Removing monitor with uid %s", monitor_uid)
+
+        # 1. Stop the monitor thread and close the metric log file
+        found, running_index, monitors_index = False, -1, -1
+        for monitor in self.__running_monitors:
+            if monitor_uid == monitor.uid:
+                found = True
+                monitor.stop(wait_on_join=False)
+                monitor.close_metric_log()
+
+                running_index = self.__running_monitors.index(monitor)
+                monitors_index = self.__monitors.index(monitor)
+                break
+
+        if found:
+            # If found, remove it from the internal tracking lists
+            with self.__lock:
+                del self.__running_monitors[running_index]
+                del self.__monitors[running_index]
+
+            log.info("Removed monitor %s (%s)", monitor.monitor_name, monitor_uid)
+        else:
+            log.info("Failed to find running monitor with id %s", monitor_uid)
 
     @staticmethod
     def load_monitor(monitor_module, additional_python_paths):

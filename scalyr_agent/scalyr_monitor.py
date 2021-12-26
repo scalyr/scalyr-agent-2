@@ -193,6 +193,18 @@ class ScalyrMonitor(StoppableThread):
 
         StoppableThread.__init__(self, name="metric thread")
 
+    @property
+    def uid(self):
+        """
+        Return unique id for this monitor.
+
+        Unique ID is composed of the monitor name and the id specified in the monitor local config.
+        """
+        return (
+            self._config["module"] + "-" + self._config.get("id", "default")
+            or "default"
+        )
+
     def _initialize(self):
         """Can be overridden by derived classes to perform initialization functions before the monitor is run.
 
