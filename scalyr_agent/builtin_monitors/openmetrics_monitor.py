@@ -182,6 +182,15 @@ class OpenMetricsMonitor(ScalyrMonitor):
             and not self.__metric_component_value_whitelist
         )
 
+        # Override the default value for the rate limit for writing the metric logs. We override the
+        # default value since each scrape could result in a lot of metrics.
+        self._log_write_rate = self._config.get(
+            "monitor_log_write_rate", convert_to=int, default=-1
+        )
+        self._log_max_write_burst = self._config.get(
+            "monitor_log_max_write_burst", convert_to=int, default=-1
+        )
+
     def gather_sample(self):
         # type: () -> None
         metrics = self._scrape_metrics(self.__url)
