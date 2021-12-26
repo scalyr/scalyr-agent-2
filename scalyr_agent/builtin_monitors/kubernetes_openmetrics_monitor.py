@@ -377,66 +377,68 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         monitors_manager = get_monitors_manager()
 
         # 1. Kubernetes API metrics monitor
-        monitor_config = {
-            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
-            "id": f"{node_name}_kubernetes-api-metrics",
-            "url": kubernetes_api_metrics_scrape_url,
-            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-            "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
-        }
-        log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
+        if self.__scrape_kubernetes_api_metrics:
+            monitor_config = {
+                "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+                "id": f"{node_name}_kubernetes-api-metrics",
+                "url": kubernetes_api_metrics_scrape_url,
+                "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+                "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+            }
+            log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
 
-        # TODO: Use PlatformController specific method even though this monitor only supports Linux
-        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
-        log_config = {
-            "path": log_path,
-        }
-        monitor = monitors_manager.add_monitor(
-            monitor_config=monitor_config,
-            global_config=self._global_config,
-            log_config=log_config,
-        )
-
-        response = monitor.check_connectivity()
-        if response.status_code != 200:
-            self._logger.warn(
-                f"Kubernetes API metrics endpoint {kubernetes_api_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+            # TODO: Use PlatformController specific method even though this monitor only supports Linux
+            log_path = os.path.join(self._global_config.agent_log_path, log_filename)
+            log_config = {
+                "path": log_path,
+            }
+            monitor = monitors_manager.add_monitor(
+                monitor_config=monitor_config,
+                global_config=self._global_config,
+                log_config=log_config,
             )
-            monitors_manager.remove_monitor(monitor.uid)
-        else:
-            self.__fixed_running_monitors.append(monitor.uid)
+
+            response = monitor.check_connectivity()
+            if response.status_code != 200:
+                self._logger.warn(
+                    f"Kubernetes API metrics endpoint {kubernetes_api_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+                )
+                monitors_manager.remove_monitor(monitor.uid)
+            else:
+                self.__fixed_running_monitors.append(monitor.uid)
 
         # 2. Kubernetes API cAdvisor metrics monitor
-        monitor_config = {
-            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
-            "id": f"{node_name}_kubernetes-api-cadvisor-metrics",
-            "url": kubernetes_api_cadvisor_metrics_scrape_url,
-            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-            "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
-        }
-        log_filename = (
-            f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log"
-        )
-
-        # TODO: Use PlatformController specific method even though this monitor only supports Linux
-        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
-        log_config = {
-            "path": log_path,
-        }
-        monitor = monitors_manager.add_monitor(
-            monitor_config=monitor_config,
-            global_config=self._global_config,
-            log_config=log_config,
-        )
-
-        response = monitor.check_connectivity()
-        if response.status_code != 200:
-            self._logger.warn(
-                f"Kubernetes API cAdvisor metrics endpoint {kubernetes_api_cadvisor_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+        if self.__scrape_kubernetes_api_cadvisor_metrics:
+            monitor_config = {
+                "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+                "id": f"{node_name}_kubernetes-api-cadvisor-metrics",
+                "url": kubernetes_api_cadvisor_metrics_scrape_url,
+                "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+                "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+            }
+            log_filename = (
+                f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log"
             )
-            monitors_manager.remove_monitor(monitor.uid)
-        else:
-            self.__fixed_running_monitors.append(monitor.uid)
+
+            # TODO: Use PlatformController specific method even though this monitor only supports Linux
+            log_path = os.path.join(self._global_config.agent_log_path, log_filename)
+            log_config = {
+                "path": log_path,
+            }
+            monitor = monitors_manager.add_monitor(
+                monitor_config=monitor_config,
+                global_config=self._global_config,
+                log_config=log_config,
+            )
+
+            response = monitor.check_connectivity()
+            if response.status_code != 200:
+                self._logger.warn(
+                    f"Kubernetes API cAdvisor metrics endpoint {kubernetes_api_cadvisor_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+                )
+                monitors_manager.remove_monitor(monitor.uid)
+            else:
+                self.__fixed_running_monitors.append(monitor.uid)
 
     def __schedule_dynamic_open_metrics_monitors(self):
         """
