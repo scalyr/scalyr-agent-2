@@ -116,6 +116,31 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "headers",
+    "Optional HTTP headers which are sent with the outgoing request.",
+    convert_to=JsonObject,
+    default=JsonObject({}),
+)
+
+define_config_option(
+    __monitor__,
+    "ca_file",
+    "Optional file with CA certificate used to validate the server certificate. Only applies to https "
+    "requests.",
+    convert_to=str,
+    default=None,
+)
+
+define_config_option(
+    __monitor__,
+    "verify_https",
+    "Set to False to disable verification of the server certificate and hostname for https requests.",
+    convert_to=bool,
+    default=True,
+)
+
+define_config_option(
+    __monitor__,
     "metric_name_whitelist",
     "List of globs for metric names to scrape (defaults to all).",
     convert_to=ArrayOfStrings,
@@ -160,6 +185,14 @@ class OpenMetricsMonitor(ScalyrMonitor):
             convert_to=six.text_type,
             required_field=True,
         )
+        self.__headers = self._config.get(
+            "headers",
+            {},
+        )
+        self.__ca_file = self._config.get(
+            "ca_file",
+            None,
+        )
 
         if self._config.get("metric_name_whitelist"):
             if isinstance(self._config.get("metric_name_white"), ArrayOfStrings):
@@ -191,6 +224,12 @@ class OpenMetricsMonitor(ScalyrMonitor):
             "monitor_log_max_write_burst", convert_to=int, default=-1
         )
 
+        base_request_headers = {"User-Agent": "scalyr-agent-2/OpenMetricsMonitor"}
+        base_request_headers.update(self.__headers)
+
+        self.__session = requests.Session()
+        self.__session.headers.update(base_request_headers)
+
     def gather_sample(self):
         # type: () -> None
         metrics = self._scrape_metrics(self.__url)
@@ -200,12 +239,29 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 metric_name, metric_value, extra_fields=extra_fields
             )
 
+    def _get_request_kwargs(self, url: str) -> dict:
+        """
+        Return optional keyword arguments which are passed to the requests.get() method for the
+        provided url.
+        """
+        request_kwargs = {}
+        if url.startswith("https://"):
+            verify = True
+
+            if self.__ca_file:
+                verify = self.__ca_file
+
+            request_kwargs["verify"] = verify
+
+        return request_kwargs
+
     def _scrape_metrics(self, url):
         # type: (str) -> List[Tuple[str, dict, Any]]
         """
         Scrape metrics from Prometheus interface and return dictionary with parsed metrics.
         """
-        resp = requests.get(url)
+        request_kwargs = self._get_request_kwargs(url=url)
+        resp = self.__session.get(url, **request_kwargs)
 
         if resp.status_code != 200:
             self._logger.warn(
