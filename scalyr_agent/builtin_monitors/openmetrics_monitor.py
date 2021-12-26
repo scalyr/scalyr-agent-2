@@ -239,6 +239,16 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 metric_name, metric_value, extra_fields=extra_fields
             )
 
+    def check_connectivity(self) -> requests.Response:
+        """
+        Send the request to the configured URL and return a response.
+
+        This is used for checking connectivity and other similar purposes.
+        """
+        request_kwargs = self._get_request_kwargs(url=self.__url)
+        resp = self.__session.get(self.__url, **request_kwargs)
+        return resp
+
     def _get_request_kwargs(self, url: str) -> dict:
         """
         Return optional keyword arguments which are passed to the requests.get() method for the
