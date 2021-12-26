@@ -16,7 +16,7 @@
 Monitor which scrapes metrics from OpenMetrics / Prometheus metrics endpoints from metrics exporter
 running as pods in a Kubernetes cluster.
 
-This monitor is designed to run on an agent which is deployed as a DeaamonSet on a Kubernetes
+This monitor is designed to run on an agent which is deployed as a DaemonSet on a Kubernetes
 cluster. If you to scrape metrics in a OpenMetrics format from a static endpoint, you can use
 "scalyr_agent.builtin_monitors.openmetrics_monitor" monitor.
 
@@ -124,7 +124,7 @@ http://<pod ip>:9100/metrics.
 
 # Notes, Limitations
 
-This monitor will only work correctly if the agent is deployed as a deamonset. That's because each
+This monitor will only work correctly if the agent is deployed as a DaemonSet. That's because each
 monitor instance will only discover metrics endpoints which are local to the node the agent is
 running on.
 
