@@ -89,6 +89,21 @@ class MonitorsManager(StoppableThread):
 
         return None
 
+    def find_monitors(self, module_name):
+        """
+        Finds all monitor with a specific name.
+
+        @param module_name: the module name of the monitors to find
+        @return: A list of Monitor objects if found, otherwise an empty list.
+        """
+        result = []
+
+        for monitor in self.__monitors:
+            if monitor.module_name == module_name:
+                result.append(monitor)
+
+        return result
+
     def generate_status(self):
         """Creates and returns a status object that reports the monitor status.
 
@@ -378,7 +393,7 @@ class MonitorsManager(StoppableThread):
             # If found, remove it from the internal tracking lists
             with self.__lock:
                 del self.__running_monitors[running_index]
-                del self.__monitors[running_index]
+                del self.__monitors[monitors_index]
 
             log.info("Removed monitor %s (%s)", monitor.monitor_name, monitor_uid)
         else:
