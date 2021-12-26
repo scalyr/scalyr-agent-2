@@ -270,7 +270,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor.gather_sample()
         self.assertEqual(mock_logger.debug.call_count, 0)
         self.assertEqual(mock_logger.warn.call_count, 0)
-        self.assertEqual(mock_logger.emit_value.call_count, 142)
+        self.assertEqual(mock_logger.emit_value.call_count, 144)
 
         mock_logger.emit_value.assert_any_call(
             "zookeeper_electiontype",
@@ -320,6 +320,16 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "pool": "Compressed Class Space",
             },
+        )
+        mock_logger.emit_value.assert_any_call(
+            "jvm_bar_1",
+            1.8446744073709552e19,
+            extra_fields={},
+        )
+        mock_logger.emit_value.assert_any_call(
+            "jvm_bar_2",
+            6e08,
+            extra_fields={},
         )
 
     @requests_mock.Mocker()

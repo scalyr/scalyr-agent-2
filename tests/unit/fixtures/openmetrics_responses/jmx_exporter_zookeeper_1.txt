@@ -330,3 +330,5 @@ jvm_memory_pool_bytes_init{pool="CodeHeap 'non-profiled nmethods'",} 2555904.0
 # HELP jvm_info JVM version info
 # TYPE jvm_info gauge
 jvm_info{version="11.0.13+8-LTS",vendor="Azul Systems, Inc.",runtime="OpenJDK Runtime Environment",} 1.0
+jvm_bar_1 1.8446744073709552e+19
+jvm_bar_2 6e+08
