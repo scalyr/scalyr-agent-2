@@ -157,6 +157,13 @@ from scalyr_agent import compat
 
 __monitor__ = __name__
 
+define_config_option(
+    __monitor__,
+    "module",
+    "Always ``scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor``",
+    convert_to=six.text_type,
+    required_option=True,
+)
 
 define_config_option(
     __monitor__,
@@ -201,8 +208,16 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
         # Maps scrape url to the monitor uid for all the monitors which have been dynamically
         # scheduled and started by us
-        self.__running_monitors = {}
+        self.__running_monitors: Dict[str, str] = {}
 
+        # Maps monitor uid to log config dictionary which is used by log watcher
+        self.__watcher_log_configs: Dict[str, dict] = {}
+
+        # Those variables get set when MonitorsManager is starting a monitor
+        self.__log_watcher = None
+        self.__module = None
+
+        # Holds reference to the KubeletApi client which is populated lazily on first access
         self._kubelet = None
 
     @property
@@ -226,6 +241,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
 
         return self._kubelet
+
+    def set_log_watcher(self, log_watcher):
+        self.__log_watcher = log_watcher
 
     def config_from_monitors(self, manager):
         # Only a single instance of this monitor can run at a time
@@ -326,8 +344,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "sample_interval": self._config.get("scrape_interval", 60.0),
         }
         log_filename = f"openmetrics_monitor-{node_name}-{pod.name}.log"
+        # TODO: Use PlatformController specific method even though this monitor only supports Linux
+        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
         log_config = {
-            "path": os.path.join(self._global_config.agent_log_path, log_filename)
+            "path": log_path,
         }
         monitors_manager = get_monitors_manager()
         monitor = monitors_manager.add_monitor(
@@ -341,6 +361,20 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f'Started scrapping url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
         )
 
+        # Add config entry to the log watcher to make sure this file is being ingested
+        # TODO: Ensure checkpointing works correctly
+        watcher_log_config = {
+            "parser": "agent-metrics",
+            "path": log_path,
+        }
+        self._logger.info(
+            f"Adding log config {watcher_log_config} for monitor {monitor.uid} and scrape url {scrape_url}"
+        )
+        watcher_log_config = self.__log_watcher.add_log_config(
+            "openmetrics_monitor", watcher_log_config, force_add=True
+        )
+        self.__watcher_log_configs[monitor.uid] = watcher_log_config
+
     def __remove_monitor(self, scrape_url: str) -> None:
         """
         Remove and stop monitor for the provided scrape url.
@@ -349,10 +383,17 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             return
 
         monitor_id = self.__running_monitors[scrape_url]
+        log_path = self.__watcher_log_configs[monitor_id]["path"]
 
         monitors_manager = get_monitors_manager()
         monitors_manager.remove_monitor(monitor_id)
         del self.__running_monitors[scrape_url]
+        del self.__watcher_log_configs[monitor_id]
+
+        # Remove corresponding log watcher
+        self.__log_watcher.schedule_log_path_for_removal(
+            self.__module.module_name, log_path
+        )
 
         # TODO: We should probably remove file from disk here since in case there is a lot of
         # exporter pod churn this could result in a lot of old unused files on disk. To do that,
