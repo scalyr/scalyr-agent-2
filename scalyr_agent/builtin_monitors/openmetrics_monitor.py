@@ -297,7 +297,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
             if "." in metric_value:
                 metric_value = float(metric_value)  # type: ignore
-            elif "e+" in metric_value:
+            elif "e+" in metric_value or "e-" in metric_value:
                 # Special case for values in scientific notation which we first need to cast to
                 # float
                 metric_value = float(metric_value)  # type: ignore
