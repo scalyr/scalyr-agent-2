@@ -32,7 +32,7 @@ monitor:
       for a specific pod.
     * ``prometheus.io/port`` (required) - Tells agent which port on the node to use when scraping metrics.
       Actual pod IP address is automatically discovered.
-    * ``prometheus.io/protocol`` (optional, defaults to http) - Tells agent which protocol to use when
+    * ``prometheus.io/scheme`` (optional, defaults to http) - Tells agent which protocol to use when
       building scrapper URL. Valid values are http and https.
     * ``prometheus.io/path`` (optional, defaults to /metrics) - Tells agent which request path to use when
       building scrapper URL.
@@ -98,9 +98,6 @@ for the exporter pod:
             mountPropagation: HostToContainer
             name: root
             readOnly: true
-        # NOTE: We don't need to use host network since we mount host stuff inside
-        hostNetwork: true
-        hostPID: true
         nodeSelector:
             kubernetes.io/os: linux
         securityContext:
@@ -119,6 +116,23 @@ for the exporter pod:
 
 In this example, agent will dynamically retrieve pod IP and scrape metrics from
 http://<pod ip>:9100/metrics.
+
+In addition to scrapping metrics from those dynamically discovered exporters, this monitor also
+supports scraping system wide and cAdvisor metrics from Kuberntes API.
+
+Those metrics are scraped from the following URLs:
+
+* General Kubernetes API metrics - https://kubernetes.default.svc:443/api/v1/nodes/<node name>/proxy/metrics
+* Kubernetes cAdvisor metrics - https://kubernetes.default.svc:443/api/v1/nodes/<node name>/proxy/metrics/cadvisor
+
+Both of those endpoints return metrics which are specific to that node. If you want to view metrics
+globally across the whole cluster, you will need to combine it on the server side using sum() and
+similar.
+
+Since those endpoints result in a lot of metrics per scrape (2000+) scraping is disabled by default
+and can be enabled via monitor config options. This is especially true for general Kubernetes
+API metrics endpoint which include response duration histograms and many other metrics for all the
+API endpoints.
 
 ## How it works
 
@@ -192,6 +206,46 @@ define_config_option(
     default=60.0,
 )
 
+define_config_option(
+    __monitor__,
+    "scrape_kubernetes_api_metrics",
+    "Set to True to enable scraping metrics from /metrics Kubernetes API endpoint.",
+    convert_to=bool,
+    default=False,
+)
+
+define_config_option(
+    __monitor__,
+    "scrape_kubernetes_api_cadvisor_metrics",
+    "Set to True to enable scraping metrics from /metrics/cadvisor Kubernetes API endpoint.",
+    convert_to=bool,
+    default=False,
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_metrics_scrape_interval",
+    "How often to scrape metrics Kubernetes API /metrics endpoint. Defaults to 60 seconds.",
+    convert_to=float,
+    default=60.0,
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_cadvisor_metrics_scrape_interval",
+    "How often to scrape metrics Kubernetes API /metrics/cadvisor endpoint. Defaults to 60 seconds.",
+    convert_to=float,
+    default=60.0,
+)
+
+
+KUBERNETES_API_METRICS_URL = Template(
+    "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics"
+)
+KUBERNETES_API_CADVISORS_METRICS_URL = Template(
+    "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics/cadvisor"
+)
+
 
 @dataclass
 class K8sPod(object):
@@ -206,6 +260,26 @@ class K8sPod(object):
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
+        self.__scrape_kubernetes_api_metrics = self._config.get(
+            "scrape_kubernetes_api_metrics", False
+        )
+        self.__scrape_kubernetes_api_cadvisor_metrics = self._config.get(
+            "scrape_kubernetes_api_cadvisor_metrics", False
+        )
+
+        self.__kubernetes_api_metrics_scrape_interval = self._config.get(
+            "kubernetes_api_metrics_scrape_interval", 60
+        )
+        self.__kubernetes_api_cadvisor_metrics_scrape_interval = self._config.get(
+            "kubernetes_api_cadvisor_metrics_scrape_interval", 60
+        )
+
+        self.__k8s_api_url = self._global_config.k8s_api_url
+
+        # Stores a list of monitor uids for fixed running monitors (Kubernetes API metrics and
+        # Kubernetes API cAdvisor metrics)
+        self.__fixed_running_monitors: List[str] = []
+
         # Maps scrape url to the monitor uid for all the monitors which have been dynamically
         # scheduled and started by us
         self.__running_monitors: Dict[str, str] = {}
@@ -219,6 +293,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         # Holds reference to the KubeletApi client which is populated lazily on first access
         self._kubelet = None
+
+        self.__gather_sample_counter = 0
 
     @property
     def kubelet(self):
@@ -262,7 +338,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self._logger.info(
             f"There are currently {len(self.__running_monitors)} open metrics monitors running"
         )
-        self.__schedule_open_metrics_monitors()
+
+        if self.__gather_sample_counter == 0:
+            # On first iteration we schedule fixed global monitors which are not dynamically updated
+            self.__schedule_fixed_open_metrics_monitors()
+
+        self.__schedule_dynamic_open_metrics_monitors()
+        self.__gather_sample_counter += 1
 
     def __get_node_name(self):
         """
@@ -270,10 +352,96 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
 
-    def __schedule_open_metrics_monitors(self):
+    def __schedule_fixed_open_metrics_monitors(self):
         """
-        Discover a list of metrics exporter URLs to scrape and schedule corresponding monitor for
-        each scrape url.
+        Schedule OpenMetrics monitors for global Kubernetes API metrics and Kubernetes API cAdvisor
+        metrics endpoints.
+
+        Those endpoints are not auto-discovered and are fixed per node which means we only set up those
+        monitors once since they don't change.
+        """
+        # TODO: Refactor duplicated code
+        node_name = self.__get_node_name()
+
+        template_context = {
+            "k8s_api_url": self.__k8s_api_url,
+            "node_name": node_name,
+        }
+        kubernetes_api_metrics_scrape_url = KUBERNETES_API_METRICS_URL.safe_substitute(
+            template_context
+        )
+        kubernetes_api_cadvisor_metrics_scrape_url = (
+            KUBERNETES_API_CADVISORS_METRICS_URL.safe_substitute(template_context)
+        )
+
+        monitors_manager = get_monitors_manager()
+
+        # 1. Kubernetes API metrics monitor
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "id": f"{node_name}_kubernetes-api-metrics",
+            "url": kubernetes_api_metrics_scrape_url,
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+        }
+        log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
+
+        # TODO: Use PlatformController specific method even though this monitor only supports Linux
+        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
+        log_config = {
+            "path": log_path,
+        }
+        monitor = monitors_manager.add_monitor(
+            monitor_config=monitor_config,
+            global_config=self._global_config,
+            log_config=log_config,
+        )
+
+        response = monitor.check_connectivity()
+        if response.status_code != 200:
+            self._logger.warn(
+                f"Kubernetes API metrics endpoint {kubernetes_api_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+            )
+            monitors_manager.remove_monitor(monitor.uid)
+        else:
+            self.__fixed_running_monitors.append(monitor.uid)
+
+        # 2. Kubernetes API cAdvisor metrics monitor
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "id": f"{node_name}_kubernetes-api-cadvisor-metrics",
+            "url": kubernetes_api_cadvisor_metrics_scrape_url,
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+        }
+        log_filename = (
+            f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log"
+        )
+
+        # TODO: Use PlatformController specific method even though this monitor only supports Linux
+        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
+        log_config = {
+            "path": log_path,
+        }
+        monitor = monitors_manager.add_monitor(
+            monitor_config=monitor_config,
+            global_config=self._global_config,
+            log_config=log_config,
+        )
+
+        response = monitor.check_connectivity()
+        if response.status_code != 200:
+            self._logger.warn(
+                f"Kubernetes API cAdvisor metrics endpoint {kubernetes_api_cadvisor_metrics_scrape_url} URL returned non-200 status code {response.status_code}, won't enable this monitor."
+            )
+            monitors_manager.remove_monitor(monitor.uid)
+        else:
+            self.__fixed_running_monitors.append(monitor.uid)
+
+    def __schedule_dynamic_open_metrics_monitors(self):
+        """
+        Discover a list of metrics exporter URLs to scrape and configure, schedule and run
+        corresponding ScalyrMonitor each scrape url.
         """
         start_ts = int(time.time())
 
@@ -362,7 +530,6 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         # Add config entry to the log watcher to make sure this file is being ingested
-        # TODO: Ensure checkpointing works correctly
         watcher_log_config = {
             "parser": "agent-metrics",
             "path": log_path,
