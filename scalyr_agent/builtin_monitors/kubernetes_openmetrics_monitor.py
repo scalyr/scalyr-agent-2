@@ -36,6 +36,12 @@ monitor:
       building scrapper URL. Valid values are http and https.
     * ``prometheus.io/path`` (optional, defaults to /metrics) - Tells agent which request path to use when
       building scrapper URL.
+    * ``monitor.k8s_om.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint,
+      defaults to 60 seconds.
+    * ``monitor.k8s_om.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
+      of metric names to include when scraping.
+    * ``monitor.k8s_om.config.scalyr.com/metric_name_exclude_list`` (optional) - Comma delimited list
+      of metric names to exclude from scraping.
 
 "prometheus.io/*" annotations are de-facto annotations used by various other Prometheus metrics
 exporters auto discovery mechanisms.
@@ -144,13 +150,13 @@ running on.
 
 ## TODO
 
-- [ ] Support for metric whitelist globs via annotations or similar
 - [ ] Support for defining per exporter scrape interval via annotations
 """
 
 from __future__ import absolute_import
 from typing import Dict
 from typing import List
+from typing import Tuple
 from typing import Optional
 
 import os
@@ -163,6 +169,7 @@ import six
 
 from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.monitors_manager import get_monitors_manager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.monitor_utils.k8s import KubernetesApi
@@ -201,7 +208,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "scrape_interval",
-    "How often to scrape metrics from each of the dynamically discovered metric exporter endpoints. Defaults to 60 seconds.",
+    "How often to scrape metrics from each of the dynamically discovered metric exporter endpoints. Defaults to 60 seconds. This can be overridden on per exporter basis using annotations.",
     convert_to=float,
     default=60.0,
 )
@@ -232,18 +239,66 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "kubernetes_api_metrics_include_list",
+    "Optional metric name include list for Kubernetes API metrics endpoint. By default all metrics are included.",
+    convert_to=ArrayOfStrings,
+    default=["*"],
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_metrics_exclude_list",
+    "Optional metric name exclude list for Kubernetes API metrics endpoint. By default all metrics are included and no metrics are excluded.",
+    convert_to=ArrayOfStrings,
+    default=[],
+)
+
+define_config_option(
+    __monitor__,
     "kubernetes_api_cadvisor_metrics_scrape_interval",
     "How often to scrape metrics Kubernetes API /metrics/cadvisor endpoint. Defaults to 60 seconds.",
     convert_to=float,
     default=60.0,
 )
 
+define_config_option(
+    __monitor__,
+    "kubernetes_api_cadvisor_metrics_include_list",
+    "Optional metric name include list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included.",
+    convert_to=ArrayOfStrings,
+    default=["*"],
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_cadvisor_metrics_exclude_list",
+    "Optional metric name exclude list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included and no metrics are excluded.",
+    convert_to=ArrayOfStrings,
+    default=[],
+)
 
 KUBERNETES_API_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics"
 )
 KUBERNETES_API_CADVISORS_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics/cadvisor"
+)
+
+# Annotation related constants
+PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
+PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
+PROMETHEUS_ANNOTATION_SCAPE_PATH = "prometheus.io/path"
+# TODO: Update key name to match other scalyr annotations
+SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "monitor.config.scalyr.com/scrape"
+
+SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
+    "monitor.k8s_om.config.scalyr.com/scrape_interval"
+)
+SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
+    "monitor.k8s_om.config.scalyr.com/metric_name_include_list"
+)
+SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
+    "monitor.k8s_om.config.scalyr.com/metric_name_exclude_list"
 )
 
 
@@ -256,6 +311,14 @@ class K8sPod(object):
     annotations: Dict[str, str]
     status_phase: str
     ips: List[str]
+
+
+@dataclass
+class OpenMetricsMonitorConfig(object):
+    scrape_url: str
+    scrape_interval: int
+    metric_name_include_list: List[str]
+    metric_name_exclude_list: List[str]
 
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
@@ -384,6 +447,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 "url": kubernetes_api_metrics_scrape_url,
                 "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
                 "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+                "metric_name_include_list": self._config.get(
+                    "kubernetes_api_metrics_include_list", ["*"]
+                ),
+                "metric_name_exclude_list": self._config.get(
+                    "kubernetes_api_metrics_exclude_list", []
+                ),
             }
             log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
 
@@ -415,6 +484,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 "url": kubernetes_api_cadvisor_metrics_scrape_url,
                 "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
                 "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
+                "metric_name_include_list": self._config.get(
+                    "kubernetes_api_cadvisor_metrics_include_list", ["*"]
+                ),
+                "metric_name_exclude_list": self._config.get(
+                    "kubernetes_api_cadvisor_metrics_exclude_list", []
+                ),
             }
             log_filename = (
                 f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log"
@@ -454,22 +529,22 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         self._logger.info(f"Found {len(k8s_pods)} pods on node {node_name}")
 
-        # Maps scrape URL to the corresponding pod
-        scrape_configs: Dict[str, K8sPod] = {}
+        # Maps scrape URL to the corresponding monitor config and K8sPod
+        scrape_configs: Dict[str, Tuple(OpenMetricsMonitorConfig, K8sPod)] = {}
 
         # Dynamically query for scrape URLs based on the pods running on thise node and
         # corresponding pod annotations
         for pod in k8s_pods:
-            scrape_url = self.__get_scrape_url_for_pod(pod=pod)
+            scrape_config = self.__get_monitor_config_for_pod(pod=pod)
 
-            if scrape_url:
+            if scrape_config:
                 self._logger.info(
-                    f'Found scrape url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
+                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
                 )
                 assert (
-                    scrape_url not in scrape_configs
-                ), f"Found duplicated scrape url {scrape_url} for pod {pod.namespace}/{pod.name} ({pod.uid})"
-                scrape_configs[scrape_url] = pod
+                    scrape_config.scrape_url not in scrape_configs
+                ), f"Found duplicated scrape url {scrape_config.scrape_url} for pod {pod.namespace}/{pod.name} ({pod.uid})"
+                scrape_configs[scrape_config.scrape_url] = (scrape_config, pod)
 
         # Schedule monitors as necessary (add any new ones and remove obsolete ones)
         current_scrape_urls = set(self.__running_monitors.keys())
@@ -488,17 +563,21 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             self.__remove_monitor(scrape_url=scrape_url)
 
         for scrape_url in to_add_scrape_urls:
-            self.__add_monitor(scrape_url=scrape_url, pod=scrape_configs[scrape_url])
+            scrape_config, pod = scrape_configs[scrape_url]
+            self.__add_monitor(scrape_config=scrape_config, pod=pod)
 
         end_ts = int(time.time())
         self._logger.info(
             f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds."
         )
 
-    def __add_monitor(self, scrape_url: str, pod: K8sPod) -> None:
+    def __add_monitor(
+        self, scrape_config: OpenMetricsMonitorConfig, pod: K8sPod
+    ) -> None:
         """
-        Add and start monitor for the provided scrape url.
+        Add and start monitor for the provided monitor config.
         """
+        scrape_url = scrape_config.scrape_url
         if scrape_url in self.__running_monitors:
             self._logger.info(
                 f"URL {scrape_url} is already being scrapped, skipping starting monitor"
@@ -511,7 +590,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "id": f"{node_name}_{pod.name}",
             "url": scrape_url,
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-            "sample_interval": self._config.get("scrape_interval", 60.0),
+            "sample_interval": scrape_config.scrape_interval
+            or self._config.get("scrape_interval", 60.0),
+            "metric_name_include_list": scrape_config.metric_name_include_list,
+            "metric_name_exclude_list": scrape_config.metric_name_exclude_list,
         }
         log_filename = f"openmetrics_monitor-{node_name}-{pod.name}.log"
         # TODO: Use PlatformController specific method even though this monitor only supports Linux
@@ -529,6 +611,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self.__running_monitors[scrape_url] = monitor.uid
         self._logger.info(
             f'Started scrapping url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
+        )
+        self._logger.debug(
+            f'Using monitor config options for scrape url "{scrape_url}": {monitor_config}'
         )
 
         # Add config entry to the log watcher to make sure this file is being ingested
@@ -605,13 +690,17 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         return result
 
-    def __get_scrape_url_for_pod(self, pod: K8sPod) -> Optional[str]:
+    def __get_monitor_config_for_pod(
+        self, pod: K8sPod
+    ) -> Optional[OpenMetricsMonitorConfig]:
         """
-        Return metric exporter scrape URL for the provided pod if the pod has scraping configured
-        via annotations, otherwise return None.
+        Return OpenMetrics monitor config for the provided pod based on the annotations defined on
+        the pod.
+
+        If no matching annotations are found, None is returned.
         """
         if (
-            pod.annotations.get("monitor.config.scalyr.com/scrape", "false").lower()
+            pod.annotations.get(SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE, "false").lower()
             != "true"
         ):
             return None
@@ -620,9 +709,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled"
         )
 
-        scrape_scheme = pod.annotations.get("prometheus.io/scheme", "http")
-        scrape_port = pod.annotations.get("prometheus.io/port", None)
-        scrape_path = pod.annotations.get("prometheus.io/path", "/metrics")
+        scrape_scheme = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_SCHEME, "http")
+        scrape_port = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PORT, None)
+        scrape_path = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PATH, "/metrics")
         node_ip = pod.ips[0] if pod.ips else None
 
         if pod.status_phase != "running":
@@ -659,4 +748,29 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_path = scrape_path[1:]
 
         scrape_url = f"{scrape_scheme}://{node_ip}:{scrape_port}/{scrape_path}"
-        return scrape_url
+
+        scrape_interval_string = pod.annotations.get(
+            SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL, 60
+        )
+
+        try:
+            scrape_interval = int(scrape_interval_string)
+        except ValueError:
+            self._logger.warn(
+                f"Pod {pod.namespace}/{pod.name} ({pod.uid}) contains invalid value for scrape interval ({scrape_interval_string}). Value must be a number."
+            )
+            return None
+
+        metric_name_include_list = pod.annotations.get(
+            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST, ""
+        ).split(",")
+        metric_name_exclude_list = pod.annotations.get(
+            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST, ""
+        ).split(",")
+
+        return OpenMetricsMonitorConfig(
+            scrape_url=scrape_url,
+            scrape_interval=scrape_interval,
+            metric_name_include_list=metric_name_include_list,
+            metric_name_exclude_list=metric_name_exclude_list,
+        )
