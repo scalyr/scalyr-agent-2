@@ -15,17 +15,17 @@
 """
 Monitor which scrapes metrics from OpenMetrics / Prometheus metrics API endpoint.
 
-Monitor support specifying a whitelist of metric names to scrape using metric name and metric
+Monitor support specifying a include_list of metric names to scrape using metric name and metric
 component value filters using the configuration options described below:
 
-- ``metric_name_whitelist`` - A list of metric names to include. If not specified, we include all
+- ``metric_name_include_list`` - A list of metric names to include. If not specified, we include all
   the scraped metrics.
 
   For example:
 
       ``["my.metric1", "my.metric2"].
 
-- ``metric_component_value_whitelist`` - Dictionary where the key is a metric name and the value is
+- ``metric_component_value_include_list`` - Dictionary where the key is a metric name and the value is
   an object where a key is component name and the value is a list of globs for the component values.
 
   For examples:
@@ -39,7 +39,7 @@ component value filters using the configuration options described below:
   ``kafka_log_log_logstartoffset`` where the ``topic`` component name is ``connect-status`` will
   be included.
 
-``metric_name_whitelist`` has priority over ``metric_component_value_whitelist`` config option.
+``metric_name_include_list`` has priority over ``metric_component_value_include_list`` config option.
 
 Where possible you are strongly encouraged to filter metrics at the source aka configure various
 Prometheus exporters (where applicable and possible) to only expose metrics you want to ingest
@@ -141,7 +141,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "metric_name_whitelist",
+    "metric_name_include_list",
     "List of globs for metric names to scrape (defaults to all).",
     convert_to=ArrayOfStrings,
     default=[u"*"],
@@ -149,7 +149,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "metric_name_blacklist",
+    "metric_name_exclude_list",
     "List of globs for metric names to exclude (all the metrics are included by default). NOTE: "
     "Exclude list has priority over a white list. This means that if the same metric name is specified "
     "in exclude and include list, it will be excluded.",
@@ -158,7 +158,7 @@ define_config_option(
 )
 
 # Maps metric_name to a dictionary where the key is extra_field key name and a value is a list of
-# globs for the value whitelist.
+# globs for the value include_list.
 #
 # For example:
 # {
@@ -167,9 +167,9 @@ define_config_option(
 # }
 define_config_option(
     __monitor__,
-    "metric_component_value_whitelist",
-    "List of globs for metric component values to whitelist. Metrics which extra_fields don't "
-    "match this whitelist will be ignored (defaults to all).",
+    "metric_component_value_include_list",
+    "List of globs for metric component values to include_list. Metrics which extra_fields don't "
+    "match this include_list will be ignored (defaults to all).",
     convert_to=JsonObject,
     default=JsonObject({}),
 )
@@ -204,36 +204,40 @@ class OpenMetricsMonitor(ScalyrMonitor):
             None,
         )
 
-        if self._config.get("metric_name_whitelist"):
-            if isinstance(self._config.get("metric_name_whitelist"), ArrayOfStrings):
-                self.__metric_name_whitelist = self._config.get(
-                    "metric_name_whitelist"
+        if self._config.get("metric_name_include_list"):
+            if isinstance(self._config.get("metric_name_include_list"), ArrayOfStrings):
+                self.__metric_name_include_list = self._config.get(
+                    "metric_name_include_list"
                 )._items
             else:
-                self.__metric_name_whitelist = self._config.get("metric_name_whitelist")
+                self.__metric_name_include_list = self._config.get(
+                    "metric_name_include_list"
+                )
         else:
-            self.__metric_name_whitelist = ["*"]
+            self.__metric_name_include_list = ["*"]
 
-        if self._config.get("metric_name_blacklist"):
-            if isinstance(self._config.get("metric_name_blacklist"), ArrayOfStrings):
-                self.__metric_name_blacklist = self._config.get(
-                    "metric_name_blacklist"
+        if self._config.get("metric_name_exclude_list"):
+            if isinstance(self._config.get("metric_name_exclude_list"), ArrayOfStrings):
+                self.__metric_name_exclude_list = self._config.get(
+                    "metric_name_exclude_list"
                 )._items
             else:
-                self.__metric_name_blacklist = self._config.get("metric_name_blacklist")
+                self.__metric_name_exclude_list = self._config.get(
+                    "metric_name_exclude_list"
+                )
         else:
-            self.__metric_name_blacklist = []
+            self.__metric_name_exclude_list = []
 
-        self.__metric_component_value_whitelist = (
-            self._validate_metric_component_value_whitelist(
-                self._config.get("metric_component_value_whitelist", {})
+        self.__metric_component_value_include_list = (
+            self._validate_metric_component_value_include_list(
+                self._config.get("metric_component_value_include_list", {})
             )
         )
 
         self.__include_all_metrics = (
-            "*" in self.__metric_name_whitelist
-            and not self.__metric_component_value_whitelist
-            and not self.__metric_name_blacklist
+            "*" in self.__metric_name_include_list
+            and not self.__metric_component_value_include_list
+            and not self.__metric_name_exclude_list
         )
 
         # Override the default value for the rate limit for writing the metric logs. We override the
@@ -423,7 +427,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             self._logger.warn(
                 "Parsed more than 2000 metrics (%s) for URL %s. You are strongly "
                 "encouraged to filter metrics at the source or set "
-                '"metric_name_blacklist" monitor configuration option to avoid '
+                '"metric_name_exclude_list" monitor configuration option to avoid '
                 "excessive number of metrics being ingested."
                 % (metrics_count, self.__url),
                 limit_once_per_x_secs=86400,
@@ -444,25 +448,25 @@ class OpenMetricsMonitor(ScalyrMonitor):
         if self.__include_all_metrics:
             return True
 
-        # 1. Perform metric_name blacklist checks
-        for glob_pattern in self.__metric_name_blacklist:
+        # 1. Perform metric_name exclude_list checks
+        for glob_pattern in self.__metric_name_exclude_list:
             if fnmatch.fnmatch(metric_name, glob_pattern):
                 return False
 
-        # 2. Perform metric_name whitelist checks
-        if u"*" not in self.__metric_name_whitelist:
-            for glob_pattern in self.__metric_name_whitelist:
+        # 2. Perform metric_name include_list checks
+        if u"*" not in self.__metric_name_include_list:
+            for glob_pattern in self.__metric_name_include_list:
                 if fnmatch.fnmatch(metric_name, glob_pattern):
                     return True
 
-        # 3. Perform extra_field whitelist checks
-        metric_component_value_whitelist = self.__metric_component_value_whitelist.get(
-            metric_name, {}
+        # 3. Perform extra_field include_list checks
+        metric_component_value_include_list = (
+            self.__metric_component_value_include_list.get(metric_name, {})
         )
         for (
             extra_field_name,
             extra_field_value_filters,
-        ) in metric_component_value_whitelist.items():
+        ) in metric_component_value_include_list.items():
             for glob_pattern in extra_field_value_filters:
                 extra_field_value = extra_fields.get(extra_field_name, None)
 
@@ -510,9 +514,9 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
         return metric_name, extra_fields
 
-    def _validate_metric_component_value_whitelist(self, value):
+    def _validate_metric_component_value_include_list(self, value):
         """
-        Validate that the "metric_component_value_whitelist" configuration options is in a correct
+        Validate that the "metric_component_value_include_list" configuration options is in a correct
         format (if specified).
         """
         value = value or {}
@@ -521,7 +525,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             if not isinstance(component_filters, dict):
                 raise BadMonitorConfiguration(
                     "Value must be a dictionary (got %s)" % (type(component_filters)),
-                    field="metric_component_value_whitelist",
+                    field="metric_component_value_include_list",
                 )
 
             for component_name, component_filter_globs in component_filters.items():
@@ -529,7 +533,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
                     raise BadMonitorConfiguration(
                         "Value must be a list of strings (got %s)"
                         % (type(component_filter_globs)),
-                        field="metric_component_value_whitelist",
+                        field="metric_component_value_include_list",
                     )
 
                 for filter_glob in component_filter_globs:
@@ -537,7 +541,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
                         raise BadMonitorConfiguration(
                             "Value must be a list of strings (got list of %s)"
                             % (type(filter_glob)),
-                            field="metric_component_value_whitelist",
+                            field="metric_component_value_include_list",
                         )
 
         return value

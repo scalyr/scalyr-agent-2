@@ -174,7 +174,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             'Failed to cast metric "kafka_server_socketservermetrics_reauthentication_latency_avg" value "NaN" to int: invalid literal for int() with base 10: \'NaN\''
         )
         mock_logger.warn.assert_called_with(
-            'Parsed more than 2000 metrics (4900) for URL https://my.host:8080/metrics. You are strongly encouraged to filter metrics at the source or set "metric_name_blacklist" monitor configuration option to avoid excessive number of metrics being ingested.',
+            'Parsed more than 2000 metrics (4900) for URL https://my.host:8080/metrics. You are strongly encouraged to filter metrics at the source or set "metric_name_exclude_list" monitor configuration option to avoid excessive number of metrics being ingested.',
             limit_once_per_x_secs=86400,
             limit_key="https://my.host:8080/metrics",
         )
@@ -205,7 +205,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": JsonObject(
+            "metric_component_value_include_list": JsonObject(
                 {
                     "kafka_log_log_numlogsegments": {
                         "topic": [six.text_type("connect-status")]
@@ -350,12 +350,12 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
     @requests_mock.Mocker()
-    def test_gather_sample_metric_name_whitelist(self, m):
+    def test_gather_sample_metric_name_include_list(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_name_whitelist": [
+            "metric_name_include_list": [
                 six.text_type("some.*"),
                 six.text_type("traefik*"),
             ],
@@ -385,12 +385,12 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         )
 
     @requests_mock.Mocker()
-    def test_gather_sample_metric_name_blacklist(self, m):
+    def test_gather_sample_metric_name_exclude_list(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_name_blacklist": [
+            "metric_name_exclude_list": [
                 six.text_type("some.*"),
                 six.text_type("traefik*"),
             ],
@@ -403,17 +403,17 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
     @requests_mock.Mocker()
-    def test_gather_sample_metric_name_whitelist_and_blacklist(self, m):
-        # Both blacklist and whitelist options are specified, but blacklist has higher priority
+    def test_gather_sample_metric_name_include_list_and_exclude_list(self, m):
+        # Both exclude_list and include_list options are specified, but exclude_list has higher priority
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_name_whitelist": [
+            "metric_name_include_list": [
                 six.text_type("some.*"),
                 six.text_type("traefik*"),
             ],
-            "metric_name_blacklist": [
+            "metric_name_exclude_list": [
                 six.text_type("some.*"),
                 six.text_type("traefik*"),
             ],
@@ -460,11 +460,11 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
-    def test_metric_component_value_whitelist_config_option_value(self):
+    def test_metric_component_value_include_list_config_option_value(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": ["foo"],
+            "metric_component_value_include_list": ["foo"],
         }
         mock_logger = mock.Mock()
         self.assertRaisesRegexp(
@@ -478,7 +478,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": JsonObject({"metric": "bar"}),
+            "metric_component_value_include_list": JsonObject({"metric": "bar"}),
         }
         mock_logger = mock.Mock()
         self.assertRaisesRegexp(
@@ -492,7 +492,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": JsonObject(
+            "metric_component_value_include_list": JsonObject(
                 {"metric": {"component": "bar"}}
             ),
         }
@@ -508,7 +508,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": JsonObject(
+            "metric_component_value_include_list": JsonObject(
                 {"metric": {"component": [1, 2]}}
             ),
         }
@@ -524,7 +524,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
-            "metric_component_value_whitelist": JsonObject(
+            "metric_component_value_include_list": JsonObject(
                 {"metric": {"component": [six.text_type("value")]}}
             ),
         }
