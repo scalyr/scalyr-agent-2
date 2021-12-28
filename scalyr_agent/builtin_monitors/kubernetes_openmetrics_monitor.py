@@ -530,7 +530,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         Discover a list of metrics exporter URLs to scrape and configure, schedule and run
         corresponding ScalyrMonitor each scrape url.
         """
-        start_ts = int(time.time())
+        start_ts = time.time()
 
         # 1. Query Kubelet API for pods running on this node and find exporters we want to scrape
         # (based on the annotations)
@@ -576,7 +576,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_config, pod = scrape_configs[scrape_url]
             self.__add_monitor(scrape_config=scrape_config, pod=pod)
 
-        end_ts = int(time.time())
+        end_ts = time.time()
         self._logger.info(
             f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds."
         )
@@ -773,11 +773,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             return None
 
         metric_name_include_list = pod.annotations.get(
-            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST, "*"
-        ).split(",") or ["*"]
+            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST, None
+        )
+        metric_name_include_list = (
+            metric_name_include_list and metric_name_include_list.split(",") or ["*"]
+        )
+
         metric_name_exclude_list = pod.annotations.get(
-            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST, ""
-        ).split(",")
+            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST, None
+        )
+        metric_name_exclude_list = (
+            metric_name_exclude_list and metric_name_exclude_list.split(",") or []
+        )
 
         return OpenMetricsMonitorConfig(
             scrape_url=scrape_url,
