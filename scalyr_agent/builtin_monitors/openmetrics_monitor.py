@@ -204,7 +204,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             None,
         )
 
-        if self._config.get("metric_name_include_list"):
+        if self._config.get("metric_name_include_list") is not None:
             if isinstance(self._config.get("metric_name_include_list"), ArrayOfStrings):
                 self.__metric_name_include_list = self._config.get(
                     "metric_name_include_list"
@@ -216,7 +216,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         else:
             self.__metric_name_include_list = ["*"]
 
-        if self._config.get("metric_name_exclude_list"):
+        if self._config.get("metric_name_exclude_list") is not None:
             if isinstance(self._config.get("metric_name_exclude_list"), ArrayOfStrings):
                 self.__metric_name_exclude_list = self._config.get(
                     "metric_name_exclude_list"
@@ -453,13 +453,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             if fnmatch.fnmatch(metric_name, glob_pattern):
                 return False
 
-        # 2. Perform metric_name include_list checks
-        if u"*" not in self.__metric_name_include_list:
-            for glob_pattern in self.__metric_name_include_list:
-                if fnmatch.fnmatch(metric_name, glob_pattern):
-                    return True
-
-        # 3. Perform extra_field include_list checks
+        # 2. Perform extra_field include_list checks
         metric_component_value_include_list = (
             self.__metric_component_value_include_list.get(metric_name, {})
         )
@@ -472,6 +466,11 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
                 if fnmatch.fnmatch(extra_field_value, glob_pattern):
                     return True
+
+        # 3. Perform metric_name include_list checks
+        for glob_pattern in self.__metric_name_include_list:
+            if fnmatch.fnmatch(metric_name, glob_pattern):
+                return True
 
         return False
 

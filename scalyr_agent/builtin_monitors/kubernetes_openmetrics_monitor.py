@@ -154,6 +154,7 @@ running on.
 """
 
 from __future__ import absolute_import
+
 from typing import Dict
 from typing import List
 from typing import Tuple
@@ -239,7 +240,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "kubernetes_api_metrics_include_list",
+    "kubernetes_api_metric_name_include_list",
     "Optional metric name include list for Kubernetes API metrics endpoint. By default all metrics are included.",
     convert_to=ArrayOfStrings,
     default=["*"],
@@ -247,7 +248,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "kubernetes_api_metrics_exclude_list",
+    "kubernetes_api_metric_name_exclude_list",
     "Optional metric name exclude list for Kubernetes API metrics endpoint. By default all metrics are included and no metrics are excluded.",
     convert_to=ArrayOfStrings,
     default=[],
@@ -263,7 +264,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "kubernetes_api_cadvisor_metrics_include_list",
+    "kubernetes_api_cadvisor_metric_name_include_list",
     "Optional metric name include list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included.",
     convert_to=ArrayOfStrings,
     default=["*"],
@@ -271,7 +272,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "kubernetes_api_cadvisor_metrics_exclude_list",
+    "kubernetes_api_cadvisor_metric_name_exclude_list",
     "Optional metric name exclude list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included and no metrics are excluded.",
     convert_to=ArrayOfStrings,
     default=[],
@@ -448,10 +449,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
                 "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
                 "metric_name_include_list": self._config.get(
-                    "kubernetes_api_metrics_include_list", ["*"]
+                    "kubernetes_api_metric_name_include_list", ["*"]
                 ),
                 "metric_name_exclude_list": self._config.get(
-                    "kubernetes_api_metrics_exclude_list", []
+                    "kubernetes_api_metric_name_exclude_list", []
                 ),
             }
             log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
@@ -485,10 +486,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
                 "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
                 "metric_name_include_list": self._config.get(
-                    "kubernetes_api_cadvisor_metrics_include_list", ["*"]
+                    "kubernetes_api_cadvisor_metric_name_include_list", ["*"]
                 ),
                 "metric_name_exclude_list": self._config.get(
-                    "kubernetes_api_cadvisor_metrics_exclude_list", []
+                    "kubernetes_api_cadvisor_metric_name_exclude_list", []
                 ),
             }
             log_filename = (
@@ -750,7 +751,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         scrape_url = f"{scrape_scheme}://{node_ip}:{scrape_port}/{scrape_path}"
 
         scrape_interval_string = pod.annotations.get(
-            SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL, 60
+            SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL, self._config.get("scrape_interval", 60)
         )
 
         try:
@@ -762,8 +763,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             return None
 
         metric_name_include_list = pod.annotations.get(
-            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST, ""
-        ).split(",")
+            SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST, "*"
+        ).split(",") or ["*"]
         metric_name_exclude_list = pod.annotations.get(
             SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST, ""
         ).split(",")

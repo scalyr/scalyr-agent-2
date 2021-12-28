@@ -205,6 +205,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
+            "metric_name_include_list": [],
             "metric_component_value_include_list": JsonObject(
                 {
                     "kafka_log_log_numlogsegments": {
@@ -400,7 +401,18 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor.gather_sample()
         self.assertEqual(mock_logger.debug.call_count, 0)
         self.assertEqual(mock_logger.warn.call_count, 0)
-        self.assertEqual(mock_logger.emit_value.call_count, 0)
+        self.assertEqual(mock_logger.emit_value.call_count, 2)
+
+        mock_logger.emit_value.assert_any_call(
+            "http_requests_total",
+            3,
+            extra_fields={"method": "post", "code": "400", "timestamp": 1395066363000},
+        )
+        mock_logger.emit_value.assert_any_call(
+            "http_requests_total",
+            4,
+            extra_fields={"method": "post", "code": "400", "timestamp": 1395066363001},
+        )
 
     @requests_mock.Mocker()
     def test_gather_sample_metric_name_include_list_and_exclude_list(self, m):
@@ -424,6 +436,37 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.debug.call_count, 0)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_include_list": [
+                six.text_type("http_*"),
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
+            "metric_name_exclude_list": [
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.emit_value.call_count, 2)
+
+        mock_logger.emit_value.assert_any_call(
+            "http_requests_total",
+            3,
+            extra_fields={"method": "post", "code": "400", "timestamp": 1395066363000},
+        )
+        mock_logger.emit_value.assert_any_call(
+            "http_requests_total",
+            4,
+            extra_fields={"method": "post", "code": "400", "timestamp": 1395066363001},
+        )
 
     @requests_mock.Mocker()
     def test_gather_sample_non_supported_metric_types(self, m):
