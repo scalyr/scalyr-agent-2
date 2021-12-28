@@ -249,9 +249,18 @@ define_config_option(
 define_config_option(
     __monitor__,
     "kubernetes_api_metric_name_exclude_list",
-    "Optional metric name exclude list for Kubernetes API metrics endpoint. By default all metrics are included and no metrics are excluded.",
+    'Optional metric name exclude list for Kubernetes API metrics endpoint. By default all the histogram and per HTTP path metrics are excluded. If you want to include all the metrics, set this value to "*".',
     convert_to=ArrayOfStrings,
-    default=[],
+    default=[
+        # We exclude all the per request path metrics which provide little value and there are tons
+        # per those (one per visited path + query params). This means that each scrape only returns
+        # ~400 metrics instead of 2000+.
+        # Exclude histograms
+        "*_bucket",
+        # Exclude per path and rest client stats (tons of metrics, one for every path and not so useful)
+        "kubelet_http_",
+        "rest_client_",
+    ],
 )
 
 define_config_option(
@@ -751,7 +760,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         scrape_url = f"{scrape_scheme}://{node_ip}:{scrape_port}/{scrape_path}"
 
         scrape_interval_string = pod.annotations.get(
-            SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL, self._config.get("scrape_interval", 60)
+            SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL,
+            self._config.get("scrape_interval", 60),
         )
 
         try:
