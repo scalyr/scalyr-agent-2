@@ -124,6 +124,14 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "timeout",
+    "Timeout for outgoing requests.",
+    convert_to=int,
+    default=10,
+)
+
+define_config_option(
+    __monitor__,
     "ca_file",
     "Optional file with CA certificate used to validate the server certificate. Only applies to https "
     "requests.",
@@ -195,6 +203,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             convert_to=six.text_type,
             required_field=True,
         )
+        self.__timeout = self._config.get("timeout", 10)
         self.__headers = self._config.get(
             "headers",
             {},
@@ -271,7 +280,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         This is used for checking connectivity and other similar purposes.
         """
         request_kwargs = self._get_request_kwargs(url=self.__url)
-        resp = self.__session.get(self.__url, **request_kwargs)
+        resp = self.__session.get(self.__url, **request_kwargs, timeout=self.__timeout)
         return resp
 
     def _get_request_kwargs(self, url: str) -> dict:
@@ -296,7 +305,14 @@ class OpenMetricsMonitor(ScalyrMonitor):
         Scrape metrics from Prometheus interface and return dictionary with parsed metrics.
         """
         request_kwargs = self._get_request_kwargs(url=url)
-        resp = self.__session.get(url, **request_kwargs)
+
+        try:
+            resp = self.__session.get(url, **request_kwargs, timeout=self.__timeout)
+        except Exception as e:
+            self._logger.warn(
+                "Outgoing request failed to %s failed: %s" % (url, str(e))
+            )
+            return []
 
         if resp.status_code != 200:
             self._logger.warn(
