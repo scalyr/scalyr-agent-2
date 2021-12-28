@@ -350,7 +350,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
     @requests_mock.Mocker()
-    def test_gather_sample_ignored_metric_names(self, m):
+    def test_gather_sample_metric_name_whitelist(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
@@ -383,6 +383,47 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "protocol": "http",
             },
         )
+
+    @requests_mock.Mocker()
+    def test_gather_sample_metric_name_blacklist(self, m):
+        m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_blacklist": [
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+
+    @requests_mock.Mocker()
+    def test_gather_sample_metric_name_whitelist_and_blacklist(self, m):
+        # Both blacklist and whitelist options are specified, but blacklist has higher priority
+        m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_whitelist": [
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
+            "metric_name_blacklist": [
+                six.text_type("some.*"),
+                six.text_type("traefik*"),
+            ],
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
 
     @requests_mock.Mocker()
     def test_gather_sample_non_supported_metric_types(self, m):

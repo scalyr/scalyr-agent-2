@@ -147,6 +147,16 @@ define_config_option(
     default=[u"*"],
 )
 
+define_config_option(
+    __monitor__,
+    "metric_name_blacklist",
+    "List of globs for metric names to exclude (all the metrics are included by default). NOTE: "
+    "Exclude list has priority over a white list. This means that if the same metric name is specified "
+    "in exclude and include list, it will be excluded.",
+    convert_to=ArrayOfStrings,
+    default=[],
+)
+
 # Maps metric_name to a dictionary where the key is extra_field key name and a value is a list of
 # globs for the value whitelist.
 #
@@ -195,7 +205,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         )
 
         if self._config.get("metric_name_whitelist"):
-            if isinstance(self._config.get("metric_name_white"), ArrayOfStrings):
+            if isinstance(self._config.get("metric_name_whitelist"), ArrayOfStrings):
                 self.__metric_name_whitelist = self._config.get(
                     "metric_name_whitelist"
                 )._items
@@ -203,6 +213,16 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 self.__metric_name_whitelist = self._config.get("metric_name_whitelist")
         else:
             self.__metric_name_whitelist = ["*"]
+
+        if self._config.get("metric_name_blacklist"):
+            if isinstance(self._config.get("metric_name_blacklist"), ArrayOfStrings):
+                self.__metric_name_blacklist = self._config.get(
+                    "metric_name_blacklist"
+                )._items
+            else:
+                self.__metric_name_blacklist = self._config.get("metric_name_blacklist")
+        else:
+            self.__metric_name_blacklist = []
 
         self.__metric_component_value_whitelist = (
             self._validate_metric_component_value_whitelist(
@@ -213,6 +233,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         self.__include_all_metrics = (
             "*" in self.__metric_name_whitelist
             and not self.__metric_component_value_whitelist
+            and not self.__metric_name_blacklist
         )
 
         # Override the default value for the rate limit for writing the metric logs. We override the
@@ -423,13 +444,18 @@ class OpenMetricsMonitor(ScalyrMonitor):
         if self.__include_all_metrics:
             return True
 
-        # 1. Perform metric_name whitelist checks
+        # 1. Perform metric_name blacklist checks
+        for glob_pattern in self.__metric_name_blacklist:
+            if fnmatch.fnmatch(metric_name, glob_pattern):
+                return False
+
+        # 2. Perform metric_name whitelist checks
         if u"*" not in self.__metric_name_whitelist:
             for glob_pattern in self.__metric_name_whitelist:
                 if fnmatch.fnmatch(metric_name, glob_pattern):
                     return True
 
-        # 2. Perform extra_field whitelist checks
+        # 3. Perform extra_field whitelist checks
         metric_component_value_whitelist = self.__metric_component_value_whitelist.get(
             metric_name, {}
         )
