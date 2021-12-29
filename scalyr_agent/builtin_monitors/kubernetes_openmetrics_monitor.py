@@ -28,7 +28,7 @@ It finds matching exporters by querying the Kubernetes API for pods which match 
 If a pod contains the following annotations, it will be automatically discovered and scraped by this
 monitor:
 
-    * ``monitor.config.scalyr.com/k8s_om/scrape`` (required) - Set this value to "true" to enable metrics scraping
+    * ``k8s.monitor.config.scalyr.com/scrape`` (required) - Set this value to "true" to enable metrics scraping
       for a specific pod.
     * ``prometheus.io/port`` (required) - Tells agent which port on the node to use when scraping metrics.
       Actual pod IP address is automatically discovered.
@@ -36,11 +36,11 @@ monitor:
       building scrapper URL. Valid values are http and https.
     * ``prometheus.io/path`` (optional, defaults to /metrics) - Tells agent which request path to use when
       building scrapper URL.
-    * ``monitor.config.scalyr.com/k8s_om/scrape_interval`` (optional) - How often to scrape this endpoint,
+    * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint,
       defaults to 60 seconds.
-    * ``monitor.config.scalyr.com/k8s_om/metric_name_include_list`` (optional) - Comma delimited list
+    * ``k8s.monitor.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
-    * ``monitor.config.scalyr.com/k8s_om/metric_name_exclude_list`` (optional) - Comma delimited list
+    * ``k8s.monitor.config.scalyr.com/metric_name_exclude_list`` (optional) - Comma delimited list
       of metric names to exclude from scraping.
 
 "prometheus.io/*" annotations are de-facto annotations used by various other Prometheus metrics
@@ -71,7 +71,7 @@ for the exporter pod:
         annotations:
             prometheus.io/scrape:                    'true'
             prometheus.io/port:                      '9100'
-            monitor.config.scalyr.com/k8s_om/scrape: 'true'
+            k8s.monitor.config.scalyr.com/scrape: 'true'
         spec:
         containers:
         - args:
@@ -296,20 +296,25 @@ KUBERNETES_API_CADVISORS_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics/cadvisor"
 )
 
+OPEN_METRICS_MONITOR_MODULE = "scalyr_agent.builtin_monitors.openmetrics_monitor"
+KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
+    "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor"
+)
+
 # Annotation related constants
 PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
 PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
 PROMETHEUS_ANNOTATION_SCAPE_PATH = "prometheus.io/path"
-SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "monitorconfig.scalyr.com/k8s_om/scrape"
+SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "k8s.monitor.config.scalyr.com/scrape"
 
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
-    "monitor.config.scalyr.com/k8s_om/scrape_interval"
+    "k8s.monitor.config.scalyr.com/scrape_interval"
 )
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
-    "monitor.config.scalyr.com/k8s_om/metric_name_include_list"
+    "k8s.monitor.config.scalyr.com/metric_name_include_list"
 )
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
-    "monitor.config.scalyr.com/k8s_om/metric_name_exclude_list"
+    "k8s.monitor.config.scalyr.com/metric_name_exclude_list"
 )
 
 
@@ -334,6 +339,11 @@ class OpenMetricsMonitorConfig(object):
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
+        self.__k8s_kubelet_host_ip = self._config.get("k8s_kubelet_host_ip")
+        self.__k8s_kubelet_api_url_template = self._config.get(
+            "k8s_kubelet_api_url_template"
+        )
+
         self.__scrape_kubernetes_api_metrics = self._config.get(
             "scrape_kubernetes_api_metrics", False
         )
@@ -381,11 +391,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
             self._kubelet = KubeletApi(
                 k8s=k8s,
-                host_ip=self._config.get("k8s_kubelet_host_ip"),
+                host_ip=self.__k8s_kubelet_host_ip,
                 node_name=self.__get_node_name(),
-                kubelet_url_template=Template(
-                    self._config.get("k8s_kubelet_api_url_template")
-                ),
+                kubelet_url_template=Template(self.__k8s_kubelet_api_url_template),
                 verify_https=self._global_config.k8s_verify_kubelet_queries,
                 ca_file=self._global_config.k8s_kubelet_ca_cert,
             )
@@ -397,20 +405,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
     def config_from_monitors(self, manager):
         # Only a single instance of this monitor can run at a time
-        monitors = manager.find_monitors(
-            "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor"
-        )
+        monitors = manager.find_monitors(KUBERNETES_OPEN_METRICS_MONITOR_MODULE)
 
         if len(monitors) > 1:
             raise BadMonitorConfiguration(
-                'Found an existing instance of "kubernetes_openmetrics_monitor". Only '
+                'Found an existing instance of "kubernetes_openmetrics_monitor". Only a'
                 "single instance of this monitor can run at the same time.",
                 "multiple_monitor_instances",
             )
 
     def gather_sample(self):
         self._logger.info(
-            f"There are currently {len(self.__running_monitors)} open metrics monitors running"
+            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__fixed_running_monitors)} fixed open metrics monitors running"
         )
 
         if self.__gather_sample_counter == 0:
@@ -425,6 +431,41 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         Gets the node name of the node running the agent from downward API
         """
         return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
+
+    def __get_monitor_config_and_log_config(
+        self,
+        monitor_id: str,
+        url: str,
+        sample_interval: int,
+        log_filename: str,
+        metric_name_include_list: List[str] = None,
+        metric_name_exclude_list: List[str] = None,
+    ) -> Tuple[dict, dict]:
+        """
+        Return monitor config dictionary and log config dictionary for the provided arguments.
+        """
+        metric_name_include_list = metric_name_include_list or ["*"]
+        metric_name_exclude_list = metric_name_exclude_list or []
+
+        monitor_config = {
+            "module": OPEN_METRICS_MONITOR_MODULE,
+            "id": monitor_id,
+            "url": url,
+            # This gets changed dynamically per monitor via log config path
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "sample_interval": sample_interval,
+            "metric_name_include_list": metric_name_include_list,
+            "metric_name_exclude_list": metric_name_exclude_list,
+        }
+
+        # TODO: Use PlatformController specific method even though this monitor only supports Linux
+        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
+
+        log_config = {
+            "path": log_path,
+        }
+
+        return monitor_config, log_config
 
     def __schedule_fixed_open_metrics_monitors(self):
         """
@@ -452,26 +493,19 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         # 1. Kubernetes API metrics monitor
         if self.__scrape_kubernetes_api_metrics:
-            monitor_config = {
-                "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
-                "id": f"{node_name}_kubernetes-api-metrics",
-                "url": kubernetes_api_metrics_scrape_url,
-                "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-                "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
-                "metric_name_include_list": self._config.get(
-                    "kubernetes_api_metric_name_include_list", ["*"]
+            monitor_config, log_config = self.__get_monitor_config_and_log_config(
+                monitor_id=f"{node_name}_kubernetes-api-metrics",
+                url=kubernetes_api_metrics_scrape_url,
+                sample_interval=self.__kubernetes_api_metrics_scrape_interval,
+                log_filename=f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log",
+                metric_name_include_list=self._config.get(
+                    "kubernetes_api_metric_name_include_list"
                 ),
-                "metric_name_exclude_list": self._config.get(
-                    "kubernetes_api_metric_name_exclude_list", []
+                metric_name_exclude_list=self._config.get(
+                    "kubernetes_api_metric_name_exclude_list"
                 ),
-            }
-            log_filename = f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log"
+            )
 
-            # TODO: Use PlatformController specific method even though this monitor only supports Linux
-            log_path = os.path.join(self._global_config.agent_log_path, log_filename)
-            log_config = {
-                "path": log_path,
-            }
             monitor = monitors_manager.add_monitor(
                 monitor_config=monitor_config,
                 global_config=self._global_config,
@@ -486,31 +520,27 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 monitors_manager.remove_monitor(monitor.uid)
             else:
                 self.__fixed_running_monitors.append(monitor.uid)
+                self.__add_watcher_log_config(
+                    monitor=monitor,
+                    log_config=log_config,
+                    scrape_url=kubernetes_api_metrics_scrape_url,
+                )
 
         # 2. Kubernetes API cAdvisor metrics monitor
         if self.__scrape_kubernetes_api_cadvisor_metrics:
-            monitor_config = {
-                "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
-                "id": f"{node_name}_kubernetes-api-cadvisor-metrics",
-                "url": kubernetes_api_cadvisor_metrics_scrape_url,
-                "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-                "sample_interval": self.__kubernetes_api_metrics_scrape_interval,
-                "metric_name_include_list": self._config.get(
-                    "kubernetes_api_cadvisor_metric_name_include_list", ["*"]
+            monitor_config, log_config = self.__get_monitor_config_and_log_config(
+                monitor_id=f"{node_name}_kubernetes-api-cadvisor-metrics",
+                url=kubernetes_api_cadvisor_metrics_scrape_url,
+                sample_interval=self.__kubernetes_api_cadvisor_metrics_scrape_interval,
+                log_filename=f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log",
+                metric_name_include_list=self._config.get(
+                    "kubernetes_api_cadvisor_metric_name_include_list"
                 ),
-                "metric_name_exclude_list": self._config.get(
-                    "kubernetes_api_cadvisor_metric_name_exclude_list", []
+                metric_name_exclude_list=self._config.get(
+                    "kubernetes_api_cadvisor_metric_name_exclude_list"
                 ),
-            }
-            log_filename = (
-                f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log"
             )
 
-            # TODO: Use PlatformController specific method even though this monitor only supports Linux
-            log_path = os.path.join(self._global_config.agent_log_path, log_filename)
-            log_config = {
-                "path": log_path,
-            }
             monitor = monitors_manager.add_monitor(
                 monitor_config=monitor_config,
                 global_config=self._global_config,
@@ -525,6 +555,11 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 monitors_manager.remove_monitor(monitor.uid)
             else:
                 self.__fixed_running_monitors.append(monitor.uid)
+                self.__add_watcher_log_config(
+                    monitor=monitor,
+                    log_config=log_config,
+                    scrape_url=kubernetes_api_cadvisor_metrics_scrape_url,
+                )
 
     def __schedule_dynamic_open_metrics_monitors(self):
         """
@@ -596,22 +631,16 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             return
 
         node_name = self.__get_node_name()
-        monitor_config = {
-            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
-            "id": f"{node_name}_{pod.name}",
-            "url": scrape_url,
-            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
-            "sample_interval": scrape_config.scrape_interval
+        monitor_config, log_config = self.__get_monitor_config_and_log_config(
+            monitor_id=f"{node_name}_{pod.name}",
+            url=scrape_url,
+            sample_interval=scrape_config.scrape_interval
             or self._config.get("scrape_interval", 60.0),
-            "metric_name_include_list": scrape_config.metric_name_include_list,
-            "metric_name_exclude_list": scrape_config.metric_name_exclude_list,
-        }
-        log_filename = f"openmetrics_monitor-{node_name}-{pod.name}.log"
-        # TODO: Use PlatformController specific method even though this monitor only supports Linux
-        log_path = os.path.join(self._global_config.agent_log_path, log_filename)
-        log_config = {
-            "path": log_path,
-        }
+            log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
+            metric_name_include_list=scrape_config.metric_name_include_list,
+            metric_name_exclude_list=scrape_config.metric_name_exclude_list,
+        )
+
         monitors_manager = get_monitors_manager()
         monitor = monitors_manager.add_monitor(
             monitor_config=monitor_config,
@@ -627,18 +656,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f'Using monitor config options for scrape url "{scrape_url}": {monitor_config}'
         )
 
-        # Add config entry to the log watcher to make sure this file is being ingested
-        watcher_log_config = {
-            "parser": "agent-metrics",
-            "path": log_path,
-        }
-        self._logger.info(
-            f"Adding log config {watcher_log_config} for monitor {monitor.uid} and scrape url {scrape_url}"
+        self.__add_watcher_log_config(
+            monitor=monitor, log_config=log_config, scrape_url=scrape_url
         )
-        watcher_log_config = self.__log_watcher.add_log_config(
-            "openmetrics_monitor", watcher_log_config, force_add=True
-        )
-        self.__watcher_log_configs[monitor.uid] = watcher_log_config
 
     def __remove_monitor(self, scrape_url: str) -> None:
         """
@@ -665,6 +685,27 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         # we need to wait for the file to be fully flashed and ingested. Which means it's better
         # to handle that via periodic job which deletes files older than X days / similar.
         self._logger.info(f"Stopped scrapping url {scrape_url}")
+
+    def __add_watcher_log_config(
+        self, monitor: ScalyrMonitor, scrape_url: str, log_config: dict
+    ) -> None:
+        """
+        Add watcher log config for the provided monitor.
+
+        This ensures that the log file for that monitor is being ingested into Scalyr.
+        """
+        # Add config entry to the log watcher to make sure this file is being ingested
+        watcher_log_config = {
+            "parser": "agent-metrics",
+            "path": log_config["path"],
+        }
+        self._logger.info(
+            f"Adding log config {watcher_log_config} for monitor {monitor.uid} and scrape url {scrape_url}"
+        )
+        watcher_log_config = self.__log_watcher.add_log_config(
+            "openmetrics_monitor", watcher_log_config, force_add=True
+        )
+        self.__watcher_log_configs[monitor.uid] = watcher_log_config
 
     def __get_k8s_pods(self) -> List[K8sPod]:
         """
