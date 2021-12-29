@@ -28,7 +28,7 @@ It finds matching exporters by querying the Kubernetes API for pods which match 
 If a pod contains the following annotations, it will be automatically discovered and scraped by this
 monitor:
 
-    * ``monitor.config.scalyr.com/scrape`` (required) - Set this value to "true" to enable metrics scraping
+    * ``monitor.config.scalyr.com/k8s_om/scrape`` (required) - Set this value to "true" to enable metrics scraping
       for a specific pod.
     * ``prometheus.io/port`` (required) - Tells agent which port on the node to use when scraping metrics.
       Actual pod IP address is automatically discovered.
@@ -36,11 +36,11 @@ monitor:
       building scrapper URL. Valid values are http and https.
     * ``prometheus.io/path`` (optional, defaults to /metrics) - Tells agent which request path to use when
       building scrapper URL.
-    * ``monitor.k8s_om.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint,
+    * ``monitor.config.scalyr.com/k8s_om/scrape_interval`` (optional) - How often to scrape this endpoint,
       defaults to 60 seconds.
-    * ``monitor.k8s_om.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
+    * ``monitor.config.scalyr.com/k8s_om/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
-    * ``monitor.k8s_om.config.scalyr.com/metric_name_exclude_list`` (optional) - Comma delimited list
+    * ``monitor.config.scalyr.com/k8s_om/metric_name_exclude_list`` (optional) - Comma delimited list
       of metric names to exclude from scraping.
 
 "prometheus.io/*" annotations are de-facto annotations used by various other Prometheus metrics
@@ -69,9 +69,9 @@ for the exporter pod:
             app.kubernetes.io/component: exporter
             app.kubernetes.io/name: node-exporter
         annotations:
-            prometheus.io/scrape:             'true'
-            prometheus.io/port:               '9100'
-            monitor.config.scalyr.com/scrape: 'true'
+            prometheus.io/scrape:                    'true'
+            prometheus.io/port:                      '9100'
+            monitor.config.scalyr.com/k8s_om/scrape: 'true'
         spec:
         containers:
         - args:
@@ -187,6 +187,7 @@ define_config_option(
     required_option=True,
 )
 
+# Common Kubernetes monitors options
 define_config_option(
     __monitor__,
     "k8s_kubelet_host_ip",
@@ -206,6 +207,7 @@ define_config_option(
     env_aware=True,
 )
 
+# Monitor specific options
 define_config_option(
     __monitor__,
     "scrape_interval",
@@ -298,17 +300,16 @@ KUBERNETES_API_CADVISORS_METRICS_URL = Template(
 PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
 PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
 PROMETHEUS_ANNOTATION_SCAPE_PATH = "prometheus.io/path"
-# TODO: Update key name to match other scalyr annotations
-SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "monitor.config.scalyr.com/scrape"
+SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "monitorconfig.scalyr.com/k8s_om/scrape"
 
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
-    "monitor.k8s_om.config.scalyr.com/scrape_interval"
+    "monitor.config.scalyr.com/k8s_om/scrape_interval"
 )
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
-    "monitor.k8s_om.config.scalyr.com/metric_name_include_list"
+    "monitor.config.scalyr.com/k8s_om/metric_name_include_list"
 )
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
-    "monitor.k8s_om.config.scalyr.com/metric_name_exclude_list"
+    "monitor.config.scalyr.com/k8s_om/metric_name_exclude_list"
 )
 
 
