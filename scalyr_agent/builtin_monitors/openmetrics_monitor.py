@@ -41,6 +41,10 @@ component value filters using the configuration options described below:
 
 ``metric_name_include_list`` has priority over ``metric_component_value_include_list`` config option.
 
+- ``metric_name_exclude_list`` - A list of metrics names to exclude. This has higher priority over
+  include list which means that a metric won't be included if it's specified in this list even if
+  it's also specified in an include list.
+
 Where possible you are strongly encouraged to filter metrics at the source aka configure various
 Prometheus exporters (where applicable and possible) to only expose metrics you want to ingest
 (this way we can avoid additional filtering overhead in this monitor).
@@ -70,7 +74,6 @@ details.
 
 # TODO:
 
-- Add support for Protobuf format
 - If metric contains a description / help string, should we include this with every metric as part
   of the extra_fields? This could provide large increase in storage and little value so it may not
   be a good idea.
