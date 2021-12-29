@@ -17,8 +17,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from __future__ import print_function
-
 if False:  # NOSONAR
     from typing import List
 
@@ -355,6 +353,7 @@ class MonitorsManager(StoppableThread):
             monitor.start()
 
             self.__running_monitors.append(monitor)
+            self.__monitors.append(monitor)
         else:
             log.warn(
                 "Could not start monitor %s because its log could not be opened",
@@ -395,7 +394,7 @@ class MonitorsManager(StoppableThread):
         """
         log.info("Removing monitor with uid %s", monitor_uid)
 
-        # 1. Stop the monitor thread and close the metric log file
+        # Stop the monitor thread and close the metric log file
         found, running_index, monitors_index = False, -1, -1
         for monitor in self.__running_monitors:
             if monitor_uid == monitor.uid:
@@ -413,7 +412,9 @@ class MonitorsManager(StoppableThread):
                 del self.__running_monitors[running_index]
                 del self.__monitors[monitors_index]
 
-            log.info("Removed monitor %s (%s)", monitor.monitor_name, monitor_uid)
+            log.info(
+                "Stopped and removed monitor %s (%s)", monitor.monitor_name, monitor_uid
+            )
         else:
             log.info("Failed to find running monitor with id %s", monitor_uid)
 

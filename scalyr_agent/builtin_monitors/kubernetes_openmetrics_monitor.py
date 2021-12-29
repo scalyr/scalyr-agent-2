@@ -667,17 +667,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         if scrape_url not in self.__running_monitors:
             return
 
-        monitor_id = self.__running_monitors[scrape_url]
-        log_path = self.__watcher_log_configs[monitor_id]["path"]
+        monitor_uid = self.__running_monitors[scrape_url]
+        log_path = self.__watcher_log_configs[monitor_uid]["path"]
 
         monitors_manager = get_monitors_manager()
-        monitors_manager.remove_monitor(monitor_id)
+        monitors_manager.remove_monitor(monitor_uid)
         del self.__running_monitors[scrape_url]
-        del self.__watcher_log_configs[monitor_id]
+        del self.__watcher_log_configs[monitor_uid]
 
         # Remove corresponding log watcher
         self.__log_watcher.schedule_log_path_for_removal(
-            self.__module.module_name, log_path
+            monitor_name="openmetrics_monitor",
+            log_path=log_path,
         )
 
         # TODO: We should probably remove file from disk here since in case there is a lot of
@@ -699,11 +700,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "parser": "agent-metrics",
             "path": log_config["path"],
         }
-        self._logger.info(
-            f"Adding log config {watcher_log_config} for monitor {monitor.uid} and scrape url {scrape_url}"
+        self._logger.debug(
+            f"Adding watcher log config {watcher_log_config} for monitor {monitor.uid} and scrape url {scrape_url}"
         )
         watcher_log_config = self.__log_watcher.add_log_config(
-            "openmetrics_monitor", watcher_log_config, force_add=True
+            monitor_name="openmetrics_monitor",
+            log_config=watcher_log_config,
+            force_add=True,
         )
         self.__watcher_log_configs[monitor.uid] = watcher_log_config
 
