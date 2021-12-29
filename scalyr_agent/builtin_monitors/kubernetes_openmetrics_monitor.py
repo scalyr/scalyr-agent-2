@@ -171,6 +171,7 @@ import six
 from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
 from scalyr_agent.json_lib.objects import ArrayOfStrings
+from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import get_monitors_manager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.monitor_utils.k8s import KubernetesApi
@@ -255,7 +256,7 @@ define_config_option(
     convert_to=ArrayOfStrings,
     default=[
         # We exclude all the per request path metrics which provide little value and there are tons
-        # per those (one per visited path + query params). This means that each scrape only returns
+        # of those (one per visited path + query params). This means that each scrape only returns
         # ~400 metrics instead of 2000+.
         # Exclude histograms
         "*_bucket",
@@ -263,6 +264,14 @@ define_config_option(
         "kubelet_http_",
         "rest_client_",
     ],
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_metric_component_value_include_list",
+    "Optional include list filter for metric component values.",
+    convert_to=JsonObject,
+    default=JsonObject({}),
 )
 
 define_config_option(
@@ -287,6 +296,14 @@ define_config_option(
     "Optional metric name exclude list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included and no metrics are excluded.",
     convert_to=ArrayOfStrings,
     default=[],
+)
+
+define_config_option(
+    __monitor__,
+    "kubernetes_api_cadvisor_metric_component_value_include_list",
+    "Optional include list filter for metric component values.",
+    convert_to=JsonObject,
+    default=JsonObject({}),
 )
 
 KUBERNETES_API_METRICS_URL = Template(
@@ -440,12 +457,19 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         log_filename: str,
         metric_name_include_list: List[str] = None,
         metric_name_exclude_list: List[str] = None,
+        metric_component_value_include_list: dict = None,
     ) -> Tuple[dict, dict]:
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
         """
-        metric_name_include_list = metric_name_include_list or ["*"]
-        metric_name_exclude_list = metric_name_exclude_list or []
+        if metric_name_include_list is None:
+            metric_name_include_list = ["*"]
+
+        if metric_name_exclude_list is None:
+            metric_name_exclude_list = []
+
+        if metric_component_value_include_list is None:
+            metric_component_value_include_list = {}
 
         monitor_config = {
             "module": OPEN_METRICS_MONITOR_MODULE,
@@ -456,6 +480,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "sample_interval": sample_interval,
             "metric_name_include_list": metric_name_include_list,
             "metric_name_exclude_list": metric_name_exclude_list,
+            "metric_component_value_include_list": JsonObject(
+                metric_component_value_include_list
+            ),
         }
 
         # TODO: Use PlatformController specific method even though this monitor only supports Linux
@@ -504,6 +531,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 metric_name_exclude_list=self._config.get(
                     "kubernetes_api_metric_name_exclude_list"
                 ),
+                metric_component_value_include_list=self._config.get(
+                    "kubernetes_api_metric_component_value_include_list"
+                ),
             )
 
             monitor = monitors_manager.add_monitor(
@@ -538,6 +568,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 ),
                 metric_name_exclude_list=self._config.get(
                     "kubernetes_api_cadvisor_metric_name_exclude_list"
+                ),
+                metric_component_value_include_list=self._config.get(
+                    "kubernetes_api_cadvisor_metric_component_value_include_list"
                 ),
             )
 

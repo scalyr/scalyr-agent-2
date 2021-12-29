@@ -31,13 +31,25 @@ component value filters using the configuration options described below:
   For examples:
 
       {
-        "kafka_log_log_numlogsegments": {"topic": "connect-status"},
-        "kafka_log_log_logstartoffset": {"topic": "connect-status"},
+        "kafka_log_log_numlogsegments": {"topic": ["connect-status"]},
+        "kafka_log_log_logstartoffset": {"topic": ["connect-status", "connect-failures"]},
       }
 
   In this example, only metric with name ``kafka_log_log_numlogsegments`` and
   ``kafka_log_log_logstartoffset`` where the ``topic`` component name is ``connect-status`` will
   be included.
+
+  Another option is something like this:
+
+      {
+        "*": {"topic": "account-foo-*"},
+      }
+
+  In this example any metric which has a component (extra attribute) named ``topic`` with a value of
+  ``account-foo-*`` will be included.
+
+  Keep in mind that globs are only supported for metric component value items and special "*" glob
+  for the metric name which matches all the metrics.
 
 ``metric_name_include_list`` has priority over ``metric_component_value_include_list`` config option.
 
@@ -100,6 +112,7 @@ from scalyr_agent import define_log_field
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib import JsonArray
 
 __monitor__ = __name__
 
@@ -475,15 +488,20 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 return False
 
         # 2. Perform extra_field include_list checks
+        # NOTE: User can specify "*" for metric name which means we will check this filter against
+        # all the metric names
         metric_component_value_include_list = (
-            self.__metric_component_value_include_list.get(metric_name, {})
+            self.__metric_component_value_include_list.get(
+                metric_name, self.__metric_component_value_include_list.get("*", {})
+            )
         )
+
         for (
             extra_field_name,
             extra_field_value_filters,
         ) in metric_component_value_include_list.items():
             for glob_pattern in extra_field_value_filters:
-                extra_field_value = extra_fields.get(extra_field_name, None)
+                extra_field_value = extra_fields.get(extra_field_name, "")
 
                 if fnmatch.fnmatch(extra_field_value, glob_pattern):
                     return True
@@ -542,14 +560,14 @@ class OpenMetricsMonitor(ScalyrMonitor):
         value = value or {}
 
         for metric_name, component_filters in value.items():
-            if not isinstance(component_filters, dict):
+            if not isinstance(component_filters, (dict, JsonObject)):
                 raise BadMonitorConfiguration(
                     "Value must be a dictionary (got %s)" % (type(component_filters)),
                     field="metric_component_value_include_list",
                 )
 
             for component_name, component_filter_globs in component_filters.items():
-                if not isinstance(component_filter_globs, (list, tuple)):
+                if not isinstance(component_filter_globs, (list, tuple, JsonArray)):
                     raise BadMonitorConfiguration(
                         "Value must be a list of strings (got %s)"
                         % (type(component_filter_globs)),

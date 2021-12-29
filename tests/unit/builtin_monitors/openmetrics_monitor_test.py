@@ -259,6 +259,28 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={"topic": "connect-status", "partition": "3"},
         )
 
+        # 2. Metric extra_field filters (matches any metric name)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_include_list": [],
+            "metric_component_value_include_list": JsonObject(
+                {
+                    "*": {"topic": [six.text_type("connect-status")]},
+                }
+            ),
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 19)
+        self.assertEqual(mock_logger.emit_value.call_count, 55)
+
+        for call in mock_logger.emit_value.call_args_list:
+            call_kwargs = call[1]
+            self.assertEqual(call_kwargs["extra_fields"]["topic"], "connect-status")
+
     @requests_mock.Mocker()
     def test_gather_sample_success_mock_data_jmx_exporter_zookeeper_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_5, headers=MOCK_RESPONSE_HEADERS_TEXT)
