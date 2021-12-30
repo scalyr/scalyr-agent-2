@@ -404,10 +404,21 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self.__log_watcher = None
         self.__module = None
 
-        # Holds reference to the KubeletApi client which is populated lazily on first access
+        # Holds reference to the KubernetesApi and KubeletApi client which is populated lazily on
+        # first access
+        self._k8s = None
         self._kubelet = None
 
         self.__gather_sample_counter = 0
+
+    @property
+    def k8s(self):
+        if not self._k8s:
+            self._k8s = KubernetesApi.create_instance(
+                self._global_config, k8s_api_url=self._global_config.k8s_api_url
+            )
+
+        return self._k8s
 
     @property
     def kubelet(self):
@@ -415,11 +426,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         # changes and we need to restart the MonitorsManager so we need to perform any instantiation
         # with side effects outside "_initialize()".
         if not self._kubelet:
-            k8s = KubernetesApi.create_instance(
-                self._global_config, k8s_api_url=self._global_config.k8s_api_url
-            )
             self._kubelet = KubeletApi(
-                k8s=k8s,
+                k8s=self.k8s,
                 host_ip=self.__k8s_kubelet_host_ip,
                 node_name=self.__get_node_name(),
                 kubelet_url_template=Template(self.__k8s_kubelet_api_url_template),
@@ -467,6 +475,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         url: str,
         sample_interval: int,
         log_filename: str,
+        verify_https: str = None,
+        ca_file: str = None,
+        headers: dict = None,
         metric_name_include_list: List[str] = None,
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
@@ -474,6 +485,11 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
         """
+        if verify_https is None:
+            verify_https = self.__verify_https
+
+        headers = headers or {}
+
         if metric_name_include_list is None:
             metric_name_include_list = ["*"]
 
@@ -487,7 +503,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "module": OPEN_METRICS_MONITOR_MODULE,
             "id": monitor_id,
             "url": url,
-            "verify_https": self.__verify_https,
+            "verify_https": verify_https,
+            "ca_file": ca_file,
+            "headers": JsonObject(headers or {}),
             # This gets changed dynamically per monitor via log config path
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
             "sample_interval": sample_interval,
@@ -531,11 +549,20 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         monitors_manager = get_monitors_manager()
 
+        ca_file = self._global_config.k8s_kubelet_ca_cert
+        verify_https = self._global_config.k8s_verify_kubelet_queries
+        headers = {
+            "Authorization": "Bearer %s" % self.k8s.token,
+        }
+
         # 1. Kubernetes API metrics monitor
         if self.__scrape_kubernetes_api_metrics:
             monitor_config, log_config = self.__get_monitor_config_and_log_config(
                 monitor_id=f"{node_name}_kubernetes-api-metrics",
                 url=kubernetes_api_metrics_scrape_url,
+                verify_https=verify_https,
+                ca_file=ca_file,
+                headers=headers,
                 sample_interval=self.__kubernetes_api_metrics_scrape_interval,
                 log_filename=f"openmetrics_monitor-{node_name}-kubernetes-api-metrics.log",
                 metric_name_include_list=self._config.get(
@@ -574,6 +601,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             monitor_config, log_config = self.__get_monitor_config_and_log_config(
                 monitor_id=f"{node_name}_kubernetes-api-cadvisor-metrics",
                 url=kubernetes_api_cadvisor_metrics_scrape_url,
+                verify_https=verify_https,
+                ca_file=ca_file,
+                headers=headers,
                 sample_interval=self.__kubernetes_api_cadvisor_metrics_scrape_interval,
                 log_filename=f"openmetrics_monitor-{node_name}-kubernetes-api-cadvisor-metrics.log",
                 metric_name_include_list=self._config.get(
