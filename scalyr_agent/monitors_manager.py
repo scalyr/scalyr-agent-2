@@ -146,6 +146,15 @@ class MonitorsManager(StoppableThread):
             self.__lock.acquire()
 
             for monitor in self.__monitors:
+                # Make sure we don't start any monitors which have already been started (e.g.
+                # dynamically via add_monitor() method)
+                if monitor in self.__running_monitors:
+                    log.debug(
+                        "Monitor %s is already running, skipping starting it..."
+                        % (monitor.uid)
+                    )
+                    continue
+
                 self.__start_monitor(monitor=monitor)
 
             # Start the monitor manager thread. Do not wait for all monitor threads to start as some may misbehave
