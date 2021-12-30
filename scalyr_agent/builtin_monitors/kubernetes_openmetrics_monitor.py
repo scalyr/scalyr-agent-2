@@ -271,8 +271,8 @@ define_config_option(
         # Exclude histograms
         "*_bucket",
         # Exclude per path and rest client stats (tons of metrics, one for every path and not so useful)
-        "kubelet_http_",
-        "rest_client_",
+        "kubelet_http_*",
+        "rest_client_*",
     ],
 )
 
