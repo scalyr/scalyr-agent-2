@@ -193,7 +193,8 @@ define_config_option(
     __monitor__,
     "metric_component_value_include_list",
     "List of globs for metric component values to include_list. Metrics which extra_fields don't "
-    "match this include_list will be ignored (defaults to all).",
+    "match this include_list will be ignored (defaults to all). If this value is set you also need "
+    'set "metric_name_include_list" value to an empty list ([]) otherwise all metrics will be included.',
     convert_to=JsonObject,
     default=JsonObject({}),
 )
