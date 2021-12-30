@@ -2323,7 +2323,12 @@ class KubeletApi(object):
         }
         self._session.headers.update(headers)
 
-        global_log.info("KubeletApi host ip = %s" % self._host_ip)
+        # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
+        # easier
+        global_log.info(
+            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s"
+            % (self._host_ip, self._verify_https, self._ca_file)
+        )
         self._kubelet_url = self._build_kubelet_url(
             kubelet_url_template, host_ip, node_name
         )
