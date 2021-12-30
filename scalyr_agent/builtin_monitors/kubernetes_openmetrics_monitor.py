@@ -209,8 +209,6 @@ define_config_option(
 )
 
 # Monitor specific options
-# TODO: Support enabling / disabling it on per pod basis via pod annotations
-# TODO: Also use global k8s / kubelet options for fixed / static Kubernetes API monitors
 define_config_option(
     __monitor__,
     "verify_https",
@@ -337,6 +335,11 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "k8s.monitor.config.scalyr.com/scrape"
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
     "k8s.monitor.config.scalyr.com/scrape_interval"
 )
+# Set to False to disable ssl cert and hostname verification for a specific exporter (only applies
+# if that exporter is using https scheme)
+SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP = (
+    "k8s.monitor.config.scalyr.com/verify_https"
+)
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_include_list"
 )
@@ -360,6 +363,7 @@ class K8sPod(object):
 class OpenMetricsMonitorConfig(object):
     scrape_url: str
     scrape_interval: int
+    verify_https: bool = None
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
 
@@ -844,6 +848,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         scrape_port = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PORT, None)
         scrape_path = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PATH, "/metrics")
         node_ip = pod.ips[0] if pod.ips else None
+        verify_https = (
+            pod.annotations.get(
+                SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP, str(self.__verify_https)
+            ).lower()
+            == "true"
+        )
 
         if pod.status_phase != "running":
             self._logger.debug(
@@ -910,6 +920,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         return OpenMetricsMonitorConfig(
             scrape_url=scrape_url,
             scrape_interval=scrape_interval,
+            verify_https=verify_https,
             metric_name_include_list=metric_name_include_list,
             metric_name_exclude_list=metric_name_exclude_list,
         )
