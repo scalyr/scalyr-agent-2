@@ -220,6 +220,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             required_field=True,
         )
         self.__timeout = self._config.get("timeout", 10)
+        self.__verify_https = self._config.get("verify_https", True)
         self.__headers = self._config.get(
             "headers",
             {},
@@ -306,13 +307,14 @@ class OpenMetricsMonitor(ScalyrMonitor):
         """
         request_kwargs = {}
         if url.startswith("https://"):
-            verify = True
+            verify = self.__verify_https
 
             if self.__ca_file:
                 verify = self.__ca_file
 
             request_kwargs["verify"] = verify
 
+        # TODO: Use rate limited warn if verify is false
         return request_kwargs
 
     def _scrape_metrics(self, url):

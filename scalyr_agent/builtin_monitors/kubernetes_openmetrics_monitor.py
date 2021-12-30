@@ -209,6 +209,16 @@ define_config_option(
 )
 
 # Monitor specific options
+# TODO: Support enabling / disabling it on per pod basis via pod annotations
+# TODO: Also use global k8s / kubelet options for fixed / static Kubernetes API monitors
+define_config_option(
+    __monitor__,
+    "verify_https",
+    "Set to False to disable verification of the server certificate and hostname when scraping metrics from all the exporters.",
+    convert_to=bool,
+    default=True,
+)
+
 define_config_option(
     __monitor__,
     "scrape_interval",
@@ -356,6 +366,8 @@ class OpenMetricsMonitorConfig(object):
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
+        self.__verify_https = self._config.get("verify_https", True)
+
         self.__k8s_kubelet_host_ip = self._config.get("k8s_kubelet_host_ip")
         self.__k8s_kubelet_api_url_template = self._config.get(
             "k8s_kubelet_api_url_template"
@@ -475,6 +487,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "module": OPEN_METRICS_MONITOR_MODULE,
             "id": monitor_id,
             "url": url,
+            "verify_https": self.__verify_https,
             # This gets changed dynamically per monitor via log config path
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
             "sample_interval": sample_interval,
