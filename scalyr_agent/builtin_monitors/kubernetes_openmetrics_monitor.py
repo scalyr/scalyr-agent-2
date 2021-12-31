@@ -415,7 +415,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self._k8s = None
         self._kubelet = None
 
-        self.__gather_sample_counter = 0
+        self.__static_monitors_started = False
 
     @property
     def k8s(self):
@@ -462,12 +462,14 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running"
         )
 
-        if self.__gather_sample_counter == 0:
-            # On first iteration we schedule static global monitors which are not dynamically updated
+        if not self.__static_monitors_started:
+            # On first iteration we schedule static global monitors which are not dynamically
+            # updated. We intentionally do that here and don't override start() method to avoid
+            # long blocking in the start() method.
             self.__schedule_static_open_metrics_monitors()
+            self.__static_monitors_started = True
 
         self.__schedule_dynamic_open_metrics_monitors()
-        self.__gather_sample_counter += 1
 
     def __get_node_name(self):
         """
@@ -522,7 +524,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             ),
         }
 
-        # TODO: Use PlatformController specific method even though this monitor only supports Linux
+        # NOTE: This monitor is only supported on Linux platform
         log_path = os.path.join(self._global_config.agent_log_path, log_filename)
 
         log_config = {
@@ -539,7 +541,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         Those endpoints are not auto-discovered and are static per node which means we only set up those
         monitors once since they don't change.
         """
-        # TODO: Refactor duplicated code
+        self._logger.debug("Scheduling static open metrics monitors...")
+
         node_name = self.__get_node_name()
 
         template_context = {
