@@ -151,6 +151,8 @@ running on.
 ## TODO
 
 - [ ] Support for defining per exporter scrape interval via annotations
+- [ ] Should we include node name (+cluster name - scalyr_k8s_cluster_name ?) with each metric? We
+      already do in the monitor name, so we could just define a special parser for it.
 """
 
 from __future__ import absolute_import
