@@ -178,6 +178,7 @@ from scalyr_agent.monitors_manager import get_monitors_manager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.monitor_utils.k8s import KubernetesApi
 from scalyr_agent.monitor_utils.k8s import KubeletApi
+from scalyr_agent import scalyr_logging
 from scalyr_agent import compat
 
 __monitor__ = __name__
@@ -372,6 +373,13 @@ class OpenMetricsMonitorConfig(object):
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
+        # There can only be a single instance of this monitor running so we assign a custom id
+        # with node name in it to make searching for this monitor logs easier
+        module_name = self._config.get("module")
+        self._logger = scalyr_logging.getLogger(
+            "%s(%s)" % (module_name, self.__get_node_name())
+        )
+
         self.__verify_https = self._config.get("verify_https", True)
 
         self.__k8s_kubelet_host_ip = self._config.get("k8s_kubelet_host_ip")
