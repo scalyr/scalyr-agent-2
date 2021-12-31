@@ -365,7 +365,7 @@ class K8sPod(object):
 class OpenMetricsMonitorConfig(object):
     scrape_url: str
     scrape_interval: int
-    verify_https: bool = None
+    verify_https: bool
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
 
@@ -395,9 +395,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         self.__k8s_api_url = self._global_config.k8s_api_url
 
-        # Stores a list of monitor uids for fixed running monitors (Kubernetes API metrics and
+        # Stores a list of monitor uids for static running monitors (Kubernetes API metrics and
         # Kubernetes API cAdvisor metrics)
-        self.__fixed_running_monitors: List[str] = []
+        self.__static_running_monitors: List[str] = []
 
         # Maps scrape url to the monitor uid for all the monitors which have been dynamically
         # scheduled and started by us
@@ -459,12 +459,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
     def gather_sample(self):
         self._logger.info(
-            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__fixed_running_monitors)} fixed open metrics monitors running"
+            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running"
         )
 
         if self.__gather_sample_counter == 0:
-            # On first iteration we schedule fixed global monitors which are not dynamically updated
-            self.__schedule_fixed_open_metrics_monitors()
+            # On first iteration we schedule static global monitors which are not dynamically updated
+            self.__schedule_static_open_metrics_monitors()
 
         self.__schedule_dynamic_open_metrics_monitors()
         self.__gather_sample_counter += 1
@@ -531,12 +531,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         return monitor_config, log_config
 
-    def __schedule_fixed_open_metrics_monitors(self):
+    def __schedule_static_open_metrics_monitors(self):
         """
         Schedule OpenMetrics monitors for global Kubernetes API metrics and Kubernetes API cAdvisor
         metrics endpoints.
 
-        Those endpoints are not auto-discovered and are fixed per node which means we only set up those
+        Those endpoints are not auto-discovered and are static per node which means we only set up those
         monitors once since they don't change.
         """
         # TODO: Refactor duplicated code
@@ -595,7 +595,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 )
                 monitors_manager.remove_monitor(monitor.uid)
             else:
-                self.__fixed_running_monitors.append(monitor.uid)
+                self.__static_running_monitors.append(monitor.uid)
                 self.__add_watcher_log_config(
                     monitor=monitor,
                     log_config=log_config,
@@ -636,7 +636,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 )
                 monitors_manager.remove_monitor(monitor.uid)
             else:
-                self.__fixed_running_monitors.append(monitor.uid)
+                self.__static_running_monitors.append(monitor.uid)
                 self.__add_watcher_log_config(
                     monitor=monitor,
                     log_config=log_config,
