@@ -317,6 +317,15 @@ define_config_option(
     default=JsonObject({}),
 )
 
+# NOTE: This will result in substantial amount of bytes being written per line basis (uncompressed)
+define_config_option(
+    __monitor__,
+    "include_node_name",
+    "Set to true to include node name as an additional attribute with each metric log line.",
+    convert_to=bool,
+    default=False,
+)
+
 KUBERNETES_API_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics"
 )
@@ -400,6 +409,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self.__kubernetes_api_cadvisor_metrics_scrape_interval = self._config.get(
             "kubernetes_api_cadvisor_metrics_scrape_interval", 60
         )
+        self.__include_node_name = self._config.get("include_node_name", False)
 
         self.__k8s_api_url = self._global_config.k8s_api_url
 
@@ -497,6 +507,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         metric_name_include_list: List[str] = None,
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
+        include_node_name: bool = False,
     ) -> Tuple[dict, dict]:
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
@@ -531,6 +542,11 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 metric_component_value_include_list
             ),
         }
+
+        if include_node_name:
+            monitor_config["extra_fields"] = JsonObject(
+                {"node": self.__get_node_name()}
+            )
 
         # NOTE: This monitor is only supported on Linux platform
         log_path = os.path.join(self._global_config.agent_log_path, log_filename)
@@ -591,6 +607,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 metric_component_value_include_list=self._config.get(
                     "kubernetes_api_metric_component_value_include_list"
                 ),
+                include_node_name=self.__include_node_name,
             )
 
             monitor = monitors_manager.add_monitor(
@@ -632,6 +649,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 metric_component_value_include_list=self._config.get(
                     "kubernetes_api_cadvisor_metric_component_value_include_list"
                 ),
+                include_node_name=self.__include_node_name,
             )
 
             monitor = monitors_manager.add_monitor(
@@ -732,6 +750,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
+            include_node_name=self.__include_node_name,
         )
 
         monitors_manager = get_monitors_manager()

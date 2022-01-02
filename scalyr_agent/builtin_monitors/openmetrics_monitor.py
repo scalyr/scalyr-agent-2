@@ -199,6 +199,14 @@ define_config_option(
     default=JsonObject({}),
 )
 
+define_config_option(
+    __monitor__,
+    "extra_fields",
+    "Optional dictionary with extra fields which are included with each emitted metric line.",
+    convert_to=JsonObject,
+    default=JsonObject({}),
+)
+
 # A list of metric types we currently support. Keep in mind that Scalyr doesn't currently
 # support some metric types such as histograms and summaries.
 SUPPORTED_METRIC_TYPES = [
@@ -267,6 +275,8 @@ class OpenMetricsMonitor(ScalyrMonitor):
             and not self.__metric_name_exclude_list
         )
 
+        self.__base_extra_fields = dict(self._config.get("extra_fields", {}) or {})
+
         # Override the default value for the rate limit for writing the metric logs. We override the
         # default value since each scrape could result in a lot of metrics.
         self._log_write_rate = self._config.get(
@@ -287,6 +297,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         metrics = self._scrape_metrics(self.__url)
 
         for metric_name, extra_fields, metric_value in metrics:
+            extra_fields.update(self.__base_extra_fields or {})
             self._logger.emit_value(
                 metric_name, metric_value, extra_fields=extra_fields
             )
