@@ -163,8 +163,8 @@ def set_log_destination(
         logs_directory=logs_directory,
         agent_log_file_path=agent_log_file_path,
         agent_debug_log_file_suffix=agent_debug_log_file_suffix,
-        max_bytes=max_bytes,
-        backup_count=backup_count,
+        max_bytes=int(max_bytes),
+        backup_count=int(backup_count),
         log_write_rate=log_write_rate,
         max_write_burst=max_write_burst,
     )
@@ -662,8 +662,8 @@ class AgentLogger(logging.Logger):
 
         self.__metric_handler = MetricLogHandler.get_handler_for_path(
             path,
-            max_bytes=max_bytes,
-            backup_count=backup_count,
+            max_bytes=int(max_bytes),
+            backup_count=int(backup_count),
             max_write_burst=max_write_burst,
             log_write_rate=log_write_rate,
             flush_delay=flush_delay,
@@ -1223,8 +1223,8 @@ class MetricLogHandler(object):
             if not MetricLogHandler.__use_stdout__:
                 result = MetricRotatingLogHandler(
                     file_path,
-                    max_bytes=max_bytes,
-                    backup_count=backup_count,
+                    max_bytes=int(max_bytes),
+                    backup_count=int(backup_count),
                     max_write_burst=max_write_burst,
                     log_write_rate=log_write_rate,
                     flush_delay=flush_delay,
@@ -1373,8 +1373,8 @@ class MetricRotatingLogHandler(AutoFlushingRotatingFileHandler, MetricLogHandler
         AutoFlushingRotatingFileHandler.__init__(
             self,
             file_path,
-            maxBytes=max_bytes,
-            backupCount=backup_count,
+            maxBytes=int(max_bytes),
+            backupCount=int(backup_count),
             flushDelay=flush_delay,
         )
         MetricLogHandler.__init__(
@@ -1506,8 +1506,8 @@ class AgentLogManager(object):
         self.__use_stdout = use_stdout
         self.__no_fork = no_fork
         self.__stdout_severity = stdout_severity
-        self.__rotation_max_bytes = max_bytes
-        self.__rotation_backup_count = backup_count
+        self.__rotation_max_bytes = int(max_bytes)
+        self.__rotation_backup_count = int(backup_count)
         self.__log_write_rate = log_write_rate
         self.__max_write_burst = max_write_burst
 

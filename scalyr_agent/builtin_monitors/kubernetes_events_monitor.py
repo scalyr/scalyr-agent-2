@@ -332,6 +332,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             )
 
         # The namespace whose logs we should collect.
+        # TODO: Correctly handle int values
         self.__k8s_namespaces_to_include = K8sNamespaceFilter.from_config(
             global_config=self._global_config
         )
@@ -360,10 +361,14 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         self.__max_log_size = self._config.get("max_log_size")
         if self.__max_log_size is None:
             self.__max_log_size = default_max_bytes
+        else:
+            self.__max_log_size = int(self.__max_log_size)
 
         self.__max_log_rotations = self._config.get("max_log_rotations")
         if self.__max_log_rotations is None:
             self.__max_log_rotations = default_rotation_count
+        else:
+            self.__max_log_rotations = int(self.__max_log_rotations)
 
         # Support legacy disabling of k8s_events via the K8S_EVENTS_DISABLE environment variable
         k8s_events_disable_envar = compat.os_environ_unicode.get("K8S_EVENTS_DISABLE")

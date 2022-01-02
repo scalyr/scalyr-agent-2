@@ -441,7 +441,7 @@ class ScalyrMonitor(StoppableThread):
             else:
                 max_bytes = 20 * 1024 * 1024
 
-        return (rotation_count, max_bytes)
+        return (int(rotation_count), int(max_bytes))
 
     def open_metric_log(self):
         """Opens the logger for this monitor.
