@@ -51,13 +51,22 @@ ADD agent_build/requirement-files/docker-image-requirements.txt agent_build/requ
 ADD agent_build/requirement-files/compression-requirements.txt agent_build/requirement-files/compression-requirements.txt
 ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
 
+# Workaround so we can use pre-built orjson wheel for musl. We need to pin pip to older version for
+# manylinux2014 wheel format to work.
+# See https://github.com/ijl/orjson/issues/8 for details.
+# If we don't that and we include orjson and zstandard, we need rust chain and building the image
+# will be very slow due to cross compilation in emulated environment (QEMU)
+RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py && pip install "pip==20.2.2" --user
+
 # Install agent dependencies.
-RUN pip3 install --upgrade pip
+#RUN pip3 install --upgrade pip
 RUN pip3 --no-cache-dir install --root /tmp/dependencies -r agent_build/requirement-files/docker-image-requirements.txt
 
 # Install coverage if its version if specified. Only used in testing.
 RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
 
+# Clean up files which were installed to use manylinux2014 workaround
+RUN pip uninstall -y pip && pip --version && rm /usr/local/lib/python3.8/_manylinux.py
 
 # Install packages and tools that will be required during the final image build.
 
