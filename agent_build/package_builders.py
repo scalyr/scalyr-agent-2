@@ -831,7 +831,24 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
             # Prepare the deployment output directory and also remove previous one, if exists.
             if registry_data_path.is_dir():
-                shutil.rmtree(registry_data_path)
+                try:
+                    shutil.rmtree(registry_data_path)
+                except PermissionError as e:
+                    if e.errno == 13:
+                        # NOTE: Depends on the uid user for the registry inside the container, /var/lib/registry
+                        # inside the container and as such host directory will be owned by root. This is not
+                        # great, but that's just a quick workaround.
+                        # Better solution would be for the registry image to suppport setting uid and gid for
+                        # that directory to the current user or applying 777 permissions + umask to that
+                        # directory.
+                        # Just a safe guard to ensure that data path is local to this directory so
+                        # we don't accidentaly delete system stuff.
+                        cwd = os.getcwd()
+                        assert str(registry_data_path).startswith(str(self.deployment.output_path))
+                        assert str(registry_data_path).startswith(cwd)
+                        common.check_output_with_log(["sudo", "rm", "-rf", str(registry_data_path)])
+                    else:
+                        raise e
 
             self.deployment.deploy()
 
