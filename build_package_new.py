@@ -116,9 +116,7 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--push",
-                action="store_true",
-                help="Push the result docker image."
+                "--push", action="store_true", help="Push the result docker image."
             )
 
         else:

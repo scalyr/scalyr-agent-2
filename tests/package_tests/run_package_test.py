@@ -114,6 +114,6 @@ if __name__ == "__main__":
                 scalyr_api_key=scalyr_api_key,
                 name_suffix=get_option(
                     "name_suffix", default=str(datetime.datetime.now().timestamp())
-                )
+                ),
             )
         exit(0)

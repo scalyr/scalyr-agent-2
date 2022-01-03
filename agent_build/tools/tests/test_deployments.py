@@ -33,14 +33,17 @@ _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH = _PARENT_REL_DIR / "fixtures/example_steps"
 class ExampleStep(deployments.ShellScriptDeploymentStep):
     @property
     def script_path(self) -> pl.Path:
-        return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-requirements-and-download-webdriver.sh"
+        return (
+            _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH
+            / "install-requirements-and-download-webdriver.sh"
+        )
 
     @property
     def _tracked_file_globs(self) -> List[pl.Path]:
         return [
             *super(ExampleStep, self)._tracked_file_globs,
             _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "requirements-*.txt",
-    ]
+        ]
 
 
 @pytest.fixture
@@ -77,13 +80,8 @@ def in_ci_cd(request):
 @pytest.mark.parametrize(
     ["example_deployment"], [["locally"], ["in_docker"]], indirect=True
 )
-@pytest.mark.parametrize(
-    ["in_ci_cd"], [[True]], indirect=True
-)
-def test_example_deployment(
-    example_deployment: deployments.Deployment,
-    in_ci_cd: bool
-):
+@pytest.mark.parametrize(["in_ci_cd"], [[True]], indirect=True)
+def test_example_deployment(example_deployment: deployments.Deployment, in_ci_cd: bool):
     example_deployment_step = example_deployment.steps[0]
     deployment_step_cache_path = example_deployment_step.cache_directory
     if deployment_step_cache_path.exists():

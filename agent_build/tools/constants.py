@@ -76,5 +76,5 @@ class PackageType(enum.Enum):
 AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     DockerPlatform.AMD64,
     DockerPlatform.ARM64,
-    DockerPlatform.ARMV7
+    DockerPlatform.ARMV7,
 ]

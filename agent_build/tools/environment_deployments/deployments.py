@@ -76,7 +76,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
     def __init__(
         self,
-        deployment: 'Deployment',
+        deployment: "Deployment",
         architecture: constants.Architecture,
         previous_step: Union[str, "DeploymentStep"] = None,
     ):
@@ -195,9 +195,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
         return self._get_files_checksum(additional_seed=additional_seed)
 
-    def run(
-        self
-    ):
+    def run(self):
         """
         Run the step. Based on its initial data, it will be performed in docker or locally, on the current system.
         """
@@ -273,9 +271,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         pass
 
     @abc.abstractmethod
-    def _run_in_docker_impl(
-        self, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Run step in docker. This has to be implemented in children classes.
         :param locally: If we are already in docker, this has to be set as True, to avoid loop.
@@ -343,9 +339,7 @@ class DockerFileDeploymentStep(DeploymentStep):
         # This step is in docker by definition.
         raise RuntimeError("The docker based step can not be performed locally.")
 
-    def _run_in_docker_impl(
-        self, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Perform the actual build by calling docker build with specified dockerfile and other options.
         :param locally: This is ignored, the dockerfile based step can not be performed locally.
@@ -365,14 +359,14 @@ class ShellScriptDeploymentStep(DeploymentStep):
 
     def __init__(
         self,
-        deployment: 'Deployment',
+        deployment: "Deployment",
         architecture: constants.Architecture,
         previous_step: Union[str, "DeploymentStep"] = None,
     ):
         super(ShellScriptDeploymentStep, self).__init__(
             deployment=deployment,
             architecture=architecture,
-            previous_step=previous_step
+            previous_step=previous_step,
         )
 
     @property
@@ -382,7 +376,6 @@ class ShellScriptDeploymentStep(DeploymentStep):
         Path to  the script file that has to be executed during the step.
         """
         pass
-
 
     @property
     def _tracked_file_globs(self) -> List[pl.Path]:
@@ -448,9 +441,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
 
         return output
 
-    def _run_in_docker_impl(
-        self, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Run step in docker. It uses a special logic, which is implemented in 'agent_build/tools/tools.build_in_docker'
         module,that allows to execute custom command inside docker by using 'docker build' command. It differs from
@@ -632,7 +623,9 @@ _REL_DOCKER_BASE_IMAGE_STEP_PATH = _REL_DEPLOYMENT_STEPS_PATH / "docker-base-ima
 _REL_AGENT_BUILD_DOCKER_PATH = _REL_AGENT_BUILD_PATH / "docker"
 
 
-_REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP = _REL_DEPLOYMENT_STEPS_PATH / "build_base_docker_image"
+_REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
+    _REL_DEPLOYMENT_STEPS_PATH / "build_base_docker_image"
+)
 
 
 class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
@@ -655,7 +648,10 @@ class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
         """
         Resolve path to the base image builder script which depends on suffix on the base image.
         """
-        return _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP / f"{type(self).BASE_DOCKER_IMAGE_TAG_SUFFIX}.sh"
+        return (
+            _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP
+            / f"{type(self).BASE_DOCKER_IMAGE_TAG_SUFFIX}.sh"
+        )
 
     @property
     def _tracked_file_globs(self) -> List[pl.Path]:
@@ -667,7 +663,9 @@ class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
             _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP / "build_base_images_common_lib.sh"
         )
         # .. and requirement files...
-        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt")
+        globs.append(
+            _REL_AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt"
+        )
         globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt")
         globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "main-requirements.txt")
         return globs
@@ -677,6 +675,7 @@ class BuildBusterDockerBaseImageStep(BuildDockerBaseImageStep):
     """
     Subclass that builds agent's base docker image based on debian buster (slim)
     """
+
     BASE_DOCKER_IMAGE_TAG_SUFFIX = "slim"
 
 
@@ -684,6 +683,7 @@ class BuildAlpineDockerBaseImageStep(BuildDockerBaseImageStep):
     """
     Subclass that builds agent's base docker image based on alpine.
     """
+
     BASE_DOCKER_IMAGE_TAG_SUFFIX = "alpine"
 
 

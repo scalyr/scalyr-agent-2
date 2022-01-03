@@ -169,12 +169,13 @@ class DockerContainer:
     NOTE: The 'docker' library is not used on purpose, since there's only one abstraction that is needed. Using
     docker through the docker CLI is much easier and does not require the "docker" lib as dependency.
     """
+
     def __init__(
-            self,
-            name: str,
-            image_name: str,
-            ports: List[str] = None,
-            mounts: List[str] = None,
+        self,
+        name: str,
+        image_name: str,
+        ports: List[str] = None,
+        mounts: List[str] = None,
     ):
         self.name = name
         self.image_name = image_name
@@ -205,9 +206,7 @@ class DockerContainer:
 
         command_args.append(self.image_name)
 
-        common.check_call_with_log(
-            command_args
-        )
+        common.check_call_with_log(command_args)
 
     def kill(self):
         common.run_command(["docker", "rm", "-f", self.name])
@@ -223,11 +222,9 @@ class LocalRegistryContainer(DockerContainer):
     """
     Container start runs local docker registry inside.
     """
+
     def __init__(
-            self,
-            name: str,
-            registry_port: int,
-            registry_data_path: pl.Path = None
+        self, name: str, registry_port: int, registry_data_path: pl.Path = None
     ):
         """
         :param name: Name of the container.

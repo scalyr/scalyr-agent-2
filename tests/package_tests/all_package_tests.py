@@ -156,8 +156,7 @@ class DockerImagePackageTest(Test):
         # Run container with docker registry.
         logging.info("Run new local docker registry in container.")
         registry_container = build_in_docker.LocalRegistryContainer(
-            name="agent_images_registry",
-            registry_port=5050
+            name="agent_images_registry", registry_port=5050
         )
 
         registry_host = "localhost:5050"

@@ -17,7 +17,6 @@ This module defines all possible packages of the Scalyr Agent and how they can b
 """
 
 
-import datetime
 import json
 import pathlib as pl
 import shlex
@@ -39,7 +38,6 @@ from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
-from agent_build.tools import files_checksum_tracker
 
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
@@ -175,10 +173,12 @@ class PackageBuilder(abc.ABC):
         :param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
         """
         # The path where the build output will be stored.
-        self._build_output_path: Optional[pl.Path] = constants.PACKAGE_BUILDER_OUTPUT / self.name
+        self._build_output_path: Optional[pl.Path] = (
+            constants.PACKAGE_BUILDER_OUTPUT / self.name
+        )
         # Folder with intermediate and temporary results of the build.
         self._intermediate_results_path = (
-                self._build_output_path / "intermediate_results"
+            self._build_output_path / "intermediate_results"
         )
         # The path of the folder where all files of the package will be stored.
         # Also may be helpful for the debug purposes.
@@ -566,10 +566,14 @@ class PackageBuilder(abc.ABC):
         # Copy the monitors directory.
         monitors_path = self._agent_install_root_path / "monitors"
         shutil.copytree(__SOURCE_ROOT__ / "monitors", monitors_path)
-        recursively_delete_files_by_name(self._agent_install_root_path / monitors_path, "README.md")
+        recursively_delete_files_by_name(
+            self._agent_install_root_path / monitors_path, "README.md"
+        )
 
         # Add VERSION file.
-        shutil.copy2(__SOURCE_ROOT__ / "VERSION", self._agent_install_root_path / "VERSION")
+        shutil.copy2(
+            __SOURCE_ROOT__ / "VERSION", self._agent_install_root_path / "VERSION"
+        )
 
         # Create bin directory with executables.
         bin_path = self._agent_install_root_path / "bin"
@@ -658,7 +662,9 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
     @property
     def _agent_install_root_path(self) -> pl.Path:
         # The install root for FHS based packages is located in the usr/share/scalyr-agent-2.
-        original_install_root = super(LinuxFhsBasedPackageBuilder, self)._agent_install_root_path
+        original_install_root = super(
+            LinuxFhsBasedPackageBuilder, self
+        )._agent_install_root_path
         return original_install_root / "usr/share/scalyr-agent-2"
 
     def _build_package_files(self):
@@ -673,7 +679,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
         usr_sbin_path.mkdir(parents=True)
         for binary_path in bin_path.iterdir():
             binary_symlink_path = (
-                    self._package_root_path / "usr/sbin" / binary_path.name
+                self._package_root_path / "usr/sbin" / binary_path.name
             )
             symlink_target_path = pl.Path(
                 "..", "share", "scalyr-agent-2", "bin", binary_path.name
@@ -720,7 +726,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             architecture=constants.Architecture.UNKNOWN,
             variant=variant,
             no_versioned_file_name=no_versioned_file_name,
-            deployment_step_classes=[base_image_deployment_step_cls]
+            deployment_step_classes=[base_image_deployment_step_cls],
         )
 
         self.base_image_deployment_step_cls = base_image_deployment_step_cls
@@ -778,9 +784,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                         container_tar.addfile(file_entry)
 
     def build_filesystem_tarball(self, output_path: pl.Path):
-        super(ContainerPackageBuilder, self).build(
-            locally=True
-        )
+        super(ContainerPackageBuilder, self).build(locally=True)
 
         # Also copy result tarball to the given path.
         output_path.parent.mkdir(exist_ok=True, parents=True)
@@ -844,9 +848,13 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                         # Just a safe guard to ensure that data path is local to this directory so
                         # we don't accidentaly delete system stuff.
                         cwd = os.getcwd()
-                        assert str(registry_data_path).startswith(str(self.deployment.output_path))
+                        assert str(registry_data_path).startswith(
+                            str(self.deployment.output_path)
+                        )
                         assert str(registry_data_path).startswith(cwd)
-                        common.check_output_with_log(["sudo", "rm", "-rf", str(registry_data_path)])
+                        common.check_output_with_log(
+                            ["sudo", "rm", "-rf", str(registry_data_path)]
+                        )
                     else:
                         raise e
 
@@ -889,7 +897,9 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         logging.info("Build base image.")
 
-        base_image_tag_suffix = self.base_image_deployment_step_cls.BASE_DOCKER_IMAGE_TAG_SUFFIX
+        base_image_tag_suffix = (
+            self.base_image_deployment_step_cls.BASE_DOCKER_IMAGE_TAG_SUFFIX
+        )
 
         if use_test_version:
             logging.info("Build testing image version.")
@@ -935,7 +945,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             "--build-arg",
             f"BUILDER_NAME={self.name}",
             "--build-arg",
-            f"BASE_IMAGE=localhost:5000/{base_image_name}"
+            f"BASE_IMAGE=localhost:5000/{base_image_name}",
         ]
 
         if common.DEBUG:
@@ -979,7 +989,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         registry_container = build_in_docker.LocalRegistryContainer(
             name="agent_image_output_registry",
             registry_port=5000,
-            registry_data_path=registry_data_path
+            registry_data_path=registry_data_path,
         )
 
         # Start registry and run build of the final docker image. Build process will refer the the
@@ -1045,43 +1055,43 @@ _AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
 DOCKER_JSON_CONTAINER_BUILDER_BUSTER = DockerJsonPackageBuilder(
     name="docker-json-buster",
     config_path=_CONFIGS_PATH / "docker-json-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
 )
 DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
     name="docker-json-alpine",
     config_path=_CONFIGS_PATH / "docker-json-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
 DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER = DockerSyslogPackageBuilder(
     name="docker-syslog-buster",
     config_path=_CONFIGS_PATH / "docker-syslog-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
 )
 DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
     name="docker-syslog-alpine",
     config_path=_CONFIGS_PATH / "docker-syslog-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
 DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
     name="docker-api-buster",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
 )
 DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     name="docker-api-alpine",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
 K8S_CONTAINER_BUILDER_BUSTER = K8sPackageBuilder(
     name="k8s-buster",
     config_path=_CONFIGS_PATH / "k8s-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
 )
 K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
     name="k8s-alpine",
     config_path=_CONFIGS_PATH / "k8s-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
