@@ -5,7 +5,8 @@
 # and zstandard dependencies. Both of those dependencies are optional.
 # Keep in mind that pre-built wheels are available for ARM64 (e.g. graviton) so we do use those on
 # linux/arm64
-orjson==3.6.5; python_version >= '3.6' and 'armv7' not in platform_machine
+orjson==3.6.5; python_version >= '3.7' and 'armv7' not in platform_machine
+orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine
 orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine
 zstandard==0.16.0; python_version >= '3.5' and 'armv7' not in platform_machine
 zstandard==0.14.1; python_version < '3.5' and 'armv7' not in platform_machine
