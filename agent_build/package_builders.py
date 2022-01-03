@@ -821,11 +821,18 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
         """
 
+        registry_data_path = self.deployment.output_path / "output_registry"
+
         if not common.IN_CICD:
             # If there's not a CI/CD then the deployment has to be done explicitly.
             # If there is an CI/CD, then the deployment has to be already done.
 
             # The ready deployment is required because it builds the base image of out result image.
+
+            # Prepare the deployment output directory and also remove previous one, if exists.
+            if registry_data_path.is_dir():
+                shutil.rmtree(registry_data_path)
+
             self.deployment.deploy()
 
         # Create docker buildx builder instance. # Without it the result image won't be pushed correctly
@@ -951,11 +958,9 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         logging.info(build_log_message)
 
-        registry_data_path = self.deployment.output_path / "output_registry"
-
         # Create container with local image registry. And mount existing registry root with base images.
         registry_container = build_in_docker.LocalRegistryContainer(
-            name="output_registry_path",
+            name="agent_image_output_registry",
             registry_port=5000,
             registry_data_path=registry_data_path
         )
