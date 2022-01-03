@@ -252,17 +252,20 @@ class AgentLogRequestStatsLineCheck(LogVerifierCheck):
                 if bytes_sent <= 0:
                     return (
                         LogVerifierCheckResult.FAIL,
-                        "Agent log says that during the run the agent has sent zero bytes.",
+                        f"Agent log says that during the run the agent has sent zero bytes."
+                        f"Whole log content: {whole_log_text}",
                     )
                 if requests_sent <= 0:
                     return (
                         LogVerifierCheckResult.FAIL,
-                        "Agent log says that during the run the agent has sent zero requests.",
+                        f"Agent log says that during the run the agent has sent zero requests."
+                        f"Whole log content: {whole_log_text}",
                     )
 
                 return (
                     LogVerifierCheckResult.SUCCESS,
-                    "Agent requests stats have been found and they are valid.",
+                    f"Agent requests stats have been found and they are valid."
+                    f"Whole log content: {whole_log_text}",
                 )
 
         else:
@@ -280,7 +283,7 @@ class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
             if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*", line):
                 return (
                     LogVerifierCheckResult.FAIL,
-                    f"Agent log contains error line : {line}",
+                    f"Agent log contains error line : {line}. Whole log content: {whole_log_text}",
                 )
 
         return LogVerifierCheckResult.SUCCESS
