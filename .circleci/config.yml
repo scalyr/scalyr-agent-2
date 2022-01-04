@@ -1355,7 +1355,7 @@ jobs:
     machine:
       image: ubuntu-2004:202111-02
     environment:
-      K8S_VERSION: v1.10.0
+      K8S_VERSION: v1.18.0
       KUBECONFIG: /home/circleci/.kube/config
       MINIKUBE_VERSION: v1.24.0
       MINIKUBE_WANTUPDATENOTIFICATION: false
