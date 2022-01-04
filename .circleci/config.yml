@@ -1200,7 +1200,7 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           name: "Install Python Dependencies"
           command: |
@@ -1211,7 +1211,7 @@ jobs:
             pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
             - "~/.cache/pip"
@@ -1253,7 +1253,7 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-api-{{ checksum "dev-requirements.txt" }}
       - run:
           name: "Install Python Dependencies"
           command: |
@@ -1264,7 +1264,7 @@ jobs:
             pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-api-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
             - "~/.cache/pip"
@@ -1306,7 +1306,7 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           name: "Install Python Dependencies"
           command: |
@@ -1317,7 +1317,7 @@ jobs:
             pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-py38-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
             - "~/.cache/pip"
