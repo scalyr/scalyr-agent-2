@@ -28,5 +28,5 @@ flask==1.1.1
 # NOTE: Not supported on windows
 # Includes bug fix for Python >= 3.9
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=972029
-git+https://salsa.debian.org/python-team/packages/python-udatetime.git@e93536081b6786e7b6b1827fe0a8f3ce21bf8c2d#egg=udatetime
+git+https://salsa.debian.org/python-team/packages/python-udatetime.git@e93536081b6786e7b6b1827fe0a8f3ce21bf8c2d#egg=udatetime; python_version < '3.9'
 more-itertools==8.5.0
