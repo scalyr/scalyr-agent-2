@@ -110,20 +110,8 @@ echo "=================================================="
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 
 # Build image by specifying image type through build args.
-docker build -t local_k8s_image -f Dockerfile --build-arg "BUILD_TYPE=k8s" --build-arg "BUILDER_NAME=k8s-buster" --build-arg MODE=with-coverage .
-
-python build_package.py k8s_builder --coverage
-TARBALL=$(ls scalyr-k8s-agent-*)
-
-TEMP_DIRECTORY=~/temp_directory
-mkdir $TEMP_DIRECTORY
-mv $TARBALL $TEMP_DIRECTORY
-
-pushd $TEMP_DIRECTORY
-./${TARBALL} --extract-packages
-docker build -t local_k8s_image .
-
-popd
+python3 build_package_new.py k8s-buster --tag "local_k8s_image" --coverage
+docker image ls
 
 echo ""
 echo "=================================================="
@@ -132,7 +120,7 @@ echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
 cp .circleci/scalyr-agent-2-with-extra-config.yaml .
-perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2-with-extra-config.yaml
+perl -pi.bak -e 's#image\:\s+(\S+)#image: scalyr/scalyr-k8s-agent:local_k8s_image#' scalyr-agent-2-with-extra-config.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-with-extra-config.yaml
 
 kubectl create -f ./scalyr-agent-2-with-extra-config.yaml
@@ -158,6 +146,13 @@ ${contname_uploader} ${max_wait} \
 # Capture uploader pod
 uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
+
+sleep 10
+echo "=================================================="
+echo "Agent pod logs and kubernetes events"
+echo "=================================================="
+kubectl get event
+kubectl logs "${agent_hostname}"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data

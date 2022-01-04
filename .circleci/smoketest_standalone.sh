@@ -78,6 +78,8 @@ elif [[ $PYTHON_VERSION == "3.6" ]]; then
     export PYENV_VERSION="3.6.9"
 elif [[ $PYTHON_VERSION == "3.7" ]]; then
     export PYENV_VERSION="3.7.3"
+elif [[ $PYTHON_VERSION == "3.8" ]]; then
+    export PYENV_VERSION="3.8.12"
 fi
 
 

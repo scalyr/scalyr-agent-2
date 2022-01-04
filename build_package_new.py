@@ -136,6 +136,14 @@ if __name__ == "__main__":
                 "image. Used to save docker buildx cache in the CI/CD's cache to reuse it in future.",
             )
 
+            package_parser.add_argument(
+                "--coverage",
+                dest="coverage",
+                action="store_true",
+                default=False,
+                help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+            )
+
         else:
 
             # Add output dir argument. It is required only for non-docker image builds.
@@ -185,6 +193,7 @@ if __name__ == "__main__":
             cache_to_path=args.cache_to_dir,
             reuse_local_cache=args.reuse_local_cache,
             remove_image_name_prefix=args.remove_image_name_prefix,
+            with_coverage=args.coverage,
         )
         exit(0)
 
