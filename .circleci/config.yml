@@ -799,7 +799,7 @@ jobs:
     macos:
       xcode: "11.2.1"
     environment:
-      PYTHON: 3.8.12
+      PYTHON: 3.8.10
       # Updating homebrew is slow
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
