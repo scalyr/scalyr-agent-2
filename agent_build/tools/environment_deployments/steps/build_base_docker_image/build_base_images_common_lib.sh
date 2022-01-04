@@ -34,6 +34,9 @@ set -e
 # The directory with registry's data root
 registry_output_path="$STEP_OUTPUT_PATH/output_registry"
 
+# Clear the registry data root path.
+rm -rf "$registry_output_path"
+
 # Check if registry data root already exists in cache.
 restore_from_cache output_registry "$registry_output_path"
 
@@ -42,8 +45,17 @@ if [ -d "$registry_output_path" ]; then
   exit 0
 fi
 
+# Create temporary registry folder, it will be renamed to the valid name at the very end, so we won't use
+# "broken" directory if it fails in the middle.
+tmp_registry_output_path="$STEP_OUTPUT_PATH/~output_registry"
+
+# Remove temp registry folder from previous run.
+if [ -d "$tmp_registry_output_path" ]; then
+  rm -r "$tmp_registry_output_path"
+fi
+
 log "Registry data root is not found in cache, build image from scratch"
-sh_cs mkdir -p "$registry_output_path"
+sh_cs mkdir -p "$tmp_registry_output_path"
 
 container_name="agent_base_image_registry_step"
 
@@ -53,8 +65,11 @@ kill_registry_container() {
 
 trap kill_registry_container EXIT
 
+# Kill registry container from the previous run, is exists.
+kill_registry_container
+
 log "Spin up local registry  in container"
-sh_cs docker run -d --rm -p 5000:5000 -v "$registry_output_path:/var/lib/registry" --name "$container_name" registry:2
+sh_cs docker run -d --rm -p 5000:5000 -v "$tmp_registry_output_path:/var/lib/registry" --name "$container_name" registry:2
 
 
 buildx_builder_name="agent_image_buildx_builder"
@@ -113,6 +128,9 @@ build_all_base_images() {
 
   # prod version
   build_base_image false
+
+  # Everything is successful, rename temp registry folder to normal.
+  mv "$tmp_registry_output_path" "$registry_output_path"
 
   log "Save registry's data root to cache to reuse it in future."
   save_to_cache output_registry "$registry_output_path"

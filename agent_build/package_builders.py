@@ -831,7 +831,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             # If there's not a CI/CD then the deployment has to be done explicitly.
             # If there is an CI/CD, then the deployment has to be already done.
 
-            # The ready deployment is required because it builds the base image of out result image.
+            # The ready deployment is required because it builds the base image of our result image.
 
             # Prepare the deployment output directory and also remove previous one, if exists.
             if registry_data_path.is_dir():
@@ -846,7 +846,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                         # that directory to the current user or applying 777 permissions + umask to that
                         # directory.
                         # Just a safe guard to ensure that data path is local to this directory so
-                        # we don't accidentaly delete system stuff.
+                        # we don't accidentally delete system stuff.
                         cwd = os.getcwd()
                         assert str(registry_data_path).startswith(
                             str(self.deployment.output_path)
@@ -901,11 +901,11 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             self.base_image_deployment_step_cls.BASE_DOCKER_IMAGE_TAG_SUFFIX
         )
 
+        base_image_name = f"agent_base_image:{base_image_tag_suffix}"
+
         if use_test_version:
             logging.info("Build testing image version.")
-            base_image_tag_suffix = f"{base_image_tag_suffix}-testing"
-
-        base_image_name = f"agent_base_image:{base_image_tag_suffix}"
+            base_image_name = f"{base_image_name}-testing"
 
         registries = registries or [""]
         tags = tags or ["latest"]
@@ -946,6 +946,8 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             f"BUILDER_NAME={self.name}",
             "--build-arg",
             f"BASE_IMAGE=localhost:5000/{base_image_name}",
+            "--build-arg",
+            f"BASE_IMAGE_SUFFIX={base_image_tag_suffix}",
         ]
 
         if common.DEBUG:

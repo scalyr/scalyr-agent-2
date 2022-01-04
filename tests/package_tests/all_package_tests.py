@@ -26,6 +26,7 @@ from agent_build import package_builders
 from tests.package_tests.internals import docker_test, k8s_test
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
+from agent_build.tools import common
 
 _PARENT_DIR = pl.Path(__file__).parent
 __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
@@ -200,6 +201,27 @@ class DockerImagePackageTest(Test):
                         logging.exception(
                             "    Can not pull the result image from local registry."
                         )
+
+                    # Check if the tested image contains needed distribution.
+                    if "buster" in self.unique_name:
+                        expected_os_name = "buster"
+                    elif "alpine" in self.unique_name:
+                        expected_os_name = "alpine"
+                    else:
+                        raise AssertionError(f"Test {self.unique_name} does not contain os name (buster or alpine)")
+
+                    # Get the content of the 'os-release' file from the image and verify the distribution name.
+                    os_release_content = common.check_output_with_log([
+                        "docker",
+                        "run",
+                        "-i",
+                        "--rm",
+                        str(full_image_name),
+                        "/bin/cat",
+                        "/etc/os-release"
+                    ]).decode()
+
+                    assert expected_os_name in os_release_content.lower()
 
                     # Remove the image once more.
                     logging.info("    Remove existing image.")

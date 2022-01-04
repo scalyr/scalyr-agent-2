@@ -9,6 +9,11 @@ ARG BASE_IMAGE
 
 ARG MODE="normal"
 
+# Suffix for the python dockerhub image. For now can be:
+#   - 'slim' for buster based image
+#   - 'alpine' for alpine based image.
+ARG BASE_IMAGE_SUFFIX
+
 
 FROM $BASE_IMAGE as scalyr-build
 MAINTAINER Scalyr Inc <support@scalyr.com>
@@ -34,7 +39,7 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 WORKDIR /
 
 # Copy result files to a new base stage.
-FROM python:3.8.10-slim as scalyr-base
+FROM python:3.8.10-$BASE_IMAGE_SUFFIX as scalyr-base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Copy Agent's Python dependencies. Those dependencies were built in the base image,
 # which is given by 'BASE_IMAGE' arg.
