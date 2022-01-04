@@ -808,12 +808,14 @@ jobs:
           name: install pyenv
           shell: bash
           command: |
+            brew update
             brew install pyenv
       - restore_cache:
           key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
+            pyenv install --list
             pyenv install $PYTHON -s
       - run:
           name: Install Dependencies
