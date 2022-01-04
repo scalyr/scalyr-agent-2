@@ -794,39 +794,12 @@ jobs:
           python_version: "3.8"
           tox_target: "py3.8-unit-tests"
 
-  unittest-37:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:3.7
-    steps:
-      - unittest_tox:
-          python_version: "3.7"
-          tox_target: "py3.7-unit-tests"
-
-  unittest-36:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:3.6
-    steps:
-      - unittest_tox:
-          python_version: "3.6"
-          tox_target: "py3.6-unit-tests"
-
-  unittest-35:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:3.5
-    steps:
-      - unittest_tox:
-          python_version: "3.5"
-          tox_target: "py3.5-unit-tests"
-
-  unittest-35-osx:
+  unittest-38-osx:
     working_directory: ~/scalyr-agent-2
     macos:
       xcode: "11.2.1"
     environment:
-      PYTHON: 3.5.6
+      PYTHON: 3.8.12
       # Updating homebrew is slow
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -837,7 +810,7 @@ jobs:
           command: |
             brew install pyenv
       - restore_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -851,13 +824,13 @@ jobs:
             python -m virtualenv venv
             ./venv/bin/pip install "tox==<< pipeline.parameters.default_tox_version >>"
       - run:
-          name: Run Unit Tests under Python 3.5
+          name: Run Unit Tests under Python 3.8
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
-            tox -epy3.5-unit-tests
+            tox -epy3.8-unit-tests
       - save_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - ~/.cache/pip
             - ~/.pyenv
@@ -1704,10 +1677,10 @@ jobs:
   benchmarks-idle-agent-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - idle conf 1"
+          codespeed_executable: "Python 3.8.9 - idle conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
           agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-1"
@@ -1730,10 +1703,10 @@ jobs:
   benchmarks-idle-agent-no-monitors-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - idle conf 2"
+          codespeed_executable: "Python 3.8.9 - idle conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
           agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-2"
@@ -1759,10 +1732,10 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 1"
+          codespeed_executable: "Python 3.8.9 - loaded conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
@@ -1793,10 +1766,10 @@ jobs:
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 2"
+          codespeed_executable: "Python 3.8.9 - loaded conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
           run_time: 140
@@ -1830,10 +1803,10 @@ jobs:
   benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 4"
+          codespeed_executable: "Python 3.8.9 - loaded conf 4"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
           run_time: 140
@@ -1862,10 +1835,10 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - loaded conf 5"
+          codespeed_executable: "Python 3.8.9 - loaded conf 5"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
@@ -1878,13 +1851,13 @@ jobs:
   benchmarks-micro-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     # NOTE: We use larger resource class to speed up the tests. This job only runs on master merge
     # aka not often.
     resource_class: large
     steps:
       - codespeed_micro_benchmarks:
-          codespeed_executable: "Python 3.5.9"
+          codespeed_executable: "Python 3.8.9"
           codespeed_environment: "Circle CI Docker Executor Large Size"
           cache_key_name: "benchmarks-micro-py36"
 
@@ -1908,7 +1881,7 @@ jobs:
     circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes. Needed some Slack blocks
                              # some EC2 IP ranges
     docker:
-      - image: circleci/python:3.5.9
+      - image: circleci/python:3.8.9
     steps:
       - checkout
       - run:
@@ -1917,7 +1890,7 @@ jobs:
             # Set permissions so we can directly restore into /usr/local/bin
             sudo chmod 777 /usr/local/bin
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-3.5-capture-screenshot
+          key: deps2-tox-{{ .Branch }}-3.8-capture-screenshot
       - run:
           name: Download and install Phantom JS
           command: |
@@ -1929,7 +1902,7 @@ jobs:
             fi
       - save_cache:
           name: Save PhantomJS Cache
-          key: deps2-tox-{{ .Branch }}-3.5-capture-screenshot
+          key: deps2-tox-{{ .Branch }}-3.8-capture-screenshot
           paths:
             - /usr/local/bin/phantomjs
       - run:
@@ -1950,11 +1923,11 @@ jobs:
   smoke-standalone-35-rate-limit:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5
+      - image: circleci/python:3.8
     steps:
       - smoke-standalone-tox:
-          python_version: "3.5"
-          tox_target: "py3.5-smoke-tests-rate-limit"
+          python_version: "3.8"
+          tox_target: "py3.8-smoke-tests-rate-limit"
 
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
@@ -1986,11 +1959,11 @@ jobs:
   smoke-standalone-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5
+      - image: circleci/python:3.8
     steps:
       - smoke-standalone-tox:
-          python_version: "3.5"
-          tox_target: "py3.5-smoke-tests"
+          python_version: "3.8"
+          tox_target: "py3.8-smoke-tests"
 
   smoke-standalone-27:
     working_directory: ~/scalyr-agent-2
