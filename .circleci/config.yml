@@ -1175,7 +1175,7 @@ jobs:
 
   smoke-standalone-27-tls12:
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:3.8
     steps:
       - checkout
       - setup_remote_docker:
@@ -1194,7 +1194,7 @@ jobs:
   smoke-docker-json:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:3.8
     steps:
       - setup_remote_docker:
           docker_layer_caching: false
@@ -1247,7 +1247,7 @@ jobs:
   smoke-docker-api-raw-logs-disabled:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:3.8
     steps:
       - setup_remote_docker:
           docker_layer_caching: false
@@ -1300,7 +1300,7 @@ jobs:
   smoke-docker-syslog:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:3.8
     steps:
       - setup_remote_docker:
           docker_layer_caching: false
