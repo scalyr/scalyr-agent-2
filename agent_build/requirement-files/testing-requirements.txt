@@ -26,5 +26,5 @@ orjson==3.5.2
 flask==1.1.1
 # Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
-udatetime==0.0.16
+udatetime==0.0.16; python_version < '3.0'
 more-itertools==8.5.0
