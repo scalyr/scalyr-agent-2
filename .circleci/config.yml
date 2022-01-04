@@ -1741,7 +1741,7 @@ jobs:
           run_time: 140
           capture_agent_status_metrics: true
           capture_line_counts: true
-          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27"
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-28"
 
   benchmarks-micro-py-38:
     working_directory: ~/scalyr-agent-2
