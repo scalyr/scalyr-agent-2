@@ -794,12 +794,14 @@ jobs:
           python_version: "3.8"
           tox_target: "py3.8-unit-tests"
 
-  unittest-38-osx:
+  unittest-37-osx:
     working_directory: ~/scalyr-agent-2
     macos:
       xcode: "11.2.1"
     environment:
-      PYTHON: 3.8.10
+      # For now we use 3.7 since there is known pickling related issue under 3.8
+      # https://github.com/spack/spack/issues/14102
+      PYTHON: 3.7.10
       # Updating homebrew is slow
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -811,7 +813,7 @@ jobs:
             brew update
             brew install pyenv
       - restore_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -830,9 +832,9 @@ jobs:
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
-            tox -epy3.8-unit-tests
+            tox -epy3.7-unit-tests
       - save_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - ~/.cache/pip
             - ~/.pyenv
@@ -2086,7 +2088,7 @@ workflows:
    jobs:
      - unittest-38:
          context: scalyr-agent
-     - unittest-38-osx:
+     - unittest-37-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent
@@ -2210,7 +2212,7 @@ workflows:
          context: scalyr-agent
      - unittest-38:
          context: scalyr-agent
-     - unittest-38-osx:
+     - unittest-37-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent
