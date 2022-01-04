@@ -148,7 +148,7 @@ commands:
                 command: |
                   ls -la .coverage* || true
 
-                  pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
+                  pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==3.4.1"
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Print the report
@@ -479,7 +479,7 @@ commands:
                   # Each test function runs in an isolated Docker container and results in a new .coverage file which we need to combine
                   ls -la ~/artifacts/*/.coverage
 
-                  pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
+                  pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==3.4.1"
                   cp .circleci/.coveragerc_ci .coveragerc
 
                   # Generate combined .coverage file for all our test functions
@@ -994,7 +994,7 @@ jobs:
           command: |
             ls -la .coverage* || true
 
-            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==2.8.3"
+            python.exe -m pip install "coverage==4.5.4" "codecov==2.1.3" "apache-libcloud==3.4.1"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Print the report
@@ -1204,10 +1204,11 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1256,10 +1257,11 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
@@ -1308,10 +1310,11 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1366,12 +1369,11 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
-            python --version
             python3 --version
-            virtualenv venv
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
@@ -1618,7 +1620,7 @@ jobs:
           # build.
           name: Download Coverage Data files
           command: |
-            sudo pip install "coverage==4.5.4" "apache-libcloud==3.1.0"
+            sudo pip install "coverage==4.5.4" "apache-libcloud==3.4.1"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Download Coverage Data
