@@ -17,8 +17,8 @@
 Script which uploads coverage data files to a S3 bucket.
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
+# from __future__ import absolute_import
+# from __future__ import print_function
 
 import os
 import sys
