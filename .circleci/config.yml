@@ -1009,7 +1009,7 @@ jobs:
             # Combine it and upload it to S3
             coverage combine || true
             export PYTHONPATH=.
-            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
+            python.exe ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       # TODO: That's a temporary in-line definition from slack orb. We can remove it once
       # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
