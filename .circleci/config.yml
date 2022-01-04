@@ -1366,6 +1366,8 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
+            python --version
+            python3 --version
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
