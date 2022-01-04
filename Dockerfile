@@ -5,7 +5,7 @@
 # Type of the image build, e.g: docker-json, docker-syslog, k8s
 ARG BUILD_TYPE
 
-# Agent run mode. Can be 'normal' or 'coverage' to enable code coverage tool.
+# Agent run mode. Can be 'normal' or 'with-coverage' to enable code coverage tool.
 ARG MODE="normal"
 
 # Build image files and dependencies.

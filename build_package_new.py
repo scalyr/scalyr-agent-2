@@ -119,6 +119,14 @@ if __name__ == "__main__":
                 "--push", action="store_true", help="Push the result docker image."
             )
 
+            package_parser.add_argument(
+                "--coverage",
+                dest="coverage",
+                action="store_true",
+                default=False,
+                help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+            )
+
         else:
 
             # Add output dir argument. It is required only for non-docker image builds.
@@ -157,6 +165,7 @@ if __name__ == "__main__":
             registries=args.registry or [],
             tags=args.tag or [],
             remove_image_name_prefix=args.remove_image_name_prefix,
+            with_coverage=args.coverage,
         )
         exit(0)
 
