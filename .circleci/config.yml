@@ -1228,11 +1228,9 @@ jobs:
 
   smoke-docker-json:
     working_directory: ~/scalyr-agent-2
-    docker:
-      - image: cimg/python:3.8.10
+    machine:
+      image: ubuntu-2004:202111-02
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: false
       - checkout
       - restore_cache:
           key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -1252,9 +1250,6 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            docker context create agent_image_buildx_builder
-            docker context use agent_image_buildx_builder
-            docker buildx create --name agent_image_buildx_builder
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-json 150
       - run:
           name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
