@@ -1385,7 +1385,7 @@ jobs:
   smoke-k8s:
     working_directory: ~/scalyr-agent-2
     machine:
-      image: circleci/classic:201808-01
+      image: ubuntu-2004:202111-02
     environment:
       K8S_VERSION: v1.18.0
       KUBECONFIG: /home/circleci/.kube/config
