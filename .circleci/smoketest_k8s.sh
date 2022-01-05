@@ -110,7 +110,9 @@ echo "=================================================="
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 
 # Build image by specifying image type through build args.
-python3 build_package_new.py k8s-buster --tag "local_k8s_image" --coverage
+# We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
+# fine since we only test amd64 image on Circle CI.
+python3 build_package_new.py k8s-buster --tag "local_k8s_image" --coverage --platforms linux/amd64
 docker image ls
 
 echo ""
