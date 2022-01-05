@@ -62,6 +62,9 @@ class DeploymentStepError(Exception):
     DEFAULT_LAST_ERROR_LINES_NUMBER = 30
 
     def __init__(self, stdout, stderr, add_list_lines=DEFAULT_LAST_ERROR_LINES_NUMBER):
+        stdout = stdout or ""
+        stderr = stderr or ""
+
         if not isinstance(stdout, six.text_type):
             stdout = stdout.decode("utf-8")
         if not isinstance(stderr, six.text_type):
