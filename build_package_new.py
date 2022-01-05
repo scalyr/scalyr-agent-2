@@ -165,7 +165,7 @@ if __name__ == "__main__":
             registries=args.registry or [],
             tags=args.tag or [],
             remove_image_name_prefix=args.remove_image_name_prefix,
-            with_coverage=args.coverage,
+            use_test_version=args.coverage,
         )
         exit(0)
 
