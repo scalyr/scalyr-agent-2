@@ -152,7 +152,7 @@ jobs:
 
       - name: Publish real image tags.
         run: |
-          python3 scripts/cicd/push_docker_images.py \
+          python3 scripts/cicd/publish-docker-images-tags.py \
             --git-ref-name ${{ github.ref_name }}
             --git-ref-type ${{ github.ref_type }}
             --git-commit-sha ${{ github.sha }}
