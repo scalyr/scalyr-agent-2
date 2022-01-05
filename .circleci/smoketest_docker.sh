@@ -108,8 +108,11 @@ echo $fakeversion > ./VERSION
 echo "Building docker image"
 agent_image="agent-ci/scalyr-agent-${log_mode}:${fakeversion}"
 
-# Build image by specifying image type through build args.
-docker build -t "$agent_image" -f Dockerfile --build-arg "BUILD_TYPE=$log_mode" --build-arg "BUILDER_NAME=$log_mode-buster" --build-arg MODE=with-coverage .
+# We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
+# fine since we only test amd64 image on Circle CI.
+python3 build_package_new.py "docker-${log_mode}-buster" --tag "$agent_image" --coverage --platforms linux/amd64
+docker image ls
+
 
 # Launch Agent container (which begins gathering stdout logs)
 docker run -d --name ${contname_agent} \
