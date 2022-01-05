@@ -1401,10 +1401,11 @@ jobs:
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
           key: deps2-{{ .Branch }}-smoke-k8s-{{ checksum "dev-requirements.txt" }}
