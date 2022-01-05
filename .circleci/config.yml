@@ -1229,7 +1229,7 @@ jobs:
   smoke-docker-json:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: cimg/python:3.8.10
     steps:
       - setup_remote_docker:
           docker_layer_caching: false
