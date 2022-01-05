@@ -88,9 +88,10 @@ jobs:
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
 
   publish-temp-release:
+    concurrency: publish-release
     needs: [test]
     name: Publish Docker Image
-    if: ${{ inputs.publish == true && (github.ref == 'refs/heads/improve-caching' || github.ref_type == 'tag') }}
+    if: ${{ github.ref == 'refs/heads/improve-caching' || github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -134,6 +135,7 @@ jobs:
             --tag "_temp_release"
 
   publish-release:
+    concurrency: publish-release
     needs: [ publish-temp-release ]
     name: Publish Docker Image
     runs-on: ubuntu-latest
