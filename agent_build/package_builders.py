@@ -793,11 +793,11 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
     def build(
         self,
         image_names=None,
-        registries: List[str] = None,
+        registry: str = None,
+        user: str = None,
         tags: List[str] = None,
         push: bool = False,
         use_test_version: bool = False,
-        remove_image_name_prefix: bool = False,
         platforms: List[str] = constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING,
     ):
         """
@@ -815,15 +815,14 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         :param image_names: The list of image names. By default uses image names that are specified in the
             package builder.
-        :param registries: List of registries to push to.
+        :param registry: The registry to push to.
+        :param user: User prefix for the image name.
         :param tags: List of tags.
         :param push: If True, push result image to the registries that are specified in the 'registries' argument.
             If False, then just export the result image to the local docker. NOTE: The local docker cannot handle
             multi-platform images, so it will only get image for its  platform.
         :param use_test_version: Makes testing docker image that runs agent with enabled coverage measuring (Python
             'coverage' library). Must not be enabled in production images.
-        :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
-            For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
         :param platforms: List of platform names to build the image for.
         """
 
@@ -891,6 +890,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                     "create",
                     # This option is important, without it the image won't be pushed to the local registry.
                     "--driver-opt=network=host",
+                    "--storage-opt dm.basesize=50G",
                     "--name",
                     buildx_builder_name,
                 ]
@@ -919,7 +919,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             logging.info("Build testing image version.")
             base_image_name = f"{base_image_name}-testing"
 
-        registries = registries or [""]
+        registry = registry or ""
         tags = tags or ["latest"]
 
         if not os.path.isfile(self.dockerfile_path):
@@ -930,20 +930,21 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         image_names = image_names or type(self).RESULT_IMAGE_NAMES
 
         for image_name in image_names:
-            for registry in registries:
-                for tag in tags:
-                    tag_options.append("-t")
-                    if registry:
-                        registry_prefix = f"{registry}/"
-                    else:
-                        registry_prefix = ""
-                    # NOTE: If we are using custom registry and image name already contains user
-                    # prefix, we remove it in case remove_image_prefix argument is provided (
-                    # this is desired in a lot of cases when using custom registry)
-                    # e.g. scalyr/scalyr-agent-2 -> scalyr-agent-2
-                    if remove_image_name_prefix and "/" in image_name:
-                        image_name = image_name.split("/")[1]
-                    tag_options.append(f"{registry_prefix}{image_name}:{tag}")
+
+            full_name = image_name
+
+            if user:
+                full_name = f"{user}/{full_name}"
+
+            if registry:
+                full_name = f"{registry}/{full_name}"
+
+            for tag in tags:
+                tag_options.append("-t")
+
+                full_name_with_tag = f"{full_name}:{tag}"
+
+                tag_options.append(full_name_with_tag)
 
         command_options = [
             "docker",
@@ -1022,7 +1023,7 @@ class K8sPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.K8S
-    RESULT_IMAGE_NAMES = ["scalyr/scalyr-k8s-agent"]
+    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
 
 
 class DockerJsonPackageBuilder(ContainerPackageBuilder):
@@ -1033,7 +1034,7 @@ class DockerJsonPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
-    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-json"]
+    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
 
 
 class DockerSyslogPackageBuilder(ContainerPackageBuilder):
@@ -1046,8 +1047,8 @@ class DockerSyslogPackageBuilder(ContainerPackageBuilder):
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_SYSLOG
     RESULT_IMAGE_NAMES = [
-        "scalyr/scalyr-agent-docker-syslog",
-        "scalyr/scalyr-agent-docker",
+        "scalyr-agent-docker-syslog",
+        "scalyr-agent-docker",
     ]
 
 
@@ -1058,7 +1059,7 @@ class DockerApiPackageBuilder(ContainerPackageBuilder):
     """
 
     PACKAGE_TYPE = constants.PackageType.DOCKER_API
-    RESULT_IMAGE_NAMES = ["scalyr/scalyr-agent-docker-api"]
+    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-api"]
 
 
 _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"

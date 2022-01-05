@@ -23,7 +23,7 @@ on: [push]
 # For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
   build-images:
-    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@refactor-deployment-caching
+    uses: scalyr/scalyr-agent-2/.github/workflows/docker-and-k8s.yml@improve-caching
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}

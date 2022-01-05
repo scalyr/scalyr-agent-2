@@ -95,8 +95,7 @@ if __name__ == "__main__":
 
             package_parser.add_argument(
                 "--registry",
-                action="append",
-                help="Registry (or repository) name where to push the result image. Can be used multiple times.",
+                help="Registry (or repository) name where to push the result image.",
             )
 
             package_parser.add_argument(
@@ -172,9 +171,8 @@ if __name__ == "__main__":
 
         package_builder.build(
             push=args.push,
-            registries=args.registry or [],
+            registry=args.registry,
             tags=args.tag or [],
-            remove_image_name_prefix=args.remove_image_name_prefix,
             use_test_version=args.coverage,
             platforms=args.platforms.split(","),
         )
