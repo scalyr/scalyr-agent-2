@@ -106,7 +106,7 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-agent_image="agent-ci/scalyr-agent-${log_mode}:${fakeversion}"
+agent_image="local_${log_mode}_image"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
