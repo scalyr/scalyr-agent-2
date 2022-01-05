@@ -7,6 +7,7 @@ ARG BUILD_TYPE
 # Name of the base image to use.
 ARG BASE_IMAGE
 
+# Valid modes are "normal" and "testing"
 ARG MODE="normal"
 
 # Suffix for the python dockerhub image. For now can be:
