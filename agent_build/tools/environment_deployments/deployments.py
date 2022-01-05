@@ -23,8 +23,6 @@ import subprocess
 import logging
 from typing import Union, Optional, List, Dict, Type
 
-import six
-
 from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools import files_checksum_tracker
@@ -65,9 +63,9 @@ class DeploymentStepError(Exception):
         stdout = stdout or ""
         stderr = stderr or ""
 
-        if not isinstance(stdout, six.text_type):
+        if isinstance(stdout, bytes):
             stdout = stdout.decode("utf-8")
-        if not isinstance(stderr, six.text_type):
+        if isinstance(stderr, bytes):
             stderr = stderr.decode("utf-8")
 
         self.stdout = stdout
