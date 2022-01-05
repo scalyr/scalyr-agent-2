@@ -110,7 +110,7 @@ agent_image="agent-ci/scalyr-agent-${log_mode}:${fakeversion}"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
-python3 build_package_new.py "docker-${log_mode}-buster" --tag "$agent_image" --coverage --platforms linux/amd64
+python3 build_package_new.py "${log_mode}-buster" --tag "$agent_image" --coverage --platforms linux/amd64
 docker image ls
 
 
