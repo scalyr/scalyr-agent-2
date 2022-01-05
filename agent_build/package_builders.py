@@ -798,6 +798,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         push: bool = False,
         use_test_version: bool = False,
         remove_image_name_prefix: bool = False,
+        platforms: List[str] = constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING,
     ):
         """
         This function builds Agent docker image by using the specified dockerfile (defaults to "Dockerfile").
@@ -823,7 +824,18 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             'coverage' library). Must not be enabled in production images.
         :param remove_image_name_prefix: True to remove user / org prefix when using a custom registry.
             For example: scalyr/scalyr-agent-2 -> scalyr-agent-2.
+        :param platforms: List of platform names to build the image for.
         """
+
+        for plat in platforms:
+            if plat not in constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING:
+                raise ValueError(
+                    f"Unsupported platform: {plat}. Valid values are: {constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING}"
+                )
+
+        # There is no other easy way to pass parameters to the deployment bash script so we
+        # communicate with it via environment variables
+        os.environ["TO_BUILD_PLATFORMS"] = ",".join(platforms)
 
         registry_data_path = self.deployment.output_path / "output_registry"
 
@@ -961,9 +973,9 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         # If we need to push, then specify all platforms.
         if push:
-            for plat in constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
+            for plat in platforms:
                 command_options.append("--platform")
-                command_options.append(plat.value)
+                command_options.append(plat)
 
         if use_test_version:
             # Pass special build argument to produce testing image.

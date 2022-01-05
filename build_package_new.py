@@ -29,6 +29,7 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
+from agent_build.tools import constants
 from agent_build import package_builders
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
@@ -127,6 +128,15 @@ if __name__ == "__main__":
                 help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
             )
 
+            package_parser.add_argument(
+                "--platforms",
+                dest="platforms",
+                default=",".join(
+                    constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING
+                ),
+                help="Comma delimited list of platforms to build (and optionally push) the image for.",
+            )
+
         else:
 
             # Add output dir argument. It is required only for non-docker image builds.
@@ -166,6 +176,7 @@ if __name__ == "__main__":
             tags=args.tag or [],
             remove_image_name_prefix=args.remove_image_name_prefix,
             use_test_version=args.coverage,
+            platforms=args.platforms.split(","),
         )
         exit(0)
 

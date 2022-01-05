@@ -31,6 +31,17 @@
 
 set -e
 
+TO_BUILD_PLATFORMS=${TO_BUILD_PLATFORMS:-"linux/amd64,linux/arm64,linux/arm/v7"}
+echo ${TO_BUILD_PLATFORMS}
+IFS=', ' read -r -a TO_BUILD_PLATFORMS_ARRAY <<< "${TO_BUILD_PLATFORMS}"
+
+PLATFORMS_DOCKER_BUILX_ARGS=""
+for PLATFORM in "${TO_BUILD_PLATFORMS_ARRAY[@]}"; do
+    PLATFORMS_DOCKER_BUILX_ARGS="${PLATFORMS_DOCKER_BUILX_ARGS} --platform ${PLATFORM}"
+done
+
+log "Building image for the following platforms: ${TO_BUILD_PLATFORMS}"
+
 # The directory with registry's data root
 registry_output_path="$STEP_OUTPUT_PATH/output_registry"
 
@@ -116,9 +127,7 @@ build_all_base_images() {
       --push \
       --build-arg "BASE_IMAGE_SUFFIX=$base_image_tag_suffix" \
       $coverage_arg \
-      --platform linux/amd64 \
-      --platform linux/arm64 \
-      --platform linux/arm/v7 \
+      "${PLATFORMS_DOCKER_BUILX_ARGS}" \
       "$SOURCE_ROOT"
 
   }
