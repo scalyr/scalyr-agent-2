@@ -890,7 +890,6 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                     "create",
                     # This option is important, without it the image won't be pushed to the local registry.
                     "--driver-opt=network=host",
-                    "--storage-opt dm.basesize=50G",
                     "--name",
                     buildx_builder_name,
                 ]
