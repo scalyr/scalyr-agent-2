@@ -23,6 +23,8 @@ import subprocess
 import logging
 from typing import Union, Optional, List, Dict, Type
 
+import six
+
 from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools import files_checksum_tracker
@@ -57,12 +59,21 @@ class DeploymentStepError(Exception):
     Special exception class for the deployment step error.
     """
 
-    _LAST_ERROR_LINES_NUMBER = 20
+    DEFAULT_LAST_ERROR_LINES_NUMBER = 30
 
-    def __init__(self, stdout, add_list_lines=20):
+    def __init__(self, stdout, stderr, add_list_lines=DEFAULT_LAST_ERROR_LINES_NUMBER):
+        if not isinstance(stdout, six.text_type):
+            stdout = stdout.decode("utf-8")
+        if not isinstance(stderr, six.text_type):
+            stderr = stderr.decode("utf-8")
+
         self.stdout = stdout
-        last_lines = self.stdout.splitlines()[-add_list_lines:]
-        message = "Output: \n" + "\n".join(last_lines)
+        self.stderr = stderr
+
+        stdout = "\n".join(self.stdout.splitlines()[-add_list_lines:])
+        stderr = "\n".join(self.stderr.splitlines()[-add_list_lines:])
+        message = f"Stdout: {stdout}\n\nStderr:{stderr}"
+
         super(DeploymentStepError, self).__init__(message)
 
 
@@ -437,7 +448,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                 debug=True,
             ).decode()
         except subprocess.CalledProcessError as e:
-            raise DeploymentStepError(stdout=e.stdout.decode()) from None
+            raise DeploymentStepError(stdout=e.stdout, stderr=e.stderr) from None
 
         return output
 
@@ -505,7 +516,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                     debug=True,
                 )
             except build_in_docker.RunDockerBuildError as e:
-                raise DeploymentStepError(stdout=e.stdout)
+                raise DeploymentStepError(stdout=e.stdout, stderr=e.stderr)
 
         finally:
             # Remove intermediate container and image.
