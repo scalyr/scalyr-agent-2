@@ -32,7 +32,9 @@ flask==1.1.1
 pathlib2==2.3.5; python_version <= '2.7'
 # Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
-udatetime==0.0.16
+# Includes bug fix for Python >= 3.9 (doesn't work under 3.9)
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=972029
+udatetime==0.0.16; python_version < '3.9'
 futures==3.3.0; python_version <= '2.7'
 # Newer versions don't support Python 3.5 anymore
 more-itertools==8.5.0; python_version >= '3.0'
