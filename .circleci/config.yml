@@ -1233,7 +1233,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}-v2
       - run:
           name: "Install Python Dependencies"
           command: |
@@ -1244,7 +1244,7 @@ jobs:
             pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}-v1
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}-v2
           paths:
             - "venv"
             - "~/.cache/pip"
