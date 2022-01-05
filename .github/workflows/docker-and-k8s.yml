@@ -116,6 +116,11 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Perform the build of the base docker image in the deployment.
+        uses: ./.github/actions/perform-deployment
+        with:
+          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
