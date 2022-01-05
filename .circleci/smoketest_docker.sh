@@ -106,11 +106,11 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-agent_image="local_${log_mode}_image"
+agent_image="scalyr-agent-${log_mode}"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
-python3 build_package_new.py "${log_mode}-buster" --tag "$agent_image" --coverage --platforms linux/amd64
+python3 build_package_new.py "${log_mode}-buster" --tag "local_image" --coverage --platforms linux/amd64
 docker image ls
 
 
@@ -119,7 +119,7 @@ docker run -d --name ${contname_agent} \
 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
 -v /var/run/docker.sock:/var/scalyr/docker.sock \
 ${jsonlog_containers_mount} ${syslog_driver_portmap} \
-${agent_image}
+"${agent_image}:local_image"
 
 # Capture agent short container ID
 agent_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_agent")
