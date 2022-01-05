@@ -10,6 +10,13 @@ ARG BASE_IMAGE_SUFFIX
 FROM python:3.8.10-slim as scalyr-dependencies-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
+# Workaround for weird build failure on Circle CI, see
+# https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
+RUN ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split
+RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
+RUN ln -s /bin/rm /usr/sbin/rm
+RUN ln -s /bin/tar /usr/sbin/tar
+
 RUN apt-get update && apt-get install -y build-essential git tar curl
 
 
@@ -84,6 +91,13 @@ RUN apk update && apk add --virtual curl git
 # Install tools for buster.
 FROM python:3.8.10-slim as ready-base-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
+
+# Workaround for weird build failure on Circle CI, see
+# https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
+RUN ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split
+RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
+RUN ln -s /bin/rm /usr/sbin/rm
+RUN ln -s /bin/tar /usr/sbin/tar
 
 RUN apt-get update && apt-get install -y git tar curl
 
