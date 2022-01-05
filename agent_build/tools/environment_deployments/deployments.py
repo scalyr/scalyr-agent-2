@@ -409,7 +409,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         if self.script_path.suffix == ".ps1":
             command_args = ["powershell", self.script_path]
         else:
-            shell = "/bin/sh"
+            shell = "/bin/bash"
 
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
