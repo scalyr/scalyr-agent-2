@@ -1471,7 +1471,7 @@ jobs:
             # Combine it and upload it to S3
             ./venv/bin/coverage combine || true
             export PYTHONPATH=.
-            ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
+            python3 ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
 
       - slack/status:
           fail_only: true
