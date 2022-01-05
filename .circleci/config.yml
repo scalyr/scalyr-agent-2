@@ -1279,24 +1279,23 @@ jobs:
 
   smoke-docker-api-raw-logs-disabled:
     working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:2.7-jessie
+    machine:
+      image: ubuntu-2004:202111-02
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}-v1
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-api-{{ checksum "dev-requirements.txt" }}-v1
           paths:
             - "venv"
             - "~/.cache/pip"
@@ -1331,24 +1330,23 @@ jobs:
 
   smoke-docker-syslog:
     working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:2.7-jessie
+    machine:
+      image: ubuntu-2004:202111-02
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}-v1
       - run:
           name: "Install Python Dependencies"
           command: |
-            virtualenv venv
+            python3 --version
+            python3 -m venv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
-            pip install "apache-libcloud==2.8.2"
+            pip install "apache-libcloud==3.4.1"
       - save_cache:
           name: "Save Dependencies Cache"
-          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}-v1
           paths:
             - "venv"
             - "~/.cache/pip"
