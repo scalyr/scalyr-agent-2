@@ -1252,6 +1252,7 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
+            docker context create agent_image_buildx_builder
             source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-json 150
       - run:
           name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
