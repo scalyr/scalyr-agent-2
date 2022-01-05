@@ -135,6 +135,7 @@ jobs:
           # That is done to guarantee that the real, production tag only pushed when all job are succeeded.
           python3 build_package_new.py "${{ matrix.image-type }}-${{ matrix.image-distro-name }}" \
             --push \
+            --user "${{ secrets.DOCKER_HUB_USERNAME }}" \
             --tag "_temp_release"
 
   publish-release:

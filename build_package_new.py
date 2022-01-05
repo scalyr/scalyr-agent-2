@@ -99,6 +99,11 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
+                "--user",
+                help="User name prefix for the image name."
+            )
+
+            package_parser.add_argument(
                 "--tag",
                 action="append",
                 help="The tag that will be applied to every registry that is specified. Can be used multiple times.",
@@ -172,6 +177,7 @@ if __name__ == "__main__":
         package_builder.build(
             push=args.push,
             registry=args.registry,
+            user=args.user,
             tags=args.tag or [],
             use_test_version=args.coverage,
             platforms=args.platforms.split(","),
