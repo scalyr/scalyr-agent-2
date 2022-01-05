@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Copyright 2014-2021 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +32,6 @@
 set -e
 
 TO_BUILD_PLATFORMS=${TO_BUILD_PLATFORMS:-"linux/amd64,linux/arm64,linux/arm/v7"}
-echo ${TO_BUILD_PLATFORMS}
 IFS=', ' read -r -a TO_BUILD_PLATFORMS_ARRAY <<< "${TO_BUILD_PLATFORMS}"
 
 PLATFORMS_DOCKER_BUILX_ARGS=""
