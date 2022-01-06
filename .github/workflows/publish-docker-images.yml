@@ -20,80 +20,15 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
+  # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
+  AGENT_BUILD_IN_CICD: "1"
+
+concurrency: publish-release
 
 jobs:
-  # TODO move here tests from the CicleCi.
-
-#  test:
-#    runs-on: ubuntu-latest
-#
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        image-type: ["docker-json", "docker-syslog", "docker-api", "k8s"]
-#        image-distro-name: ["buster", "alpine"]
-#
-#    env:
-#      # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
-#      AGENT_BUILD_IN_CICD: "1"
-#
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v2
-#
-#      - name: Install python
-#        uses: actions/setup-python@v2
-#        with:
-#          python-version: ${{ inputs.python-version }}
-#
-#      - name: Perform the deployment of the test environment
-#        uses: ./.github/actions/perform-deployment
-#        with:
-#          deployment-name: "test_environment"
-#
-#      - name: Sanity check deployments logic by running internal tests
-#        run: |
-#          python3 -m pytest agent_build/tools/tests
-#
-#      - name: Set up QEMU
-#        id: qemu
-#        uses: docker/setup-qemu-action@v1
-#        with:
-#          image: tonistiigi/binfmt:qemu-v6.1.0
-#          platforms: all
-#
-#      - name: Perform the build of the base docker image in the deployment.
-#        uses: ./.github/actions/perform-deployment
-#        with:
-#          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
-#
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v1
-#        with:
-#          driver-opts: network=host
-#
-#      - name: Start minikube for the test of the kubernetes build
-#        if: matrix.image-type == 'k8s'
-#        shell: bash
-#        run: |
-#          minikube start
-#
-#      - name: Run image test
-#        env:
-#            SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
-#        run: |
-#
-#          python3 tests/package_tests/run_package_test.py package-test \
-#           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
-#            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
-
   publish-temp-release:
-    concurrency: publish-release-${{ matrix.image-type }}-${{ matrix.image-distro-name }}
-#    needs: [test]
     name: Publish Docker Image to a temporary tag.
-    if: ${{ github.ref == 'refs/heads/improve-caching' || github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
@@ -129,17 +64,15 @@ jobs:
 
       - name: Push image using the a temporary tag.
         run: |
-
           # Push result docker image with a special tag "_temp_release".
           # The next job will "re-tag" that image to an appropriate one.
           # That is done to guarantee that the real, production tag only pushed when all job are succeeded.
           python3 build_package_new.py "${{ matrix.image-type }}-${{ matrix.image-distro-name }}" \
             --push \
             --user "${{ secrets.DOCKER_HUB_USERNAME }}" \
-            --tag "_temp_release"
+            --tag "_temp_release-${{ matrix.image-distro-name }}"
 
   publish-release:
-    concurrency: publish-release
     needs: [ publish-temp-release ]
     name: Publish Docker Image
     runs-on: ubuntu-latest
@@ -156,7 +89,8 @@ jobs:
       - name: Publish real image tags.
         run: |
           python3 scripts/cicd/publish-docker-images-tags.py \
-            --git-ref-name ${{ github.ref_name }}
-            --git-ref-type ${{ github.ref_type }}
-            --git-commit-sha ${{ github.sha }}
+            --git-ref-name ${{ github.ref_name }} \
+            --git-ref-type ${{ github.ref_type }} \
+            --git-commit-sha ${{ github.sha }} \
+            --user ${{ secrets.DOCKER_HUB_USERNAME }}
 
