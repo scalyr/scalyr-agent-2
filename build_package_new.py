@@ -99,8 +99,7 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--user",
-                help="User name prefix for the image name."
+                "--user", help="User name prefix for the image name."
             )
 
             package_parser.add_argument(

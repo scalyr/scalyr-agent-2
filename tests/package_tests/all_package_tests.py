@@ -208,18 +208,22 @@ class DockerImagePackageTest(Test):
                     elif "alpine" in self.unique_name:
                         expected_os_name = "alpine"
                     else:
-                        raise AssertionError(f"Test {self.unique_name} does not contain os name (buster or alpine)")
+                        raise AssertionError(
+                            f"Test {self.unique_name} does not contain os name (buster or alpine)"
+                        )
 
                     # Get the content of the 'os-release' file from the image and verify the distribution name.
-                    os_release_content = common.check_output_with_log([
-                        "docker",
-                        "run",
-                        "-i",
-                        "--rm",
-                        str(full_image_name),
-                        "/bin/cat",
-                        "/etc/os-release"
-                    ]).decode()
+                    os_release_content = common.check_output_with_log(
+                        [
+                            "docker",
+                            "run",
+                            "-i",
+                            "--rm",
+                            str(full_image_name),
+                            "/bin/cat",
+                            "/etc/os-release",
+                        ]
+                    ).decode()
 
                     assert expected_os_name in os_release_content.lower()
 
@@ -247,7 +251,7 @@ class DockerImagePackageTest(Test):
                         image_name=local_registry_image_name,
                         architecture=arch,
                         scalyr_api_key=scalyr_api_key,
-                        name_suffix=name_suffix
+                        name_suffix=name_suffix,
                     )
                 else:
                     docker_test.run(

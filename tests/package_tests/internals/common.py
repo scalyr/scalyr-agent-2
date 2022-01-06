@@ -322,11 +322,11 @@ class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
                     stack_trace_lines = get_stack_trace_lines()
                     stack_trace = "".join(stack_trace_lines)
 
-                    # It the traceback that follows after error message contains particular error message,
+                    # If the traceback that follows after error message contains particular error message,
                     # then we are ok with that.
                     errors_to_ignore = [
                         "socket.gaierror: [Errno -3] Try again",
-                        "socket.gaierror: [Errno -3] Temporary failure in name resolution"
+                        "socket.gaierror: [Errno -3] Temporary failure in name resolution",
                     ]
                     for error_to_ignore in errors_to_ignore:
                         if error_to_ignore in stack_trace_lines[-1]:

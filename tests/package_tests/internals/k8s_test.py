@@ -85,10 +85,10 @@ def _delete_k8s_objects():
 
 
 def _test(
-        image_name: str,
-        architecture: constants.Architecture,
-        scalyr_api_key: str,
-        name_suffix: str = None
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str,
+    name_suffix: str = None,
 ):
     # Create agent's service account.
     subprocess.check_call(
@@ -209,10 +209,10 @@ def _test(
 
 
 def run(
-        image_name: str,
-        architecture: constants.Architecture,
-        scalyr_api_key: str,
-        name_suffix: str = None
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str,
+    name_suffix: str = None,
 ):
     """
     :param image_name: Full name of the image to test.
@@ -226,12 +226,7 @@ def run(
     subprocess.check_call(["minikube", "image", "load", image_name])
 
     try:
-        _test(
-            image_name,
-            architecture,
-            scalyr_api_key,
-            name_suffix=name_suffix
-        )
+        _test(image_name, architecture, scalyr_api_key, name_suffix=name_suffix)
     finally:
         logging.info("Clean up. Removing all kubernetes objects...")
         _delete_k8s_objects()
