@@ -50,19 +50,24 @@ In the example we use step class ``ExampleStep``:
 
 ``` 
 
-class ExampleStep(ShellScriptDeploymentStep):
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "example/install-requirements-and-download-webdriver.sh"
-    USED_FILES = [
-        _DEPLOYMENT_STEPS_PATH / "example/requirements-1.txt",
-        _DEPLOYMENT_STEPS_PATH / "example/requirements-2.txt",
+class ExampleStep(deployments.ShellScriptDeploymentStep):
+    @property
+    def script_path(self) -> pl.Path:
+        return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-requirements-and-download-webdriver.sh"
+
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        return [
+            *super(ExampleStep, self)._tracked_file_globs,
+            _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "requirements-*.txt",
     ]
 ```
 
 Here in the example we declare class `ExampleStep` as a child of the `ShellScriptDeploymentStep`
 class. The ``ShellScriptDeploymentStep`` base class is a `DeploymentStep` that runs some shell script in order to perform
-the step, and the script is specified in the ``SCRIPT_PATH`` class attribute. In our case, the shell script is 
-``install-requirements-and-download-webdriver.sh``. The needed requirement files are reflected in the ``USED_FILES`` -
-another class attribute, which is the list of paths to the files, that are somehow used in the deployment step.
+the step, and the script is specified in its ``script_path`` property method. In our case, the shell script is 
+``install-requirements-and-download-webdriver.sh``. The needed requirement files are reflected in the ``tracked_file_globs`` -
+another property method, which is the list of paths to the files, that are somehow used in the deployment step.
 
 The script file ``install-requirements-and-download-webdriver.sh`` does the main work of the step, and it can also cache 
 some intermediate results by calling special cache functions, which are sourced before the script:
@@ -76,7 +81,7 @@ some intermediate results by calling special cache functions, which are sourced 
     save_to_cache <cache_key> <path>
     ```
 
-NOTE: You can find those example files in the ``agent_build/tools/environment_deployments/steps/example`` directory.
+NOTE: You can find those example files in tests in file ``agent_build/tools/tests/test_deployments.py``
 
 After the deployment and its steps are defined, we can use it in the GitHub Actions.
 To do that, we just have to call a local GitHub action `github/actions/perform-deployment`

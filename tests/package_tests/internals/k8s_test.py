@@ -84,7 +84,12 @@ def _delete_k8s_objects():
         pass
 
 
-def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key: str):
+def _test(
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str,
+    name_suffix: str = None,
+):
     # Create agent's service account.
     subprocess.check_call(
         ["kubectl", "create", "-f", str(_SCALYR_SERVICE_ACCOUNT_MANIFEST_PATH)]
@@ -102,6 +107,11 @@ def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key:
         ]
     )
 
+    cluster_name = "ci-agent-k8s"
+
+    if name_suffix:
+        cluster_name = f"{cluster_name}-{name_suffix}"
+
     # Create configmap
     subprocess.check_call(
         [
@@ -109,7 +119,7 @@ def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key:
             "create",
             "configmap",
             "scalyr-config",
-            "--from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-",
+            f"--from-literal=SCALYR_K8S_CLUSTER_NAME={cluster_name}",
         ]
     )
 
@@ -198,7 +208,12 @@ def _test(image_name: str, architecture: constants.Architecture, scalyr_api_key:
     logging.info("Test passed!")
 
 
-def run(image_name: str, architecture: constants.Architecture, scalyr_api_key: str):
+def run(
+    image_name: str,
+    architecture: constants.Architecture,
+    scalyr_api_key: str,
+    name_suffix: str = None,
+):
     """
     :param image_name: Full name of the image to test.
     :param architecture: Architecture of the image to test.
@@ -211,7 +226,7 @@ def run(image_name: str, architecture: constants.Architecture, scalyr_api_key: s
     subprocess.check_call(["minikube", "image", "load", image_name])
 
     try:
-        _test(image_name, architecture, scalyr_api_key)
+        _test(image_name, architecture, scalyr_api_key, name_suffix=name_suffix)
     finally:
         logging.info("Clean up. Removing all kubernetes objects...")
         _delete_k8s_objects()

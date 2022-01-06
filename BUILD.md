@@ -44,11 +44,12 @@ docker run --it --rm --name registry -p 5000:5000 registry:2
 python3 build_package_new.py <build_name> --push --registry localhost:5000
 ```
 
-Pushing to a custom registry where the username organization is not ``scalyr``:
+Pushing image with username:
 
 ```bash
-python3 build_package_new.py <build_name> --push --registry my-dockerhub-user --remove-image-name-prefix
+python3 build_package_new.py <build_name> --push --user my-dockerhub-user
 ```
+
 
 ## Supported Images and Architectures
 

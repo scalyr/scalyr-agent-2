@@ -1,3 +1,7 @@
+-r ./main-requirements.txt
+-r ./compression-requirements.txt
+-r ./docker-image-requirements.txt
+
 # Testing tools and libraries
 mock==3.0.5
 psutil==5.7.0
@@ -22,16 +26,15 @@ docker==4.1.0
 # the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
-requests==2.20.0
 ujson==1.35
-orjson==3.5.2; python_version >= '3.6'
-orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
 flask==1.1.1
 pathlib2==2.3.5; python_version <= '2.7'
 # Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
-udatetime==0.0.16
+# Includes bug fix for Python >= 3.9 (doesn't work under 3.9)
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=972029
+udatetime==0.0.16; python_version < '3.9'
 futures==3.3.0; python_version <= '2.7'
 # Newer versions don't support Python 3.5 anymore
 more-itertools==8.5.0; python_version >= '3.0'

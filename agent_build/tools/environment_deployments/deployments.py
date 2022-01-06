@@ -14,9 +14,11 @@
 
 
 import abc
+import os
 import pathlib as pl
 import shlex
 import re
+import shutil
 import subprocess
 import logging
 from typing import Union, Optional, List, Dict, Type
@@ -55,12 +57,24 @@ class DeploymentStepError(Exception):
     Special exception class for the deployment step error.
     """
 
-    _LAST_ERROR_LINES_NUMBER = 20
+    DEFAULT_LAST_ERROR_LINES_NUMBER = 30
 
-    def __init__(self, stdout, add_list_lines=20):
+    def __init__(self, stdout, stderr, add_list_lines=DEFAULT_LAST_ERROR_LINES_NUMBER):
+        stdout = stdout or ""
+        stderr = stderr or ""
+
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8")
+
         self.stdout = stdout
-        last_lines = self.stdout.splitlines()[-add_list_lines:]
-        message = "Output: \n" + "\n".join(last_lines)
+        self.stderr = stderr
+
+        stdout = "\n".join(self.stdout.splitlines()[-add_list_lines:])
+        stderr = "\n".join(self.stderr.splitlines()[-add_list_lines:])
+        message = f"Stdout: {stdout}\n\nStderr:{stderr}"
+
         super(DeploymentStepError, self).__init__(message)
 
 
@@ -72,16 +86,14 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         CI/CD such as Github Actions.
     """
 
-    # Set of files that are somehow used during the step. Needed to calculate the checksum of the whole step, so it can
-    # be used as cache key.
-    USED_FILES: List[pl.Path] = []
-
     def __init__(
         self,
+        deployment: "Deployment",
         architecture: constants.Architecture,
         previous_step: Union[str, "DeploymentStep"] = None,
     ):
         """
+        :param deployment: The deployment instance where this step is added.
         :param architecture: Architecture of the machine where step has to be performed.
         :param previous_step: If None then step is considered as first and it doesn't have to be performed on top
             of another step. If this is an instance of another DeploymentStep, then this step will be performed on top
@@ -92,6 +104,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         super(DeploymentStep, self).__init__()
 
         self.architecture = architecture
+        self.deployment = deployment
 
         if isinstance(previous_step, DeploymentStep):
             # The previous step is specified.
@@ -107,12 +120,16 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
             self.base_docker_image = None
             self.previous_step = None
 
+        # personal cache directory of the step.
+        self.cache_directory = self.deployment.cache_directory / self.cache_key
+        self.output_directory = self.deployment.output_directory / self.unique_name
+
     @property
     def _tracked_file_globs(self) -> List[pl.Path]:
         """
         Get filed that has to be tracked by the step in order to calculate checksum, for caching.
         """
-        return type(self).USED_FILES
+        return []
 
     @property
     def name(self) -> str:
@@ -190,36 +207,21 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
         return self._get_files_checksum(additional_seed=additional_seed)
 
-    def run(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ):
+    def run(self):
         """
         Run the step. Based on its initial data, it will be performed in docker or locally, on the current system.
-
-        :param cache_dir: Path of the cache directory. If specified, then the step may save or reuse some intermediate
-            result using it.
-        :param locally: A special flag that forces a step to be performed locally on the current system, even
-            if it meant to be performed inside docker. This is needed to avoid the loop when the step is already in the
-            docker.
         """
 
-        def run_step():
-            if self.in_docker:
-                self._run_in_docker(cache_dir=cache_dir)
-            else:
-                self._run_locally(cache_dir=cache_dir)
+        if self.in_docker:
+            run_func = self._run_in_docker
+        else:
+            run_func = self._run_locally
 
-        self._run_function_in_isolated_source_directory(function=run_step)
+        self._run_function_in_isolated_source_directory(function=run_func)
 
-    def _run_in_docker(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ):
+    def _run_in_docker(self):
         """
         This function does the same deployment but inside the docker.
-        :param cache_dir: Path of the cache directory. If specified, then the step may save or reuse some intermediate
-            result using it. In case of docker, the whole result image of the step will be cached.
         """
 
         # Before the build, check if there is already an image with the same name. The name contains the checksum
@@ -241,10 +243,9 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
         save_to_cache = False
 
-        # If cache directory is specified, then check if the image file is already there and we can reuse it.
-        if cache_dir:
-            cache_dir = pl.Path(cache_dir)
-            cached_image_path = cache_dir / self.result_image_name
+        # If code runs in CI/CD, then check if the image file is already in cache and we can reuse it.
+        if common.IN_CICD:
+            cached_image_path = self.cache_directory / self.result_image_name
             if cached_image_path.is_file():
                 logging.info(
                     f"Cached image {self.result_image_name} file for the deployment step '{self.name}' has been found, "
@@ -264,9 +265,9 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
         self._run_in_docker_impl()
 
-        if cache_dir and save_to_cache:
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            cached_image_path = cache_dir / self.result_image_name
+        if common.IN_CICD and save_to_cache:
+            self.cache_directory.mkdir(parents=True, exist_ok=True)
+            cached_image_path = self.cache_directory / self.result_image_name
             logging.info(
                 f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
             )
@@ -275,27 +276,48 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
             )
 
     @abc.abstractmethod
-    def _run_locally(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ):
+    def _run_locally(self):
         """
         Run step locally. This has to be implemented in children classes.
-        :param cache_dir: Path of the cache directory. If specified, then the step may save or reuse some intermediate
-            result using it.
         """
         pass
 
     @abc.abstractmethod
-    def _run_in_docker_impl(
-        self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Run step in docker. This has to be implemented in children classes.
-        :param cache_dir: Path of the cache directory.
         :param locally: If we are already in docker, this has to be set as True, to avoid loop.
         """
         pass
+
+    def _restore_from_cache(self, key: str, path: pl.Path) -> bool:
+        """
+        Restore file or directory by given key from the step's cache.
+        :param key: Name of the file or directory to search in cache.
+        :param path: Path where to copy the cached object if it's found.
+        :return: True if cached object is found.
+        """
+        full_path = self.cache_directory / key
+        if full_path.exists():
+            if full_path.is_dir():
+                shutil.copytree(full_path, path)
+            else:
+                shutil.copy2(full_path, path)
+            return True
+
+        return False
+
+    def _save_to_cache(self, key: str, path: pl.Path):
+        """
+
+        :param key: Name of the file or directory in cache.
+        :param path: Path from where to copy the object to the cache.
+        """
+        full_path = self.cache_directory / key
+        if path.is_dir():
+            shutil.copytree(path, full_path)
+        else:
+            shutil.copy2(path, key)
 
 
 class DockerFileDeploymentStep(DeploymentStep):
@@ -325,19 +347,13 @@ class DockerFileDeploymentStep(DeploymentStep):
         # This step is in docker by definition.
         return True
 
-    def _run_locally(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ):
+    def _run_locally(self):
         # This step is in docker by definition.
         raise RuntimeError("The docker based step can not be performed locally.")
 
-    def _run_in_docker_impl(
-        self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Perform the actual build by calling docker build with specified dockerfile and other options.
-        :param cache_dir: Path of the cache directory.
         :param locally: This is ignored, the dockerfile based step can not be performed locally.
         """
         build_in_docker.run_docker_build(
@@ -353,43 +369,47 @@ class ShellScriptDeploymentStep(DeploymentStep):
     The deployment step class which is a wrapper around some shell script.
     """
 
-    # Path to  the script file that has to be executed during the step.
-    SCRIPT_PATH: pl.Path
-
     def __init__(
         self,
+        deployment: "Deployment",
         architecture: constants.Architecture,
         previous_step: Union[str, "DeploymentStep"] = None,
     ):
         super(ShellScriptDeploymentStep, self).__init__(
-            architecture=architecture, previous_step=previous_step
+            deployment=deployment,
+            architecture=architecture,
+            previous_step=previous_step,
         )
+
+    @property
+    @abc.abstractmethod
+    def script_path(self) -> pl.Path:
+        """
+        Path to  the script file that has to be executed during the step.
+        """
+        pass
 
     @property
     def _tracked_file_globs(self) -> List[pl.Path]:
         # Also add script to the used file collection, so it is included to the checksum calculation.
         script_files = [
-            type(self).SCRIPT_PATH,
+            self.script_path,
             _REL_DEPLOYMENT_STEPS_PATH / "step_runner.sh",
         ]
         return super(ShellScriptDeploymentStep, self)._tracked_file_globs + script_files
 
-    def _get_command_line_args(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ) -> List[str]:
+    def _get_command_line_args(self) -> List[str]:
         """
         Create list with the shell command line arguments that has to execute the shell script.
             Optionally also adds cache path to the shell script as additional argument.
-        :param cache_dir: Path to the cache dir.
         :return: String with shell command that can be executed to needed shell.
         """
 
         # Determine needed shell interpreter.
-        if type(self).SCRIPT_PATH.suffix == ".ps1":
-            command_args = ["powershell", str(type(self).SCRIPT_PATH)]
+        if self.script_path.suffix == ".ps1":
+            command_args = ["powershell", self.script_path]
         else:
-            shell = "/bin/sh"
+            shell = "/bin/bash"
 
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
@@ -399,45 +419,45 @@ class ShellScriptDeploymentStep(DeploymentStep):
             command_args = [
                 shell,
                 str(step_runner_script_path),
-                str(type(self).SCRIPT_PATH),
+                str(self.script_path),
             ]
 
-        # If cache directory is presented, then we pass it as an additional argument to the
+        # Pass cache directory as an additional argument to the
         # script, so it can use the cache too.
-        if cache_dir:
-            command_args.append(str(pl.Path(cache_dir)))
+        command_args.append(str(pl.Path(self.cache_directory)))
+
+        command_args.append(str(self.deployment.output_directory))
 
         return command_args
 
-    def _run_locally(
-        self,
-        cache_dir: Union[str, pl.Path] = None,
-    ):
+    def _run_locally(self):
         """
         Run step locally by running the script on current system.
-        :param cache_dir: Path of the cache directory. If specified, then the script may save or reuse some intermediate
-            results in it.
         """
-        command_args = self._get_command_line_args(cache_dir=cache_dir)
+        command_args = self._get_command_line_args()
+
+        # Copy current environment.
+        env = os.environ.copy()
+
+        if common.IN_CICD:
+            env["IN_CICD"] = "1"
 
         try:
             output = common.run_command(
                 command_args,
+                env=env,
                 debug=True,
             ).decode()
         except subprocess.CalledProcessError as e:
-            raise DeploymentStepError(stdout=e.stdout.decode()) from None
+            raise DeploymentStepError(stdout=e.stdout, stderr=e.stderr) from None
 
         return output
 
-    def _run_in_docker_impl(
-        self, cache_dir: Union[str, pl.Path] = None, locally: bool = False
-    ):
+    def _run_in_docker_impl(self, locally: bool = False):
         """
         Run step in docker. It uses a special logic, which is implemented in 'agent_build/tools/tools.build_in_docker'
         module,that allows to execute custom command inside docker by using 'docker build' command. It differs from
         running just in the container because we can benefit from the docker caching mechanism.
-        :param cache_dir: Path of the cache directory.
         :param locally: If we are already in docker, this has to be set as True, to avoid loop.
         """
 
@@ -483,7 +503,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
             )
 
             # Get command that has to run shell script.
-            command_args = self._get_command_line_args(cache_dir=cache_dir)
+            command_args = self._get_command_line_args()
 
             # Run command in the previously created intermediate image.
             try:
@@ -497,7 +517,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                     debug=True,
                 )
             except build_in_docker.RunDockerBuildError as e:
-                raise DeploymentStepError(stdout=e.stdout)
+                raise DeploymentStepError(stdout=e.stdout, stderr=e.stderr)
 
         finally:
             # Remove intermediate container and image.
@@ -529,6 +549,8 @@ class Deployment:
         self.name = name
         self.architecture = architecture
         self.base_docker_image = base_docker_image
+        self.cache_directory = constants.DEPLOYMENT_CACHE_DIR / self.name
+        self.output_directory = constants.DEPLOYMENT_OUTPUT / self.name
 
         # List with instantiated steps.
         self.steps = []
@@ -538,6 +560,7 @@ class Deployment:
 
         for step_cls in step_classes:
             step = step_cls(
+                deployment=self,
                 architecture=architecture,
                 # specify previous step for the current step.
                 previous_step=previous_step,
@@ -550,6 +573,13 @@ class Deployment:
             raise ValueError(f"The deployment with name: {self.name} already exists.")
 
         ALL_DEPLOYMENTS[self.name] = self
+
+    @property
+    def output_path(self) -> pl.Path:
+        """
+        Path to the directory where the deployment's steps can put their results.
+        """
+        return constants.DEPLOYMENT_OUTPUT / self.name
 
     @property
     def in_docker(self) -> bool:
@@ -569,33 +599,13 @@ class Deployment:
         """
         return self.steps[-1].result_image_name.lower()
 
-    def deploy(
-        self,
-        cache_dir: pl.Path = None,
-    ):
+    def deploy(self):
         """
         Perform the deployment by running all deployment steps.
-
-        :param cache_dir: Cache directory. If specified, all steps of the deployment will use it to
-            save their results in it.
-        :return:
         """
 
         for step in self.steps:
-
-            # If cache is specified, then create separate sub-folder in it for each step.
-            # NOTE: Those sub-folders are used by our special Github-Actions action that caches all such sub-folders to
-            # the Github Actions cache. See more in ".github/actions/perform-deployment"
-            if cache_dir:
-                step_cache_path = cache_dir.absolute() / step.cache_key
-                if not step_cache_path.is_dir():
-                    step_cache_path.mkdir(parents=True)
-            else:
-                step_cache_path = None
-
-            step.run(
-                cache_dir=step_cache_path,
-            )
+            step.run()
 
 
 # Special collection where all created deployments are stored. All of the  deployments are saved with unique name as
@@ -610,11 +620,83 @@ def get_deployment_by_name(name: str) -> Deployment:
 
 # Step that runs small script which installs requirements for the test/dev environment.
 class InstallTestRequirementsDeploymentStep(ShellScriptDeploymentStep):
-    SCRIPT_PATH = _REL_DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
-    USED_FILES = [
-        _REL_AGENT_REQUIREMENT_FILES_PATH / "testing-requirements.txt",
-        _REL_AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
-    ]
+    @property
+    def script_path(self) -> pl.Path:
+        return _REL_DEPLOYMENT_STEPS_PATH / "deploy-test-environment.sh"
+
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        globs = super(InstallTestRequirementsDeploymentStep, self)._tracked_file_globs
+        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "*.txt")
+        return globs
+
+
+_REL_DOCKER_BASE_IMAGE_STEP_PATH = _REL_DEPLOYMENT_STEPS_PATH / "docker-base-images"
+_REL_AGENT_BUILD_DOCKER_PATH = _REL_AGENT_BUILD_PATH / "docker"
+
+
+_REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
+    _REL_DEPLOYMENT_STEPS_PATH / "build_base_docker_image"
+)
+
+
+class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
+    """
+    This deployment step is responsible for the building of the base image of the agent docker images.
+    It runs shell script that builds that base image and pushes it to the local registry that runs in container.
+    After push, registry is shut down, but it's data root is preserved. This step puts this
+    registry data root to the output of the deployment, so the builder of the final agent docker image can access this
+    output and fetch base images from registry root (it needs to start another registry and mount existing registry
+    root).
+    """
+
+    # Suffix of that python image, that is used as the base image for our base image.
+    # has to match one of the names from the 'agent_build/tools/environment_deployments/steps/build_base_docker_image'
+    # directory, except 'build_base_images_common_lib.sh', it is a helper library.
+    BASE_DOCKER_IMAGE_TAG_SUFFIX: str
+
+    @property
+    def script_path(self) -> pl.Path:
+        """
+        Resolve path to the base image builder script which depends on suffix on the base image.
+        """
+        return (
+            _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP
+            / f"{type(self).BASE_DOCKER_IMAGE_TAG_SUFFIX}.sh"
+        )
+
+    @property
+    def _tracked_file_globs(self) -> List[pl.Path]:
+        globs = super(BuildDockerBaseImageStep, self)._tracked_file_globs
+        # Track the dockerfile...
+        globs.append(_REL_AGENT_BUILD_DOCKER_PATH / "Dockerfile.base")
+        # and helper lib for base image builder.
+        globs.append(
+            _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP / "build_base_images_common_lib.sh"
+        )
+        # .. and requirement files...
+        globs.append(
+            _REL_AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt"
+        )
+        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt")
+        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "main-requirements.txt")
+        return globs
+
+
+class BuildBusterDockerBaseImageStep(BuildDockerBaseImageStep):
+    """
+    Subclass that builds agent's base docker image based on debian buster (slim)
+    """
+
+    BASE_DOCKER_IMAGE_TAG_SUFFIX = "slim"
+
+
+class BuildAlpineDockerBaseImageStep(BuildDockerBaseImageStep):
+    """
+    Subclass that builds agent's base docker image based on alpine.
+    """
+
+    BASE_DOCKER_IMAGE_TAG_SUFFIX = "alpine"
 
 
 # Create common test environment that will be used by GitHub Actions CI

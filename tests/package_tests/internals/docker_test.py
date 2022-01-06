@@ -56,6 +56,8 @@ def _test(
             f"SCALYR_API_KEY={scalyr_api_key}",
             "-v",
             "/var/run/docker.sock:/var/scalyr/docker.sock",
+            "-v",
+            "/var/lib/docker/containers:/var/lib/docker/containers",
             "--platform",
             architecture.as_docker_platform.value,
             image_name,
