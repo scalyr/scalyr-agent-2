@@ -1,0 +1,11 @@
+-r ./main-requirements.txt
+-r ./compression-requirements.txt
+
+# Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
+# default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
+# end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
+# option)
+yappi==1.2.3
+pympler==0.8
+
+docker==4.1.0
