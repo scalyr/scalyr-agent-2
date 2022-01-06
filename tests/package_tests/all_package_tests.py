@@ -247,6 +247,7 @@ class DockerImagePackageTest(Test):
                         image_name=local_registry_image_name,
                         architecture=arch,
                         scalyr_api_key=scalyr_api_key,
+                        name_suffix=name_suffix
                     )
                 else:
                     docker_test.run(

@@ -194,6 +194,8 @@ class LogVerifier:
                     error_message = f"The check '{line_check.description}' has failed."
                     if message:
                         error_message = message
+
+                    error_message = f"{error_message}. Whole log: {self._content}"
                     raise TestFail(error_message)
 
                 # Leave the check for the next iteration to retry it once more.
@@ -276,11 +278,77 @@ class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
     def perform(
         self, new_text, whole_log_text
     ) -> Union[LogVerifierCheckResult, Tuple[LogVerifierCheckResult, str]]:
-        for line in io.StringIO(new_text):
-            if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*", line):
-                return (
-                    LogVerifierCheckResult.FAIL,
-                    f"Agent log contains error line : {line}",
-                )
 
-        return LogVerifierCheckResult.SUCCESS
+        new_lines = io.StringIO(new_text).readlines()
+
+        error_line_pattern = re.compile(rf"{AGENT_LOG_LINE_TIMESTAMP} ERROR .*")
+
+        def get_stack_trace_lines():
+            """
+            Closure that keeps iterating through lines in order to get lines of the expected traceback.
+            """
+            nonlocal i
+
+            result = []
+
+            i += 1
+            while i < len(new_lines):
+                _line = new_lines[i]
+
+                # We know that this is a traceback line because it does not start with regular log message preamble.
+                if re.match(rf"{AGENT_LOG_LINE_TIMESTAMP} .*", _line):
+                    break
+
+                result.append(_line)
+                i += 1
+
+            return result
+
+        i = 0
+
+        ignored_errors = []
+
+        while i < len(new_lines):
+            line = new_lines[i]
+            if error_line_pattern.match(line):
+
+                # There is an issue with dns resolution on GitHub actions side, so we skip some of the error messages.
+                connection_error_mgs = '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
+
+                to_fail = True
+                stack_trace = ""
+
+                if connection_error_mgs in line:
+                    stack_trace_lines = get_stack_trace_lines()
+                    stack_trace = "".join(stack_trace_lines)
+
+                    # It the traceback that follows after error message contains particular error message,
+                    # then we are ok with that.
+                    errors_to_ignore = [
+                        "socket.gaierror: [Errno -3] Try again",
+                        "socket.gaierror: [Errno -3] Temporary failure in name resolution"
+                    ]
+                    for error_to_ignore in errors_to_ignore:
+                        if error_to_ignore in stack_trace_lines[-1]:
+                            to_fail = False
+                            whole_error = "".join([line, stack_trace])
+                            ignored_errors.append(whole_error)
+                            break
+
+                if to_fail:
+                    return (
+                        LogVerifierCheckResult.FAIL,
+                        f"Agent log contains error line : {line}, traceback: {stack_trace}",
+                    )
+
+            i += 1
+
+        message = None
+        # Add additional message with ignored errors.
+        if ignored_errors:
+            message = "The next error lines have been ignored:\n"
+
+            for i, error in enumerate(ignored_errors):
+                message = f"{message}{i}:\n{error}\n"
+
+        return LogVerifierCheckResult.SUCCESS, message
