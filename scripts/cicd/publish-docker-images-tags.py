@@ -116,12 +116,20 @@ def main(
             # NOTE: We expect that this script runs right after the GitHub action job that has pushed
             # all needed images with a special tag "_temp_release", so we just can use the
             # "buildx imagetools" command to "retag" it.
+
+            # Also add distribution related suffix to the temporary tag.
+            temp_release_tag = "_temp_release"
+            if builder.name.endswith("alpine"):
+                temp_release_tag = f"{temp_release_tag}-alpine"
+            else:
+                temp_release_tag = f"{temp_release_tag}-buster"
+
             subprocess.check_call([
                 "docker",
                 "buildx",
                 "imagetools",
                 "create",
-                f"{full_image_name}:_temp_release",
+                f"{full_image_name}:{temp_release_tag}",
                 *tag_options
             ])
 
@@ -133,6 +141,7 @@ if __name__ == '__main__':
     parser.add_argument("--git-ref-type")
     parser.add_argument("--git-commit-sha", required=False)
     parser.add_argument("--registry", required=False)
+    parser.add_argument("--user", required=False)
 
     args = parser.parse_args()
     main(
@@ -140,4 +149,5 @@ if __name__ == '__main__':
         git_ref_type=args.git_ref_type,
         git_commit_sha=args.git_commit_sha,
         registry=args.registry,
+        registry_user=args.user,
     )
