@@ -1,4 +1,4 @@
-name: Build Agent Images
+name: Publish Agent Images
 
 on:
   workflow_call:
