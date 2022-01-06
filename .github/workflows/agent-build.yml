@@ -85,11 +85,11 @@ jobs:
 
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/improve-caching' || github.ref_type == 'tag' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
     needs:
       - test-images
 
-    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@improve-caching
+    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
