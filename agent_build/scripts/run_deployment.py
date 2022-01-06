@@ -51,7 +51,7 @@ _SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 sys.path.append(str(_SOURCE_ROOT))
 
 from agent_build.tools.environment_deployments import deployments
-from agent_build import package_builders
+from agent_build import package_builders  # noqa: F401
 from agent_build.tools import common
 
 
