@@ -21,6 +21,7 @@ from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import re
+import copy
 
 import scalyr_agent.util as scalyr_util
 
@@ -299,3 +300,102 @@ class MonitorsManagerTest(ScalyrTestCase):
         # set_daemon=True obviates the following (saves a few seconds in cleanup):
         test_manager.stop_manager(wait_on_join=False)
         fake_clock.advance_time(increment_by=poll_interval)
+
+    def test_dynamic_monitor_adding_and_removal(self):
+        base_monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.test_monitor",
+            "id": "1",
+            "gauss_mean": 0,
+        }
+
+        test_manager, global_config = ScalyrTestUtils.create_test_monitors_manager(
+            [
+                base_monitor_config,
+            ],
+            [],
+        )
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 0)
+
+        def augment_user_agent(fragments):
+            pass
+
+        test_manager.set_user_agent_augment_callback(augment_user_agent)
+        test_manager.start_manager()
+
+        # 1. Initially we start with a single statically defined monitor in the config
+        self.assertEqual(len(test_manager.monitors), 1)
+        self.assertEqual(test_manager.monitors, test_manager.running_monitors)
+        self.assertEqual(
+            test_manager.monitors[0].uid, "scalyr_agent.builtin_monitors.test_monitor-1"
+        )
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 1)
+        self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
+
+        # 2. Then we dynamically add 2 more
+        monitor_config = copy.deepcopy(base_monitor_config)
+        monitor_config["id"] = "2"
+        test_manager.add_monitor(
+            monitor_config=monitor_config, global_config=global_config
+        )
+
+        self.assertEqual(len(test_manager.monitors), 2)
+        self.assertEqual(test_manager.monitors, test_manager.running_monitors)
+        self.assertEqual(
+            test_manager.monitors[0].uid, "scalyr_agent.builtin_monitors.test_monitor-1"
+        )
+        self.assertEqual(
+            test_manager.monitors[1].uid, "scalyr_agent.builtin_monitors.test_monitor-2"
+        )
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 2)
+        self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
+
+        monitor_config = copy.deepcopy(base_monitor_config)
+        monitor_config["id"] = "3"
+        test_manager.add_monitor(
+            monitor_config=monitor_config, global_config=global_config
+        )
+
+        self.assertEqual(len(test_manager.monitors), 3)
+        self.assertEqual(test_manager.monitors, test_manager.running_monitors)
+        self.assertEqual(
+            test_manager.monitors[0].uid, "scalyr_agent.builtin_monitors.test_monitor-1"
+        )
+        self.assertEqual(
+            test_manager.monitors[1].uid, "scalyr_agent.builtin_monitors.test_monitor-2"
+        )
+        self.assertEqual(
+            test_manager.monitors[2].uid, "scalyr_agent.builtin_monitors.test_monitor-3"
+        )
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 3)
+        self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
+
+        # 3. Now we dynamically remove and stop monitor with id "2"
+        test_manager.remove_monitor(
+            monitor_uid="scalyr_agent.builtin_monitors.test_monitor-2"
+        )
+
+        self.assertEqual(len(test_manager.monitors), 2)
+        self.assertEqual(test_manager.monitors, test_manager.running_monitors)
+        self.assertEqual(
+            test_manager.monitors[0].uid, "scalyr_agent.builtin_monitors.test_monitor-1"
+        )
+        self.assertEqual(
+            test_manager.monitors[1].uid, "scalyr_agent.builtin_monitors.test_monitor-3"
+        )
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 2)
+        self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
+
+        test_manager.stop_manager(wait_on_join=True)
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))

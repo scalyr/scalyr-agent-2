@@ -267,6 +267,13 @@ class MonitorsManager(StoppableThread):
         """
         return self.__monitors
 
+    @property
+    def running_monitors(self):
+        """
+        Returns the list of all the running monitors.
+        """
+        return self.__running_monitors
+
     @staticmethod
     def __create_monitors(configuration, platform_controller):
         """Creates instances of the monitors that should be run based on the contents of the configuration file
