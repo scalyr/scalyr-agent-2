@@ -362,7 +362,6 @@ class MonitorsManager(StoppableThread):
             monitor.start()
 
             self.__running_monitors.append(monitor)
-            self.__monitors.append(monitor)
         else:
             log.warn(
                 "Could not start monitor %s because its log could not be opened",
@@ -393,6 +392,7 @@ class MonitorsManager(StoppableThread):
             monitor.log_config.update(log_config)
 
         with self.__lock:
+            self.__monitors.append(monitor)
             monitor = self.__start_monitor(monitor=monitor)
 
         return monitor
