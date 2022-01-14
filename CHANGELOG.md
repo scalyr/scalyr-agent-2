@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.26 "TBW" - Dec 17, 2021
+## 2.1.26 "Yavin" - Jan 12, 2022
 
 <!---
-Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 12, 2022 23:04 -0800
 --->
 
 Improvements:

@@ -32,6 +32,7 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
+from agent_build.tools import constants
 from agent_build import package_builders
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
@@ -97,20 +98,17 @@ if __name__ == "__main__":
 
             package_parser.add_argument(
                 "--registry",
-                action="append",
-                help="Registry (or repository) name where to push the result image. Can be used multiple times.",
+                help="Registry (or repository) name where to push the result image.",
+            )
+
+            package_parser.add_argument(
+                "--user", help="User name prefix for the image name."
             )
 
             package_parser.add_argument(
                 "--tag",
                 action="append",
                 help="The tag that will be applied to every registry that is specified. Can be used multiple times.",
-            )
-
-            package_parser.add_argument(
-                "--reuse-local-cache",
-                action="store_true",
-                help="Enable Docker image cache re-use (e.g. when building locally and not on CI).",
             )
 
             package_parser.add_argument(
@@ -128,15 +126,21 @@ if __name__ == "__main__":
                 "--push", action="store_true", help="Push the result docker image."
             )
 
-            package_parser.add_argument("--cache-from-dir", dest="cache_from_dir")
-            package_parser.add_argument("--cache-to-dir", dest="cache_to_dir")
+            package_parser.add_argument(
+                "--coverage",
+                dest="coverage",
+                action="store_true",
+                default=False,
+                help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+            )
 
             package_parser.add_argument(
-                "--files-checksum",
-                dest="files_checksum",
-                action="store_true",
-                help="Only used in CI/CD. Prints checksum of files that are used to create the base of the docker "
-                "image. Used to save docker buildx cache in the CI/CD's cache to reuse it in future.",
+                "--platforms",
+                dest="platforms",
+                default=",".join(
+                    constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING
+                ),
+                help="Comma delimited list of platforms to build (and optionally push) the image for.",
             )
 
         else:
@@ -162,33 +166,24 @@ if __name__ == "__main__":
     builder_name = args.package_name
     package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
 
-    if not args.files_checksum:
-        logging.info(f"Build package '{package_builder.PACKAGE_TYPE.value}'.")
-
     # If that's a docker image builder handle their arguments too.
     if isinstance(package_builder, package_builders.ContainerPackageBuilder):
 
         if args.only_filesystem_tarball:
             # Build only image filesystem.
-            package_builder.build(
-                output_path=pl.Path(args.only_filesystem_tarball), locally=args.locally
+            package_builder.build_filesystem_tarball(
+                output_path=pl.Path(args.only_filesystem_tarball)
             )
             exit(0)
 
-        if args.files_checksum:
-            checksum = package_builder.used_files_checksum
-            print(checksum)
-            exit(0)
-
-        package_builder.build_image(
+        package_builder.build(
             push=args.push,
-            registries=args.registry or [],
+            registry=args.registry,
+            user=args.user,
             tags=args.tag or [],
-            cache_from_path=args.cache_from_dir,
-            cache_to_path=args.cache_to_dir,
-            reuse_local_cache=args.reuse_local_cache,
-            remove_image_name_prefix=args.remove_image_name_prefix,
+            use_test_version=args.coverage,
+            platforms=args.platforms.split(","),
         )
         exit(0)
 
-    package_builder.build(output_path=pl.Path(args.output_dir), locally=args.locally)
+    package_builder.build(locally=args.locally)
