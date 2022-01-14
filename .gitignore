@@ -28,6 +28,7 @@ scalyr-agent-2-*/
 tests/package_tests/credentials.json
 !.github/actions/perform-deployment/dist
 .github/actions/perform-deployment/node_modules
+/agent_build_output
 
 # Installer logs
 pip-log.txt
