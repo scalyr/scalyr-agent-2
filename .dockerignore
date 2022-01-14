@@ -1,5 +1,6 @@
 debug
 build
+/agent_build_output
 .vagrant
 .idea
 .run

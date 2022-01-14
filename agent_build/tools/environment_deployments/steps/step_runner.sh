@@ -25,6 +25,7 @@
 
 STEP_SCRIPT_PATH="$1"
 CACHE_DIR="$2"
+STEP_OUTPUT_PATH="$3"
 
 set -e
 
@@ -64,22 +65,10 @@ log "=========== Run Deployment Step Script'$(basename "$STEP_SCRIPT_PATH")' ===
 
 log "SOURCE_ROOT: ${SOURCE_ROOT}"
 
-# Check if the cache directory is specified. If it doesn't, then the caching has to be disabled.
-if [ -n "$CACHE_DIR" ]; then
-  if [ ! -d "$CACHE_DIR" ]; then
-    mkdir -p "${CACHE_DIR}"
-  fi
-  log "Use directory ${CACHE_DIR} as cache."
-  use_cache=true
-else
-  use_cache=false
-fi
-
-
 
 # Function that restores data from cache if exists.
 restore_from_cache() {
-  if ! $use_cache ; then
+  if [ -z "$IN_CICD" ]; then
     log "Cache disabled."
     return 0
   fi
@@ -109,7 +98,7 @@ save_to_cache() {
   cache_key=$1
   path=$2
 
-  if ! $use_cache ; then
+  if [ -z "$IN_CICD" ]; then
     log "Cache disabled"
     return 0
   fi
@@ -137,6 +126,7 @@ save_to_cache() {
 
 # Export useful variables, so they can be used by the script.
 export SOURCE_ROOT
+export STEP_OUTPUT_PATH
 
 # Run the script.
 . "${STEP_SCRIPT_PATH}"

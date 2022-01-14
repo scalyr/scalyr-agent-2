@@ -7,39 +7,10 @@ Agent in a container with Docker-specific features turned on.
 
 In particular, the key integration features are:
 
-  * Send all logs received from other local containers via syslog to Scalyr
+  * Send all logs received from other local containers to Scalyr
   * Automatically collect and report metrics to Scalyr from all local containers
 
-## Building
-
-We support two Docker images:
-- **scalyr-docker-agent-json**: uploads Docker logs captured by the Docker JSON File logging driver.
-- **scalyr-docker-agent-syslog**: uploads Docker logs captured by the Docker Syslog File logging driver.
-
-We recommend customers use the **scalyr-docker-agent-json** image.
-
-Use the following commands to build the respective images:
-
-#### scalyr-docker-agent-json
-
-    cd scalyr-agent-2/docker
-    python ../build_package.py --no-versioned-file-name docker_json_builder
-    ./scalyr-docker-agent-json --extract-packages
-    docker build -t scalyr/scalyr-docker-agent-json .
-
-#### scalyr-docker-agent-syslog
-
-    cd scalyr-agent-2/docker
-    python ../build_package.py --no-versioned-file-name docker_syslog_builder
-    ./scalyr-docker-agent-syslog --extract-packages
-    docker build -t scalyr/scalyr-docker-agent-syslog .
-
-#### scalyr-k8s-agent
-
-    cd scalyr-agent-2/docker
-    python ../build_package.py --no-versioned-file-name k8s_builder
-    ./scalyr-k8s-agent --extract-packages
-    docker build -t scalyr/scalyr-k8s-agent -f Dockerfile.k8s .
+If you want to build such image, please see [BUILD](../BUILD.md)
 
 ## Running the Scalyr Agent in Docker
 

@@ -17,6 +17,10 @@ import enum
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
+AGENT_BUILD_OUTPUT = SOURCE_ROOT / "agent_build_output"
+PACKAGE_BUILDER_OUTPUT = AGENT_BUILD_OUTPUT / "package"
+DEPLOYMENT_OUTPUT = AGENT_BUILD_OUTPUT / "deployment"
+DEPLOYMENT_CACHE_DIR = AGENT_BUILD_OUTPUT / "deployment_cache"
 
 
 class DockerPlatform(enum.Enum):
@@ -66,3 +70,16 @@ class PackageType(enum.Enum):
     DOCKER_API = "docker-api"
     K8S = "k8s"
     MSI = "msi"
+
+
+# CPU architectures or platforms that has to be supported by the Agent docker images,
+AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
+    DockerPlatform.AMD64,
+    DockerPlatform.ARM64,
+    DockerPlatform.ARMV7,
+]
+
+AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING = []
+
+for plat in AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
+    AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING.append(plat.value)
