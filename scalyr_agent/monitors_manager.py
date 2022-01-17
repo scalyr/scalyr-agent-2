@@ -41,8 +41,11 @@ import six
 
 log = scalyr_logging.getLogger(__name__)
 
-# Holds reference to the currently active MonitorsManager instance (singleton)
+# Holds reference to the currently active MonitorsManager instance (singleton). Reference to this
+# instance should be obtained using "get_monitors_manager()" function.
 MONITORS_MANAGER_INSTANCE = None
+
+# Lock which is used when manipulating the value of MONITORS_MANAGER_INSTANCE variable.
 MONITORS_MANAGER_INSTANCE_LOCK = threading.Lock()
 
 
