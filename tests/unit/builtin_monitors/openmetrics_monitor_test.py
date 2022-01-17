@@ -125,6 +125,79 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         )
 
     @requests_mock.Mocker()
+    def test_gather_sample_success_mock_data_1_extra_fields(self, m):
+        m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "extra_fields": JsonObject({"foo1": "bar1", "foo2": "bar2"}),
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.emit_value.call_count, 5)
+
+        mock_logger.emit_value.assert_any_call(
+            "http_requests_total",
+            3,
+            extra_fields={
+                "method": "post",
+                "code": "400",
+                "timestamp": 1395066363000,
+                "foo1": "bar1",
+                "foo2": "bar2",
+            },
+        )
+        mock_logger.emit_value.assert_any_call(
+            "some.metric.name1",
+            1555,
+            extra_fields={"foo1": "bar1", "foo2": "bar2"},
+        )
+        mock_logger.emit_value.assert_any_call(
+            "some.metric.name2",
+            1556,
+            extra_fields={"timestamp": 123456789, "foo1": "bar1", "foo2": "bar2"},
+        )
+
+    @requests_mock.Mocker()
+    def test_gather_sample_success_mock_data_1_additional_request_kwargs(self, m):
+        m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "timeout": 1,
+            "ca_file": "/tmp/cafile",
+            "verify_https": True,
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+
+        request_kwargs = monitor._get_request_kwargs(url="https://fooo")
+        self.assertEqual(request_kwargs, {"verify": "/tmp/cafile"})
+
+        request_kwargs = monitor._get_request_kwargs(url="http://fooo")
+        self.assertEqual(request_kwargs, {})
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "timeout": 1,
+            "verify_https": True,
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+
+        request_kwargs = monitor._get_request_kwargs(url="https://fooo")
+        self.assertEqual(
+            request_kwargs,
+            {
+                "verify": True,
+            },
+        )
+
+    @requests_mock.Mocker()
     def test_gather_sample_success_mock_data_jmx_exporter_kafka_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_3, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
