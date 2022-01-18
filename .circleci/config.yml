@@ -2259,7 +2259,7 @@ workflows:
    jobs:
      - unittest-27:
          context: scalyr-agent
-     - unittest-35:
+     - unittest-36:
          context: scalyr-agent
      - unittest-35-osx:
          context: scalyr-agent
@@ -2406,7 +2406,7 @@ workflows:
          context: scalyr-agent
      - unittest-27:
          context: scalyr-agent
-     - unittest-35:
+     - unittest-36:
          context: scalyr-agent
      - unittest-35-osx:
          context: scalyr-agent
