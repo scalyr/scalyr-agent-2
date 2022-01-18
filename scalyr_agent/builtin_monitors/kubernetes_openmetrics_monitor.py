@@ -716,10 +716,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
         )
 
-        for scrape_url in to_remove_scrape_urls:
+        for scrape_url in sorted(to_remove_scrape_urls):
             self.__remove_monitor(scrape_url=scrape_url)
 
-        for scrape_url in to_add_scrape_urls:
+        for scrape_url in sorted(to_add_scrape_urls):
             scrape_config, pod = scrape_configs[scrape_url]
             self.__add_monitor(scrape_config=scrape_config, pod=pod)
 
