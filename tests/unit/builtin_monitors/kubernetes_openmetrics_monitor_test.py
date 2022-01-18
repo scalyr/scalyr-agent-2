@@ -25,6 +25,7 @@ import mock
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     KubernetesOpenMetricsMonitor,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
+    PROMETHEUS_ANNOTATION_SCAPE_PATH,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -55,6 +56,17 @@ for index, pod in enumerate(MOCK_KUBELET_QUERY_PODS_RESPONSE_NO_ARM_EXPORTER["it
     if pod["metadata"]["name"] == "arm-exporter-sv7rk":
         break
 MOCK_KUBELET_QUERY_PODS_RESPONSE_NO_ARM_EXPORTER["items"].pop(index)
+
+MOCK_KUBELET_QUERY_PODS_RESPONSE_ARM_EXPORTER_NEW_PATH = copy.deepcopy(
+    MOCK_KUBELET_QUERY_PODS_RESPONSE
+)
+for index, pod in enumerate(
+    MOCK_KUBELET_QUERY_PODS_RESPONSE_ARM_EXPORTER_NEW_PATH["items"]
+):
+    if pod["metadata"]["name"] == "arm-exporter-sv7rk":
+        pod["metadata"]["annotations"][
+            PROMETHEUS_ANNOTATION_SCAPE_PATH
+        ] = "/test/new/path"
 
 
 class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
@@ -458,6 +470,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
 
         mock_log_watcher.reset_mock()
         mock_add_monitor.reset_mock()
+        mock_monitors_manager.remove_monitor.reset_mock()
 
         monitor.gather_sample()
         self.assertTrue(monitor._KubernetesOpenMetricsMonitor__static_monitors_started)
@@ -474,7 +487,40 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_arm-exporter-sv7rk"
         )
 
-        # 3. And now API returns no pods which means all the monitors should be removed
+        # 3. Pod comes back but with different scrape url
+        mock_kubelet.query_pods = mock.Mock(
+            return_value=MOCK_KUBELET_QUERY_PODS_RESPONSE_ARM_EXPORTER_NEW_PATH
+        )
+
+        mock_log_watcher.reset_mock()
+        mock_add_monitor.reset_mock()
+        mock_monitors_manager.remove_monitor.reset_mock()
+
+        monitor.gather_sample()
+        self.assertTrue(monitor._KubernetesOpenMetricsMonitor__static_monitors_started)
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__static_running_monitors), 0
+        )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 3
+        )
+        self.assertEqual(mock_monitors_manager.add_monitor.call_count, 1)
+        self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 0)
+
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
+                "id"
+            ],
+            "node1_arm-exporter-sv7rk",
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
+                "url"
+            ],
+            "http://10.5.5.5.141:9243/test/new/path",
+        )
+
+        # 4. And now API returns no pods which means all the monitors should be removed
         mock_kubelet.query_pods = mock.Mock(return_value={})
 
         mock_log_watcher.reset_mock()
@@ -490,11 +536,14 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 0
         )
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 0)
-        self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 2)
+        self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 3)
 
         mock_monitors_manager.remove_monitor.assert_any_call(
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_java-hello-world-7596684fcd-jwqcp"
         )
         mock_monitors_manager.remove_monitor.assert_any_call(
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_node-exporter-bhhvk"
+        )
+        mock_monitors_manager.remove_monitor.assert_any_call(
+            "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_arm-exporter-sv7rk"
         )
