@@ -21,3 +21,7 @@ collect_ignore = ["setup.py"]
 if sys.version_info[0] < 3:
     collect_ignore.append("tests/unit/builtin_monitors/openmetrics_monitor_test.py")
     collect_ignore.append("builtin_monitors/openmetrics_monitor_test.py")
+    collect_ignore.append(
+        "tests/unit/builtin_monitors/kubernetes_openmetrics_monitor_test.py"
+    )
+    collect_ignore.append("builtin_monitors/kubernetes_openmetrics_monitor_test.py")
