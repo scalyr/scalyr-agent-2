@@ -18,7 +18,7 @@ import sys
 
 # We ignore Python 3 only tests and modules under Python 2
 collect_ignore = ["setup.py"]
-if sys.version_info[0] < 3:
+if sys.version_info[0] < (3, 6, 0):
     collect_ignore.append("tests/unit/builtin_monitors/openmetrics_monitor_test.py")
     collect_ignore.append("builtin_monitors/openmetrics_monitor_test.py")
     collect_ignore.append(
