@@ -338,6 +338,10 @@ KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
     "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor"
 )
 
+DEFAULT_SCRAPE_SCHEME = "http"
+DEFAULT_SCRAPE_PORT = None
+DEFAULT_SCRAPE_PATH = "/metrics"
+
 # Annotation related constants
 PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
 PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
@@ -881,18 +885,25 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             != "true"
         ):
             self._logger.debug(
-                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scraping enabled, skipping it..."
+                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scraping enabled, skipping it... (pod annotations={pod.annotations})"
             )
 
             return None
 
         self._logger.debug(
-            f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled"
+            f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled (pod annotations={pod.annotations})"
         )
 
-        scrape_scheme = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_SCHEME, "http")
-        scrape_port = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PORT, None)
-        scrape_path = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PATH, "/metrics")
+        scrape_scheme = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
+        )
+        scrape_port = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_PORT, DEFAULT_SCRAPE_PORT
+        )
+        scrape_path = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_PATH, DEFAULT_SCRAPE_PATH
+        )
+
         node_ip = pod.ips[0] if pod.ips else None
         verify_https = (
             pod.annotations.get(
