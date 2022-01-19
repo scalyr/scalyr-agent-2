@@ -493,6 +493,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Gets the node name of the node running the agent from downward API
         """
+        if not compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME"):
+            self._logger.warn(
+                "SCALYR_K8S_NODE_NAME environment variable is not set, monitor will "
+                "not work correctly."
+            )
+
         return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
 
     def __get_monitor_config_and_log_config(
