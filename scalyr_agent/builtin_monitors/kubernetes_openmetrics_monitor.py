@@ -881,7 +881,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             != "true"
         ):
             self._logger.debug(
-                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scrapin enabled, skipping it..."
+                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scraping enabled, skipping it..."
             )
 
             return None
