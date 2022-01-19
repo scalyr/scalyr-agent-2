@@ -36,6 +36,8 @@ __all__ = ["KubernetesOpenMetricsMonitorTestCase"]
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(BASE_DIR, "../fixtures/kubernetes_openmetrics_responses")
 
+MOCK_AGENT_LOG_PATH = os.path.join("/data", "agent")
+
 MOCK_CHECK_CONNECTIVITY = mock.Mock()
 MOCK_CHECK_CONNECTIVITY.status_code = 200
 
@@ -75,7 +77,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -115,7 +117,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "verify_https": False,
         }
         self.assertEqual(dict(monitor_config), dict(expected_monitor_config))
-        self.assertEqual(log_config, {"path": "/data/agent/foo.log"})
+        self.assertEqual(
+            log_config, {"path": os.path.join(MOCK_AGENT_LOG_PATH, "foo.log")}
+        )
 
     def test_schedule_static_monitors_static_monitors_disabled(self):
         # 1. Static monitors are disabled
@@ -125,7 +129,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scrape_kubernetes_api_cadvisor_metrics": False,
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -157,7 +161,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scrape_kubernetes_api_cadvisor_metrics": True,
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -204,7 +208,10 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             force_add=True,
             log_config={
                 "parser": "agent-metrics",
-                "path": "/data/agent/openmetrics_monitor-node1-kubernetes-api-metrics.log",
+                "path": os.path.join(
+                    MOCK_AGENT_LOG_PATH,
+                    "openmetrics_monitor-node1-kubernetes-api-metrics.log",
+                ),
             },
             monitor_name="openmetrics_monitor",
         )
@@ -212,7 +219,10 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             force_add=True,
             log_config={
                 "parser": "agent-metrics",
-                "path": "/data/agent/openmetrics_monitor-node1-kubernetes-api-cadvisor-metrics.log",
+                "path": os.path.join(
+                    MOCK_AGENT_LOG_PATH,
+                    "openmetrics_monitor-node1-kubernetes-api-cadvisor-metrics.log",
+                ),
             },
             monitor_name="openmetrics_monitor",
         )
@@ -233,13 +243,19 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             mock_monitors_manager.add_monitor.call_args_list[1][1]["log_config"][
                 "path"
             ],
-            "/data/agent/openmetrics_monitor-node1-kubernetes-api-metrics.log",
+            os.path.join(
+                MOCK_AGENT_LOG_PATH,
+                "openmetrics_monitor-node1-kubernetes-api-metrics.log",
+            ),
         )
         self.assertEqual(
             mock_monitors_manager.add_monitor.call_args_list[2][1]["log_config"][
                 "path"
             ],
-            "/data/agent/openmetrics_monitor-node1-kubernetes-api-cadvisor-metrics.log",
+            os.path.join(
+                MOCK_AGENT_LOG_PATH,
+                "openmetrics_monitor-node1-kubernetes-api-cadvisor-metrics.log",
+            ),
         )
 
     def test_schedule_dynamic_monitors_no_pods_found(self):
@@ -249,7 +265,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scrape_kubernetes_api_cadvisor_metrics": False,
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -294,7 +310,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scrape_kubernetes_api_cadvisor_metrics": False,
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -344,7 +360,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "scrape_kubernetes_api_cadvisor_metrics": False,
         }
         global_config = mock.Mock()
-        global_config.agent_log_path = "/data/agent"
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         mock_logger = mock.Mock()
 
         monitor = KubernetesOpenMetricsMonitor(
@@ -405,7 +421,10 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             force_add=True,
             log_config={
                 "parser": "agent-metrics",
-                "path": "/data/agent/openmetrics_monitor-node1-java-hello-world-7596684fcd-jwqcp.log",
+                "path": os.path.join(
+                    MOCK_AGENT_LOG_PATH,
+                    "openmetrics_monitor-node1-java-hello-world-7596684fcd-jwqcp.log",
+                ),
             },
             monitor_name="openmetrics_monitor",
         )
@@ -413,7 +432,10 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             force_add=True,
             log_config={
                 "parser": "agent-metrics",
-                "path": "/data/agent/openmetrics_monitor-node1-arm-exporter-sv7rk.log",
+                "path": os.path.join(
+                    MOCK_AGENT_LOG_PATH,
+                    "openmetrics_monitor-node1-arm-exporter-sv7rk.log",
+                ),
             },
             monitor_name="openmetrics_monitor",
         )
@@ -421,7 +443,10 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             force_add=True,
             log_config={
                 "parser": "agent-metrics",
-                "path": "/data/agent/openmetrics_monitor-node1-node-exporter-bhhvk.log",
+                "path": os.path.join(
+                    MOCK_AGENT_LOG_PATH,
+                    "openmetrics_monitor-node1-node-exporter-bhhvk.log",
+                ),
             },
             monitor_name="openmetrics_monitor",
         )
