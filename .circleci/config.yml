@@ -1302,7 +1302,7 @@ jobs:
       - run:
           name: Run Tests (with coverage)
           command: |
-            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-api 150
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-api 220
       - run:
           name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
           command: |
