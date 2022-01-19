@@ -821,46 +821,61 @@ jobs:
           python_version: "3.5"
           tox_target: "py3.5-unit-tests"
 
-  unittest-35-osx:
+  unittest-37-osx:
     working_directory: ~/scalyr-agent-2
     macos:
-      xcode: "11.7.0"
+      xcode: "13.2.1"
     environment:
-      PYTHON: 3.5.6
-      # Updating homebrew is slow
+      PYTHON: 3.7.10
+      # Updating homebrew is slow so we skip it
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - checkout
       - run:
-          name: install pyenv
+          name: Install pyenv
           shell: bash
           command: |
             brew install pyenv
       - restore_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          name: Restore pyenv cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
       - run:
           name: Install Python
           command: |
-            pyenv install $PYTHON -s
+            # For Python < 3.8 we need a workaround so the install doesn't fail
+            # CFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix bzip2)/include -I$(brew --prefix readline)/include -I$(xcrun --show-sdk-path)/usr/include"
+            # LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix bzip2)/lib"
+            # pyenv install --patch "$PYTHON" < <(curl -sSL https://github.com/python/cpython/commit/8ea6353.patch\?full_index\=1)
+            pyenv install "$PYTHON" -s
+      - save_cache:
+          name: Save pyenv cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
+          paths:
+            - ~/.pyenv
+      - restore_cache:
+          name: Restore pip cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
       - run:
           name: Install Dependencies
           command: |
+            hash -r
             eval "$(pyenv init --path)"
             pyenv local $PYTHON
             python -m pip install virtualenv
             python -m virtualenv venv
+            ./venv/bin/pip install --upgrade pip
             ./venv/bin/pip install "tox==<< pipeline.parameters.default_tox_version >>"
       - run:
-          name: Run Unit Tests under Python 3.5
+          name: Run Unit Tests
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
-            tox -epy3.5-unit-tests
+            tox -epy3.7-unit-tests
       - save_cache:
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.5-osx-venv-{{ checksum "dev-requirements.txt" }}
+          name: Save pip cache
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
           paths:
             - ~/.cache/pip
-            - ~/.pyenv
       - slack/status:
           fail_only: true
           only_for_branches: master
@@ -2261,7 +2276,7 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-     - unittest-35-osx:
+     - unittest-37-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent
@@ -2408,7 +2423,7 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-     - unittest-35-osx:
+     - unittest-37-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent

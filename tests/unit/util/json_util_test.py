@@ -25,6 +25,7 @@ import sys
 import unittest
 import importlib
 import locale
+import platform
 
 import six
 import mock
@@ -34,7 +35,7 @@ from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
-if six.PY3:
+if six.PY3 and platform.system() != "Darwin":
     reload = importlib.reload
     import orjson
 
@@ -82,6 +83,7 @@ class EncodeDecodeTest(ScalyrTestCase):
     def test_negative_long(self):
         self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
 
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_64_bit_int(self):
         # NOTE: Latest version of orjson available for Python >= 3.6 can also serialize large
         # siigned and unsigned 64 bit ints
@@ -157,7 +159,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
-        if sys.version_info[:2] >= (3, 5):
+        if sys.version_info[:2] >= (3, 5) and platform.system() != "Darwin":
             __runtest(ORJSON)
 
         # do the same check but now with binary string.
@@ -205,6 +207,7 @@ class UnicodeAndLocaleEncodingAndDecodingTestCase(ScalyrTestCase):
         self.assertEqual(loaded, original_data)
 
     @skipIf(six.PY2, "Skipping under Python 2")
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_non_ascii_data_non_utf_locale_coding_orjson(self):
         util.set_json_lib("orjson")
         original_data = "čććžšđ"
@@ -244,6 +247,7 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
                 del sys.modules[value]
 
     @skipIf(six.PY2, "Skipping under Python 2")
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_correct_default_json_library_is_used_python3(self):
         sys.modules["orjson"] = mock.Mock()
 
@@ -273,6 +277,7 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
         self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
 
     @skipIf(six.PY3, "Skipping under Python 3")
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_correct_default_json_library_is_used_python2(self):
         # NOTE: orjson is not available on Python 2 so we should not try and use it
         sys.modules["orjson"] = mock.Mock()
