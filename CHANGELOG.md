@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.27 "" - Feb 12, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 12, 2022 23:04 -0800
+--->
+
+Improvements:
+
+* Add new ``debug_level_logger_names`` config option. With this config option user can specify a list of logger names for which to set debug log level for. Previously user could only set debug level for all the loggers. This comes handy when we want to set debug level for a single of subset of loggers (e.g. for a single monitor).
+
 ## 2.1.26 "Yavin" - Jan 12, 2022
 
 <!---
