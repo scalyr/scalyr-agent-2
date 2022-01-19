@@ -24,6 +24,7 @@ import types
 __author__ = "czerwin@scalyr.com"
 
 import os
+import logging
 import tempfile
 
 import mock
@@ -71,6 +72,63 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             r"\[.*\.py:\d+\] Test line 5"
         )
         self.assertLogFileContainsLineRegex(expression=expression)
+
+    def test_debug_level_for_subset_of_loggers(self):
+        logger1 = scalyr_logging.getLogger("logger1")
+        logger2 = scalyr_logging.getLogger("logger2")
+        logger3 = scalyr_logging.getLogger("logger3")
+
+        logger1.info("XX Test info 1")
+        logger2.debug("XX Test debug 1")
+
+        logger2.info("XX Test info 2")
+        logger2.debug("XX Test debug 2")
+
+        logger3.info("XX Test info 3")
+        logger3.debug("XX Test debug 3")
+
+        # 1. Default behavior - only INFO is enabled
+        self.assertLogFileContainsLineRegex(expression="XX Test info 1")
+        self.assertLogFileContainsLineRegex(expression="XX Test info 2")
+        self.assertLogFileContainsLineRegex(expression="XX Test info 3")
+
+        self.assertLogFileDoesntContainsLineRegex(
+            expression="XX Test debug 1", file_path=self.agent_debug_log_path
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            expression="XX Test debug 2", file_path=self.agent_debug_log_path
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            expression="XX Test debug 3", file_path=self.agent_debug_log_path
+        )
+
+        # 2. Now we enable debug level for 2 loggers only
+        scalyr_logging.set_log_level(
+            level=logging.INFO, debug_level_logger_names=["logger2", "logger3"]
+        )
+
+        logger1.info("YY Test info 1")
+        logger2.debug("YY Test debug 1")
+
+        logger2.info("YY Test info 2")
+        logger2.debug("YY Test debug 2")
+
+        logger3.info("YY Test info 3")
+        logger3.debug("YY Test debug 3")
+
+        self.assertLogFileContainsLineRegex(expression="YY Test info 1")
+        self.assertLogFileContainsLineRegex(expression="YY Test info 2")
+        self.assertLogFileContainsLineRegex(expression="YY Test info 3")
+
+        self.assertLogFileContainsLineRegex(
+            expression="YY Test debug 1", file_path=self.agent_debug_log_path
+        )
+        self.assertLogFileContainsLineRegex(
+            expression="YY Test debug 2", file_path=self.agent_debug_log_path
+        )
+        self.assertLogFileContainsLineRegex(
+            expression="YY Test debug 3", file_path=self.agent_debug_log_path
+        )
 
     def test_error_code(self):
         self.__logger.warn("Bad result", error_code="statusCode")
