@@ -876,6 +876,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             pod.annotations.get(SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE, "false").lower()
             != "true"
         ):
+            self._logger.debug(
+                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scrapin enabled, skipping it..."
+            )
+
             return None
 
         self._logger.debug(
