@@ -201,7 +201,7 @@ class ScalyrMonitor(StoppableThread):
         Unique ID is composed of the monitor name and the id specified in the monitor local config.
         """
         return (
-            self._config["module"] + "-" + self._config.get("id", "default")
+            self._config["module"] + "-" + str(self._config.get("id", "default"))
             or "default"
         )
 

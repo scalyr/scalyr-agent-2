@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-type: [ "docker-json", "docker-syslog", "k8s" ]
         image-distro-name: [ "buster", "alpine" ]
 
     steps:

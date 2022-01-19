@@ -338,6 +338,10 @@ KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
     "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor"
 )
 
+DEFAULT_SCRAPE_SCHEME = "http"
+DEFAULT_SCRAPE_PORT = None
+DEFAULT_SCRAPE_PATH = "/metrics"
+
 # Annotation related constants
 PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
 PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
@@ -493,6 +497,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Gets the node name of the node running the agent from downward API
         """
+        if not compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME"):
+            self._logger.warn(
+                "SCALYR_K8S_NODE_NAME environment variable is not set, monitor will "
+                "not work correctly."
+            )
+
         return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
 
     def __get_monitor_config_and_log_config(
@@ -716,10 +726,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
         )
 
-        for scrape_url in to_remove_scrape_urls:
+        for scrape_url in sorted(to_remove_scrape_urls):
             self.__remove_monitor(scrape_url=scrape_url)
 
-        for scrape_url in to_add_scrape_urls:
+        for scrape_url in sorted(to_add_scrape_urls):
             scrape_config, pod = scrape_configs[scrape_url]
             self.__add_monitor(scrape_config=scrape_config, pod=pod)
 
@@ -761,11 +771,15 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         self.__running_monitors[scrape_url] = monitor.uid
+
         self._logger.info(
             f'Started scrapping url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
         )
         self._logger.debug(
             f'Using monitor config options for scrape url "{scrape_url}": {monitor_config}'
+        )
+        self._logger.debug(
+            f'Using log config options for scrape url "{scrape_url}": {log_config}'
         )
 
         self.__add_watcher_log_config(
@@ -870,15 +884,26 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             pod.annotations.get(SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE, "false").lower()
             != "true"
         ):
+            self._logger.debug(
+                f"Discovered pod {pod.name} ({pod.uid}) doesn't have Open Metrics metrics scraping enabled, skipping it... (pod annotations={pod.annotations})"
+            )
+
             return None
 
         self._logger.debug(
-            f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled"
+            f"Discovered pod {pod.name} ({pod.uid}) with Scalyr Open Metrics metric scraping enabled (pod annotations={pod.annotations})"
         )
 
-        scrape_scheme = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_SCHEME, "http")
-        scrape_port = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PORT, None)
-        scrape_path = pod.annotations.get(PROMETHEUS_ANNOTATION_SCAPE_PATH, "/metrics")
+        scrape_scheme = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
+        )
+        scrape_port = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_PORT, DEFAULT_SCRAPE_PORT
+        )
+        scrape_path = pod.annotations.get(
+            PROMETHEUS_ANNOTATION_SCAPE_PATH, DEFAULT_SCRAPE_PATH
+        )
+
         node_ip = pod.ips[0] if pod.ips else None
         verify_https = (
             pod.annotations.get(

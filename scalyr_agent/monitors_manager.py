@@ -41,8 +41,11 @@ import six
 
 log = scalyr_logging.getLogger(__name__)
 
-# Holds reference to the currently active MonitorsManager instance (singleton)
+# Holds reference to the currently active MonitorsManager instance (singleton). Reference to this
+# instance should be obtained using "get_monitors_manager()" function.
 MONITORS_MANAGER_INSTANCE = None
+
+# Lock which is used when manipulating the value of MONITORS_MANAGER_INSTANCE variable.
 MONITORS_MANAGER_INSTANCE_LOCK = threading.Lock()
 
 
@@ -267,6 +270,13 @@ class MonitorsManager(StoppableThread):
         """
         return self.__monitors
 
+    @property
+    def running_monitors(self):
+        """
+        Returns the list of all the running monitors.
+        """
+        return self.__running_monitors
+
     @staticmethod
     def __create_monitors(configuration, platform_controller):
         """Creates instances of the monitors that should be run based on the contents of the configuration file
@@ -362,7 +372,6 @@ class MonitorsManager(StoppableThread):
             monitor.start()
 
             self.__running_monitors.append(monitor)
-            self.__monitors.append(monitor)
         else:
             log.warn(
                 "Could not start monitor %s because its log could not be opened",
@@ -393,6 +402,7 @@ class MonitorsManager(StoppableThread):
             monitor.log_config.update(log_config)
 
         with self.__lock:
+            self.__monitors.append(monitor)
             monitor = self.__start_monitor(monitor=monitor)
 
         return monitor

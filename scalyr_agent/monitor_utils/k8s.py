@@ -2326,8 +2326,8 @@ class KubeletApi(object):
         # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
         # easier
         global_log.info(
-            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s"
-            % (self._host_ip, self._verify_https, self._ca_file)
+            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s, node_name = %s"
+            % (self._host_ip, self._verify_https, self._ca_file, node_name)
         )
         self._kubelet_url = self._build_kubelet_url(
             kubelet_url_template, host_ip, node_name
@@ -2341,6 +2341,10 @@ class KubeletApi(object):
     def _build_kubelet_url(kubelet_url, host_ip, node_name):
         if node_name and host_ip:
             return kubelet_url.substitute(node_name=node_name, host_ip=host_ip)
+
+        global_log.warn(
+            "Either node_name or host_ip is not set, can't build kubelet url"
+        )
         return None
 
     def _switch_to_fallback(self):
