@@ -767,11 +767,15 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         self.__running_monitors[scrape_url] = monitor.uid
+
         self._logger.info(
             f'Started scrapping url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
         )
         self._logger.debug(
             f'Using monitor config options for scrape url "{scrape_url}": {monitor_config}'
+        )
+        self._logger.debug(
+            f'Using log config options for scrape url "{scrape_url}": {log_config}'
         )
 
         self.__add_watcher_log_config(
