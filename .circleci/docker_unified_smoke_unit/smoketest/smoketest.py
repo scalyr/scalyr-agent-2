@@ -86,6 +86,8 @@ import shlex
 from io import open
 from copy import deepcopy
 
+from pprint import pprint
+
 
 try:
     from urllib.parse import urlencode, quote_plus, unquote_plus
@@ -481,7 +483,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
                     return False
                 print("")
                 print("Sample response for matches[0]")
-                print(matches[0])
+                pprint(matches[0])
                 print("")
                 att = matches[0]["attributes"]
                 verifier_type = att["verifier_type"]
@@ -600,7 +602,8 @@ class DockerSmokeTestActor(SmokeTestActor):
             def _func():
                 resp = requests.get(
                     self._make_query_url(
-                        override_serverHost=self._agent_hostname, override_log=logfile,
+                        override_serverHost=self._agent_hostname,
+                        override_log=logfile,
                     )
                 )
                 if resp.ok:
@@ -699,7 +702,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                         return False
                     print("")
                     print("Sample response for matches[0]")
-                    print(matches[0])
+                    pprint(matches[0])
                     print("")
                     att = matches[0]["attributes"]
                     return self._verify_queried_attributes(
@@ -820,7 +823,7 @@ class DockerAPIActor(DockerSmokeTestActor):
 
                     print("")
                     print("Sample response for matches[0]")
-                    print(matches[0])
+                    pprint(matches[0])
                     print("")
 
                     self._last_seen_timestamp = int(matches[0]["timestamp"])
@@ -881,7 +884,7 @@ class DockerAPIActor(DockerSmokeTestActor):
                 process_name=process_name,
             )
 
-        success = len(self._seen_matching_lines) == 1 + 2 + 2
+        success = len(self._seen_matching_lines) >= 1 + 2 + 2
         if success:
             print(
                 "Found all the required log lines (%s)"
@@ -895,7 +898,10 @@ class DockerAPIActor(DockerSmokeTestActor):
             stream_name=stream_name, process_name=process_name
         )
 
-        if "Docker API (docker_raw_logs: false)" in message:
+        if (
+            "Docker API (docker_raw_logs: false)" in message
+            or "Starting docker monitor (raw_logs=False)" in message
+        ):
             self._seen_matching_lines.add(message)
             return
 
@@ -1134,7 +1140,7 @@ class K8sActor(DockerSmokeTestActor):
                         return False
                     print("")
                     print("Sample response for matches[0]")
-                    print(matches[0])
+                    pprint(matches[0])
                     print("")
                     att = matches[0]["attributes"]
                     return self._verify_queried_attributes(
@@ -1170,13 +1176,16 @@ class K8sActor(DockerSmokeTestActor):
                         return False
                     print("")
                     print("Sample response for matches[0]")
-                    print(matches[0])
+                    pprint(matches[0])
                     print("")
 
                     for expected_metric in metrics:
                         found_match = False
                         for match in matches:
-                            if match.get("attributes", {}).get("metric", "") == expected_metric:
+                            if (
+                                match.get("attributes", {}).get("metric", "")
+                                == expected_metric
+                            ):
                                 found_match = True
                                 break
                         if not found_match:
@@ -1206,7 +1215,9 @@ class K8sActor(DockerSmokeTestActor):
                     exit_on_fail=True,
                 )
 
-        metrics_to_check = self.EXPECTED_DOCKER_METRICS  # TODO: if running in CRI use a different list
+        metrics_to_check = (
+            self.EXPECTED_DOCKER_METRICS
+        )  # TODO: if running in CRI use a different list
 
         self.poll_until_max_wait(
             _query_scalyr_for_metrics(metrics_to_check),
