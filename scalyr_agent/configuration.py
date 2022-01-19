@@ -1488,6 +1488,20 @@ class Configuration(object):
         return self.__get_config().get_int("debug_level")
 
     @property
+    def debug_level_logger_names(self):
+        """
+        Returns the configuration value for 'debug_level'.
+
+        This config option allows user to only enable debug level for a specific set of loggers.
+
+        For example, value could be set to: ["scalyr_agent.copying_manager.worker",
+                                             "scalyr_agent.builtin_monitors.linux_process_metrics(agent)"]
+
+        This would enable debug log level for worker module and process metrics monitor.
+        """
+        return self.__get_config().get_json_array("debug_level_logger_names")
+
+    @property
     def stdout_severity(self):
         """Returns the configuration value for 'stdout_severity'.
         Only used when running in no-fork mode.
@@ -2486,6 +2500,16 @@ class Configuration(object):
                 "debug_level",
                 "badDebugLevel",
             )
+
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "debug_level_logger_names",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
 
         self.__verify_or_set_optional_string(
             config,

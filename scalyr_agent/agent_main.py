@@ -1124,7 +1124,9 @@ class ScalyrAgent(object):
                     agent_log_file_path=AGENT_LOG_FILENAME,
                 )
 
-                self.__update_debug_log_level(self.__config.debug_level)
+                self.__update_debug_log_level(
+                    self.__config.debug_level, self.__config.debug_level_logger_names
+                )
 
                 # We record where the log files(including multiprocess worker sessions logs) currently are
                 # so that we can (in the worse case) start copying them from those position.
@@ -1528,7 +1530,7 @@ class ScalyrAgent(object):
             print("%s" % six.text_type(e), file=sys.stderr)
             sys.exit(4)
 
-    def __update_debug_log_level(self, debug_level):
+    def __update_debug_log_level(self, debug_level, debug_level_logger_names=None):
         """Updates the debug log level of the agent.
         @param debug_level: The debug level, ranging from 0 (no debug) to 5.
 
@@ -1543,7 +1545,9 @@ class ScalyrAgent(object):
             scalyr_logging.DEBUG_LEVEL_5,
         ]
 
-        scalyr_logging.set_log_level(levels[debug_level])
+        scalyr_logging.set_log_level(
+            level=levels[debug_level], debug_level_logger_names=debug_level_logger_names
+        )
 
     def __create_new_client(self):
         result = None
