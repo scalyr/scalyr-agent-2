@@ -824,7 +824,7 @@ jobs:
   unittest-35-osx:
     working_directory: ~/scalyr-agent-2
     macos:
-      xcode: "11.2.1"
+      xcode: "13.2.1"
     environment:
       PYTHON: 3.5.6
       # Updating homebrew is slow
