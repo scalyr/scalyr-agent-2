@@ -299,6 +299,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 0
         )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 0
+        )
         self.assertEqual(mock_log_watcher.add_log_config.call_count, 0)
         # First mock call is empty and happen due to the connectivity checks
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 1)
@@ -348,6 +351,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 0
+        )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 0
         )
         self.assertEqual(mock_log_watcher.add_log_config.call_count, 0)
         # First mock call is empty and happen due to the connectivity checks
@@ -412,6 +418,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 3
+        )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 3
         )
         self.assertEqual(mock_log_watcher.add_log_config.call_count, 3)
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 3)
@@ -505,6 +514,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 2
         )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 2
+        )
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 0)
         self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 1)
 
@@ -528,6 +540,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 3
+        )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 3
         )
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 1)
         self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 0)
@@ -559,6 +574,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertEqual(
             len(monitor._KubernetesOpenMetricsMonitor__running_monitors), 0
+        )
+        self.assertEqual(
+            len(monitor._KubernetesOpenMetricsMonitor__watcher_log_configs), 0
         )
         self.assertEqual(mock_monitors_manager.add_monitor.call_count, 0)
         self.assertEqual(mock_monitors_manager.remove_monitor.call_count, 3)
