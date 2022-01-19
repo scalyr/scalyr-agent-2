@@ -170,8 +170,9 @@ def set_log_destination(
     )
 
 
-def set_log_level(level):
-    """Sets the log level that should be used by all AgentLogger instances.
+def set_log_level(level, debug_level_logger_names=None):
+    """Sets the log level that should be used by all AgentLogger instances and if debug_level_logger_names
+    is set, also set log level for the specific loggers to debug.
 
     This method is thread-safe.
 
@@ -179,7 +180,24 @@ def set_log_level(level):
         You can also use one of the Scalyr debug levels, such as DEBUG_LEVEL_0, DEBUG_LEVEL_1, etc.
     @type level: int
     """
+    # 1. Set global log level for all the loggers
     __log_manager__.set_log_level(level)
+
+    # 2. Set debug level for specific loggers (if enabled)
+    if debug_level_logger_names:
+        loggers = [
+            logging.getLogger(logger_name) for logger_name in debug_level_logger_names
+        ]
+        __log_manager__.set_log_level_for_loggers(loggers=loggers, level=DEBUG_LEVEL_5)
+
+
+def get_logger_names():
+    """
+    Return name of all the currently instantiated and valid loggers.
+    """
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    logger_names = [logger.name for logger in loggers]
+    return logger_names
 
 
 #
@@ -1574,6 +1592,24 @@ class AgentLogManager(object):
         finally:
             self.__lock.release()
 
+    def set_log_level_for_loggers(self, loggers, level):
+        """
+        Set log level for the provided loggers.
+
+        This method is mostly to be used in scenarios where we set debug level for a subset of loggers
+        (e.g. single or multiple monitor modules).
+        """
+        self.__lock.acquire()
+
+        try:
+            for logger in loggers:
+                logger.setLevel(level)
+
+            self.__recreate_debug_handler(force=True)
+            self.__reset_root_logger()
+        finally:
+            self.__lock.release()
+
     @property
     def log_level(self):
         """
@@ -1600,7 +1636,7 @@ class AgentLogManager(object):
             self.__main_log_fn, is_debug=False
         )
 
-    def __recreate_debug_handler(self):
+    def __recreate_debug_handler(self, force=False):
         """Recreates the debug log handler according to the variables set on this instance.
 
         If there is already a debug log handler, this method will close it.
@@ -1613,9 +1649,14 @@ class AgentLogManager(object):
         Note, you should hold __lock if this is being called from a method that needs to be thread safe.
 
         You must invoke `__reset_root_logger` at some point after this call for it to take effect.
+
+        :param force: True to force recreate the debug handler. This should be set to True when
+                      setting debug log level for a single or subset of all the loggers.
         """
         self.__debug_log_handler = self.__recreate_handler(
-            self.__debug_log_fn, is_debug=True
+            self.__debug_log_fn,
+            is_debug=True,
+            is_force_debug=force,
         )
 
     def __recreate_force_stdout_handler(self):
@@ -1640,7 +1681,12 @@ class AgentLogManager(object):
         )
 
     def __recreate_handler(
-        self, file_path, is_debug=False, is_force_stdout=False, is_force_stderr=False
+        self,
+        file_path,
+        is_debug=False,
+        is_force_debug=False,
+        is_force_stdout=False,
+        is_force_stderr=False,
     ):
         """Creates and returns an appropriate handler for either the main, debug, forced stdout, or force stderr log.
 
@@ -1654,7 +1700,7 @@ class AgentLogManager(object):
         @return: The created handler or None if none should be created.
         @rtype: logging.LogHandler
         """
-        if is_debug and not self.__is_debug_on:
+        if is_debug and not is_force_debug and not self.__is_debug_on:
             return None
         if self.__use_stdout and is_force_stdout:
             return None
