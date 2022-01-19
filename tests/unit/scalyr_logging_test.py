@@ -79,7 +79,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         logger3 = scalyr_logging.getLogger("logger3")
 
         logger1.info("XX Test info 1")
-        logger2.debug("XX Test debug 1")
+        logger1.debug("XX Test debug 1")
 
         logger2.info("XX Test info 2")
         logger2.debug("XX Test debug 2")
@@ -108,7 +108,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         )
 
         logger1.info("YY Test info 1")
-        logger2.debug("YY Test debug 1")
+        logger1.debug("YY Test debug 1")
 
         logger2.info("YY Test info 2")
         logger2.debug("YY Test debug 2")
@@ -120,7 +120,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.assertLogFileContainsLineRegex(expression="YY Test info 2")
         self.assertLogFileContainsLineRegex(expression="YY Test info 3")
 
-        self.assertLogFileContainsLineRegex(
+        self.assertLogFileDoesntContainsRegex(
             expression="YY Test debug 1", file_path=self.agent_debug_log_path
         )
         self.assertLogFileContainsLineRegex(
