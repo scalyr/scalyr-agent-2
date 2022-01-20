@@ -2287,6 +2287,8 @@ workflows:
          context: scalyr-agent
      - smoke-standalone-35:
          context: scalyr-agent
+     - smoke-standalone-38:
+         context: scalyr-agent
      - smoke-standalone-35-rate-limit:
          context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
@@ -2422,6 +2424,8 @@ workflows:
      - unittest-27:
          context: scalyr-agent
      - unittest-35:
+         context: scalyr-agent
+     - unittest-38:
          context: scalyr-agent
      - unittest-38-osx:
          context: scalyr-agent
