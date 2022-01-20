@@ -6,7 +6,7 @@ on:
       python-version:
         required: false
         type: string
-        default: 3.8.10
+        default: 3.8.12
 
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN:
@@ -33,7 +33,7 @@ jobs:
       fail-fast: false
       matrix:
         image-type: [ "docker-json", "docker-syslog", "k8s" ]
-        image-distro-name: [ "buster", "alpine" ]
+        image-distro-name: [ "debian", "alpine" ]
 
     steps:
       - name: Checkout repository

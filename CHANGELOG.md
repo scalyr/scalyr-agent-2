@@ -8,8 +8,11 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 12, 2022 23:04 -0800
 --->
 
 Improvements:
-
 * Add new ``debug_level_logger_names`` config option. With this config option user can specify a list of logger names for which to set debug log level for. Previously user could only set debug level for all the loggers. This comes handy when we want to set debug level for a single of subset of loggers (e.g. for a single monitor).
+
+Docker images:
+* Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
+* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye.
 
 ## 2.1.26 "Yavin" - Jan 12, 2022
 
@@ -29,7 +32,7 @@ Docker Images:
 * Docker images are now also produced and pushed to the registry for the ``linux/arm64`` and ``linux/arm/v7`` architecture.
 * Docker image now includes ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
 * ``ujson`` dependency has been removed from the Docker image in favor of ``orjson`` which is more performant and now used by default.
-* Alpine based Docker images which are 50% small than regular Debian buster-slim based ones are now available. Alpine based images contains ``-alpine`` tag name suffix.
+* Alpine based Docker images which are 50% small than regular Debian bullseye-slim based ones are now available. Alpine based images contains ``-alpine`` tag name suffix.
 
 ## 2.1.25 "Hamarus" - Nov 17, 2021
 

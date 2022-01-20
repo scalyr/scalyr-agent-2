@@ -53,7 +53,7 @@ python3 build_package_new.py <build_name> --push --user my-dockerhub-user
 
 ## Supported Images and Architectures
 
-Right now we provide Debian buster-slim and Alpine linux based images for the following platforms:
+Right now we provide Debian bullseye-slim and Alpine linux based images for the following platforms:
   * ``linux/amd64``
   * ``linux/arm64``
   * ``linux/arm/v7``

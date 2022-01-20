@@ -25,8 +25,8 @@ jobs:
       fail-fast: false
       matrix:
         image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
-        image-distro-name: [ "buster", "alpine" ]
-        python-version: [ "3.8.10" ]
+        image-distro-name: [ "debian", "alpine" ]
+        python-version: [ "3.8.12" ]
 
     env:
       DOCKER_BUILDKIT: 1
