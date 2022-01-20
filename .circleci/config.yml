@@ -821,12 +821,12 @@ jobs:
           python_version: "3.5"
           tox_target: "py3.5-unit-tests"
 
-  unittest-37-osx:
+  unittest-38-osx:
     working_directory: ~/scalyr-agent-2
     macos:
       xcode: "13.2.1"
     environment:
-      PYTHON: 3.7.10
+      PYTHON: 3.8.12
       # Updating homebrew is slow so we skip it
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -838,7 +838,7 @@ jobs:
             brew install pyenv
       - restore_cache:
           name: Restore pyenv cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
       - run:
           name: Install Python
           command: |
@@ -849,12 +849,12 @@ jobs:
             pyenv install "$PYTHON" -s
       - save_cache:
           name: Save pyenv cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}-pyenv
           paths:
             - ~/.pyenv
       - restore_cache:
           name: Restore pip cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
       - run:
           name: Install Dependencies
           command: |
@@ -870,10 +870,10 @@ jobs:
           command: |
             pyenv local $PYTHON
             source ./venv/bin/activate
-            tox -epy3.7-unit-tests
+            tox -epy3.8-unit-tests
       - save_cache:
           name: Save pip cache
-          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.7-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
+          key: deps-<< pipeline.parameters.cache_version_py_dependencies >>-xcode-13.2.1-tox-{{ .Branch }}-py-3.8-osx-venv-{{ checksum "dev-requirements.txt" }}-pip
           paths:
             - ~/.cache/pip
       - slack/status:
@@ -2276,7 +2276,9 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-     - unittest-37-osx:
+     - unittest-38:
+         context: scalyr-agent
+     - unittest-38-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent
@@ -2286,6 +2288,8 @@ workflows:
      - smoke-standalone-27:
          context: scalyr-agent
      - smoke-standalone-35:
+         context: scalyr-agent
+     - smoke-standalone-38:
          context: scalyr-agent
      - smoke-standalone-35-rate-limit:
          context: scalyr-agent
@@ -2423,7 +2427,9 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
-     - unittest-37-osx:
+     - unittest-38:
+         context: scalyr-agent
+     - unittest-38-osx:
          context: scalyr-agent
      - unittest-38-windows:
          context: scalyr-agent
