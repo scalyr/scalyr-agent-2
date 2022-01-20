@@ -1066,10 +1066,10 @@ _AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
 
 # Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
 # create the filesystem for the image.
-DOCKER_JSON_CONTAINER_BUILDER_BUSTER = DockerJsonPackageBuilder(
-    name="docker-json-buster",
+DOCKER_JSON_CONTAINER_BUILDER_DEBIAN = DockerJsonPackageBuilder(
+    name="docker-json-debian",
     config_path=_CONFIGS_PATH / "docker-json-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
 )
 DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
     name="docker-json-alpine",
@@ -1077,10 +1077,10 @@ DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
-DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER = DockerSyslogPackageBuilder(
-    name="docker-syslog-buster",
+DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN = DockerSyslogPackageBuilder(
+    name="docker-syslog-debian",
     config_path=_CONFIGS_PATH / "docker-syslog-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
 )
 DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
     name="docker-syslog-alpine",
@@ -1088,10 +1088,10 @@ DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
-DOCKER_API_CONTAINER_BUILDER_BUSTER = DockerApiPackageBuilder(
-    name="docker-api-buster",
+DOCKER_API_CONTAINER_BUILDER_DEBIAN = DockerApiPackageBuilder(
+    name="docker-api-debian",
     config_path=_CONFIGS_PATH / "docker-api-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
 )
 DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     name="docker-api-alpine",
@@ -1099,10 +1099,10 @@ DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )
 
-K8S_CONTAINER_BUILDER_BUSTER = K8sPackageBuilder(
-    name="k8s-buster",
+K8S_CONTAINER_BUILDER_DEBIAN = K8sPackageBuilder(
+    name="k8s-debian",
     config_path=_CONFIGS_PATH / "k8s-config",
-    base_image_deployment_step_cls=deployments.BuildBusterDockerBaseImageStep,
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
 )
 K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
     name="k8s-alpine",

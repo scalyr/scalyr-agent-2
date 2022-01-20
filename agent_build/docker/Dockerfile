@@ -11,7 +11,7 @@ ARG BASE_IMAGE
 ARG MODE="normal"
 
 # Suffix for the python dockerhub image. For now can be:
-#   - 'slim' for buster based image
+#   - 'slim' for debian based image
 #   - 'alpine' for alpine based image.
 ARG BASE_IMAGE_SUFFIX
 
@@ -26,7 +26,7 @@ ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 ENV AGENT_BUILD_IN_DOCKER=1
 # e.g. k8s, docker-json
 ARG BUILD_TYPE
-# e.g. k8s-buster, docker-json-buster, k8s-alpine
+# e.g. k8s-debian, docker-json-debian, k8s-alpine
 ARG BUILDER_NAME
 ADD . /scalyr-agent-2
 

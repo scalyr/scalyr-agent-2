@@ -16,7 +16,7 @@
 # This script is used by "ShellScriptDeploymentStep"
 # (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/deployments.py"
 
-# This script is used in the deployment step that build base image for the buster(debian) based agent docker images.
+# This script is used in the deployment step that build base image for the bullseye(debian) based agent docker images.
 # This file is sourced by one of the actual shell scripts that has to build the base image.
 
 # source main library, all needed functions are in there.

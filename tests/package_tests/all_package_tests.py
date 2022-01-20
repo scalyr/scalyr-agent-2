@@ -203,13 +203,13 @@ class DockerImagePackageTest(Test):
                         )
 
                     # Check if the tested image contains needed distribution.
-                    if "buster" in self.unique_name:
-                        expected_os_name = "buster"
+                    if "debian" in self.unique_name:
+                        expected_os_name = "debian"
                     elif "alpine" in self.unique_name:
                         expected_os_name = "alpine"
                     else:
                         raise AssertionError(
-                            f"Test {self.unique_name} does not contain os name (buster or alpine)"
+                            f"Test {self.unique_name} does not contain os name (bullseye or alpine)"
                         )
 
                     # Get the content of the 'os-release' file from the image and verify the distribution name.
@@ -302,10 +302,10 @@ class DockerImagePackageTest(Test):
 # Create tests for the all docker images (json/syslog/api) and for k8s image.
 _docker_image_tests = []
 for builder in [
-    package_builders.DOCKER_JSON_CONTAINER_BUILDER_BUSTER,
-    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER,
-    package_builders.DOCKER_API_CONTAINER_BUILDER_BUSTER,
-    package_builders.K8S_CONTAINER_BUILDER_BUSTER,
+    package_builders.DOCKER_JSON_CONTAINER_BUILDER_DEBIAN,
+    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN,
+    package_builders.DOCKER_API_CONTAINER_BUILDER_DEBIAN,
+    package_builders.K8S_CONTAINER_BUILDER_DEBIAN,
     package_builders.DOCKER_JSON_CONTAINER_BUILDER_ALPINE,
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
     package_builders.DOCKER_API_CONTAINER_BUILDER_ALPINE,
@@ -325,12 +325,12 @@ for builder in [
     _docker_image_tests.append(test)
 
 (
-    DOCKER_JSON_TEST_BUSTER,
-    DOCKER_SYSLOG_TEST_BUSTER,
-    DOCKER_API_TEST_BUSTER,
-    K8S_TEST_BUSTER,
+    DOCKER_JSON_TEST_DEBIAN,
+    DOCKER_SYSLOG_TEST_DEBIAN,
+    DOCKER_API_TEST_DEBIAN,
+    K8S_TEST_DEBIAN,
     DOCKER_JSON_TEST_ALPINE,
     DOCKER_SYSLOG_TEST_ALPINE,
     DOCKER_API_TEST_ALPINE,
-    K8S_TEST_BUSTER_ALPINE,
+    K8S_TEST_ALPINE,
 ) = _docker_image_tests

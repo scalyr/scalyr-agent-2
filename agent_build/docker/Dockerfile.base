@@ -2,11 +2,11 @@
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
 # Suffix for the python dockerhub image. For now can be:
-#   - 'slim' for buster based image
+#   - 'slim' for debian based image
 #   - 'alpine' for alpine based image.
 ARG BASE_IMAGE_SUFFIX
 
-# Install dependency packages for buster.
+# Install dependency packages for debian.
 FROM python:3.8.12-slim as scalyr-dependencies-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
@@ -88,7 +88,7 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk update && apk add --virtual curl git
 
-# Install tools for buster.
+# Install tools for debian.
 FROM python:3.8.12-slim as ready-base-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
 

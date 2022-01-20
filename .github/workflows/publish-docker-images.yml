@@ -33,7 +33,7 @@ jobs:
       fail-fast: false
       matrix:
         image-type: [ "docker-json", "docker-syslog", "k8s" ]
-        image-distro-name: [ "buster", "alpine" ]
+        image-distro-name: [ "debian", "alpine" ]
 
     steps:
       - name: Checkout repository
