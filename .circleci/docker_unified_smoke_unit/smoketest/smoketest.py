@@ -602,7 +602,8 @@ class DockerSmokeTestActor(SmokeTestActor):
             def _func():
                 resp = requests.get(
                     self._make_query_url(
-                        override_serverHost=self._agent_hostname, override_log=logfile,
+                        override_serverHost=self._agent_hostname,
+                        override_log=logfile,
                     )
                 )
                 if resp.ok:
@@ -897,7 +898,10 @@ class DockerAPIActor(DockerSmokeTestActor):
             stream_name=stream_name, process_name=process_name
         )
 
-        if "Docker API (docker_raw_logs: false)" in message or "Starting docker monitor (raw_logs=False)" in message:
+        if (
+            "Docker API (docker_raw_logs: false)" in message
+            or "Starting docker monitor (raw_logs=False)" in message
+        ):
             self._seen_matching_lines.add(message)
             return
 
@@ -1172,13 +1176,16 @@ class K8sActor(DockerSmokeTestActor):
                         return False
                     print("")
                     print("Sample response for matches[0]")
-                    print(matches[0])
+                    pprint(matches[0])
                     print("")
 
                     for expected_metric in metrics:
                         found_match = False
                         for match in matches:
-                            if match.get("attributes", {}).get("metric", "") == expected_metric:
+                            if (
+                                match.get("attributes", {}).get("metric", "")
+                                == expected_metric
+                            ):
                                 found_match = True
                                 break
                         if not found_match:
@@ -1208,7 +1215,9 @@ class K8sActor(DockerSmokeTestActor):
                     exit_on_fail=True,
                 )
 
-        metrics_to_check = self.EXPECTED_DOCKER_METRICS  # TODO: if running in CRI use a different list
+        metrics_to_check = (
+            self.EXPECTED_DOCKER_METRICS
+        )  # TODO: if running in CRI use a different list
 
         self.poll_until_max_wait(
             _query_scalyr_for_metrics(metrics_to_check),

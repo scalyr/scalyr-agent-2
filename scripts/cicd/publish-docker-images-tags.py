@@ -35,9 +35,9 @@ sys.path.append(str(_SOURCE_ROOT))
 from agent_build import package_builders
 
 BUILDERS_TO_USE = [
-    package_builders.DOCKER_JSON_CONTAINER_BUILDER_BUSTER,
-    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_BUSTER,
-    package_builders.K8S_CONTAINER_BUILDER_BUSTER,
+    package_builders.DOCKER_JSON_CONTAINER_BUILDER_DEBIAN,
+    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN,
+    package_builders.K8S_CONTAINER_BUILDER_DEBIAN,
     package_builders.DOCKER_JSON_CONTAINER_BUILDER_ALPINE,
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
     package_builders.K8S_CONTAINER_BUILDER_ALPINE,
@@ -122,7 +122,7 @@ def main(
             if builder.name.endswith("alpine"):
                 temp_release_tag = f"{temp_release_tag}-alpine"
             else:
-                temp_release_tag = f"{temp_release_tag}-buster"
+                temp_release_tag = f"{temp_release_tag}-debian"
 
             subprocess.check_call([
                 "docker",

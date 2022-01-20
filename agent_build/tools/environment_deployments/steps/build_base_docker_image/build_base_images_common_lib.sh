@@ -102,7 +102,7 @@ sh_cs docker buildx use "$buildx_builder_name"
 build_all_base_images() {
   # The argument is a tag suffix of the Python's image on dockerhub image.
   # According to that suffix, the appropriate python image will be used.
-  # For example, for base image that is based on buster, the suffix is 'slim', so the builder will use "python:slim",
+  # For example, for base image that is based on debian, the suffix is 'slim', so the builder will use "python:slim",
   # or 'alpine, so builder will use 'python:alpine'
   base_image_tag_suffix=$1
 
