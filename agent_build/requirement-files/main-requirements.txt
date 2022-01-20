@@ -1,7 +1,6 @@
-# NOTE: orjson don't include pre-built wheels for ARMv7 for glibc and
-# musl.
-orjson==3.6.5; python_version >= '3.7' and 'armv7' not in platform_machine
-orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine
-orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine
+# NOTE: orjson doesnt provide pre-built wheels for ARMv7 for glibc and musl.
+orjson==3.6.5; python_version >= '3.7' and 'armv7' not in platform_machine and platform_system != 'Darwin'
+orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine and platform_system != 'Darwin'
+orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 
 requests==2.20.0
