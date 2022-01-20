@@ -213,19 +213,25 @@ class DockerImagePackageTest(Test):
                         )
 
                     # Get the content of the 'os-release' file from the image and verify the distribution name.
-                    os_release_content = common.check_output_with_log(
-                        [
-                            "docker",
-                            "run",
-                            "-i",
-                            "--rm",
-                            str(full_image_name),
-                            "/bin/cat",
-                            "/etc/os-release",
-                        ]
-                    ).decode()
+                    os_release_content = (
+                        common.check_output_with_log(
+                            [
+                                "docker",
+                                "run",
+                                "-i",
+                                "--rm",
+                                str(full_image_name),
+                                "/bin/cat",
+                                "/etc/os-release",
+                            ]
+                        )
+                        .decode()
+                        .lower()
+                    )
 
-                    assert expected_os_name in os_release_content.lower()
+                    assert (
+                        expected_os_name in os_release_content
+                    ), f"Expected {expected_os_name}, got {os_release_content}"
 
                     # Remove the image once more.
                     logging.info("    Remove existing image.")
