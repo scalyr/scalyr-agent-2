@@ -12,6 +12,7 @@ Improvements:
 
 Docker images:
 * Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
+* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye.
 
 ## 2.1.26 "Yavin" - Jan 12, 2022
 
