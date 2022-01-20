@@ -2276,6 +2276,8 @@ workflows:
          context: scalyr-agent
      - unittest-35:
          context: scalyr-agent
+     - unittest-38:
+         context: scalyr-agent
      - unittest-38-osx:
          context: scalyr-agent
      - unittest-38-windows:
