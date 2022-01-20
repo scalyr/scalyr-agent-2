@@ -1368,6 +1368,7 @@ _CopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyType(  # t
 class CopyingManagerWorkerSessionProxy(_CopyingManagerWorkerSessionProxy):  # type: ignore
     pass
 
+
 # NOTE: This class needs to be top-level in the module scope since Python >= 3.8 doesn't support
 # pickling local objects anymore and this object is indeed used for communication and is pickled.
 # - https://gist.github.com/Kami/8386c79d2db7c95329e6c182ec639f49
