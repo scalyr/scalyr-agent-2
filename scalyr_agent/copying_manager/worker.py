@@ -1368,6 +1368,81 @@ _CopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyType(  # t
 class CopyingManagerWorkerSessionProxy(_CopyingManagerWorkerSessionProxy):  # type: ignore
     pass
 
+# NOTE: This class needs to be top-level in the module scope since Python >= 3.8 doesn't support
+# pickling local objects anymore and this object is indeed used for communication and is pickled.
+# - https://gist.github.com/Kami/8386c79d2db7c95329e6c182ec639f49
+# - https://github.com/spack/spack/issues/14102
+class _SharedObjectManager(scalyr_util.ParentProcessAwareSyncManager):
+    """
+    The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker session
+    instance in order to stop it if the parent process is killed.
+
+    According to the fact that the worker session runs in manager's process in a separate thread, we have to
+    handle the situation where the agent was killed and worker session remains alive in the manager's process
+    and keeps sending logs.
+    """
+
+    def __init__(self, worker_session_class, *args, **kwargs):
+        super(_SharedObjectManager, self).__init__(*args, **kwargs)
+
+        self._worker_session_class = worker_session_class
+
+        self._worker_session = (
+            None
+        )  # type: Optional[CopyingManagerWorkerSessionInterface]
+
+    def _create_worker_session(
+        self, configuration, worker_config_entry, worker_session_id
+    ):
+        # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorkerSessionInterface
+        """
+        Create a new worker session and save it as an attribute to be able to access the
+        worker session's instance within the local process.
+
+        The arguments are the same as in the worker session's constructor.
+        :return: the proxy object for the worker session instance.
+        """
+
+        # we set 'is_daemon' as True in order to be able to stop the
+        # worker session's thread if the  manager's main thread is exited.
+        # but it is just a 'last stand' option when the graceful worker session stop is failed.
+        self._worker_session = self._worker_session_class(
+            configuration, worker_config_entry, worker_session_id, is_daemon=True
+        )
+
+        return self._worker_session  # type: ignore
+
+    def _on_parent_process_kill(self):
+        """
+        Override the callback which is invoked when the parent process is killed,
+        so we have to stop the worker session before this process will be terminated.
+        """
+        log.error(
+            "The main agent process does not exist. Probably it was forcibly killed. "
+            "Checking if the worker session is still alive."
+        )
+        if self._worker_session and self._worker_session.is_alive():
+            log.error("The worker session is alive. Stopping it.")
+            try:
+                self._worker_session.stop_worker_session()
+            except:
+                log.exception(
+                    "Can not stop the worker session. Waiting before killing the process..."
+                )
+                # can not stop worker session gracefully, just wait for the main thread of the process exits and
+                # the worker session's thread(since it is a daemon)  will be terminated too.
+
+    @classmethod
+    def _on_exit(cls, error=None):
+        """
+        Just add more log messages before the process is terminated.
+        :return:
+        """
+        if error:
+            log.error("The shared object manager thread has ended with an error.")
+        else:
+            log.info("The shared object manager of the worker session has stopped.")
+
 
 def create_shared_object_manager(worker_session_class, worker_session_proxy_class):
     """
@@ -1379,76 +1454,7 @@ def create_shared_object_manager(worker_session_class, worker_session_proxy_clas
     :return: a new instance of the 'scalyr_utils.ParentAwareSyncManager' with registered proxies.
     """
 
-    class _SharedObjectManager(scalyr_util.ParentProcessAwareSyncManager):
-        """
-        The subclass of the 'scalyr_util.ParentAwareSyncManager' which also has access to the worker session
-        instance in order to stop it if the parent process is killed.
-
-        According to the fact that the worker session runs in manager's process in a separate thread, we have to
-        handle the situation where the agent was killed and worker session remains alive in the manager's process
-        and keeps sending logs.
-        """
-
-        def __init__(self, *args, **kwargs):
-            super(_SharedObjectManager, self).__init__(*args, **kwargs)
-
-            self._worker_session = (
-                None
-            )  # type: Optional[CopyingManagerWorkerSessionInterface]
-
-        def _create_worker_session(
-            self, configuration, worker_config_entry, worker_session_id
-        ):
-            # type: (Configuration, Dict, six.text_type) -> CopyingManagerWorkerSessionInterface
-            """
-            Create a new worker session and save it as an attribute to be able to access the
-            worker session's instance within the local process.
-
-            The arguments are the same as in the worker session's constructor.
-            :return: the proxy object for the worker session instance.
-            """
-
-            # we set 'is_daemon' as True in order to be able to stop the
-            # worker session's thread if the  manager's main thread is exited.
-            # but it is just a 'last stand' option when the graceful worker session stop is failed.
-            self._worker_session = worker_session_class(
-                configuration, worker_config_entry, worker_session_id, is_daemon=True
-            )
-
-            return self._worker_session  # type: ignore
-
-        def _on_parent_process_kill(self):
-            """
-            Override the callback which is invoked when the parent process is killed,
-            so we have to stop the worker session before this process will be terminated.
-            """
-            log.error(
-                "The main agent process does not exist. Probably it was forcibly killed. "
-                "Checking if the worker session is still alive."
-            )
-            if self._worker_session and self._worker_session.is_alive():
-                log.error("The worker session is alive. Stopping it.")
-                try:
-                    self._worker_session.stop_worker_session()
-                except:
-                    log.exception(
-                        "Can not stop the worker session. Waiting before killing the process..."
-                    )
-                    # can not stop worker session gracefully, just wait for the main thread of the process exits and
-                    # the worker session's thread(since it is a daemon)  will be terminated too.
-
-        @classmethod
-        def _on_exit(cls, error=None):
-            """
-            Just add more log messages before the process is terminated.
-            :return:
-            """
-            if error:
-                log.error("The shared object manager thread has ended with an error.")
-            else:
-                log.info("The shared object manager of the worker session has stopped.")
-
-    manager = _SharedObjectManager()
+    manager = _SharedObjectManager(worker_session_class=worker_session_class)
 
     # pylint: disable=E1101
     manager.register(
