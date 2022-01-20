@@ -60,8 +60,11 @@ def pytest_addoption(parser):
 def pytest_generate_tests(metafunc):
     if "worker_type" in metafunc.fixturenames:
         test_params = ["thread"]
-        # if the OS is not Windows and python version > 2.7 then also do the multiprocess workers testing.
-        if platform.system() != "Windows" and sys.version_info >= (2, 7):
+        # if the OS is not Windows / OSX and python version > 2.7 then also do the multiprocess workers testing.
+        if platform.system() not in ["Windows", "Darwin"] and sys.version_info >= (
+            2,
+            7,
+        ):
             test_params.append("process")
 
         metafunc.parametrize("worker_type", test_params)
