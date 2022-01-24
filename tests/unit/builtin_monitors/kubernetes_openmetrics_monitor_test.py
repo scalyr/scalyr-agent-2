@@ -81,6 +81,39 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         if "SCALYR_K8S_NODE_NAME" in os.environ:
             del os.environ["SCALYR_K8S_NODE_NAME"]
 
+    def test_logger_include_node_name_config_option(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        self.assertEqual(
+            monitor._logger.name,
+            "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor(test-node-name)",
+        )
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+            "logger_include_node_name": False,
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        self.assertTrue(isinstance(monitor._logger.name, mock.Mock))
+
     def test_get_monitor_and_log_config(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
