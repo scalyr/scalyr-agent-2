@@ -36,8 +36,10 @@ monitor:
       building scrapper URL. Valid values are http and https.
     * ``prometheus.io/path`` (optional, defaults to /metrics) - Tells agent which request path to use when
       building scrapper URL.
-    * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint,
-      defaults to 60 seconds.
+    * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint.
+      Defaults to 60 seconds.
+    * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out.
+      scrape requests. Defaults to 10 seconds.
     * ``k8s.monitor.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
     * ``k8s.monitor.config.scalyr.com/metric_name_exclude_list`` (optional) - Comma delimited list
@@ -69,9 +71,11 @@ for the exporter pod:
             app.kubernetes.io/component: exporter
             app.kubernetes.io/name: node-exporter
         annotations:
-            prometheus.io/scrape:                    'true'
-            prometheus.io/port:                      '9100'
-            k8s.monitor.config.scalyr.com/scrape: 'true'
+            prometheus.io/scrape:                          'true'
+            prometheus.io/port:                            '9100'
+            k8s.monitor.config.scalyr.com/scrape:          'true'
+            k8s.monitor.config.scalyr.com/scrape_interval: '120'
+            k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
         spec:
         containers:
         - args:
@@ -150,7 +154,6 @@ running on.
 
 ## TODO
 
-- [ ] Support for defining per exporter scrape interval via annotations
 - [ ] Should we include node name (+cluster name - scalyr_k8s_cluster_name ?) with each metric? We
       already do in the monitor name, so we could just define a special parser for it.
 """
@@ -182,6 +185,34 @@ from scalyr_agent import scalyr_logging
 from scalyr_agent import compat
 
 __monitor__ = __name__
+
+# Default config option values
+DEFAULT_SCRAPE_INTERVAL = 60.0
+DEFAULT_SCRAPE_TIMEOUT = 10
+DEFAULT_VERIFY_HTTPS = True
+
+DEFAULT_KUBERNETES_API_METRICS_SCRAPE_INTERVAL = 60.0
+DEFAULT_KUBERNETES_API_CADVISOR_METRICS_SCRAPE_INTERVAL = 60.0
+
+DEFAULT_KUBERNETES_API_METRIC_NAME_INCLUDE_LIST = ["*"]
+DEFAULT_KUBERNETES_API_METRIC_NAME_EXCLUDE_LIST = [
+    # We exclude all the per request path metrics which provide little value and there are tons
+    # of those (one per visited path + query params). This means that each scrape only returns
+    # ~400 metrics instead of 2000+.
+    # Exclude histograms
+    "*_bucket",
+    # Exclude per path and rest client stats (tons of metrics, one for every path and not so useful)
+    "kubelet_http_*",
+    "rest_client_*",
+]
+
+DEFAULT_KUBERNETES_API_CADVISOR_METRIC_NAME_INCLUDE_LIST = ["*"]
+DEFAULT_KUBERNETES_API_CADVISOR_METRIC_NAME_EXCLUDE_LIST = []
+
+# Default annotation values
+DEFAULT_SCRAPE_SCHEME = "http"
+DEFAULT_SCRAPE_PORT = None
+DEFAULT_SCRAPE_PATH = "/metrics"
 
 define_config_option(
     __monitor__,
@@ -217,7 +248,7 @@ define_config_option(
     "verify_https",
     "Set to False to disable verification of the server certificate and hostname when scraping metrics from all the exporters.",
     convert_to=bool,
-    default=True,
+    default=DEFAULT_VERIFY_HTTPS,
 )
 
 define_config_option(
@@ -225,7 +256,15 @@ define_config_option(
     "scrape_interval",
     "How often to scrape metrics from each of the dynamically discovered metric exporter endpoints. Defaults to 60 seconds. This can be overridden on per exporter basis using annotations.",
     convert_to=float,
-    default=60.0,
+    default=DEFAULT_SCRAPE_INTERVAL,
+)
+
+define_config_option(
+    __monitor__,
+    "scrape_timeout",
+    "Timeout for scrape HTTP requests. Defaults to 10 seconds.",
+    convert_to=int,
+    default=DEFAULT_SCRAPE_TIMEOUT,
 )
 
 define_config_option(
@@ -249,7 +288,7 @@ define_config_option(
     "kubernetes_api_metrics_scrape_interval",
     "How often to scrape metrics Kubernetes API /metrics endpoint. Defaults to 60 seconds.",
     convert_to=float,
-    default=60.0,
+    default=DEFAULT_KUBERNETES_API_METRICS_SCRAPE_INTERVAL,
 )
 
 define_config_option(
@@ -257,7 +296,7 @@ define_config_option(
     "kubernetes_api_metric_name_include_list",
     "Optional metric name include list for Kubernetes API metrics endpoint. By default all metrics are included.",
     convert_to=ArrayOfStrings,
-    default=["*"],
+    default=DEFAULT_KUBERNETES_API_METRIC_NAME_INCLUDE_LIST,
 )
 
 define_config_option(
@@ -265,16 +304,7 @@ define_config_option(
     "kubernetes_api_metric_name_exclude_list",
     'Optional metric name exclude list for Kubernetes API metrics endpoint. By default all the histogram and per HTTP path metrics are excluded. If you want to include all the metrics, set this value to "*".',
     convert_to=ArrayOfStrings,
-    default=[
-        # We exclude all the per request path metrics which provide little value and there are tons
-        # of those (one per visited path + query params). This means that each scrape only returns
-        # ~400 metrics instead of 2000+.
-        # Exclude histograms
-        "*_bucket",
-        # Exclude per path and rest client stats (tons of metrics, one for every path and not so useful)
-        "kubelet_http_*",
-        "rest_client_*",
-    ],
+    default=DEFAULT_KUBERNETES_API_METRIC_NAME_EXCLUDE_LIST,
 )
 
 define_config_option(
@@ -290,7 +320,7 @@ define_config_option(
     "kubernetes_api_cadvisor_metrics_scrape_interval",
     "How often to scrape metrics Kubernetes API /metrics/cadvisor endpoint. Defaults to 60 seconds.",
     convert_to=float,
-    default=60.0,
+    default=DEFAULT_KUBERNETES_API_CADVISOR_METRICS_SCRAPE_INTERVAL,
 )
 
 define_config_option(
@@ -298,7 +328,7 @@ define_config_option(
     "kubernetes_api_cadvisor_metric_name_include_list",
     "Optional metric name include list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included.",
     convert_to=ArrayOfStrings,
-    default=["*"],
+    default=DEFAULT_KUBERNETES_API_CADVISOR_METRIC_NAME_INCLUDE_LIST,
 )
 
 define_config_option(
@@ -306,7 +336,7 @@ define_config_option(
     "kubernetes_api_cadvisor_metric_name_exclude_list",
     "Optional metric name exclude list for Kubernetes cAdvisor API metrics endpoint. By default all metrics are included and no metrics are excluded.",
     convert_to=ArrayOfStrings,
-    default=[],
+    default=DEFAULT_KUBERNETES_API_CADVISOR_METRIC_NAME_EXCLUDE_LIST,
 )
 
 define_config_option(
@@ -338,10 +368,6 @@ KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
     "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor"
 )
 
-DEFAULT_SCRAPE_SCHEME = "http"
-DEFAULT_SCRAPE_PORT = None
-DEFAULT_SCRAPE_PATH = "/metrics"
-
 # Annotation related constants
 PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
 PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
@@ -351,6 +377,7 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "k8s.monitor.config.scalyr.com/scrape"
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
     "k8s.monitor.config.scalyr.com/scrape_interval"
 )
+SCALYR_AGENT_ANNOTATION_SCRAPE_TIMEOUT = "k8s.monitor.config.scalyr.com/scrape_timeout"
 # Set to False to disable ssl cert and hostname verification for a specific exporter (only applies
 # if that exporter is using https scheme)
 SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP = (
@@ -379,6 +406,7 @@ class K8sPod(object):
 class OpenMetricsMonitorConfig(object):
     scrape_url: str
     scrape_interval: int
+    scrape_timeout: int
     verify_https: bool
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
@@ -393,7 +421,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "%s(%s)" % (module_name, self.__get_node_name())
         )
 
-        self.__verify_https = self._config.get("verify_https", True)
+        self.__scrape_interval = self._config.get(
+            "scrape_interval", DEFAULT_SCRAPE_INTERVAL
+        )
+        self.__scrape_timeout = self._config.get(
+            "scrape_timeout", DEFAULT_SCRAPE_TIMEOUT
+        )
+        self.__verify_https = self._config.get("verify_https", DEFAULT_VERIFY_HTTPS)
 
         self.__k8s_kubelet_host_ip = self._config.get("k8s_kubelet_host_ip")
         self.__k8s_kubelet_api_url_template = self._config.get(
@@ -408,10 +442,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         self.__kubernetes_api_metrics_scrape_interval = self._config.get(
-            "kubernetes_api_metrics_scrape_interval", 60
+            "kubernetes_api_metrics_scrape_interval",
+            DEFAULT_KUBERNETES_API_METRICS_SCRAPE_INTERVAL,
         )
         self.__kubernetes_api_cadvisor_metrics_scrape_interval = self._config.get(
-            "kubernetes_api_cadvisor_metrics_scrape_interval", 60
+            "kubernetes_api_cadvisor_metrics_scrape_interval",
+            DEFAULT_KUBERNETES_API_CADVISOR_METRICS_SCRAPE_INTERVAL,
         )
         self.__include_node_name = self._config.get("include_node_name", False)
 
@@ -511,6 +547,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         url: str,
         sample_interval: int,
         log_filename: str,
+        scrape_timeout: int = None,
         verify_https: str = None,
         ca_file: str = None,
         headers: dict = None,
@@ -522,6 +559,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
         """
+        if scrape_timeout is None:
+            scrape_timeout = self.__scrape_timeout
+
         if verify_https is None:
             verify_https = self.__verify_https
 
@@ -546,6 +586,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             # This gets changed dynamically per monitor via log config path
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
             "sample_interval": sample_interval,
+            "timeout": scrape_timeout,
             "metric_name_include_list": metric_name_include_list,
             "metric_name_exclude_list": metric_name_exclude_list,
             "metric_component_value_include_list": JsonObject(
@@ -949,7 +990,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         scrape_interval_string = pod.annotations.get(
             SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL,
-            self._config.get("scrape_interval", 60),
+            self.__scrape_interval,
         )
 
         try:
@@ -957,6 +998,19 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         except ValueError:
             self._logger.warn(
                 f"Pod {pod.namespace}/{pod.name} ({pod.uid}) contains invalid value for scrape interval ({scrape_interval_string}). Value must be a number."
+            )
+            return None
+
+        scrape_timeout_string = pod.annotations.get(
+            SCALYR_AGENT_ANNOTATION_SCRAPE_TIMEOUT,
+            self.__scrape_timeout,
+        )
+
+        try:
+            scrape_timeout = int(scrape_timeout_string)
+        except ValueError:
+            self._logger.warn(
+                f"Pod {pod.namespace}/{pod.name} ({pod.uid}) contains invalid value for scrape timeout ({scrape_timeout_string}). Value must be a number."
             )
             return None
 
@@ -977,6 +1031,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         return OpenMetricsMonitorConfig(
             scrape_url=scrape_url,
             scrape_interval=scrape_interval,
+            scrape_timeout=scrape_timeout,
             verify_https=verify_https,
             metric_name_include_list=metric_name_include_list,
             metric_name_exclude_list=metric_name_exclude_list,

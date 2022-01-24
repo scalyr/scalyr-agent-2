@@ -113,6 +113,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_name_include_list": ["*"],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "sample_interval": 10,
+            "timeout": 10,
             "url": "https://192.168.100.0:8080/metrics",
             "verify_https": False,
         }
