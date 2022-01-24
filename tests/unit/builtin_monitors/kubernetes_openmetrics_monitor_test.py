@@ -72,6 +72,15 @@ for index, pod in enumerate(
 
 
 class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ["SCALYR_K8S_NODE_NAME"] = "test-node-name"
+
+    @classmethod
+    def tearDownClass(cls):
+        if "SCALYR_K8S_NODE_NAME" in os.environ:
+            del os.environ["SCALYR_K8S_NODE_NAME"]
+
     def test_get_monitor_and_log_config(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
@@ -104,7 +113,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         expected_monitor_config = {
             "ca_file": None,
-            "extra_fields": JsonObject({"node": None}),
+            "extra_fields": JsonObject({"node": "test-node-name"}),
             "headers": JsonObject({}),
             "id": "one",
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
