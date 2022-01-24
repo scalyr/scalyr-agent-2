@@ -370,9 +370,6 @@ class OpenMetricsMonitor(ScalyrMonitor):
         metrics_count = 0
 
         for line in lines:
-            comment_metric_name = None
-            comment_metric_type = None
-
             # Skip comments
             if line.startswith("# "):
                 if "TYPE" in line:
