@@ -356,6 +356,14 @@ define_config_option(
     default=False,
 )
 
+define_config_option(
+    __monitor__,
+    "logger_include_node_name",
+    "True to include node name in the logger name. Setting this to False can come handy in debugging scenarios where we want to enable debug level for all the monitors without needing to know the node name.",
+    convert_to=bool,
+    default=True,
+)
+
 KUBERNETES_API_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics"
 )
@@ -414,12 +422,17 @@ class OpenMetricsMonitorConfig(object):
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
     def _initialize(self):
+        self.__logger_include_node_name = self._config.get(
+            "logger_include_node_name", True
+        )
+
         # There can only be a single instance of this monitor running so we assign a custom id
         # with node name in it to make searching for this monitor logs easier
         module_name = self._config.get("module")
-        self._logger = scalyr_logging.getLogger(
-            "%s(%s)" % (module_name, self.__get_node_name())
-        )
+        if self.__logger_include_node_name:
+            self._logger = scalyr_logging.getLogger(
+                "%s(%s)" % (module_name, self.__get_node_name())
+            )
 
         self.__scrape_interval = self._config.get(
             "scrape_interval", DEFAULT_SCRAPE_INTERVAL
