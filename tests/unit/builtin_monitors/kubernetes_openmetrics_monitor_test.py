@@ -495,7 +495,37 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
                 "url"
             ],
-            "http://10.5.5.5.141:9404/metrics",
+            "https://10.5.5.5.141:9404/metrics1",
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
+                "sample_interval"
+            ],
+            120,
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
+                "timeout"
+            ],
+            5,
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
+                "verify_https"
+            ],
+            False,
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
+                "metric_name_include_list"
+            ],
+            ["include1", "include2"],
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[2][1]["monitor_config"][
+                "metric_name_exclude_list"
+            ],
+            ["exclude1", "exclude2"],
         )
 
         # 2. Second gather call, single pod (arm exporter) has gonne away so 1 dynamic monitor should be removed

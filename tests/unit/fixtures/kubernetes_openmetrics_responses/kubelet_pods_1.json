@@ -460,9 +460,16 @@
                 },
                 "annotations": {
                     "k8s.monitor.config.scalyr.com/scrape": "true",
+                    "k8s.monitor.config.scalyr.com/scrape_interval": "120",
+                    "k8s.monitor.config.scalyr.com/scrape_timeout": "5",
+                    "k8s.monitor.config.scalyr.com/verify_https": "False",
+                    "k8s.monitor.config.scalyr.com/metric_name_include_list": "include1,include2",
+                    "k8s.monitor.config.scalyr.com/metric_name_exclude_list": "exclude1,exclude2",
                     "kubernetes.io/config.seen": "2022-01-10T18:30:05.514151956Z",
                     "kubernetes.io/config.source": "api",
                     "prometheus.io/port": "9404",
+                    "prometheus.io/scheme": "https",
+                    "prometheus.io/path": "/metrics1",
                     "prometheus.io/scrape": "true"
                 },
                 "ownerReferences": [

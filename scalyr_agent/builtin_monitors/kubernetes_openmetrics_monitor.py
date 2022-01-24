@@ -796,8 +796,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         monitor_config, log_config = self.__get_monitor_config_and_log_config(
             monitor_id=f"{node_name}_{pod.name}",
             url=scrape_url,
-            sample_interval=scrape_config.scrape_interval
-            or self._config.get("scrape_interval", 60.0),
+            sample_interval=scrape_config.scrape_interval or self.__scrape_interval,
+            scrape_timeout=scrape_config.scrape_timeout,
+            verify_https=scrape_config.verify_https,
             log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
