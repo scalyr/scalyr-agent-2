@@ -738,7 +738,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self._logger.info(f"Found {len(k8s_pods)} pods on node {node_name}")
 
         # Maps scrape URL to the corresponding monitor config and K8sPod
-        scrape_configs: Dict[str, Tuple(OpenMetricsMonitorConfig, K8sPod)] = {}
+        scrape_configs: Dict[str, Tuple[OpenMetricsMonitorConfig, K8sPod]] = {}
 
         # Dynamically query for scrape URLs based on the pods running on thise node and
         # corresponding pod annotations
