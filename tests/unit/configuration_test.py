@@ -2137,11 +2137,11 @@ class TestConfiguration(TestConfigurationBase):
         new_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(new_json_lib, "json")
 
-        # auth should fall back to ujson again
+        # auth should fall back to orjson again
         self._write_file_with_separator_conversion(
             """{
              api_key: "hi there",
-            json_library: "ujson"
+            json_library: "orjson"
           }
         """
         )
@@ -2151,7 +2151,7 @@ class TestConfiguration(TestConfigurationBase):
         config.apply_config()
 
         new_json_lib = scalyr_util.get_json_lib()
-        self.assertEqual(new_json_lib, "ujson")
+        self.assertEqual(new_json_lib, "orjson")
 
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_apply_config_without_parse(self):

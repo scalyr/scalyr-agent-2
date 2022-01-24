@@ -100,14 +100,6 @@ from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  
 from scalyr_agent.date_parsing_utils import rfc3339_to_datetime  # NOQA
 
 
-USJON_NOT_AVAILABLE_MSG = """
-ujson library is not available. You can install it using pip:
-
-    pip install usjon
-
-Original error: %s
-""".strip()
-
 ORJSON_NOT_AVAILABLE_MSG = """
 orjson library is not available. You can install it using pip.
 
@@ -221,44 +213,13 @@ def warn_on_old_or_unsupported_python_version():
 
 
 def get_json_implementation(lib_name):
-    if lib_name not in ["json", "ujson", "orjson"]:
+    if lib_name not in ["json", "orjson"]:
         raise ValueError("Unsupported json library %s" % lib_name)
 
     if lib_name == "orjson" and not six.PY3:
         raise ValueError('"orjson" is only available under Python 3')
 
-    if lib_name == "ujson":
-        try:
-            import ujson  # pylint: disable=import-error
-        except ImportError as e:
-            raise ImportError(USJON_NOT_AVAILABLE_MSG % (str(e)))
-
-        def ujson_dumps_custom(obj, fp):
-            """Serialize the objection.
-            Note, this function returns different types (text vs binary) based on which version of Python you are using.
-            We leave the type unchanged here because the code that invokes this function
-            will convert it to the final desired return type.
-            Otherwise, we'd be double converting the result in some cases.
-            :param obj: The object to serialize
-            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
-            :type obj: dict
-            :return: If fp is not None, then the string representing the serialization.
-            :rtype: Python3 - six.text_type, Python2 - six.binary_type
-            """
-            # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
-            # Detect and complain loudly.
-            if isinstance(obj, (json_lib.JsonObject, json_lib.JsonArray)):
-                raise TypeError(
-                    "ujson does not correctly encode objects of type: %s" % type(obj)
-                )
-            if fp is not None:
-                return ujson.dump(obj, sort_keys=SORT_KEYS)
-            else:
-                return ujson.dumps(obj, sort_keys=SORT_KEYS)
-
-        return lib_name, ujson_dumps_custom, ujson.loads
-
-    elif lib_name == "orjson":
+    if lib_name == "orjson":
         # todo: throw a more friendly error message on import error with info on how to install it
         # special case for 3.5
         try:
@@ -372,9 +333,9 @@ def set_json_lib(lib_name):
 # We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
 # encoding
 if six.PY3:
-    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
+    JSON_LIBS_TO_USE = ["orjson", "json"]
 else:
-    JSON_LIBS_TO_USE = ["ujson", "json"]
+    JSON_LIBS_TO_USE = ["json"]
 
 last_error = None
 for json_lib_to_use in JSON_LIBS_TO_USE:

@@ -40,7 +40,6 @@ if six.PY3 and platform.system() != "Darwin":
     import orjson
 
 JSON = 1
-UJSON = 2
 ORJSON = 3
 
 
@@ -50,8 +49,6 @@ class EncodeDecodeTest(ScalyrTestCase):
     def _setlib(self, library):
         if library == JSON:
             util.set_json_lib("json")
-        elif library == UJSON:
-            util.set_json_lib("ujson")
         elif library == ORJSON:
             util.set_json_lib("orjson")
         else:
@@ -155,8 +152,6 @@ class EncodeDecodeTest(ScalyrTestCase):
             finally:
                 util.set_json_lib(original_lib)
 
-        if sys.version_info[:2] > (2, 4) and sys.version_info[:2] != (2, 6):
-            __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
         if sys.version_info[:2] >= (3, 5) and platform.system() != "Darwin":
@@ -242,7 +237,7 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
     def tearDown(self):
         super(TestDefaultJsonLibrary, self).tearDown()
 
-        for value in ["scalyr_agent.util", "orjson", "ujson", "json"]:
+        for value in ["scalyr_agent.util", "orjson", "json"]:
             if value in sys.modules:
                 del sys.modules[value]
 
@@ -258,16 +253,8 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
         self.assertEqual(scalyr_agent.util.get_json_lib(), "orjson")
 
         sys.modules["orjson"] = None
-        sys.modules["ujson"] = mock.Mock()
-
-        import scalyr_agent.util
-
-        reload(scalyr_agent.util)
-
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
 
         sys.modules["orjson"] = None
-        sys.modules["ujson"] = None
         sys.modules["json"] = mock.Mock()
 
         import scalyr_agent.util
@@ -281,32 +268,12 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
     def test_correct_default_json_library_is_used_python2(self):
         # NOTE: orjson is not available on Python 2 so we should not try and use it
         sys.modules["orjson"] = mock.Mock()
-        sys.modules["ujson"] = mock.Mock()
 
         import scalyr_agent.util
 
         reload(scalyr_agent.util)
 
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
-
-        sys.modules["orjson"] = None
-        sys.modules["ujson"] = mock.Mock()
-
-        import scalyr_agent.util
-
-        reload(scalyr_agent.util)
-
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "ujson")
-
-        sys.modules["orjson"] = None
-        sys.modules["ujson"] = None
-        sys.modules["json"] = mock.Mock()
-
-        import scalyr_agent.util
-
-        reload(scalyr_agent.util)
-
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "jsoj")
 
 
 def main():
