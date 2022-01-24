@@ -104,6 +104,7 @@ from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.scalyr_client import create_client, verify_server_certificate
 from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.monitors_manager import set_monitors_manager
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.util import warn_on_old_or_unsupported_python_version
@@ -120,6 +121,7 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent import compat
+import scalyr_agent.monitors_manager
 
 
 STATUS_FILE = "last_status"
@@ -1169,6 +1171,8 @@ class ScalyrAgent(object):
                     wt.monitors_manager.set_user_agent_augment_callback(
                         wt.copying_manager.augment_user_agent_for_workers_sessions
                     )
+                    # configure currently active monitor manager instance variable
+                    set_monitors_manager(monitors_manager=wt.monitors_manager)
                     wt.start(logs_initial_positions)
                     return wt, wt.copying_manager, wt.monitors_manager
 

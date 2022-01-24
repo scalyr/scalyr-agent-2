@@ -179,8 +179,8 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
         for item in value:
             if type(item) not in STRING_TYPES:
                 raise BadConfiguration(
-                    'Non-string element found in value %s for field "%s"'
-                    % (value, field_name),
+                    'Non-string element found in value %s (type %s) for field "%s"'
+                    % (value, str(type(item)), field_name),
                     field_name,
                     "notArrayOfStrings",
                 )

@@ -254,17 +254,20 @@ class AgentLogRequestStatsLineCheck(LogVerifierCheck):
                 if bytes_sent <= 0:
                     return (
                         LogVerifierCheckResult.FAIL,
-                        "Agent log says that during the run the agent has sent zero bytes.",
+                        f"Agent log says that during the run the agent has sent zero bytes.\n"
+                        f"Whole log content: {whole_log_text}",
                     )
                 if requests_sent <= 0:
                     return (
                         LogVerifierCheckResult.FAIL,
-                        "Agent log says that during the run the agent has sent zero requests.",
+                        f"Agent log says that during the run the agent has sent zero requests.\n"
+                        f"Whole log content: {whole_log_text}",
                     )
 
                 return (
                     LogVerifierCheckResult.SUCCESS,
-                    "Agent requests stats have been found and they are valid.",
+                    f"Agent requests stats have been found and they are valid.\n"
+                    f"Whole log content: {whole_log_text}",
                 )
 
         else:

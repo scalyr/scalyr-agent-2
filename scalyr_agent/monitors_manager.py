@@ -24,6 +24,7 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import time
+import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
@@ -39,6 +40,13 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import six
 
 log = scalyr_logging.getLogger(__name__)
+
+# Holds reference to the currently active MonitorsManager instance (singleton). Reference to this
+# instance should be obtained using "get_monitors_manager()" function.
+MONITORS_MANAGER_INSTANCE = None
+
+# Lock which is used when manipulating the value of MONITORS_MANAGER_INSTANCE variable.
+MONITORS_MANAGER_INSTANCE_LOCK = threading.Lock()
 
 
 class MonitorsManager(StoppableThread):
@@ -74,6 +82,9 @@ class MonitorsManager(StoppableThread):
         self.__user_agent_callback = None
         self._user_agent_refresh_interval = configuration.user_agent_refresh_interval
 
+        # Lock which is used when manipulating self.__monitors and self.__running_monitors variables
+        self.__lock = threading.Lock()
+
     def find_monitor(self, module_name):
         """Finds a monitor with a specific name
         @param module_name: the module name of the monitor to find
@@ -84,6 +95,21 @@ class MonitorsManager(StoppableThread):
                 return monitor
 
         return None
+
+    def find_monitors(self, module_name):
+        """
+        Finds all monitor with a specific name.
+
+        @param module_name: the module name of the monitors to find
+        @return: A list of Monitor objects if found, otherwise an empty list.
+        """
+        result = []
+
+        for monitor in self.__monitors:
+            if monitor.module_name == module_name:
+                result.append(monitor)
+
+        return result
 
     def generate_status(self):
         """Creates and returns a status object that reports the monitor status.
@@ -117,43 +143,23 @@ class MonitorsManager(StoppableThread):
         # TODO:  Move this try statement out of here.  Let higher layers catch it.
         # noinspection PyBroadException
         try:
+            # NOTE: We could use a more granular lock (e.g. only when manipulating protected
+            # internal variables), but that's not really needed since this method should only be
+            # called once before any other monitors which can manipulate this state are started.
+            self.__lock.acquire()
+
             for monitor in self.__monitors:
-                # Debug Leaks
-                if self.__disable_monitor_threads:
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name,
+                # Make sure we don't start any monitors which have already been started (e.g.
+                # dynamically via add_monitor() method)
+                if monitor in self.__running_monitors:
+                    log.debug(
+                        "Monitor %s is already running, skipping starting it..."
+                        % (monitor.uid)
                     )
                     continue
-                # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead fail.
-                if monitor.open_metric_log():
-                    monitor.config_from_monitors(self)
-                    log.info("Starting monitor %s", monitor.monitor_name)
 
-                    # NOTE: Workaround for a not so great behavior with out code where we create
-                    # thread instances before forking. This causes issues because "_is_stopped"
-                    # instance attribute gets set to "True" and never gets reset to "False". This
-                    # means isAlive() will correctly return that the threat is not alive is it was
-                    # created before forking.
-                    # See the following for details:
-                    #
-                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L800
-                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L806
-                    # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L817
-                    #
-                    # Long term and correct solution is making sure we don't create any threads
-                    # before we fork
-                    if six.PY3:
-                        monitor._is_stopped = False
+                self.__start_monitor(monitor=monitor)
 
-                    monitor.start()
-
-                    self.__running_monitors.append(monitor)
-                else:
-                    log.warn(
-                        "Could not start monitor %s because its log could not be opened",
-                        monitor.monitor_name,
-                    )
             # Start the monitor manager thread. Do not wait for all monitor threads to start as some may misbehave
             if not self.__disable_monitor_threads:
                 log.log(
@@ -168,6 +174,8 @@ class MonitorsManager(StoppableThread):
                 )
         except Exception:
             log.exception("Failed to start the monitors due to an exception")
+        finally:
+            self.__lock.release()
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops all of the monitors.
@@ -262,6 +270,13 @@ class MonitorsManager(StoppableThread):
         """
         return self.__monitors
 
+    @property
+    def running_monitors(self):
+        """
+        Returns the list of all the running monitors.
+        """
+        return self.__running_monitors
+
     @staticmethod
     def __create_monitors(configuration, platform_controller):
         """Creates instances of the monitors that should be run based on the contents of the configuration file
@@ -320,6 +335,107 @@ class MonitorsManager(StoppableThread):
                 )
             )
         return result
+
+    def __start_monitor(self, monitor):
+        """
+        Method which starts the monitor and updates internal tracking state.
+        """
+        # Debug Leaks
+        if self.__disable_monitor_threads:
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name,
+            )
+            return
+
+        # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead fail.
+        if monitor.open_metric_log():
+            monitor.config_from_monitors(self)
+            log.info("Starting monitor %s", monitor.monitor_name)
+
+            # NOTE: Workaround for a not so great behavior with out code where we create
+            # thread instances before forking. This causes issues because "_is_stopped"
+            # instance attribute gets set to "True" and never gets reset to "False". This
+            # means isAlive() will correctly return that the threat is not alive is it was
+            # created before forking.
+            # See the following for details:
+            #
+            # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L800
+            # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L806
+            # - https://github.com/python/cpython/blob/3.7/Lib/threading.py#L817
+            #
+            # Long term and correct solution is making sure we don't create any threads
+            # before we fork
+            if six.PY3:
+                monitor._is_stopped = False
+
+            monitor.start()
+
+            self.__running_monitors.append(monitor)
+        else:
+            log.warn(
+                "Could not start monitor %s because its log could not be opened",
+                monitor.monitor_name,
+            )
+
+        return monitor
+
+    def add_monitor(self, monitor_config, global_config, log_config=None):
+        """
+        Dynamically add start a new monitor during run time.
+
+        :param monitor_config: Dictionary with the monitor config.
+        :param global_config: Scalyr global configuration object.
+        :param log_config: Optional dictionary with the monitor "log_config" attribute values. This
+                           allows overriding values such as log config path, etc.
+        """
+        log.debug("Adding new monitor with config: %s" % (str(monitor_config)))
+
+        monitor = MonitorsManager.build_monitor(
+            monitor_config=monitor_config,
+            additional_python_paths=global_config.additional_monitor_module_paths,
+            default_sample_interval_secs=global_config.global_monitor_sample_interval,
+            global_config=global_config,
+        )
+
+        if log_config:
+            monitor.log_config.update(log_config)
+
+        with self.__lock:
+            self.__monitors.append(monitor)
+            monitor = self.__start_monitor(monitor=monitor)
+
+        return monitor
+
+    def remove_monitor(self, monitor_uid):
+        """
+        Dynamically remove and stop an existing running monitor.
+        """
+        log.info("Removing monitor with uid %s", monitor_uid)
+
+        # Stop the monitor thread and close the metric log file
+        found, running_index, monitors_index = False, -1, -1
+        for monitor in self.__running_monitors:
+            if monitor_uid == monitor.uid:
+                found = True
+                monitor.stop(wait_on_join=False)
+                monitor.close_metric_log()
+
+                running_index = self.__running_monitors.index(monitor)
+                monitors_index = self.__monitors.index(monitor)
+                break
+
+        if found:
+            # If found, remove it from the internal tracking lists
+            with self.__lock:
+                del self.__running_monitors[running_index]
+                del self.__monitors[monitors_index]
+
+            log.info(
+                "Stopped and removed monitor %s (%s)", monitor.monitor_name, monitor_uid
+            )
+        else:
+            log.info("Failed to find running monitor with id %s", monitor_uid)
 
     @staticmethod
     def load_monitor(monitor_module, additional_python_paths):
@@ -417,3 +533,26 @@ class MonitorsManager(StoppableThread):
             )
 
         return all_monitors
+
+
+def set_monitors_manager(monitors_manager):
+    """
+    Update module level variable which points to the currently active MonitorsManager instance.
+    """
+    global MONITORS_MANAGER_INSTANCE, MONITORS_MANAGER_INSTANCE_LOCK
+
+    with MONITORS_MANAGER_INSTANCE_LOCK:
+        MONITORS_MANAGER_INSTANCE = monitors_manager
+
+
+def get_monitors_manager():
+    """
+    Return currently active MonitorsManager instance.
+
+    This method is to be used and called in places where we don't want cyclic references (e.g.
+    inside the Monitor class since MonitorsManager already holds a reference to Monitor class).
+    """
+    global MONITORS_MANAGER_INSTANCE, MONITORS_MANAGER_INSTANCE_LOCK
+
+    with MONITORS_MANAGER_INSTANCE_LOCK:
+        return MONITORS_MANAGER_INSTANCE

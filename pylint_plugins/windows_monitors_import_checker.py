@@ -32,6 +32,7 @@ from pylint.interfaces import IAstroidChecker
 
 
 from win32.dynamic_modules import WINDOWS_MONITOR_MODULES_TO_INCLUDE
+from win32.dynamic_modules import WINDOWS_MONITOR_MODULES_TO_EXCLUDE
 
 
 class PyInstallerChecker(BaseChecker):
@@ -94,6 +95,7 @@ class PyInstallerChecker(BaseChecker):
         if (
             "ScalyrMonitor" in node.basenames
             and self.__current_module not in WINDOWS_MONITOR_MODULES_TO_INCLUDE
+            and self.__current_module not in WINDOWS_MONITOR_MODULES_TO_EXCLUDE
         ):
             args = (class_name, self.__current_module)
             self.add_message(self.MONITOR_NOT_INCLUDED_FOR_WIN32, node=node, args=args)
