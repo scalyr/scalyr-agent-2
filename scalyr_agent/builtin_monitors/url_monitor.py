@@ -198,15 +198,19 @@ class UrlMonitor(ScalyrMonitor):
         Builds the HTTP request based on the request URL, HTTP headers and method
         @return: Request object
         """
+        # TODO: Switch to requests
+        request_data = self.request_data
 
-        request = six.moves.urllib.request.Request(self.url, data=self.request_data)
+        if six.PY3 and request_data:
+            request_data = six.ensure_binary(request_data)
+
+        request = six.moves.urllib.request.Request(self.url, data=request_data)
 
         for header_key, header_value in six.iteritems(self._base_headers):
             request.add_header(header_key, header_value)
 
         if self.request_headers:
             for header in self.request_headers:
-                print(header)
                 request.add_header(header["header"], header["value"])
 
         # seems awkward to override the GET method, but internally it flips
