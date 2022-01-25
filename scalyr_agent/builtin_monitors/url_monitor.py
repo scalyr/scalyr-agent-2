@@ -19,6 +19,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import re
+import traceback
 
 import six
 import six.moves.urllib.request
@@ -197,8 +198,13 @@ class UrlMonitor(ScalyrMonitor):
         Builds the HTTP request based on the request URL, HTTP headers and method
         @return: Request object
         """
+        # TODO: Switch to requests
+        request_data = self.request_data
 
-        request = six.moves.urllib.request.Request(self.url, data=self.request_data)
+        if six.PY3 and request_data:
+            request_data = six.ensure_binary(request_data)
+
+        request = six.moves.urllib.request.Request(self.url, data=request_data)
 
         for header_key, header_value in six.iteritems(self._base_headers):
             request.add_header(header_key, header_value)
@@ -230,7 +236,7 @@ class UrlMonitor(ScalyrMonitor):
             self._record_error(e, "url_error")
             return
         except Exception as e:
-            self._record_error(e, "unknown_error")
+            self._record_error(e, "unknown_error", include_traceback=True)
             return
 
         # Read the response, and apply any extraction pattern
@@ -241,7 +247,7 @@ class UrlMonitor(ScalyrMonitor):
             self._record_error(e, "incomplete_read")
             return
         except Exception as e:
-            self._record_error(e, "unknown_error")
+            self._record_error(e, "unknown_error", include_traceback=True)
             return
 
         response_body = six.ensure_text(response_body, errors="replace")
@@ -273,7 +279,7 @@ class UrlMonitor(ScalyrMonitor):
             },
         )
 
-    def _record_error(self, e, error_type):
+    def _record_error(self, e, error_type, include_traceback=False):
         """Emits a value for the URL metric that reports an error.
 
         Status code is set to zero and we included an extra field capturing a portion of the exception's name.
@@ -282,17 +288,24 @@ class UrlMonitor(ScalyrMonitor):
         @type e: Exception
         @type error_type: str
         """
-        # Convert the exception to a string, truncated to 20 chars.
+        # Convert the exception to a string, truncated to 30 chars.
         e_to_str = six.text_type(e)
-        if len(e_to_str) > 20:
-            e_to_str = e_to_str[0:20]
+
+        if len(e_to_str) > 30:
+            e_to_str = e_to_str[0:30] + "..."
+
+        extra_fields = {
+            "url": self.url,
+            "status": 0,
+            "length": 0,
+            error_type: e_to_str,
+        }
+
+        if include_traceback:
+            extra_fields["traceback"] = traceback.format_exc()
+
         self._logger.emit_value(
             "response",
             "failed",
-            extra_fields={
-                "url": self.url,
-                "status": 0,
-                "length": 0,
-                error_type: e_to_str,
-            },
+            extra_fields=extra_fields,
         )

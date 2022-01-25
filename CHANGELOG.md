@@ -15,6 +15,9 @@ Docker images:
 * Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
 * Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye.
 
+Bug fixes:
+* Fix a bug with the URL monitor not working correctly with POST methods when ``request_data`` was specified under Python 3.
+
 ## 2.1.26 "Yavin" - Jan 12, 2022
 
 <!---
