@@ -440,7 +440,6 @@ class Configuration(object):
                 )
                 self.__log_configs.append(profile_config)
 
-
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
             # Perform validation for k8s_logs option
