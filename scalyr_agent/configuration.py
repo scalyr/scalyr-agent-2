@@ -416,6 +416,14 @@ class Configuration(object):
 
             # add in the profile logs if we have enabled profiling
             if self.enable_profiling:
+                self.__logger.info(
+                    "Profiling is enabled, will ingest CPU profiling (%s) and memory "
+                    "profiling (%s) data by default"
+                    % (self.profile_log_name, self.memory_profile_log_name),
+                    limit_once_per_x_secs=86400,
+                    limit_key="profiling-enabled-ingest",
+                )
+
                 # 1. CPU profiling
                 profile_config = JsonObject(
                     path=self.profile_log_name,
