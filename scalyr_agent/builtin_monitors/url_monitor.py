@@ -284,11 +284,11 @@ class UrlMonitor(ScalyrMonitor):
         @type e: Exception
         @type error_type: str
         """
-        # Convert the exception to a string, truncated to 20 chars.
+        # Convert the exception to a string, truncated to 30 chars.
         e_to_str = six.text_type(e)
 
-        if len(e_to_str) > 20:
-            e_to_str = e_to_str[0:20]
+        if len(e_to_str) > 30:
+            e_to_str = e_to_str[0:30] + "..."
 
         extra_fields = {
             "url": self.url,
