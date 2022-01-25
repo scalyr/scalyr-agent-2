@@ -414,18 +414,32 @@ class Configuration(object):
 
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
-            # add in the profile log if we have enabled profiling
+            # add in the profile logs if we have enabled profiling
             if self.enable_profiling:
+                # 1. CPU profiling
                 profile_config = JsonObject(
                     path=self.profile_log_name,
                     copy_from_start=True,
                     staleness_threshold_secs=20 * 60,
-                    parser="scalyrAgentProfiling",
+                    parser="scalyrAgentCpuProfiling",
                 )
                 self.__verify_log_entry_and_set_defaults(
                     profile_config, description="CPU profile log config"
                 )
                 self.__log_configs.append(profile_config)
+
+                # 2. Memory profiling
+                profile_config = JsonObject(
+                    path=self.memory_profile_log_name,
+                    copy_from_start=True,
+                    staleness_threshold_secs=20 * 60,
+                    parser="scalyrAgentMemoryProfiling",
+                )
+                self.__verify_log_entry_and_set_defaults(
+                    profile_config, description="CPU profile log config"
+                )
+                self.__log_configs.append(profile_config)
+
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
