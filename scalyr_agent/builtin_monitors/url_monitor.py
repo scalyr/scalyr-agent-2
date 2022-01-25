@@ -19,6 +19,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import re
+import traceback
 
 import six
 import six.moves.urllib.request
@@ -205,6 +206,7 @@ class UrlMonitor(ScalyrMonitor):
 
         if self.request_headers:
             for header in self.request_headers:
+                print(header)
                 request.add_header(header["header"], header["value"])
 
         # seems awkward to override the GET method, but internally it flips
@@ -230,7 +232,7 @@ class UrlMonitor(ScalyrMonitor):
             self._record_error(e, "url_error")
             return
         except Exception as e:
-            self._record_error(e, "unknown_error")
+            self._record_error(e, "unknown_error", include_traceback=True)
             return
 
         # Read the response, and apply any extraction pattern
@@ -241,7 +243,7 @@ class UrlMonitor(ScalyrMonitor):
             self._record_error(e, "incomplete_read")
             return
         except Exception as e:
-            self._record_error(e, "unknown_error")
+            self._record_error(e, "unknown_error", include_traceback=True)
             return
 
         response_body = six.ensure_text(response_body, errors="replace")
@@ -273,7 +275,7 @@ class UrlMonitor(ScalyrMonitor):
             },
         )
 
-    def _record_error(self, e, error_type):
+    def _record_error(self, e, error_type, include_traceback=False):
         """Emits a value for the URL metric that reports an error.
 
         Status code is set to zero and we included an extra field capturing a portion of the exception's name.
@@ -284,15 +286,22 @@ class UrlMonitor(ScalyrMonitor):
         """
         # Convert the exception to a string, truncated to 20 chars.
         e_to_str = six.text_type(e)
+
         if len(e_to_str) > 20:
             e_to_str = e_to_str[0:20]
+
+        extra_fields = {
+            "url": self.url,
+            "status": 0,
+            "length": 0,
+            error_type: e_to_str,
+        }
+
+        if include_traceback:
+            extra_fields["traceback"] = traceback.format_exc()
+
         self._logger.emit_value(
             "response",
             "failed",
-            extra_fields={
-                "url": self.url,
-                "status": 0,
-                "length": 0,
-                error_type: e_to_str,
-            },
+            extra_fields=extra_fields,
         )
