@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.27 "" - Feb 12, 2022
+## 2.1.27 "Thonia" - Jan 27, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 12, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 27, 2022 23:04 -0800
 --->
 
 Improvements:
@@ -13,7 +13,7 @@ Improvements:
 
 Docker images:
 * Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
-* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye.
+* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye (11).
 
 Bug fixes:
 * Fix a bug with the URL monitor not working correctly with POST methods when ``request_data`` was specified under Python 3.
