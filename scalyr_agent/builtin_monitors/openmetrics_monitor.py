@@ -168,7 +168,7 @@ define_config_option(
     "metric_name_include_list",
     "List of globs for metric names to scrape (defaults to all).",
     convert_to=ArrayOfStrings,
-    default=[u"*"],
+    default=["*"],
 )
 
 define_config_option(

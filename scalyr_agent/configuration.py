@@ -2386,7 +2386,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_sequence_number",
-            1024 ** 4,
+            1024**4,
             description,
             apply_defaults,
             env_aware=True,

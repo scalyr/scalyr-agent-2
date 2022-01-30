@@ -879,10 +879,13 @@ class BaseFormatter(logging.Formatter):
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
         if getattr(record, "rate_limited_dropped_records", 0) > 0:
-            result = ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s" % (
-                record.rate_limited_dropped_records,
-                "monitor_log_write_rate",
-                logging.Formatter.format(self, record),
+            result = (
+                ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
+                % (
+                    record.rate_limited_dropped_records,
+                    "monitor_log_write_rate",
+                    logging.Formatter.format(self, record),
+                )
             )
         else:
             result = logging.Formatter.format(self, record)
@@ -1871,10 +1874,14 @@ class UnsupportedValueType(Exception):
                 % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
-            message = 'Unsupported metric value type of "%s" with value "%s" for metric="%s". ' "Only int, long, float, and str are supported." % (
-                six.text_type(type(metric_value)),
-                six.text_type(metric_value),
-                metric_name,
+            message = (
+                'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
+                "Only int, long, float, and str are supported."
+                % (
+                    six.text_type(type(metric_value)),
+                    six.text_type(metric_value),
+                    metric_name,
+                )
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (

@@ -697,7 +697,7 @@ def microseconds_since_epoch(date_time, epoch=None):
     delta = date_time - epoch
 
     # 86400 is 24 * 60 * 60 e.g. total seconds in a day
-    return delta.microseconds + (delta.seconds + delta.days * 86400) * 10 ** 6
+    return delta.microseconds + (delta.seconds + delta.days * 86400) * 10**6
 
 
 def seconds_since_epoch(date_time, epoch=None):
@@ -711,7 +711,7 @@ def seconds_since_epoch(date_time, epoch=None):
 
     @rtype float
     """
-    return microseconds_since_epoch(date_time) / 10.0 ** 6
+    return microseconds_since_epoch(date_time) / 10.0**6
 
 
 def format_time(time_value):
@@ -831,11 +831,11 @@ def parse_data_rate_string(value):
         if numerator == "K":
             value = value * base
         elif numerator == "M":
-            value = value * base ** 2
+            value = value * base**2
         elif numerator == "G":
-            value = value * base ** 3
+            value = value * base**3
         elif numerator == "T":
-            value = value * base ** 4
+            value = value * base**4
 
         if bit_or_byte == "b":
             raise ValueError(
@@ -2200,15 +2200,19 @@ def get_agent_start_up_message():
         used_locale,
     ) = get_language_code_coding_and_locale()
 
-    msg = "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) " "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)" % (
-        SCALYR_VERSION,
-        build_revision,
-        get_pid_tid(),
-        python_version_str,
-        openssl_version,
-        sys.getfilesystemencoding(),
-        used_locale,
-        lang_env_var,
+    msg = (
+        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
+        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        % (
+            SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+        )
     )
 
     return msg

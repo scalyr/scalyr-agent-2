@@ -2018,12 +2018,15 @@ class DockerOptions(object):
         """
         String representation of a DockerOption
         """
-        return "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s" % (
-            six.text_type(self.labels_as_attributes),
-            self.label_prefix,
-            six.text_type(self.label_include_globs),
-            six.text_type(self.label_exclude_globs),
-            six.text_type(self.use_labels_for_log_config),
+        return (
+            "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s"
+            % (
+                six.text_type(self.labels_as_attributes),
+                self.label_prefix,
+                six.text_type(self.label_include_globs),
+                six.text_type(self.label_exclude_globs),
+                six.text_type(self.use_labels_for_log_config),
+            )
         )
 
     def configure_from_monitor(self, monitor):

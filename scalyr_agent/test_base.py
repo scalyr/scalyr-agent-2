@@ -266,7 +266,6 @@ if sys.version_info[:2] < (2, 7):
                         'Expected "%s" message, got "%s"' % (expected_msg, str(e))
                     )
 
-
 else:
 
     class ScalyrTestCase(BaseScalyrTestCase):
