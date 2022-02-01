@@ -31,6 +31,7 @@ function retry_on_failure {
   until [ "${i}" -gt "${RETRY_ATTEMPTS}" ]
   do
      echo ""
+     # shellcheck disable=SC2145
      echo "Running function \"$@\" attempt ${i}/${RETRY_ATTEMPTS}..."
      echo ""
 
