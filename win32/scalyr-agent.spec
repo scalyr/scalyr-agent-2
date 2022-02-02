@@ -42,7 +42,7 @@ main_a = Analysis(
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
-        ("data_files\\install_info", ".\\scalyr_agent"),
+        ("data_files\\install_info", "."),
     ],
 )
 
@@ -56,7 +56,7 @@ config_a = Analysis(
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
-        ("data_files\\install_info", ".\\scalyr_agent"),
+        ("data_files\\install_info", "."),
     ],
 )
 
@@ -70,7 +70,7 @@ service_a = Analysis(
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
-        ("data_files\\install_info", ".\\scalyr_agent"),
+        ("data_files\\install_info", "."),
     ],
 )
 
