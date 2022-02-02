@@ -100,7 +100,7 @@ def _rfc3339_to_nanoseconds_since_epoch_strptime(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10**to_nanos)
 
     return nano_seconds + nanos
 
@@ -150,7 +150,7 @@ def _rfc3339_to_nanoseconds_since_epoch_regex(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10**to_nanos)
 
     return nano_seconds + nanos
 
@@ -217,7 +217,7 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10**to_nanos)
 
     return nano_seconds + nanos
 
@@ -264,7 +264,7 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = int(int(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10**to_nanos)
 
     return nano_seconds + nanos
 
@@ -306,7 +306,7 @@ def _rfc3339_to_datetime_strptime(string):
         # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
+        micro = int(int(fractions) * 10**to_micros)
         dt = dt.replace(microsecond=micro)
 
     return dt
@@ -349,7 +349,7 @@ def _rfc3339_to_datetime_regex(string):
         # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
+        micro = int(int(fractions) * 10**to_micros)
         dt = dt.replace(microsecond=micro)
 
     return dt
@@ -409,7 +409,7 @@ def _rfc3339_to_datetime_string_split(string):
         # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
+        micro = int(int(fractions) * 10**to_micros)
         dt = dt.replace(microsecond=micro)
 
     return dt
@@ -452,7 +452,7 @@ def _rfc3339_to_datetime_udatetime(string):
         # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
-        micro = int(int(fractions) * 10 ** to_micros)
+        micro = int(int(fractions) * 10**to_micros)
         # NOTE(Tomaz): dt.replace is quite slow...
         dt = dt.replace(microsecond=micro)
 
