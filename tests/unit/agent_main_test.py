@@ -16,6 +16,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import platform
 import re
 from io import open
 import functools
@@ -29,6 +30,7 @@ from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent import agent_main, agent_status
 from scalyr_agent.scalyr_client import create_client
 
+import pytest
 __all__ = ["AgentMainTestCase"]
 
 CORRECT_INIT_PRAGMA = """
@@ -97,7 +99,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             ValueError, expected_msg, functools.partial(create_client, config)
         )
 
-    def test_ca_cert_files_checks_are_skipped_under_dev_and_msi_install(self):
+    def test_ca_cert_files_checks_are_skipped_under_dev(self):
         # Skip those checks under dev and msi install because those final generated certs files
         # are not present under dev install
 
@@ -128,8 +130,14 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
             self.assertTrue(create_client(config=config))
 
+    @pytest.mark.skipif(platform.system() != "Windows", reason="This test has to run on Windows.")
+    def test_ca_cert_files_checks_are_skipped_under_windows(self):
+
+        from scalyr_agent.agent_main import ScalyrAgent
+        from scalyr_agent.platform_controller import PlatformController
+
         # 2. MSI install (only intermediate_certs_path check should be skipped)
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.MSI_INSTALL):
+        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"

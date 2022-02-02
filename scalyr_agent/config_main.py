@@ -51,7 +51,6 @@ from __scalyr__ import (
     scalyr_init,
     get_install_root,
     TARBALL_INSTALL,
-    MSI_INSTALL,
     SCALYR_VERSION,
     PACKAGE_INSTALL,
 )
@@ -644,7 +643,7 @@ def upgrade_windows_install(
         my_default_paths = platform_controller.default_paths
 
         # Ensure agent was installed via MSI
-        if MSI_INSTALL != platform_controller.install_type:
+        if platform_controller.install_type != PACKAGE_INSTALL or platform.system() != "Windows":
             raise UpgradeFailure(
                 "The current agent was not installed via MSI, so you may not use the upgrade windows "
                 "command."

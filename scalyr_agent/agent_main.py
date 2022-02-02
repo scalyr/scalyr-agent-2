@@ -64,13 +64,11 @@ try:
     from __scalyr__ import scalyr_init
     from __scalyr__ import INSTALL_TYPE
     from __scalyr__ import DEV_INSTALL
-    from __scalyr__ import MSI_INSTALL
 except ImportError:
     from scalyr_agent.__scalyr__ import SCALYR_VERSION
     from scalyr_agent.__scalyr__ import scalyr_init
     from scalyr_agent.__scalyr__ import INSTALL_TYPE
     from scalyr_agent.__scalyr__ import DEV_INSTALL
-    from scalyr_agent.__scalyr__ import MSI_INSTALL
 
 # We must invoke this since we are an executable script.
 scalyr_init()
