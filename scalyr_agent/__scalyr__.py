@@ -26,6 +26,8 @@ __author__ = "czerwin@scalyr.com"
 # because there is only one incompatible piece of code here.
 # and it can be fixed in code below...
 import json
+import platform
+import subprocess
 
 try:
     # Python2
@@ -311,6 +313,10 @@ def __determine_version():
 
 SCALYR_VERSION = __determine_version()
 
+if platform.system() == "Linux":
+    subprocess.check_call("ls {}".format(__file__))
+    print("+++++++")
+    subprocess.check_call("ls {}/..".format(__file__))
 print("install_info: ", __install_info__)
 print("INSTALL_ROOT: ", get_install_root())
 print("PACKAGE_ROOT: ", get_package_root())
