@@ -285,7 +285,7 @@ def build_win32_installer_package(variant, version):
 
     # Also add in build_info file
     try:
-        write_to_file(get_install_info("package"), "build_info")
+        write_to_file(get_install_info("package"), "install_info")
     except Exception as e:
         # NOTE: For now this error is not fatal in case git is not present on the system where
         # we are building a package
@@ -1023,6 +1023,12 @@ def build_base_files(install_type, base_configs="config"):
     os.chdir("py")
 
     shutil.copytree(make_path(agent_source_root, "scalyr_agent"), "scalyr_agent")
+
+    # Write install_info file inside the 'scalyr_agent' package.
+    os.chdir("scalyr_agent")
+    write_to_file(get_install_info(install_type), "install_info")
+    os.chdir("..")
+
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
     os.chdir("monitors")
     recursively_delete_files_by_name("README.md")
@@ -1120,8 +1126,6 @@ def build_base_files(install_type, base_configs="config"):
     )
 
     os.chdir("..")
-
-    write_to_file(get_install_info(install_type), "build_info")
 
     os.chdir(original_dir)
 

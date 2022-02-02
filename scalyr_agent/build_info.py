@@ -46,7 +46,7 @@ def get_build_info():
     Return sanitized dictionary populated with data from build_info file.
     """
 
-    build_info_str = __scalyr__.__build_info__.get("build_info")
+    build_info_str = __scalyr__.__install_info__.get("build_info")
 
     if not build_info_str:
         return {}

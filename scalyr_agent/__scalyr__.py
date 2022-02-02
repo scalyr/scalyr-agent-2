@@ -92,6 +92,56 @@ PY3_pre_32 = PY3 and sys.version_info < (3, 2)
 __is_frozen__ = hasattr(sys, "frozen")
 
 
+# The constants for INSTALL_TYPE, a variable declared down below.
+PACKAGE_INSTALL = 1  # Indicates source code was installed via a package manager such as RPM or Windows executable.
+TARBALL_INSTALL = 2  # Indicates source code was installed via a tarball created by the build_package.py script.
+DEV_INSTALL = 3  # Indicates source code is running out of the original source tree, usually during dev testing.
+
+
+def read_install_info():
+    # type: (Dict) -> Dict
+    """
+    Read the 'install_info' file that has to be located near this file. In opposite return empty dict.
+    """
+    install_info_path = os.path.join(__file__, "install_info")
+    if not os.path.exists(install_info_path):
+        return {}
+
+    with open(install_info_path, "r") as fp:
+        return json.load(fp)
+
+
+__install_info__ = read_install_info()
+
+
+def __determine_install_type():
+    """Returns the type of install that was used for the source currently running.
+
+    @return: The install type, drawn from the constants above.
+    @rtype: int
+    """
+    # Determine which type of install this is by checking the 'install_info' file, that
+    # should be located near the this file.
+    install_type = __install_info__.get("install_type")
+
+    # If there's no  install_type field, then consider it as dev run.
+    if not install_type:
+        return DEV_INSTALL
+
+    if install_type in ["package"]:
+        return PACKAGE_INSTALL
+    elif install_type == "tar":
+        return TARBALL_INSTALL
+
+    raise ValueError(
+        "Unrecognized package type {} in the 'build_info' file".format(install_type)
+    )
+
+
+# Holds which type of installation we are currently running from.
+INSTALL_TYPE = __determine_install_type()
+
+
 def scalyr_init():
     """Initializes the environment to execute a Scalyr script.
 
@@ -114,23 +164,26 @@ def __determine_package_root():
 
     @return: The absolute file path for the package root.
     """
-    # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
-    # We could just return the parent of __file__, however, this apparently is not portable on all version of
-    # Windows.  Moreover, when running as a win32 exe, __file__ is not set.
-    if not __is_frozen__:
-        base = os.getcwd()
-        file_path = inspect.stack()[1][1]
-        if not os.path.isabs(file_path):
-            file_path = os.path.join(base, file_path)
-        file_path = os.path.dirname(os.path.realpath(file_path))
-    else:
-        # encode python executable path for python 2.
-        executable_path = sys.executable
-        if type(executable_path) != text_type:
-            executable_path = text_type(executable_path, sys.getfilesystemencoding())
-        return os.path.dirname(executable_path)
 
-    return file_path
+    return os.path.dirname(__file__)
+
+    # # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
+    # # We could just return the parent of __file__, however, this apparently is not portable on all version of
+    # # Windows.  Moreover, when running as a win32 exe, __file__ is not set.
+    # if not __is_frozen__:
+    #     base = os.getcwd()
+    #     file_path = inspect.stack()[1][1]
+    #     if not os.path.isabs(file_path):
+    #         file_path = os.path.join(base, file_path)
+    #     file_path = os.path.dirname(os.path.realpath(file_path))
+    # else:
+    #     # encode python executable path for python 2.
+    #     executable_path = sys.executable
+    #     if type(executable_path) != text_type:
+    #         executable_path = text_type(executable_path, sys.getfilesystemencoding())
+    #     return os.path.dirname(executable_path)
+    #
+    # return file_path
 
 
 __package_root__ = __determine_package_root()
@@ -157,13 +210,44 @@ def get_install_root():
     @rtype: six.text_type
     """
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
-    parent_of_package_install = os.path.dirname(get_package_root())
-    if __is_frozen__:  # win32 install
-        return parent_of_package_install
-    elif os.path.basename(parent_of_package_install) != "py":  # Running from Source
-        return parent_of_package_install
-    else:  # Installed using tarball or rpm/debian package
-        return os.path.dirname(parent_of_package_install)
+
+    # On dev install just return source root as install root.
+    if INSTALL_TYPE == DEV_INSTALL:
+        package_root = os.path.dirname(__file__)
+        return os.path.dirname(package_root)
+
+    if __is_frozen__:
+        # In case of frozen binary, the sys.executable is the frozen binary itself
+        executable_path = sys.executable
+    else:
+        executable_path = __file__
+
+    # Resolve possible symlinks until we reach the real file.
+    while os.path.islink(executable_path):
+        executable_path = os.path.realpath(executable_path)
+
+    if __is_frozen__:
+        # In case if frozen binaries the executable has to be located in the '<install root>/bin', so we just
+        # go down until we reach the the install root.
+        bin_path = os.path.dirname(executable_path)
+        install_root = os.path.dirname(bin_path)
+    else:
+        # In case of the source code package the executable script has to be located in <install root>/py/scalyr_agent
+        # and we also have to go down until we reach the install root.
+        scalyr_agent_package_dir = os.path.dirname(executable_path)
+        py_dir = os.path.dirname(scalyr_agent_package_dir)
+        install_root = os.path.dirname(py_dir)
+
+    return install_root
+
+    #
+    # parent_of_package_install = os.path.dirname(get_package_root())
+    # if __is_frozen__:  # win32 install
+    #     return parent_of_package_install
+    # elif os.path.basename(parent_of_package_install) != "py":  # Running from Source
+    #     return parent_of_package_install
+    # else:  # Installed using tarball or rpm/debian package
+    #     return os.path.dirname(parent_of_package_install)
 
 
 def __add_scalyr_package_to_path():
@@ -227,52 +311,3 @@ def __determine_version():
 
 SCALYR_VERSION = __determine_version()
 
-
-# The constants for INSTALL_TYPE, a variable declared down below.
-PACKAGE_INSTALL = 1  # Indicates source code was installed via a package manager such as RPM or Windows executable.
-TARBALL_INSTALL = 2  # Indicates source code was installed via a tarball created by the build_package.py script.
-DEV_INSTALL = 3  # Indicates source code is running out of the original source tree, usually during dev testing.
-
-
-def read_build_info():
-    # type: (Dict) -> Dict
-    """
-    Read the 'build_info' file that has to be located near this file. In opposite return empty dict.
-    """
-    build_info_path = os.path.join(__file__, "build_info")
-    if not os.path.exists(build_info_path):
-        return {}
-
-    with open(build_info_path, "r") as fp:
-        return json.load(fp)
-
-
-__build_info__ = read_build_info()
-
-
-def __determine_install_type():
-    """Returns the type of install that was used for the source currently running.
-
-    @return: The install type, drawn from the constants above.
-    @rtype: int
-    """
-    # Determine which type of install this is by checking the 'build_info' file, that
-    # should be located near the this file.
-    install_type = __build_info__.get("install_type")
-
-    # If there's no package type field, then consider it as dev run.
-    if not install_type:
-        return DEV_INSTALL
-
-    if install_type in ["package"]:
-        return PACKAGE_INSTALL
-    elif install_type == "tar":
-        return TARBALL_INSTALL
-
-    raise ValueError(
-        "Unrecognized package type {} in the 'build_info' file".format(install_type)
-    )
-
-
-# Holds which type of installation we are currently running from.
-INSTALL_TYPE = __determine_install_type()

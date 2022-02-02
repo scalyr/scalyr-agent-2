@@ -37,7 +37,7 @@ with open(MOCK_BUILD_INFO_PATH) as f:
 
 
 class BuildInfoUtilTestCase(unittest.TestCase):
-    @mock.patch("scalyr_agent.__scalyr__.__build_info__", MOCK_BUILD_INFO)
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", MOCK_BUILD_INFO)
     def test_get_build_info_success(self):
         build_info = get_build_info()
         self.assertEqual(build_info["packaged_by"], "jenkins@scalyr.com")
@@ -47,17 +47,17 @@ class BuildInfoUtilTestCase(unittest.TestCase):
         self.assertEqual(build_info["from_branch"], "release")
         self.assertEqual(build_info["build_time"], "2020-05-06 17:59:21 UTC")
 
-    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     def test_get_build_info_build_info_file_doesnt_exist(self):
         build_info = get_build_info()
         self.assertEqual(build_info, {})
 
-    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     def test_get_build_revision_from_build_info_success(self):
         build_revision = get_build_revision()
         self.assertEqual(build_revision, get_build_revision_from_git())
 
-    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     @mock.patch("scalyr_agent.build_info.GIT_GET_HEAD_REVISION_CMD", "echo revision")
     def test_get_build_revision_from_git_success(self):
         build_revision = get_build_revision()
