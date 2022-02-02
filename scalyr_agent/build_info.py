@@ -25,7 +25,6 @@ if False:  # NOSONAR
     from typing import Dict
 
 import os
-import pathlib as pl
 from io import open
 
 import six
@@ -36,7 +35,7 @@ from scalyr_agent.compat import subprocess_check_output
 GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
 
 # The build_info file should be located in the install root directory.
-BUILD_INFO_FILE_PATH = str(pl.Path(__scalyr__.get_install_root(), "build_info"))
+BUILD_INFO_FILE_PATH = os.path.join(__scalyr__.get_install_root(), "build_info")
 
 
 def get_build_info():
@@ -47,13 +46,14 @@ def get_build_info():
     if not os.path.isfile(BUILD_INFO_FILE_PATH):
         return {}
 
-    build_info_file_content = pl.Path(BUILD_INFO_FILE_PATH).read_text()
+    with open(BUILD_INFO_FILE_PATH, "r") as f:
+        build_info_file_content = f.read()
 
     return _parse_build_info_content(build_info_file_content)
 
 
 def _parse_build_info_content(content):
-    # type: (str) -> Dict[str, str]
+    # type: (six.text_type) -> Dict[str, str]
     result = {}
     for line in content.strip().split("\n"):
         line = line.strip()
@@ -102,7 +102,7 @@ def get_build_revision():
     from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
     if INSTALL_TYPE == __scalyr__.DEV_INSTALL:
-        if not pl.Path(BUILD_INFO_FILE_PATH).is_file():
+        if not os.path.isfile(BUILD_INFO_FILE_PATH):
             return get_build_revision_from_git()
 
     build_info = get_build_info()
