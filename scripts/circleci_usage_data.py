@@ -146,12 +146,12 @@ def get_usage_data_for_branch_and_workflow(
     items = [item for item in items if (status == "all" or item["status"] == status)]
 
     buff.write(
-        u'Usage data for recent workflow runs for workflow "%s" with status="%s" and branch "%s"\n\n'
+        'Usage data for recent workflow runs for workflow "%s" with status="%s" and branch "%s"\n\n'
         % (workflow, status, branch)
     )
 
     if not items:
-        buff.write(u"No recent runs which match this criteria.\n\n")
+        buff.write("No recent runs which match this criteria.\n\n")
         buff.write("=" * 100 + "\n\n")
         return
 
@@ -160,13 +160,13 @@ def get_usage_data_for_branch_and_workflow(
         workflow_view_url = CIRCLE_CI_WORKFLOW_VIEW_URL.format(workflow_id=item["id"])
         price_estimate = round(item["credits_used"] * PRICE_PER_CREDIT, 2)
 
-        buff.write(u"Workflow ID: %s (%s)\n" % (item["id"], workflow_view_url))
-        buff.write(u"Start time: %s\n" % (item["created_at"]))
-        buff.write(u"Duration: %s seconds\n" % item["duration"])
-        buff.write(u"Status: %s\n" % (item["status"]))
-        buff.write(u"Total duration: %s seconds\n" % item["duration"])
+        buff.write("Workflow ID: %s (%s)\n" % (item["id"], workflow_view_url))
+        buff.write("Start time: %s\n" % (item["created_at"]))
+        buff.write("Duration: %s seconds\n" % item["duration"])
+        buff.write("Status: %s\n" % (item["status"]))
+        buff.write("Total duration: %s seconds\n" % item["duration"])
         buff.write(
-            u"Credits used: %s (~%s USD)\n\n" % (item["credits_used"], price_estimate)
+            "Credits used: %s (~%s USD)\n\n" % (item["credits_used"], price_estimate)
         )
 
         count += 1
@@ -197,9 +197,9 @@ def print_usage_data(
 
     buff = StringIO()
 
-    buff.write(u"Circle CI usage and cost report\n\n")
+    buff.write("Circle CI usage and cost report\n\n")
     buff.write(
-        u"Pricing estimate assumes %s credits cost %s$\n\n"
+        "Pricing estimate assumes %s credits cost %s$\n\n"
         % (CREDIT_BUNDLE_UNIT_COUNT, CREDIT_BUNDLE_PRICE)
     )
 
@@ -222,7 +222,7 @@ def print_usage_data(
             "%Y-%m-%d"
         )
 
-        subject = u"Circle CI Usage Report For Period %s - %s" % (week_ago, now)
+        subject = "Circle CI Usage Report For Period %s - %s" % (week_ago, now)
         send_email(to=emails, subject=subject, text=value)
         print(("Sent email report to %s" % (",".join(emails))))
 

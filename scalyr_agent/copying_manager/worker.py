@@ -806,9 +806,12 @@ class CopyingManagerWorkerSession(
                     > self._last_attempt_time
                     + self.__config.healthy_max_time_since_last_copy_attempt
                 ):
-                    result.health_check_result = "Worker session '%s' failed, max time since last copy attempt (%s seconds) exceeded" % (
-                        self._id,
-                        self.__config.healthy_max_time_since_last_copy_attempt,
+                    result.health_check_result = (
+                        "Worker session '%s' failed, max time since last copy attempt (%s seconds) exceeded"
+                        % (
+                            self._id,
+                            self.__config.healthy_max_time_since_last_copy_attempt,
+                        )
                     )
 
         finally:
