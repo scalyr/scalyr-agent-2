@@ -21,6 +21,8 @@ Keep in mind that that file is only available for package and not for dev instal
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import json
+
 if False:  # NOSONAR
     from typing import Dict
 
@@ -34,8 +36,8 @@ from scalyr_agent.compat import subprocess_check_output
 
 GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
 
-# The build_info file should be located in the install root directory.
-BUILD_INFO_FILE_PATH = os.path.join(__scalyr__.get_install_root(), "build_info")
+# # The build_info file should be located in the install root directory.
+# BUILD_INFO_FILE_PATH = os.path.join(__scalyr__.get_install_root(), "build_info")
 
 
 def get_build_info():
@@ -43,13 +45,13 @@ def get_build_info():
     """
     Return sanitized dictionary populated with data from build_info file.
     """
-    if not os.path.isfile(BUILD_INFO_FILE_PATH):
+
+    build_info_str = __scalyr__.__build_info__.get("build_info")
+
+    if not build_info_str:
         return {}
 
-    with open(BUILD_INFO_FILE_PATH, "r") as f:
-        build_info_file_content = f.read()
-
-    return _parse_build_info_content(build_info_file_content)
+    return _parse_build_info_content(build_info_str)
 
 
 def _parse_build_info_content(content):
@@ -101,9 +103,9 @@ def get_build_revision():
     # NOTE: We use lazy import to avoid import time side affects
     from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
-    if INSTALL_TYPE == __scalyr__.DEV_INSTALL:
-        if not os.path.isfile(BUILD_INFO_FILE_PATH):
-            return get_build_revision_from_git()
-
     build_info = get_build_info()
+
+    if not build_info:
+        return get_build_revision_from_git()
+
     return build_info.get("latest_commit", "unknown")

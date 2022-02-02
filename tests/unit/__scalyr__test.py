@@ -35,3 +35,4 @@ class TestUtil(ScalyrTestCase):
 
     def test_get_package_root(self):
         self.assertEquals(os.path.basename(get_package_root()), "scalyr_agent")
+

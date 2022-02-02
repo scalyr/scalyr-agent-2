@@ -14,6 +14,7 @@
 
 from __future__ import absolute_import
 
+import json
 import os
 import unittest
 
@@ -30,9 +31,12 @@ MOCK_BUILD_INFO_PATH = os.path.abspath(
     os.path.join(BASE_DIR, "fixtures/build_info/build_info")
 )
 
+with open(MOCK_BUILD_INFO_PATH) as f:
+    MOCK_BUILD_INFO = json.load(f)
+
 
 class BuildInfoUtilTestCase(unittest.TestCase):
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_FILE_PATH", MOCK_BUILD_INFO_PATH)
+    @mock.patch("scalyr_agent.__scalyr__.__build_info__", MOCK_BUILD_INFO)
     def test_get_build_info_success(self):
         build_info = get_build_info()
         self.assertEqual(build_info["packaged_by"], "jenkins@scalyr.com")
@@ -42,12 +46,12 @@ class BuildInfoUtilTestCase(unittest.TestCase):
         self.assertEqual(build_info["from_branch"], "release")
         self.assertEqual(build_info["build_time"], "2020-05-06 17:59:21 UTC")
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_FILE_PATH", "/tmp/doesnt.exist")
+    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
     def test_get_build_info_build_info_file_doesnt_exist(self):
         build_info = get_build_info()
         self.assertEqual(build_info, {})
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_FILE_PATH", MOCK_BUILD_INFO_PATH)
+    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
     @mock.patch(
         "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL
     )
