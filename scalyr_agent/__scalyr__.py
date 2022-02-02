@@ -105,7 +105,10 @@ def read_install_info():
     """
     Read the 'install_info' file that has to be located near this file. In opposite return empty dict.
     """
-    install_info_path = os.path.join(__file__, "install_info")
+    install_info_path = os.path.join(
+        os.path.dirname(__file__),
+        "install_info"
+    )
     if not os.path.exists(install_info_path):
         return {}
 
