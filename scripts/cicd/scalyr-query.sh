@@ -62,7 +62,7 @@ function retry_on_failure {
 function query_scalyr {
     echo "Using query '${SCALYR_TOOL_QUERY}'"
 
-    RESULT=$(eval "./scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='2000m' --count='100' --output multiline")
+    RESULT=$(eval "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='20m' --count='100' --output multiline")
     RESULT_LINES=$(echo -e "${RESULT}" | sed '/^$/d' | wc -l)
 
     echo "Results for query '${SCALYR_TOOL_QUERY}':"
