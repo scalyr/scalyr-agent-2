@@ -72,7 +72,7 @@ if grep 'PRETTY_NAME="CentOS Linux 8 (Core)"' /etc/os-release; then
   cat /etc/yum.repos.d/CentOS-Base.repo 1>&2
   cat /etc/yum.repos.d/CentOS-AppStream.repo 1>&2
   
-  sudo yum update
+  sudo yum update -y
 fi
 
 sudo yum install -y wget iptables-services
