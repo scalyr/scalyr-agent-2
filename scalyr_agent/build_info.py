@@ -25,49 +25,31 @@ if False:  # NOSONAR
     from typing import Dict
 
 import os
-import platform
+import pathlib as pl
 from io import open
 
 import six
 
+from scalyr_agent import __scalyr__
 from scalyr_agent.compat import subprocess_check_output
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-IS_WINDOWS = platform.system() == "Windows"
-
-# Directory structure for packages looks like this:
-# /usr/share/scalyr-agent-2/py/scalyr_agent/build_info.py
-# /usr/share/scalyr-agent-2/build_info
-BUILD_INFO_PATH_LINUX = os.path.abspath(os.path.join(BASE_DIR, "../../build_info"))
-
-# On Windows, it's stored under bin/ directory and there we also use binary so we can't work with
-# relative paths
-BUILD_INFO_PATH_WINDOWS = "C:\\Program Files (x86)\\Scalyr\\bin\\build_info"
 
 GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
 
+# The build_info file should be located in the install root directory.
+BUILD_INFO_FILE_PATH = str(pl.Path(__scalyr__.get_install_root(), "build_info"))
 
-def _get_build_info_linux():
+
+def get_build_info():
     # type: () -> Dict[str, str]
-    if not os.path.isfile(BUILD_INFO_PATH_LINUX):
+    """
+    Return sanitized dictionary populated with data from build_info file.
+    """
+    if not os.path.isfile(BUILD_INFO_FILE_PATH):
         return {}
 
-    with open(BUILD_INFO_PATH_LINUX, "r") as fp:
-        content = fp.read()
+    build_info_file_content = pl.Path(BUILD_INFO_FILE_PATH).read_text()
 
-    return _parse_build_info_content(content)
-
-
-def _get_build_info_windows():
-    # type: () -> Dict[str, str]
-    if not os.path.isfile(BUILD_INFO_PATH_WINDOWS):
-        return {}
-
-    with open(BUILD_INFO_PATH_WINDOWS, "r") as fp:
-        content = fp.read()
-
-    return _parse_build_info_content(content)
+    return _parse_build_info_content(build_info_file_content)
 
 
 def _parse_build_info_content(content):
@@ -88,17 +70,6 @@ def _parse_build_info_content(content):
         result[key] = value
 
     return result
-
-
-def get_build_info():
-    # type: () -> Dict[str, str]
-    """
-    Return sanitized dictionary populated with data from build_info file.
-    """
-    if IS_WINDOWS:
-        return _get_build_info_windows()
-    else:
-        return _get_build_info_linux()
 
 
 def get_build_revision_from_git():
@@ -128,15 +99,10 @@ def get_build_revision():
     instead.
     """
     # NOTE: We use lazy import to avoid import time side affects
-    try:
-        from __scalyr__ import DEV_INSTALL, INSTALL_TYPE
-    except ImportError:
-        from scalyr_agent.__scalyr__ import DEV_INSTALL, INSTALL_TYPE  # type: ignore
+    from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
-    if INSTALL_TYPE == DEV_INSTALL:
-        if IS_WINDOWS and not os.path.isfile(BUILD_INFO_PATH_WINDOWS):
-            return get_build_revision_from_git()
-        elif not os.path.isfile(BUILD_INFO_PATH_LINUX):
+    if INSTALL_TYPE == __scalyr__.InstallType.DEV_INSTALL:
+        if not pl.Path(BUILD_INFO_FILE_PATH).is_file():
             return get_build_revision_from_git()
 
     build_info = get_build_info()
