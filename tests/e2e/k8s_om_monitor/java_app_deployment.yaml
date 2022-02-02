@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-hello-world
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-hello-world
+  template:
+    metadata:
+      labels:
+        app: java-hello-world
+      annotations:
+        prometheus.io/scrape:             'true'
+        prometheus.io/port:               '9404'
+        k8s.monitor.config.scalyr.com/scrape: 'true'
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: java-hello-world
+        image: java-hello-world:latest
+        imagePullPolicy: Never
+        env:
+          - name: PORT
+            value: "8051"
+        ports:
+          - containerPort: 8041
+            protocol: TCP
+          - containerPort: 9404
+            protocol: TCP
+      nodeSelector:
+        kubernetes.io/os: linux
