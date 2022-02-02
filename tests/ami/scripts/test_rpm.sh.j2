@@ -57,6 +57,12 @@ id
 echo_with_date ""
 echo_with_date "==========================="
 
+# If it is a centos 8, then change repo source to centos vault.
+if grep 'PRETTY_NAME="CentOS Linux 8"' /etc/os-release; then
+  sed 's~#baseurl=http://mirror.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/~baseurl=http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/~g'  -i /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+  sed 's~#baseurl=http://mirror.centos.org/$contentdir/$releasever/AppStream/$basearch/os/~baseurl=http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/~g'  -i /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+fi
+
 sudo yum install -y wget iptables-services
 sudo yum install -y "{{python_package}}"
 
