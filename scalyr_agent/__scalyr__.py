@@ -174,7 +174,11 @@ def __determine_package_root():
     @return: The absolute file path for the package root.
     """
 
-    return os.path.dirname(__file__)
+    if __is_frozen__:
+        print("MEIII")
+        print(list(os.listdir(sys._MEIPASS)))
+    else:
+        return os.path.dirname(__file__)
 
     # # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
     # # We could just return the parent of __file__, however, this apparently is not portable on all version of
