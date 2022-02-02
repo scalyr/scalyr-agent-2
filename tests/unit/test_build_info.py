@@ -23,6 +23,7 @@ import mock
 from scalyr_agent import __scalyr__
 from scalyr_agent.build_info import get_build_info
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.build_info import get_build_revision_from_git
 
 __all__ = ["BuildInfoUtilTestCase"]
 
@@ -52,17 +53,11 @@ class BuildInfoUtilTestCase(unittest.TestCase):
         self.assertEqual(build_info, {})
 
     @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
-    @mock.patch(
-        "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL
-    )
     def test_get_build_revision_from_build_info_success(self):
         build_revision = get_build_revision()
-        self.assertEqual(build_revision, "7d4c4e2e94242ee25320a75c510d52967cfe50eb")
+        self.assertEqual(build_revision, get_build_revision_from_git())
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_FILE_PATH", "/tmp/doesnt.exist")
-    @mock.patch(
-        "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL
-    )
+    @mock.patch("scalyr_agent.__scalyr__.__build_info__", {})
     @mock.patch("scalyr_agent.build_info.GIT_GET_HEAD_REVISION_CMD", "echo revision")
     def test_get_build_revision_from_git_success(self):
         build_revision = get_build_revision()

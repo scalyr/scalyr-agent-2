@@ -25,6 +25,8 @@ __author__ = "czerwin@scalyr.com"
 # The first option is to provide 2->3 compatibility without "six". This is easy for now,
 # because there is only one incompatible piece of code here.
 # and it can be fixed in code below...
+import json
+
 try:
     # Python2
     text_type = unicode  # type: ignore
@@ -232,22 +234,44 @@ TARBALL_INSTALL = 2  # Indicates source code was installed via a tarball created
 DEV_INSTALL = 3  # Indicates source code is running out of the original source tree, usually during dev testing.
 
 
+def read_build_info():
+    # type: (Dict) -> Dict
+    """
+    Read the 'build_info' file that has to be located near this file. In opposite return empty dict.
+    """
+    build_info_path = os.path.join(__file__, "build_info")
+    if not os.path.exists(build_info_path):
+        return {}
+
+    with open(build_info_path, "r") as fp:
+        return json.load(fp)
+
+
+__build_info__ = read_build_info()
+
+
 def __determine_install_type():
     """Returns the type of install that was used for the source currently running.
 
     @return: The install type, drawn from the constants above.
     @rtype: int
     """
-    # Determine which type of install this is.  We do this based on
-    # whether or not certain files exist in the root of the source tree.
-    install_root = get_install_root()
-    if os.path.exists(os.path.join(install_root, "packageless")):
-        install_type = TARBALL_INSTALL
-    elif os.path.exists(os.path.join(install_root, "run_tests.py")):
-        install_type = DEV_INSTALL
-    else:
-        install_type = PACKAGE_INSTALL
-    return install_type
+    # Determine which type of install this is by checking the 'build_info' file, that
+    # should be located near the this file.
+    install_type = __build_info__.get("install_type")
+
+    # If there's no package type field, then consider it as dev run.
+    if not install_type:
+        return DEV_INSTALL
+
+    if install_type in ["package"]:
+        return PACKAGE_INSTALL
+    elif install_type == "tar":
+        return TARBALL_INSTALL
+
+    raise ValueError(
+        "Unrecognized package type {} in the 'build_info' file".format(install_type)
+    )
 
 
 # Holds which type of installation we are currently running from.

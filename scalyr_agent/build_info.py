@@ -100,11 +100,10 @@ def get_build_revision():
     If we are running on a dev install, it retrieves the commit revision by querying git reflog
     instead.
     """
-    # NOTE: We use lazy import to avoid import time side affects
-    from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
     build_info = get_build_info()
 
+    # If there's no build_info, try to get revision from the current git.
     if not build_info:
         return get_build_revision_from_git()
 
