@@ -1026,7 +1026,11 @@ def build_base_files(install_type, base_configs="config"):
 
     # Write install_info file inside the 'scalyr_agent' package.
     os.chdir("scalyr_agent")
-    write_to_file(get_install_info(install_type), "install_info")
+    install_info = get_install_info(install_type)
+    print("INSTALL_INFO")
+    print(install_info)
+    print(os.getcwd())
+    write_to_file(install_info, "install_info")
     os.chdir("..")
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
