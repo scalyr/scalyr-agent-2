@@ -105,6 +105,7 @@ def read_install_info():
     """
     Read the 'install_info' file that has to be located near this file. In opposite return empty dict.
     """
+    print(sys.executable)
     print("READ INFO")
     print(list(os.listdir(os.path.dirname(__file__))))
     install_info_path = os.path.join(
