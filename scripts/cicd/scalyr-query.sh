@@ -23,6 +23,9 @@ set -e
 RETRY_ATTEMPTS=${RETRY_ATTEMPTS:-"10"}
 SLEEP_DELAY=${SLEEP_DELAY:-"15"}
 
+# Script will fail if query doesn't return at least this number of results / lines
+MINIMUM_RESULTS=${MINIMUM_RESULTS:-"1"}
+
 SCALYR_TOOL_QUERY=$1
 
 function retry_on_failure {
@@ -59,16 +62,16 @@ function retry_on_failure {
 function query_scalyr {
     echo "Using query '${SCALYR_TOOL_QUERY}'"
 
-    RESULT=$(eval "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='200m' --count='100' --output multiline")
+    RESULT=$(eval "./scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='2000m' --count='100' --output multiline")
     RESULT_LINES=$(echo -e "${RESULT}" | sed '/^$/d' | wc -l)
 
     echo "Results for query '${SCALYR_TOOL_QUERY}':"
     echo ""
     echo -e "${RESULT}"
 
-    if [ "${RESULT_LINES}" -lt 1 ]; then
+    if [ "${RESULT_LINES}" -lt ${MINIMUM_RESULTS} ]; then
         echo ""
-        echo "Expected at least 1 matching line, got none"
+        echo "Expected at least ${MINIMUM_RESULTS} matching lines, got ${RESULT_LINES}."
         return 1
     fi
 
