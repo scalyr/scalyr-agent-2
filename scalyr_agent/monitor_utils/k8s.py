@@ -2388,12 +2388,16 @@ class KubeletApi(object):
                     response.status_code == 403
                     and self._kubelet_url != self._fallback_kubelet_url
                 ):
-                    msg = "Invalid response while querying the Kubelet API on %s. Falling back " "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n" % (
-                        url,
-                        self._fallback_kubelet_url,
-                        url,
-                        response.status_code,
-                        response.text,
+                    msg = (
+                        "Invalid response while querying the Kubelet API on %s. Falling back "
+                        "to older endpoint (%s).\n\nurl: %s\nstatus: %s\nresponse: %s\n"
+                        % (
+                            url,
+                            self._fallback_kubelet_url,
+                            url,
+                            response.status_code,
+                            response.text,
+                        )
                     )
 
                     global_log.warn(
