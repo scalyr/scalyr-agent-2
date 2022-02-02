@@ -311,3 +311,6 @@ def __determine_version():
 
 SCALYR_VERSION = __determine_version()
 
+print("INSTALL_ROOT: ", get_install_root())
+print("PACKAGE_ROOT: ", get_package_root())
+
