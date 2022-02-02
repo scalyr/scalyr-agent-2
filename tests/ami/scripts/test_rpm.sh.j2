@@ -59,7 +59,7 @@ echo_with_date "==========================="
 
 # If it is a centos 8, then change repo source to centos vault.
 if grep 'PRETTY_NAME="CentOS Linux 8 (Core)"' /etc/os-release; then
-  ls /etc/yum.repos.d
+  ls /etc/yum.repos.d 1>&2
   sed 's~#baseurl=http://mirror.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/~baseurl=http://vault.centos.org/$contentdir/$releasever/BaseOS/$basearch/os/~g'  -i /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
   sed 's~#baseurl=http://mirror.centos.org/$contentdir/$releasever/AppStream/$basearch/os/~baseurl=http://vault.centos.org/$contentdir/$releasever/AppStream/$basearch/os/~g'  -i /etc/yum.repos.d/CentOS-Linux-AppStream.repo
   yum update
