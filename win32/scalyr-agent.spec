@@ -42,7 +42,7 @@ main_a = Analysis(
     datas=[
         ("data_files\\VERSION.txt", "."),
         ("data_files\\licenses", "third_party_licenses"),
-        ("data_files\\build_info", "."),
+        ("data_files\\install_info", "."),
     ],
 )
 
