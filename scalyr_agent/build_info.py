@@ -101,7 +101,7 @@ def get_build_revision():
     # NOTE: We use lazy import to avoid import time side affects
     from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
-    if INSTALL_TYPE == __scalyr__.InstallType.DEV_INSTALL:
+    if INSTALL_TYPE == __scalyr__.DEV_INSTALL:
         if not pl.Path(BUILD_INFO_FILE_PATH).is_file():
             return get_build_revision_from_git()
 
