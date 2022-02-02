@@ -31,6 +31,7 @@ __author__ = "czerwin@scalyr.com"
 
 import errno
 import glob
+import json
 import os
 import re
 import shutil
@@ -284,7 +285,7 @@ def build_win32_installer_package(variant, version):
 
     # Also add in build_info file
     try:
-        write_to_file(get_build_info(), "build_info")
+        write_to_file(get_install_info("package"), "build_info")
     except Exception as e:
         # NOTE: For now this error is not fatal in case git is not present on the system where
         # we are building a package
@@ -583,7 +584,10 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     # Place all of the import source in /usr/share/scalyr-agent-2.
     os.chdir("root/usr/share")
 
-    build_base_files(base_configs=base_configs)
+    build_base_files(
+        install_type="package",
+        base_configs=base_configs
+    )
 
     os.chdir("scalyr-agent-2")
     # The build_base_files leaves the config directory in config, but we have to move it to its etc
@@ -927,7 +931,9 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     @return: The file name of the built tarball.
     """
     # Use build_base_files to build all of the important stuff in ./scalyr-agent-2
-    build_base_files()
+    build_base_files(
+        install_type="tar"
+    )
 
     # Build the rest of the directories required for the tarball install.  Mainly, the log and data directories
     # in the tarball itself where the running process will store its state.
@@ -975,7 +981,7 @@ def replace_shebang(path, new_path, new_shebang):
             newf.write(f.read())
 
 
-def build_base_files(base_configs="config"):
+def build_base_files(install_type, base_configs="config"):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
     This creates scalyr-agent-2 in the current working directory and then populates it with the basic structure
@@ -994,6 +1000,7 @@ def build_base_files(base_configs="config"):
         build_info                 -- A file containing the commit id of the latest commit included in this package,
                                       the time it was built, and other information.
 
+    @param install_type: String with type of the installation. For now it can be 'package' or 'tar'
     @param base_configs:  The directory (relative to the top of the source tree) that contains the configuration
         files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
     """
@@ -1114,7 +1121,7 @@ def build_base_files(base_configs="config"):
 
     os.chdir("..")
 
-    write_to_file(get_build_info(), "build_info")
+    write_to_file(get_install_info(install_type), "build_info")
 
     os.chdir(original_dir)
 
@@ -1776,6 +1783,20 @@ def get_build_info():
 
         if build_info_buffer is not None:
             build_info_buffer.close()
+
+
+def get_install_info(install_type):
+    """
+    Get json serialized string with installation info.
+    """
+    return json.dumps(
+        {
+            "build_info": get_build_info(),
+            "install_type": install_type
+        },
+        indent=4,
+        sort_keys=True
+    )
 
 
 def set_build_info(build_info_file_path):
