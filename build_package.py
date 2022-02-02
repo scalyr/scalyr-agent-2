@@ -1031,6 +1031,7 @@ def build_base_files(install_type, base_configs="config"):
     print(install_info)
     print(os.getcwd())
     write_to_file(install_info, "install_info")
+    print(list(os.listdir(".")))
     os.chdir("..")
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
