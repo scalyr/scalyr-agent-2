@@ -47,6 +47,7 @@ CORRECT_INIT_PRAGMA = """
 
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
+    @pytest.mark.skipif(platform.system() == "Windows", reason="This test is not for Windows.")
     @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL)
     def test_create_client_ca_file_and_intermediate_certs_file_doesnt_exist(self):
         from scalyr_agent.agent_main import ScalyrAgent
