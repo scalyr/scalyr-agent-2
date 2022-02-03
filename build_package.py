@@ -421,9 +421,21 @@ def build_win32_installer_package(variant, version):
 
     shutil.copy(make_path(agent_source_root, "VERSION"), "Scalyr/VERSION")
 
-    #os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
+    # Copy frozen binary.
     shutil.copy(
         os.path.join("dist", "scalyr-agent-2.exe"),
+        "Scalyr/bin"
+    )
+    # Also copy the same binary as windows service binary.
+    # Even if we use the same binary for everything, I couldn't figure out how to make Wix
+    # reuse the same file for multiple components. (TODO: figure out how), but it seems that
+    # packager compression handles this well and does now increase package size.
+    shutil.copy(
+        os.path.join("dist", "scalyr-agent-2.exe"),
+        "Scalyr/bin/ScalyrAgentService.exe"
+    )
+    shutil.copy(
+        os.path.join(agent_source_root, "win32", "scalyr-agent-2-config.cmd"),
         "Scalyr/bin"
     )
     shutil.copy(
