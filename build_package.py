@@ -333,7 +333,7 @@ def build_win32_installer_package(variant, version):
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
     add_data = {
-        os.path.join("data_files", "install_type"): "scalyr_agent"
+        os.path.join("data_files", "install_info"): "scalyr_agent"
     }
 
     # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
