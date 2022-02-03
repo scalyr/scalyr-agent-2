@@ -105,10 +105,6 @@ def read_install_info():
     """
     Read the 'install_info' file that has to be located near this file. In opposite return empty dict.
     """
-    print(sys.executable)
-    print(__file__)
-    print("READ INFO")
-    print(list(os.listdir(os.path.dirname(__file__))))
     install_info_path = os.path.join(
         os.path.dirname(__file__),
         "install_info"
@@ -174,11 +170,8 @@ def __determine_package_root():
     @return: The absolute file path for the package root.
     """
 
-    if __is_frozen__:
-        print("MEIII")
-        print(list(os.listdir(sys._MEIPASS)))
-    else:
-        return os.path.dirname(__file__)
+
+    return os.path.dirname(__file__)
 
     # # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
     # # We could just return the parent of __file__, however, this apparently is not portable on all version of
@@ -324,11 +317,4 @@ def __determine_version():
 
 SCALYR_VERSION = __determine_version()
 
-if platform.system() == "Linux":
-    print(list(os.listdir(os.path.dirname(__file__))))
-    print("+++++++")
-    print(list(os.listdir(os.path.dirname(os.path.dirname(__file__)))))
-print("install_info: ", __install_info__)
-print("INSTALL_ROOT: ", get_install_root())
-print("PACKAGE_ROOT: ", get_package_root())
 
