@@ -1388,8 +1388,9 @@ def configure_agent_service_for_systemd_management():
     )
 
 
-def add_config_options(parser):
-    # type: (argparse.ArgumentParser) -> None
+def parse_config_options(argv):
+
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c",
         "--config-file",
@@ -1593,16 +1594,13 @@ def add_config_options(parser):
             help="Configure the agent to be managed by systemd instead of init.d which is a default",
         )
 
-
-def parse_config_options(options):
-    # type: (argparse.Namespace) -> None
-
     controller = PlatformController.new_platform()
     default_paths = controller.default_paths
 
     # NOTE: This piece of code should be at the top before we parse the config since the script
     # can run as part of postinstall step when the config is not present yet. And in general, that
     # operation should be standalone without any reliance on the agent config.
+    options = parser.parse_args(args=argv)
     if options.set_python is not None:
         set_python_version(options.set_python)
         print("Agent switched to {0}.".format(options.set_python))

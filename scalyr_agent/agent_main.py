@@ -2117,102 +2117,122 @@ class WorkerThread(object):
 if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
 
-    commands = ["start", "stop", "status", "restart", "condrestart", "version"]
-
-    parser = argparse.ArgumentParser()
-
-    subparsers = parser.add_subparsers(dest="command")
-
-    config_parser = subparsers.add_parser("config")
-    config_main.add_config_options(config_parser)
+    commands = ["start", "stop", "status", "restart", "condrestart", "version", "config"]
 
     if platform.system() == "Windows":
         # If this is Windows, then also add service option.
         # Using this option we can use windows executable as a base for the Windows Agent service.
         # It has to save us from building multiple frozen binaries, when packaging.
-        service_parser = subparsers.add_parser("service")
+        commands.append("service")
 
-    for command in commands:
-        command_parser = subparsers.add_parser(command)
+    # Create a special parser that does not print anything on error.
+    # This is needed to parse first positional argument and to decide which parser to use next.
+    # for example scalyr-agent-config parser or windows service.
+    # Also that is needed because we have to keep old behaviour of the script
+    # and when theres no any arguments, to show usage for the agent_main script.
+    class ErrorSilentParser(argparse.ArgumentParser):
+        def error(self, message):
+            pass
 
-        command_parser.add_argument(
-            "-c",
-            "--config-file",
-            dest="config_filename",
-            help="Read configuration from FILE",
-            metavar="FILE",
-        )
-        command_parser.add_argument(
-            "--extra-config-dir",
-            default=None,
-            help="An extra directory to check for configuration files",
-            metavar="PATH",
-        )
-        command_parser.add_argument(
-            "-q",
-            "--quiet",
-            action="store_true",
-            dest="quiet",
-            default=False,
-            help="Only print error messages when running the start, stop, and condrestart commands",
-        )
-        command_parser.add_argument(
-            "-v",
-            "--verbose",
-            action="store_true",
-            dest="verbose",
-            default=False,
-            help="For status command, prints detailed information about running agent.",
-        )
-        command_parser.add_argument(
-            "-H",
-            "--health_check",
-            action="store_true",
-            dest="health_check",
-            default=False,
-            help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
-        )
-        command_parser.add_argument(
-            "--format",
-            dest="status_format",
-            default="text",
-            help="Format to use (text / json) for the agent status command.",
-        )
+    # Create parser that only has to parse first positional argument - our main command.
+    command_parser = ErrorSilentParser(
+        add_help=False,
+    )
+    command_parser.add_argument(
+        "command",
+        choices=commands
+    )
 
-        command_parser.add_argument(
-            "--no-fork",
-            action="store_true",
-            dest="no_fork",
-            default=False,
-            help="For the run command, does not fork the program to the background.",
-        )
-        command_parser.add_argument(
-            "--no-check-remote-server",
-            action="store_true",
-            dest="no_check_remote",
-            help="For the start command, does not perform the first check to see if the agent can "
-            "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
-            "the background until it is successful.  This is useful if the network is not immediately "
-            "available when the agent starts.",
-        )
+    # Also create parser for the agent command line.
+    parser = argparse.ArgumentParser()
 
-        my_controller.add_options(command_parser)
+    parser.add_argument(
+        "-c",
+        "--config-file",
+        dest="config_filename",
+        help="Read configuration from FILE",
+        metavar="FILE",
+    )
+    parser.add_argument(
+        "--extra-config-dir",
+        default=None,
+        help="An extra directory to check for configuration files",
+        metavar="PATH",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        dest="quiet",
+        default=False,
+        help="Only print error messages when running the start, stop, and condrestart commands",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        default=False,
+        help="For status command, prints detailed information about running agent.",
+    )
+    parser.add_argument(
+        "-H",
+        "--health_check",
+        action="store_true",
+        dest="health_check",
+        default=False,
+        help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
+    )
+    parser.add_argument(
+        "--format",
+        dest="status_format",
+        default="text",
+        help="Format to use (text / json) for the agent status command.",
+    )
 
-    options = parser.parse_args()
+    parser.add_argument(
+        "--no-fork",
+        action="store_true",
+        dest="no_fork",
+        default=False,
+        help="For the run command, does not fork the program to the background.",
+    )
+    parser.add_argument(
+        "--no-check-remote-server",
+        action="store_true",
+        dest="no_check_remote",
+        help="For the start command, does not perform the first check to see if the agent can "
+        "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
+        "the background until it is successful.  This is useful if the network is not immediately "
+        "available when the agent starts.",
+    )
+    my_controller.add_options(parser)
 
-    if options.command == "service":
+    # Parse the main command by command parser.
+    command_args, other_argv = command_parser.parse_known_args()
+
+    # If command is not specified, then we just print usage of the this script.
+    if command_args.command is None:
+        parser.print_help(file=sys.stderr)
+        exit(1)
+
+    if command_args.command == "service":
+        # Windows specific command that tell to start Agent's Windows service.
         from scalyr_agent import platform_windows
+
         # Create fully valid command line args so the Windows service could handle it properly.
-        argv = sys.argv[:]
-        # Remove command element from command args since it can be handled only by this script, not ny
-        # Windows service
-        argv.pop(1)
+        argv = [sys.argv[0]]
+        argv.extend(other_argv)
         platform_windows.parse_options(argv)
         exit(0)
 
-    if options.command == "config":
-        config_main.parse_config_options(options)
+    if command_args.command == "config":
+        # Add the config option. So we can configure the agent from the same executable.
+        # It has to save us from building multiple frozen binaries, when packaging.
+        config_main.parse_config_options(other_argv)
         exit(0)
+
+    options = parser.parse_args(args=other_argv)
 
     my_controller.consume_options(options)
 
@@ -2224,7 +2244,7 @@ if __name__ == "__main__":
     main_rc = 1
     try:
         main_rc = ScalyrAgent(my_controller).main(
-            options.config_filename, options.command, options
+            options.config_filename, command_args.command, options
         )
     except Exception as mainExcept:
         print(six.text_type(mainExcept), file=sys.stderr)
