@@ -1,1 +1,1 @@
-@scalyr-agent-2 config %*
+@"%~dp0scalyr-agent-2" config %*
