@@ -1,1 +1,0 @@
-../agent_build/windows/scalyr-agent-2-config.cmd

@@ -1,1 +1,1 @@
-@scalyr-agent-2.exe config %*
+@scalyr-agent-2 config %*
