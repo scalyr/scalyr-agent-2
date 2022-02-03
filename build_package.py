@@ -392,7 +392,7 @@ def build_win32_installer_package(variant, version):
         "--exclude-module", "sqlite",
     ])
 
-    run_command(
+    subprocess.check_call(
         command
     )
 
