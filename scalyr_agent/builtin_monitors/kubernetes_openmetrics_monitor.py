@@ -530,7 +530,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
     def gather_sample(self):
         self._logger.info(
-            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running"
+            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running",
+            limit_once_per_x_secs=10 * 60,
+            limit_key="k8s-om-mon-info",
         )
 
         if not self.__static_monitors_started:
@@ -748,7 +750,11 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         k8s_pods = self.__get_k8s_pods()
         node_name = self.__get_node_name()
 
-        self._logger.info(f"Found {len(k8s_pods)} pods on node {node_name}")
+        self._logger.info(
+            f"Found {len(k8s_pods)} pods on node {node_name}",
+            limit_once_per_x_secs=10 * 60,
+            limit_key="k8s-om-mon-sched-1",
+        )
 
         # Maps scrape URL to the corresponding monitor config and K8sPod
         scrape_configs: Dict[str, Tuple[OpenMetricsMonitorConfig, K8sPod]] = {}
@@ -759,8 +765,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_config = self.__get_monitor_config_for_pod(pod=pod)
 
             if scrape_config:
-                self._logger.info(
-                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
+                self._logger.debug(
+                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})',
                 )
                 assert (
                     scrape_config.scrape_url not in scrape_configs
@@ -776,9 +782,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         to_remove_scrape_urls = current_scrape_urls.difference(new_scrape_urls)
 
         node_name = self.__get_node_name()
-        self._logger.info(
-            f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
-        )
+
+        if to_add_scrape_urls or to_remove_scrape_urls:
+            self._logger.info(
+                f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
+            )
+        else:
+            # If nothing has changed, we use rate limit log to avoid spamming
+            self._logger.info(
+                f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}",
+                limit_once_per_x_secs=10 * 60,
+                limit_key="k8s-om-mon-sched-3",
+            )
 
         for scrape_url in sorted(to_remove_scrape_urls):
             self.__remove_monitor(scrape_url=scrape_url)
@@ -789,7 +804,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         end_ts = time.time()
         self._logger.info(
-            f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds."
+            f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds.",
+            limit_once_per_x_secs=10 * 60,
+            limit_key="k8s-om-mon-sched-4",
         )
 
     def __add_monitor(

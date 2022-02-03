@@ -846,10 +846,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # For multi processing mode we also include pids of all the spawned processes
                 if self.__config.use_multiprocess_workers:
-                    msg = "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s" % (
-                        worker_sessions_count,
-                        os.getpid(),
-                        ", ".join([str(pid) for pid in worker_session_process_ids]),
+                    msg = (
+                        "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s"
+                        % (
+                            worker_sessions_count,
+                            os.getpid(),
+                            ", ".join([str(pid) for pid in worker_session_process_ids]),
+                        )
                     )
                 else:
                     msg = (

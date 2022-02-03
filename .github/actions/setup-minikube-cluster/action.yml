@@ -1,0 +1,49 @@
+name: "Setup minikube cluster"
+description: "Action which sets up minikube k8s cluster"
+
+inputs:
+  minikube_version:
+    description: "Minikube version to use"
+    required: false
+    default: "v1.23.2"
+  k8s_version:
+    description: "Kubernetes version to be installed by minikube (if any)"
+    required: false
+    default: ""
+  github_token:
+    description: "Github token to use for communication with Github API to avoid rate limits"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create minikube Kubernetes ${{ inputs.k8s_version }} Cluster
+      id: create-minikube-cluster
+      # TODO: Workaround until conditions are supported natively
+      # See https://github.com/actions/runner/issues/834
+      uses: ChristopherHX/conditional@b4a9649204f81002ec9a4ef7d4bf7d6b2ab7fa55
+      with:
+        if: ${{ inputs.k8s_version != '' }}
+        step: |
+          uses: manusa/actions-setup-minikube@3cce81c968cabc530141d5620b7d9942a2907df5 # v2.4.2
+          with:
+            minikube version: '${{ inputs.minikube_version }}'
+            kubernetes version: '${{ inputs.k8s_version }}'
+            github token: '${{ inputs.github_token }}'
+
+    - name: Print minikube environment info
+      id: print-k8s-cluster-info
+      uses: ChristopherHX/conditional@b4a9649204f81002ec9a4ef7d4bf7d6b2ab7fa55
+      with:
+        if: ${{ inputs.k8s_version != '' }}
+        step: |
+          shell: bash
+          run: |
+            # Workaround for occasional DNS issues
+            # kubectl -n kube-system rollout restart deployment coredns
+            kubectl version
+            minikube addons list
+            kubectl get nodes
+            kubectl cluster-info
+            kubectl get pods -A
+            sleep 5

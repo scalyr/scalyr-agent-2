@@ -456,8 +456,8 @@ def main(
         cat_step_timeout = 10
         max_tries = 3
     else:
-        deploy_step_timeout = 320  # 260
-        deploy_overall_timeout = 340  # 280
+        deploy_step_timeout = 320
+        deploy_overall_timeout = 340
         max_tries = 3
         cat_step_timeout = 5
 

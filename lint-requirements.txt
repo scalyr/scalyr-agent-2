@@ -1,5 +1,5 @@
 # This file contains requirements which are needed by the lint test targets
-black==21.4b2
+black==22.1.0
 modernize==0.7
 flake8==3.7.9
 pylint==2.4.4
