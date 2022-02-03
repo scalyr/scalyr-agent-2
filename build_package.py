@@ -291,17 +291,6 @@ def build_win32_installer_package(variant, version):
         make_path(agent_source_root, "scalyr_agent/third_party/licenses"), "licenses"
     )
 
-    # Copy the config file.
-    agent_json_path = make_path(agent_source_root, "config/agent.json")
-    cat_files(
-        [agent_json_path],
-        "agent_config.tmpl",
-        convert_newlines=True,
-    )
-    # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
-    # readable by others.
-    os.chmod(agent_json_path, int("640", 8))
-
     os.chdir("..")
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
     shutil.copy(make_path(agent_source_root, "setup.py"), "setup.py")
@@ -417,6 +406,19 @@ def build_win32_installer_package(variant, version):
     # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
     # readable by others.
     os.chmod("Scalyr/config/agent.d", int("741", 8))
+
+    # Copy the config file.
+    agent_json_path = make_path(agent_source_root, "config/agent.json")
+    cat_files(
+        [agent_json_path],
+        "Scalyr/config/templates/agent_config.tmpl",
+        convert_newlines=True,
+    )
+    # NOTE: We in intentionally set this permission bit for agent.json to make sure it's not
+    # readable by others.
+    os.chmod("Scalyr/config/templates/agent_config.tmpl", int("640", 8))
+
+    shutil.copy(make_path(agent_source_root, "VERSION"), "Scalyr/VERSION")
 
     #os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
     shutil.copy(
