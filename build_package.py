@@ -393,6 +393,7 @@ def build_win32_installer_package(variant, version):
     ])
     print(os.getcwd())
     print(list(os.listdir(os.getcwd())))
+    print(list(os.listdir(os.path.join(os.getcwd(), "data_files"))))
 
     subprocess.check_call(
         command
