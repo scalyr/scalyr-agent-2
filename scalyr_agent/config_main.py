@@ -48,13 +48,22 @@ if not sys.platform.startswith("win"):
     from pwd import getpwnam
 
 # pylint: disable=import-error
-from __scalyr__ import (
-    scalyr_init,
-    get_install_root,
-    TARBALL_INSTALL,
-    SCALYR_VERSION,
-    PACKAGE_INSTALL,
-)
+try:
+    from scalyr_agent.__scalyr__ import (
+        scalyr_init,
+        get_install_root,
+        TARBALL_INSTALL,
+        SCALYR_VERSION,
+        PACKAGE_INSTALL,
+    )
+except ImportError:
+    from __scalyr__ import (
+        scalyr_init,
+        get_install_root,
+        TARBALL_INSTALL,
+        SCALYR_VERSION,
+        PACKAGE_INSTALL,
+    )
 
 # pylint: enable=import-error
 
