@@ -2224,7 +2224,7 @@ if __name__ == "__main__":
     main_rc = 1
     try:
         main_rc = ScalyrAgent(my_controller).main(
-            options.config_filename, command_args.command, options
+            options.config_filename, options.command, options
         )
     except Exception as mainExcept:
         print(six.text_type(mainExcept), file=sys.stderr)
