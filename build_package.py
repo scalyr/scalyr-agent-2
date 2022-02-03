@@ -376,7 +376,7 @@ def build_win32_installer_package(variant, version):
             "PyInstaller",
             os.path.join(agent_package_path, "agent_main.py"),
             "--onefile",
-            "-n", "scalyr-agent-2.exe",
+            "-n", "scalyr-agent-2",
             "--paths", ":".join(paths_to_include),
         ]
     command.extend(add_data_options)
@@ -401,6 +401,7 @@ def build_win32_installer_package(variant, version):
 
     print(os.getcwd())
     print(list(os.listdir(os.getcwd())))
+    print(list(os.listdir(os.path.join(os.getcwd(), "dist"))))
 
     # run_command(
     #     "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
@@ -412,11 +413,16 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
+    make_directory("Scalyr/bin")
     # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
     # readable by others.
     os.chmod("Scalyr/config/agent.d", int("741", 8))
 
-    os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
+    #os.rename(os.path.join("dist", "scalyr-agent-2"), convert_path("Scalyr/bin"))
+    shutil.copy(
+        os.path.join("dist", "scalyr-agent-2.exe"),
+        "Scalyr/bin"
+    )
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
         "Scalyr/bin/ScalyrShell.cmd",
