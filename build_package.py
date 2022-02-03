@@ -283,13 +283,8 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, "VERSION"), "VERSION.txt")
     shutil.copy(make_path(agent_source_root, "LICENSE.txt"), "LICENSE.txt")
 
-    # Also add in build_info file
-    try:
-        write_to_file(get_install_info("package"), "install_info")
-    except Exception as e:
-        # NOTE: For now this error is not fatal in case git is not present on the system where
-        # we are building a package
-        print("Failed to retrieve / write build info fail: %s" % (str(e)))
+    # Also add in install_info file
+    write_to_file(get_install_info("package"), "install_info")
 
     # Copy the third party licenses
     shutil.copytree(
@@ -315,31 +310,97 @@ def build_win32_installer_package(variant, version):
         make_path(agent_source_root, "DESCRIPTION.rst"),
         convert_path("source_root/DESCRIPTION.rst"),
     )
-    pyinstaller_spec_path = os.path.join(
-        agent_source_root, "win32", "scalyr-agent.spec"
-    )
+    # pyinstaller_spec_path = os.path.join(
+    #     agent_source_root, "win32", "scalyr-agent.spec"
+    # )
+    #
+    # shutil.copy(pyinstaller_spec_path, "scalyr-agent.spec")
+    #
+    # shutil.copy(
+    #     os.path.join(agent_source_root, "win32", "dynamic_modules.py"),
+    #     "dynamic_modules.py",
+    # )
 
-    shutil.copy(pyinstaller_spec_path, "scalyr-agent.spec")
+    # shutil.copy(
+    #     os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
+    #     "wix-heat-bin-transform.xsl",
+    # )
 
-    shutil.copy(
-        os.path.join(agent_source_root, "win32", "dynamic_modules.py"),
-        "dynamic_modules.py",
-    )
+    # shutil.copy(
+    #     os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
+    # )
 
-    shutil.copy(
-        os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
-        "wix-heat-bin-transform.xsl",
-    )
+    agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
-    shutil.copy(
-        os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
-    )
+    add_data = {
+        str("data_files"): "scalyr_agent"
+    }
+
+    # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
+    hidden_imports = [
+        "scalyr_agent.builtin_monitors.apache_monitor",
+        "scalyr_agent.builtin_monitors.graphite_monitor",
+        "scalyr_agent.builtin_monitors.mysql_monitor",
+        "scalyr_agent.builtin_monitors.nginx_monitor",
+        "scalyr_agent.builtin_monitors.shell_monitor",
+        "scalyr_agent.builtin_monitors.syslog_monitor",
+        "scalyr_agent.builtin_monitors.test_monitor",
+        "scalyr_agent.builtin_monitors.url_monitor",
+        "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        "scalyr_agent.builtin_monitors.windows_system_metrics",
+        "scalyr_agent.builtin_monitors.windows_process_metrics",
+        "scalyr_agent.builtin_monitors.openmetrics_monitor",
+    ]
+
+    # Add packages to frozen binary paths.
+    paths_to_include = [
+        os.path.join(agent_source_root, "scalyr_agent", "third_party"),
+        os.path.join(agent_source_root, "scalyr_agent", "third_party_python2"),
+    ]
+
+    # Create --add-data options from previously added files.
+    add_data_options = []
+    for src, dest in add_data.items():
+        add_data_options.append("--add-data")
+        add_data_options.append("{}{}{}".format(src, os.path.pathsep, dest))
+
+    # Create --hidden-import options from previously created hidden imports list.
+    hidden_import_options = []
+    for h in hidden_imports:
+        hidden_import_options.append("--hidden-import")
+        hidden_import_options.append(str(h))
+
+    command = [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            os.path.join(agent_package_path, "agent_main.py"),
+            "--onefile",
+            "-n", "scalyr-agent-2",
+            "--paths", ":".join(paths_to_include),
+        ]
+    command.extend(add_data_options)
+    command.extend(hidden_import_options)
+    command.extend([
+        "--exclude-module", "asyncio",
+        "--exclude-module", "FixTk",
+        "--exclude-module", "tcl",
+        "--exclude-module", "tk",
+        "--exclude-module", "_tkinter",
+        "--exclude-module", "tkinter",
+        "--exclude-module", "Tkinter",
+        "--exclude-module", "sqlite",
+    ])
 
     run_command(
-        "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
-        exit_on_fail=True,
-        command_name="pyinstaller",
+        command
     )
+
+    # run_command(
+    #     "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
+    #     exit_on_fail=True,
+    #     command_name="pyinstaller",
+    # )
 
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")

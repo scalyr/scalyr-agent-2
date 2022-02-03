@@ -37,6 +37,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import platform
 import traceback
 import errno
 import gc
@@ -2113,24 +2114,56 @@ class WorkerThread(object):
 
 if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
-    parser = OptionParser(
-        usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
-        version="scalyr-agent v" + SCALYR_VERSION,
+
+    commands = ["start", "stop", "status", "restart", "condrestart", "version", "config"]
+
+    if platform.system() == "Windows":
+        # If this is Windows, then also add service option.
+        # Using this option we can use windows executable as a base for the Windows Agent service.
+        # It has to save us from building multiple frozen binaries, when packaging.
+        commands.append("service")
+
+    command_parser = argparse.ArgumentParser(
+        usage="Usage: scalyr-agent-2 [options] ({})".format(commands),
     )
-    parser.add_option(
+    command_parser.add_argument(
+        "command",
+        choices=commands
+    )
+
+    command_args, other_argv = command_parser.parse_known_args()
+    # Add the config option. So we can configure the agent from the same executable.
+    # It has to save us from building multiple frozen binaries, when packaging.
+    if command_args.command == "config":
+        agent_config.parse_config_options(other_argv)
+        exit(0)
+
+    if command_args.command == "service":
+        # Windows specific command that tell to start Agent's Windows service.
+        from scalyr_agent import platform_windows
+
+        # Create fully valid command line args so the Windows service could handle it properly.
+        argv = [sys.argv[0]]
+        argv.extend(other_argv)
+        platform_windows.parse_options(argv)
+        exit(0)
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
         "-c",
         "--config-file",
         dest="config_filename",
         help="Read configuration from FILE",
         metavar="FILE",
     )
-    parser.add_option(
+    parser.add_argument(
         "--extra-config-dir",
         default=None,
         help="An extra directory to check for configuration files",
         metavar="PATH",
     )
-    parser.add_option(
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
@@ -2138,7 +2171,7 @@ if __name__ == "__main__":
         default=False,
         help="Only print error messages when running the start, stop, and condrestart commands",
     )
-    parser.add_option(
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -2146,7 +2179,7 @@ if __name__ == "__main__":
         default=False,
         help="For status command, prints detailed information about running agent.",
     )
-    parser.add_option(
+    parser.add_argument(
         "-H",
         "--health_check",
         action="store_true",
@@ -2154,23 +2187,21 @@ if __name__ == "__main__":
         default=False,
         help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
     )
-    parser.add_option(
+    parser.add_argument(
         "--format",
         dest="status_format",
         default="text",
         help="Format to use (text / json) for the agent status command.",
     )
 
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--no-fork",
         action="store_true",
         dest="no_fork",
         default=False,
         help="For the run command, does not fork the program to the background.",
     )
-    parser.add_option(
-        "",
+    parser.add_argument(
         "--no-check-remote-server",
         action="store_true",
         dest="no_check_remote",
@@ -2181,7 +2212,7 @@ if __name__ == "__main__":
     )
     my_controller.add_options(parser)
 
-    (options, args) = parser.parse_args()
+    options = parser.parse_args(args=other_argv)
     my_controller.consume_options(options)
 
     if len(args) < 1:
@@ -2218,7 +2249,7 @@ if __name__ == "__main__":
     main_rc = 1
     try:
         main_rc = ScalyrAgent(my_controller).main(
-            options.config_filename, args[0], options
+            options.config_filename, command_args.command, options
         )
     except Exception as mainExcept:
         print(six.text_type(mainExcept), file=sys.stderr)

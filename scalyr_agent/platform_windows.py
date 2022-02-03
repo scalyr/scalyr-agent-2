@@ -18,7 +18,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-
+import argparse
 import atexit
 import errno
 
@@ -590,8 +590,8 @@ class WindowsPlatformController(PlatformController):
         @type agent_run_method: func(PlatformController)
         @type quiet: bool
         """
-        # NOTE:  The config_main.py file relies on it being ok to pass in None for agent_run_method.
-        # If this assumption changes, fix that in config_main.py.
+        # NOTE:  The agent_config.py file relies on it being ok to pass in None for agent_run_method.
+        # If this assumption changes, fix that in agent_config.py.
         try:
             _set_config_path_registry_entry(self.__config_file_path)
         except Exception as e:
@@ -703,20 +703,19 @@ class WindowsPlatformController(PlatformController):
                 raise e
 
     def add_options(self, options_parser):
+        # type: (argparse.ArgumentParser) -> None
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
         @param options_parser:
         @type options_parser: optparse.OptionParser
         """
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--redirect-to-pipe",
             dest="redirect_pipe",
             help="Used to redirect stdin/stdout to a named pipe.  Used internally.",
         )
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--no-change-user",
             action="store_true",
             dest="no_change_user",
@@ -726,8 +725,7 @@ class WindowsPlatformController(PlatformController):
             "in changing to the correct user.  Users should not need to set this option.",
         )
 
-        options_parser.add_option(
-            "-n",
+        options_parser.add_argument(
             "--no-warn-escalation",
             action="store_true",
             dest="no_escalation_warning",
@@ -739,6 +737,7 @@ class WindowsPlatformController(PlatformController):
         )
 
     def consume_options(self, options):
+        # type: (argparse.Namespace) -> None
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
@@ -923,10 +922,14 @@ class PipeRedirectorClient(RedirectorClient):
                 self.__pipe_handle = None
 
 
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
+def parse_options(argv):
+    if len(argv) == 0:
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(ScalyrAgentService)
         servicemanager.StartServiceCtrlDispatcher()
     else:
-        win32serviceutil.HandleCommandLine(ScalyrAgentService)
+        win32serviceutil.HandleCommandLine(ScalyrAgentService, argv=argv)
+
+
+if __name__ == "__main__":
+    parse_options(sys.argv)
