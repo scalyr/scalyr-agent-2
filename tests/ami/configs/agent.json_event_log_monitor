@@ -6,7 +6,7 @@
 
   monitors: [
       {
-          module:                  "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+          module:                  "scalyr_agent.builtin_monitors.windows_event_log_monitorr",
           channels: [
               { "channel": ["Application"],
               "query": "*"
