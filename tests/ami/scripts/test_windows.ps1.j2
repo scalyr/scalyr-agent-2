@@ -194,7 +194,7 @@ New-EventLog –LogName Application –Source “ScalyrAgentTest”
 [system.diagnostics.EventLog]::CreateEventSource("ScalyrAgentTest", "Application")
 Write-EventLog -LogName "Application" -Source "ScalyrAgentTest" -EventID 30001 -EntryType Information -Message "Scalyr automated tests event." -Category 1 -RawData 10,20
 
-Start-Sleep 50
+Start-Sleep 100
 
 $status_output=scalyr-agent-2 status -v;
 echo $status_output
