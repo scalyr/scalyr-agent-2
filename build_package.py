@@ -333,7 +333,7 @@ def build_win32_installer_package(variant, version):
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
     add_data = {
-        str("data_files"): "scalyr_agent"
+        os.path.join("data_files", "install_type"): "scalyr_agent"
     }
 
     # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
@@ -395,6 +395,9 @@ def build_win32_installer_package(variant, version):
     subprocess.check_call(
         command
     )
+
+    print(os.getcwd())
+    print(list(os.listdir(os.getcwd())))
 
     # run_command(
     #     "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
