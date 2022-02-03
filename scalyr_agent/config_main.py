@@ -1388,8 +1388,8 @@ def configure_agent_service_for_systemd_management():
     )
 
 
-def parse_config_options(argv):
-    parser = argparse.ArgumentParser(usage="Usage: scalyr-agent-2-config [options]")
+def add_config_options(parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         "-c",
         "--config-file",
@@ -1593,7 +1593,9 @@ def parse_config_options(argv):
             help="Configure the agent to be managed by systemd instead of init.d which is a default",
         )
 
-    options = parser.parse_args(args=argv)
+
+def parse_config_options(options):
+    # type: (argparse.Namespace) -> None
 
     controller = PlatformController.new_platform()
     default_paths = controller.default_paths
@@ -1776,4 +1778,4 @@ def parse_config_options(argv):
 
 
 if __name__ == '__main__':
-    parse_config_options(sys.argv)
+    add_config_options(sys.argv)

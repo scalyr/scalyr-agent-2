@@ -923,13 +923,9 @@ class PipeRedirectorClient(RedirectorClient):
 
 
 def parse_options(argv):
-    if len(argv) == 0:
+    if len(argv) == 1:
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(ScalyrAgentService)
         servicemanager.StartServiceCtrlDispatcher()
     else:
         win32serviceutil.HandleCommandLine(ScalyrAgentService, argv=argv)
-
-
-if __name__ == "__main__":
-    parse_options(sys.argv)
