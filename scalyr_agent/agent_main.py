@@ -2216,32 +2216,6 @@ if __name__ == "__main__":
     options = parser.parse_args(args=other_argv)
     my_controller.consume_options(options)
 
-    if len(args) < 1:
-        print(
-            'You must specify a command, such as "start", "stop", or "status".',
-            file=sys.stderr,
-        )
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-    elif len(args) > 1:
-        print(
-            'Too many commands specified.  Only specify one of "start", "stop", "status".',
-            file=sys.stderr,
-        )
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-    elif args[0] not in (
-        "start",
-        "stop",
-        "status",
-        "restart",
-        "condrestart",
-        "version",
-    ):
-        print('Unknown command given: "%s"' % args[0], file=sys.stderr)
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-
     if options.config_filename is not None and not os.path.isabs(
         options.config_filename
     ):
