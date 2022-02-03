@@ -391,6 +391,8 @@ def build_win32_installer_package(variant, version):
         "--exclude-module", "Tkinter",
         "--exclude-module", "sqlite",
     ])
+    print(os.getcwd())
+    print(list(os.listdir(os.getcwd())))
 
     subprocess.check_call(
         command
