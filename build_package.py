@@ -376,7 +376,7 @@ def build_win32_installer_package(variant, version):
             "PyInstaller",
             os.path.join(agent_package_path, "agent_main.py"),
             "--onefile",
-            "-n", "scalyr-agent-2",
+            "-n", "scalyr-agent-2.exe",
             "--paths", ":".join(paths_to_include),
         ]
     command.extend(add_data_options)
