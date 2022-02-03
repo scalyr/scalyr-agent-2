@@ -402,6 +402,7 @@ def build_win32_installer_package(variant, version):
     make_directory("Scalyr/logs")
     make_directory("Scalyr/data")
     make_directory("Scalyr/config/agent.d")
+    make_directory("Scalyr/config/templates")
     make_directory("Scalyr/bin")
     # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
     # readable by others.
