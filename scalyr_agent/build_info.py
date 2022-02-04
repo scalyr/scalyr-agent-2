@@ -21,8 +21,6 @@ Keep in mind that that file is only available for package and not for dev instal
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import json
-
 if False:  # NOSONAR
     from typing import Dict
 
@@ -35,10 +33,6 @@ from scalyr_agent import __scalyr__
 from scalyr_agent.compat import subprocess_check_output
 
 GIT_GET_HEAD_REVISION_CMD = "git rev-parse HEAD"
-
-# # The build_info file should be located in the install root directory.
-# BUILD_INFO_FILE_PATH = os.path.join(__scalyr__.get_install_root(), "build_info")
-
 
 def get_build_info():
     # type: () -> Dict[str, str]

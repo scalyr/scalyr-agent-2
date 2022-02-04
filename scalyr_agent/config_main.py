@@ -1785,4 +1785,4 @@ def parse_config_options(argv):
 
 
 if __name__ == '__main__':
-    add_config_options(sys.argv)
+    parse_config_options(sys.argv)

@@ -26,8 +26,6 @@ __author__ = "czerwin@scalyr.com"
 # because there is only one incompatible piece of code here.
 # and it can be fixed in code below...
 import json
-import platform
-import subprocess
 
 try:
     # Python2
@@ -170,26 +168,7 @@ def __determine_package_root():
     @return: The absolute file path for the package root.
     """
 
-
     return os.path.dirname(__file__)
-
-    # # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
-    # # We could just return the parent of __file__, however, this apparently is not portable on all version of
-    # # Windows.  Moreover, when running as a win32 exe, __file__ is not set.
-    # if not __is_frozen__:
-    #     base = os.getcwd()
-    #     file_path = inspect.stack()[1][1]
-    #     if not os.path.isabs(file_path):
-    #         file_path = os.path.join(base, file_path)
-    #     file_path = os.path.dirname(os.path.realpath(file_path))
-    # else:
-    #     # encode python executable path for python 2.
-    #     executable_path = sys.executable
-    #     if type(executable_path) != text_type:
-    #         executable_path = text_type(executable_path, sys.getfilesystemencoding())
-    #     return os.path.dirname(executable_path)
-    #
-    # return file_path
 
 
 __package_root__ = __determine_package_root()
@@ -245,15 +224,6 @@ def get_install_root():
         install_root = os.path.dirname(py_dir)
 
     return install_root
-
-    #
-    # parent_of_package_install = os.path.dirname(get_package_root())
-    # if __is_frozen__:  # win32 install
-    #     return parent_of_package_install
-    # elif os.path.basename(parent_of_package_install) != "py":  # Running from Source
-    #     return parent_of_package_install
-    # else:  # Installed using tarball or rpm/debian package
-    #     return os.path.dirname(parent_of_package_install)
 
 
 def __add_scalyr_package_to_path():

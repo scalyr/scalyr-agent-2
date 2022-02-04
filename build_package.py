@@ -299,24 +299,9 @@ def build_win32_installer_package(variant, version):
         make_path(agent_source_root, "DESCRIPTION.rst"),
         convert_path("source_root/DESCRIPTION.rst"),
     )
-    # pyinstaller_spec_path = os.path.join(
-    #     agent_source_root, "win32", "scalyr-agent.spec"
-    # )
-    #
-    # shutil.copy(pyinstaller_spec_path, "scalyr-agent.spec")
-    #
-    # shutil.copy(
-    #     os.path.join(agent_source_root, "win32", "dynamic_modules.py"),
-    #     "dynamic_modules.py",
-    # )
-
-    # shutil.copy(
-    #     os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
-    #     "wix-heat-bin-transform.xsl",
-    # )
 
     shutil.copy(
-        os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
+        os.path.join(agent_source_root, "agent_build", "windows", "scalyr_agent.wxs"), "scalyr_agent.wxs"
     )
 
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
@@ -380,23 +365,10 @@ def build_win32_installer_package(variant, version):
         "--exclude-module", "Tkinter",
         "--exclude-module", "sqlite",
     ])
-    print(os.getcwd())
-    print(list(os.listdir(os.getcwd())))
-    print(list(os.listdir(os.path.join(os.getcwd(), "data_files"))))
 
     subprocess.check_call(
         command
     )
-
-    print(os.getcwd())
-    print(list(os.listdir(os.getcwd())))
-    print(list(os.listdir(os.path.join(os.getcwd(), "dist"))))
-
-    # run_command(
-    #     "{0} -m PyInstaller scalyr-agent.spec".format(sys.executable),
-    #     exit_on_fail=True,
-    #     command_name="pyinstaller",
-    # )
 
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")
@@ -474,18 +446,6 @@ def build_win32_installer_package(variant, version):
         del parts[3]
         version = ".".join(parts)
 
-    # # Gather files by 'heat' tool from WIX and generate .wxs file for 'bin' folder.
-    # run_command(
-    #     "heat dir Scalyr/bin -sreg -ag -cg BIN -dr APPLICATIONROOTDIRECTORY -var var.BinFolderSource -t wix-heat-bin-transform.xsl -o bin.wxs",
-    #     exit_on_fail=True,
-    #     command_name="heat",
-    # )
-
-    # run_command(
-    #     'candle -nologo -out scalyr_agent.wixobj scalyr_agent.wxs -dBinFolderSource="Scalyr/bin"',
-    #     exit_on_fail=True,
-    #     command_name="candle",
-    # )
 
     run_command(
         'candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
@@ -1115,11 +1075,7 @@ def build_base_files(install_type, base_configs="config"):
     # Write install_info file inside the 'scalyr_agent' package.
     os.chdir("scalyr_agent")
     install_info = get_install_info(install_type)
-    print("INSTALL_INFO")
-    print(install_info)
-    print(os.getcwd())
     write_to_file(install_info, "install_info")
-    print(list(os.listdir(".")))
     os.chdir("..")
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
