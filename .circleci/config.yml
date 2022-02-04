@@ -2110,7 +2110,7 @@ jobs:
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.10-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2164,7 +2164,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-3.8.7-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-3.8.10-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
