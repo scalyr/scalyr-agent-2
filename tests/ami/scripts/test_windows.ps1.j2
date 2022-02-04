@@ -185,9 +185,13 @@ Log-Message ""
 Log-Message "Performing Windows Event Log monitor checks"
 Log-Message ""
 
+scalyr-agent-2 status -v
+
 Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
+
+scalyr-agent-2 status -v
 
 # Write mock entry to event log and ensure Scalyr picks it up
 New-EventLog –LogName Application –Source “ScalyrAgentTest”
