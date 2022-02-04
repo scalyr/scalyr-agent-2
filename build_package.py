@@ -911,7 +911,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         # updated by scalyr-switch-python and we want to leave this in place - aka make sure
         # selected Python version is preserved on upgrade
         "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
-        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
+        # "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
