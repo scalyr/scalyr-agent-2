@@ -660,10 +660,10 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     make_soft_link(
         "/usr/share/scalyr-agent-2/bin/scalyr-agent-2", "root/usr/sbin/scalyr-agent-2"
     )
-    make_soft_link(
-        "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
-        "root/usr/sbin/scalyr-agent-2-config",
-    )
+    # make_soft_link(
+    #     "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
+    #     "root/usr/sbin/scalyr-agent-2-config",
+    # )
     make_soft_link(
         "/usr/share/scalyr-agent-2/bin/scalyr-switch-python",
         "root/usr/sbin/scalyr-switch-python",
@@ -1097,15 +1097,15 @@ def build_base_files(install_type, base_configs="config"):
     os.chmod(agent_main_py2_path, main_permissions)
     os.chmod(agent_main_py3_path, main_permissions)
 
-    # create copies of the config_main.py with python2 and python3 shebang.
-    config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
-    config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
-    config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
-    replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
-    replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
-    config_permissions = os.stat(config_main_path).st_mode
-    os.chmod(config_main_py2_path, config_permissions)
-    os.chmod(config_main_py3_path, config_permissions)
+    # # create copies of the config_main.py with python2 and python3 shebang.
+    # config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
+    # config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
+    # config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
+    # replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
+    # replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
+    # config_permissions = os.stat(config_main_path).st_mode
+    # os.chmod(config_main_py2_path, config_permissions)
+    # os.chmod(config_main_py3_path, config_permissions)
 
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
@@ -1164,7 +1164,12 @@ def build_base_files(install_type, base_configs="config"):
     os.chdir("bin")
 
     make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
-    make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
+    # make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
+
+    shutil.copy(
+        make_path(agent_source_root, "agent_build/linux/scalyr-agent-2-config"),
+        "scalyr-agent-2-config"
+    )
 
     # add switch python version script.
     shutil.copy(

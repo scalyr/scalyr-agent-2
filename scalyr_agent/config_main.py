@@ -1240,21 +1240,21 @@ def set_python_version(version):
     # use on the 'python' command and rely on the python version which it mapped on.
     if version in DEFAULT:
         agent_main_filename = "agent_main.py"
-        config_main_filename = "agent_config.py"
+        # config_main_filename = "agent_config.py"
     # python 'python2
     elif version == PYTHON2:
         agent_main_filename = "agent_main_py2.py"
-        config_main_filename = "config_main_py2.py"
+        # config_main_filename = "config_main_py2.py"
     # python 'python3
     else:
         agent_main_filename = "agent_main_py3.py"
-        config_main_filename = "config_main_py3.py"
+        # config_main_filename = "config_main_py3.py"
 
     agent_main_source = os.path.join(source_path, agent_main_filename)
-    config_main_source = os.path.join(source_path, config_main_filename)
+    # config_main_source = os.path.join(source_path, config_main_filename)
 
     scalyr_agent_2_target = os.path.join(binary_path, "scalyr-agent-2")
-    scalyr_agent_2_config_target = os.path.join(binary_path, "scalyr-agent-2-config")
+    # scalyr_agent_2_config_target = os.path.join(binary_path, "scalyr-agent-2-config")
 
     def make_symlink(source, target):
         try:
@@ -1266,7 +1266,7 @@ def set_python_version(version):
 
     # recreate symlinks to agent main and config_main.
     make_symlink(agent_main_source, scalyr_agent_2_target)
-    make_symlink(config_main_source, scalyr_agent_2_config_target)
+    # make_symlink(config_main_source, scalyr_agent_2_config_target)
 
     print("Switched agent to {0}".format(version))
     print(
