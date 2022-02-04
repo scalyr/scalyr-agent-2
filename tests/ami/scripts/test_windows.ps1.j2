@@ -200,6 +200,9 @@ Write-EventLog -LogName "Application" -Source "ScalyrAgentTest" -EventID 30001 -
 
 Start-Sleep 150
 
+echo "GGGG"
+Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Tail 50 -ErrorAction SilentlyContinue
+
 $status_output=scalyr-agent-2 status -v;
 echo $status_output
 
