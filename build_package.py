@@ -660,10 +660,10 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     make_soft_link(
         "/usr/share/scalyr-agent-2/bin/scalyr-agent-2", "root/usr/sbin/scalyr-agent-2"
     )
-    # make_soft_link(
-    #     "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
-    #     "root/usr/sbin/scalyr-agent-2-config",
-    # )
+    make_soft_link(
+        "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
+        "root/usr/sbin/scalyr-agent-2-config",
+    )
     make_soft_link(
         "/usr/share/scalyr-agent-2/bin/scalyr-switch-python",
         "root/usr/sbin/scalyr-switch-python",
