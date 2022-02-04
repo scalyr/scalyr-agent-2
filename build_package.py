@@ -301,7 +301,7 @@ def build_win32_installer_package(variant, version):
     )
 
     shutil.copy(
-        os.path.join(agent_source_root, "agent_build", "windows", "scalyr_agent.wxs"), "scalyr_agent.wxs"
+        os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
     )
 
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
@@ -407,11 +407,11 @@ def build_win32_installer_package(variant, version):
         "Scalyr/bin/ScalyrAgentService.exe"
     )
     shutil.copy(
-        os.path.join(agent_source_root, "agent_build/windows/scalyr-agent-2-config.cmd"),
+        os.path.join(agent_source_root, "win32/scalyr-agent-2-config.cmd"),
         "Scalyr/bin"
     )
     shutil.copy(
-        make_path(agent_source_root, "agent_build/windows/ScalyrShell.cmd"),
+        make_path(agent_source_root, "win32/ScalyrShell.cmd"),
         "Scalyr/bin/ScalyrShell.cmd",
     )
 
