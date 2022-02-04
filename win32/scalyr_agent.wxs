@@ -46,9 +46,6 @@
             <Component Id='version_file' Guid='2c6bbb53-4c83-41cf-b5d8-2855cf86c15c'>
                 <File Id='version_file' Name='VERSION' KeyPath='yes' Checksum='yes' Source='Scalyr\VERSION' />
             </Component>
-            <Component Id='build_info_file' Guid='79582e30-fadc-4b24-a9ff-cf52fd62aecd'>
-                <File Id='build_info_file' Name='build_info' KeyPath='yes' Checksum='yes' Source='Scalyr\build_info' />
-            </Component>
             <Directory Id='DEFAULTAPPLOGS' Name='log'>
                 <Component Id='log_dir' Guid='3af7df35-608a-4cd0-8356-6cb03def0a66' SharedDllRefCount='no' KeyPath='no'
                            NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
@@ -160,7 +157,6 @@
             <ComponentRef Id='data_dir' />
             <ComponentRef Id='config_d_dir' />
             <ComponentRef Id='version_file' />
-            <ComponentRef Id='build_info_file' />
             <!--<ComponentGroupRef Id='BIN' /> -->
 
         </Feature>
