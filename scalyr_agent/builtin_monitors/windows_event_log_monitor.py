@@ -548,6 +548,7 @@ class NewApi(Api):
             metadata, event, win32evtlog.EvtFormatMessageTask, ""
         )
 
+        self._logger.error(vals)
         logging.error(vals)
         self._AddValueIfNotNullType(
             result, "ProviderName", vals[win32evtlog.EvtSystemProviderName]
