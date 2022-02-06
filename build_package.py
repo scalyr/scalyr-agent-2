@@ -344,6 +344,13 @@ def build_win32_installer_package(variant, version):
         hidden_import_options.append("--hidden-import")
         hidden_import_options.append(str(h))
 
+    paths_options = []
+    for p in paths_to_include:
+        paths_options.extend([
+            "--paths",
+            p
+        ])
+
     command = [
             sys.executable,
             "-m",
@@ -351,7 +358,6 @@ def build_win32_installer_package(variant, version):
             os.path.join(agent_package_path, "agent_main.py"),
             "--onefile",
             "-n", "scalyr-agent-2",
-            "--paths", ":".join(paths_to_include),
         ]
     command.extend(add_data_options)
     command.extend(hidden_import_options)
