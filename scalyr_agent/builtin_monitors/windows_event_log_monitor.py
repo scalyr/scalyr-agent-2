@@ -596,7 +596,7 @@ class NewApi(Api):
                 logging.error("2")
                 tb = traceback.format_exc()
                 self._logger.error(tb)
-                raise e
+                raise Exception(str(tb))
                 self._logger.info("Error printing exception information")
 
     def log_event(self, event):
