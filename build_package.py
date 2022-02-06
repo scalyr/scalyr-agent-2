@@ -361,6 +361,7 @@ def build_win32_installer_package(variant, version):
         ]
     command.extend(add_data_options)
     command.extend(hidden_import_options)
+    command.extend(paths_options)
     command.extend([
         # "--exclude-module", "asyncio",
         # "--exclude-module", "FixTk",
