@@ -589,7 +589,8 @@ class NewApi(Api):
         )
         self._logger.error("8")
         self._logger.error("hhh", dir(win32evtlog))
-        self._logger.error(win32evtlog.EvtSystemTimeCreated)
+        #self._logger.error(win32evtlog.EvtSystemTimeCreated)
+        time.sleep(0.1)
         self._AddValueIfNotNullType(result, "UserId", vals[win32evtlog.EvtSystemUserID])
         self._logger.error("9")
         self._AddValueIfNotNullType(
