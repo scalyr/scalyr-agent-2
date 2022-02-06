@@ -584,6 +584,7 @@ class NewApi(Api):
         try:
             self.log_event(event)
         except Exception as e:
+            raise e
             try:
                 self._logger.info("%s", six.text_type(e))
             except Exception:
