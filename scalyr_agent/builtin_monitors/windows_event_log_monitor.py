@@ -588,6 +588,7 @@ class NewApi(Api):
             result, "Computer", vals[win32evtlog.EvtSystemComputer]
         )
         self._logger.error("8")
+        self._logger.error("gggggggg")
         self._logger.error("hhh", dir(win32evtlog))
         #self._logger.error(win32evtlog.EvtSystemTimeCreated)
         time.sleep(0.1)
