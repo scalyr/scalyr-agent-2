@@ -356,14 +356,14 @@ def build_win32_installer_package(variant, version):
     command.extend(add_data_options)
     command.extend(hidden_import_options)
     command.extend([
-        "--exclude-module", "asyncio",
-        "--exclude-module", "FixTk",
-        "--exclude-module", "tcl",
-        "--exclude-module", "tk",
-        "--exclude-module", "_tkinter",
-        "--exclude-module", "tkinter",
-        "--exclude-module", "Tkinter",
-        "--exclude-module", "sqlite",
+        # "--exclude-module", "asyncio",
+        # "--exclude-module", "FixTk",
+        # "--exclude-module", "tcl",
+        # "--exclude-module", "tk",
+        # "--exclude-module", "_tkinter",
+        # "--exclude-module", "tkinter",
+        # "--exclude-module", "Tkinter",
+        # "--exclude-module", "sqlite",
     ])
 
     subprocess.check_call(
