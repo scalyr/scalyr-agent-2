@@ -17,11 +17,9 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import logging
 import os
 import threading
 import time
-import traceback
 
 import six
 
@@ -548,59 +546,37 @@ class NewApi(Api):
             metadata, event, win32evtlog.EvtFormatMessageTask, ""
         )
 
-        self._logger.error(vals)
-        logging.error(vals)
-        self._logger.error("1")
         self._AddValueIfNotNullType(
             result, "ProviderName", vals[win32evtlog.EvtSystemProviderName]
         )
-        self._logger.error("2")
         self._AddValueIfNotNullType(
             result, "ProviderGuid", vals[win32evtlog.EvtSystemProviderGuid]
         )
-        self._logger.error("3")
-        self._logger.error(win32evtlog.EvtSystemTimeCreated)
-        # self._AddValueIfNotNullType(
-        #     result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
-        # )
         self._AddValueIfNotNullType(
-            result, "TimeCreated", "12345677"
+            result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
         )
-        self._logger.error("4")
         self._AddValueIfNotNullType(
             result, "RecordId", vals[win32evtlog.EvtSystemEventRecordId]
         )
-        self._logger.error("5")
         self._AddValueIfNotNullType(
             result, "ActivityId", vals[win32evtlog.EvtSystemActivityID]
         )
-        self._logger.error("6")
         self._AddValueIfNotNullType(
             result, "RelatedActivityId", vals[win32evtlog.EvtSystemRelatedActivityID]
         )
-        self._logger.error("6")
         self._AddValueIfNotNullType(
             result, "ProcessId", vals[win32evtlog.EvtSystemProcessID]
         )
-        self._logger.error("7")
         self._AddValueIfNotNullType(
             result, "ThreadId", vals[win32evtlog.EvtSystemThreadID]
         )
-        self._logger.error("7")
         self._AddValueIfNotNullType(
             result, "Computer", vals[win32evtlog.EvtSystemComputer]
         )
-        self._logger.error("8")
-        self._logger.error("gggggggg")
-        self._logger.error("hhh", dir(win32evtlog))
-        #self._logger.error(win32evtlog.EvtSystemTimeCreated)
-        time.sleep(0.1)
         self._AddValueIfNotNullType(result, "UserId", vals[win32evtlog.EvtSystemUserID])
-        self._logger.error("9")
         self._AddValueIfNotNullType(
             result, "Version", vals[win32evtlog.EvtSystemVersion]
         )
-        self._logger.error("10")
 
         return result
 
@@ -608,16 +584,9 @@ class NewApi(Api):
         try:
             self.log_event(event)
         except Exception as e:
-            logging.error("1")
-            tb = traceback.format_exc()
-            logging.error(tb)
             try:
                 self._logger.info("%s", six.text_type(e))
             except Exception:
-                logging.error("2")
-                tb = traceback.format_exc()
-                self._logger.error(tb)
-                raise Exception(str(tb))
                 self._logger.info("Error printing exception information")
 
     def log_event(self, event):
