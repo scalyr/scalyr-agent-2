@@ -548,6 +548,7 @@ class NewApi(Api):
             metadata, event, win32evtlog.EvtFormatMessageTask, ""
         )
 
+        logging.error(vals)
         self._AddValueIfNotNullType(
             result, "ProviderName", vals[win32evtlog.EvtSystemProviderName]
         )
@@ -586,11 +587,13 @@ class NewApi(Api):
         try:
             self.log_event(event)
         except Exception as e:
+            logging.error("1")
             tb = traceback.format_exc()
             logging.error(tb)
             try:
                 self._logger.info("%s", six.text_type(e))
             except Exception:
+                logging.error("2")
                 tb = traceback.format_exc()
                 self._logger.error(tb)
                 raise e
