@@ -17,9 +17,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import logging
 import os
 import threading
 import time
+import traceback
 
 import six
 
@@ -584,10 +586,13 @@ class NewApi(Api):
         try:
             self.log_event(event)
         except Exception as e:
+            tb = traceback.format_exc()
+            logging.error(tb)
             try:
                 self._logger.info("%s", six.text_type(e))
             except Exception:
-                self._logger.error(str(e))
+                tb = traceback.format_exc()
+                self._logger.error(tb)
                 raise e
                 self._logger.info("Error printing exception information")
 
