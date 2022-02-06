@@ -584,10 +584,11 @@ class NewApi(Api):
         try:
             self.log_event(event)
         except Exception as e:
-            raise e
             try:
                 self._logger.info("%s", six.text_type(e))
             except Exception:
+                self._logger.error(str(e))
+                raise e
                 self._logger.info("Error printing exception information")
 
     def log_event(self, event):
