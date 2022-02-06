@@ -560,9 +560,9 @@ class NewApi(Api):
         )
         self._logger.error("3")
         self._logger.error(win32evtlog.EvtSystemTimeCreated)
-        self._AddValueIfNotNullType(
-            result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
-        )
+        # self._AddValueIfNotNullType(
+        #     result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
+        # )
         self._logger.error("4")
         self._AddValueIfNotNullType(
             result, "RecordId", vals[win32evtlog.EvtSystemEventRecordId]
