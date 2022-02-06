@@ -559,6 +559,7 @@ class NewApi(Api):
             result, "ProviderGuid", vals[win32evtlog.EvtSystemProviderGuid]
         )
         self._logger.error("3")
+        self._logger.error(win32evtlog.EvtSystemTimeCreated)
         self._AddValueIfNotNullType(
             result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
         )
