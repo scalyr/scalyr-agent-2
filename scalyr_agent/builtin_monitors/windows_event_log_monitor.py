@@ -550,37 +550,49 @@ class NewApi(Api):
 
         self._logger.error(vals)
         logging.error(vals)
+        self._logger.error("1")
         self._AddValueIfNotNullType(
             result, "ProviderName", vals[win32evtlog.EvtSystemProviderName]
         )
+        self._logger.error("2")
         self._AddValueIfNotNullType(
             result, "ProviderGuid", vals[win32evtlog.EvtSystemProviderGuid]
         )
+        self._logger.error("3")
         self._AddValueIfNotNullType(
             result, "TimeCreated", vals[win32evtlog.EvtSystemTimeCreated]
         )
+        self._logger.error("4")
         self._AddValueIfNotNullType(
             result, "RecordId", vals[win32evtlog.EvtSystemEventRecordId]
         )
+        self._logger.error("5")
         self._AddValueIfNotNullType(
             result, "ActivityId", vals[win32evtlog.EvtSystemActivityID]
         )
+        self._logger.error("6")
         self._AddValueIfNotNullType(
             result, "RelatedActivityId", vals[win32evtlog.EvtSystemRelatedActivityID]
         )
+        self._logger.error("6")
         self._AddValueIfNotNullType(
             result, "ProcessId", vals[win32evtlog.EvtSystemProcessID]
         )
+        self._logger.error("7")
         self._AddValueIfNotNullType(
             result, "ThreadId", vals[win32evtlog.EvtSystemThreadID]
         )
+        self._logger.error("7")
         self._AddValueIfNotNullType(
             result, "Computer", vals[win32evtlog.EvtSystemComputer]
         )
+        self._logger.error("8")
         self._AddValueIfNotNullType(result, "UserId", vals[win32evtlog.EvtSystemUserID])
+        self._logger.error("9")
         self._AddValueIfNotNullType(
             result, "Version", vals[win32evtlog.EvtSystemVersion]
         )
+        self._logger.error("10")
 
         return result
 
