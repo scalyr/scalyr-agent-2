@@ -415,7 +415,7 @@ class Configuration(object):
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
             # add in the profile logs if we have enabled profiling
-            if self.enable_profiling:
+            if self.enable_profiling and self.__log_warnings:
                 self.__logger.info(
                     "Profiling is enabled, will ingest CPU profiling (%s) and memory "
                     "profiling (%s) data by default"
