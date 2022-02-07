@@ -16,6 +16,9 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
+import sys
+import subprocess
 import re
 from io import open
 import functools
@@ -42,6 +45,9 @@ CORRECT_INIT_PRAGMA = """
 #     and back system metric collection.
 ### END INIT INFO
 """
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+AGENT_MAIN = os.path.abspath(os.path.join(BASE_DIR, "../../scalyr_agent/agent_main.py"))
 
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
@@ -444,6 +450,36 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
+    def test_no_log_messages_printed_on_config_parse_on_status_stop(self):
+        log_levels = [
+            b"INFO",
+            b"DEBUG",
+            b"WARN",
+            b"ERROR",
+        ]
+
+        # Both status and stop command should not produce any log messages on config parse
+        for command in ["status", "stop"]:
+            process = subprocess.Popen(
+                [sys.executable, AGENT_MAIN, command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            stdout, stderr = process.communicate()
+
+            for log_level in log_levels:
+                self.assertFalse(
+                    log_level in stdout,
+                    "Found %s log message in command output which should not be there"
+                    % (log_level),
+                )
+                self.assertFalse(
+                    log_level in stderr,
+                    "Found %s log message in command output which should not be there"
+                    % (log_level),
+                )
 
     def _write_mock_config(self):
         _, tmp_path = tempfile.mkstemp()
