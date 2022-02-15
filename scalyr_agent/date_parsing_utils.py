@@ -243,7 +243,7 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
         # (e.g. invalid format or similar). Not great.
         return None
 
-    if dt.tzinfo not in [None, "+00:00"]:
+    if dt.tzinfo and dt.tzinfo.offset != 0:
         dt = dt.astimezone(TZ_UTC)
 
     dt = dt.replace(tzinfo=None)
@@ -407,7 +407,7 @@ def _rfc3339_to_datetime_udatetime(string):
         # (e.g. invalid format or similar). Not great.
         return None
 
-    if dt.tzinfo not in [None, "+00:00"]:
+    if dt.tzinfo and dt.tzinfo.offset != 0:
         dt = dt.astimezone(TZ_UTC)
 
     dt = dt.replace(tzinfo=None)
