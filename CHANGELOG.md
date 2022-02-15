@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.28 "TBD" - Mar 27, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 27, 2022 23:04 -0800
+--->
+
+Improvements:
+* Docker and Kubernetes monitors now support parsing time information from container log lines which contain a non-UTC timezone.
+
 ## 2.1.27 "Thonia" - Jan 27, 2022
 
 <!---
