@@ -305,11 +305,8 @@ class DateUtilsTestCase(ScalyrTestCase):
         input_strs = [
             "2015-08-06T14:40:56.123456Z",
             "2015-08-06T14:40:56Z",
+            "2015-08-06T14:40:56.123456789Z",
         ]
-
-        # NOTE: udatime doesn't support invalid format with more than 6 fractional parts
-        if not udatetime:
-            input_strs.append("2015-08-06T14:40:56.123456789Z")
 
         expected_tss = [
             scalyr_util.microseconds_since_epoch(
@@ -320,14 +317,12 @@ class DateUtilsTestCase(ScalyrTestCase):
                 datetime.datetime(2015, 8, 6, 14, 40, 56)
             )
             * 1000,
-        ]
-
-        if not udatetime:
-            expected_tss.append(scalyr_util.microseconds_since_epoch(
+            scalyr_util.microseconds_since_epoch(
                 datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
             )
             * 1000
-            + 789)
+            + 789,
+        ]
 
         for input_str, expected_ts in zip(input_strs, expected_tss):
             result_with_strptime = (
@@ -374,7 +369,6 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
-    @skipIf(datetime, "Skipping under udatetime, non valid date format")
     def test_rfc3339_to_nanoseconds_since_epoch_many_fractions(self):
         s = "2015-08-06T14:40:56.123456789Z"
         expected = (
@@ -387,7 +381,6 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
-    @skipIf(datetime, "Skipping under udatetime, non valid date format")
     def test_rfc3339_to_nanoseconds_since_epoch_too_many_fractions(self):
         s = "2015-08-06T14:40:56.123456789999Z"
         expected = (

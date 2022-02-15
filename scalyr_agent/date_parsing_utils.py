@@ -344,6 +344,15 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
     """
     rfc3339_to_nanoseconds_since_epoch variation which utilizes udatetime library.
     """
+    # split the string in to main time and fractional component
+    parts = string.split(".")
+
+    # Special case for backward compatibility with our custom implementations which accept
+    # formats with too many fractional components which are not valid as per RFC.
+    # TODO: Also handle this invalid format for non UTC timezones
+    if len(parts) > 1 and parts[1].endswith("Z"):
+        string = parts[0]
+
     # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
     # UTC so we perform the conversion here.
     try:
@@ -364,9 +373,6 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
         )
         * 1000000000
     )
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
 
     nanos = 0
 
@@ -583,6 +589,15 @@ def _rfc3339_to_datetime_udatetime(string):
 
     NOTE: udatetime supports values with timezone information.
     """
+    # split the string in to main time and fractional component
+    parts = string.split(".")
+
+    # Special case for backward compatibility with our custom implementations which accept
+    # formats with too many fractional components which are not valid as per RFC.
+    # TODO: Also handle this invalid format for non UTC timezones
+    if len(parts) > 1 and parts[1].endswith("Z"):
+        string = parts[0]
+
     # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
     # UTC so we perform the conversion here.
     try:
@@ -596,6 +611,25 @@ def _rfc3339_to_datetime_udatetime(string):
         dt = dt.astimezone(TZ_UTC)
 
     dt = dt.replace(tzinfo=None)
+
+    # now add the fractional part
+    if len(parts) > 1:
+        fractions = parts[1]
+        # strip the tzinfo
+        if fractions.endswith("Z"):
+            # in UTC, with Z at the end
+            fractions = fractions[:-1]
+        elif "-" not in fractions and "+" not in fractions:
+            # in UTC, without Z at the end (nothing to strip)
+            pass
+        else:
+            # Custom timezone offset, e.g. -08:00
+            fractions = fractions[:-6]
+
+        to_micros = 6 - len(fractions)
+        micro = int(int(fractions) * 10**to_micros)
+        dt = dt.replace(microsecond=micro)
+
     return dt
 
 
