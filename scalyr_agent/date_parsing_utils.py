@@ -238,10 +238,14 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
 
     if len(parts) > 1:
         fractions = parts[1]
+
         # strip the tzinfo
         if fractions.endswith("Z"):
-            # in UTC, ends with Z
+            # in UTC, with Z at the end
             fractions = fractions[:-1]
+        elif "-" not in fractions and "+" not in fractions:
+            # in UTC, without Z at the end (nothing to strip)
+            pass
         else:
             # Custom timezone offset, e.g. -08:00
             fractions = fractions[:-6]
@@ -342,7 +346,12 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
     """
     # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
     # UTC so we perform the conversion here.
-    dt = udatetime.from_string(string)
+    try:
+        dt = udatetime.from_string(string)
+    except ValueError:
+        # For backward compatibility reasons with other functions we return None on edge cases
+        # (e.g. invalid format or similar). Not great.
+        return None
 
     if dt.tzinfo not in [None, "+00:00"]:
         dt = dt.astimezone(TZ_UTC)
@@ -365,8 +374,11 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
         fractions = parts[1]
         # strip the tzinfo
         if fractions.endswith("Z"):
-            # in UTC, ends with Z
+            # in UTC, with Z at the end
             fractions = fractions[:-1]
+        elif "-" not in fractions and "+" not in fractions:
+            # in UTC, without Z at the end (nothing to strip)
+            pass
         else:
             # Custom timezone offset, e.g. -08:00
             fractions = fractions[:-6]
@@ -412,10 +424,19 @@ def _rfc3339_to_datetime_strptime(string):
             # we don't handle non UTC timezones yet
             if any(c in fractions for c in "+-"):
                 return None
-            return dt
 
         # remove the Z and just process the fraction.
-        fractions = fractions[:-1]
+        # strip the tzinfo
+        if fractions.endswith("Z"):
+            # in UTC, with Z at the end
+            fractions = fractions[:-1]
+        elif "-" not in fractions and "+" not in fractions:
+            # in UTC, without Z at the end (nothing to strip)
+            pass
+        else:
+            # Custom timezone offset, e.g. -08:00
+            fractions = fractions[:-6]
+
         to_micros = 6 - len(fractions)
         micro = int(int(fractions) * 10**to_micros)
         dt = dt.replace(microsecond=micro)
@@ -521,10 +542,19 @@ def _rfc3339_to_datetime_string_split(string):
             # we don't handle non UTC timezones yet
             if any(c in fractions for c in "+-"):
                 return None
-            return dt
 
         # remove the Z and just process the fraction.
-        fractions = fractions[:-1]
+        # strip the tzinfo
+        if fractions.endswith("Z"):
+            # in UTC, with Z at the end
+            fractions = fractions[:-1]
+        elif "-" not in fractions and "+" not in fractions:
+            # in UTC, without Z at the end (nothing to strip)
+            pass
+        else:
+            # Custom timezone offset, e.g. -08:00
+            fractions = fractions[:-6]
+
         to_micros = 6 - len(fractions)
         micro = int(int(fractions) * 10**to_micros)
         dt = dt.replace(microsecond=micro)
@@ -555,7 +585,12 @@ def _rfc3339_to_datetime_udatetime(string):
     """
     # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
     # UTC so we perform the conversion here.
-    dt = udatetime.from_string(string)
+    try:
+        dt = udatetime.from_string(string)
+    except ValueError:
+        # For backward compatibility reasons with other functions we return None on edge cases
+        # (e.g. invalid format or similar). Not great.
+        return None
 
     if dt.tzinfo not in [None, "+00:00"]:
         dt = dt.astimezone(TZ_UTC)

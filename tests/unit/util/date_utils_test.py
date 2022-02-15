@@ -28,14 +28,22 @@ import scalyr_agent.date_parsing_utils as date_parsing_utils
 from scalyr_agent import date_parsing_utils
 from scalyr_agent.test_base import ScalyrTestCase
 
+from scalyr_agent.test_base import skipIf
+
 if six.PY3:
     reload = importlib.reload
+try:
+    import udatetime
+except ImportError:
+    udatetime = None
+
 
 
 class DateUtilsTestCase(ScalyrTestCase):
     def tearDown(self):
         super(DateUtilsTestCase, self).tearDown()
 
+    @skipIf(not udatetime, "udatetime not available, skipping test")
     def test_rfc3339_to_datetime_with_timezone_udatetime(self):
         s = "2015-08-06T14:40:56.123456Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
@@ -110,6 +118,7 @@ class DateUtilsTestCase(ScalyrTestCase):
 
         self.assertEquals(expected, actual)
 
+    @skipIf(not udatetime, "udatetime not available, skipping test")
     def test_rfc3339_to_nanoseconds_since_epoch_with_timezone_udatetime(self):
         s = "2015-08-06T14:40:56.123456Z"
         expected = 1438872056123456000
@@ -233,7 +242,7 @@ class DateUtilsTestCase(ScalyrTestCase):
 
         s = "2015-08-06T14:40:56.123456"
         actual = scalyr_util.rfc3339_to_datetime(s)
-        self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56), actual)
+        self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56, 123456), actual)
 
     def test_rfc3339_to_datetime_with_and_without_strptime(self):
         # Verify corectness between two different implementations of this function
@@ -245,7 +254,7 @@ class DateUtilsTestCase(ScalyrTestCase):
         expected_dts = [
             datetime.datetime(2015, 8, 6, 14, 40, 56, 123456),
             datetime.datetime(2015, 8, 6, 14, 40, 56),
-            datetime.datetime(2015, 8, 6, 14, 40, 56),
+            datetime.datetime(2015, 8, 6, 14, 40, 56, 123456),
         ]
 
         for input_str, expected_dt in zip(input_strs, expected_dts):
@@ -270,14 +279,6 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_datetime(s)
         self.assertEquals(expected, actual)
 
-    def test_rfc3339_to_datetime_bad_format_has_timezone(self):
-        # currently this function only handles UTC.  Remove this test if
-        # updated to be more flexible
-        s = "2015-08-06T14:40:56.123456789+04:00"
-        expected = None
-        actual = scalyr_util.rfc3339_to_datetime(s)
-        self.assertEquals(expected, actual)
-
     def test_rfc3339_to_nanoseconds_since_epoch(self):
         s = "2015-08-06T14:40:56.123456Z"
         expected = (
@@ -292,7 +293,7 @@ class DateUtilsTestCase(ScalyrTestCase):
         s = "2015-08-06T14:40:56.123456"
         expected = (
             scalyr_util.microseconds_since_epoch(
-                datetime.datetime(2015, 8, 6, 14, 40, 56)
+                datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
             )
             * 1000
         )
@@ -401,11 +402,6 @@ class DateUtilsTestCase(ScalyrTestCase):
         )
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
-
-    def test_rfc3339_to_nanoseconds_since_epoch_bad_format_has_timezone(self):
-        s = "2015-08-06T14:40:56.123456789+04:00"
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
-        self.assertIs(None, actual)
 
     def _delete_modules_from_sys_modules(self, module_names):
         for module_name in module_names:
