@@ -185,23 +185,16 @@ Log-Message ""
 Log-Message "Performing Windows Event Log monitor checks"
 Log-Message ""
 
-scalyr-agent-2 status -v
-
 Copy-Item ".\agent.json_event_log_monitor" -Destination "C:\Program Files (x86)\Scalyr\config\agent.json"
 
 {% include "partial/restart_agent_and_remove_logs.ps1.j2" %}
-
-scalyr-agent-2 status -v
 
 # Write mock entry to event log and ensure Scalyr picks it up
 New-EventLog –LogName Application –Source “ScalyrAgentTest”
 [system.diagnostics.EventLog]::CreateEventSource("ScalyrAgentTest", "Application")
 Write-EventLog -LogName "Application" -Source "ScalyrAgentTest" -EventID 30001 -EntryType Information -Message "Scalyr automated tests event." -Category 1 -RawData 10,20
 
-Start-Sleep 150
-
-echo "GGGG"
-Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Tail 50 -ErrorAction SilentlyContinue
+Start-Sleep 10
 
 $status_output=scalyr-agent-2 status -v;
 echo $status_output

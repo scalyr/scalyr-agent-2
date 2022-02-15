@@ -326,6 +326,10 @@ def build_win32_installer_package(variant, version):
         "scalyr_agent.builtin_monitors.openmetrics_monitor",
     ]
 
+    hidden_imports.extend([
+        "win32timezone"
+    ])
+
     # Add packages to frozen binary paths.
     paths_to_include = [
         os.path.join(agent_source_root, "scalyr_agent", "third_party"),
@@ -363,14 +367,14 @@ def build_win32_installer_package(variant, version):
     command.extend(hidden_import_options)
     command.extend(paths_options)
     command.extend([
-        # "--exclude-module", "asyncio",
-        # "--exclude-module", "FixTk",
-        # "--exclude-module", "tcl",
-        # "--exclude-module", "tk",
-        # "--exclude-module", "_tkinter",
-        # "--exclude-module", "tkinter",
-        # "--exclude-module", "Tkinter",
-        # "--exclude-module", "sqlite",
+        "--exclude-module", "asyncio",
+        "--exclude-module", "FixTk",
+        "--exclude-module", "tcl",
+        "--exclude-module", "tk",
+        "--exclude-module", "_tkinter",
+        "--exclude-module", "tkinter",
+        "--exclude-module", "Tkinter",
+        "--exclude-module", "sqlite",
     ])
 
     subprocess.check_call(
