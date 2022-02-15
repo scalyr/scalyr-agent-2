@@ -24,6 +24,7 @@ import six
 from six.moves import zip
 
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.date_parsing_utils as date_parsing_utils
 from scalyr_agent import date_parsing_utils
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -34,6 +35,154 @@ if six.PY3:
 class DateUtilsTestCase(ScalyrTestCase):
     def tearDown(self):
         super(DateUtilsTestCase, self).tearDown()
+
+    def test_rfc3339_to_datetime_with_timezone_udatetime(self):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-00:00"
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-08:00"
+        expected = datetime.datetime(2015, 8, 6, 22, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-02:00"
+        expected = datetime.datetime(2015, 8, 6, 16, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+02:00"
+        expected = datetime.datetime(2015, 8, 6, 12, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+08:00"
+        expected = datetime.datetime(2015, 8, 6, 6, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_to_datetime_with_timezone_string_split(self):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-00:00"
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-08:00"
+        expected = datetime.datetime(2015, 8, 6, 22, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-02:00"
+        expected = datetime.datetime(2015, 8, 6, 16, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+02:00"
+        expected = datetime.datetime(2015, 8, 6, 12, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+08:00"
+        expected = datetime.datetime(2015, 8, 6, 6, 40, 56, 123456)
+        actual = date_parsing_utils._rfc3339_to_datetime_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_to_nanoseconds_since_epoch_with_timezone_udatetime(self):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected = 1438872056123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-00:00"
+        expected = 1438872056123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-08:00"
+        expected = 1438900856123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-02:00"
+        expected = 1438879256123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+02:00"
+        expected = 1438864856123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+08:00"
+        expected = 1438843256123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(s)
+
+        self.assertEquals(expected, actual)
+
+    def test_rfc3339_to_nanoseconds_since_epoch_with_timezone_string_split(self):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected = 1438872056123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-00:00"
+        expected = 1438872056123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-08:00"
+        expected = 1438900856123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456-02:00"
+        expected = 1438879256123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+02:00"
+        expected = 1438864856123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56.123456+08:00"
+        expected = 1438843256123456000
+        actual = date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(s)
+
+        self.assertEquals(expected, actual)
 
     def test_verify_correct_default_rfc3339_to_implementation_is_used(self):
         # 1. udatetime is available, we should use that
