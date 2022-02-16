@@ -213,7 +213,7 @@ def _rfc3339_to_nanoseconds_since_epoch_dateutil(string):
     NOTE: Other functions which don't support timezones have been heavily optimized for performance
     so using this function will likely have non trivial overhead.
     """
-    dt = _parse_rfc3339_with_non_utc_tz_datetutil(string)
+    dt = _rfc3339_to_datetime_dateutil(string)
 
     nano_seconds = (
         calendar.timegm((dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second))
