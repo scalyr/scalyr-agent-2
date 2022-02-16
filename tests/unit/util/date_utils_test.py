@@ -249,11 +249,13 @@ class DateUtilsTestCase(ScalyrTestCase):
             "2015-08-06T14:40:56.123456Z",
             "2015-08-06T14:40:56Z",
             "2015-08-06T14:40:56.123456",
+            "2022-01-31T10:52:30.148000269-08:00"
         ]
         expected_dts = [
             datetime.datetime(2015, 8, 6, 14, 40, 56, 123456),
             datetime.datetime(2015, 8, 6, 14, 40, 56),
             datetime.datetime(2015, 8, 6, 14, 40, 56, 123456),
+            datetime.datetime(2022, 1, 31, 18, 52, 30, 148000),
         ]
 
         for input_str, expected_dt in zip(input_strs, expected_dts):
@@ -306,6 +308,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             "2015-08-06T14:40:56.123456Z",
             "2015-08-06T14:40:56Z",
             "2015-08-06T14:40:56.123456789Z",
+            "2022-01-31T10:52:30.148000269-08:00"
         ]
 
         expected_tss = [
@@ -322,6 +325,12 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
             + 789,
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2022, 1, 31, 18, 52, 30, 148000),
+            )
+            * 1000
+            + 269,
+
         ]
 
         for input_str, expected_ts in zip(input_strs, expected_tss):
