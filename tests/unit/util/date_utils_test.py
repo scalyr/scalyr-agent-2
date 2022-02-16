@@ -418,6 +418,87 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
+    def test_get_fractional_nanos(self):
+        value = "2015-08-06T14:40:56.123456789999Z"
+        actual = date_parsing_utils._get_fractional_nanos(value)
+        expected = 123456789
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.12"
+        actual = date_parsing_utils._get_fractional_nanos(value)
+        expected = 12 * 1000 * 10000
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56"
+        actual = date_parsing_utils._get_fractional_nanos(value)
+        expected = 0
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.9999"
+        actual = date_parsing_utils._get_fractional_nanos(value)
+        expected = 9999 * 1000 * 100
+        self.assertEqual(actual, expected)
+
+    def test_add_fractional_part_to_dt(self):
+        value = "2015-08-06T14:40:56.123456789999Z"
+        parts = value.split(".")
+        dt = datetime.datetime(2015, 8, 6, 14, 40, 56)
+        actual = date_parsing_utils._add_fractional_part_to_dt(dt=dt, parts=parts)
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.12"
+        parts = value.split(".")
+        dt = datetime.datetime(2015, 8, 6, 14, 40, 56)
+        actual = date_parsing_utils._add_fractional_part_to_dt(dt=dt, parts=parts)
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 12 * 1000 * 10)
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56"
+        parts = value.split(".")
+        dt = datetime.datetime(2015, 8, 6, 14, 40, 56)
+        actual = date_parsing_utils._add_fractional_part_to_dt(dt=dt, parts=parts)
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 0)
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.9999"
+        parts = value.split(".")
+        dt = datetime.datetime(2015, 8, 6, 14, 40, 56)
+        actual = date_parsing_utils._add_fractional_part_to_dt(dt=dt, parts=parts)
+        expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 999900)
+        self.assertEqual(actual, expected)
+
+    def test_get_udatetime_safe_string(self):
+        value = "2015-08-06T14:40:56"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56"
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56Z"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56Z"
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.1234"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56.1234"
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.123456Z"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56"
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.123456-08:00"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56-08:00"
+        self.assertEqual(actual, expected)
+
+        value = "2015-08-06T14:40:56.123456789+06:00"
+        actual = date_parsing_utils._get_udatetime_safe_string(value)
+        expected = "2015-08-06T14:40:56+06:00"
+        self.assertEqual(actual, expected)
+
     def _delete_modules_from_sys_modules(self, module_names):
         for module_name in module_names:
             if module_name in sys.modules:

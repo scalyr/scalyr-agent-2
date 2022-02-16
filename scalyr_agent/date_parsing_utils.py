@@ -35,6 +35,7 @@ from __future__ import absolute_import
 
 if False:  # NOSONAR
     from typing import Optional
+    from typing import List
 
 import re
 import calendar
@@ -357,7 +358,7 @@ def _add_fractional_part_to_dt(dt, parts):
 
 
 def _get_fractional_nanos(value):
-    # type: (str) -> nano
+    # type: (str) -> int
     """
     Return nanoseconds (if any) for the provided date string fractional part of the RFC3336 value.
     """
