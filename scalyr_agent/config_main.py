@@ -41,8 +41,6 @@ import itertools
 import argparse
 from io import open
 
-from optparse import OptionParser
-
 # TODO: The following two imports have been modified to facilitate Windows platforms
 if not sys.platform.startswith("win"):
     from pwd import getpwnam
@@ -653,7 +651,10 @@ def upgrade_windows_install(
         my_default_paths = platform_controller.default_paths
 
         # Ensure agent was installed via MSI
-        if platform_controller.install_type != PACKAGE_INSTALL or platform.system() != "Windows":
+        if (
+            platform_controller.install_type != PACKAGE_INSTALL
+            or platform.system() != "Windows"
+        ):
             raise UpgradeFailure(
                 "The current agent was not installed via MSI, so you may not use the upgrade windows "
                 "command."
@@ -1784,5 +1785,5 @@ def parse_config_options(argv):
     sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parse_config_options(sys.argv)

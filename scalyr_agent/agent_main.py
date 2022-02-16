@@ -2117,7 +2117,15 @@ class WorkerThread(object):
 if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
 
-    commands = ["start", "stop", "status", "restart", "condrestart", "version", "config"]
+    commands = [
+        "start",
+        "stop",
+        "status",
+        "restart",
+        "condrestart",
+        "version",
+        "config",
+    ]
 
     if platform.system() == "Windows":
         # If this is Windows, then also add service option.
@@ -2138,10 +2146,7 @@ if __name__ == "__main__":
     command_parser = ErrorSilentParser(
         add_help=False,
     )
-    command_parser.add_argument(
-        "command",
-        choices=commands
-    )
+    command_parser.add_argument("command", choices=commands)
 
     # Also create parser for the agent command line.
     parser = argparse.ArgumentParser()

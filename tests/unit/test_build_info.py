@@ -20,7 +20,6 @@ import unittest
 
 import mock
 
-from scalyr_agent import __scalyr__
 from scalyr_agent.build_info import get_build_info
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent.build_info import get_build_revision_from_git

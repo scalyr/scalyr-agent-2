@@ -306,9 +306,7 @@ def build_win32_installer_package(variant, version):
 
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
-    add_data = {
-        os.path.join("data_files", "install_info"): "scalyr_agent"
-    }
+    add_data = {os.path.join("data_files", "install_info"): "scalyr_agent"}
 
     # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
     hidden_imports = [
@@ -326,9 +324,7 @@ def build_win32_installer_package(variant, version):
         "scalyr_agent.builtin_monitors.openmetrics_monitor",
     ]
 
-    hidden_imports.extend([
-        "win32timezone"
-    ])
+    hidden_imports.extend(["win32timezone"])
 
     # Add packages to frozen binary paths.
     paths_to_include = [
@@ -350,36 +346,42 @@ def build_win32_installer_package(variant, version):
 
     paths_options = []
     for p in paths_to_include:
-        paths_options.extend([
-            "--paths",
-            p
-        ])
+        paths_options.extend(["--paths", p])
 
     command = [
-            sys.executable,
-            "-m",
-            "PyInstaller",
-            os.path.join(agent_package_path, "agent_main.py"),
-            "--onefile",
-            "-n", "scalyr-agent-2",
-        ]
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        os.path.join(agent_package_path, "agent_main.py"),
+        "--onefile",
+        "-n",
+        "scalyr-agent-2",
+    ]
     command.extend(add_data_options)
     command.extend(hidden_import_options)
     command.extend(paths_options)
-    command.extend([
-        "--exclude-module", "asyncio",
-        "--exclude-module", "FixTk",
-        "--exclude-module", "tcl",
-        "--exclude-module", "tk",
-        "--exclude-module", "_tkinter",
-        "--exclude-module", "tkinter",
-        "--exclude-module", "Tkinter",
-        "--exclude-module", "sqlite",
-    ])
-
-    subprocess.check_call(
-        command
+    command.extend(
+        [
+            "--exclude-module",
+            "asyncio",
+            "--exclude-module",
+            "FixTk",
+            "--exclude-module",
+            "tcl",
+            "--exclude-module",
+            "tk",
+            "--exclude-module",
+            "_tkinter",
+            "--exclude-module",
+            "tkinter",
+            "--exclude-module",
+            "Tkinter",
+            "--exclude-module",
+            "sqlite",
+        ]
     )
+
+    subprocess.check_call(command)
 
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")
@@ -405,21 +407,16 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, "VERSION"), "Scalyr/VERSION")
 
     # Copy frozen binary.
-    shutil.copy(
-        os.path.join("dist", "scalyr-agent-2.exe"),
-        "Scalyr/bin"
-    )
+    shutil.copy(os.path.join("dist", "scalyr-agent-2.exe"), "Scalyr/bin")
     # Also copy the same binary as windows service binary.
     # Even if we use the same binary for everything, I couldn't figure out how to make Wix
     # reuse the same file for multiple components. (TODO: figure out how), but it seems that
     # packager compression handles this well and does now increase package size.
     shutil.copy(
-        os.path.join("dist", "scalyr-agent-2.exe"),
-        "Scalyr/bin/ScalyrAgentService.exe"
+        os.path.join("dist", "scalyr-agent-2.exe"), "Scalyr/bin/ScalyrAgentService.exe"
     )
     shutil.copy(
-        os.path.join(agent_source_root, "win32/scalyr-agent-2-config.cmd"),
-        "Scalyr/bin"
+        os.path.join(agent_source_root, "win32/scalyr-agent-2-config.cmd"), "Scalyr/bin"
     )
     shutil.copy(
         make_path(agent_source_root, "win32/ScalyrShell.cmd"),
@@ -456,7 +453,6 @@ def build_win32_installer_package(variant, version):
         parts = version.split(".")
         del parts[3]
         version = ".".join(parts)
-
 
     run_command(
         'candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
@@ -643,10 +639,7 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     # Place all of the import source in /usr/share/scalyr-agent-2.
     os.chdir("root/usr/share")
 
-    build_base_files(
-        install_type="package",
-        base_configs=base_configs
-    )
+    build_base_files(install_type="package", base_configs=base_configs)
 
     os.chdir("scalyr-agent-2")
     # The build_base_files leaves the config directory in config, but we have to move it to its etc
@@ -990,9 +983,7 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     @return: The file name of the built tarball.
     """
     # Use build_base_files to build all of the important stuff in ./scalyr-agent-2
-    build_base_files(
-        install_type="tar"
-    )
+    build_base_files(install_type="tar")
 
     # Build the rest of the directories required for the tarball install.  Mainly, the log and data directories
     # in the tarball itself where the running process will store its state.
@@ -1179,7 +1170,7 @@ def build_base_files(install_type, base_configs="config"):
 
     shutil.copy(
         make_path(agent_source_root, "agent_build/linux/scalyr-agent-2-config"),
-        "scalyr-agent-2-config"
+        "scalyr-agent-2-config",
     )
 
     # add switch python version script.
@@ -1804,13 +1795,16 @@ __build_info__ = None
 
 
 def get_build_info():
-    """Returns a string containing the build info."""
+    """Returns a dictionary containing the build info."""
+
     global __build_info__
-    if __build_info__ is not None:
+
+    if __build_info__:
         return __build_info__
 
-    build_info_buffer = StringIO()
     original_dir = os.getcwd()
+
+    __build_info__ = {}
 
     try:
         # We need to execute the git command in the source root.
@@ -1822,7 +1816,7 @@ def get_build_info():
         if rc != 0:
             packager_email = "unknown"
 
-        print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
+        __build_info__["packaged_by"] = packager_email
 
         # Determine the last commit from the log.
         (_, commit_id) = run_command(
@@ -1830,28 +1824,24 @@ def get_build_info():
             exit_on_fail=True,
             command_name="git",
         )
-        print("Latest commit: %s" % commit_id.strip(), file=build_info_buffer)
+
+        __build_info__["latest_commit"] = commit_id
 
         # Include the branch just for safety sake.
         (_, branch) = run_command(
             "git branch | cut -d ' ' -f 2", exit_on_fail=True, command_name="git"
         )
-        print("From branch: %s" % branch.strip(), file=build_info_buffer)
+        __build_info__["from_branch"] = branch
 
         # Add a timestamp.
-        print(
-            "Build time: %s"
-            % six.text_type(strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())),
-            file=build_info_buffer,
+
+        __build_info__["build_time"] = six.text_type(
+            strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())
         )
 
-        __build_info__ = build_info_buffer.getvalue()
         return __build_info__
     finally:
         os.chdir(original_dir)
-
-        if build_info_buffer is not None:
-            build_info_buffer.close()
 
 
 def get_install_info(install_type):
@@ -1859,12 +1849,9 @@ def get_install_info(install_type):
     Get json serialized string with installation info.
     """
     return json.dumps(
-        {
-            "build_info": get_build_info(),
-            "install_type": install_type
-        },
+        {"build_info": get_build_info(), "install_type": install_type},
         indent=4,
-        sort_keys=True
+        sort_keys=True,
     )
 
 

@@ -37,7 +37,6 @@ except NameError:
 # [end of 2->TOD0]
 
 
-import inspect
 import os
 import sys
 from io import open
@@ -99,14 +98,10 @@ DEV_INSTALL = 3  # Indicates source code is running out of the original source t
 
 
 def read_install_info():
-    # type: (Dict) -> Dict
     """
     Read the 'install_info' file that has to be located near this file. In opposite return empty dict.
     """
-    install_info_path = os.path.join(
-        os.path.dirname(__file__),
-        "install_info"
-    )
+    install_info_path = os.path.join(os.path.dirname(__file__), "install_info")
     if not os.path.exists(install_info_path):
         return {}
 
@@ -286,5 +281,3 @@ def __determine_version():
 
 
 SCALYR_VERSION = __determine_version()
-
-

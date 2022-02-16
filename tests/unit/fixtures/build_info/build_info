@@ -1,4 +1,9 @@
 {
-    "build_info": "Packaged by: jenkins@scalyr.com\nLatest commit: 7d4c4e2e94242ee25320a75c510d52967cfe50eb\nFrom branch: release\nBuild time: 2020-05-06 17:59:21 UTC\n",
+    "build_info": {
+            "packaged_by": "jenkins@scalyr.com",
+            "latest_commit": "7d4c4e2e94242ee25320a75c510d52967cfe50eb",
+            "from_branch": "release",
+            "build_time": "2020-05-06 17:59:21 UTC"
+    },
     "install_type": "package"
 }
