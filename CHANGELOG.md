@@ -10,6 +10,9 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 27, 2022 23:04 -0800
 Improvements:
 * Docker and Kubernetes monitors now support parsing time information from container log lines which contain a non-UTC timezone.
 
+Docker images:
+* Docker images now include udatetime time dependency which should speed up RFC3339 time string parsing.
+
 ## 2.1.27 "Thonia" - Jan 27, 2022
 
 <!---
