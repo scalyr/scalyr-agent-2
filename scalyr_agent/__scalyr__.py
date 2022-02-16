@@ -208,7 +208,7 @@ def get_install_root():
 
     if __is_frozen__:
         # In case if frozen binaries the executable has to be located in the '<install root>/bin', so we just
-        # go down until we reach the the install root.
+        # go up until we reach the the install root.
         bin_path = os.path.dirname(executable_path)
         install_root = os.path.dirname(bin_path)
     else:
