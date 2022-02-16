@@ -22,7 +22,6 @@ if False:  # NOSONAR
     from typing import Optional
 
 import re
-import time
 import calendar
 import datetime
 
@@ -51,8 +50,6 @@ except ImportError:
     udatetime = None
 
 from dateutil.parser import isoparse
-
-from scalyr_agent.compat import custom_any as any
 
 
 if six.PY3:

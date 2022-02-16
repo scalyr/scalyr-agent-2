@@ -24,7 +24,6 @@ import six
 from six.moves import zip
 
 import scalyr_agent.util as scalyr_util
-import scalyr_agent.date_parsing_utils as date_parsing_utils
 from scalyr_agent import date_parsing_utils
 from scalyr_agent.test_base import ScalyrTestCase
 
