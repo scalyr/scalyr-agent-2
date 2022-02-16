@@ -45,7 +45,6 @@ except ImportError:
     udatetime = None
 
 from dateutil.parser import isoparse
-from dateutil.tz import UTC as TZ_UTC
 
 from scalyr_agent.compat import custom_any as any
 
