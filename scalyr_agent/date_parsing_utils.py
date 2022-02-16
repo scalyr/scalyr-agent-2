@@ -36,12 +36,18 @@ import _strptime  # NOQA
 
 import six
 from six.moves import map
+import logging
+
+LOG = logging.getLogger(__name__)
 
 try:
     import udatetime
 except ImportError:
     # if udatetime is not available, we fall back to the second fastest approach for date parsing
     # (string.split approach)
+    LOG.warn(
+        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates'
+    )
     udatetime = None
 
 from dateutil.parser import isoparse
