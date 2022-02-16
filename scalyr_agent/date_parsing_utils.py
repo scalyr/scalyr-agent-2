@@ -91,75 +91,6 @@ def _contains_non_utc_tz(string):
     return bool(RFC3339_STR_NON_UTC_REGEX.match(string))
 
 
-# Private versions of datetime parsing functions are below. Those are not used by the production
-# code, but there are there so we can test corectness of all the functions and benchmark different
-# implementations and compare them.
-def _rfc3339_to_nanoseconds_since_epoch_strptime(string):
-    # type: (str) -> Optional[int]
-    """
-    rfc3339_to_nanoseconds_since_epoch variation which utilizes strptime approach.
-    """
-    if _contains_non_utc_tz(string):
-        return _rfc3339_to_nanoseconds_since_epoch_dateutil(string)
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-
-    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
-    nanos = _get_fractional_nanos(value=string)
-    return nano_seconds + nanos
-
-
-def _rfc3339_to_nanoseconds_since_epoch_regex(string):
-    # type: (str) -> Optional[int]
-    """
-    rfc3339_to_nanoseconds_since_epoch variation which utilizes regex approach.
-    """
-    if _contains_non_utc_tz(string):
-        return _rfc3339_to_nanoseconds_since_epoch_dateutil(string)
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    try:
-        dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
-        )
-    except Exception:
-        return None
-
-    nano_seconds = (
-        calendar.timegm(
-            (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond)
-        )
-        * 1000000000
-    )
-
-    nanos = _get_fractional_nanos(value=string)
-    return nano_seconds + nanos
-
-
 def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
     # type: (str) -> Optional[int]
     """
@@ -191,7 +122,8 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
             dt = datetime.datetime(
                 *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
             )
-        except Exception:
+        except Exception as e:
+            print(e)
             return None
 
     nano_seconds = (
@@ -284,67 +216,6 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
 
     nanos = _get_fractional_nanos(value=original_string)
     return nano_seconds + nanos
-
-
-def _rfc3339_to_datetime_strptime(string):
-    # type: (str) -> Optional[datetime.datetime]
-    """
-    rfc3339_to_datetime variation which utilizes strptime approach.
-    """
-    if _contains_non_utc_tz(string):
-        return _rfc3339_to_datetime_dateutil(string)
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    # create a datetime object
-    try:
-        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-
-    dt = datetime.datetime(*(tm[0:6]))
-    dt = _add_fractional_part_to_dt(dt=dt, parts=parts)
-    return dt
-
-
-def _rfc3339_to_datetime_regex(string):
-    # type: (str) -> Optional[datetime.datetime]
-    """
-    rfc3339_to_datetime variation which utilizes regex approach.
-    """
-    if _contains_non_utc_tz(string):
-        return _rfc3339_to_datetime_dateutil(string)
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    # it's possible that the time does not have a fractional component
-    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
-    # single element that should end in Z.  Strip the Z if it exists
-    # so we can use the same format string for processing the main
-    # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith("Z"):
-        parts[0] = parts[0][:-1]
-
-    # create a datetime object
-    try:
-        dt = datetime.datetime(
-            *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
-        )
-    except Exception:
-        return None
-
-    dt = _add_fractional_part_to_dt(dt=dt, parts=parts)
-    return dt
 
 
 def _rfc3339_to_datetime_string_split(string):

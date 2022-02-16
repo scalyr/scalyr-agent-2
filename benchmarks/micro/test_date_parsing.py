@@ -22,8 +22,6 @@ import datetime
 
 import pytest
 
-from scalyr_agent.date_parsing_utils import _rfc3339_to_nanoseconds_since_epoch_strptime
-from scalyr_agent.date_parsing_utils import _rfc3339_to_nanoseconds_since_epoch_regex
 from scalyr_agent.date_parsing_utils import (
     _rfc3339_to_nanoseconds_since_epoch_string_split,
 )
@@ -31,8 +29,6 @@ from scalyr_agent.date_parsing_utils import (
     _rfc3339_to_nanoseconds_since_epoch_udatetime,
 )
 
-from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_strptime
-from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_regex
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_string_split
 from scalyr_agent.date_parsing_utils import _rfc3339_to_datetime_udatetime
 
@@ -58,45 +54,6 @@ EXPECTED_RESULT_WITHOUT_FRACTION_WITH_TZ_DT = datetime.datetime(2015, 8, 3, 17, 
 # on Circle CI
 
 timer = process_time
-
-@pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
-)
-@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
-def test_rfc3339_to_nanoseconds_since_epoch_strptime(benchmark, with_fraction):
-    if with_fraction:
-        date_str = DATE_WITH_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
-    else:
-        date_str = DATE_WITHOUT_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
-
-    def run_benchmark():
-        result = _rfc3339_to_nanoseconds_since_epoch_strptime(date_str)
-        return result
-
-    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
-    assert result == expected_result
-
-
-@pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
-)
-@pytest.mark.benchmark(group="rfc3339_to_nanoseconds_since_epoch", timer=timer)
-def test_rfc3339_to_nanoseconds_since_epoch_regex(benchmark, with_fraction):
-    if with_fraction:
-        date_str = DATE_WITH_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITH_FRACTION_TIMESTAMP
-    else:
-        date_str = DATE_WITHOUT_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_TIMESTAMP
-
-    def run_benchmark():
-        result = _rfc3339_to_nanoseconds_since_epoch_regex(date_str)
-        return result
-
-    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
-    assert result == expected_result
 
 
 @pytest.mark.parametrize(
@@ -156,46 +113,6 @@ def test_rfc3339_to_nanoseconds_since_epoch_udatetime(benchmark, with_fraction, 
 
     def run_benchmark():
         result = _rfc3339_to_nanoseconds_since_epoch_udatetime(date_str)
-        return result
-
-    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
-    assert result == expected_result
-
-
-@pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
-)
-@pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
-def test_rfc3339_to_datetime_strptime(benchmark, with_fraction):
-    if with_fraction:
-        date_str = DATE_WITH_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
-    else:
-        date_str = DATE_WITHOUT_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
-
-    def run_benchmark():
-        result = _rfc3339_to_datetime_strptime(date_str)
-        return result
-
-    result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)
-    assert result == expected_result
-
-
-@pytest.mark.parametrize(
-    "with_fraction", [True, False], ids=["fraction", "no_fraction"]
-)
-@pytest.mark.benchmark(group="rfc3339_to_datetime", timer=timer)
-def test_rfc3339_to_datetime_regex(benchmark, with_fraction):
-    if with_fraction:
-        date_str = DATE_WITH_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITH_FRACTION_DT
-    else:
-        date_str = DATE_WITHOUT_FRACTION_STR
-        expected_result = EXPECTED_RESULT_WITHOUT_FRACTION_DT
-
-    def run_benchmark():
-        result = _rfc3339_to_datetime_regex(date_str)
         return result
 
     result = benchmark.pedantic(run_benchmark, iterations=200, rounds=200)

@@ -243,7 +243,8 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_datetime(s)
         self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56, 123456), actual)
 
-    def test_rfc3339_to_datetime_with_and_without_strptime(self):
+    @skipIf(not udatetime, "udatetime not available, skipping test")
+    def test_rfc3339_to_datetime_with_and_without_udatetime_compatibility_check(self):
         # Verify corectness between two different implementations of this function
         input_strs = [
             "2015-08-06T14:40:56.123456Z",
@@ -259,15 +260,15 @@ class DateUtilsTestCase(ScalyrTestCase):
         ]
 
         for input_str, expected_dt in zip(input_strs, expected_dts):
-            result_with_strptime = date_parsing_utils._rfc3339_to_datetime_strptime(
+            result_udatetime = date_parsing_utils._rfc3339_to_datetime_udatetime(
                 input_str
             )
-            result_without_strptime = scalyr_util.rfc3339_to_datetime(input_str)
+            result_string_split = date_parsing_utils.rfc3339_to_datetime(input_str)
 
-            self.assertEqual(result_with_strptime, expected_dt)
-            self.assertEqual(result_with_strptime, result_without_strptime)
+            self.assertEqual(result_udatetime, expected_dt)
+            self.assertEqual(result_string_split, expected_dt)
+            self.assertEqual(result_udatetime, result_string_split)
 
-    @skipIf(datetime, "Skipping under udatetime, non valid date format")
     def test_rfc3339_to_datetime_truncated_nano(self):
         s = "2015-08-06T14:40:56.123456789Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
@@ -302,7 +303,10 @@ class DateUtilsTestCase(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
-    def test_rfc3339_to_nanoseconds_since_epoch_with_and_without_strptime(self):
+    @skipIf(not udatetime, "udatetime not available, skipping test")
+    def test_rfc3339_to_nanoseconds_since_epoch_with_and_without_udatetime_compatibility_check(
+        self,
+    ):
         # Verify corectness between two different implementations of this function
         input_strs = [
             "2015-08-06T14:40:56.123456Z",
@@ -333,17 +337,20 @@ class DateUtilsTestCase(ScalyrTestCase):
         ]
 
         for input_str, expected_ts in zip(input_strs, expected_tss):
-            result_with_strptime = (
-                date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_strptime(
+            result_udatetime = (
+                date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_udatetime(
                     input_str
                 )
             )
-            result_without_strptime = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                input_str
+            result_string_split = (
+                date_parsing_utils._rfc3339_to_nanoseconds_since_epoch_string_split(
+                    input_str
+                )
             )
 
-            self.assertEqual(result_with_strptime, expected_ts)
-            self.assertEqual(result_with_strptime, result_without_strptime)
+            self.assertEqual(result_udatetime, expected_ts)
+            self.assertEqual(result_string_split, expected_ts)
+            self.assertEqual(result_udatetime, result_string_split)
 
     def test_rfc3339_to_nanoseconds_since_epoch_no_fractions(self):
         s = "2015-08-06T14:40:56"
