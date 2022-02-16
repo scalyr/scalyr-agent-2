@@ -45,11 +45,17 @@ except ImportError:
     # if udatetime is not available, we fall back to the second fastest approach for date parsing
     # (string.split approach)
     LOG.warn(
-        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates'
+        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates in the container log lines'
     )
     udatetime = None
 
-from dateutil.parser import isoparse
+try:
+    from dateutil.parser import isoparse  # NOQA
+except ImportError:
+    LOG.warn(
+        '"python-dateutil not available, won\'t be able to parse container timestamps with non UTC timezone"'
+    )
+    isoparse = None
 
 
 if six.PY3:
@@ -270,6 +276,11 @@ def _rfc3339_to_datetime_dateutil(string):
     NOTE: Other functions which don't support timezones have been heavily optimized for performance
     so using this function will have non trivial overhead.
     """
+    if not isoparse:
+        # Library not available, warning is already emitted on import (emitting it on each call
+        # could get very noisy)
+        return None
+
     try:
         return isoparse(string).astimezone(TZ_UTC).replace(tzinfo=None)
     except Exception:
