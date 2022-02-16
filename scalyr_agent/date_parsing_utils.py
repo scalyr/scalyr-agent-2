@@ -14,6 +14,21 @@
 
 """
 Module containing various date parsing related utility functions.
+
+All the functions for parsing dates in RFC3339 format have been optimized for performance since
+they are parth of a critical code path when ingesting Docker / Kubernetes logs.
+
+Per micro benchmarks (benchmarks/micro/test_date_parsing.py), "udatetime" based implementations are
+the fastest.
+
+All the functions also support time formats in arbitrary timezones (aka non-UTC), but non-udatetime
+pure Python versions fall back on python-dateutil which is rather slow. Luckily the common case and
+code path is UTC where we can skip that code path.
+
+It's also worth noting that our custom implementations also support some extended formats which are
+not fully valid as per RFC (e.g. very log fractional part). Because of that, same compatibility
+change needed to be implemented for udatetime implementation as well and that adds small amount of
+overhead.
 """
 
 from __future__ import absolute_import
@@ -44,17 +59,18 @@ try:
 except ImportError:
     # if udatetime is not available, we fall back to the second fastest approach for date parsing
     # (string.split approach)
-    LOG.warn(
-        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates in the container log lines'
+    LOG.info(
+        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates in the container log lines.'
     )
     udatetime = None
 
 try:
     from dateutil.parser import isoparse  # NOQA
 except ImportError:
-    LOG.warn(
-        '"python-dateutil not available, won\'t be able to parse container timestamps with non UTC timezone"'
-    )
+    if not udatetime:
+        LOG.info(
+            '"python-dateutil module not installed / available, won\'t be able to parse container timestamps with non UTC timezone".'
+        )
     isoparse = None
 
 
@@ -88,8 +104,9 @@ TZ_UTC = UTC()
 
 
 def _contains_non_utc_tz(string):
+    # type: (str) -> bool
     """
-    Returns True if the provided date time strings contains a non UTC timezone.
+    Returns True if the provided RFC3339 strings contains a non UTC timezone.
     """
     return bool(RFC3339_STR_NON_UTC_REGEX.match(string))
 
@@ -100,9 +117,6 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
     rfc3339_to_nanoseconds_since_epoch variation which utilizes string.split approach.
 
     Returns nanoseconds from unix epoch from a rfc3339 formatted timestamp.
-
-    This doesn't do any complex testing and assumes the string is well formed and in UTC (e.g.
-    uses Z at the end rather than a time offset).
 
     @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
     @rtype int
@@ -140,12 +154,12 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
 
 
 def _rfc3339_to_nanoseconds_since_epoch_dateutil(string):
+    # type: (str) -> Optional[int]
     """
     Special version of rfc3339_to_nanoseconds_since_epoch which supports timezones and uses
     dateutil library.
 
-    NOTE: Other functions which don't support timezones have been heavily optimized for performance
-    so using this function will likely have non trivial overhead.
+    NOTE: python-dateutil is slow so using udatetime is preferred when timestamp is non-UTC.
     """
     dt = _rfc3339_to_datetime_dateutil(string)
 
@@ -158,45 +172,14 @@ def _rfc3339_to_nanoseconds_since_epoch_dateutil(string):
     return nano_seconds + nanos
 
 
-def _get_udatetime_safe_string(string):
-    """
-    Function which returns string which can be safely passed to udatetime.
-
-    udatetime doesn't support values with > fractional components, but our custom implementation
-    does.
-
-    To work around that, we pass date + time + timezone string to udatetime to handle the parsing
-    and then handle fractional part (nanoseconds) ourselves.
-    """
-    # Special case for backward compatibility with our custom implementations which accept
-    # formats with too many fractional components which are not valid as per RFC.
-
-    # split the string in to main time and fractional component
-    parts = string.split(".")
-
-    if len(parts) > 1:
-        if parts[1].endswith("Z"):
-            # UTC, string ends with Z
-            return parts[0]
-        elif "+" in parts[1] or "-" in parts[1]:
-            # Custom timezone, we strip it and move it to the string which we parse to udatetime.
-            # This way udatetime handles time zone conversion and we handle nanoseconds manually
-            # (since udatetime doesn't support non valid dates with > fractional parts)
-            tz_str = parts[1][-6:]
-            return parts[0] + tz_str
-
-    return string
-
-
 def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
+    # type: (str) -> Optional[int]
     """
     rfc3339_to_nanoseconds_since_epoch variation which utilizes udatetime library.
     """
     original_string = string
     string = _get_udatetime_safe_string(string)
 
-    # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
-    # UTC so we perform the conversion here.
     try:
         dt = udatetime.from_string(string)
     except ValueError:
@@ -204,6 +187,8 @@ def _rfc3339_to_nanoseconds_since_epoch_udatetime(string):
         # (e.g. invalid format or similar). Not great.
         return None
 
+    # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
+    # UTC so we perform the conversion here.
     if dt.tzinfo and dt.tzinfo.offset != 0:
         dt = dt.astimezone(TZ_UTC)
 
@@ -269,6 +254,7 @@ def _rfc3339_to_datetime_string_split(string):
 
 
 def _rfc3339_to_datetime_dateutil(string):
+    # type: (str) -> Optional[datetime.datetime]
     """
     Special version of rfc3339_to_datetime which supports timezones and uses dateutil library
     underneath.
@@ -291,16 +277,12 @@ def _rfc3339_to_datetime_udatetime(string):
     # type: (str) -> Optional[datetime.datetime]
     """
     rfc3339_to_datetime variation which utilizes udatetime library.
-
-    NOTE: udatetime supports values with timezone information.
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
 
     string = _get_udatetime_safe_string(string)
 
-    # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
-    # UTC so we perform the conversion here.
     try:
         dt = udatetime.from_string(string)
     except ValueError:
@@ -308,6 +290,8 @@ def _rfc3339_to_datetime_udatetime(string):
         # (e.g. invalid format or similar). Not great.
         return None
 
+    # NOTE: udatetime supports tzinfo, but this function always return non-timezone aware objects
+    # UTC so we perform the conversion here.
     if dt.tzinfo and dt.tzinfo.offset != 0:
         dt = dt.astimezone(TZ_UTC)
 
@@ -316,7 +300,37 @@ def _rfc3339_to_datetime_udatetime(string):
     return dt
 
 
+def _get_udatetime_safe_string(string):
+    # type: (str) -> str
+    """
+    Function which returns RFC3339 string which can be safely passed to udatetime.
+
+    udatetime doesn't support values with many fractional components, but our custom implementation
+    does.
+
+    To work around that, we pass date + time + timezone string to udatetime to handle the parsing
+    and then handle fractional part (nanoseconds) ourselves.
+    """
+    # split the string in to main time and fractional component
+    parts = string.split(".")
+
+    if len(parts) > 1:
+        if parts[1].endswith("Z"):
+            # UTC, string ends with Z
+            return parts[0]
+        elif "+" in parts[1] or "-" in parts[1]:
+            # Custom timezone (e.g. -08:00), we strip it and move it to the string which we parse
+            # to udatetime. This way udatetime handles time zone conversion and we handle
+            # nanoseconds manually (since udatetime doesn't support non valid dates with large
+            # fractional parts)
+            tz_str = parts[1][-6:]
+            return parts[0] + tz_str
+
+    return string
+
+
 def _add_fractional_part_to_dt(dt, parts):
+    # type: (datetime.datetime, List[str]) -> datetime.datetime
     """
     Add fractional part (if any) to the provided datetime object.
     """
@@ -343,8 +357,9 @@ def _add_fractional_part_to_dt(dt, parts):
 
 
 def _get_fractional_nanos(value):
+    # type: (str) -> nano
     """
-    Return nanoseconds (if any) for the provided date string fractional part.
+    Return nanoseconds (if any) for the provided date string fractional part of the RFC3336 value.
     """
     parts = value.split(".")
 
