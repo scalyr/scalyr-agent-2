@@ -119,8 +119,7 @@ def _rfc3339_to_nanoseconds_since_epoch_string_split(string):
             dt = datetime.datetime(
                 *list(map(int, RFC3339_STR_REGEX.match(parts[0]).groups()))  # type: ignore
             )
-        except Exception as e:
-            print(e)
+        except Exception:
             return None
 
     nano_seconds = (
