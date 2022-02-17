@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.28 "TBD" - Mar 27, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 27, 2022 23:04 -0800
+--->
+
+Improvements:
+* Docker and Kubernetes monitors now support parsing date and time information from the container log lines with custom timezones (aka non UTC).
+
+Docker images:
+* Docker images now include udatetime time dependency which should speed up parsing date and time information from Docker container log lines.
+
 ## 2.1.27 "Thonia" - Jan 27, 2022
 
 <!---
