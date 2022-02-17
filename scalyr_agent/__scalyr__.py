@@ -132,7 +132,9 @@ def __determine_install_type():
         return TARBALL_INSTALL
 
     raise ValueError(
-        "Unrecognized package type in the 'install_info' file. Content: {}".format(__install_info__)
+        "Unrecognized package type in the 'install_info' file. Content: {}".format(
+            __install_info__
+        )
     )
 
 
