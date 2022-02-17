@@ -35,6 +35,7 @@ The following libraries are included:
   * [idna](#idna)
   * [chardet](#chardet)
   * [urllib3](#urllib3)
+  * [python-dateutil][#dateutil]
 
 ## tcollector<a name="tcollector"> (LGPL v3)
 
@@ -156,3 +157,8 @@ A dependency of Requests.
 ## urllib3<a name="urllib3"> (MIT)
 
 A dependency of Requests.
+
+
+## python-dateutil<a name="dateutil"> (Apache 2.0)
+
+Used for parsing RFC3339 date strings with custom timezones.

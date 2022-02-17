@@ -1,6 +1,9 @@
 -r ./main-requirements.txt
 -r ./compression-requirements.txt
 
+# Used for faster date string parsing
+udatetime==0.0.16; python_version < '3.9'
+
 # Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
 # default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
 # end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
