@@ -60,9 +60,6 @@ try:
 except ImportError:
     # if udatetime is not available, we fall back to the second fastest approach for date parsing
     # (string.split approach)
-    LOG.info(
-        '"udatetime" module not installed / available. Will fall back to slower Python implementation for parsing dates in the container log lines.'
-    )
     udatetime = None
 
 try:
@@ -73,6 +70,11 @@ except ImportError:
             '"python-dateutil module not installed / available, won\'t be able to parse container timestamps with non UTC timezone".'
         )
     isoparse = None
+
+if udatetime:
+    LOG.info('Using "udatetime" library for parsing container log line timestamps')
+else:
+    LOG.info("Using native Python code for parsing container log line timestamps")
 
 
 if six.PY3:
