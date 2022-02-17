@@ -416,7 +416,7 @@ class PackageBuilder(abc.ABC):
 
         # Create package info file. It will be read by agent in order to determine the package type and install root.
         # See '__determine_install_root_and_type' function in scalyr_agent/__scalyr__.py file.
-        install_info_file = self._intermediate_results_path / "install_info"
+        install_info_file = self._intermediate_results_path / "install_info.json"
 
         install_info_file.write_text(self._install_info_str)
 
@@ -605,7 +605,7 @@ class PackageBuilder(abc.ABC):
             )
 
             # Write install_info file inside the "scalyr_agent" package.
-            build_info_path = source_code_path / "scalyr_agent" / "install_info"
+            build_info_path = source_code_path / "scalyr_agent" / "install_info.json"
             build_info_path.write_text(self._install_info_str)
 
             # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.

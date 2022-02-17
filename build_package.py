@@ -284,7 +284,7 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, "LICENSE.txt"), "LICENSE.txt")
 
     # Also add in install_info file
-    write_to_file(get_install_info("package"), "install_info")
+    write_to_file(get_install_info("package"), "install_info.json")
 
     # Copy the third party licenses
     shutil.copytree(
@@ -306,7 +306,7 @@ def build_win32_installer_package(variant, version):
 
     agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
-    add_data = {os.path.join("data_files", "install_info"): "scalyr_agent"}
+    add_data = {os.path.join("data_files", "install_info.json"): "scalyr_agent"}
 
     # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
     hidden_imports = [
@@ -1077,7 +1077,7 @@ def build_base_files(install_type, base_configs="config"):
     # Write install_info file inside the 'scalyr_agent' package.
     os.chdir("scalyr_agent")
     install_info = get_install_info(install_type)
-    write_to_file(install_info, "install_info")
+    write_to_file(install_info, "install_info.json")
     os.chdir("..")
 
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
@@ -1098,16 +1098,6 @@ def build_base_files(install_type, base_configs="config"):
     main_permissions = os.stat(agent_main_path).st_mode
     os.chmod(agent_main_py2_path, main_permissions)
     os.chmod(agent_main_py3_path, main_permissions)
-
-    # # create copies of the config_main.py with python2 and python3 shebang.
-    # config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
-    # config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
-    # config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
-    # replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
-    # replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
-    # config_permissions = os.stat(config_main_path).st_mode
-    # os.chmod(config_main_py2_path, config_permissions)
-    # os.chmod(config_main_py3_path, config_permissions)
 
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
