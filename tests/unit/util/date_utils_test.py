@@ -243,7 +243,7 @@ class DateUtilsTestCase(ScalyrTestCase):
         self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56, 123456), actual)
 
     @skipIf(not udatetime, "udatetime not available, skipping test")
-    def test_rfc3339_to_datetime_with_and_without_udatetime_compatibility_check(self):
+    def test_rfc3339_to_datetime_string_split_and_udatetime(self):
         # Verify corectness between two different implementations of this function
         input_strs = [
             "2015-08-06T14:40:56.123456Z",
@@ -303,7 +303,7 @@ class DateUtilsTestCase(ScalyrTestCase):
         self.assertEquals(expected, actual)
 
     @skipIf(not udatetime, "udatetime not available, skipping test")
-    def test_rfc3339_to_nanoseconds_since_epoch_with_and_without_udatetime_compatibility_check(
+    def test_rfc3339_to_nanoseconds_since_epoch_string_split_and_udatetime(
         self,
     ):
         # Verify corectness between two different implementations of this function

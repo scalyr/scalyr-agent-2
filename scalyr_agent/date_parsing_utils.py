@@ -16,7 +16,7 @@
 Module containing various date parsing related utility functions.
 
 All the functions for parsing dates in RFC3339 format have been optimized for performance since
-they are parth of a critical code path when ingesting Docker / Kubernetes logs.
+they are part of a critical code path when ingesting Docker / Kubernetes logs.
 
 Per micro benchmarks (benchmarks/micro/test_date_parsing.py), "udatetime" based implementations are
 the fastest.
@@ -25,8 +25,8 @@ All the functions also support time formats in arbitrary timezones (aka non-UTC)
 pure Python versions fall back on python-dateutil which is rather slow. Luckily the common case and
 code path is UTC where we can skip that code path.
 
-It's also worth noting that our custom implementations also support some extended formats which are
-not fully valid as per RFC (e.g. very log fractional part). Because of that, same compatibility
+It's also worth noting that our custom implementations also supports some extended formats which are
+not fully valid as per RFC (e.g. very long fractional part). Because of that, some compatibility
 change needed to be implemented for udatetime implementation as well and that adds small amount of
 overhead.
 """
