@@ -53,7 +53,9 @@ import six
 from six.moves import map
 import logging
 
-LOG = logging.getLogger(__name__)
+from scalyr_agent import scalyr_logging
+
+LOG = scalyr_logging.getLogger(__name__)
 
 try:
     import udatetime
@@ -70,11 +72,6 @@ except ImportError:
             '"python-dateutil module not installed / available, won\'t be able to parse container timestamps with non UTC timezone".'
         )
     isoparse = None
-
-if udatetime:
-    LOG.info('Using "udatetime" library for parsing container log line timestamps')
-else:
-    LOG.info("Using native Python code for parsing container log line timestamps")
 
 
 if six.PY3:
@@ -388,9 +385,13 @@ def _get_fractional_nanos(value):
 
 
 if udatetime:
+    LOG.info('Using "udatetime" library for parsing container log line timestamps')
+
     rfc3339_to_nanoseconds_since_epoch = _rfc3339_to_nanoseconds_since_epoch_udatetime
     rfc3339_to_datetime = _rfc3339_to_datetime_udatetime
 else:
+    LOG.info("Using native Python code for parsing container log line timestamps")
+
     rfc3339_to_nanoseconds_since_epoch = (
         _rfc3339_to_nanoseconds_since_epoch_string_split
     )
