@@ -956,7 +956,7 @@ jobs:
       shell: bash
     environment:
       # NOTE: This should be the same version as we use for pre-built Windows binaries
-      PYTHON: 3.8.7
+      PYTHON: 3.8.10
     steps:
       - checkout
       - restore_cache:
