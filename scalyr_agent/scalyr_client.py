@@ -90,10 +90,7 @@ def verify_server_certificate(config):
     :return:
     """
     is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
-    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
-        __scalyr__.DEV_INSTALL,
-        __scalyr__.MSI_INSTALL,
-    ]
+    is_dev_install_or_windows = is_dev_install or platform.system() == "Windows"
 
     ca_file = config.ca_cert_path
     intermediate_certs_file = config.intermediate_certs_path
@@ -108,7 +105,7 @@ def verify_server_certificate(config):
 
     # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
     # under the MSI / Windows install
-    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
+    if not is_dev_install_or_windows and not os.path.isfile(intermediate_certs_file):
         raise ValueError(
             'Invalid path "%s" specified for the '
             '"intermediate_certs_path" config '
