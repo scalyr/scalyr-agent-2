@@ -115,7 +115,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-v1
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -133,7 +133,7 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-v1
           paths:
             - "~/.cache/pip"
       - store_test_results:
