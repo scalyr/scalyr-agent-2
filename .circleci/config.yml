@@ -2321,10 +2321,10 @@ workflows:
      - build-windows-package
      - package-test-rpm:
          context: scalyr-agent
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - package-test-deb:
          context: scalyr-agent
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - smoke-rpm-package-py2:
          context: scalyr-agent
          requires:
