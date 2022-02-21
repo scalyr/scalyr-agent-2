@@ -2181,6 +2181,8 @@ def get_agent_start_up_message():
     """
     Return a message which is logged on agent start up.
     """
+    from scalyr_agent.date_parsing_utils import udatetime
+
     python_version_str = sys.version.replace("\n", "")
     build_revision = get_build_revision()
     openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
@@ -2195,9 +2197,15 @@ def get_agent_start_up_message():
         used_locale,
     ) = get_language_code_coding_and_locale()
 
+    if udatetime:
+        date_parsing_library = "udatetime"
+    else:
+        date_parsing_library = "native python"
+
     msg = (
         "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
         "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)"
+        "(date parsing library: %s)"
         % (
             SCALYR_VERSION,
             build_revision,
@@ -2207,6 +2215,7 @@ def get_agent_start_up_message():
             sys.getfilesystemencoding(),
             used_locale,
             lang_env_var,
+            date_parsing_library,
         )
     )
 

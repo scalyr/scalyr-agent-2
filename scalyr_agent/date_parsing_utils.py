@@ -52,9 +52,6 @@ import _strptime  # NOQA
 import six
 from six.moves import map
 
-from scalyr_agent import scalyr_logging
-
-LOG = scalyr_logging.getLogger(__name__)
 
 try:
     import udatetime
@@ -66,10 +63,6 @@ except ImportError:
 try:
     from dateutil.parser import isoparse  # NOQA
 except ImportError:
-    if not udatetime:
-        LOG.info(
-            '"python-dateutil module not installed / available, won\'t be able to parse container timestamps with non UTC timezone".'
-        )
     isoparse = None
 
 
@@ -384,13 +377,9 @@ def _get_fractional_nanos(value):
 
 
 if udatetime:
-    LOG.info('Using "udatetime" library for parsing container log line timestamps')
-
     rfc3339_to_nanoseconds_since_epoch = _rfc3339_to_nanoseconds_since_epoch_udatetime
     rfc3339_to_datetime = _rfc3339_to_datetime_udatetime
 else:
-    LOG.info("Using native Python code for parsing container log line timestamps")
-
     rfc3339_to_nanoseconds_since_epoch = (
         _rfc3339_to_nanoseconds_since_epoch_string_split
     )
