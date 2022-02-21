@@ -31,10 +31,10 @@ WINDOWS_MONITOR_MODULES_TO_INCLUDE = [
     "scalyr_agent.builtin_monitors.test_monitor",
     "scalyr_agent.builtin_monitors.url_monitor",
     "scalyr_agent.builtin_monitors.windows_event_log_monitor",
-    "scalyr_agent.builtin_monitors.openmetrics_monitor",
 ]
 
 # List of monitors which should not be included on Windows
 WINDOWS_MONITOR_MODULES_TO_EXCLUDE = [
     "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+    "scalyr_agent.builtin_monitors.openmetrics_monitor",
 ]

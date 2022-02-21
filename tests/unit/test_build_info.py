@@ -14,14 +14,15 @@
 
 from __future__ import absolute_import
 
+import json
 import os
 import unittest
 
 import mock
 
-from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.build_info import get_build_info
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.build_info import get_build_revision_from_git
 
 __all__ = ["BuildInfoUtilTestCase"]
 
@@ -30,10 +31,12 @@ MOCK_BUILD_INFO_PATH = os.path.abspath(
     os.path.join(BASE_DIR, "fixtures/build_info/build_info")
 )
 
+with open(MOCK_BUILD_INFO_PATH) as f:
+    MOCK_BUILD_INFO = json.load(f)
+
 
 class BuildInfoUtilTestCase(unittest.TestCase):
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", MOCK_BUILD_INFO_PATH)
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", MOCK_BUILD_INFO_PATH)
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", MOCK_BUILD_INFO)
     def test_get_build_info_success(self):
         build_info = get_build_info()
         self.assertEqual(build_info["packaged_by"], "jenkins@scalyr.com")
@@ -43,22 +46,17 @@ class BuildInfoUtilTestCase(unittest.TestCase):
         self.assertEqual(build_info["from_branch"], "release")
         self.assertEqual(build_info["build_time"], "2020-05-06 17:59:21 UTC")
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", "/tmp/doesnt.exist")
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", "/tmp/doesnt.exist")
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     def test_get_build_info_build_info_file_doesnt_exist(self):
         build_info = get_build_info()
         self.assertEqual(build_info, {})
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", MOCK_BUILD_INFO_PATH)
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", MOCK_BUILD_INFO_PATH)
-    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", DEV_INSTALL)
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     def test_get_build_revision_from_build_info_success(self):
         build_revision = get_build_revision()
-        self.assertEqual(build_revision, "7d4c4e2e94242ee25320a75c510d52967cfe50eb")
+        self.assertEqual(build_revision, get_build_revision_from_git())
 
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_LINUX", "/tmp/doesnt.exist")
-    @mock.patch("scalyr_agent.build_info.BUILD_INFO_PATH_WINDOWS", "/tmp/doesnt.exist")
-    @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", DEV_INSTALL)
+    @mock.patch("scalyr_agent.__scalyr__.__install_info__", {})
     @mock.patch("scalyr_agent.build_info.GIT_GET_HEAD_REVISION_CMD", "echo revision")
     def test_get_build_revision_from_git_success(self):
         build_revision = get_build_revision()
