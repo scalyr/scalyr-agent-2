@@ -12,6 +12,7 @@ Improvements:
 
 Docker images:
 * Docker images now include udatetime time dependency which should speed up parsing date and time information from Docker container log lines.
+* Upgrade zstandard and orjson dependency used by the Docker image.
 
 ## 2.1.27 "Thonia" - Jan 27, 2022
 
