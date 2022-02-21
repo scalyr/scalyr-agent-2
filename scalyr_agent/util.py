@@ -94,11 +94,6 @@ except ImportError:
 
     new_md5 = False
 
-# Those imports have been moved in #494 so this alias is left here is place just in case for
-# backward compatibility reasons
-from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  # NOQA
-from scalyr_agent.date_parsing_utils import rfc3339_to_datetime  # NOQA
-
 
 USJON_NOT_AVAILABLE_MSG = """
 ujson library is not available. You can install it using pip:

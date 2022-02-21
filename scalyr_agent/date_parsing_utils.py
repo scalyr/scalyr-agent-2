@@ -51,7 +51,6 @@ import _strptime  # NOQA
 
 import six
 from six.moves import map
-import logging
 
 from scalyr_agent import scalyr_logging
 

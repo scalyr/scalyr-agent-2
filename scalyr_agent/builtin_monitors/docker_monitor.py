@@ -53,6 +53,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime
 
 from scalyr_agent.util import StoppableThread
 
@@ -709,7 +710,7 @@ def _split_datetime_from_line(line):
     dt = datetime.datetime.utcnow()
     pos = line.find(" ")
     if pos > 0:
-        dt = scalyr_util.rfc3339_to_datetime(line[0:pos])
+        dt = rfc3339_to_datetime(line[0:pos])
         log_line = line[pos + 1 :]
 
     return (dt, log_line)

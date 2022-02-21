@@ -53,6 +53,7 @@ from scalyr_agent.scalyr_logging import BaseFormatter
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -481,7 +482,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 continue
 
             # convert to datetime
-            create_time = scalyr_util.rfc3339_to_datetime(create_time)
+            create_time = rfc3339_to_datetime(create_time)
 
             # if we are older than the previous oldest datetime, then update the oldest time
             if create_time is not None and create_time < oldest_time:
