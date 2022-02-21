@@ -61,7 +61,7 @@ def _remove_python(command):
 
 def _get_current_config_script_name():
     return Path(
-        os.readlink(six.text_type(SCALYR_PACKAGE_BIN_PATH / "scalyr-agent-2-config"))
+        six.text_type(SCALYR_PACKAGE_BIN_PATH / "scalyr-agent-2-config")
     ).name
 
 

@@ -2321,30 +2321,30 @@ workflows:
      - build-windows-package
      - package-test-rpm:
          context: scalyr-agent
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - package-test-deb:
          context: scalyr-agent
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - smoke-rpm-package-py2:
          context: scalyr-agent
          requires:
            - package-test-rpm
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - smoke-rpm-package-py3:
          context: scalyr-agent
          requires:
            - package-test-rpm
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - smoke-deb-package-py2:
          context: scalyr-agent
          requires:
            - package-test-deb
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - smoke-deb-package-py3:
          context: scalyr-agent
          requires:
            - package-test-deb
-         <<: *master_and_release_only
+         #<<: *master_and_release_only
      - ami-tests-development:
           context: scalyr-agent
           requires:
