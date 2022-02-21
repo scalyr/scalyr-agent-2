@@ -23,8 +23,8 @@ import mock
 import six
 from six.moves import zip
 
-import scalyr_agent.util as scalyr_util
 from scalyr_agent import date_parsing_utils
+import scalyr_agent.util as scalyr_util
 from scalyr_agent.test_base import ScalyrTestCase
 
 from scalyr_agent.test_base import skipIf
@@ -229,17 +229,17 @@ class DateUtilsTestCase(ScalyrTestCase):
     def test_rfc3339_to_datetime(self):
         s = "2015-08-06T14:40:56.123456Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
-        actual = scalyr_util.rfc3339_to_datetime(s)
+        actual = date_parsing_utils.rfc3339_to_datetime(s)
 
         self.assertEquals(expected, actual)
 
         s = "2015-08-06T14:40:56Z"
-        actual = scalyr_util.rfc3339_to_datetime(s)
+        actual = date_parsing_utils.rfc3339_to_datetime(s)
 
         self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56), actual)
 
         s = "2015-08-06T14:40:56.123456"
-        actual = scalyr_util.rfc3339_to_datetime(s)
+        actual = date_parsing_utils.rfc3339_to_datetime(s)
         self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56, 123456), actual)
 
     @skipIf(not udatetime, "udatetime not available, skipping test")
@@ -271,14 +271,14 @@ class DateUtilsTestCase(ScalyrTestCase):
     def test_rfc3339_to_datetime_truncated_nano(self):
         s = "2015-08-06T14:40:56.123456789Z"
         expected = datetime.datetime(2015, 8, 6, 14, 40, 56, 123456)
-        actual = scalyr_util.rfc3339_to_datetime(s)
+        actual = date_parsing_utils.rfc3339_to_datetime(s)
 
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_datetime_bad_format_date_and_time_separator(self):
         s = "2015-08-06 14:40:56.123456789Z"
         expected = None
-        actual = scalyr_util.rfc3339_to_datetime(s)
+        actual = date_parsing_utils.rfc3339_to_datetime(s)
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_nanoseconds_since_epoch(self):
@@ -289,7 +289,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
         s = "2015-08-06T14:40:56.123456"
@@ -299,7 +299,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     @skipIf(not udatetime, "udatetime not available, skipping test")
@@ -359,7 +359,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
         s = "2015-08-06T14:40:56Z"
@@ -369,7 +369,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_nanoseconds_since_epoch_some_fractions(self):
@@ -380,7 +380,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_nanoseconds_since_epoch_many_fractions(self):
@@ -392,7 +392,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             * 1000
             + 789
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_nanoseconds_since_epoch_too_many_fractions(self):
@@ -404,7 +404,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             * 1000
             + 789
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     def test_rfc3339_to_nanoseconds_since_epoch_strange_value(self):
@@ -415,7 +415,7 @@ class DateUtilsTestCase(ScalyrTestCase):
             )
             * 1000
         )
-        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        actual = date_parsing_utils.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
     def test_get_fractional_nanos(self):

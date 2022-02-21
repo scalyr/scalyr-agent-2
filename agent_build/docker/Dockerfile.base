@@ -48,15 +48,20 @@ FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust-v7
 
 # Use one of the two previous stages according to the TARGETVARIANT suffix.
 # if TARGETVARIANT is 'v7', then we use stage without rust.
-# IMPORTANT: that may be needed to revise if new architectres are added.
+# IMPORTANT: that may be needed to revise if new architectures are added.
 FROM scalyr-dependencies-rust-$TARGETVARIANT as scalyr-dependencies
 
 ARG TARGETVARIANT
 ARG COVERAGE_VERSION
+ARG BASE_IMAGE_SUFFIX
 
 ADD agent_build/requirement-files/docker-image-requirements.txt agent_build/requirement-files/docker-image-requirements.txt
 ADD agent_build/requirement-files/compression-requirements.txt agent_build/requirement-files/compression-requirements.txt
 ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
+
+# orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
+# with pip environment markers since they are not specific enough.
+RUN if [ "$TARGETVARIANT" = "v7" ] && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then sed -i '/^orjson/d' agent_build/requirement-files/main-requirements.txt; fi
 
 # Right now we don't support lz4 on server side yet so we don't include this dependency since it doesn't offer pre built
 # wheel and it substantially slows down base image build

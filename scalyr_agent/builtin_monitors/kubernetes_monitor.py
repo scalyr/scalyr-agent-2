@@ -77,6 +77,7 @@ import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 from scalyr_agent.util import StoppableThread, HistogramTracker
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime
 
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -931,7 +932,7 @@ def _split_datetime_from_line(line):
     dt = datetime.datetime.utcnow()
     pos = line.find(" ")
     if pos > 0:
-        dt = scalyr_util.rfc3339_to_datetime(line[0:pos])
+        dt = rfc3339_to_datetime(line[0:pos])
         log_line = line[pos + 1 :]
 
     return (dt, log_line)

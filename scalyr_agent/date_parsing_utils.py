@@ -51,9 +51,7 @@ import _strptime  # NOQA
 
 import six
 from six.moves import map
-import logging
 
-LOG = logging.getLogger(__name__)
 
 try:
     import udatetime
@@ -65,16 +63,7 @@ except ImportError:
 try:
     from dateutil.parser import isoparse  # NOQA
 except ImportError:
-    if not udatetime:
-        LOG.info(
-            '"python-dateutil module not installed / available, won\'t be able to parse container timestamps with non UTC timezone".'
-        )
     isoparse = None
-
-if udatetime:
-    LOG.info('Using "udatetime" library for parsing container log line timestamps')
-else:
-    LOG.info("Using native Python code for parsing container log line timestamps")
 
 
 if six.PY3:

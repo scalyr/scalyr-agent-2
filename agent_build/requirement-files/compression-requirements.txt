@@ -1,7 +1,7 @@
 # Compression libraries
 # NOTE: zstandard don't include pre-built wheels for ARMv7 for glibc and
 # musl.
-zstandard==0.16.0; python_version >= '3.6' and 'armv7' not in platform_machine
+zstandard==0.17.0; python_version >= '3.6' and 'armv7' not in platform_machine
 zstandard==0.15.2; python_version >= '3.5' and python_version < '3.6' and 'armv7' not in platform_machine
 zstandard==0.14.1; python_version < '3.5' and 'armv7' not in platform_machine
 
