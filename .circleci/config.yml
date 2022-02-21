@@ -115,7 +115,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -133,7 +133,7 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
           paths:
             - "~/.cache/pip"
       - store_test_results:
@@ -961,7 +961,7 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Chocolatey Cache
-          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
       - run:
           name: Install Python
           command: |
@@ -974,14 +974,14 @@ jobs:
             echo "export PATH=\"/c/Python38:/c/Python38/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python38/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
-          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
           paths:
             - ~/choco-cache
             # Actual package files are stored in NuGet cache
             - C:\Users\circleci\AppData\Local\NuGet\Cache
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
       - run:
           name: Install Python Dependencies
           command: |
@@ -1022,7 +1022,7 @@ jobs:
           no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
-          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}
+          key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-3.8-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
       - store_test_results:

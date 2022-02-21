@@ -43,6 +43,8 @@ def _copy_agent_source(src_path, dest_path):
         for p in gitignore_path.read_text().splitlines()
         if not p.startswith("#")
     ]
+    # Filter empty lines.
+    patterns = list([p for p in patterns if p == ""])
     shutil.copytree(
         six.text_type(src_path),
         six.text_type(dest_path),
