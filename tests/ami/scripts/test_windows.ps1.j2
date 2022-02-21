@@ -91,7 +91,7 @@ Log-Message "agent.json and agent.d/ config files permissions checks"
 Log-Message ""
 
 # NOTE: At this point fix doesn't run automatically post install so we manually invoke the scrupt and verify it works
-& "C:\Program Files (x86)\Scalyr\bin\scalyr-agent-2-config.exe" "--fix-config-permissions"
+& "C:\Program Files (x86)\Scalyr\bin\scalyr-agent-2-config" "--fix-config-permissions"
 
 dir "C:\Program Files (x86)\Scalyr\config"
 dir "C:\Program Files (x86)\Scalyr\config\agent.d"
@@ -176,19 +176,6 @@ Log-Message ""
 Log-Message "native agent status output verified"
 Log-Message ""
 
-#
-# Verify build_info file exists
-#
-
-Log-Message ""
-Log-Message "Verifying build_info file exists"
-Log-Message ""
-
-type "C:\Program Files (x86)\Scalyr\bin\build_info"
-
-Log-Message ""
-Log-Message "build_info validation completed"
-Log-Message ""
 
 #
 # Perform basic Windows Event Log sanity checks

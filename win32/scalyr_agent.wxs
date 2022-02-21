@@ -38,11 +38,14 @@
 
         <DirectoryRef Id='CONFIGTEMPLATES'>
             <Component Id='config_tmpl' Guid='571081B1-6926-45D0-A7EE-8D55E7531E16'>
-                <File Id='config.tmpl' Name='agent_config.tmpl' KeyPath='yes' Checksum='yes' Source='data_files\agent_config.tmpl' />
+                <File Id='config.tmpl' Name='agent_config.tmpl' KeyPath='yes' Checksum='yes' Source='Scalyr\config\templates\agent_config.tmpl' />
             </Component>
         </DirectoryRef>
 
         <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
+            <Component Id='version_file' Guid='2c6bbb53-4c83-41cf-b5d8-2855cf86c15c'>
+                <File Id='version_file' Name='VERSION' KeyPath='yes' Checksum='yes' Source='Scalyr\VERSION' />
+            </Component>
             <Directory Id='DEFAULTAPPLOGS' Name='log'>
                 <Component Id='log_dir' Guid='3af7df35-608a-4cd0-8356-6cb03def0a66' SharedDllRefCount='no' KeyPath='no'
                            NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
@@ -77,12 +80,13 @@
             </Component>
 
             <Component Id='scalyr_agent_2_config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
-              <File Id='scalyr_agent_2_config_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2-config.exe' />
+              <File Id='scalyr_agent_2_config_cmd' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2-config.cmd' />
             </Component>
 
             <Component Id='ScalyrAgentService' Guid='cf5da252-7803-45c0-b33b-e1745925cd09' >
               <File Id='ScalyrAgentService_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrAgentService.exe' />
               <ServiceInstall Id="ServiceInstaller" Type="ownProcess" Vital="yes" Name="ScalyrAgentService"
+                              Arguments="service"
                               DisplayName="Scalyr Agent Service"
                               Description="The Scalyr Agent sends logs and metrics to Scalyr."
                               Start="auto"
@@ -100,7 +104,7 @@
             <!-- put in the dist directory by py2exe that should be distributed.  There's probably a wix way to do -->
             <!-- but it's too much of a pain to learn. -->
 
-            <!-- EXPAND_FROM_BIN EXCLUDE:third_party_licenses,scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <!-- EXPAND_FROM_BIN EXCLUDE:third_party_licenses,scalyr-agent-2.exe,scalyr-agent-2-config.cmd,ScalyrAgentService.exe,ScalyrShell.cmd -->
             <!-- EXPAND_FROM_BIN -->
         </DirectoryRef>
 
@@ -152,7 +156,8 @@
             <ComponentRef Id='log_dir' />
             <ComponentRef Id='data_dir' />
             <ComponentRef Id='config_d_dir' />
-            <ComponentGroupRef Id='BIN' />
+            <ComponentRef Id='version_file' />
+            <!--<ComponentGroupRef Id='BIN' /> -->
 
         </Feature>
 
@@ -278,17 +283,17 @@
         <!-- Also, we use the CAQuietExec utility so a console window isn't popped up. -->
         <!-- Since the action is deferred, we have to do a dance where we set a property with the command first. -->
         <CustomAction Id='CheckForCondRestart_set' Property='CheckForCondRestart' Execute='immediate'
-            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --mark-conditional-restart'/>
+            Value='"[APPLICATIONBINDIR]scalyr-agent-2.exe" config --mark-conditional-restart'/>
         <CustomAction Id="CheckForCondRestart" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
             Return="ignore" Impersonate="no"/>
 
         <!-- NOTE: At this point we don't automatically run \-\-fix-config-permissions post install since it may break
         installations where the agent runs as a non Administrator account -->
         <!-- <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate' -->
-        <!--     Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" \-\-init-config \-\-no-error-if-config-exists \-\-conditional-restart \-\-fix-config-permissions'/> -->
+        <!--     Value='"[APPLICATIONBINDIR]\scalyr-agent-2.exe" config \-\-init-config \-\-no-error-if-config-exists \-\-conditional-restart \-\-fix-config-permissions'/> -->
 
         <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
-            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
+            Value='"[APPLICATIONBINDIR]scalyr-agent-2.exe" config --init-config --no-error-if-config-exists --conditional-restart'/>
         <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
             Return="ignore" Impersonate="no"/>
 

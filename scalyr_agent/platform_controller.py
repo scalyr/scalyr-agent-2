@@ -25,6 +25,7 @@ if False:  # NOSONAR
     from typing import Type
 
 
+import argparse
 import sys
 
 from scalyr_agent.__scalyr__ import INSTALL_TYPE
@@ -119,6 +120,7 @@ class PlatformController(object):
         return False
 
     def add_options(self, options_parser):
+        # type: (argparse.ArgumentParser) -> None
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
@@ -131,6 +133,7 @@ class PlatformController(object):
         pass
 
     def consume_options(self, options):
+        # type: (argparse.Namespace) -> None
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
