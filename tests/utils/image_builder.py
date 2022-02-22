@@ -186,16 +186,18 @@ class AgentImageBuilder(object):
         dockerfile_path.write_text(self.get_dockerfile_content())
         self._copy_to_build_context(build_context_path)
 
-        subprocess.check_call([
-            "docker",
-            "build",
-            "-t",
-            self.image_tag,
-            "-f",
-            six.text_type(dockerfile_path),
-            "--rm",
-            six.text_type(build_context_path)
-        ])
+        subprocess.check_call(
+            [
+                "docker",
+                "build",
+                "-t",
+                self.image_tag,
+                "-f",
+                six.text_type(dockerfile_path),
+                "--rm",
+                six.text_type(build_context_path),
+            ]
+        )
 
         shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
 
