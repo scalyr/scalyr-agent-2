@@ -161,7 +161,7 @@ def common_version_test(
     runner,
     install_package_fn,
     remove_package_fn,
-    expected_conf_file_name,
+    expected_main_file_name,
     *python_versions,
     **kwargs
 ):
@@ -171,7 +171,7 @@ def common_version_test(
     :param runner: The agent runner
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     :param remove_package_fn: callable that removes package.
-    :param expected_conf_file_name: name of the "conf_main*" file, helps to be sure that python version is switched.
+    :param expected_main_file_name: name of the "agent_main*" file, helps to be sure that python version is switched.
     :param python_versions: mock real python binaries with with dummy bash scripts, which only prints version.
     By those mocks we make installer skip those binaries as invalid for the agent.
     :param kwargs:
@@ -190,7 +190,7 @@ def common_version_test(
         stdout, _ = install_package_fn()
 
     current_main_script_file_name = _get_current_main_script_name()
-    assert current_main_script_file_name == expected_conf_file_name
+    assert current_main_script_file_name == expected_main_file_name
 
     _mock_binaries("", "", "")
 
