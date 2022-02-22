@@ -1805,7 +1805,7 @@ def get_build_info():
         if rc != 0:
             packager_email = "unknown"
 
-        __build_info__["packaged_by"] = packager_email
+        __build_info__["packaged_by"] = packager_email.strip()
 
         # Determine the last commit from the log.
         (_, commit_id) = run_command(
@@ -1814,13 +1814,13 @@ def get_build_info():
             command_name="git",
         )
 
-        __build_info__["latest_commit"] = commit_id
+        __build_info__["latest_commit"] = commit_id.strip()
 
         # Include the branch just for safety sake.
         (_, branch) = run_command(
             "git branch | cut -d ' ' -f 2", exit_on_fail=True, command_name="git"
         )
-        __build_info__["from_branch"] = branch
+        __build_info__["from_branch"] = branch.strip()
 
         # Add a timestamp.
 
