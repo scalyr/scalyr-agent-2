@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import shutil
 import argparse
 import hashlib
+import subprocess
 from abc import ABCMeta
 
 if False:  # NOSONAR
@@ -185,17 +186,20 @@ class AgentImageBuilder(object):
         dockerfile_path.write_text(self.get_dockerfile_content())
         self._copy_to_build_context(build_context_path)
 
-        _, output_gen = self._docker_client.images.build(
-            tag=self.image_tag,
-            path=six.text_type(build_context_path),
-            dockerfile=six.text_type(dockerfile_path),
-            rm=True,
+        subprocess.check_call(
+            [
+                "docker",
+                "build",
+                "-t",
+                self.image_tag,
+                "-f",
+                six.text_type(dockerfile_path),
+                "--rm",
+                six.text_type(build_context_path),
+            ]
         )
 
         shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
-
-        for chunk in output_gen:
-            print(chunk.get("stream", ""), end="")
 
     def build_with_cache(
         self, dir_path, skip_if_exists=True

@@ -57,26 +57,26 @@ def test_centos_test_versions(request):
         runner,
         install_rpm,
         remove_rpm,
-        "config_main.py",
+        "agent_main.py",
         "",
         "2.5.1",
         "3.4.1",
         install_fails=True,
     )
     common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", "3.4.1"
+        runner, install_rpm, remove_rpm, "agent_main_py2.py", "2.5.1", "", "3.4.1"
     )
     common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py3.py", "2.5.1", "2.5.1", ""
+        runner, install_rpm, remove_rpm, "agent_main_py3.py", "2.5.1", "2.5.1", ""
     )
     common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "", "", ""
+        runner, install_rpm, remove_rpm, "agent_main_py2.py", "", "", ""
     )
     common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py2.py", "2.5.1", "", ""
+        runner, install_rpm, remove_rpm, "agent_main_py2.py", "2.5.1", "", ""
     )
     common_version_test(
-        runner, install_rpm, remove_rpm, "config_main_py3.py", "", "2.5.1", ""
+        runner, install_rpm, remove_rpm, "agent_main_py3.py", "", "2.5.1", ""
     )
 
 

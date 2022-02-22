@@ -56,4 +56,4 @@ else
   exit 2
 fi
 
-/usr/bin/env "${EXECUTABLE_NAME}" /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set-python="${EXECUTABLE_NAME}"
+/usr/bin/env "${EXECUTABLE_NAME}" /usr/share/scalyr-agent-2/bin/scalyr-agent-2 config --set-python="${EXECUTABLE_NAME}"
