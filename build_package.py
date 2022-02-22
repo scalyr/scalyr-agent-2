@@ -1156,7 +1156,6 @@ def build_base_files(install_type, base_configs="config"):
     os.chdir("bin")
 
     make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
-    # make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
 
     shutil.copy(
         make_path(agent_source_root, "agent_build/linux/scalyr-agent-2-config"),
