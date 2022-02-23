@@ -731,10 +731,10 @@ commands:
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
 
-            # If testing type is "development" we use installer script which is built in another job.
-            if [ "<< parameters.test_type >>" = "development" ]; then
-              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
-            fi
+#            # If testing type is "development" we use installer script which is built in another job.
+#            if [ "<< parameters.test_type >>" = "development" ]; then
+#              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
+#            fi
 
             set +e
 
@@ -2345,11 +2345,11 @@ workflows:
          requires:
            - package-test-deb
          <<: *master_and_release_only
-#     - ami-tests-development:
-#          context: scalyr-agent
-#          requires:
-#            - build-windows-package
-#            - build-linux-packages-and-installer-script
+     - ami-tests-development:
+          context: scalyr-agent
+          requires:
+            - build-windows-package
+            - build-linux-packages-and-installer-script
      - ami-tests-stable:
           context: scalyr-agent
           <<: *master_and_release_only
