@@ -1084,6 +1084,11 @@ def build_base_files(install_type, base_configs="config"):
 
     # Write install_info file inside the 'scalyr_agent' package.
     os.chdir("scalyr_agent")
+
+    # Write build_info file inside the package root (temporary needed until we drop old Jenkins
+    # builder)
+    write_to_file(get_build_info_json(), "build_info")
+
     install_info = get_install_info(install_type)
     write_to_file(install_info, "install_info.json")
     os.chdir("..")
