@@ -1842,13 +1842,17 @@ def get_install_info(install_type):
         sort_keys=True,
     )
 
+
 def get_build_info_json():
     """
     Get json serialized string with the build info.
     """
-    return json.dumps(get_build_info(),
+    return json.dumps(
+        get_build_info(),
         indent=4,
-        sort_keys=True,)
+        sort_keys=True,
+    )
+
 
 def get_build_info_json():
     """
