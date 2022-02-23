@@ -1851,6 +1851,17 @@ def get_build_info_json():
         indent=4,
         sort_keys=True,)
 
+def get_build_info_json():
+    """
+    Get json serialized string with the build info.
+    """
+    return json.dumps(
+        get_build_info(),
+        indent=4,
+        sort_keys=True,
+    )
+
+
 def set_build_info(build_info_file_path):
     """Sets the file to use as the build_info file to include in the package.
 
