@@ -1345,10 +1345,9 @@ def write_to_file(string_value, file_path):
     @param string_value: The value to write to the file.
     @param file_path: The path of the file to write to.
     """
-    dest_fp = open(file_path, "w")
-    dest_fp.write(string_value.rstrip())
-    dest_fp.write(six.ensure_text(os.linesep))
-    dest_fp.close()
+    with open(file_path, "wb") as dest_fp:
+        dest_fp.write(six.ensure_binary(string_value.rstrip()))
+        dest_fp.write(six.ensure_binary(os.linesep))
 
 
 def parse_date(date_str):
