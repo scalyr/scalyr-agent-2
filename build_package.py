@@ -1866,9 +1866,8 @@ def set_build_info(build_info_file_path):
     @param build_info_file_path: The path to the build_info file to use.
     """
     global __build_info__
-    fp = open(build_info_file_path, "r")
-    __build_info__ = fp.read()
-    fp.close()
+    with open(build_info_file_path, "r") as fp:
+        __build_info__ = json.load(fp)
 
     return __build_info__
 
