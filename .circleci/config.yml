@@ -731,6 +731,11 @@ commands:
             export SECRET_KEY=${AWS_SECRET_KEY}
             export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
 
+            # If testing type is "development" we use installer script which is built in another job.
+            if [ "<< parameters.test_type >>" = "development" ]; then
+              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
+            fi
+
             set +e
 
             max_attempts="2"
