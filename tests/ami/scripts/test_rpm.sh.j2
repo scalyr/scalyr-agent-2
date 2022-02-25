@@ -157,7 +157,7 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 # Verify build_info file with build metadata is present
 echo_with_date ""
 echo_with_date "Verifying install_info.json file exists"
-cat /usr/share/scalyr-agent-2/py/scalyr-agent/install_info.json || (echo_with_date "install_info.json file is missing" ; exit 1)
+cat /usr/share/scalyr-agent-2/py/scalyr_agent/install_info.json || (echo_with_date "install_info.json file is missing" ; exit 1)
 echo_with_date ""
 
 # Verify rc*.d symlinks are in place
