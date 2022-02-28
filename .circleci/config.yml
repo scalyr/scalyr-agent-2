@@ -333,6 +333,7 @@ commands:
             pip install --user "udatetime==0.0.16"
 
             # Needed for snappy library
+            sudo apt-get update
             sudo apt-get install -y libsnappy-dev
       - run:
           name: Run Micro Benchmarks
@@ -788,7 +789,7 @@ jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.8
     steps:
       - unittest_tox:
           python_version: "3.8"
@@ -797,7 +798,7 @@ jobs:
   unittest-37:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.7
+      - image: cimg/python:3.7
     steps:
       - unittest_tox:
           python_version: "3.7"
@@ -806,7 +807,7 @@ jobs:
   unittest-36:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - unittest_tox:
           python_version: "3.6"
@@ -815,7 +816,7 @@ jobs:
   unittest-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5
+      - image: cimg/python:3.5
     steps:
       - unittest_tox:
           python_version: "3.5"
@@ -1216,7 +1217,7 @@ jobs:
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7
+      - image: cimg/python:2.7
     steps:
       - unittest_tox:
           python_version: "2.7"
@@ -1225,7 +1226,7 @@ jobs:
 
   smoke-standalone-27-tls12:
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: cimg/python:2.7
     steps:
       - checkout
       - setup_remote_docker:
@@ -1492,7 +1493,7 @@ jobs:
   lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie
+      - image: cimg/python:3.6
     steps:
       - checkout
       - restore_cache:
@@ -1509,7 +1510,8 @@ jobs:
       - run:
           name: Install Python dependencies
           command: |
-            sudo pip install "tox==<< pipeline.parameters.default_tox_version >>"
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+            pip install requests
       - run:
           name: Run Python Lint Checks
           command: |
@@ -1554,7 +1556,7 @@ jobs:
   sonarcloud-scan:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie
+      - image: cimg/python:3.6
     environment:
       VERSION: "4.6.0.2311"
       SCANNER_DIRECTORY: "/tmp/cache/scanner"
@@ -1598,7 +1600,7 @@ jobs:
           # build.
           name: Download Coverage Data files
           command: |
-            sudo pip install "coverage==4.5.4" "apache-libcloud==3.1.0"
+            pip install "coverage==4.5.4" "apache-libcloud==3.1.0"
             cp .circleci/.coveragerc_ci .coveragerc
 
             # Download Coverage Data
@@ -1638,7 +1640,7 @@ jobs:
   benchmarks-idle-agent-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - idle conf 1"
@@ -1651,7 +1653,7 @@ jobs:
   benchmarks-idle-agent-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - idle conf 1"
@@ -1664,7 +1666,7 @@ jobs:
   benchmarks-idle-agent-no-monitors-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - idle conf 2"
@@ -1677,7 +1679,7 @@ jobs:
   benchmarks-idle-agent-no-monitors-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - idle conf 2"
@@ -1690,7 +1692,7 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 1"
@@ -1706,7 +1708,7 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 1"
@@ -1724,7 +1726,7 @@ jobs:
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 2"
@@ -1740,7 +1742,7 @@ jobs:
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 2"
@@ -1756,7 +1758,7 @@ jobs:
   benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 3"
@@ -1777,7 +1779,7 @@ jobs:
   benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 4"
@@ -1793,7 +1795,7 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 5"
@@ -1809,7 +1811,7 @@ jobs:
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 5"
@@ -1825,7 +1827,7 @@ jobs:
   benchmarks-micro-py-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     # NOTE: We use larger resource class to speed up the tests. This job only runs on master merge
     # aka not often.
     resource_class: large
@@ -1838,7 +1840,7 @@ jobs:
   benchmarks-micro-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7.17
+      - image: cimg/python:2.7.17
     # NOTE: We use larger resource class to speed up the tests. This job only runs on master merge
     # aka not often.
     resource_class: large
@@ -1855,7 +1857,7 @@ jobs:
     circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes. Needed some Slack blocks
                              # some EC2 IP ranges
     docker:
-      - image: circleci/python:3.5.9
+      - image: cimg/python:3.5.9
     steps:
       - checkout
       - run:
@@ -1897,7 +1899,7 @@ jobs:
   smoke-standalone-35-rate-limit:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5
+      - image: cimg/python:3.5
     steps:
       - smoke-standalone-tox:
           python_version: "3.5"
@@ -1906,7 +1908,7 @@ jobs:
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.8
     steps:
       - smoke-standalone-tox:
           python_version: "3.8"
@@ -1915,7 +1917,7 @@ jobs:
   smoke-standalone-37:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.7
+      - image: cimg/python:3.7
     steps:
       - smoke-standalone-tox:
           python_version: "3.7"
@@ -1924,7 +1926,7 @@ jobs:
   smoke-standalone-36:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - smoke-standalone-tox:
           python_version: "3.6"
@@ -1933,7 +1935,7 @@ jobs:
   smoke-standalone-35:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.5
+      - image: cimg/python:3.5
     steps:
       - smoke-standalone-tox:
           python_version: "3.5"
@@ -1942,7 +1944,7 @@ jobs:
   smoke-standalone-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7
+      - image: cimg/python:2.7
     steps:
       - smoke-standalone-tox:
           python_version: "2.7"
@@ -1951,7 +1953,7 @@ jobs:
   package-test-rpm:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "amazonlinux2"
@@ -1961,7 +1963,7 @@ jobs:
   package-test-deb:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "ubuntu1804"
@@ -1972,7 +1974,7 @@ jobs:
   package-build-deb:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "ubuntu1804"
@@ -1982,7 +1984,7 @@ jobs:
   package-build-rpm:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "centos8"
@@ -1992,7 +1994,7 @@ jobs:
   smoke-monitors-tests:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - monitors-tests:
           distribution: "ubuntu1804"
@@ -2004,7 +2006,7 @@ jobs:
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "amazonlinux2"
@@ -2015,7 +2017,7 @@ jobs:
   smoke-rpm-package-py2:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "amazonlinux2"
@@ -2025,7 +2027,7 @@ jobs:
   smoke-deb-package-py3:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "ubuntu1804"
@@ -2035,7 +2037,7 @@ jobs:
   smoke-deb-package-py2:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "ubuntu1804"
@@ -2046,7 +2048,7 @@ jobs:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie
+      - image: cimg/python:3.6
     steps:
       - checkout
       - run:
@@ -2182,7 +2184,7 @@ jobs:
         # NOTE: fpm and git gem depend on Ruby >= 2.3 so we need to use Debian
         # 10 which ships with Ruby 2.5. Jessie (Debian 8) ships with 2.1 which
         # doesn't work anymore with those gems.
-        - image: circleci/python:3.6-buster
+        - image: cimg/python:3.6
     environment:
       RELEASE_REPO_NAME: "<< pipeline.parameters.release_repo_name >>"
       RELEASE_REPO_BASE_URL: "<< pipeline.parameters.release_repo_base_url >>"
@@ -2239,7 +2241,7 @@ jobs:
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie
+      - image: cimg/python:3.6
     # TODO: Remove resource_class and use default medium one if tests are still
     # failing with large
     resource_class: large
@@ -2252,7 +2254,7 @@ jobs:
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie
+      - image: cimg/python:3.6
     # TODO: Remove resource_class and use default medium one if tests are still
     # failing with large
     resource_class: large
