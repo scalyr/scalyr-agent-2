@@ -332,6 +332,8 @@ commands:
             # Add udatetime which is needed by send_microbenchmarks_data_to_codespeed.py
             pip install --user "udatetime==0.0.16"
 
+            pip install --user "requests"
+
             # Needed for snappy library
             sudo apt-get update
             sudo apt-get install -y libsnappy-dev
