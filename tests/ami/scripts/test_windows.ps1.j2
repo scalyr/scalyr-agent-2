@@ -442,6 +442,7 @@ $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
 if ("$log_output" -match "errno=24") { Throw "Found errno 24 which shouldnt be there" };
 
 # Clean up / remove all the created log files
+Start-Sleep 5
 Remove-Item "C:\\logs\*.log"
 
 # Bumping the limit should work
