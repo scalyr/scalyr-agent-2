@@ -1076,6 +1076,7 @@ def build_base_files(install_type, base_configs="config"):
 
     # Write install_info file inside the 'scalyr_agent' package.
     os.chdir("scalyr_agent")
+
     install_info = get_install_info(install_type)
     write_to_file(install_info, "install_info.json")
     os.chdir("..")
@@ -1156,7 +1157,6 @@ def build_base_files(install_type, base_configs="config"):
     os.chdir("bin")
 
     make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
-    # make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
 
     shutil.copy(
         make_path(agent_source_root, "agent_build/linux/scalyr-agent-2-config"),
@@ -1346,10 +1346,9 @@ def write_to_file(string_value, file_path):
     @param string_value: The value to write to the file.
     @param file_path: The path of the file to write to.
     """
-    dest_fp = open(file_path, "w")
-    dest_fp.write(string_value.rstrip())
-    dest_fp.write(six.ensure_text(os.linesep))
-    dest_fp.close()
+    with open(file_path, "wb") as dest_fp:
+        dest_fp.write(six.ensure_binary(string_value.rstrip()))
+        dest_fp.write(six.ensure_binary(os.linesep))
 
 
 def parse_date(date_str):
@@ -1806,7 +1805,7 @@ def get_build_info():
         if rc != 0:
             packager_email = "unknown"
 
-        __build_info__["packaged_by"] = packager_email
+        __build_info__["packaged_by"] = packager_email.strip()
 
         # Determine the last commit from the log.
         (_, commit_id) = run_command(
@@ -1815,13 +1814,13 @@ def get_build_info():
             command_name="git",
         )
 
-        __build_info__["latest_commit"] = commit_id
+        __build_info__["latest_commit"] = commit_id.strip()
 
         # Include the branch just for safety sake.
         (_, branch) = run_command(
             "git branch | cut -d ' ' -f 2", exit_on_fail=True, command_name="git"
         )
-        __build_info__["from_branch"] = branch
+        __build_info__["from_branch"] = branch.strip()
 
         # Add a timestamp.
 
@@ -1845,6 +1844,17 @@ def get_install_info(install_type):
     )
 
 
+def get_build_info_json():
+    """
+    Get json serialized string with the build info.
+    """
+    return json.dumps(
+        get_build_info(),
+        indent=4,
+        sort_keys=True,
+    )
+
+
 def set_build_info(build_info_file_path):
     """Sets the file to use as the build_info file to include in the package.
 
@@ -1857,9 +1867,8 @@ def set_build_info(build_info_file_path):
     @param build_info_file_path: The path to the build_info file to use.
     """
     global __build_info__
-    fp = open(build_info_file_path, "r")
-    __build_info__ = fp.read()
-    fp.close()
+    with open(build_info_file_path, "r") as fp:
+        __build_info__ = json.load(fp)
 
     return __build_info__
 
@@ -1926,7 +1935,7 @@ if __name__ == "__main__":
     # If we are just suppose to create the build_info, then do it and exit.  We do not bother to check to see
     # if they specified a package.
     if options.build_info_only:
-        write_to_file(get_build_info(), "build_info")
+        write_to_file(get_build_info_json(), "build_info")
         print("Built build_info")
         sys.exit(0)
 

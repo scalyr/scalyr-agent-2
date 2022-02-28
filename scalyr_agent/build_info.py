@@ -72,4 +72,10 @@ def get_build_revision():
     if not build_info:
         return get_build_revision_from_git()
 
-    return build_info.get("latest_commit", "unknown")
+    try:
+        return build_info.get("latest_commit", "unknown")
+    except Exception as e:
+        print(
+            "Failed to retrieve build_info value. Build info content: %s" % (build_info)
+        )
+        raise e
