@@ -482,6 +482,9 @@ class PodInfo(object):
 
         return result
 
+    def __repr__(self):
+        return str(self.__dict__)
+
 
 class Controller(object):
     """
@@ -910,7 +913,6 @@ class PodProcessor(_K8sProcessor):
 
         @return A PodInfo object
         """
-
         result = {}
 
         metadata = obj.get("metadata", {})
@@ -924,6 +926,11 @@ class PodProcessor(_K8sProcessor):
 
         controller = self._get_controller_from_owners(
             k8s, owners, namespace, query_options=query_options
+        )
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Pod %s/%s metadata: %s" % (namespace, pod_name, six.text_type(metadata)),
         )
 
         container_names = []
@@ -944,7 +951,7 @@ class PodProcessor(_K8sProcessor):
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_2,
-            "Annotations: %s" % (six.text_type(annotations)),
+            "Processed annotations: %s" % (six.text_type(annotations)),
         )
 
         # create the PodInfo

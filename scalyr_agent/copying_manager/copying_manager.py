@@ -883,7 +883,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                             "Start removing finished log matchers",
                         )
                         self.__remove_logs_scheduled_for_deletion()
-                        self.__purge_finished_log_matchers()
+                        removed = self.__purge_finished_log_matchers()
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Removed %s finished log matchers" % (removed),
+                        )
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Done removing finished log matchers",
@@ -1075,16 +1079,24 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__lock.release()
 
     def __purge_finished_log_matchers(self):
+        # type: () -> int
         """
         Removes from the list of log matchers any log matchers that are finished
+
+        Returns number of finished matches which have been removed.
         """
         # make a shallow copy for iteration
         matchers = self.__dynamic_matchers.copy()
+
+        removed = 0
 
         for path, m in six.iteritems(matchers):
             if m.is_finished():
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
+                removed += 1
+
+        return removed
 
     @staticmethod
     def _merge_checkpoints(checkpoints_to_merge):  # type: (List[Dict]) -> Dict

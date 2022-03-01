@@ -2207,7 +2207,7 @@ class CRIEnumerator(ContainerEnumerator):
 
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_2,
-                "Found %s containers" % (len(container_info)),
+                "Found %s non-excluded containers" % (len(container_info)),
             )
 
             # process the container info
@@ -2674,6 +2674,11 @@ class ContainerChecker(object):
             # self.__verify_service_account()
 
             if self.__controlled_warmer is not None:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Using ControlledCacheWarmer instance: %s"
+                    % (self.__controlled_warmer),
+                )
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
                 self.__controlled_warmer.start()
 
