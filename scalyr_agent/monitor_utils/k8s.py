@@ -393,9 +393,9 @@ class PodInfo(object):
         namespace="",
         uid="",
         node_name="",
-        labels={},
-        container_names=[],
-        annotations={},
+        labels=None,
+        container_names=None,
+        annotations=None,
         controller=None,
     ):
 
@@ -403,9 +403,9 @@ class PodInfo(object):
         self.namespace = namespace
         self.uid = uid
         self.node_name = node_name
-        self.labels = labels
-        self.container_names = container_names
-        self.annotations = annotations
+        self.labels = labels or {}
+        self.container_names = container_names or []
+        self.annotations = annotations or {}
 
         self.controller = controller  # controller can't change for the life of the object so we don't include it in hash
 
