@@ -50,6 +50,16 @@ Pushing image with username:
 python3 build_package_new.py <build_name> --push --user my-dockerhub-user
 ```
 
+## Using Locally built images with minikube
+
+If you want to use locally built images with minikube, the easiest way to do that is to load
+local Docker image into minikube using ``minikube image load`` command as shown in the example
+below:
+
+```bash
+minikube image load scalyr-k8s-agent:latest
+python build_package_new.py k8s-debian --platforms linux/amd64
+```
 
 ## Supported Images and Architectures
 
