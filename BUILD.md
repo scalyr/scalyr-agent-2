@@ -3,7 +3,7 @@
 To build agent docker image run command:
 
 ```
-python3 build_package_new.py <build_name>
+python3 build_package_new.py <build_name>-{debian,alpine}
 ```
 
 Available builds:
