@@ -1,4 +1,4 @@
-name: Publish Agent Images
+name: Publish Docker Images
 
 on:
   workflow_call:
@@ -27,7 +27,7 @@ concurrency: publish-release
 
 jobs:
   publish-temp-release:
-    name: Publish Docker Image to a temporary tag - ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+    name: Publish temporary tag (${{ matrix.image-type }}, ${{ matrix.image-distro-name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-      - name: Push image using the a temporary tag.
+      - name: Push image using the a temporary tag
         run: |
           # Push result docker image with a special tag "_temp_release".
           # The next job will "re-tag" that image to an appropriate one.
@@ -89,7 +89,7 @@ jobs:
 
   publish-release:
     needs: [ publish-temp-release ]
-    name: Publish Docker Image - ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+    name: Publish Docker Image (${{ matrix.image-type }}, ${{ matrix.image-distro-name }})
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -101,7 +101,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-      - name: Publish real image tags.
+      - name: Publish real image tags
         run: |
           python3 scripts/cicd/publish-docker-images-tags.py \
             --git-ref-name ${{ github.ref_name }} \
