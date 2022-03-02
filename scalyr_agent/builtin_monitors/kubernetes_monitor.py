@@ -2259,10 +2259,14 @@ class CRIEnumerator(ContainerEnumerator):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
+                    # NOTE: CRIEnumerator doesn't utilize ControlledCacheWarmer so it's important
+                    # we use allow_expired=False here otherwise we will always read cached entry
+                    # even if it's stale
                     pod = k8s_cache.pod(
                         pod_namespace,
                         pod_name,
                         current_time,
+                        allow_expired=False,
                         ignore_k8s_api_exception=True,
                     )
                     if pod:
