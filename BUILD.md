@@ -57,8 +57,18 @@ local Docker image into minikube using ``minikube image load`` command as shown 
 below:
 
 ```bash
-minikube image load scalyr-k8s-agent:latest
 python build_package_new.py k8s-debian --platforms linux/amd64
+minikube image load scalyr-k8s-agent:latest
+```
+
+In addition to that, you also need to update ``k8s/no-kustomize/scalyr-agent-2.yaml``  image
+section to look something like this:
+
+```yaml
+...
+        image: scalyr-k8s-agent:latest
+        imagePullPolicy: Never
+...
 ```
 
 ## Supported Images and Architectures
