@@ -2198,7 +2198,7 @@ class CRIEnumerator(ContainerEnumerator):
                     k8s_namespaces_to_include
                 )
             else:
-                global_lob.log(
+                global_log.log(
                     scalyr_logging.DEBUG_LEVEL_2, "Retrieving containers from Kubelet"
                 )
                 container_info = self._get_containers_from_kubelet(
