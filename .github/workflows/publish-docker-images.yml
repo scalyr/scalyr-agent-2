@@ -107,7 +107,8 @@ jobs:
             --git-ref-name ${{ github.ref_name }} \
             --git-ref-type ${{ github.ref_type }} \
             --git-commit-sha ${{ github.sha }} \
-            --user ${{ secrets.DOCKER_HUB_USERNAME }}
+            --user ${{ secrets.DOCKER_HUB_USERNAME }} \
+            --ignore-errors
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
