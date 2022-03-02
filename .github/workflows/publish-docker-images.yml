@@ -27,14 +27,15 @@ concurrency: publish-release
 
 jobs:
   publish-temp-release:
-    name: Publish Docker Image to a temporary tag.
+    name: Publish Docker Image to a temporary tag - ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         image-type: [ "k8s" ]
         #image-type: [ "docker-json", "docker-syslog", "k8s" ]
-        image-distro-name: [ "debian", "alpine" ]
+        image-distro-name: [ "debian" ]
+        #image-distro-name: [ "debian", "alpine" ]
 
     steps:
       - name: Checkout repository
@@ -88,7 +89,7 @@ jobs:
 
   publish-release:
     needs: [ publish-temp-release ]
-    name: Publish Docker Image
+    name: Publish Docker Image - ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
