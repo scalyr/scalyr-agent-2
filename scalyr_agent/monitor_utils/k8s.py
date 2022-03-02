@@ -2336,12 +2336,6 @@ class KubeletApi(object):
         }
         self._session.headers.update(headers)
 
-        # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
-        # easier
-        global_log.info(
-            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s, node_name = %s"
-            % (self._host_ip, self._verify_https, self._ca_file, node_name)
-        )
         self._kubelet_url = self._build_kubelet_url(
             kubelet_url_template, host_ip, node_name
         )
@@ -2349,6 +2343,20 @@ class KubeletApi(object):
             FALLBACK_KUBELET_URL_TEMPLATE, host_ip, node_name
         )
         self._timeout = 20.0
+
+        # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
+        # easier
+        global_log.info(
+            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s, node_name = %s, kubelet_url = %s, fallback_kubelet_url = %s"
+            % (
+                self._host_ip,
+                self._verify_https,
+                self._ca_file,
+                node_name,
+                self._kubelet_url,
+                self._fallback_kubelet_url,
+            )
+        )
 
     @staticmethod
     def _build_kubelet_url(kubelet_url, host_ip, node_name):
