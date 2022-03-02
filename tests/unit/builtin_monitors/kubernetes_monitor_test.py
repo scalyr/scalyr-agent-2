@@ -49,6 +49,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     ContainerChecker,
     _ignore_old_dead_container,
     construct_metrics_container_name,
+    CRIEnumerator,
 )
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
@@ -1164,4 +1165,105 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
                 "metric_value": 2080768,
                 "monitor": None,
             },
+        )
+
+
+class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
+    def test_get_containers_with_caching_and_dynamic_pod_metadata_update(self):
+        """
+        Mocking based test case which verifies that CRIEnumerator._get_containers() correctly
+        handles dynamic pod metadata updates when working with KubernetesCache.
+
+        Keep in mind that this method just exercised the public API of KubernetesCache and assumes
+        KubernetesCache expiration logic is implemented correctly (that's verified by a separate
+        test case for that abstraction).
+        """
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        pod_info_1 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={},
+            container_names=["random-logger"],
+            annotations={"log.config.scalyr.com/attributes.parser": "test-4"},
+            controller=None,
+        )
+        pod_info_2 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={},
+            container_names=["random-logger"],
+            annotations={"log.config.scalyr.com/attributes.parser": "test-5"},
+            controller=None,
+        )
+
+        def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
+            result = [("loggen-58c5486566-fdmzf", "default", "random-logger", "cont-1")]
+            return result
+
+        k8s_cache = mock.Mock()
+        k8s_cache.pod_access_counter = 0
+
+        def mock_k8s_cache_pod(
+            namespace,
+            name,
+            current_time=None,
+            allow_expired=True,
+            query_options=None,
+            ignore_k8s_api_exception=True,
+        ):
+            self.assertFalse(
+                allow_expired,
+                "allow_expired needs to be False for dynamic updates to work correctly",
+            )
+
+            if k8s_cache.pod_access_counter == 0:
+                result = pod_info_1
+            elif k8s_cache.pod_access_counter == 1:
+                result = pod_info_2
+            else:
+                raise AssertionError("Unsupported counter value")
+
+            k8s_cache.pod_access_counter += 1
+            return result
+
+        k8s_cache.pod.side_effect = mock_k8s_cache_pod
+
+        cri = CRIEnumerator(
+            global_config=global_config,
+            agent_pod=mock.Mock,
+            k8s_api_url="mock",
+            query_filesystem=True,
+            node_name="node-1",
+            kubelet_api_host_ip="localhost",
+            kubelet_api_url_template="https://${host_ip}:10250",
+        )
+        cri._get_containers_from_filesystem = mock_get_containers_from_filesystem
+        self.assertEqual(k8s_cache.pod_access_counter, 0)
+
+        result = cri._get_containers(k8s_cache=k8s_cache)
+        self.assertEqual(k8s_cache.pod_access_counter, 1)
+        self.assertEqual(
+            result["cont-1"]["k8s_info"]["pod_info"].annotations,
+            {"log.config.scalyr.com/attributes.parser": "test-4"},
+        )
+
+        self.assertEqual(k8s_cache.pod_access_counter, 1)
+        result = cri._get_containers(k8s_cache=k8s_cache)
+        self.assertEqual(k8s_cache.pod_access_counter, 2)
+        self.assertEqual(
+            result["cont-1"]["k8s_info"]["pod_info"].annotations,
+            {"log.config.scalyr.com/attributes.parser": "test-5"},
         )
