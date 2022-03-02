@@ -1768,10 +1768,6 @@ class KubernetesApi(object):
 
         self._http_host = k8s_api_url
 
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host
-        )
-
         self.query_timeout = query_timeout
 
         self._session = None
@@ -1817,6 +1813,14 @@ class KubernetesApi(object):
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
+
+        global_log.info(
+            "Kubernetes API host = %s, url = %s, ca_file = %s, verify_https = %s",
+            self._http_host,
+            k8s_api_url,
+            ca_file,
+            bool(self._verify_connection()),
+        )
 
     @property
     def default_query_options(self):
