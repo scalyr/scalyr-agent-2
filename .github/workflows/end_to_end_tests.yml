@@ -26,6 +26,142 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
+  k8s_kubernetes_monitor_tests:
+    name: Kubernetes Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s_version:
+          - { "version": "v1.17.2", "driver": "", "runtime": "docker" }
+          - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
+          - { "version": "v1.22.2", "driver": "", "runtime": "docker" }
+          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.8
+        uses: actions/setup-python@v2
+        id: setup-python
+        with:
+          python-version: 3.8
+
+      - name: Install Scalyr tool
+        run: |
+          curl https://raw.githubusercontent.com/scalyr/scalyr-tool/master/scalyr > scalyr
+          chmod +x scalyr
+          sudo mv scalyr /usr/local/bin
+
+      - name: Setup minikube k8s cluster
+        uses: ./.github/actions/setup-minikube-cluster/
+        with:
+          k8s_version: "${{ matrix.k8s_version.version }}"
+          minikube_driver: "${{ matrix.k8s_version.driver }}"
+          container_runtime: "${{ matrix.k8s_version.runtime }}"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build Agent k8s Docker Image
+        run: |
+          python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
+          docker image ls
+
+          # Needed for containerd runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
+            minikube image load scalyr-k8s-agent:local_k8s_image
+          fi
+
+      # Here we build the dummy container which continously prints data to stdout
+      - name: Build Dummy App Docker Image
+        run: |
+          docker build -f docker/Dockerfile.docker_monitor_testing_config -t std-printer scripts/
+          docker image ls
+
+          # Needed for containerd runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
+            minikube image load std-printer:latest
+          fi
+
+      # Create pod for our mock container which agent will ingest
+      - name: Create mock pod
+        run: |
+          kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
+
+          sleep 10
+          kubectl get pods -A
+
+          export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
+          echo "APP_POD_NAME=${APP_POD_NAME}" >> ${GITHUB_ENV}
+          echo "APP_POD_NAME=${APP_POD_NAME}"
+
+          echo ""
+          kubectl logs "${APP_POD_NAME}"
+          echo ""
+
+      - name: Create scalyr-agent-2 daemonset
+        uses: ./.github/actions/install-k8s-agent-daemonset/
+        with:
+          scalyr_server: "agent.scalyr.com"
+          scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
+          scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
+          daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
+
+      - name: Verify data has been ingested
+        timeout-minutes: 5
+        env:
+          # Needed for scalyr-tool
+          scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
+          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+          NODE_NAME: "${{ env.NODE_NAME }}"
+        run: |
+          export RETRY_ATTEMPTS="5"
+          export SLEEP_DELAY="10"
+
+          # Verify agent is running
+          echo "Agent running checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting scalyr agent..."'
+
+          # Verify Kubernetes monitor is running
+          echo "Monitoring running checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "kubernetes_monitor parameters: ignoring namespaces: "'
+          echo ""
+
+          # Verify initial std-printer pod data has been ingested
+
+          # 1. First we want for some data to be ingested using "log.config.scalyr.com/attributes.parser"
+          # annotation set as part of the deployment YAML.
+          # After a while, we change that dynamically using kubectl and verify that this change has
+          # been correctly picked up by the agent.
+          sleep 20
+
+          echo "Initial pod ingested data checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "stdout: line 2"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "stderr: line 2"'
+          echo ""
+
+          kubectl describe pod ${APP_POD_NAME}
+          kubectl annotate --overwrite pods ${APP_POD_NAME} log.config.scalyr.com/attributes.parser="changed"
+          kubectl describe pod ${APP_POD_NAME}
+
+          # Give agent some time to pick up the annotation change (by default we poll every 30 seconds
+          # for pod metadata changes, but we use lower value for the tests)
+          sleep 15
+
+          echo ""
+          echo "Post annotation change data checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="changed" stream="stdout" "stdout: line"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="changed" stream="stderr" "stderr: line"'
+          echo ""
+
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version }}
     runs-on: ubuntu-latest
@@ -33,7 +169,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
+    #if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
 
     strategy:
       fail-fast: false

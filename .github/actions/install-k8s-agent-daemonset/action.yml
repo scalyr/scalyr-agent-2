@@ -50,7 +50,8 @@ runs:
           --from-literal=SCALYR_K8S_CLUSTER_NAME="${{ inputs.scalyr_cluster_name }}" \
           --from-literal=SCALYR_K8S_EVENTS_DISABLE="true" \
           --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="false" \
-          --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}"
+          --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}" \
+          --from-literal=SCALYR_K8S_CACHE_EXPIRY_SECS="5"
 
         # Apply any additional custom resources
         if [ ! -z "${{ inputs.extra_yaml_paths }}" ]; then
@@ -68,7 +69,7 @@ runs:
         kubectl apply -f "${{ inputs.daemonset_yaml_path }}"
 
         # Give it some time to start up
-        sleep 60
+        sleep 40
         kubectl -n scalyr get event
         kubectl -n scalyr get serviceaccount
         kubectl -n scalyr get pods
