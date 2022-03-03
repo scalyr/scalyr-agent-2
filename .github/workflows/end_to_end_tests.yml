@@ -39,9 +39,9 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version:
-          - { "version": "v1.17.2", "driver": "", "runtime": "docker" }
+          - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
-          - { "version": "v1.22.2", "driver": "", "runtime": "docker" }
+          - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
     steps:
@@ -123,7 +123,7 @@ jobs:
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           NODE_NAME: "${{ env.NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="5"
+          export RETRY_ATTEMPTS="8"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -163,7 +163,7 @@ jobs:
           echo ""
 
   k8s_open_metrics_monitor_tests:
-    name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version }}
+    name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -175,9 +175,10 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version:
-          - 'v1.17.2'
-          - 'v1.20.15'
-          - 'v1.22.2'
+          - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
+          - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
+          - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
+          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
@@ -200,13 +201,20 @@ jobs:
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
         with:
-          k8s_version: "${{ matrix.k8s_version }}"
+          k8s_version: "${{ matrix.k8s_version.version }}"
+          minikube_driver: "${{ matrix.k8s_version.driver }}"
+          container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build Agent k8s Docker Image
         run: |
           python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
           docker image ls
+
+          # Needed for containerd runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
+            minikube image load scalyr-k8s-agent:local_k8s_image
+          fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
       - name: Build Test Java App Docker Image
@@ -216,6 +224,11 @@ jobs:
           popd
 
           docker image ls
+
+          # Needed for containerd runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
+            minikube image load java-hello-world:latest
+          fi
 
       # Create mock pods and exporters which will be scrapped by the monitor
       - name: Create mock pods and exporters
@@ -253,7 +266,7 @@ jobs:
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           NODE_NAME: "${{ env.NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="5"
+          export RETRY_ATTEMPTS="8"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
