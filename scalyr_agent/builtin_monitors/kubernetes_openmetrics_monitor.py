@@ -488,6 +488,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         self.__static_monitors_started = False
 
+        self.__previous_running_monitors_count = 0
+
     @property
     def k8s(self):
         if not self._k8s:
@@ -529,12 +531,6 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
 
     def gather_sample(self):
-        self._logger.info(
-            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running",
-            limit_once_per_x_secs=10 * 60,
-            limit_key="k8s-om-mon-info",
-        )
-
         if not self.__static_monitors_started:
             # On first iteration we schedule static global monitors which are not dynamically
             # updated. We intentionally do that here and don't override start() method to avoid
@@ -543,6 +539,24 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             self.__static_monitors_started = True
 
         self.__schedule_dynamic_open_metrics_monitors()
+        self.__log_running_stats()
+
+    def __log_running_stats(self):
+        # We log a message either if the value from the previous run changes or every X minutes
+        if self.__previous_running_monitors_count != len(self.__running_monitors):
+            limit_once_per_x_secs = None
+            limit_key = None
+        else:
+            limit_once_per_x_secs = 10 * 60
+            limit_key = "k8s-om-mon-info"
+
+        self._logger.info(
+            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running",
+            limit_once_per_x_secs=limit_once_per_x_secs,
+            limit_key=limit_key,
+        )
+
+        self.__previous_running_monitors_count = len(self.__running_monitors)
 
     def __get_node_name(self):
         """

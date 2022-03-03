@@ -5,7 +5,7 @@ inputs:
   minikube_version:
     description: "Minikube version to use"
     required: false
-    default: "v1.23.2"
+    default: "v1.25.1"
   k8s_version:
     description: "Kubernetes version to be installed by minikube (if any)"
     required: false

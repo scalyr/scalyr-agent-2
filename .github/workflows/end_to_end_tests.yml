@@ -69,7 +69,7 @@ jobs:
 
       - name: Build Agent k8s Docker Image
         run: |
-          # python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
+          python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
           docker image ls
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -99,50 +99,15 @@ jobs:
           kubectl get pods -A
 
       - name: Create scalyr-agent-2 daemonset
-        run: |
-          export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
-          echo "NODE_NAME=${NODE_NAME}" >> ${GITHUB_ENV}
-          echo "Using node name: ${NODE_NAME}"
-
-          export K8S_CLUSTER_NAME="ci-agent-e2e-k8s-om-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME}" >> ${GITHUB_ENV}
-          echo "Using cluster name: ${K8S_CLUSTER_NAME}"
-
-          # Create namespace
-          kubectl create namespace scalyr
-
-          # Create service account
-          kubectl apply -f k8s/no-kustomize/scalyr-service-account.yaml
-
-          # Define api key
-          kubectl create secret generic scalyr-api-key --namespace scalyr --from-literal=scalyr-api-key="${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
-
-          # Create configmap
-          kubectl create configmap --namespace scalyr scalyr-config \
-            --from-literal=SCALYR_K8S_CLUSTER_NAME="${K8S_CLUSTER_NAME}" \
-            --from-literal=SCALYR_K8S_EVENTS_DISABLE="true" \
-            --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="false" \
-            --from-literal=SCALYR_SERVER="agent.scalyr.com"
-
-          # Create extra-d configmap
+        uses: ./.github/actions/install-k8s-agent-daemonset/
+        with:
+          scalyr_server: "agent.scalyr.com"
+          scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
+          scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
+          daemonset_yaml_path: "tests/e2e/k8s_om_monitor/scalyr-agent-2-daemonset.yaml"
           # Monitor is not enabled by default yet since it's still in preview and testing phase so
           # we expliticly enable it here
-          kubectl apply -f tests/e2e/k8s_om_monitor/scalyr-agent-extra-config-configmap.yaml
-
-          # Create daemonset
-          kubectl apply -f tests/e2e/k8s_om_monitor/scalyr-agent-2-daemonset.yaml
-
-          sleep 60
-          kubectl -n scalyr get event
-          kubectl -n scalyr get serviceaccount
-          kubectl -n scalyr get pods
-
-          export SCALYR_AGENT_POD_NAME=$(kubectl get pod --namespace=scalyr --selector=app=scalyr-agent-2 -o jsonpath="{.items[0].metadata.name}")
-          echo "SCALYR_AGENT_POD_NAME=${SCALYR_AGENT_POD_NAME}" >> ${GITHUB_ENV}
-          echo "Using scalyr agent pod name: ${SCALYR_AGENT_POD_NAME}"
-
-          echo "Agent pod logs (${SCALYR_AGENT_POD_NAME})"
-          kubectl logs -n scalyr "${SCALYR_AGENT_POD_NAME}"
+          extra_yaml_paths: "tests/e2e/k8s_om_monitor/scalyr-agent-extra-config-configmap.yaml"
 
       - name: Verify data has been ingested
         timeout-minutes: 8
@@ -179,8 +144,8 @@ jobs:
           echo "Node exporter metrics monitor checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "process_max_fds "'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "process_open_fds "'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "node_vmstat_pswpin 0 node=\"'${NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "node_vmstat_pswpout 0 node=\"'${NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "node_vmstat_pswpin "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-node-exporter-" "node_vmstat_pswpout "'
 
           # 3. Verify kube state event metrics
           echo "Kube state events metrics monitor checks"
