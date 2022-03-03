@@ -41,6 +41,7 @@ jobs:
         k8s_version:
           - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
+          - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
@@ -177,6 +178,7 @@ jobs:
         k8s_version:
           - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
+          - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
