@@ -89,7 +89,7 @@ jobs:
 
   publish-release:
     needs: [ publish-temp-release ]
-    name: Publish Docker Image (${{ matrix.image-type }}, ${{ matrix.image-distro-name }})
+    name: Publish Docker Images
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
