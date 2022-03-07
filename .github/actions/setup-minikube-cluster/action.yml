@@ -73,5 +73,3 @@ runs:
             echo "kubectl describe node"
             echo ""
             kubectl describe node ${NODE_NAME}
-
-            sleep 2

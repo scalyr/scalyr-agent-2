@@ -265,7 +265,7 @@ jobs:
       # Create mock pods and exporters which will be scrapped by the monitor
       - name: Create mock pods and exporters
         run: |
-          kubectl create namespace 
+          kubectl create namespace monitoring
 
           # 1. node exporter pod
           kubectl apply -f tests/e2e/k8s_om_monitor/node_exporter.yaml

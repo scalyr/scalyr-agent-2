@@ -19,7 +19,6 @@ on: [push]
 # For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
   test-images:
-    if: ${{ github.ref == 'refs/heads/false' }}
     runs-on: ubuntu-latest
 
     strategy:
