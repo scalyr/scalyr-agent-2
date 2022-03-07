@@ -12,6 +12,18 @@ inputs:
   scalyr_cluster_name:
     description: "Cluster name to use."
     required: true
+  scalyr_verify_api_queries:
+    description: "Set to true to verify HTTP requests to Kubernetes API."
+    required: false
+    default: "false"
+  scalyr_verify_k8s_queries:
+    description: "Set to true to verify HTTP requests to Kubelet API."
+    required: false
+    default: "false"
+  scalyr_k8s_events_disable:
+    description: "Set to true to disable Kubernetes events monitor."
+    required: false
+    default: "true"
   daemonset_yaml_path:
     description: "Which Kubernetes resource YAML file with scalyr agent daemonset definition to use."
     required: true
@@ -48,9 +60,12 @@ runs:
         # Create configmap
         kubectl create configmap --namespace scalyr scalyr-config \
           --from-literal=SCALYR_K8S_CLUSTER_NAME="${{ inputs.scalyr_cluster_name }}" \
-          --from-literal=SCALYR_K8S_EVENTS_DISABLE="true" \
-          --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="false" \
+          --from-literal=SCALYR_K8S_EVENTS_DISABLE="${{ inputs.scalyr_k8s_events_disable }}" \
+          --from-literal=SCALYR_K8S_VERIFY_API_QUERIES="${{ inputs.scalyr_verify_api_queries }}" \
+          --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="${{ inputs.scalyr_verify_k8s_queries }}" \
           --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}" \
+          --from-literal=SCALYR_K8S_LEADER_CHECK_INTERVAL="5" \
+          --from-literal=SCALYR_K8S_IGNORE_MASTER="false" \
           --from-literal=SCALYR_K8S_CACHE_EXPIRY_SECS="5"
 
         # Apply any additional custom resources

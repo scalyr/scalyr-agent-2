@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - k8s_om_monitor_e2e_tests
   pull_request:
     branches:
       - master
@@ -26,8 +25,9 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
+  # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
-    name: Kubernetes Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
+    name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -43,6 +43,7 @@ jobs:
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
           - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
+          # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
     steps:
@@ -71,6 +72,8 @@ jobs:
           container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
+      # TODO: Build image as a first job in the workflow and then re-use that image for other jobs
+      # to speed up the build and reduce number of redundant builds.
       - name: Build Agent k8s Docker Image
         run: |
           python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
@@ -81,7 +84,7 @@ jobs:
             minikube image load scalyr-k8s-agent:local_k8s_image
           fi
 
-      # Here we build the dummy container which continously prints data to stdout
+      # Here we build the dummy container which continously prints data to stdout and stderr
       - name: Build Dummy App Docker Image
         run: |
           docker build -f docker/Dockerfile.docker_monitor_testing_config -t std-printer scripts/
@@ -92,7 +95,7 @@ jobs:
             minikube image load std-printer:latest
           fi
 
-      # Create pod for our mock container which agent will ingest
+      # Create pod for our mock std printer container which logs will be ingested by the agent
       - name: Create mock pod
         run: |
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
@@ -114,6 +117,7 @@ jobs:
           scalyr_server: "agent.scalyr.com"
           scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
+          scalyr_k8s_events_disable: "false"
           daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Verify data has been ingested
@@ -132,8 +136,14 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting scalyr agent..."'
 
           # Verify Kubernetes monitor is running
-          echo "Monitoring running checks"
+          echo "Kubernetes Monitor running checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "kubernetes_monitor parameters: ignoring namespaces: "'
+          echo ""
+
+          # Verify Kubernetes events monitor is running
+          echo "Kubernetes events monitor running checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting monitor kubernetes_events_monitor"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Acting as Kubernetes event leader"'
           echo ""
 
           # Verify initial std-printer pod data has been ingested
@@ -163,6 +173,25 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="changed" stream="stderr" "stderr: line"'
           echo ""
 
+          # Verify Kubernetes Events Monitor events are ingested
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "\"kind\":\"Event\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "\"kind\":\"Pod\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "involvedObject"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "NodeReady"'
+
+      - name: Notify Slack on Failure
+        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
+        # requests and that's why we need this special conditional and check for github.head_ref in
+        # case of PRs
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#cloud-tech'
+
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-latest
@@ -170,7 +199,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    #if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
 
     strategy:
       fail-fast: false
@@ -180,6 +209,7 @@ jobs:
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
           - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
+          # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
 
     steps:
@@ -235,7 +265,7 @@ jobs:
       # Create mock pods and exporters which will be scrapped by the monitor
       - name: Create mock pods and exporters
         run: |
-          kubectl create namespace monitoring
+          kubectl create namespace 
 
           # 1. node exporter pod
           kubectl apply -f tests/e2e/k8s_om_monitor/node_exporter.yaml
@@ -276,7 +306,7 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting scalyr agent..."'
 
           # Verify monitor is running
-          echo "Monitoring running checks"
+          echo "Monitor running checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Found 3 URL(s) to scrape for node"'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "There are currently 3 dynamic and 2 static open metrics monitors running"'
           echo ""
