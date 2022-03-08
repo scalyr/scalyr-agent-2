@@ -1414,12 +1414,12 @@ class CopyingManager(StoppableThread, LogWatcher):
         the run() method before consolidating the checkpoints and doing any other work).
         """
         checkpoints = checkpoints or {}
-        ignore_checkpoints_on_startup_path_glob = (
-            self.__config.ignore_checkpoints_on_startup_path_glob
+        ignore_checkpoints_on_startup_path_globs = (
+            self.__config.ignore_checkpoints_on_startup_path_globs
         )
 
         def path_matches_any_glob(file_path):
-            for glob in ignore_checkpoints_on_startup_path_glob:
+            for glob in ignore_checkpoints_on_startup_path_globs:
                 if fnmatch.fnmatch(file_path, glob):
                     return True
 
@@ -1432,7 +1432,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
                     'Ignoring startup checkpoint data for log file "%s" due to ignore_checkpoints_on_startup_path_globs config option value (%s). Will ingest this file from the beginning.'
-                    % (file_path, ignore_checkpoints_on_startup_path_glob),
+                    % (file_path, ignore_checkpoints_on_startup_path_globs),
                 )
                 del checkpoints[file_path]
 
