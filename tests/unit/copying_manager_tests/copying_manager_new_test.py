@@ -586,6 +586,7 @@ class CopyingMangerUnitTest(ScalyrTestCase):
         manager = TestableCopyingManager(env_builder.config, [])
 
         # 1. Empty checkpoints dict
+        # pylint: disable=no-member
         result = manager._CopyingManager__process_checkpoints_on_startup({})
         self.assertEqual(result, {})
 
@@ -595,6 +596,7 @@ class CopyingMangerUnitTest(ScalyrTestCase):
             "/var/log/containers/container2.log": {},
             "/var/log/containers/container3.log": {},
         }
+        # pylint: disable=no-member
         result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
         self.assertEqual(result, checkpoints)
 
@@ -610,6 +612,7 @@ class CopyingMangerUnitTest(ScalyrTestCase):
             "/var/log/containers/container2.log": {},
             "/var/log/containers/container3.log": {},
         }
+        # pylint: disable=no-member
         result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
         self.assertEqual(result, expected_checkpoints)
 
@@ -629,5 +632,6 @@ class CopyingMangerUnitTest(ScalyrTestCase):
             "/var/log/containers/container2.log": {},
             "/var/log/containers/container3.log": {},
         }
+        # pylint: disable=no-member
         result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
         self.assertEqual(result, expected_checkpoints)
