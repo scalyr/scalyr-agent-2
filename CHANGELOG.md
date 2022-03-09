@@ -1,14 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.29 "Dryria" - Mar 10, 2022
+## 2.1.29 "TBD" - Mar 23, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 10, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 23, 2022 23:04 -0800
 --->
 
 Bug fixes:
 * Kubernetes monitor now correctly dynamically detects pod metadata changes (e.g. annotations) when using containerd runtime. Previously metadata updates were not detected dynamically which meant agent needed to be restarted to pick up any metadata changes (such as Scalyr related annotations).
+
+Docker images:
+* Kubernetes Docker image (``scalyr-k8s-agent``) has been updated to ignore checkpoint data for ephemeral log files (anything matching ``/var/log/scalyr-agent-2/*.log``) on agent start up. Those log files are ephemeral (aka only available during container runtime) which means we don't want to re-use checkpoints for those log files across pod restarts (recreations). Previously, those checkpoints were preserved across restarts which meant that on subsequent pod restarts some of the early internal agent log messages produced by the agent during start up phase were not ingested.
 
 ## 2.1.28 "Dryria" - Feb 23, 2022
 

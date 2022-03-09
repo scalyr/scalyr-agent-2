@@ -36,6 +36,7 @@ import pytest
 
 from scalyr_agent import scalyr_logging
 
+from scalyr_agent.test_base import ScalyrTestCase
 from tests.unit.copying_manager_tests.common import (
     CopyingManagerCommonTest,
     TestableCopyingManager,
@@ -569,3 +570,68 @@ class TestBasic(CopyingManagerTest):
 
         assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
+
+
+class CopyingMangerUnitTest(ScalyrTestCase):
+    def test_process_checkpoints_on_startup(self):
+        config_data = {
+            "ignore_checkpoints_on_startup_path_globs": [
+                "/var/log/scalyr-agent-2/*.log"
+            ],
+        }
+
+        env_builder = TestEnvironBuilder()
+        env_builder.init_agent_dirs()
+        env_builder.init_config(config_data=config_data)
+        manager = TestableCopyingManager(env_builder.config, [])
+
+        # 1. Empty checkpoints dict
+        # pylint: disable=no-member
+        result = manager._CopyingManager__process_checkpoints_on_startup({})
+        self.assertEqual(result, {})
+
+        # 2. No matching checkpoints
+        checkpoints = {
+            "/var/log/containers/container1.log": {},
+            "/var/log/containers/container2.log": {},
+            "/var/log/containers/container3.log": {},
+        }
+        # pylint: disable=no-member
+        result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
+        self.assertEqual(result, checkpoints)
+
+        # 3. Single matching checkpoint
+        checkpoints = {
+            "/var/log/containers/container1.log": {},
+            "/var/log/scalyr-agent-2/agent.log": {},
+            "/var/log/containers/container2.log": {},
+            "/var/log/containers/container3.log": {},
+        }
+        expected_checkpoints = {
+            "/var/log/containers/container1.log": {},
+            "/var/log/containers/container2.log": {},
+            "/var/log/containers/container3.log": {},
+        }
+        # pylint: disable=no-member
+        result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
+        self.assertEqual(result, expected_checkpoints)
+
+        # 4. Multiple matching checkpoints
+        checkpoints = {
+            "/var/log/containers/container1.log": {},
+            "/var/log/scalyr-agent-2/agent.log": {},
+            "/var/log/scalyr-agent-2/agent_debug.log": {},
+            "/var/log/scalyr-agent-2/cpu.profile": {},
+            "/var/log/containers/container2.log": {},
+            "/var/log/containers/container3.log": {},
+            "/var/log/scalyr-agent-2/linux_system_metrics.log": {},
+        }
+        expected_checkpoints = {
+            "/var/log/containers/container1.log": {},
+            "/var/log/scalyr-agent-2/cpu.profile": {},
+            "/var/log/containers/container2.log": {},
+            "/var/log/containers/container3.log": {},
+        }
+        # pylint: disable=no-member
+        result = manager._CopyingManager__process_checkpoints_on_startup(checkpoints)
+        self.assertEqual(result, expected_checkpoints)

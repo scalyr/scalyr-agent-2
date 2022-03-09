@@ -1605,6 +1605,31 @@ class Configuration(object):
         return self.__get_config().get_int("full_checkpoint_interval_in_seconds")
 
     @property
+    def ignore_checkpoints_on_startup_path_globs(self):
+        """
+        Returns the configuration value for 'ignore_checkpoints_on_startup_path_globs'.
+
+        This config option allows user to specify a list of path globs for file paths which
+        checkpoint data is ignored when reading checkpoints state on agent startup.
+
+        This comes handy in situations where checkpoint file is persisted across runs (e.g. in a
+        default Kubernetes deployment where we want to persist checkpoints for actual container
+        logs which are stored on the host and are persisted across pod restarts to avoid duplicate
+        data on restart), but not all the files which are referenced in the checkpoints file as
+        also persisted across restarts.
+
+        An example of such log files are agent log files which are ephemeral to the container and
+        stored in /var/log/scalyr-agent-2/*.log.
+
+        We don't want to re-use previous checkpoints for those files on agent restart (new pod
+        creation) since they are invalid and refer to old log files from a previous container so
+        we simply ignore those are ingest those logs from the begining.
+        """
+        return self.__get_config().get_json_array(
+            "ignore_checkpoints_on_startup_path_globs"
+        )
+
+    @property
     def minimum_scan_interval(self):
         """Returns the configuration value for 'minimum_scan_interval'."""
         return self.__get_config().get_int(
@@ -2200,6 +2225,16 @@ class Configuration(object):
             60,
             description,
             apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "ignore_checkpoints_on_startup_path_globs",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
             env_aware=True,
         )
 

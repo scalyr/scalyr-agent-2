@@ -25,6 +25,7 @@ import time
 import operator
 import signal
 import errno
+import fnmatch
 
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
@@ -781,6 +782,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # prepare and read checkpoints.
                 # read all checkpoints from the manager's previous run and combine them into one mater file.
                 checkpoints = self.__find_and_read_checkpoints(warn_on_stale=True)
+                checkpoints = self.__process_checkpoints_on_startup(checkpoints)
+
                 if checkpoints:
                     self.__consolidate_checkpoints(checkpoints)
                 else:
@@ -1412,6 +1415,40 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__config.agent_data_path,
             CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
+
+    def __process_checkpoints_on_startup(self, checkpoints):
+        # type: (dict) -> dict
+        """
+        Process checkpoints on startup and ignore any entries which should be ignored based on the
+        "ignore_checkpoints_on_startup_path_globs" config option value.
+
+        NOTE: This method should only be called once on startup before doing any other work (aka in
+        the run() method before consolidating the checkpoints and doing any other work).
+        """
+        checkpoints = checkpoints or {}
+        ignore_checkpoints_on_startup_path_globs = (
+            self.__config.ignore_checkpoints_on_startup_path_globs
+        )
+
+        def path_matches_any_glob(file_path):
+            for glob in ignore_checkpoints_on_startup_path_globs:
+                if fnmatch.fnmatch(file_path, glob):
+                    return True
+
+            return False
+
+        checkpoint_file_paths = list(checkpoints.keys())
+
+        for file_path in checkpoint_file_paths:
+            if path_matches_any_glob(file_path=file_path):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    'Ignoring startup checkpoint data for log file "%s" due to ignore_checkpoints_on_startup_path_globs config option value (%s). Will ingest this file from the beginning.'
+                    % (file_path, ignore_checkpoints_on_startup_path_globs),
+                )
+                del checkpoints[file_path]
+
+        return checkpoints
 
     def __consolidate_checkpoints(self, checkpoints):
         # type: (Dict) -> None
