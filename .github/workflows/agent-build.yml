@@ -97,13 +97,13 @@ jobs:
           channel: '#cloud-tech'
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/k8s_additional_logging' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
     needs:
       - test-images
 
-    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@k8s_additional_logging
+    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
-      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
-      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
