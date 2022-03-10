@@ -3,7 +3,7 @@
 To build agent docker image run command:
 
 ```
-python3 build_package_new.py <build_name>
+python3 build_package_new.py <build_name>-{debian,alpine} [--tag <tag name>] [--push]
 ```
 
 Available builds:
@@ -50,6 +50,26 @@ Pushing image with username:
 python3 build_package_new.py <build_name> --push --user my-dockerhub-user
 ```
 
+## Using Locally built images with minikube
+
+If you want to use locally built images with minikube, the easiest way to do that is to load
+local Docker image into minikube using ``minikube image load`` command as shown in the example
+below:
+
+```bash
+python build_package_new.py k8s-debian --tag local-image --platforms linux/amd64
+minikube image load scalyr-k8s-agent:local-image
+```
+
+In addition to that, you also need to update ``k8s/no-kustomize/scalyr-agent-2.yaml``  image
+section to look something like this:
+
+```yaml
+...
+        image: scalyr-k8s-agent:local-image
+        imagePullPolicy: Never
+...
+```
 
 ## Supported Images and Architectures
 

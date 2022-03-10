@@ -54,10 +54,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: scalyr-config
-          image: scalyr/scalyr-k8s-agent:2.1.27
-          #image: scalyr-k8s-agent:local_k8s_image
-          #imagePullPolicy: Never
-          imagePullPolicy: Always
+          image: scalyr-k8s-agent:local_k8s_image
+          imagePullPolicy: Never
           name: scalyr-agent
           resources:
             limits:

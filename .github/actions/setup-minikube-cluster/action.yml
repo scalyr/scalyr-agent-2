@@ -5,11 +5,19 @@ inputs:
   minikube_version:
     description: "Minikube version to use"
     required: false
-    default: "v1.23.2"
+    default: "v1.25.1"
   k8s_version:
     description: "Kubernetes version to be installed by minikube (if any)"
     required: false
     default: ""
+  minikube_driver:
+    description: "Minikube driver to use"
+    required: false
+    default: ""
+  container_runtime:
+    description: "Container runtime to use"
+    required: false
+    default: "docker"
   github_token:
     description: "Github token to use for communication with Github API to avoid rate limits"
     required: true
@@ -25,11 +33,13 @@ runs:
       with:
         if: ${{ inputs.k8s_version != '' }}
         step: |
-          uses: manusa/actions-setup-minikube@3cce81c968cabc530141d5620b7d9942a2907df5 # v2.4.2
+          uses: manusa/actions-setup-minikube@f6ceea1a32df47f602b1345bd8ad7da7c5824cbf # v2.4.3
           with:
             minikube version: '${{ inputs.minikube_version }}'
             kubernetes version: '${{ inputs.k8s_version }}'
             github token: '${{ inputs.github_token }}'
+            driver: '${{ inputs.minikube_driver }}'
+            start args: '--container-runtime=${{ inputs.container_runtime }}'
 
     - name: Print minikube environment info
       id: print-k8s-cluster-info
@@ -39,11 +49,27 @@ runs:
         step: |
           shell: bash
           run: |
-            # Workaround for occasional DNS issues
-            # kubectl -n kube-system rollout restart deployment coredns
+            echo "kubectl version"
             kubectl version
+            echo ""
+            echo "minikube addions"
+            echo ""
             minikube addons list
+            echo ""
+            echo "kubectl get nodes"
+            echo ""
             kubectl get nodes
+            echo ""
+            echo "kubectl cluster-info"
+            echo ""
             kubectl cluster-info
+            echo ""
+            echo "kubectl get pods -A"
+            echo ""
             kubectl get pods -A
-            sleep 5
+
+            export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
+            echo ""
+            echo "kubectl describe node"
+            echo ""
+            kubectl describe node ${NODE_NAME}
