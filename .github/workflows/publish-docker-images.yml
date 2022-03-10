@@ -32,10 +32,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "k8s" ]
-        #image-type: [ "docker-json", "docker-syslog", "k8s" ]
-        image-distro-name: [ "debian" ]
-        #image-distro-name: [ "debian", "alpine" ]
+        image-type: [ "docker-json", "docker-syslog", "k8s" ]
+        image-distro-name: [ "debian", "alpine" ]
 
     steps:
       - name: Checkout repository

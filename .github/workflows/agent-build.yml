@@ -24,10 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
-        image-type: [ "k8s" ]
-        #image-distro-name: [ "debian", "alpine" ]
-        image-distro-name: [ "debian" ]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.12" ]
 
     env:
@@ -99,13 +97,13 @@ jobs:
           channel: '#cloud-tech'
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/k8s_checkpoints_ephemeral_files_fix' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
     needs:
       - test-images
 
-    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@k8s_checkpoints_ephemeral_files_fix
+    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
-      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
-      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
