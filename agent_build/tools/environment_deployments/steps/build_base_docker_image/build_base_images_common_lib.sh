@@ -79,7 +79,7 @@ trap kill_registry_container EXIT
 kill_registry_container
 
 log "Spin up local registry  in container"
-sh_cs docker run -d --rm -p 5000:5000 -v "$tmp_registry_output_path:/var/lib/registry" --name "$container_name" registry:2
+sh_cs docker run -d --rm -p 5005:5000 -v "$tmp_registry_output_path:/var/lib/registry" --name "$container_name" registry:2
 
 
 buildx_builder_name="agent_image_buildx_builder"
@@ -121,7 +121,7 @@ build_all_base_images() {
     # shellcheck disable=SC2086 # Intended splitting of coverage_arg
     sh_cs docker \
       buildx build \
-      -t "localhost:5000/agent_base_image:$base_image_tag_suffix$tag_suffix" \
+      -t "localhost:5005/agent_base_image:$base_image_tag_suffix$tag_suffix" \
       -f "$SOURCE_ROOT/agent_build/docker/Dockerfile.base" \
       --push \
       --build-arg "BASE_IMAGE_SUFFIX=$base_image_tag_suffix" \

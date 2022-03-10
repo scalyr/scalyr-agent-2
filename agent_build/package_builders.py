@@ -967,7 +967,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             "--build-arg",
             f"BUILDER_NAME={self.name}",
             "--build-arg",
-            f"BASE_IMAGE=localhost:5000/{base_image_name}",
+            f"BASE_IMAGE=localhost:5005/{base_image_name}",
             "--build-arg",
             f"BASE_IMAGE_SUFFIX={base_image_tag_suffix}",
         ]
@@ -1012,7 +1012,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         # Create container with local image registry. And mount existing registry root with base images.
         registry_container = build_in_docker.LocalRegistryContainer(
             name="agent_image_output_registry",
-            registry_port=5000,
+            registry_port=5005,
             registry_data_path=registry_data_path,
         )
 

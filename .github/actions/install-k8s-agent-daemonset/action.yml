@@ -1,0 +1,97 @@
+name: "Install Scalyr Agent"
+description: "Install Scalyr agent on K8s cluster as DaemonSet"
+
+inputs:
+  scalyr_server:
+    description: "Scalyr agent endpoint to use."
+    required: false
+    default: "agent.scalyr.com"
+  scalyr_api_key:
+    description: "Write API key to be used by the agent."
+    required: true
+  scalyr_cluster_name:
+    description: "Cluster name to use."
+    required: true
+  scalyr_verify_api_queries:
+    description: "Set to true to verify HTTP requests to Kubernetes API."
+    required: false
+    default: "false"
+  scalyr_verify_k8s_queries:
+    description: "Set to true to verify HTTP requests to Kubelet API."
+    required: false
+    default: "false"
+  scalyr_k8s_events_disable:
+    description: "Set to true to disable Kubernetes events monitor."
+    required: false
+    default: "true"
+  daemonset_yaml_path:
+    description: "Which Kubernetes resource YAML file with scalyr agent daemonset definition to use."
+    required: true
+    default: "k8s/no-kustomize/scalyr-agent-2.yaml"
+  extra_yaml_paths:
+    description: "Comma delimited list of any additional Kubernetes resource YAML files which should be applied before applying DaemonSet YAML."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create scalyr-agent-2 daemonset
+      id: create-daemonset
+      shell: bash
+      run: |
+        export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
+        echo "NODE_NAME=${NODE_NAME}" >> ${GITHUB_ENV}
+        echo "Using node name: ${NODE_NAME}"
+
+        export K8S_CLUSTER_NAME="ci-agent-e2e-k8s-om-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        echo "K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME}" >> ${GITHUB_ENV}
+        echo "Using cluster name: ${K8S_CLUSTER_NAME}"
+
+        # Create namespace
+        kubectl create namespace scalyr
+
+        # Create service account
+        kubectl apply -f k8s/no-kustomize/scalyr-service-account.yaml
+
+        # Define api key
+        kubectl create secret generic scalyr-api-key --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key }}"
+
+        # Create configmap
+        kubectl create configmap --namespace scalyr scalyr-config \
+          --from-literal=SCALYR_K8S_CLUSTER_NAME="${{ inputs.scalyr_cluster_name }}" \
+          --from-literal=SCALYR_K8S_EVENTS_DISABLE="${{ inputs.scalyr_k8s_events_disable }}" \
+          --from-literal=SCALYR_K8S_VERIFY_API_QUERIES="${{ inputs.scalyr_verify_api_queries }}" \
+          --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="${{ inputs.scalyr_verify_k8s_queries }}" \
+          --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}" \
+          --from-literal=SCALYR_K8S_LEADER_CHECK_INTERVAL="5" \
+          --from-literal=SCALYR_K8S_IGNORE_MASTER="false" \
+          --from-literal=SCALYR_K8S_CACHE_EXPIRY_SECS="5"
+
+        # Apply any additional custom resources
+        if [ ! -z "${{ inputs.extra_yaml_paths }}" ]; then
+          echo "Applying additional custom YAML resources"
+
+          IFS=', ' read -r -a EXTRA_YAML_FILE_PATHS <<< "${{ inputs.extra_yaml_paths }}"
+
+          for yaml_path in "${EXTRA_YAML_FILE_PATHS[@]}"; do
+            echo "Applying: ${yaml_path}"
+            kubectl apply -f "${yaml_path}"
+          done
+        fi
+
+        # Create daemonset
+        kubectl apply -f "${{ inputs.daemonset_yaml_path }}"
+
+        # Give it some time to start up
+        sleep 60
+        kubectl -n scalyr get event
+        kubectl -n scalyr get serviceaccount
+        kubectl -n scalyr get pods
+
+        export SCALYR_AGENT_POD_NAME=$(kubectl get pod --namespace=scalyr --selector=app=scalyr-agent-2 -o jsonpath="{.items[0].metadata.name}")
+        echo "SCALYR_AGENT_POD_NAME=${SCALYR_AGENT_POD_NAME}" >> ${GITHUB_ENV}
+        echo "Using scalyr agent pod name: ${SCALYR_AGENT_POD_NAME}"
+
+        echo "Agent pod logs (${SCALYR_AGENT_POD_NAME})"
+        kubectl logs -n scalyr "${SCALYR_AGENT_POD_NAME}"

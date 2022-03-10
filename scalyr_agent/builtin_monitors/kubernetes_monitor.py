@@ -2190,13 +2190,25 @@ class CRIEnumerator(ContainerEnumerator):
         try:
             # see if we should query the container list from the filesystem or the kubelet API
             if self._query_filesystem:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Retrieving containers from filesystem",
+                )
                 container_info = self._get_containers_from_filesystem(
                     k8s_namespaces_to_include
                 )
             else:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2, "Retrieving containers from Kubelet"
+                )
                 container_info = self._get_containers_from_kubelet(
                     k8s_namespaces_to_include
                 )
+
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_2,
+                "Found %s non-excluded containers" % (len(container_info)),
+            )
 
             # process the container info
             for pod_name, pod_namespace, cname, cid in container_info:
@@ -2247,10 +2259,14 @@ class CRIEnumerator(ContainerEnumerator):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
+                    # NOTE: CRIEnumerator doesn't utilize ControlledCacheWarmer so it's important
+                    # we use allow_expired=False here otherwise we will always read cached entry
+                    # even if it's stale
                     pod = k8s_cache.pod(
                         pod_namespace,
                         pod_name,
                         current_time,
+                        allow_expired=False,
                         ignore_k8s_api_exception=True,
                     )
                     if pod:
@@ -2291,6 +2307,10 @@ class CRIEnumerator(ContainerEnumerator):
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Found non-excluded container: %s" % (str(result[cid])),
+                )
         except Exception as e:
             global_log.error(
                 "Error querying containers %s - %s"
@@ -2658,6 +2678,11 @@ class ContainerChecker(object):
             # self.__verify_service_account()
 
             if self.__controlled_warmer is not None:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Using ControlledCacheWarmer instance: %s"
+                    % (self.__controlled_warmer),
+                )
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
                 self.__controlled_warmer.start()
 
@@ -2917,15 +2942,20 @@ class ContainerChecker(object):
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
-                            pass
-                            # Don't log any warnings here for now
-                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                            # pod_namespace = info["k8s_info"].get(
-                            #     "pod_namespace", "invalid_namespace"
-                            # )
-                            # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
-                            #                      limit_once_per_x_secs=300,
-                            #                      limit_key='check-container-pod-info-%s' % cid)
+                            # For now this message is only logged under debug and not warning
+                            pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            pod_namespace = info["k8s_info"].get(
+                                "pod_namespace", "invalid_namespace"
+                            )
+                            # NOTE(Tomaz): To avoid logger key cache from growing very large we
+                            # should likely periodically remove old entries.
+                            self._logger.log(
+                                scalyr_logging.DEBUG_LEVEL_2,
+                                "No pod info for container %s.  pod: '%s/%s'"
+                                % (_get_short_cid(cid), pod_namespace, pod_name),
+                                limit_once_per_x_secs=300,
+                                limit_key="check-container-pod-info-%s" % cid,
+                            )
 
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
@@ -2987,6 +3017,11 @@ class ContainerChecker(object):
                             self.__log_watcher.update_log_config(
                                 self.__module.module_name, new_config
                             )
+                else:
+                    self._logger.log(
+                        scalyr_logging.DEBUG_LEVEL_2,
+                        "log watcher not set, can't update log config for changed containers",
+                    )
             except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
@@ -4343,6 +4378,7 @@ cluster.
         time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
+            self._logger.debug("Starting ContainerChecker")
             self.__container_checker.start()
 
         k8s_cache = self.__get_k8s_cache()

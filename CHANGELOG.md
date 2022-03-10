@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.29 "Dryria" - Mar 10, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 10, 2022 23:04 -0800
+--->
+
+Bug fixes:
+* Kubernetes monitor now correctly dynamically detects pod metadata changes (e.g. annotations) when using containerd runtime. Previously metadata updates were not detected dynamically which meant agent needed to be restarted to pick up any metadata changes (such as Scalyr related annotations).
+
 ## 2.1.28 "Dryria" - Feb 23, 2022
 
 <!---

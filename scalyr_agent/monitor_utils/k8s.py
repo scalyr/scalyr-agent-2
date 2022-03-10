@@ -393,9 +393,9 @@ class PodInfo(object):
         namespace="",
         uid="",
         node_name="",
-        labels={},
-        container_names=[],
-        annotations={},
+        labels=None,
+        container_names=None,
+        annotations=None,
         controller=None,
     ):
 
@@ -403,9 +403,9 @@ class PodInfo(object):
         self.namespace = namespace
         self.uid = uid
         self.node_name = node_name
-        self.labels = labels
-        self.container_names = container_names
-        self.annotations = annotations
+        self.labels = labels or {}
+        self.container_names = container_names or []
+        self.annotations = annotations or {}
 
         self.controller = controller  # controller can't change for the life of the object so we don't include it in hash
 
@@ -481,6 +481,9 @@ class PodInfo(object):
             result = exclude_status(self.annotations[container_name], result)
 
         return result
+
+    def __repr__(self):
+        return str(self.__dict__)
 
 
 class Controller(object):
@@ -763,7 +766,13 @@ class _K8sCache(object):
         if result:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_2,
-                "cache hit for %s %s/%s" % (kind, namespace, name),
+                "cache hit for %s %s/%s (allow_expired=%s)"
+                % (kind, namespace, name, allow_expired),
+            )
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_2,
+                "cache value for %s %s/%s: %s (allow_expired=%s)"
+                % (kind, namespace, name, result, allow_expired),
             )
             return result
 
@@ -904,7 +913,6 @@ class PodProcessor(_K8sProcessor):
 
         @return A PodInfo object
         """
-
         result = {}
 
         metadata = obj.get("metadata", {})
@@ -918,6 +926,11 @@ class PodProcessor(_K8sProcessor):
 
         controller = self._get_controller_from_owners(
             k8s, owners, namespace, query_options=query_options
+        )
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Pod %s/%s metadata: %s" % (namespace, pod_name, six.text_type(metadata)),
         )
 
         container_names = []
@@ -938,7 +951,7 @@ class PodProcessor(_K8sProcessor):
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_2,
-            "Annotations: %s" % (six.text_type(annotations)),
+            "Processed annotations: %s" % (six.text_type(annotations)),
         )
 
         # create the PodInfo
@@ -1755,10 +1768,6 @@ class KubernetesApi(object):
 
         self._http_host = k8s_api_url
 
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host
-        )
-
         self.query_timeout = query_timeout
 
         self._session = None
@@ -1804,6 +1813,14 @@ class KubernetesApi(object):
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
+
+        global_log.info(
+            "Kubernetes API host = %s, url = %s, ca_file = %s, verify_https = %s",
+            self._http_host,
+            k8s_api_url,
+            ca_file,
+            bool(self._verify_connection()),
+        )
 
     @property
     def default_query_options(self):
@@ -2323,12 +2340,6 @@ class KubeletApi(object):
         }
         self._session.headers.update(headers)
 
-        # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
-        # easier
-        global_log.info(
-            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s, node_name = %s"
-            % (self._host_ip, self._verify_https, self._ca_file, node_name)
-        )
         self._kubelet_url = self._build_kubelet_url(
             kubelet_url_template, host_ip, node_name
         )
@@ -2336,6 +2347,20 @@ class KubeletApi(object):
             FALLBACK_KUBELET_URL_TEMPLATE, host_ip, node_name
         )
         self._timeout = 20.0
+
+        # TODO: Allow monitor to pass it's own logger instance to it to make cross tracking logs
+        # easier
+        global_log.info(
+            "KubeletApi host ip = %s, verify_https = %s, ca_file = %s, node_name = %s, kubelet_url = %s, fallback_kubelet_url = %s"
+            % (
+                self._host_ip,
+                self._verify_https,
+                self._ca_file,
+                node_name,
+                self._kubelet_url,
+                self._fallback_kubelet_url,
+            )
+        )
 
     @staticmethod
     def _build_kubelet_url(kubelet_url, host_ip, node_name):

@@ -78,7 +78,8 @@ def main(
     git_ref_type: str,
     git_commit_sha: str,
     registry: str = None,
-    registry_user: str = None
+    registry_user: str = None,
+    ignore_errors: bool = False,
 ):
 
     # If Github actions ref type if "tag" then check if the tag is a "production" tag or not.
@@ -91,7 +92,7 @@ def main(
         tags = [git_commit_sha]
 
     for builder in BUILDERS_TO_USE:
-        for image_name in builder.RESULT_IMAGE_NAMES:
+        for image_name in builder.RESULT_IMAGE_NAMES:  # pylint: disable=no-member
             full_image_name = image_name
 
             if registry_user:
@@ -124,17 +125,25 @@ def main(
             else:
                 temp_release_tag = f"{temp_release_tag}-debian"
 
-            subprocess.check_call([
-                "docker",
-                "buildx",
-                "imagetools",
-                "create",
-                f"{full_image_name}:{temp_release_tag}",
-                *tag_options
-            ])
+            try:
+                subprocess.check_call(
+                    [
+                        "docker",
+                        "buildx",
+                        "imagetools",
+                        "create",
+                        f"{full_image_name}:{temp_release_tag}",
+                        *tag_options,
+                    ]
+                )
+            except Exception as e:
+                if ignore_errors:
+                    print("Ignoring error: %s" % (str(e)))
+                else:
+                    raise e
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--git-ref-name", required=False)
@@ -142,6 +151,11 @@ if __name__ == '__main__':
     parser.add_argument("--git-commit-sha", required=False)
     parser.add_argument("--registry", required=False)
     parser.add_argument("--user", required=False)
+    # Can be useful to set that when we just want to publish subset of images and ignore errors
+    # if some image doesn't exist
+    parser.add_argument(
+        "--ignore-errors", action="store_true", required=False, default=False
+    )
 
     args = parser.parse_args()
     main(
@@ -150,4 +164,5 @@ if __name__ == '__main__':
         git_commit_sha=args.git_commit_sha,
         registry=args.registry,
         registry_user=args.user,
+        ignore_errors=args.ignore_errors,
     )

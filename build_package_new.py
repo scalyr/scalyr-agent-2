@@ -112,17 +112,6 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--remove-image-name-prefix",
-                action="store_true",
-                help=(
-                    "True to remove user / org name prefix from the image name when using a custom registry. This "
-                    "is usually a desired behavior when using a custom registry url where the user or "
-                    "the organization name doesn't match one specified in the Docker image name. E.g. "
-                    "scalyr/scalyr-k8s-agent -> scalyr-k8s-agent."
-                ),
-            )
-
-            package_parser.add_argument(
                 "--push", action="store_true", help="Push the result docker image."
             )
 
