@@ -17,7 +17,6 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import json
-import shutil
 import tempfile
 
 if False:
@@ -169,6 +168,19 @@ class TestEnvironBuilder(object):
 
         self._config = config
 
+        # We print this info to help user with troubleshooting on test failures since any kind of
+        # exception won't be directly bubbled up, but it will be contained in those log files.
+        print("")
+        print(
+            "Agent log will be saved to: %s"
+            % (self.agent_logs_path / pathlib.Path("agent.log"))
+        )
+        print(
+            "Agent debug log will be saved to: %s"
+            % (self.agent_logs_path / pathlib.Path("agent_debug.log"))
+        )
+        print("")
+
     def recreate_files(self, files_number, path, file_name_format=None):
         # type: (int, pathlib.Path, six.text_type) -> List
         """
@@ -212,8 +224,13 @@ class TestEnvironBuilder(object):
     def clear(self):
         scalyr_logging.close_handlers()
 
-        if self._root_path.exists():
-            shutil.rmtree(six.text_type(self._root_path))
+        # NOTE: There is no easy way in pytest to detect if test has failed and get that information
+        # all the way here so we don't remove those files on failure for ease of troubleshooting
+        # (there is a way to use test finalized + fixtures + module level variables, but that
+        # approach is quite hacky).
+        # To work around that, we simply never delete those files.
+        # if self._root_path.exists():
+        #    shutil.rmtree(six.text_type(self._root_path))
 
     @property
     def root_path(self):
