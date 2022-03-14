@@ -78,7 +78,6 @@ jobs:
         env:
           SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
-
           python3 tests/package_tests/run_package_test.py package-test \
            "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \

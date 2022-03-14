@@ -78,9 +78,11 @@ trap kill_registry_container EXIT
 # Kill registry container from the previous run, is exists.
 kill_registry_container
 
-log "Spin up local registry  in container"
+log "Spin up local registry in container"
 sh_cs docker run -d --rm -p 5005:5000 -v "$tmp_registry_output_path:/var/lib/registry" --name "$container_name" registry:2
 
+buildx_version=$(docker buildx version)
+log "Using buildx version: ${buildx_version}"
 
 buildx_builder_name="agent_image_buildx_builder"
 
