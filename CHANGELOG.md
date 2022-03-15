@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.29 "Auter" - Mar 14, 2022
+## 2.1.29 "Auter" - Mar 15, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 14, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 15, 2022 23:04 -0800
 --->
 
 Docker images:
