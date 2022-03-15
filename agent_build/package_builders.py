@@ -885,6 +885,19 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         # to the local registry.
         buildx_builder_name = "agent_image_buildx_builder"
 
+        # print docker and buildx version
+        docker_version_output = (
+            common.check_output_with_log(["docker", "version"]).decode().strip()
+        )
+        logging.info(f"Using docker version:\n{docker_version_output}\n")
+
+        buildx_version_output = (
+            common.check_output_with_log(["docker", "buildx", "version"])
+            .decode()
+            .strip()
+        )
+        logging.info(f"Using buildx version {buildx_version_output}")
+
         # check if builder already exists.
         ls_output = (
             common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
