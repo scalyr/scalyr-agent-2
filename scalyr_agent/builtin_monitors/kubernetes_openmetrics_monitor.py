@@ -880,6 +880,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
             include_node_name=self.__include_node_name,
+            include_cluster_name=self.__include_cluster_name,
         )
 
         monitors_manager = get_monitors_manager()
