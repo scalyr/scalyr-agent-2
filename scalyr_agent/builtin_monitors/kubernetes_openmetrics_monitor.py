@@ -351,7 +351,14 @@ define_config_option(
 define_config_option(
     __monitor__,
     "include_node_name",
-    "Set to true to include node name as an additional attribute with each metric log line.",
+    "Set to true to include Kubernetes node name as an additional attribute with each metric log line.",
+    convert_to=bool,
+    default=False,
+)
+define_config_option(
+    __monitor__,
+    "include_cluster_name",
+    "Set to true to include Kubernetes cluster name as an additional attribute with each metric log line.",
     convert_to=bool,
     default=False,
 )
@@ -463,6 +470,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             DEFAULT_KUBERNETES_API_CADVISOR_METRICS_SCRAPE_INTERVAL,
         )
         self.__include_node_name = self._config.get("include_node_name", False)
+        self.__include_cluster_name = self._config.get("include_cluster_name", False)
 
         self.__k8s_api_url = self._global_config.k8s_api_url
 
@@ -560,15 +568,31 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
     def __get_node_name(self):
         """
-        Gets the node name of the node running the agent from downward API
+        Gets the node name of the node running the agent from downward API.
         """
-        if not compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME"):
+        node_name = compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME", None)
+
+        if not node_name:
             self._logger.warn(
                 "SCALYR_K8S_NODE_NAME environment variable is not set, monitor will "
                 "not work correctly."
             )
 
-        return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
+        return node_name
+
+    def __get_node_name(self):
+        """
+        Gets name of the cluster this agent i srunning on.
+        """
+        cluster_name = compat.os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME")
+
+        if not cluster_name:
+            self._logger.warn(
+                "SCALYR_K8S_CLUSTER_NAME environment variable is not set, monitor will "
+                "not work correctly."
+            )
+
+        return cluster_name
 
     def __get_monitor_config_and_log_config(
         self,
@@ -584,6 +608,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
         include_node_name: bool = False,
+        __include_cluster_name: bool = False,
     ) -> Tuple[dict, dict]:
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
@@ -623,10 +648,16 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             ),
         }
 
+        extra_fields = {}
+
         if include_node_name:
-            monitor_config["extra_fields"] = JsonObject(
-                {"node": self.__get_node_name()}
-            )
+            extra_fields["node"] = self.__get_node_name()
+
+        if include_cluster_name:
+            extra_fields["cluster"] = self.__get_cluter_name()
+
+        if extra_fields:
+            monitor_config["extra_fields"] = JsonObject(extra_fields)
 
         # NOTE: This monitor is only supported on Linux platform
         log_path = os.path.join(self._global_config.agent_log_path, log_filename)
@@ -688,6 +719,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                     "kubernetes_api_metric_component_value_include_list"
                 ),
                 include_node_name=self.__include_node_name,
+                include_cluster_name=self.__include_cluster_name,
             )
 
             monitor = monitors_manager.add_monitor(
@@ -730,6 +762,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                     "kubernetes_api_cadvisor_metric_component_value_include_list"
                 ),
                 include_node_name=self.__include_node_name,
+                include_cluster_name=self.__include_cluster_name,
             )
 
             monitor = monitors_manager.add_monitor(
