@@ -580,7 +580,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         return node_name
 
-    def __get_node_name(self):
+    def __get_cluster_name(self):
         """
         Gets name of the cluster this agent i srunning on.
         """
@@ -608,7 +608,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
         include_node_name: bool = False,
-        __include_cluster_name: bool = False,
+        include_cluster_name: bool = False,
     ) -> Tuple[dict, dict]:
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
@@ -654,7 +654,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             extra_fields["k8s-node"] = self.__get_node_name()
 
         if include_cluster_name:
-            extra_fields["k8s-cluster"] = self.__get_cluter_name()
+            extra_fields["k8s-cluster"] = self.__get_cluster_name()
 
         if extra_fields:
             monitor_config["extra_fields"] = JsonObject(extra_fields)
