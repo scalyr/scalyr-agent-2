@@ -584,6 +584,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Gets name of the cluster this agent i srunning on.
         """
+        # TODO: Similar to the old monitor, we could fall back to querying Kubelet in case this
+        # environment variable is not available (but it should really be available since it's
+        # documented in the docs and example config as required).
         cluster_name = compat.os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME")
 
         if not cluster_name:
