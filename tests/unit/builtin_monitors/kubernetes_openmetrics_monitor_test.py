@@ -148,7 +148,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         expected_monitor_config = {
             "ca_file": None,
-            "extra_fields": JsonObject({"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}),
+            "extra_fields": JsonObject(
+                {"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}
+            ),
             "headers": JsonObject({}),
             "id": "one",
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
