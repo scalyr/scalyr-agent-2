@@ -651,10 +651,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         extra_fields = {}
 
         if include_node_name:
-            extra_fields["node"] = self.__get_node_name()
+            extra_fields["k8s-node"] = self.__get_node_name()
 
         if include_cluster_name:
-            extra_fields["cluster"] = self.__get_cluter_name()
+            extra_fields["k8s-cluster"] = self.__get_cluter_name()
 
         if extra_fields:
             monitor_config["extra_fields"] = JsonObject(extra_fields)
