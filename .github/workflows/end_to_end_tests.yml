@@ -297,6 +297,7 @@ jobs:
           scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           NODE_NAME: "${{ env.NODE_NAME }}"
+          CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
         run: |
           export RETRY_ATTEMPTS="8"
           export SLEEP_DELAY="10"
@@ -313,7 +314,7 @@ jobs:
 
           # Kubernetes API metrics (static monitor)
           echo "Kubernetes API metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-kubernetes-api-metrics.log" "process_max_fds 1000000 node=\"'${NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-kubernetes-api-metrics.log" "process_max_fds 1000000 k8s-node=\"'${NODE_NAME}'\" k8s-cluster=\"'${CLUSTER_NAME}'\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'-kubernetes-api-metrics.log" "process_open_fds "'
 
           # Kubernetes API cAdvisor metrics (static monitor)
@@ -330,8 +331,8 @@ jobs:
 
           # 3. Verify kube state event metrics
           echo "Kube state events metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_storageclass_labels 1 node=\"'${NODE_NAME}'\" storageclass=\"standard\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_secret_type 1 namespace=\"scalyr\" node=\"'${NODE_NAME}'\" secret=\"scalyr-api-key\" type=\"Opaque\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_storageclass_labels 1 k8s-node=\"'${NODE_NAME}'\" storageclass=\"standard\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_secret_type 1 namespace=\"scalyr\" k8s-node=\"'${NODE_NAME}'\" secret=\"scalyr-api-key\" type=\"Opaque\""'
 
           # 4. Verify java app JMX metrics
           echo "Java JMX metrics events metrics monitor checks"
