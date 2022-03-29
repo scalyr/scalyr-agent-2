@@ -75,6 +75,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["SCALYR_K8S_NODE_NAME"] = "test-node-name"
+        os.environ["SCALYR_K8S_CLUSTER_NAME"] = "test-cluster-name"
 
     @classmethod
     def tearDownClass(cls):
@@ -137,6 +138,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "ca_file": None,
             "headers": None,
             "include_node_name": True,
+            "include_cluster_name": True,
         }
         (
             monitor_config,
@@ -146,7 +148,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         expected_monitor_config = {
             "ca_file": None,
-            "extra_fields": JsonObject({"node": "test-node-name"}),
+            "extra_fields": JsonObject({"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}),
             "headers": JsonObject({}),
             "id": "one",
             "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
