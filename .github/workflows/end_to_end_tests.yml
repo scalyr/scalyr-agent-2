@@ -314,7 +314,7 @@ jobs:
 
           # Kubernetes API metrics (static monitor)
           echo "Kubernetes API metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-metrics.log" "process_max_fds 1000000 k8s-node=\"'${K8S_NODE_NAME}'\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-metrics.log" "process_max_fds 1000000 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-metrics.log" "process_open_fds "'
 
           # Kubernetes API cAdvisor metrics (static monitor)
@@ -331,14 +331,14 @@ jobs:
 
           # 3. Verify kube state event metrics
           echo "Kube state events metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_storageclass_labels 1 k8s-node=\"'${K8S_NODE_NAME}'\" storageclass=\"standard\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_secret_type 1 namespace=\"scalyr\" k8s-node=\"'${K8S_NODE_NAME}'\" secret=\"scalyr-api-key\" type=\"Opaque\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_storageclass_labels 1 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" storageclass=\"standard\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "kube-state-metrics" "kube_secret_type 1 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" namespace=\"scalyr\" k8s-node=\"'${K8S_NODE_NAME}'\" secret=\"scalyr-api-key\" type=\"Opaque\""'
 
           # 4. Verify java app JMX metrics
           echo "Java JMX metrics events metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 node=\"'${K8S_NODE_NAME}'\" runtime="'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" node=\"'${K8S_NODE_NAME}'\" runtime="'
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
