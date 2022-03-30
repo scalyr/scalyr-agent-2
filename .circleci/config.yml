@@ -2149,6 +2149,8 @@ jobs:
 
               # TODO: This step doesn't correctly exit with non zero on failure
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
+              # TODO: Add a check to fail if exe is not produced which would
+              # indicate command failure
 
               mkdir package
               mkdir artifacts
