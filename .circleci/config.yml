@@ -2142,6 +2142,8 @@ jobs:
       - run:
           name: Build MSI package
           command: |
+              # Make sure step fails on any command failure
+              $ErrorActionPreference = "Stop"
               $Env:WIX = ";C:\wix311;"
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
