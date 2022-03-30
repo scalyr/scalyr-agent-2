@@ -1,5 +1,5 @@
 psutil==5.7.0
-pyinstaller==4.10
+pyinstaller==4.101
 pywin32==301
 orjson==3.5.2
 six==1.13.0
