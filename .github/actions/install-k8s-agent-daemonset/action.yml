@@ -40,9 +40,9 @@ runs:
       id: create-daemonset
       shell: bash
       run: |
-        export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
-        echo "NODE_NAME=${NODE_NAME}" >> ${GITHUB_ENV}
-        echo "Using node name: ${NODE_NAME}"
+        export K8S_NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
+        echo "K8S_NODE_NAME=${K8S_NODE_NAME}" >> ${GITHUB_ENV}
+        echo "Using node name: ${K8S_NODE_NAME}"
 
         export K8S_CLUSTER_NAME="ci-agent-e2e-k8s-om-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
         echo "K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME}" >> ${GITHUB_ENV}
