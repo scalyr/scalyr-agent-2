@@ -53,7 +53,7 @@ __monitor__ = __name__
 define_config_option(
     __monitor__,
     "journal_path",
-    "Optional (defaults to /var/log/journal). Location on the filesystem of the journald logs.",
+    "Optional (defaults to /var/log/journal). Location of the journald logs in the filesystem.",
     convert_to=six.text_type,
     default="/var/log/journal",
 )
@@ -61,8 +61,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "journal_poll_interval",
-    "Optional (defaults to 5). The number of seconds to wait for data while polling the journal file. "
-    "Fractional values are supported. Note: This values overrides the sample_interval of the monitor",
+    "Optional (defaults to 5). The number of seconds to wait for data while polling the journal file. Fractional values are supported. Note: This values overrides the sample_interval of the monitor.",
     convert_to=float,
     default=5,
 )
@@ -70,43 +69,24 @@ define_config_option(
 define_config_option(
     __monitor__,
     "journal_fields",
-    "Optional dict containing a list of journal fields to include with each message, as well as a field name to map them to.\n"
-    "Note: Not all fields need to exist in every message and only fields that exist will be included.\n"
-    "Defaults to {:\n"
-    '  "_SYSTEMD_UNIT": "unit"\n'
-    '  "_PID": "pid"\n'
-    '  "_MACHINE_ID": "machine_id"\n'
-    '  "_BOOT_ID": "boot_id"\n'
-    '  "_SOURCE_REALTIME_TIMESTAMP": timestamp"\n'
+    'Optional. A dict of journal fields to upload with each message, and a field name to map them to. Note: Not all fields need exist in every message, and only fields that exist will be included. Defaults to { "_SYSTEMD_UNIT": "unit", "_PID": "pid", "_MACHINE_ID": "machine_id", "_BOOT_ID": "boot_id", "_SOURCE_REALTIME_TIMESTAMP": "timestamp" }',
     # Note, we dont' include the _HOSTNAME field as this is likely already specified by the serverHost variable
     # and so there's no need to duplicate this information.  If needed, this can be manually specified in the
     # plugin configuration.
-    "}\n",
     default=None,
 )
 
 define_config_option(
     __monitor__,
     "journal_matches",
-    "Optional list containing 'match' strings for filtering entries."
-    'A match string follows the pattern  "FIELD=value" where FIELD is a field of '
-    'the journal entry e.g. _SYSTEMD_UNIT, _HOSTNAME, _GID and "value" is the value '
-    'to filter that field on, so a match string equal to "_SYSTEMD_UNIT=ssh.service" '
-    "would filter query results to make sure that all entries entries originated from "
-    "the `ssh.service` system unit. "
-    "The journald monitor calls the journal reader method `add_match` for each string in this list. "
-    "See the journald documentation for details on how the filtering works: "
-    "https://www.freedesktop.org/software/systemd/python-systemd/journal.html#systemd.journal.Reader.add_match "
-    "If this config item is empty or None then no filtering occurs.",
+    'Optional. A list of "match strings" to filter entries on. A match string follows the pattern  "FIELD=value", where FIELD is a field of the journal entry, e.g. `_SYSTEMD_UNIT` or `_HOSTNAME`, and "value" is the value to filter that field on. For example, "_SYSTEMD_UNIT=ssh.service" only imports entries from the `ssh.service` system unit. The journald monitor calls the journal reader method `add_match` for each string in this list. See the [add_match documentation](https://www.freedesktop.org/software/systemd/python-systemd/journal.html#systemd.journal) for more information. If this property is empty or None, then no filtering occurs.',
     default=None,
 )
 
 define_config_option(
     __monitor__,
     "id",
-    "Optional id used to differentiate between multiple journald monitors. "
-    "This is useful for configurations that define multiple journald monitors and that want to save unique checkpoints for each "
-    "monitor.  If specified, the id is also sent to the server along with other attributes under the `monitor_id` field",
+    "An optional id for the monitor. This is useful when multiple journald monitors are specified, and you want to save unique checkpoints for each monitor. When specified, the id shows in the UI as the `monitor_id` field'.",
     convert_to=six.text_type,
     default="",
 )
@@ -114,7 +94,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "staleness_threshold_secs",
-    "When loading the journal events from a checkpoint, if the logs are older than this threshold, then skip to the end.",
+    "Optional (defaults to `600` seconds). When loading the journal events from a checkpoint, if the logs are older than this threshold, then skip to the end.",
     convert_to=int,
     default=10 * 60,
 )
@@ -122,7 +102,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "max_log_rotations",
-    "How many rotated logs to keep before deleting them, when writing journal entries to a log for sending to Scalyr.",
+    "Optional (defaults to `2`). How many rotated logs to keep before deleting them, when writing journal entries to a log for import.",
     convert_to=int,
     default=2,
 )
@@ -130,7 +110,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "max_log_size",
-    "Max size of a log file before we rotate it out, when writing journal entries to a log for sending to Scalyr.",
+    "Optional (defaults to `20MB`). Max size of a log file before we rotate it out, when writing journal entries to a log for import.",
     convert_to=int,
     default=20 * 1024 * 1024,
 )
@@ -259,7 +239,7 @@ class Checkpoint(object):
 class JournaldMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
     """
-# Journald Monitor
+# Journald 
 
 A Scalyr agent monitor that imports log entries from journald.
 
