@@ -75,25 +75,27 @@ def print_monitor_documentation(
     if "description" in include_sections:
         # NOTE: We only include monitor name header if the section doesn't already contain one
         if "# " not in info.description:
-            # This turns scalyr_agent.builtin_monitors.redis_monitor -> Redis Monitor
+            # This turns scalyr_agent.builtin_monitors.redis_monitor -> Redis
             monitor_module = info.monitor_module.split(".")[-1]
-            monitor_name = monitor_module.replace("_", "").capitalize()
-            print("# %s" % (monitor_name))
+            monitor_name = monitor_module.replace("_", " ").title().split()
+            print("# %s" % (monitor_name[0]))
             print("")
 
         print(info.description)
         print("")
 
     if "configuration_reference" in include_sections and len(info.config_options) > 0:
-        print("## Configuration Reference")
+        print('<a name="options"></a>')
+        print("## Configuration Options")
         print("")
         print_options(info.config_options, column_size)
         print("")
 
     if "log_reference" in include_sections and len(info.log_fields) > 0:
-        print("## Log reference")
+        print('<a name="events"></a>')
+        print("## Event Reference")
         print("")
-        print("Each event recorded by this plugin will have the following fields:")
+        print("In the UI, each event has the fields:")
         print("")
         print_log_fields(info.log_fields, column_size)
         print("")
@@ -101,9 +103,10 @@ def print_monitor_documentation(
     if "metrics" not in include_sections or len(info.metrics) == 0:
         return
 
-    print("## Metrics")
+    print('<a name="metrics"></a>')
+    print("## Metrics Reference")
     print("")
-    print("The table below describes the metrics recorded by the monitor.")
+    print("Metrics recorded by this plugin:")
     print("")
 
     # Have to break the metrics up into their categories if they have them.
@@ -125,7 +128,7 @@ def print_monitor_documentation(
     print("")
 
     for category in categories:
-        print("### %s metrics" % category)
+        print("### %s Metrics" % category)
         print("")
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
         print("")
@@ -141,10 +144,11 @@ def print_options(option_list, column_size):
     @type column_size: int
     """
     # First, prepare a list of lists representing the table contents.  Each row has two elements.
-    rows = [["# Option", "Usage"]]
+    # Append ["---", "---"] to generate the markdown delimiter row.
+    rows = [["Property", "Description"]]
+    rows.append(["---", "---"])
     for x in option_list:
-        rows.append(["# ``%s``" % x.option_name, x.description])
-
+        rows.append(["`%s`" % x.option_name, x.description])
     # We let the second column take up as much room as it needs, so find out how large the first column is
     # by finding the longest string in it.
     longest_first_column = ""
@@ -152,20 +156,18 @@ def print_options(option_list, column_size):
         if len(x[0]) > len(longest_first_column):
             longest_first_column = x[0]
 
-    # The length has to include the '|||' characters we prefix the line with.
-    first_column_length = 3 + len(longest_first_column)
+    # The length has to include the '|' characters we prefix the line with.
+    first_column_length = 1 + len(longest_first_column)
 
     sys.stdout.flush()
     for row in rows:
         sys.stdout.write(
-            "|||%s%s||| "
-            % (row[0], space_filler(first_column_length - len(row[0]) - 3))
+            "| %s%s |"
+            % (row[0], space_filler(first_column_length - len(row[0]) - 1))
         )
         row[1] = row[1].replace("\\n", "\\ n").replace("\\000", "\\ 000")
-        write_wrapped_line(
-            row[1],
-            column_size - first_column_length - 4,
-            " " * (first_column_length + 4),
+        sys.stdout.write(
+            " %s | \n" % (row[1])
         )
     sys.stdout.flush()
 
@@ -180,9 +182,11 @@ def print_log_fields(log_fields_list, column_size):
     @type column_size: int
     """
     # First, prepare a list of lists representing the table contents.  Each row has two elements.
-    rows = [["# Field", "Meaning"]]
+    # Append ["---", "---"] to generate the markdown delimiter row.
+    rows = [["Field", "Description"]]
+    rows.append(["---", "---"])
     for x in log_fields_list:
-        rows.append(["# ``%s``" % x.field, x.description])
+        rows.append(["`%s`" % x.field, x.description])
 
     # We let the second column take up as much room as it needs, so find out how large the first column is
     # by finding the longest string in it.
@@ -191,19 +195,14 @@ def print_log_fields(log_fields_list, column_size):
         if len(x[0]) > len(longest_first_column):
             longest_first_column = x[0]
 
-    # The length has to include the '|||' characters we prefix the line with.
-    first_column_length = 3 + len(longest_first_column)
+    # The length has to include the '|' characters we prefix the line with.
+    first_column_length = 1 + len(longest_first_column)
 
     sys.stdout.flush()
     for row in rows:
         sys.stdout.write(
-            "|||%s%s||| "
-            % (row[0], space_filler(first_column_length - len(row[0]) - 3))
-        )
-        write_wrapped_line(
-            row[1],
-            column_size - first_column_length - 4,
-            " " * (first_column_length + 4),
+            "| %s%s | %s | \n"
+            % (row[0], space_filler(first_column_length - len(row[0]) - 1), row[1])
         )
     sys.stdout.flush()
 
@@ -221,18 +220,22 @@ def print_metrics(metric_list, column_size):
     # Create the contents of the table, split up by the different columns.  We populate each column with
     # its header row.
     # The metric name column will be the first be displayed.
+    # Append "---" to all 3 columns to generate the markdown delimiter row.
     metric_name_column = ["Metric"]
+    metric_name_column.append("---")
     # The extra fields column is optional, only used if any of the metrics has extra fields.  The content
     # for each cell will be a list of strings, one for each extra field.
     extra_fields_column = [["Fields"]]
+    extra_fields_column.append(["---"])
     # The description is the last column.
     description_column = ["Description"]
+    description_column.append("---")
 
     total_extra_fields = 0
 
     for metric in metric_list:
         # Create the metric name cell for this row.
-        metric_name_column.append("``%s``" % metric.metric_name)
+        metric_name_column.append("`%s`" % metric.metric_name)
 
         # Create the description
         description_column.append(metric.description.strip())
@@ -245,9 +248,9 @@ def print_metrics(metric_list, column_size):
             # field_name=value if value is not an empty string, otherwise just field_name.
             for key, value in six.iteritems(metric.extra_fields):
                 if value == "":
-                    str_rep = "``%s``" % key
+                    str_rep = "`%s`" % key
                 else:
-                    str_rep = "``%s=%s``" % (key, value)
+                    str_rep = "`%s=%s`" % (key, value)
                 cell.append(str_rep)
                 total_extra_fields += 1
 
@@ -272,7 +275,7 @@ def print_metrics(metric_list, column_size):
     # Actually print out the rows.
     for row in range(len(metric_name_column)):
         # Print the metric name with enough padding to get to the end of the column.
-        metric_cell = "|||# %s " % metric_name_column[row]
+        metric_cell = "| %s " % metric_name_column[row]
         sys.stdout.write(
             "%s%s"
             % (metric_cell, space_filler(metric_name_column_width - len(metric_cell)))
@@ -280,7 +283,7 @@ def print_metrics(metric_list, column_size):
 
         # If we have an extra field column, print it out.
         if extra_field_column_width > 0:
-            sys.stdout.write("||| ")
+            sys.stdout.write("| ")
             extra_cell = extra_fields_column[row]
             # If there are multiple fields, then we want to stick a newline and padding in the next line to
             # get the next field lined up with the previous one.  We can do this trick with str.join
@@ -295,44 +298,9 @@ def print_metrics(metric_list, column_size):
                 sys.stdout.write(space_filler(extra_field_column_width - 4))
 
         # The description gets line wrapped in the final column.
-        sys.stdout.write("||| ")
-        write_wrapped_line(
-            description_column[row],
-            description_column_width,
-            space_filler(column_size - description_column_width + 4),
-        )
+        sys.stdout.write("| %s | \n" % description_column[row])
 
     sys.stdout.flush()
-
-
-def write_wrapped_line(content, wrap_length, line_prefix):
-    """Writes content to stdout but breaking it after ``wrap_length`` along space boundaries.
-
-    When it begins a new line, ``line_prefix`` is printed first.
-
-    @param content: The line to write
-    @param wrap_length: The maximum size of any line emitted.  After this length, the line will be wrapped.
-    @param line_prefix: The prefix to write whenenver starting a new line
-
-    @type content: str
-    @type wrap_length: int
-    @type line_prefix: str
-    """
-    current_line = ""
-    for word in content.split(" "):
-        if len(current_line) + len(word) + 3 > wrap_length:
-            sys.stdout.write(current_line)
-            sys.stdout.write(" \\\n")
-            sys.stdout.write(line_prefix)
-            current_line = word
-        elif len(current_line) == 0:
-            current_line = word
-        else:
-            current_line = "%s %s" % (current_line, word)
-
-    if len(current_line) > 0:
-        sys.stdout.write(current_line)
-        sys.stdout.write("\n")
 
 
 def space_filler(num_spaces):

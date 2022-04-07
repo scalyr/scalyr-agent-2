@@ -63,7 +63,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "sources",
-    "Optional (defaults to ``Application, Security, System``). A comma separated list of event sources.\n"
+    "Optional (defaults to ``Application, Security, System``). A comma separated list of event sources."
     "You can use this to specify which event sources you are interested in listening to."
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
     convert_to=six.text_type,
@@ -73,7 +73,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "event_types",
-    "Optional (defaults to ``All``). A comma separated list of event types to log.\n"
+    "Optional (defaults to ``All``). A comma separated list of event types to log."
     "Valid values are: All, Error, Warning, Information, AuditSuccess and AuditFailure"
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
     default=DEFAULT_EVENTS,
@@ -83,9 +83,9 @@ define_config_option(
 define_config_option(
     __monitor__,
     "channels",
-    "A list of dict objects specifying a list of channels and an XPath query for those channels.\n"
-    "Only available on Windows Vista and later.\n"
-    'Optional (defaults to ``[ {"channel" : ["Application", "Security", "System"], "query": "*"}]\n',
+    "A list of dict objects specifying a list of channels and an XPath query for those channels."
+    "Only available on Windows Vista and later."
+    'Optional (defaults to ``[ {"channel" : ["Application", "Security", "System"], "query": "*"}]',
     convert_to=None,
 )
 
@@ -93,7 +93,7 @@ define_config_option(
     __monitor__,
     "maximum_records_per_source",
     "Optional (defaults to ``10000``). The maximum number of records to read from the end of each log source"
-    "per gather_sample. Only applicable when using old WEL API.\n",
+    "per gather_sample. Only applicable when using old WEL API.",
     default=DEFAULT_MAXIMUM_RECORDS_PER_SOURCE,
     convert_to=int,
 )
@@ -101,7 +101,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "error_repeat_interval",
-    "Optional (defaults to ``300``). The number of seconds to wait before logging similar errors in the event log.\n",
+    "Optional (defaults to ``300``). The number of seconds to wait before logging similar errors in the event log.",
     default="300",
     convert_to=int,
 )
@@ -109,7 +109,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "server_name",
-    "Optional (defaults to ``localhost``). The remote server where the event log is to be opened\n",
+    "Optional (defaults to ``localhost``). The remote server where the event log is to be opened.",
     default="localhost",
     convert_to=six.text_type,
 )
@@ -117,7 +117,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "remote_user",
-    "Optional (defaults to ``None``). The username to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
+    "Optional (defaults to ``None``). The username to use for authentication on the remote server.  This option is only valid on Windows Vista and above.",
     default=None,
     convert_to=six.text_type,
 )
@@ -125,7 +125,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "remote_password",
-    "Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
+    "Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above.",
     default=None,
     convert_to=six.text_type,
 )
@@ -133,7 +133,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "remote_domain",
-    "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above\n",
+    "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above.",
     default=None,
     convert_to=six.text_type,
 )

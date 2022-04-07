@@ -96,8 +96,8 @@ define_config_option(
     __monitor__,
     "container_name",
     "Optional (defaults to None). Defines a regular expression that matches the name given to the "
-    "container running the scalyr-agent.\n"
-    "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n",
+    "container running the scalyr-agent."
+    "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.",
     convert_to=six.text_type,
     default=None,
 )
@@ -127,8 +127,8 @@ define_config_option(
     "api_socket",
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
-    "`docker_api_socket` configuration option in the syslog monitor to this same value\n"
-    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n"
+    "`docker_api_socket` configuration option in the syslog monitor to this same value."
+    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g."
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
@@ -139,7 +139,7 @@ define_config_option(
     "docker_api_version",
     "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
     "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
-    "syslog monitor to this same value\n",
+    "syslog monitor to this same value.",
     convert_to=six.text_type,
     default="auto",
 )
@@ -175,7 +175,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "max_previous_lines",
-    "Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n"
+    "Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs."
     "when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.",
     convert_to=int,
     default=5000,
@@ -184,7 +184,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "readback_buffer_size",
-    "Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n"
+    "Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk."
     "when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file "
     "was sent to Scalyr.",
     convert_to=int,
@@ -199,7 +199,7 @@ define_config_option(
     'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
     'to push logs to this one using the syslog Docker log plugin.  Currently, "syslog" is the '
     "preferred method due to bugs/issues found with the docker API.  It is not the default to protect "
-    "legacy behavior.\n",
+    "legacy behavior.",
     convert_to=six.text_type,
     default="docker_api",
 )
