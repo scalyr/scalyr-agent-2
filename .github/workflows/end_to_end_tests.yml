@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - peteryork-DOC-174-journald-and-tables
   pull_request:
     branches:
       - master
