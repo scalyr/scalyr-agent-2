@@ -2143,16 +2143,34 @@ jobs:
           name: Build MSI package
           command: |
               $Env:WIX = ";C:\wix311;"
+
+              # Make sure step fails on any command failure
+              Set-StrictMode -Version Latest
+              $ErrorActionPreference = "Stop"
+
+              function ThrowOnNativeFailure {
+                if (-not $?)
+                {
+                    throw 'Native Failure'
+                }
+              }
+
+              $PSDefaultParameterValues['*:ErrorAction']='Stop'
+
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
               C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
+              ThrowOnNativeFailure
 
               mkdir package
               mkdir artifacts
 
               cp .\ScalyrAgentInstaller-*.msi artifacts/
               mv .\ScalyrAgentInstaller-*.msi package\ScalyrAgentInstaller.msi
+
+              $ErrorActionPreference = "Stop"
+              Test-Path -Path package/ScalyrAgentInstaller.msi -PathType Leaf
 
       - run:
           name: Copy Package With Version in Name
