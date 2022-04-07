@@ -239,7 +239,7 @@ class Checkpoint(object):
 class JournaldMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
     """
-# Journald 
+# Journald
 
 A Scalyr agent monitor that imports log entries from journald.
 

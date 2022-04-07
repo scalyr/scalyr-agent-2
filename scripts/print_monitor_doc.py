@@ -265,10 +265,6 @@ def print_metrics(metric_list, column_size):
     for cell in metric_name_column:
         metric_name_column_width = max(metric_name_column_width, len(cell) + 6)
 
-    description_column_width = (
-        column_size - metric_name_column_width - extra_field_column_width
-    )
-
     # Actually print out the rows.
     for row in range(len(metric_name_column)):
         # Print the metric name with enough padding to get to the end of the column.
