@@ -1,6 +1,6 @@
 psutil==5.7.0
 # Install the PyInstaller library from the dev branch to workaround the issue with PYTHONUTF8 handling by the frozen binary.
-git+https://github.com/pyinstaller/pyinstaller.git@e9984be3ac820aca05997244fb7c7db44f2d86fe
+git+https://github.com/pyinstaller/pyinstaller.git@3940e5fc5f9e02bce9f1af53c70a42db81071381
 pywin32==301
 orjson==3.5.2
 six==1.13.0
