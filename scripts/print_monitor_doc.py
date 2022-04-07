@@ -162,13 +162,10 @@ def print_options(option_list, column_size):
     sys.stdout.flush()
     for row in rows:
         sys.stdout.write(
-            "| %s%s |"
-            % (row[0], space_filler(first_column_length - len(row[0]) - 1))
+            "| %s%s |" % (row[0], space_filler(first_column_length - len(row[0]) - 1))
         )
         row[1] = row[1].replace("\\n", "\\ n").replace("\\000", "\\ 000")
-        sys.stdout.write(
-            " %s | \n" % (row[1])
-        )
+        sys.stdout.write(" %s | \n" % (row[1]))
     sys.stdout.flush()
 
 
