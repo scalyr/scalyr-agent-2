@@ -229,7 +229,7 @@ Metrics recorded by this plugin:
 | `docker.mem.fail_cnt`                          | The number of times the container hit its memory limit | 
 | `docker.mem.limit`                             | The memory limit for the container in bytes. | 
 
-### CPU Metrics
+### Cpu Metrics
 
 | Metric                                       | Description | 
 | ---                                          | --- | 
