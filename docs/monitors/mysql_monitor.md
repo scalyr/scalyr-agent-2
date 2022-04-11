@@ -172,7 +172,7 @@ In the UI, each event has the fields:
 Metrics recorded by this plugin:
 
 
-### connections Metrics
+### Connections Metrics
 
 | Metric                                 | Description | 
 | ---                                    | --- | 
@@ -184,7 +184,7 @@ Metrics recorded by this plugin:
 | `mysql.global.max_used_connections`    | High water mark for the total number of connections used at any one time since the server was started. | 
 | `mysql.max_connections`                | The maximum number of allowed open connections to server. | 
 
-### commands Metrics
+### Commands Metrics
 
 | Metric                        | Description | 
 | ---                           | --- | 
@@ -193,7 +193,7 @@ Metrics recorded by this plugin:
 | `mysql.global.com_replace`    | The number of ``replace`` commands run against the server | 
 | `mysql.global.com_select`     | The number of ``select`` commands run against the server | 
 
-### general Metrics
+### General Metrics
 
 | Metric                              | Description | 
 | ---                                 | --- | 
@@ -202,7 +202,7 @@ Metrics recorded by this plugin:
 | `mysql.open_files_limit`            | The maximum number of allowed open files. | 
 | `mysql.global.slow_queries`         | The total number of queries over the uptime of the server that exceeded the "long_query_time" configuration. | 
 
-### innodb Metrics
+### InnoDB Metrics
 
 | Metric                                           | Description | 
 | ---                                              | --- | 
@@ -215,7 +215,7 @@ Metrics recorded by this plugin:
 | `mysql.innodb.opened_read_views`                 | The number of views into the db, this is "started transactions" which have no current statement actively operating. | 
 | `mysql.innodb.queries_queued`                    | The number of queries waiting to be processed.  The value is based on the time the monitor sample is run. | 
 
-### innodb insert buffer Metrics
+### InnoDB Insert Buffer Metrics
 
 | Metric                                      | Description | 
 | ---                                         | --- | 
@@ -226,7 +226,7 @@ Metrics recorded by this plugin:
 | `mysql.innodb.innodb.ibuf.merged_recs`      | The total number of records merged in the insert buffer since server start. | 
 | `mysql.innodb.innodb.ibuf.merges`           | The total number of merges for the insert buffer since server start. | 
 
-### threads Metrics
+### Threads Metrics
 
 | Metric                   | Description | 
 | ---                      | --- | 

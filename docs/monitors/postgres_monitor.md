@@ -73,13 +73,13 @@ In the UI, each event has the fields:
 Metrics recorded by this plugin:
 
 
-### connections Metrics
+### Connections Metrics
 
 | Metric                             | Description | 
 | ---                                | --- | 
 | `postgres.database.connections`    | The number of current active connections.  The value is accurate to when the check was made. | 
 
-### general Metrics
+### General Metrics
 
 | Metric                                | Fields              | Description | 
 | ---                                   | ---                 | --- | 
