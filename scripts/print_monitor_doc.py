@@ -128,7 +128,7 @@ def print_monitor_documentation(
     print("")
 
     for category in categories:
-        print("### %s Metrics" % category)
+        print("### %s Metrics" % category.title())
         print("")
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
         print("")
