@@ -81,7 +81,7 @@ Metrics recorded by this plugin:
 | `proc.vmstat.pgpgin`        | The total number of pages swapped in since boot. | 
 | `proc.vmstat.pgpgout`       | The total number of pages swapped out in since boot. | 
 
-### Numa Metrics
+### NUMA Metrics
 
 | Metric                       | Fields     | Description | 
 | ---                          | ---        | --- | 

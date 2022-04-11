@@ -202,7 +202,7 @@ Metrics recorded by this plugin:
 | `mysql.open_files_limit`            | The maximum number of allowed open files. | 
 | `mysql.global.slow_queries`         | The total number of queries over the uptime of the server that exceeded the "long_query_time" configuration. | 
 
-### Innodb Metrics
+### InnoDB Metrics
 
 | Metric                                           | Description | 
 | ---                                              | --- | 
@@ -215,7 +215,7 @@ Metrics recorded by this plugin:
 | `mysql.innodb.opened_read_views`                 | The number of views into the db, this is "started transactions" which have no current statement actively operating. | 
 | `mysql.innodb.queries_queued`                    | The number of queries waiting to be processed.  The value is based on the time the monitor sample is run. | 
 
-### Innodb Insert Buffer Metrics
+### InnoDB Insert Buffer Metrics
 
 | Metric                                      | Description | 
 | ---                                         | --- | 
