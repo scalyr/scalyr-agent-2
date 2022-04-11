@@ -67,7 +67,9 @@ define_log_field(
 )
 define_log_field(__monitor__, "value", "The value of the metric.")
 define_log_field(
-    __monitor__, "instance", "The `id` value, if specified. See [Configuration Options](#options)."
+    __monitor__,
+    "instance",
+    "The `id` value, if specified. See [Configuration Options](#options).",
 )
 
 define_metric(
