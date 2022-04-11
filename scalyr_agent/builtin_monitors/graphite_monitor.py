@@ -151,12 +151,12 @@ This plugin enables the Agent to act as a carbon server. It can receive metrics 
 
 ## Installation
 
-1\. Install the Scalyr Agent
+1\\. Install the Scalyr Agent
 
 If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome). We recommend you install the Agent on each server you want to monitor. Your Graphite data will automatically be tagged for the server it came from, and the Agent can also collect system metrics, and log files.
 
 
-2\. Configure the Scalyr Agent to receive Graphite metrics
+2\\. Configure the Scalyr Agent to receive Graphite metrics
 
 Open the Scalyr Agent configuration file at `/etc/scalyr-agent-2/agent.json`.
 
@@ -173,14 +173,14 @@ By default, the plugin will listen on port 2003 for the `plaintext` protocol, an
 See [Configuration Options](#options) below to set custom ports, or to disallow a protocol.
 
 
-3\. Save and confirm
+3\\. Save and confirm
 
 Save the `agent.json` file. The Agent will detect changes within 30 seconds.
 
 You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
 
 
-4\. Configure your Graphite-compatible tools to send metrics
+4\\. Configure your Graphite-compatible tools to send metrics
 
 These steps will differ, depending on your preferred architecture. You can configure [Graphite-compatible tools](https://graphite.readthedocs.io/en/latest/tools.html) to send metrics directly to the Scalyr Agent. In this scenario you can stop the carbon daemon(s).
 
@@ -189,7 +189,7 @@ If you wish to retain your carbon architecture, you can relay metrics to Scalyr.
 If you are using `carbon-c-relay`, you can set up a [forward cluster](https://github.com/grobian/carbon-c-relay/blob/master/carbon-c-relay.md#configuration-syntax). If you are using `carbon-relay-ng`, see the "Routes" section of the [documentation](https://github.com/grafana/carbon-relay-ng/blob/master/docs/config.md).
 
 
-5\. Confirm
+5\\. Confirm
 
 Log in to your account and search for [monitor = 'graphite_monitor'](https://app.scalyr.com/events?filter=$monitor%20%3D%20%27graphite_monitor%27). This will show all Graphite data imported by the Scalyr Agent.
 

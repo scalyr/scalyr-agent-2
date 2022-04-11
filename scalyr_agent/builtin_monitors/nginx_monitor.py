@@ -154,12 +154,12 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 ## Installation
 
-1\. Install the Scalyr Agent
+1\\. Install the Scalyr Agent
 
 If you haven't done so already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on servers running nginx.
 
 
-2\. Check requirements
+2\\. Check requirements
 
 Make sure your nginx server supports the status module. Run this command:
 
@@ -174,7 +174,7 @@ If not, you will need to either recompile nginx and add the `--with-http_stub_st
 To recompile, see the section on "Building Nginx From Source" in the [install tutorial](https://www.nginx.com/resources/wiki/start/topics/tutorials/install/). You can also consult the status module [documentation](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
 
 
-3\. Enable the nginx status module
+3\\. Enable the nginx status module
 
 Find the `nginx.conf` file, or the file corresponding to your site in the `sites-available` directory. For most Linux systems, these are located at `/etc/nginx/nginx.conf` and `/etc/nginx/sites-available`.
 
@@ -191,7 +191,7 @@ This sets the status page, served at `http://<address>/nginx_status`. Access is 
 Each time the Scalyr Agent fetches `/nginx_status`, an entry will be added to the nginx access log. To stop this, add the line `access_log off;` to the above configuration.
 
 
-4\. Restart nginx and confirm
+4\\. Restart nginx and confirm
 
 To restart on most Linux systems:
 
@@ -202,7 +202,7 @@ To confirm the status module is working, run this command on the server, substit
     curl http://localhost:80/nginx_status
 
 
-5\. Configure the Scalyr Agent to import status module data
+5\\. Configure the Scalyr Agent to import status module data
 
 Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
 
@@ -218,7 +218,7 @@ Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` 
 See "Configuration Options" below for more properties you can add.
 
 
-6\. Configure the Scalyr Agent to import the nginx access log
+6\\. Configure the Scalyr Agent to import the nginx access log
 
 If haven't already done so when installing the Scalyr Agent, add the following entry to the `logs: [ ... ]` section of the Scalyr Agent configuration file, found at `/etc/scalyr-agent-2/agent.json`:
 
@@ -234,7 +234,7 @@ If haven't already done so when installing the Scalyr Agent, add the following e
 For most Linux systems the `access.log` file is saved in `/var/log/nginx/access.log`. Adjust the `path` property if applicable.
 
 
-7\. Save and confirm
+7\\. Save and confirm
 
 Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Scalyr Agent to begin sending nginx data.
 

@@ -251,12 +251,12 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 ## Installation
 
-1\. Install the Scalyr Agent
+1\\. Install the Scalyr Agent
 
 If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on servers running the journald daemon.
 
 
-2\. Install the `python-systemd` dependency
+2\\. Install the `python-systemd` dependency
 
 The `python-systemd` package is a wrapper for the `systemd` C API. See [https://github.com/systemd/python-systemd/](https://github.com/systemd/python-systemd/) for more information. If the Scalyr Agent cannot find this library, a warning message will show.
 
@@ -273,7 +273,7 @@ You can also install from source with pip:
     pip install systemd-python
 
 
-3\. Configure the Scalyr Agent to import the journal file
+3\\. Configure the Scalyr Agent to import the journal file
 
 Open the Scalyr Agent configuration file, found at `/etc/scalyr-agent-2/agent.json`.
 
@@ -302,7 +302,7 @@ The `journal_matches` property lets you to filter your journal entries. This pro
 See [Configuration Options](#options) below for more properties you can add to the `monitors: [ ... ]` section.
 
 
-4\. Set parsers
+4\\. Set parsers
 
 In the `agent.json` configuration file, add a top-level `journald_logs: [...]` array. [Modular Configuration](#modular) is supported - you can add this array to any `.json` file in the `agent.d` directory.
 
@@ -358,7 +358,7 @@ For example, to assign `sshParser` to the logs from the SSH service, you can use
     ]
 
 
-5\. Set attributes, and other properties
+5\\. Set attributes, and other properties
 
 The `attributes` property lets you attach key-value pairs to your entries. These attributes become searchable fields in the UI, and are especially useful for determining the source of log data.
 
@@ -391,7 +391,7 @@ Here is an example with attributes, redaction rules, and sampling rules set:
     ]
 
 
-6\. Override value escaping (optional)
+6\\. Override value escaping (optional)
 
 By default, several quoting and escaping rules are applied. In particular, we quote extracted fields and escape values. You may wish to override this behavior, depending on your journald entry format.
 
@@ -415,7 +415,7 @@ If `detect_escaped_strings` is `true`, all extracted fields, including `MESSAGE`
 
 
 
-7\. Save and confirm
+7\\. Save and confirm
 
 Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Scalyr Agent to begin sending data.
 

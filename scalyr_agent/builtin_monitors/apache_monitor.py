@@ -161,12 +161,12 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 ## Installation
 
-1\. Install the Scalyr Agent
+1\\. Install the Scalyr Agent
 
 If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on servers running Apache.
 
 
-2\. Check requirements
+2\\. Check requirements
 
 The `status_module` [module](https://httpd.apache.org/docs/current/mod/mod_status.html) must be enabled on the Apache server. On most Linux installations you can run:
 
@@ -183,7 +183,7 @@ On some platforms, different commands will enable the `status_module` (filename 
 - [Windows](http://httpd.apache.org/docs/2.0/platform/windows.html#cust)
 
 
-3\. Configure access to the `server-status` page.
+3\\. Configure access to the `server-status` page.
 
 You must allow localhost access to to the `server-status` page, usually in the `VirtualHost` configuration section of your
 Apache server. On Linux, this is typically found in the `/etc/apache2/sites-available` directory, in the file for your site.
@@ -200,7 +200,7 @@ Add to the `VirtualHost` section (between `<VirtualHost>` and `</VirtualHost>`):
 This sets the status page, served at `http://<address>/server-status`. Access is denied for all except localhost.
 
 
-4\. Restart and confirm
+4\\. Restart and confirm
 
 When you make the configuration change, restart Apache.  On most Linux systems, run:
 
@@ -211,7 +211,7 @@ To confirm the status module, run this command, substituting the port number as 
     curl http://localhost:80/server-status
 
 
-5\. Configure the Scalyr Agent to import status module data
+5\\. Configure the Scalyr Agent to import status module data
 
 Open the Scalyr Agent configuration file, found at `/etc/scalyr-agent-2/agent.json`.
 
@@ -227,7 +227,7 @@ Find the `monitors: [ ... ]` section and add a `{...}` stanza for the Apache `mo
 See [Configuration Options](#options) below for more properties you can add.
 
 
-6\. Configure the Scalyr Agent to import Apache access logs
+6\\. Configure the Scalyr Agent to import Apache access logs
 
 If haven't already done so when installing the Scalyr Agent, find the location of the access log. On most Linux systems this is saved at `/var/log/apache2/access.log`.
 
@@ -247,7 +247,7 @@ Add to the `logs: [ ... ]` section of the Scalyr Agent configuration file, found
 Edit the `path` field as applicable for your system setup.
 
 
-7\. Save and confirm
+7\\. Save and confirm
 
 Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Scalyr Agent to begin sending Apache data.
 
