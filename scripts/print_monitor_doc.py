@@ -120,6 +120,7 @@ def print_monitor_documentation(
         # This is a bit inefficient, but that's ok here.
         if categories.count(metric.category) == 0:
             categories.append(metric.category)
+        categories = [category.title() for category in categories]
 
     # Print each grouping.
     metrics_with_no_categories = filter_metric_by_category(all_metrics, None)
@@ -128,7 +129,7 @@ def print_monitor_documentation(
     print("")
 
     for category in categories:
-        print("### %s Metrics" % category.title())
+        print("### %s Metrics" % category)
         print("")
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
         print("")
