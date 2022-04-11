@@ -229,9 +229,9 @@ define_config_option(
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API. This is only used when `mode` is set to `docker` to look up container "
     "names by their ids.  WARNING, you must also set the `api_socket` configuration option in the "
-    "docker monitor to this same value.\n"
+    "docker monitor to this same value."
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using "
-    "the -v parameter, e.g.\n"
+    "the -v parameter, e.g."
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",

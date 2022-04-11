@@ -1,6 +1,6 @@
 <!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
 
-# Journald Monitor
+# Journald
 
 A Scalyr agent monitor that imports log entries from journald.
 
@@ -62,45 +62,16 @@ of that object.  The ``poll`` method is called with a 0 second timeout so it nev
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
 
-## Configuration Reference
+<a name="options"></a>
+## Configuration Options
 
-|||# Option                      ||| Usage
-|||# ``journal_path``            ||| Optional (defaults to /var/log/journal). Location on the filesystem of the \
-                                     journald logs.
-|||# ``journal_poll_interval``   ||| Optional (defaults to 5). The number of seconds to wait for data while polling \
-                                     the journal file. Fractional values are supported. Note: This values overrides \
-                                     the sample_interval of the monitor
-|||# ``journal_fields``          ||| Optional dict containing a list of journal fields to include with each message, \
-                                     as well as a field name to map them to.
-Note: Not all fields need to exist in \
-                                     every message and only fields that exist will be included.
-Defaults to {:
-  \
-                                     "_SYSTEMD_UNIT": "unit"
-  "_PID": "pid"
-  "_MACHINE_ID": "machine_id"
-  \
-                                     "_BOOT_ID": "boot_id"
-  "_SOURCE_REALTIME_TIMESTAMP": timestamp"
-}
-
-|||# ``journal_matches``         ||| Optional list containing 'match' strings for filtering entries.A match string \
-                                     follows the pattern  "FIELD=value" where FIELD is a field of the journal entry \
-                                     e.g. _SYSTEMD_UNIT, _HOSTNAME, _GID and "value" is the value to filter that field \
-                                     on, so a match string equal to "_SYSTEMD_UNIT=ssh.service" would filter query \
-                                     results to make sure that all entries entries originated from the `ssh.service` \
-                                     system unit. The journald monitor calls the journal reader method `add_match` for \
-                                     each string in this list. See the journald documentation for details on how the \
-                                     filtering works: \
-                                     https://www.freedesktop.org/software/systemd/python-systemd/journal.html#systemd.journal.Reader.add_match \
-                                     If this config item is empty or None then no filtering occurs.
-|||# ``id``                      ||| Optional id used to differentiate between multiple journald monitors. This is \
-                                     useful for configurations that define multiple journald monitors and that want to \
-                                     save unique checkpoints for each monitor.  If specified, the id is also sent to \
-                                     the server along with other attributes under the `monitor_id` field
-|||# ``staleness_threshold_secs``||| When loading the journal events from a checkpoint, if the logs are older than \
-                                     this threshold, then skip to the end.
-|||# ``max_log_rotations``       ||| How many rotated logs to keep before deleting them, when writing journal entries \
-                                     to a log for sending to Scalyr.
-|||# ``max_log_size``            ||| Max size of a log file before we rotate it out, when writing journal entries to a \
-                                     log for sending to Scalyr.
+| Property                   | Description | 
+| ---                        | --- | 
+| `journal_path`             | Optional (defaults to /var/log/journal). Location of the journald logs in the filesystem. | 
+| `journal_poll_interval`    | Optional (defaults to 5). The number of seconds to wait for data while polling the journal file. Fractional values are supported. Note: This values overrides the sample_interval of the monitor. | 
+| `journal_fields`           | Optional. A dict of journal fields to upload with each message, and a field name to map them to. Note: Not all fields need exist in every message, and only fields that exist will be included. Defaults to { "_SYSTEMD_UNIT": "unit", "_PID": "pid", "_MACHINE_ID": "machine_id", "_BOOT_ID": "boot_id", "_SOURCE_REALTIME_TIMESTAMP": "timestamp" } | 
+| `journal_matches`          | Optional. A list of "match strings" to filter entries on. A match string follows the pattern  "FIELD=value", where FIELD is a field of the journal entry, e.g. `_SYSTEMD_UNIT` or `_HOSTNAME`, and "value" is the value to filter that field on. For example, "_SYSTEMD_UNIT=ssh.service" only imports entries from the `ssh.service` system unit. The journald monitor calls the journal reader method `add_match` for each string in this list. See the [add_match documentation](https://www.freedesktop.org/software/systemd/python-systemd/journal.html#systemd.journal) for more information. If this property is empty or None, then no filtering occurs. | 
+| `id`                       | An optional id for the monitor. This is useful when multiple journald monitors are specified, and you want to save unique checkpoints for each monitor. When specified, the id shows in the UI as the `monitor_id` field'. | 
+| `staleness_threshold_secs` | Optional (defaults to `600` seconds). When loading the journal events from a checkpoint, if the logs are older than this threshold, then skip to the end. | 
+| `max_log_rotations`        | Optional (defaults to `2`). How many rotated logs to keep before deleting them, when writing journal entries to a log for import. | 
+| `max_log_size`             | Optional (defaults to `20MB`). Max size of a log file before we rotate it out, when writing journal entries to a log for import. | 

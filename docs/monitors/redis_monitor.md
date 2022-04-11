@@ -78,9 +78,9 @@ Here is an example with two hosts with passwords:
     such that the number of messages you receive in this interval does not exceed the value of `lines_to_fetch`, otherwise
     some log lines will be dropped.
 
-## Configuration Reference
+<a name="options"></a>
+## Configuration Options
 
-|||# Option                          ||| Usage
-|||# ``log_cluster_replication_info``||| Optional (defaults to false). If true, the monitor will record redis \
-                                         cluster's replication offsets, difference between master and replica, and how \
-                                         many seconds the replica is falling behind
+| Property                       | Description | 
+| ---                            | --- | 
+| `log_cluster_replication_info` | Optional (defaults to false). If true, the monitor will record redis cluster's replication offsets, difference between master and replica, and how many seconds the replica is falling behind | 

@@ -126,28 +126,25 @@ well as a list of OID groups to query. e.g.
 
         }
 
-## Configuration Reference
+<a name="options"></a>
+## Configuration Options
 
-|||# Option                   ||| Usage
-|||# ``module``               ||| Always ``scalyr_agent.builtin_monitors.snmp_monitor``
-|||# ``error_repeat_interval``||| Optional (defaults to 300). The number of seconds to wait before repeating an error \
-                                  message.
-|||# ``mib_path``             ||| Optional (defaults to None).  An absolute path to a location on disk that contains \
-                                  ASN1 MIB files
-|||# ``oid_groups``           ||| A JSON object that maps custom names to a list of OIDs/variables defined as strings \
-                                  such "group1" : ["IF-MIB::ifDescr",  "1.3.6.1.2.1.2.2.1.16.1"].
-|||# ``poll_targets``         ||| A JSON array contain a list of target devices to poll.  Each element of the array is \
-                                  a JSON object that containsa list of target devices, and a list of "oid_groups" to \
-                                  query.  Each "target device" in the list is a JSON object containingvariables that \
-                                  define the target (host, port, authentication details) and each "oid_group" is a \
-                                  string key from thepreviously defined "oid_groups" configuration option.
+| Property                | Description | 
+| ---                     | --- | 
+| `module`                | Always ``scalyr_agent.builtin_monitors.snmp_monitor`` | 
+| `error_repeat_interval` | Optional (defaults to 300). The number of seconds to wait before repeating an error message. | 
+| `mib_path`              | Optional (defaults to None).  An absolute path to a location on disk that contains ASN1 MIB files | 
+| `oid_groups`            | A JSON object that maps custom names to a list of OIDs/variables defined as strings such "group1" : ["IF-MIB::ifDescr",  "1.3.6.1.2.1.2.2.1.16.1"]. | 
+| `poll_targets`          | A JSON array contain a list of target devices to poll.  Each element of the array is a JSON object that containsa list of target devices, and a list of "oid_groups" to query.  Each "target device" in the list is a JSON object containingvariables that define the target (host, port, authentication details) and each "oid_group" is a string key from thepreviously defined "oid_groups" configuration option. | 
 
-## Log reference
+<a name="events"></a>
+## Event Reference
 
-Each event recorded by this plugin will have the following fields:
+In the UI, each event has the fields:
 
-|||# Field          ||| Meaning
-|||# ``monitor``    ||| Always ``snmp_monitor``.
-|||# ``poll_target``||| The device that was queried to retrieve this value, e.g. ``demo.snpmlabs.com``
-|||# ``oid``        ||| The OID for the retrieved value, e.g. ``IF-MIB::ifDescr."1"``
-|||# ``value``      ||| The value reported by the device.
+| Field         | Description | 
+| ---           | --- | 
+| `monitor`     | Always ``snmp_monitor``. | 
+| `poll_target` | The device that was queried to retrieve this value, e.g. ``demo.snpmlabs.com`` | 
+| `oid`         | The OID for the retrieved value, e.g. ``IF-MIB::ifDescr."1"`` | 
+| `value`       | The value reported by the device. | 
