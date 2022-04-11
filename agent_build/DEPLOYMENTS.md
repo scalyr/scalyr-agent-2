@@ -43,14 +43,14 @@ EXAMPLE_ENVIRONMENT = Deployment(
 ```
 
 Here we give a name for our new deployment -`example_environment` and also specify steps that deployment has to perform. 
-Each step is a child **class** of the `DeploymentStep` base class, and each such class defines some work that has to be 
+Each step is a child **class** of the `ScriptBuildStep` base class, and each such class defines some work that has to be 
 done in order to perform the step.
 
 In the example we use step class ``ExampleStep``:
 
 ``` 
 
-class ExampleStep(deployments.ShellScriptDeploymentStep):
+class ExampleStep(deployments.ScriptBuildStep):
     @property
     def script_path(self) -> pl.Path:
         return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-requirements-and-download-webdriver.sh"
@@ -63,8 +63,8 @@ class ExampleStep(deployments.ShellScriptDeploymentStep):
     ]
 ```
 
-Here in the example we declare class `ExampleStep` as a child of the `ShellScriptDeploymentStep`
-class. The ``ShellScriptDeploymentStep`` base class is a `DeploymentStep` that runs some shell script in order to perform
+Here in the example we declare class `ExampleStep` as a child of the `ScriptBuildStep`
+class. The ``ScriptBuildStep`` base class is a `ScriptBuildStep` that runs some shell script in order to perform
 the step, and the script is specified in its ``script_path`` property method. In our case, the shell script is 
 ``install-requirements-and-download-webdriver.sh``. The needed requirement files are reflected in the ``tracked_file_globs`` -
 another property method, which is the list of paths to the files, that are somehow used in the deployment step.

@@ -549,7 +549,7 @@ class Deployment:
         self.name = name
         self.architecture = architecture
         self.base_docker_image = base_docker_image
-        self.cache_directory = constants.DEPLOYMENT_CACHE_DIR / self.name
+        self.cache_directory = constants.DEPLOYMENT_OUTPUTS_DIR / self.name
         self.output_directory = constants.DEPLOYMENT_OUTPUT / self.name
 
         # List with instantiated steps.

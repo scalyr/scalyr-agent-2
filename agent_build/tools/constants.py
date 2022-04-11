@@ -20,7 +20,8 @@ SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_OUTPUT = SOURCE_ROOT / "agent_build_output"
 PACKAGE_BUILDER_OUTPUT = AGENT_BUILD_OUTPUT / "package"
 DEPLOYMENT_OUTPUT = AGENT_BUILD_OUTPUT / "deployment"
-DEPLOYMENT_CACHE_DIR = AGENT_BUILD_OUTPUT / "deployment_cache"
+DEPLOYMENT_OUTPUTS_DIR = AGENT_BUILD_OUTPUT / "deployment_cache"
+DEPLOYMENT_ISOLATED_ROOTS_DIR = AGENT_BUILD_OUTPUT / "isolated_source_roots"
 
 
 class DockerPlatform(enum.Enum):
