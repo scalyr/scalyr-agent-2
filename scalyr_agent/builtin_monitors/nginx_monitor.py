@@ -35,7 +35,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "status_url",
-    'Optional (defaults to `http://localhost/nginx_status`). The URL the plugin will fetch '
+    "Optional (defaults to `http://localhost/nginx_status`). The URL the plugin will fetch "
     "nginx status information from.",
     default="http://localhost/nginx_status",
 )

@@ -45,7 +45,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "status_url",
-    'Optional (defaults to `http://localhost/server-status/?auto`). The URL, in particular the port '
+    "Optional (defaults to `http://localhost/server-status/?auto`). The URL, in particular the port "
     "number, at which the Apache status module is served. The URL should end in `/?auto` to "
     "indicate that the machine-readable version of the page should be returned.",
     default="http://localhost/server-status/?auto",
