@@ -95,7 +95,7 @@ define_metric(
     "postgres.database.connections",
     "The number of current active connections.  The value is accurate to when the check was made.",
     cumulative=False,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
@@ -104,7 +104,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"result": "committed"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -113,7 +113,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"result": "rolledback"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -122,7 +122,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"type": "read"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -131,7 +131,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"type": "hit"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -140,7 +140,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "returned"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -149,7 +149,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "fetched"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -158,7 +158,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "inserted"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -167,7 +167,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "updated"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -176,7 +176,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "deleted"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -184,7 +184,7 @@ define_metric(
     "The number of temporary files created by queries to the database.  "
     "The value is relative to postgres.database.stats_reset.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -192,7 +192,7 @@ define_metric(
     "The total amount of data written to temporary files by queries to the database.  "
     "The value is relative to postgres.database.stats_reset.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -200,7 +200,7 @@ define_metric(
     "The number of deadlocks detected in the database.  "
     "The value is relative to postgres.database.stats_reset.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -209,7 +209,7 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "read"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -218,21 +218,21 @@ define_metric(
     "The value is relative to postgres.database.stats_reset.",
     extra_fields={"op": "write"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "postgres.database.stats_reset",
     "The time at which database statistics were last reset.",
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "postgres.database.size",
     "The number of bytes the database is taking up on disk.",
     cumulative=False,
-    category="general",
+    category="General",
 )
 
 define_log_field(__monitor__, "monitor", "Always ``postgres_monitor``.")

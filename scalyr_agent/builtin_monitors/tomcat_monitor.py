@@ -93,7 +93,7 @@ define_metric(
     "The amount of memory free.",
     extra_fields={"type": "free"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -101,7 +101,7 @@ define_metric(
     "The total amount of memory available.",
     extra_fields={"type": "total"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -109,7 +109,7 @@ define_metric(
     "The maximum amount of memory free.",
     extra_fields={"type": "max"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -117,7 +117,7 @@ define_metric(
     "The maximum number of threads available/configured.",
     extra_fields={"type": "max"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -125,7 +125,7 @@ define_metric(
     "The number of threads currently active.",
     extra_fields={"type": "active"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -133,35 +133,35 @@ define_metric(
     "The number of threads currently busy.",
     extra_fields={"type": "busy"},
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.processing_time_max",
     "The value represents the largest amount of time spent processing a single request.",
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.processing_time",
     "The value represents the largest amount of time spent processing the current request.",
     cumulative=False,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.request_count",
     "The value represents the total number of requests made.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.error_count",
     "The value represents the total number requests that resulted in errors.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -169,7 +169,7 @@ define_metric(
     "The value represents the total number bytes received by the server.",
     extra_fields={"type": "received"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -177,7 +177,7 @@ define_metric(
     "The value represents the total number sent by the server.",
     extra_fields={"type": "sent"},
     cumulative=True,
-    category="general",
+    category="General",
 )
 
 memory_pools = {
@@ -196,7 +196,7 @@ for i in memory_pools.keys():
         % memory_pools[i],
         extra_fields={"pool": i},
         cumulative=False,
-        category="memory",
+        category="Memory",
     )
     define_metric(
         __monitor__,
@@ -205,7 +205,7 @@ for i in memory_pools.keys():
         % memory_pools[i],
         extra_fields={"pool": i},
         cumulative=False,
-        category="memory",
+        category="Memory",
     )
     define_metric(
         __monitor__,
@@ -214,7 +214,7 @@ for i in memory_pools.keys():
         % memory_pools[i],
         extra_fields={"pool": i},
         cumulative=False,
-        category="memory",
+        category="Memory",
     )
     define_metric(
         __monitor__,
@@ -223,7 +223,7 @@ for i in memory_pools.keys():
         % memory_pools[i],
         extra_fields={"pool": i},
         cumulative=False,
-        category="memory",
+        category="Memory",
     )
 
 define_log_field(__monitor__, "monitor", "Always ``tomcat_monitor``.")
