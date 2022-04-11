@@ -65,9 +65,9 @@ define_log_field(
     "metric",
     "The metric name.  See the metric tables for more information.",
 )
-define_log_field(__monitor__, "value", "The value of the metric.")
+define_log_field(__monitor__, "value", "The value of the metric.",)
 define_log_field(
-    __monitor__, "instance", "The `id` value, if specified. See [Configuration Options](#options)."
+    __monitor__, "instance", "The `id` value, if specified. See [Configuration Options](#options).",
 )
 
 define_metric(
@@ -248,6 +248,7 @@ Our [In-Depth Guide to Nginx Metrics](https://github.com/scalyr/scalyr-community
 Our [Essential Guide to Monitoring Nginx](https://github.com/scalyr/scalyr-community/blob/master/guides/how-to-monitor-nginx-the-essential-guide.md) explains how to use these metrics to monitor nginx.
 
 See [Analyze Access Logs](https://app.scalyr.com/solutions/analyze-access-logs) for more information about working with web access logs.
+
     """
     # fmt: on
 
