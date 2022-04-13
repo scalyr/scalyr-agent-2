@@ -34,72 +34,6 @@ _PARENT_DIR = pl.Path(__file__).parent
 _BUILD_STEPS_DIR = _PARENT_DIR / "fixtures/build_step_scripts"
 
 
-def get_initial_artifact_class(
-):
-    class InitialArtifactStep(build_step.ScriptBuildStep):
-        IS_BASE_STEP = True
-
-        def __init__(
-                self,
-                input_value: str,
-                script_path: pl.Path,
-                base_step: Optional[Union[build_step.ScriptBuildStep.DockerImageSpec, str]]=None,
-                dependency_steps=None
-        ):
-            super(InitialArtifactStep, self).__init__(
-                script_path=script_path,
-                base_step=base_step,
-                dependency_steps=dependency_steps
-            )
-
-            self._add_input("INPUT", input_value)
-
-            if isinstance(base_step, build_step.ScriptBuildStep.DockerImageSpec):
-                self._add_input("IN_DOCKER", "1")
-
-    return InitialArtifactStep
-
-
-def test_artifact_build_shell_step():
-    step_cls = get_initial_artifact_class(
-        script_suffix="sh"
-    )
-
-    step = step_cls(
-        input_value="TEST"
-    )
-
-    step.run()
-
-    result_file_path = step.output_directory / "result.txt"
-    assert result_file_path.exists()
-    assert result_file_path.read_text() == "TEST_shell\n"
-
-
-_DEBIAN_OS_RELEASE_CONTENT = """PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
-NAME="Debian GNU/Linux"
-VERSION_ID="11"
-VERSION="11 (bullseye)"
-VERSION_CODENAME=bullseye
-ID=debian
-HOME_URL="https://www.debian.org/"
-SUPPORT_URL="https://www.debian.org/support"
-BUG_REPORT_URL="https://bugs.debian.org/"
-"""
-
-@pytest.fixture(scope="session")
-def test_dir():
-    temp_dir = constants.SOURCE_ROOT / "build_test"
-    if temp_dir.exists():
-        shutil.rmtree(temp_dir)
-
-    temp_dir.mkdir(parents=True)
-    yield temp_dir
-
-@dataclasses.dataclass
-class StepFixture:
-    step: dict
-
 def _get_docker_image_spec_or_none(
         docker_image: str = None
 ):
@@ -110,49 +44,6 @@ def _get_docker_image_spec_or_none(
         name=docker_image,
         architecture=constants.Architecture.X86_64
     )
-
-
-class BaseStep(build_step.ScriptBuildStep):
-    IS_BASE_STEP = True
-
-def spawn_step(
-        script_type,
-        in_docker,
-        input_value: str,
-        result_file: pl.Path,
-        build_root: pl.Path,
-        is_base_step: bool
-):
-
-    if in_docker:
-        if script_type == "shell":
-            docker_image = "debian:bullseye"
-        else:
-            docker_image = "python:3.8-bullseye"
-    else:
-        docker_image = None
-
-    if script_type == "shell":
-        script_ext = ".sh"
-
-    else:
-        script_ext = ".py"
-
-    if is_base_step:
-        script_path = _BUILD_STEPS_DIR / f"base_step{script_ext}"
-        step = build_step.PrepareEnvironmentStep(
-            script_path=script_path,
-            build_root=build_root,
-
-            base_step=_get_docker_image_spec_or_none(docker_image),
-            additional_settings={
-                "INPUT": input_value,
-                "RESULT_FILE_PATH": str(result_file)
-            }
-        )
-
-
-    return step
 
 
 _BASE_STEP_SCRIPTS={
@@ -213,7 +104,6 @@ def test_base_step(
             base_step=docker_image,
             additional_settings={
                 "INPUT": "BASE",
-
                 "BASE_RESULT_FILE_PATH": str(base_step_result_file_path)
             }
         )
@@ -261,7 +151,10 @@ def test_base_step(
         assert base_step_result_file_path.exists()
         result_file_content = base_step_result_file_path.read_text()
 
-    assert result_file_content.strip() == f"BASE_{script_type}"
+    base_step_expected_result = f"BASE_{script_type}"
+    if in_docker:
+        base_step_expected_result = f"{base_step_expected_result}_in_docker"
+    assert result_file_content.strip() == base_step_expected_result
 
     # Check dependency step result
     dependency_step_result_file = dependency_step.output_directory / "result.txt"
@@ -273,7 +166,7 @@ def test_base_step(
     assert final_step_result_file.exists()
     assert final_step_result_file.read_text().strip() == textwrap.dedent(
         f"""
-        BASE_{script_type}
+        {base_step_expected_result}
         DEPENDENCY_{dependency_script_type}
         FINAL_{script_type}
         """
@@ -281,29 +174,38 @@ def test_base_step(
 
 
 def test_steps_id_consistency(tmp_path):
+    """
+    Test that essential input step information such as additional_settings,
+    docker_image and used_files will be reflected in an id of a step,
+    and the same step with the same inputs always produces the same id.
+    """
+    # Create temporary file and write there one of the scripts.
+    script_path = _BUILD_STEPS_DIR / "base_step.sh"
+    modifiable_script_path = tmp_path / "base_step.sh"
+    modifiable_script_path.write_text(
+        script_path.read_text()
+    )
+    base_step = build_step.PrepareEnvironmentStep(
+        script_path=_BUILD_STEPS_DIR / "base_step.sh",
+        build_root=tmp_path,
+        base_step=None,
+        additional_settings={
+            "NAME": "VALUE"
+        }
+    )
 
-    def create_base_step(
-            script_path=None,
-            additional_settings=None
-    ):
-
-        script_path = script_path or _BUILD_STEPS_DIR / "base_step.sh"
-        step = build_step.PrepareEnvironmentStep(
-            script_path=script_path,
+    same_step = build_step.PrepareEnvironmentStep(
+            script_path=_BUILD_STEPS_DIR / "base_step.sh",
             build_root=tmp_path,
             base_step=None,
-            additional_settings=additional_settings or {
+            additional_settings={
                 "NAME": "VALUE"
             }
         )
 
-        return step
+    assert base_step.id == same_step.id
 
-    base_step = create_base_step()
-    base_step2 = create_base_step()
-
-    assert base_step.id == base_step2.id
-
+    # Change additional settings
     changed_base = build_step.PrepareEnvironmentStep(
             script_path=_BUILD_STEPS_DIR / "base_step.sh",
             build_root=tmp_path,
@@ -315,7 +217,8 @@ def test_steps_id_consistency(tmp_path):
 
     assert base_step.id != changed_base.id
 
-    changed_base2 = build_step.PrepareEnvironmentStep(
+    # Change script file. The id also has to change.
+    changed_script_step = build_step.PrepareEnvironmentStep(
             script_path=_BUILD_STEPS_DIR / "base_step.py",
             build_root=tmp_path,
             base_step=None,
@@ -324,391 +227,16 @@ def test_steps_id_consistency(tmp_path):
             }
         )
 
-    assert base_step.id != changed_base2.id
+    assert base_step.id != changed_script_step.id
 
-
-
-
-
-
-
-@pytest.mark.parametrize(
-    ["script_type", "docker_image"],
-    [
-        ("shell", None),
-        ("python", None),
-        ("shell", "debian:bullseye"),
-        ("python", "python:3.8-bullseye")
-    ],
-)
-def test_step_overall_info(
-        script_type, docker_image: str
-):
-    """
-    Verify correctness of the overall info of the step.
-    If important to have correct overall_info method because unique id is built upon it.
-    """
-
-    script_path = _STEP_SCRIPTS[script_type]
-
-    # Step that just generates an artifact which is used in further steps.
-    dependency_step = CommonBuildStep(
-        script_path=script_path,
-        input_value="DEPENDENCY_STEP",
-        base_step=_get_docker_image_spec_or_none(docker_image)
-    )
-
-    expected_dependency_step_info = {
-        'name': 'initial_artifact_step',
-        'used_files': [
-            '.dockerignore',
-            str(script_path.relative_to(constants.SOURCE_ROOT))
-        ],
-        'files_checksum': build_step.calculate_files_checksum(dependency_step.overall_info["used_files"]),
-        'dependency_steps': [],
-        'base_step': None,
-        'additional_settings': {
-            'INPUT': 'DEPENDENCY_STEP'
-        }
-    }
-
-    # If step runs in docker, then the info object also has to contain an image information.
-    if docker_image:
-        expected_dependency_step_info['docker_image'] = {
-            'architecture': 'x86_64',
-            'name': docker_image
-        }
-
-    assert dependency_step.overall_info == expected_dependency_step_info
-
-    base_step = CommonBuildStep(
-        script_path=_STEP_SCRIPTS[script_type],
-        input_value="BASE_STEP",
-        base_step=_get_docker_image_spec_or_none(docker_image)
-    )
-
-    expected_base_step_info = {
-        'name': 'initial_artifact_step',
-        'used_files': [
-            '.dockerignore',
-            str(script_path.relative_to(constants.SOURCE_ROOT))
-        ],
-        'files_checksum': build_step.calculate_files_checksum(base_step.overall_info["used_files"]),
-        'dependency_steps': [],
-        'base_step': None,
-        'additional_settings': {
-            'INPUT': 'BASE_STEP'
-        }
-    }
-
-    if docker_image:
-        expected_base_step_info['docker_image'] = {
-            'architecture': 'x86_64',
-            'name': docker_image
-        }
-
-    assert base_step.overall_info == expected_base_step_info
-
-    final_step = CommonBuildStep(
-        script_path=script_path,
-        input_value="TEST_STEP",
-        base_step=base_step,
-        dependency_steps=[dependency_step]
-    )
-    print(final_step.overall_info)
-
-    expected_step_overall_info = {
-        'name': 'initial_artifact_step',
-        'used_files': [
-            '.dockerignore',
-            str(script_path.relative_to(constants.SOURCE_ROOT))
-        ],
-        'files_checksum': build_step.calculate_files_checksum(
-            files=final_step.overall_info["used_files"]
-        ),
-        'dependency_steps': [
-            dependency_step.overall_info
-        ],
-        'base_step': base_step.overall_info,
-        'additional_settings': {
-            'INPUT': 'TEST_STEP'
-        }
-    }
-
-    # If step runs in docker image, then we also expect docker image info in the overall info.
-    if docker_image:
-        expected_step_overall_info['docker_image'] = {
-            'architecture': 'x86_64',
-            'name': docker_image
-        }
-
-    assert final_step.overall_info == expected_step_overall_info
-
-
-
-@pytest.mark.parametrize(
-    ["final_step_script_type", "final_step_docker_image"],
-    [
-        ("shell", None),
-        ("python", None),
-        ("shell", "debian:bullseye"),
-        ("python", "python:3.8-bullseye")
-    ],
-)
-@pytest.mark.parametrize(
-    ["dependency_step_script_type", "dependency_step_docker_image"],
-    [
-        ("shell", None),
-        ("python", None),
-        ("shell", "debian:bullseye"),
-        ("python", "python:3.8-bullseye")
-    ],
-)
-def test_dependency_build_step(
-    dependency_step_script_type,
-    dependency_step_docker_image,
-    final_step_script_type,
-    final_step_docker_image
-
-
-):
-    dependency_step_script_path = _STEP_SCRIPTS[dependency_step_script_type]
-    final_step_script_path = _STEP_SCRIPTS[final_step_script_type]
-
-    dependency_step = CommonBuildStep(
-        script_path=dependency_step_script_path,
-        input_value="DEPENDENCY_STEP",
-        base_step=_get_docker_image_spec_or_none(dependency_step_docker_image)
-    )
-
-    final_step = CommonBuildStep(
-        script_path=final_step_script_path,
-        input_value="FINAL_STEP",
-        base_step=_get_docker_image_spec_or_none(final_step_docker_image),
-        dependency_steps=[dependency_step]
-    )
-
-    final_step.run()
-
-    dependency_step_result_file = dependency_step.output_directory / "result.txt"
-    assert dependency_step_result_file.exists()
-    assert dependency_step_result_file.read_text().strip() == f"DEPENDENCY_STEP_{dependency_step_script_type}"
-
-    # Check an additional file in case if step1 is in docker.
-    # There has to be a file with os-release content.
-    dependency_step_docker_image_release_path = dependency_step.output_directory / "docker_image_release.txt"
-    if dependency_step_docker_image:
-        assert dependency_step_docker_image_release_path.exists()
-        assert dependency_step_docker_image_release_path.read_text() == _DEBIAN_OS_RELEASE_CONTENT
-    else:
-        assert not dependency_step_docker_image_release_path.exists()
-
-    final_step_result_file = final_step.output_directory / "result.txt"
-    assert final_step_result_file.exists()
-    assert final_step_result_file.read_text().strip() == textwrap.dedent(
-        f"""
-        DEPENDENCY_STEP_{dependency_step_script_type}
-        FINAL_STEP_{final_step_script_type}
-        """
-    ).strip()
-
-    # Check an additional file in case if step2 is in docker.
-    step2_docker_release_info_file_path = final_step.output_directory / "docker_image_release.txt"
-    if final_step_docker_image:
-        assert step2_docker_release_info_file_path.exists()
-        assert step2_docker_release_info_file_path.read_text() == _DEBIAN_OS_RELEASE_CONTENT
-    else:
-        assert not step2_docker_release_info_file_path.exists()
-
-@pytest.mark.parametrize(
-    ["base_step_script_type", "base_step_docker_image"],
-    [
-        ("shell", None),
-        ("python", None),
-        ("shell", "debian:bullseye"),
-        ("python", "python:3.8-bullseye")
-    ]
-)
-@pytest.mark.parametrize(
-    ["final_step_script_type"],
-    [
-        ("shell",),
-        ("python",)
-    ]
-)
-def test_base_build_step(
-    base_step_script_type,
-    base_step_docker_image,
-    final_step_script_type,
-):
-    """
-    Verify the case where the final step is executed upon its base step.
-    In other words, the final step has to be run in the environment that is created inside base step.
-    """
-    base_step_script_path = _BASE_STEP_SCRIPTS[base_step_script_type]
-    final_step_script_path = _STEP_SCRIPTS[final_step_script_type]
-
-    temp_dir = None
-
-    if base_step_docker_image:
-        result_file_path = "/tmp/result.txt"
-    else:
-        temp_dir = tempfile.TemporaryDirectory(prefix="scalyr_build_step_test")
-        result_file_path = pl.Path(temp_dir.name, "result.txt")
-
-    base_step = BaseBuildStep(
-        input_value="BASE_STEP",
-        result_file_path=result_file_path,
-        script_path=base_step_script_path,
-        base_step=_get_docker_image_spec_or_none(base_step_docker_image)
-    )
-
-    # final_step = CommonBuildStep(
-    #     script_path=final_step_script_path,
-    #     input_value="FINAL_STEP",
-    #     base_step=base_step,
-    #     dependency_steps=[base_step]
-    # )
-
-
-    base_step.run()
-
-
-
-    return
-
-    dependency_step_result_file = base_step.output_directory / "result.txt"
-    assert dependency_step_result_file.exists()
-    assert dependency_step_result_file.read_text().strip() == f"DEPENDENCY_STEP_{base_step_script_type}"
-
-    # Check an additional file in case if step1 is in docker.
-    # There has to be a file with os-release content.
-    dependency_step_docker_image_release_path = base_step.output_directory / "docker_image_release.txt"
-    if base_step_docker_image:
-        assert dependency_step_docker_image_release_path.exists()
-        assert dependency_step_docker_image_release_path.read_text() == _DEBIAN_OS_RELEASE_CONTENT
-    else:
-        assert not dependency_step_docker_image_release_path.exists()
-
-    final_step_result_file = final_step.output_directory / "result.txt"
-    assert final_step_result_file.exists()
-    assert final_step_result_file.read_text().strip() == textwrap.dedent(
-        f"""
-        DEPENDENCY_STEP_{base_step_script_type}
-        FINAL_STEP_{final_step_script_type}
-        """
-    ).strip()
-
-    # Check an additional file in case if step2 is in docker.
-    step2_docker_release_info_file_path = final_step.output_directory / "docker_image_release.txt"
-    if final_step_docker_image:
-        assert step2_docker_release_info_file_path.exists()
-        assert step2_docker_release_info_file_path.read_text() == _DEBIAN_OS_RELEASE_CONTENT
-    else:
-        assert not step2_docker_release_info_file_path.exists()
-
-
-
-
-
-@pytest.fixture
-def example_deployment(request):
-
-    if request.param == "in_docker":
-        name = "example_environment_in_docker"
-        # This is the same example of the deployment by that run in docker. It is used only for tests.
-        deployment = deployments.Deployment(
-            name=name,
-            step_classes=[ExampleStep],
-            architecture=constants.Architecture.X86_64,
-            base_docker_image="python:3.8",
-        )
-    else:
-        name = "example_environment"
-        # This is just an example of the deployment. It is used only for tests.
-        deployment = deployments.Deployment(
-            name=name,
-            step_classes=[ExampleStep],
-        )
-    yield deployment
-    deployments.ALL_DEPLOYMENTS.pop(name)
-
-
-@pytest.fixture
-def in_ci_cd(request):
-    original_in_ci_cd = common.IN_CICD
-    common.IN_CICD = request.param
-    yield
-    common.IN_CICD = original_in_ci_cd
-
-
-@pytest.mark.parametrize(
-    ["example_deployment"], [["locally"], ["in_docker"]], indirect=True
-)
-@pytest.mark.parametrize(["in_ci_cd"], [[True]], indirect=True)
-def test_example_deployment(example_deployment: deployments.Deployment, in_ci_cd: bool):
-    example_deployment_step = example_deployment.steps[0]
-    deployment_step_cache_path = example_deployment_step.cache_directory
-    if deployment_step_cache_path.exists():
-        shutil.rmtree(deployment_step_cache_path)
-
-    if example_deployment.in_docker:
-        subprocess.check_call(
-            ["docker", "image", "rm", "-f", example_deployment.result_image_name]
+    # Add docker image.
+    step_with_docker_image = build_step.PrepareEnvironmentStep(
+            script_path=_BUILD_STEPS_DIR / "base_step.sh",
+            build_root=tmp_path,
+            base_step=_get_docker_image_spec_or_none("ubuntu"),
+            additional_settings={
+                "NAME": "VALUE",
+            }
         )
 
-    # mock real save docker image function to skip real image saving and to save time.
-    def step_save_image_mock(image_name: str, output_path: pl.Path):
-        output_path.touch()
-
-    with mock.patch.object(deployments, "save_docker_image", step_save_image_mock):
-        example_deployment.deploy()
-
-    # Check if the deployment created all needed cache directories.
-    if example_deployment.in_docker:
-        # IF that's a in docker deployment, then look for a serialized docker result image.
-        cached_docker_image_path = (
-            deployment_step_cache_path / example_deployment_step.result_image_name
-        )
-        assert cached_docker_image_path.is_file()
-    else:
-        # If not in docker, then look for directories that were cached by shell script.
-        pip_cache_directory = deployment_step_cache_path / "pip"
-        assert pip_cache_directory.is_dir()
-
-        webdriver_cache_directory = deployment_step_cache_path / "webdriver"
-        assert webdriver_cache_directory.is_dir()
-
-        # also check if those cache directories are not empty
-        assert list(pip_cache_directory.iterdir())
-        assert list(webdriver_cache_directory.iterdir())
-
-    assert example_deployment_step.cache_key == deployment_step_cache_path.name
-
-
-def test_deployment_step_with_untracked_file(caplog, capsys):
-    """
-    Run another invalid deployment that tries to access file that is not tracked.
-    """
-
-    class ExampleInvalidStepWithUntrackedFiles(deployments.ShellScriptDeploymentStep):
-        @property
-        def script_path(self) -> pl.Path:
-            return _REL_EXAMPLE_DEPLOYMENT_STEPS_PATH / "install-with-untracked-file.sh"
-
-    deployment = deployments.Deployment(
-        name="example_environment_untracked",
-        step_classes=[ExampleInvalidStepWithUntrackedFiles],
-    )
-
-    try:
-        with pytest.raises(deployments.DeploymentStepError):
-            deployment.deploy()
-
-        captured_output = capsys.readouterr()
-
-        assert "No such file or directory" in captured_output.err
-        assert "VERSION" in captured_output.err
-        assert "HINT: Make sure that you have specified all files." in caplog.text
-    finally:
-        deployments.ALL_DEPLOYMENTS.pop("example_environment_untracked")
+    assert base_step.id != step_with_docker_image.id
