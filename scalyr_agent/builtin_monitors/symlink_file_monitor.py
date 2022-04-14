@@ -16,14 +16,14 @@
 NOTE: This monitor is only used for testing purposes and is not to be used in production.
 
 Agent monitor which scans for files which match the provided glob and creates symlink(s) for
-each of the matching file to a new location with a specified prefix.
+each of the matching file to a new location using a specified file name.
 
 For example, let's say we have the following files on disk:
 
     /tmp/openmetrics_monitor_file1.log
     /tmp/openmetrics_monitor_file2.log
 
-And the following config:
+And the following monitor config:
 
     input_path_glob: "/tmp/openmetrics_monitor_*.log"
     symlink_file_name_format: "worker-{index}s-{file_name}s"
@@ -33,10 +33,29 @@ In this case, this monitor would create the following symlinks when a file which
 the input glob is found:
 
     /tmp/worker-0-openmetrics_monitor_file1.log
+    /tmp/worker-0-openmetrics_monitor_file2.log
+    /tmp/worker-1-openmetrics_monitor_file1.log
     /tmp/worker-1-openmetrics_monitor_file2.log
 
-Keep in mind that we use prefix and not suffix so we can still utilize agent glob matching
-for files which are to be ingested.
+This would then allow us to configure to additional workers to ingest those files into different
+accounts.
+
+For example:
+
+    {
+      "path": "/tmp/worker-0-openmetrics_monitor_file*.log",
+      "worker_id": "test_team_one",
+      "copy_from_start": true,
+   },
+   {
+      "path": "/tmp/worker-1-openmetrics_monitor_file*.log",
+      "worker_id": "test_team_two",
+      "copy_from_start": true,
+   },
+
+Keep in mind that we use a unique prefix and not suffix so we can still utilize agent glob matching
+for files which are to be ingested - if we used a unique suffix, main worker would still ingest
+the symlinked files because we can't exclude those files using the glob notation we support.
 """
 
 import os
@@ -91,9 +110,7 @@ define_config_option(
 class SymlinkMatchingFilesMonitor(ScalyrMonitor):
     def _initialize(self):
         self._input_path_glob = self._config.get("input_path_glob")
-        self._symlink_file_name_format = self._config.get(
-            "symlink_file_name_format"
-        )
+        self._symlink_file_name_format = self._config.get("symlink_file_name_format")
         self._symlinks_count = self._config.get("symlinks_count")
 
     def gather_sample(self):
@@ -118,7 +135,9 @@ class SymlinkMatchingFilesMonitor(ScalyrMonitor):
             symlink_destination_path = self._symlink_file_name_format.format(
                 index=index, file_name=file_name
             )
-            symlink_destination_path = os.path.join(file_directory, symlink_destination_path)
+            symlink_destination_path = os.path.join(
+                file_directory, symlink_destination_path
+            )
 
             if os.path.isfile(symlink_destination_path):
                 # This symlink destination already exists, skip creation
