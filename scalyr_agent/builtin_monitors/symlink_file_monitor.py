@@ -63,7 +63,6 @@ import os.path
 
 from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
-from scalyr_agent import define_log_field
 
 from scalyr_agent.util import match_glob
 
