@@ -175,7 +175,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
         monitor_logger.closeMetricLog()
 
-    @skipIf(sys.version_info <= (2, 7, 0), "Skipping tests under Python 2.7")
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_metric_logging_custom_timestamp(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
