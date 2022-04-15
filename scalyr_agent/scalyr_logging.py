@@ -373,6 +373,7 @@ class AgentLogger(logging.Logger):
         extra_fields=None,
         monitor=None,
         monitor_id_override=None,
+        timestamp=None,
     ):
         """Emits a metric and its value to the underlying log to be transmitted to Scalyr.
 
@@ -398,6 +399,9 @@ class AgentLogger(logging.Logger):
             of reporting this one value.  The base monitor name will remain unchanged.
         @type metric_name: six.text_type
         @raise UnsupportedValueType: If the value type is not one of the supported types.
+        @param timestamp: Optional timestamp in milliseconds to use for this log record. If not specified, it uses
+            current time when creating a Record object. Comes handy when you want to use the same timestamp for
+            multiple metrics.
         """
         if monitor is None:
             monitor = self.__monitor
@@ -462,6 +466,7 @@ class AgentLogger(logging.Logger):
             string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
+            timestamp=timestamp,
         )
         string_buffer.close()
 
@@ -482,6 +487,7 @@ class AgentLogger(logging.Logger):
         monitor_id_override=None,
         force_stdout=False,
         force_stderr=False,
+        timestamp=None,
     ):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
@@ -553,6 +559,10 @@ class AgentLogger(logging.Logger):
                 __thread_local__.last_error_for_monitor = self.__monitor
         else:
             __thread_local__.last_error_for_monitor = None
+
+        extra = extra or {}
+        if timestamp and "timestamp" not in extra:
+            extra["timestamp"] = timestamp
 
         # pylint: disable=assignment-from-no-return
         if extra is not None:
@@ -629,6 +639,14 @@ class AgentLogger(logging.Logger):
             result.metric_log_for_monitor.increment_counter(reported_lines=1)
         if result.error_for_monitor is not None:
             result.error_for_monitor.increment_counter(errors=1)
+
+        # If custom timestamp is provided we use that
+        timestamp = getattr(result, "timestamp", None)
+        if timestamp:
+            timestamp_s = timestamp / 1000
+            timestamp_ms = timestamp % 1000
+            result.created = timestamp_s
+            result.msecs = timestamp_ms
 
         if self.__keep_last_record:
             self.__last_record = result
