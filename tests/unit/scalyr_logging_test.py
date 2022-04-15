@@ -185,7 +185,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         timestamp_ms1 = 1650021068015
         timestamp_ms2 = 1650021068016
 
-        expected_line_prefix = "2022-04-15 11:11:08.015Z \[foo\(1\)\] test_name "
+        expected_line_prefix = r"2022-04-15 11:11:08.015Z \[foo\(1\)\] test_name "
 
         monitor_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo(1)"
