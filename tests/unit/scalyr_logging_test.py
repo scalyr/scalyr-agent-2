@@ -32,6 +32,7 @@ import mock
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+from scalyr_agent.test_base import skipIf
 
 
 class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
@@ -172,6 +173,56 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         )
         self.assertLogFileDoesntContainsLineRegex(expression="foo=5")
 
+        monitor_logger.closeMetricLog()
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_metric_logging_custom_timestamp(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        timestamp_ms1 = 1650021068015
+        timestamp_ms2 = 1650021068016
+
+        expected_line_prefix = r"2022-04-15 11:11:08.015Z \[foo\(1\)\] test_name "
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+        monitor_logger.emit_value("test_name", 1, {"foo": 5}, timestamp=timestamp_ms1)
+        monitor_logger.emit_value("test_name", 2, {"foo": 5}, timestamp=timestamp_ms1)
+        monitor_logger.emit_value("test_name", 3, {"foo": 5}, timestamp=timestamp_ms1)
+        monitor_logger.emit_value("test_name", 4, {"foo": 5}, timestamp=timestamp_ms1)
+        monitor_logger.emit_value(
+            "test_name",
+            5,
+            {"foo": 5, "timestamp": timestamp_ms2},
+            timestamp=timestamp_ms1,
+        )
+
+        self.assertEquals(monitor_instance.reported_lines, 5)
+
+        # The value should only appear in the metric log file and not the main one.
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression=expected_line_prefix + "1 foo=5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression=expected_line_prefix + "2 foo=5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression=expected_line_prefix + "3 foo=5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression=expected_line_prefix + "4 foo=5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression=expected_line_prefix + "5 foo=5 timestamp=1650021068016",
+        )
         monitor_logger.closeMetricLog()
 
     def test_metric_logging_extra_fields_are_sorted(self):
