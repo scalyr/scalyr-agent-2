@@ -561,11 +561,11 @@ class AgentLogger(logging.Logger):
             __thread_local__.last_error_for_monitor = None
 
         extra = extra or {}
-        if timestamp and "timestamp" not in extra:
+        if timestamp:
             extra["timestamp"] = timestamp
 
         # pylint: disable=assignment-from-no-return
-        if extra is not None:
+        if extra:
             result = logging.Logger._log(self, level, msg, args, exc_info, extra)
         elif exc_info is not None:
             result = logging.Logger._log(self, level, msg, args, exc_info)
