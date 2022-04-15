@@ -561,6 +561,8 @@ class AgentLogger(logging.Logger):
             __thread_local__.last_error_for_monitor = None
 
         extra = extra or {}
+        # TODO / NOTE: Add support for using timestamp from "extra_fields" field for metrics
+        # (if available)
         if timestamp:
             extra["timestamp"] = timestamp
 
