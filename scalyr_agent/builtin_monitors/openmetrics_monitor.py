@@ -307,7 +307,9 @@ class OpenMetricsMonitor(ScalyrMonitor):
         for metric_name, extra_fields, metric_value in metrics:
             extra_fields.update(self.__base_extra_fields or {})
             self._logger.emit_value(
-                metric_name, metric_value, extra_fields=extra_fields,
+                metric_name,
+                metric_value,
+                extra_fields=extra_fields,
                 timestamp=timestamp_ms,
             )
 
