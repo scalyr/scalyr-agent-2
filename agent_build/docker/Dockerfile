@@ -31,7 +31,7 @@ ARG BUILDER_NAME
 ADD . /scalyr-agent-2
 
 # Build the tarball with Agent's files.
-RUN python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
+RUN python3 /scalyr-agent-2/create_container_tarball.py --output-path /tmp/build
 
 # Extract tarball to the special place that can be reused by next stages.
 WORKDIR /tmp/container-fs
