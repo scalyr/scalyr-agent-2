@@ -697,7 +697,7 @@ class LinuxFhsBasedPackageBuilder(LinuxPackageBuilder):
             binary_symlink_path.symlink_to(symlink_target_path)
 
 
-class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
+class ContainerPackageBuilder2(LinuxFhsBasedPackageBuilder):
     """
     The base builder for all docker and kubernetes based images . It builds an executable script in the current working
      directory that will build the container image for the various Docker and Kubernetes targets.
@@ -1037,7 +1037,6 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
                 # This command runs partially runs the same code, so it would be nice to see the output.
                 debug=True,
             )
-
 
 class K8sPackageBuilder(ContainerPackageBuilder):
     """

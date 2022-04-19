@@ -1,0 +1,7 @@
+ARG BASE_IMAGE
+
+FROM $BASE_IMAGE
+
+ARG COVERAGE_VERSION
+# Install coverage lib.
+RUN pip3 --no-cache-dir install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"
