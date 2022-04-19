@@ -51,7 +51,7 @@ In the UI, each event has the fields:
 Metrics recorded by this plugin:
 
 
-### general Metrics
+### General Metrics
 
 | Metric                          | Fields | Description | 
 | ---                             | ---    | --- | 
@@ -70,7 +70,7 @@ Metrics recorded by this plugin:
 | `proc.uptime.total`             |        | The total number of seconds since boot. | 
 | `proc.uptime.now`               |        | The seconds since boot of idle time | 
 
-### virtual memory Metrics
+### Virtual Memory Metrics
 
 | Metric                      | Description | 
 | ---                         | --- | 
@@ -81,7 +81,7 @@ Metrics recorded by this plugin:
 | `proc.vmstat.pgpgin`        | The total number of pages swapped in since boot. | 
 | `proc.vmstat.pgpgout`       | The total number of pages swapped out in since boot. | 
 
-### numa Metrics
+### NUMA Metrics
 
 | Metric                       | Fields     | Description | 
 | ---                          | ---        | --- | 
@@ -93,7 +93,7 @@ Metrics recorded by this plugin:
 | `sys.numa.interleave`        | `node`, \
                                    `type=hit` | The number of pages allocated successfully by the interleave strategy. | 
 
-### sockets Metrics
+### Sockets Metrics
 
 | Metric                          | Fields | Description | 
 | ---                             | ---    | --- | 
@@ -104,7 +104,7 @@ Metrics recorded by this plugin:
 | `net.sockstat.memory`           | `type` | Memory allocated for this socket type (in bytes). | 
 | `net.sockstat.ipfragqueues`     |        | The total number of IP flows for which there are currently fragments queued for reassembly. | 
 
-### network Metrics
+### Network Metrics
 
 | Metric                                | Fields       | Description | 
 | ---                                   | ---          | --- | 
@@ -121,7 +121,7 @@ Metrics recorded by this plugin:
 | `net.stat.tcp.reording`               | `detectedby` | The number of times we detected re-ordering broken down by how. | 
 | `net.stat.tcp.syncookies`             | `type`       | SYN cookies (both sent & received). | 
 
-### disk requests Metrics
+### Disk Requests Metrics
 
 | Metric                               | Fields | Description | 
 | ---                                  | ---    | --- | 
@@ -137,7 +137,7 @@ Metrics recorded by this plugin:
 | `iostat.disk.msec_total`             | `dev`  | The total time in milliseconds doing I/O by device. | 
 | `iostat.disk.msec_weighted_total`    | `dev`  | Weighted time doing I/O (multiplied by ios_in_progress) by device. | 
 
-### disk resources Metrics
+### Disk Resources Metrics
 
 | Metric                 | Fields   | Description | 
 | ---                    | ---      | --- | 
@@ -152,7 +152,7 @@ Metrics recorded by this plugin:
 | `df.inodes.free`       | `mount`, \
                              `fstype` | The number of free inodes broken down by mount and filesystem type. | 
 
-### memory Metrics
+### Memory Metrics
 
 | Metric                     | Description | 
 | ---                        | --- | 

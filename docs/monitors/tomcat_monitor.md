@@ -92,7 +92,7 @@ In the UI, each event has the fields:
 Metrics recorded by this plugin:
 
 
-### general Metrics
+### General Metrics
 
 | Metric                                  | Fields          | Description | 
 | ---                                     | ---             | --- | 
@@ -109,7 +109,7 @@ Metrics recorded by this plugin:
 | `tomcat.runtime.network_bytes`          | `type=received` | The value represents the total number bytes received by the server. | 
 | `tomcat.runtime.network_bytes`          | `type=sent`     | The value represents the total number sent by the server. | 
 
-### memory Metrics
+### Memory Metrics
 
 | Metric                             | Fields                | Description | 
 | ---                                | ---                   | --- | 

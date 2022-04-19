@@ -5,33 +5,40 @@
 
 <!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
 
-# Nginx Monitor
+# Nginx
 
-This agent monitor plugin records performance and usage data from an nginx server.
+Import performance and usage data from an nginx server.
 
-@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Configuring Nginx
 
-To use this monitor, you will need to configure your nginx server to enable the status module. For details,
-see the [nginx documentation](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
+## Installation
 
-First, verify that your nginx server supports the status module. Execute the following command:
+1\. Install the Scalyr Agent
+
+If you haven't done so already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on servers running nginx.
+
+
+2\. Check requirements
+
+Make sure your nginx server supports the status module. Run this command:
 
     nginx -V 2>&1 | grep -o with-http_stub_status_module
 
-The output ``with-http_stub_status_module`` indicates that your server supports the status module. Otherwise,
-you will need to either recompile nginx with the ``--with-http_stub_status_module`` flag, or upgrade to a full
-version of nginx that has been compiled with that flag.
+The output must be:
 
-Next, you must enable the status module, by updating the ``server`` configuration section of your nginx server.
-This section can either be found in the ``nginx.conf`` file, or the file in your ``sites-available`` directory
-that corresponds to your site. For most Linux systems, these are located at ``/etc/nginx/nginx.conf`` and
-``/etc/nginx/sites-available``.
+    with-http_stub_status_module
 
-Add the following configuration inside the ``server { ... }`` stanza:
+If not, you will need to either recompile nginx and add the `--with-http_stub_status_module` flag to `./configure`, or upgrade to a full version of nginx compiled with this flag.
+
+To recompile, see the section on "Building Nginx From Source" in the [install tutorial](https://www.nginx.com/resources/wiki/start/topics/tutorials/install/). You can also consult the status module [documentation](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
+
+
+3\. Enable the nginx status module
+
+Find the `nginx.conf` file, or the file corresponding to your site in the `sites-available` directory. For most Linux systems, these are located at `/etc/nginx/nginx.conf` and `/etc/nginx/sites-available`.
+
+Add to the `server { ... }` section:
 
     location /nginx_status {
       stub_status on;      # enable the status module
@@ -39,87 +46,84 @@ Add the following configuration inside the ``server { ... }`` stanza:
       deny all;            # deny every other connection
     }
 
-This specifies that the status page should be served at ``http://<address>/nginx_status``, and can't be accessed
-from other servers.
+This sets the status page, served at `http://<address>/nginx_status`. Access is denied for all except localhost.
 
-Each time the Scalyr agent fetches ``/nginx_status``, an entry will be added to the Nginx access log. If you wish to
-prevent this, add the line ``access_log off;`` to the above configuration.
+Each time the Scalyr Agent fetches `/nginx_status`, an entry will be added to the nginx access log. To stop this, add the line `access_log off;` to the above configuration.
 
-Once you make the configuration change, you will need to restart Nginx.  On most Linux systems, use the following
-command:
+
+4\. Restart nginx and confirm
+
+To restart on most Linux systems:
 
     sudo service nginx restart
 
-To verify that the status module is working properly, you can view it manually. Execute this command on the server
-(substituting the appropriate port number as needed):
+To confirm the status module is working, run this command on the server, substituting the applicable port number:
 
     curl http://localhost:80/nginx_status
 
-If you have any difficulty enabling the status module, drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
 
-## Sample Configuration
+5\. Configure the Scalyr Agent to import status module data
 
-Here is a typical configuration fragment:
+Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
 
-    monitors: [
-      {
-          module: "scalyr_agent.builtin_monitors.nginx_monitor",
-      }
-    ]
-
-If you were running an instances of Nginx on a non-standard port (say 8080), your config might resemble:
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for nginx. Set the `status_url` property, replacing `80` with the applicable port number if you are on a nonstandard port:
 
     monitors: [
       {
           module: "scalyr_agent.builtin_monitors.nginx_monitor",
-          status_url: "http://localhost:8080/nginx_status"
-          id: "customers"
+          status_url: "http://localhost:80/nginx_status"
       }
     ]
 
-Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
-specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
-instance.
-
-accessLog:
-## Uploading the nginx access log
-
-If you have not already done so, you should also configure the Scalyr Agent to upload the access log
-generated by nginx. Scalyr's nginx dashboard uses this log to generate many statistics.
-
-For most Linux systems, the access log is saved in ``/var/log/nginx/access.log``. To upload, edit the
-``logs`` section of ``/etc/scalyr-agent-2/agent.json``. Add the following entry:
-
-    logs: [
-       ...
-
-    ***   {***
-    ***     path: "/var/log/nginx/access.log",***
-    ***     attributes: {parser: "accessLog", serverType: "nginx"}***
-    ***   }***
-    ]
-
-Edit the ``path`` field as appropriate for your system setup.
+See "Configuration Options" below for more properties you can add.
 
 
-## Viewing Data
+6\. Configure the Scalyr Agent to import the nginx access log
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
-click the {{menuRef:Dashboards}} menu and select {{menuRef:Nginx}}. (The dashboard may not be listed until
-the agent begins sending nginx data.) You will see an overview of nginx data across all servers where you are
-running the nginx plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.
+If haven't already done so when installing the Scalyr Agent, add the following entry to the `logs: [ ... ]` section of the Scalyr Agent configuration file, found at `/etc/scalyr-agent-2/agent.json`:
 
-See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
+<pre><code>logs: [
+   ...
+
+   <strong>{
+     path: "/var/log/nginx/access.log",
+     attributes: {parser: "accessLog", serverType: "nginx"}
+   }</strong>
+]</pre></code>
+
+For most Linux systems the `access.log` file is saved in `/var/log/nginx/access.log`. Adjust the `path` property if applicable.
+
+
+7\. Save and confirm
+
+Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Scalyr Agent to begin sending nginx data.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > nginx. You will see an overview of nginx data, across all servers configured for this plugin.
+
+The [Event Reference](#events) below explains the fields created by this plugin.
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
+
+## Further Reading
+
+Our [In-Depth Guide to Nginx Metrics](https://github.com/scalyr/scalyr-community/blob/master/guides/an-in-depth-guide-to-nginx-metrics.md) has more information on the metrics collected by this plugin.
+
+Our [Essential Guide to Monitoring Nginx](https://github.com/scalyr/scalyr-community/blob/master/guides/how-to-monitor-nginx-the-essential-guide.md) explains how to use these metrics to monitor nginx.
+
+See [Analyze Access Logs](https://app.scalyr.com/solutions/analyze-access-logs) for more information about working with web access logs.
 
 <a name="options"></a>
 ## Configuration Options
 
 | Property         | Description | 
 | ---              | --- | 
-| `module`         | Always ``scalyr_agent.builtin_monitors.nginx_monitor`` | 
-| `status_url`     | Optional (defaults to 'http://localhost/nginx_status').  The URL the monitor will fetchto retrieve the nginx status information. | 
-| `source_address` | Optional (defaults to '127.0.0.1'). The IP address to be used as the source address when fetching the status URL.  Many servers require this to be 127.0.0.1 because they only server the status page to requests from localhost. | 
-| `id`             | Optional (defaults to empty string).  Included in each log message generated by this monitor, as a field named ``instance``. Allows you to distinguish between different nginx instances running on the same server. | 
+| `module`         | Always `scalyr_agent.builtin_monitors.nginx_monitor` | 
+| `status_url`     | Optional (defaults to `http://localhost/nginx_status`). The URL the plugin will fetch nginx status information from. | 
+| `source_address` | Optional (defaults to `127.0.0.1`). The source IP address to use when fetching the status page. Many servers require this to be `127.0.0.1`, because they only serve the status page to requests from localhost. | 
+| `id`             | Optional (defaults to empty string). An id, included with each event. Shows in the UI as a value for the `instance` field. If you are running multiple instances of this plugin, id lets you distinguish between them. This is especially useful if you are running multiple nginx instances on a single server; you can monitor each instance with separate `{...}` stanzas in the configuration file (`/etc/scalyr-agent-2/agent.json`). | 
 
 <a name="events"></a>
 ## Event Reference
@@ -128,10 +132,10 @@ In the UI, each event has the fields:
 
 | Field      | Description | 
 | ---        | --- | 
-| `monitor`  | Always ``nginx_monitor``. | 
+| `monitor`  | Always `nginx_monitor`. | 
 | `metric`   | The metric name.  See the metric tables for more information. | 
 | `value`    | The value of the metric. | 
-| `instance` | The ``id`` value from the monitor configuration. | 
+| `instance` | The `id` value, if specified. See [Configuration Options](#options). | 
 
 <a name="metrics"></a>
 ## Metrics Reference
@@ -140,7 +144,7 @@ Metrics recorded by this plugin:
 
 | Metric                         | Description | 
 | ---                            | --- | 
-| `nginx.connections.active`     | This is the number of connections currently opened to the server.  The total number of allowed connections is a function of the number of worker_processes and the number of worker_connections configured within your Nginx configuration file. | 
-| `nginx.connections.reading`    | The number of connections currently reading from the clients. | 
-| `nginx.connections.writing`    | The number of connections currently writing to the clients. | 
-| `nginx.connections.waiting`    | The number of connections currently idle/sending keep alives. | 
+| `nginx.connections.active`     | The number of connections currently open on the server. The total number of allowed connections is a function of the number of worker_processes and the number of worker_connections in your Nginx configuration file. | 
+| `nginx.connections.reading`    | The number of connections currently reading request data. | 
+| `nginx.connections.writing`    | The number of connections currently writing response data. | 
+| `nginx.connections.waiting`    | The number of connections currently idle / sending keepalives. | 

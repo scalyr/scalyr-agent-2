@@ -145,14 +145,14 @@ define_metric(
     "The number of connections aborted because the client died or didn't close the connection properly.  "
     "The value is relative to the uptime of the server.",
     cumulative=True,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
     "mysql.global.aborted_connects",
     "The number of failed connection attempts.  The value is relative to the uptime of the server.",
     cumulative=True,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
@@ -161,7 +161,7 @@ define_metric(
     "the server.",
     unit="bytes",
     cumulative=True,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
@@ -170,7 +170,7 @@ define_metric(
     "the server.",
     unit="bytes",
     cumulative=True,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
@@ -178,19 +178,19 @@ define_metric(
     "Total number of connection attempts (successful and failed).  The value is relative to the uptime of "
     "the server.",
     cumulative=True,
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
     "mysql.global.max_used_connections",
     "High water mark for the total number of connections used at any one time since the server was started.",
-    category="connections",
+    category="Connections",
 )
 define_metric(
     __monitor__,
     "mysql.max_connections",
     "The maximum number of allowed open connections to server.",
-    category="connections",
+    category="Connections",
 )
 
 define_metric(
@@ -198,28 +198,28 @@ define_metric(
     "mysql.global.com_insert",
     "The number of ``insert`` commands run against the server",
     cumulative=True,
-    category="commands",
+    category="Commands",
 )
 define_metric(
     __monitor__,
     "mysql.global.com_delete",
     "The number of ``delete`` commands run against the server",
     cumulative=True,
-    category="commands",
+    category="Commands",
 )
 define_metric(
     __monitor__,
     "mysql.global.com_replace",
     "The number of ``replace`` commands run against the server",
     cumulative=True,
-    category="commands",
+    category="Commands",
 )
 define_metric(
     __monitor__,
     "mysql.global.com_select",
     "The number of ``select`` commands run against the server",
     cumulative=True,
-    category="commands",
+    category="Commands",
 )
 
 define_metric(
@@ -227,20 +227,20 @@ define_metric(
     "mysql.global.key_blocks_unused",
     "The total number of keyblocks unused at the time of the monitor check.  A high number indicates that "
     "the key cache might be large.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "mysql.global.key_blocks_used",
     "Maximum number of key blocks used at any one point.  Indicates a high water mark of the number used.  "
     "The value is relative to the uptime of the server.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "mysql.open_files_limit",
     "The maximum number of allowed open files.",
-    category="general",
+    category="General",
 )
 
 define_metric(
@@ -248,7 +248,7 @@ define_metric(
     "mysql.global.slow_queries",
     'The total number of queries over the uptime of the server that exceeded the "long_query_time" '
     "configuration.",
-    category="general",
+    category="General",
 )
 
 define_metric(
@@ -256,115 +256,115 @@ define_metric(
     "mysql.innodb.oswait_array.reservation_count",
     "A measure of how actively innodb uses it's internal sync array. Specifically, how frequently slots are "
     "allocated.",
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.oswait_array.signal_count",
     "As above, part of the measure of activity of the internal sync array, in this case how frequently "
     "threads are signaled using the sync array.",
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.locks.spin_waits",
     "The number of times since server start that a thread tried to a mutex that wasn't available.",
     cumulative=True,
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.locks.rounds",
     "The number of times since server start that a thread looped through the spin-wait cycle.",
     cumulative=True,
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.locks.os_waits",
     "The number of times since server start that a thread gave up spin-waiting and went to sleep.",
     cumulative=True,
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.history_list_length",
     "The number of unpurged transactions in the internal undo buffer It typically increases while "
     "transactions with updates are run and will decrease once the internal purge runs.",
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.opened_read_views",
     'The number of views into the db, this is "started transactions" which have no current statement '
     "actively operating.",
-    category="innodb",
+    category="InnoDB",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.queries_queued",
     "The number of queries waiting to be processed.  The value is based on the time the monitor sample is "
     "run.",
-    category="innodb",
+    category="InnoDB",
 )
 
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.size",
     "The size of the insert buffer.",
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.free_list_len",
     "The size free list for the insert buffer.",
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.seg_size",
     "The segment size of the insert buffer.",
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.inserts",
     "The total number of inserts since server start into the insert buffer.",
     cumulative=True,
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.merged_recs",
     "The total number of records merged in the insert buffer since server start.",
     cumulative=True,
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 define_metric(
     __monitor__,
     "mysql.innodb.innodb.ibuf.merges",
     "The total number of merges for the insert buffer since server start.",
     cumulative=True,
-    category="innodb insert buffer",
+    category="InnoDB Insert Buffer",
 )
 
 define_metric(
     __monitor__,
     "mysql.process.query",
     "The number of threads performing a query.",
-    category="threads",
+    category="Threads",
 )
 define_metric(
     __monitor__,
     "mysql.process.sleep",
     "The number of threads sleeping.",
-    category="threads",
+    category="Threads",
 )
 define_metric(
     __monitor__,
     "mysql.process.xxx",
     "The number of threads in state ``xxx``",
-    category="threads",
+    category="Threads",
 )
 
 define_log_field(__monitor__, "monitor", "Always ``mysql_monitor``.")

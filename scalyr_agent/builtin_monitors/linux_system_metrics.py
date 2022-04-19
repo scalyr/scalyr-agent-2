@@ -53,7 +53,7 @@ __monitor__ = __name__
 # These are the metrics collected, broken up by tcollector controllor:
 # We use the original tcollector documentation here has much as possible.
 define_metric(
-    __monitor__, "sys.cpu.count", "The number of CPUs on the system", category="general"
+    __monitor__, "sys.cpu.count", "The number of CPUs on the system", category="General"
 )
 
 define_metric(
@@ -64,79 +64,79 @@ define_metric(
     "``100*numcpus`` on the host.",
     extra_fields={"type": ""},
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.stat.intr",
     "The number of interrupts since boot.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.stat.ctxt",
     "The number of context switches since boot.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.stat.processes",
     "The number of processes created since boot.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.stat.procs_blocked",
     "The number of processes currently blocked on I/O.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.loadavg.1min",
     "The load average over 1 minute.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.loadavg.5min",
     "The load average over 5 minutes.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.loadavg.15min",
     "The load average over 15 minutes.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.loadavg.runnable",
     "The number of runnable threads/processes.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.loadavg.total_threads",
     "The total number of threads/processes.",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.kernel.entropy_avail",
     "The number of bits of entropy that can be read without blocking from /dev/random",
     unit="bits",
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
     "proc.uptime.total",
     "The total number of seconds since boot.",
     cumulative=True,
-    category="general",
+    category="General",
 )
 define_metric(
     __monitor__,
@@ -144,7 +144,7 @@ define_metric(
     "The seconds since boot of idle time",
     unit="seconds",
     cumulative=True,
-    category="general",
+    category="General",
 )
 
 define_metric(
@@ -152,42 +152,42 @@ define_metric(
     "proc.vmstat.pgfault",
     "The total number of minor page faults since boot.",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 define_metric(
     __monitor__,
     "proc.vmstat.pgmajfault",
     "The total number of major page faults since boot",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 define_metric(
     __monitor__,
     "proc.vmstat.pswpin",
     "The total number of processes swapped in since boot.",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 define_metric(
     __monitor__,
     "proc.vmstat.pswpout",
     "The total number of processes swapped out since boot.",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 define_metric(
     __monitor__,
     "proc.vmstat.pgpgin",
     "The total number of pages swapped in since boot.",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 define_metric(
     __monitor__,
     "proc.vmstat.pgpgout",
     "The total number of pages swapped out in since boot.",
     cumulative=True,
-    category="virtual memory",
+    category="Virtual Memory",
 )
 
 define_metric(
@@ -195,28 +195,28 @@ define_metric(
     "sys.numa.zoneallocs",
     "The number of pages allocated from the preferred node, either type=hit or type=miss.",
     extra_fields={"node": "", "type": ""},
-    category="numa",
+    category="NUMA",
 )
 define_metric(
     __monitor__,
     "sys.numa.foreign_allocs",
     "The number of pages allocated from node because the preferred node did not have any free.",
     extra_fields={"node": ""},
-    category="numa",
+    category="NUMA",
 )
 define_metric(
     __monitor__,
     "sys.numa.allocation",
     "The number of pages allocated either type=locally or type=remotely for processes on this node.",
     extra_fields={"node": "", "type": ""},
-    category="numa",
+    category="NUMA",
 )
 define_metric(
     __monitor__,
     "sys.numa.interleave",
     "The number of pages allocated successfully by the interleave strategy.",
     extra_fields={"node": "", "type": "hit"},
-    category="numa",
+    category="NUMA",
 )
 
 
@@ -224,26 +224,26 @@ define_metric(
     __monitor__,
     "net.sockstat.num_sockets",
     "The total number of sockets allocated (only TCP).",
-    category="sockets",
+    category="Sockets",
 )
 define_metric(
     __monitor__,
     "net.sockstat.num_timewait",
     "The total number of TCP sockets currently in TIME_WAIT state.",
-    category="sockets",
+    category="Sockets",
 )
 define_metric(
     __monitor__,
     "net.sockstat.sockets_inuse",
     "The total number of sockets in use by type.",
     extra_fields={"type": ""},
-    category="sockets",
+    category="Sockets",
 )
 define_metric(
     __monitor__,
     "net.sockstat.num_orphans",
     "The total number of orphan TCP sockets (not attached to any file descriptor).",
-    category="sockets",
+    category="Sockets",
 )
 define_metric(
     __monitor__,
@@ -251,13 +251,13 @@ define_metric(
     "Memory allocated for this socket type (in bytes).",
     extra_fields={"type": ""},
     unit="bytes",
-    category="sockets",
+    category="Sockets",
 )
 define_metric(
     __monitor__,
     "net.sockstat.ipfragqueues",
     "The total number of IP flows for which there are currently fragments queued for reassembly.",
-    category="sockets",
+    category="Sockets",
 )
 
 define_metric(
@@ -266,7 +266,7 @@ define_metric(
     "The total number of connections that the kernel had to abort due broken down by reason.",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -274,7 +274,7 @@ define_metric(
     "The total number of times the kernel failed to abort a connection because it didn't even have enough "
     "memory to reset it.",
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -283,7 +283,7 @@ define_metric(
     "CWND, broken down by how it recovered.",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -291,7 +291,7 @@ define_metric(
     "The number of delayed ACKs sent of different types.",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -300,7 +300,7 @@ define_metric(
     "the application isn't accepting connections fast enough.  You should see SYN cookies too.",
     extra_fields={"reason": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -308,14 +308,14 @@ define_metric(
     "The number of invalid SACKs we saw of diff types. (requires Linux v2.6.24-rc1 or newer)",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
     "net.stat.tcp.memory.pressure",
     'The number of times a socket entered the "memory pressure" mode.',
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -324,7 +324,7 @@ define_metric(
     "type.",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -332,7 +332,7 @@ define_metric(
     "The number of times we recovered from packet loss by type of recovery (e.g. fast retransmit vs SACK).",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -340,7 +340,7 @@ define_metric(
     "The number of times a received packet had to be dropped because the socket's receive queue was full "
     "(requires Linux v2.6.34-rc2 or newer)",
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -348,7 +348,7 @@ define_metric(
     "The number of times we detected re-ordering broken down by how.",
     extra_fields={"detectedby": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 define_metric(
     __monitor__,
@@ -356,7 +356,7 @@ define_metric(
     "SYN cookies (both sent & received).",
     extra_fields={"type": ""},
     cumulative=True,
-    category="network",
+    category="Network",
 )
 
 define_metric(
@@ -365,7 +365,7 @@ define_metric(
     "The total number of reads completed by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -373,7 +373,7 @@ define_metric(
     "The total number of reads merged by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -381,7 +381,7 @@ define_metric(
     "The total number of sectors read by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -390,7 +390,7 @@ define_metric(
     extra_fields={"dev": ""},
     unit="milliseconds",
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -398,7 +398,7 @@ define_metric(
     "The total number of writes completed by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -406,7 +406,7 @@ define_metric(
     "The total number of writes merged by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -414,7 +414,7 @@ define_metric(
     "The total number of sectors written by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -423,7 +423,7 @@ define_metric(
     extra_fields={"dev": ""},
     unit="milliseconds",
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -431,7 +431,7 @@ define_metric(
     "The number of I/O operations in progress by device",
     extra_fields={"dev": ""},
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -440,7 +440,7 @@ define_metric(
     extra_fields={"dev": ""},
     unit="milliseconds",
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 define_metric(
     __monitor__,
@@ -449,7 +449,7 @@ define_metric(
     extra_fields={"dev": ""},
     unit="milliseconds",
     cumulative=True,
-    category="disk requests",
+    category="Disk Requests",
 )
 
 define_metric(
@@ -458,7 +458,7 @@ define_metric(
     "The total size of the file system broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
     unit="bytes:1024",
-    category="disk resources",
+    category="Disk Resources",
 )
 define_metric(
     __monitor__,
@@ -466,28 +466,28 @@ define_metric(
     "The number of blocks used broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
     unit="bytes:1024",
-    category="disk resources",
+    category="Disk Resources",
 )
 define_metric(
     __monitor__,
     "df.inodes.total",
     "The number of inodes broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
-    category="disk resources",
+    category="Disk Resources",
 )
 define_metric(
     __monitor__,
     "df.inodes.used",
     "The number of used inodes broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
-    category="disk resources",
+    category="Disk Resources",
 )
 define_metric(
     __monitor__,
     "df.inodes.free",
     "The number of free inodes broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
-    category="disk resources",
+    category="Disk Resources",
 )
 
 define_metric(
@@ -495,7 +495,7 @@ define_metric(
     "proc.meminfo.memtotal",
     "The total number of 1 KB pages of RAM.",
     unit="bytes:1024",
-    category="memory",
+    category="Memory",
 )
 define_metric(
     __monitor__,
@@ -503,7 +503,7 @@ define_metric(
     "The total number of unused 1 KB pages of RAM. This does not include the number of cached pages which "
     "can be used when allocating memory.",
     unit="bytes:1024",
-    category="memory",
+    category="Memory",
 )
 define_metric(
     __monitor__,
@@ -511,14 +511,14 @@ define_metric(
     "The total number of 1 KB pages of RAM being used to cache blocks from the filesystem.  These can be "
     "reclaimed as used to allocate memory as needed.",
     unit="bytes:1024",
-    category="memory",
+    category="Memory",
 )
 define_metric(
     __monitor__,
     "proc.meminfo.buffers",
     "The total number of 1 KB pages of RAM being used in system buffers.",
     unit="bytes:1024",
-    category="memory",
+    category="Memory",
 )
 
 define_log_field(__monitor__, "monitor", "Always ``linux_system_metrics``.")
