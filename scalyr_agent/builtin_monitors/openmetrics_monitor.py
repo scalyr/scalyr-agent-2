@@ -102,6 +102,7 @@ if False:
 
 import re
 import fnmatch
+import time
 
 import six
 import requests
@@ -294,12 +295,22 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
     def gather_sample(self):
         # type: () -> None
+        # We want to use the same timestamp for all the metrics in a batch (aka all the metrics
+        # which are scraped at the same time( to make joins and other server side operations easier.
+        # Keep in mind that in case the parsed metric (aka record) contains a custom timestamp,
+        # that value has precedence over this one aka that record / metric specific value will be
+        # used for that metric
+        timestamp_ms = round(time.time() * 1000)
+
         metrics = self._scrape_metrics(self.__url)
 
         for metric_name, extra_fields, metric_value in metrics:
             extra_fields.update(self.__base_extra_fields or {})
             self._logger.emit_value(
-                metric_name, metric_value, extra_fields=extra_fields
+                metric_name,
+                metric_value,
+                extra_fields=extra_fields,
+                timestamp=timestamp_ms,
             )
 
     def check_connectivity(self) -> requests.Response:
