@@ -1274,6 +1274,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
 
 
 class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTestCase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_re_read_token_every_x_seconds(self):
         _, token_file_path = tempfile.mkstemp()
 
@@ -1310,7 +1311,8 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         self.assertEqual(k8s.token, "token2")
         self.assertEqual(k8s.token, "token2")
 
-    def test_kubernetes_apire_read_token_every_x_seconds(self):
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_kubernetes_api_re_read_token_every_x_seconds(self):
         _, token_file_path = tempfile.mkstemp()
 
         with open(token_file_path, "w") as fp:
@@ -1380,7 +1382,8 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         k8s.query_api("/test")
         self.assertEqual(k8s._token, "k8s-token2")
 
-    def test_kubelet_apire_read_token_every_x_seconds(self):
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_kubelet_api_re_read_token_every_x_seconds(self):
         _, token_file_path = tempfile.mkstemp()
 
         with open(token_file_path, "w") as fp:
