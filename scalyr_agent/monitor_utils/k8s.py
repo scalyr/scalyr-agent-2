@@ -34,8 +34,9 @@ import scalyr_agent.util as util
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
-    InsecureRequestWarning as InsecureRequestWarningAlias
+    InsecureRequestWarning as InsecureRequestWarningAlias,
 )
+
 global_log = scalyr_logging.getLogger(__name__)
 
 

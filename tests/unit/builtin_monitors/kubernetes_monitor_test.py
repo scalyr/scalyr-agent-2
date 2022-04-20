@@ -64,6 +64,8 @@ from tests.unit.copying_manager_tests.copying_manager_test import FakeMonitor
 from scalyr_agent.test_base import skipIf
 
 import mock
+import requests
+import requests_mock
 from mock import patch
 from six.moves import range
 
@@ -1270,6 +1272,8 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             {"log.config.scalyr.com/attributes.parser": "test-5"},
         )
 
+
+class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTestCase):
     def test_re_read_token_every_x_seconds(self):
         _, token_file_path = tempfile.mkstemp()
 
@@ -1305,3 +1309,154 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         time.sleep(1.2)
         self.assertEqual(k8s.token, "token2")
         self.assertEqual(k8s.token, "token2")
+
+    def test_kubernetes_apire_read_token_every_x_seconds(self):
+        _, token_file_path = tempfile.mkstemp()
+
+        with open(token_file_path, "w") as fp:
+            fp.write("k8s-token1")
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_service_account_token: "%s"
+            k8s_token_re_read_interval: 1,
+          }
+        """
+            % (token_file_path)
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        session = requests.Session()
+        adapter = requests_mock.Adapter()
+        session.mount("mock://", adapter)
+
+        expected_headers_token = ""
+
+        def custom_request_matcher(request):
+            """
+            Custom matcher which verify headers contain the correct auth token.
+            """
+            return "Authorization" in request.headers and request.headers[
+                "Authorization"
+            ] == "Bearer %s" % (expected_headers_token)
+
+        adapter.register_uri(
+            "GET",
+            "mock://test.com/test?pretty=0",
+            text="{}",
+            additional_matcher=custom_request_matcher,
+        )
+
+        k8s_api_url = "mock://test.com"
+
+        k8s = KubernetesApi.create_instance(
+            global_config=global_config,
+            k8s_api_url=k8s_api_url,
+            verify_api_queries=False,
+        )
+        k8s._session = session
+
+        # Token is read lazily on first request
+        expected_headers_token = "k8s-token1"
+
+        self.assertIsNone(k8s._token)
+        k8s.query_api("/test")
+
+        # Verify token has been read on initial request
+        self.assertEqual(k8s._token, "k8s-token1")
+
+        # Write a new token and verify it will be read after the timeout has been reached
+        with open(token_file_path, "w") as fp:
+            fp.write("k8s-token2")
+
+        k8s.query_api("/test")
+        self.assertEqual(k8s._token, "k8s-token1")
+
+        time.sleep(1.2)
+        expected_headers_token = "k8s-token2"
+
+        k8s.query_api("/test")
+        self.assertEqual(k8s._token, "k8s-token2")
+
+    def test_kubelet_apire_read_token_every_x_seconds(self):
+        _, token_file_path = tempfile.mkstemp()
+
+        with open(token_file_path, "w") as fp:
+            fp.write("kubelet-token1")
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_service_account_token: "%s"
+            k8s_token_re_read_interval: 1,
+          }
+        """
+            % (token_file_path)
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        session = requests.Session()
+        adapter = requests_mock.Adapter()
+        session.mount("mock://", adapter)
+
+        expected_headers_token = ""
+
+        def custom_request_matcher(request):
+            """
+            Custom matcher which verify headers contain the correct auth token.
+            """
+            return "Authorization" in request.headers and request.headers[
+                "Authorization"
+            ] == "Bearer %s" % (expected_headers_token)
+
+        adapter.register_uri(
+            "GET",
+            "mock://test.com:10250/test",
+            text="{}",
+            additional_matcher=custom_request_matcher,
+        )
+
+        k8s_api_url = "mock://test.com"
+
+        k8s = KubernetesApi.create_instance(
+            global_config=global_config,
+            k8s_api_url=k8s_api_url,
+            verify_api_queries=False,
+        )
+        k8s._session = session
+
+        kubelet_url_template = Template("mock://${host_ip}:10250")
+
+        kubelet = KubeletApi(
+            k8s=k8s,
+            host_ip="test.com",
+            node_name="node-1",
+            verify_https=False,
+            kubelet_url_template=kubelet_url_template,
+        )
+        kubelet._session = session
+
+        # Token is read lazily on first request
+        expected_headers_token = "kubelet-token1"
+
+        self.assertIsNone(k8s._token)
+        kubelet.query_api("/test")
+
+        # Verify token has been read on initial request
+        self.assertEqual(k8s._token, "kubelet-token1")
+
+        # Write a new token and verify it will be read after the timeout has been reached
+        with open(token_file_path, "w") as fp:
+            fp.write("kubelet-token2")
+
+        kubelet.query_api("/test")
+        self.assertEqual(k8s._token, "kubelet-token1")
+
+        time.sleep(1.2)
+        expected_headers_token = "kubelet-token2"
+
+        kubelet.query_api("/test")
+        self.assertEqual(k8s._token, "kubelet-token2")
