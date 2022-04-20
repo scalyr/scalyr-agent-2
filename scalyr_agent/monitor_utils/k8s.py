@@ -33,6 +33,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as util
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent.configuration import Configuration
+from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
+    InsecureRequestWarning as InsecureRequestWarningAlias,
+)
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -1737,6 +1740,7 @@ class KubernetesApi(object):
                     ),
                     "token_file": global_config.k8s_service_account_token,
                     "namespace_file": global_config.k8s_service_account_namespace,
+                    "token_re_read_interval": global_config.k8s_token_re_read_interval,
                 }
             )
         return KubernetesApi(**kwargs)
@@ -1756,6 +1760,7 @@ class KubernetesApi(object):
         rate_limiter=None,
         token_file="/var/run/secrets/kubernetes.io/serviceaccount/token",
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        token_re_read_interval=300,
     ):
         """Init the kubernetes object"""
         self.log_api_responses = log_api_responses
@@ -1773,6 +1778,8 @@ class KubernetesApi(object):
         self._session = None
 
         self._ca_file = ca_file
+        self._token_file = token_file
+        self._token_re_read_interval = int(token_re_read_interval)
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self._standard_headers = {
@@ -1780,20 +1787,13 @@ class KubernetesApi(object):
             "Accept": "application/json",
         }
 
-        # The k8s API requires us to pass in an authentication token
-        # which we can obtain from a token file in a 'well known' location
-        self.token = ""
+        # Stores unix timestamp of when we last read the token value from file on disk (so we can
+        # periodically re-reading this file to support tokens which get periodically refreshed /
+        # rotated)
+        self._token_read_time_ts = 0
 
-        try:
-            # using with is ok here, because we need to be running
-            # a recent version of python for various 3rd party libs
-            f = open(token_file, "r")
-            try:
-                self.token = f.read().strip()
-            finally:
-                f.close()
-        except IOError:
-            pass
+        # Stores cached value of the authentication token read from a volume mount on disk.
+        self._token = None
 
         # get the namespace this pod is running on
         self.namespace = "default"
@@ -1808,8 +1808,6 @@ class KubernetesApi(object):
         except IOError:
             pass
 
-        self._standard_headers["Authorization"] = "Bearer %s" % (self.token)
-
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
@@ -1821,6 +1819,64 @@ class KubernetesApi(object):
             ca_file,
             bool(self._verify_connection()),
         )
+
+    @property
+    def token(self):
+        """
+        Retrieve currently cached authentication token value.
+
+        This method will read token from the mounted volume on disk. It also supports re-reading
+        the token from disk (by default every 5 minutes) to ensure we have the latest version of
+        the token in case it has been rotated.
+        """
+        token_re_read_interval = self._token_re_read_interval
+
+        now_ts = int(time.time())
+        should_re_read_token = (
+            now_ts - token_re_read_interval
+        ) >= self._token_read_time_ts
+
+        # TODO: We should probably consider token file not existing fatal and throw so we don't end
+        # up in a constant re-read token loop?
+        # But previous version of the code didn't treat token file not existing as fatal so I left
+        # that behavior the same, for now.
+
+        if should_re_read_token:
+            # We periodically try to re-read the token from disk to support scenarios where the
+            # token has been refreshed or rotated.
+            # See https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection
+            # for details.
+            self._token_read_time_ts = int(time.time())
+            previous_token_value = self._token
+
+            if not self._token:
+                global_log.debug(
+                    "Locally cached token not available, reading it from %s file on "
+                    "disk." % (self._token_file)
+                )
+            elif should_re_read_token:
+                global_log.debug(
+                    "%s seconds have passed since reading the token from file %s on "
+                    "disk, re-reading it in case the token has been refreshed or "
+                    "rotated." % (token_re_read_interval, self._token_file)
+                )
+
+            try:
+                with open(self._token_file, "r") as fp:
+                    self._token = fp.read().strip()
+            except IOError as e:
+                global_log.warning(
+                    "Unable to read auth token from file %s: %s"
+                    % (self._token_file, str(e))
+                )
+
+            if previous_token_value != self._token:
+                global_log.debug(
+                    "Read token value from file %s is different than the one which "
+                    "we had cached which indicates token has been rotated."
+                )
+
+        return self._token
 
     @property
     def default_query_options(self):
@@ -1840,7 +1896,17 @@ class KubernetesApi(object):
         """Create the session if it doesn't exist, otherwise do nothing"""
         if not self._session:
             self._session = requests.Session()
-            self._session.headers.update(self._standard_headers)
+
+        self._add_auth_header()
+
+    def _add_auth_header(self):
+        """
+        Add authentication header to the current session.
+
+        This method also takes care of periodically re-reading token value from disk.
+        """
+        headers = {"Authorization": "Bearer %s" % (self.token)}
+        self._session.headers.update(headers)
 
     def get_pod_name(self):
         """Gets the pod name of the pod running the scalyr-agent"""
@@ -2317,6 +2383,8 @@ class KubeletApi(object):
         """
         @param k8s - a KubernetesApi object
         """
+        # TODO: Verify we don't have a cyclic dependency
+        self._k8s = k8s
         self._ca_file = ca_file
         self._host_ip = host_ip
         self._verify_https = verify_https
@@ -2336,7 +2404,6 @@ class KubeletApi(object):
         self._session = requests.Session()
         headers = {
             "Accept": "application/json",
-            "Authorization": "Bearer %s" % k8s.token,
         }
         self._session.headers.update(headers)
 
@@ -2381,7 +2448,17 @@ class KubeletApi(object):
             return self._ca_file
         return False
 
+    def _add_auth_header(self):
+        """
+        Add authentication header to the current session.
+
+        This method also takes care of periodically re-reading token value from disk.
+        """
+        headers = {"Authorization": "Bearer %s" % (self._k8s.token)}
+        self._session.headers.update(headers)
+
     def _get(self, url, verify):
+        self._add_auth_header()
         return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
@@ -2398,6 +2475,11 @@ class KubeletApi(object):
                         "ignore",
                         category=urllib3.exceptions.InsecureRequestWarning,
                     )
+                    warnings.simplefilter(
+                        "ignore",
+                        category=InsecureRequestWarningAlias,
+                    )
+
                     response = self._get(url, False)
                 if self._kubelet_url.startswith("https://"):
                     global_log.warn(

@@ -985,6 +985,10 @@ class Configuration(object):
         return self.__get_config().get_string("k8s_service_account_namespace")
 
     @property
+    def k8s_token_re_read_interval(self):
+        return self.__get_config().get_int("k8s_token_re_read_interval")
+
+    @property
     def k8s_log_api_responses(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool("k8s_log_api_responses")
@@ -2767,6 +2771,15 @@ class Configuration(object):
             config,
             "k8s_service_account_namespace",
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # In seconds, defaults to every 5 minutes
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_token_re_read_interval",
+            5 * 60,
             description,
             apply_defaults,
             env_aware=True,

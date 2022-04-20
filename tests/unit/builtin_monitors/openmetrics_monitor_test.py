@@ -272,7 +272,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger.warn.assert_called_with(
             'Parsed more than 2000 metrics (4900) for URL https://my.host:8080/metrics. You are strongly encouraged to filter metrics at the source or set "metric_name_exclude_list" monitor configuration option to avoid excessive number of metrics being ingested.',
             limit_once_per_x_secs=86400,
-            limit_key="https://my.host:8080/metrics",
+            limit_key="max-metrics-https://my.host:8080/metrics",
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_server_socketservermetrics_io_wait_ratio",
@@ -300,7 +300,26 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             timestamp=MOCK_TIMESTAMP_MS,
         )
 
-        # 2. Metric extra_field filters
+        # 2. All metrics are excluded - warning should be emitted
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_include_list": [],
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 20)
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+
+        mock_logger.warn.assert_called_with(
+            "Server returned 4900 metrics, but none were included. This likely means that filters specified as part of the plugin configuration are too restrictive and need to be relaxed.",
+            limit_once_per_x_secs=86400,
+            limit_key="no-metrics-https://my.host:8080/metrics",
+        )
+
+        # 3. Metric extra_field filters
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
@@ -362,7 +381,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             timestamp=MOCK_TIMESTAMP_MS,
         )
 
-        # 2. Metric extra_field filters (matches any metric name)
+        # 4. Metric extra_field filters (matches any metric name)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
@@ -581,7 +600,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
         self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
         monitor_config = {

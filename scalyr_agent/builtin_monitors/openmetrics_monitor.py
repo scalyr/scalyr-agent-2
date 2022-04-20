@@ -378,7 +378,11 @@ class OpenMetricsMonitor(ScalyrMonitor):
 
         metric_name_to_type_map = {}
 
-        metrics_count = 0
+        total_metrics_count = (
+            0  # total number of returned metrics, including ignored ones
+        )
+        included_metrics_count = 0  # number of metrics which are included
+        ignored_metrics_count = 0  # number of ignored / skipped metrics
 
         for line in lines:
             # Skip comments
@@ -460,9 +464,12 @@ class OpenMetricsMonitor(ScalyrMonitor):
                     )
                     continue
 
+            total_metrics_count += 1
+
             if not self._should_include_metric(
                 metric_name=metric_name, extra_fields=extra_fields
             ):
+                ignored_metrics_count += 1
                 continue
 
             metric_type = metric_name_to_type_map.get(metric_name, None)
@@ -473,19 +480,29 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 )
                 continue
 
-            metrics_count += 1
+            included_metrics_count += 1
 
             item = (metric_name, extra_fields, metric_value)
             result.append(item)
 
-        if metrics_count > MAX_METRICS_PER_GATHER_WARN:
-            limit_key = self.__url
+        if included_metrics_count > MAX_METRICS_PER_GATHER_WARN:
+            limit_key = "max-metrics-" + self.__url
             self._logger.warn(
                 "Parsed more than 2000 metrics (%s) for URL %s. You are strongly "
                 "encouraged to filter metrics at the source or set "
                 '"metric_name_exclude_list" monitor configuration option to avoid '
                 "excessive number of metrics being ingested."
-                % (metrics_count, self.__url),
+                % (included_metrics_count, self.__url),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
+
+        if total_metrics_count >= 1 and included_metrics_count == 0:
+            limit_key = "no-metrics-" + self.__url
+            self._logger.warn(
+                "Server returned %s metrics, but none were included. This likely means "
+                "that filters specified as part of the plugin configuration are too restrictive and "
+                "need to be relaxed." % (total_metrics_count),
                 limit_once_per_x_secs=86400,
                 limit_key=limit_key,
             )
