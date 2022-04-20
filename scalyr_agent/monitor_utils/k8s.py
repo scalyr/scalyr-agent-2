@@ -1864,7 +1864,7 @@ class KubernetesApi(object):
             try:
                 with open(self._token_file, "r") as fp:
                     self._token = fp.read().strip()
-            except IOError:
+            except IOError as e:
                 global_log.warning(
                     "Unable to read auth token from file %s: %s"
                     % (self._token_file, str(e))
