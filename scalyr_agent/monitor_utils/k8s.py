@@ -2371,6 +2371,8 @@ class KubeletApi(object):
         """
         @param k8s - a KubernetesApi object
         """
+        # TODO: Verify we don't have a cyclic dependency
+        self._k8s = k8s
         self._ca_file = ca_file
         self._host_ip = host_ip
         self._verify_https = verify_https
