@@ -33,7 +33,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as util
 from scalyr_agent.compat import os_environ_unicode
 from scalyr_agent.configuration import Configuration
-
+from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
+    InsecureRequestWarning as InsecureRequestWarningAlias
+)
 global_log = scalyr_logging.getLogger(__name__)
 
 
@@ -2472,6 +2474,11 @@ class KubeletApi(object):
                         "ignore",
                         category=urllib3.exceptions.InsecureRequestWarning,
                     )
+                    warnings.simplefilter(
+                        "ignore",
+                        category=InsecureRequestWarningAlias,
+                    )
+
                     response = self._get(url, False)
                 if self._kubelet_url.startswith("https://"):
                     global_log.warn(
