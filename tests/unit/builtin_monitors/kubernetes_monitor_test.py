@@ -22,6 +22,7 @@ import re
 import time
 import warnings
 import platform
+import tempfile
 from string import Template
 from collections import OrderedDict
 
@@ -57,6 +58,7 @@ from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
+from tests.unit.monitor_utils.k8s_test import KubernetesApi
 from tests.unit.configuration_test import TestConfigurationBase
 from tests.unit.copying_manager_tests.copying_manager_test import FakeMonitor
 from scalyr_agent.test_base import skipIf
@@ -1267,3 +1269,38 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             result["cont-1"]["k8s_info"]["pod_info"].annotations,
             {"log.config.scalyr.com/attributes.parser": "test-5"},
         )
+
+    def test_re_read_token_every_x_seconds(self):
+        _, token_file_path = tempfile.mkstemp()
+
+        with open(token_file_path, "w") as fp:
+            fp.write("token1")
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_service_account_token: "%s"
+            k8s_token_re_read_interval: 1,
+          }
+        """ % (token_file_path)
+        )
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        k8s = KubernetesApi.create_instance(global_config=global_config)
+
+        # 1. On initial read we should read first token
+        self.assertEqual(k8s.token, "token1")
+        self.assertEqual(k8s.token, "token1")
+        self.assertEqual(k8s.token, "token1")
+
+        # Update the token
+        with open(token_file_path, "w") as fp:
+            fp.write("token2")
+
+        self.assertEqual(k8s.token, "token1")
+
+        # 2. After the token has been updated, the code should eventually re-read a new token
+        time.sleep(1.2)
+        self.assertEqual(k8s.token, "token2")
+        self.assertEqual(k8s.token, "token2")
