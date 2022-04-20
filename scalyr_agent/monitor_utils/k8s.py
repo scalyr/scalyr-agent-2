@@ -1829,7 +1829,9 @@ class KubernetesApi(object):
         token_re_read_interval = self._token_re_read_interval
 
         now_ts = int(time.time())
-        should_re_read_token = (now_ts - token_re_read_interval) >= self._token_read_time_ts
+        should_re_read_token = (
+            now_ts - token_re_read_interval
+        ) >= self._token_read_time_ts
 
         # TODO: We should probably consider token file not existing fatal and throw so we don't end
         # up in a constant re-read token loop?
@@ -1845,22 +1847,31 @@ class KubernetesApi(object):
             previous_token_value = self._token
 
             if not self._token:
-                global_log.debug("Locally cached token not available, reading it from %s file on "
-                                 "disk." % (self._token_file))
+                global_log.debug(
+                    "Locally cached token not available, reading it from %s file on "
+                    "disk." % (self._token_file)
+                )
             elif should_re_read_token:
-                global_log.debug("%s seconds have passed since reading the token from file %s on "
-                                 "disk, re-reading it in case the token has been refreshed or "
-                                 "rotated." % (token_re_read_interval, self._token_file))
+                global_log.debug(
+                    "%s seconds have passed since reading the token from file %s on "
+                    "disk, re-reading it in case the token has been refreshed or "
+                    "rotated." % (token_re_read_interval, self._token_file)
+                )
 
             try:
                 with open(self._token_file, "r") as fp:
                     self._token = fp.read().strip()
             except IOError:
-                global_log.warning("Unable to read auth token from file %s: %s" % (self._token_file, str(e)))
+                global_log.warning(
+                    "Unable to read auth token from file %s: %s"
+                    % (self._token_file, str(e))
+                )
 
             if previous_token_value != self._token:
-                global_log.debug("Read token value from file %s is different than the one which "
-                                 "we had cached which indicates token has been rotated.")
+                global_log.debug(
+                    "Read token value from file %s is different than the one which "
+                    "we had cached which indicates token has been rotated."
+                )
 
         return self._token
 
@@ -1891,9 +1902,7 @@ class KubernetesApi(object):
 
         This method also takes care of periodically re-reading token value from disk.
         """
-        headers = {
-            "Authorization": "Bearer %s" % (self.token)
-        }
+        headers = {"Authorization": "Bearer %s" % (self.token)}
         self._session.headers.update(headers)
 
     def get_pod_name(self):
@@ -2442,9 +2451,7 @@ class KubeletApi(object):
 
         This method also takes care of periodically re-reading token value from disk.
         """
-        headers = {
-            "Authorization": "Bearer %s" % (self._k8s.token)
-        }
+        headers = {"Authorization": "Bearer %s" % (self._k8s.token)}
         self._session.headers.update(headers)
 
     def _get(self, url, verify):

@@ -1282,7 +1282,8 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             k8s_service_account_token: "%s"
             k8s_token_re_read_interval: 1,
           }
-        """ % (token_file_path)
+        """
+            % (token_file_path)
         )
         global_config = self._create_test_configuration_instance()
         global_config.parse()
