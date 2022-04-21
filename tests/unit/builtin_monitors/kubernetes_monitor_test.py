@@ -36,6 +36,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sNamespaceFilter,
     PodInfo,
 )
+
 from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
@@ -1275,21 +1276,15 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
 
 class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTestCase):
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_re_read_token_every_x_seconds(self):
-        _, token_file_path = tempfile.mkstemp()
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=1)
 
-        with open(token_file_path, "w") as fp:
-            fp.write("token1")
+        token_file_path = self._write_mock_config(token_re_read_interval=1)
 
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            k8s_service_account_token: "%s"
-            k8s_token_re_read_interval: 1,
-          }
-        """
-            % (token_file_path)
-        )
+        # Write initial token value
+        self._write_mock_token(token_file_path, "token1")
+
         global_config = self._create_test_configuration_instance()
         global_config.parse()
 
@@ -1301,32 +1296,26 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         self.assertEqual(k8s.token, "token1")
 
         # Update the token
-        with open(token_file_path, "w") as fp:
-            fp.write("token2")
+        self._write_mock_token(token_file_path, "token2")
 
         self.assertEqual(k8s.token, "token1")
 
         # 2. After the token has been updated, the code should eventually re-read a new token
-        time.sleep(1.2)
+        mock_time.advance_time(increment_by=2)
+
         self.assertEqual(k8s.token, "token2")
         self.assertEqual(k8s.token, "token2")
 
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_kubernetes_api_re_read_token_every_x_seconds(self):
-        _, token_file_path = tempfile.mkstemp()
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_kubernetes_api_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=1)
 
-        with open(token_file_path, "w") as fp:
-            fp.write("k8s-token1")
+        token_file_path = self._write_mock_config(token_re_read_interval=1)
 
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            k8s_service_account_token: "%s"
-            k8s_token_re_read_interval: 1,
-          }
-        """
-            % (token_file_path)
-        )
+        # Write initial token value
+        self._write_mock_token(token_file_path, "k8s-token1")
+
         global_config = self._create_test_configuration_instance()
         global_config.parse()
 
@@ -1370,34 +1359,29 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         self.assertEqual(k8s._token, "k8s-token1")
 
         # Write a new token and verify it will be read after the timeout has been reached
-        with open(token_file_path, "w") as fp:
-            fp.write("k8s-token2")
+        self._write_mock_token(token_file_path, "k8s-token2")
 
         k8s.query_api("/test")
         self.assertEqual(k8s._token, "k8s-token1")
 
-        time.sleep(1.2)
+        # Increment time simulate timeout being reached
+        mock_time.advance_time(increment_by=2)
+
         expected_headers_token = "k8s-token2"
 
         k8s.query_api("/test")
         self.assertEqual(k8s._token, "k8s-token2")
 
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
-    def test_kubelet_api_re_read_token_every_x_seconds(self):
-        _, token_file_path = tempfile.mkstemp()
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_kubelet_api_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=5)
 
-        with open(token_file_path, "w") as fp:
-            fp.write("kubelet-token1")
+        token_file_path = self._write_mock_config(token_re_read_interval=5)
 
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            k8s_service_account_token: "%s"
-            k8s_token_re_read_interval: 1,
-          }
-        """
-            % (token_file_path)
-        )
+        # Write initial token value
+        self._write_mock_token(token_file_path, "kubelet-token1")
+
         global_config = self._create_test_configuration_instance()
         global_config.parse()
 
@@ -1452,14 +1436,32 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         self.assertEqual(k8s._token, "kubelet-token1")
 
         # Write a new token and verify it will be read after the timeout has been reached
-        with open(token_file_path, "w") as fp:
-            fp.write("kubelet-token2")
+        self._write_mock_token(token_file_path, "kubelet-token2")
 
         kubelet.query_api("/test")
         self.assertEqual(k8s._token, "kubelet-token1")
 
-        time.sleep(1.2)
+        mock_time.advance_time(increment_by=6)
         expected_headers_token = "kubelet-token2"
 
         kubelet.query_api("/test")
         self.assertEqual(k8s._token, "kubelet-token2")
+
+    def _write_mock_config(self, token_re_read_interval=1):
+        _, token_file_path = tempfile.mkstemp()
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_service_account_token: "%s"
+            k8s_token_re_read_interval: %s,
+          }
+        """
+            % (token_file_path, token_re_read_interval)
+        )
+
+        return token_file_path
+
+    def _write_mock_token(self, file_path, token):
+        with open(file_path, "w") as fp:
+            fp.write(token)
