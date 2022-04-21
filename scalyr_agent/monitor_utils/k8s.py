@@ -1870,10 +1870,11 @@ class KubernetesApi(object):
                     % (self._token_file, str(e))
                 )
 
-            if previous_token_value != self._token:
+            if previous_token_value and previous_token_value != self._token:
                 global_log.debug(
                     "Read token value from file %s is different than the one which "
                     "we had cached which indicates token has been rotated."
+                    % (self._token_file)
                 )
 
         return self._token
