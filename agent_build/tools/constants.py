@@ -24,15 +24,6 @@ DEPLOYMENT_OUTPUTS_DIR = AGENT_BUILD_OUTPUT / "deployment_cache"
 DEPLOYMENT_ISOLATED_ROOTS_DIR = AGENT_BUILD_OUTPUT / "isolated_source_roots"
 
 
-class DockerPlatform(enum.Enum):
-    AMD64 = "linux/amd64"
-    ARM64 = "linux/arm64"
-    # For Raspberry Pi and other lower powered armv7 based ARM platforms
-    ARM = "linux/arm"
-    ARMV7 = "linux/arm/v7"
-    ARMV8 = "linux/arm/v8"
-
-
 class Architecture(enum.Enum):
     """
     Architecture types.
@@ -46,19 +37,20 @@ class Architecture(enum.Enum):
     UNKNOWN = "unknown"
 
     @property
-    def as_docker_platform(self) -> DockerPlatform:
+    def as_docker_platform(self) -> str:
         global _ARCHITECTURE_TO_DOCKER_PLATFORM
         return _ARCHITECTURE_TO_DOCKER_PLATFORM[self]
 
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
-    Architecture.X86_64: DockerPlatform.AMD64,
-    Architecture.ARM64: DockerPlatform.ARM64,
-    Architecture.ARM: DockerPlatform.ARM,
-    Architecture.ARMV7: DockerPlatform.ARMV7,
-    Architecture.ARMV8: DockerPlatform.ARMV8,
+    Architecture.X86_64: "linux/amd64",
+    Architecture.ARM64: "linux/arm64",
+    # For Raspberry Pi and other lower powered armv7 based ARM platforms
+    Architecture.ARM: "linux/arm",
+    Architecture.ARMV7: "linux/arm/v7",
+    Architecture.ARMV8: "linux/arm/v8",
     # Handle unknown architecture value as x86_64
-    Architecture.UNKNOWN: DockerPlatform.AMD64,
+    Architecture.UNKNOWN: "linux/amd64",
 }
 
 
@@ -75,9 +67,9 @@ class PackageType(enum.Enum):
 
 # CPU architectures or platforms that has to be supported by the Agent docker images,
 AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
-    DockerPlatform.AMD64,
-    DockerPlatform.ARM64,
-    DockerPlatform.ARMV7,
+    Architecture.ARM64,
+    Architecture.ARM64,
+    Architecture.ARMV7,
 ]
 
 AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING = []

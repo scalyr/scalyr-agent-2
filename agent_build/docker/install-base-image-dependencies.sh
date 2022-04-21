@@ -5,14 +5,12 @@
 
 set -e
 
-if [ "$TARGETVARIANT" = "v7" ]; then
-  echo "Skip rust installation from target 'v7'"
-  exit 0
+if [ "$TARGETVARIANT" != "v7" ]; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  PATH="/root/.cargo/bin:${PATH}"
+  rustup toolchain install nightly
+  rustup default nightly
 fi
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-PATH="/root/.cargo/bin:${PATH}"
-rustup toolchain install nightly
-rustup default nightly
 
 # orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
 # with pip environment markers since they are not specific enough.

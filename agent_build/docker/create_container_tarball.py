@@ -2,16 +2,31 @@ import argparse
 import pathlib as pl
 import tarfile
 import os
+import sys
+
+_SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
+
+# This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
+# local packages. All such imports also have to be done after that.
+sys.path.append(str(_SOURCE_ROOT))
 
 from agent_build import prepare_agent_filesystem
+from agent_build.tools import constants
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output-path",
         required=True,
         help="Output path for the container tarball."
     )
+
+    parser.add_argument(
+        "--config",
+        help="Name of the config directory to use in the build."
+    )
+
     args = parser.parse_args()
 
     output_path = pl.Path(args.output_path)
@@ -21,12 +36,14 @@ if __name__ == '__main__':
 
     agent_filesystem_root_path = output_path / "root"
 
+    config_path = constants.SOURCE_ROOT / "docker" / args.config
+
     prepare_agent_filesystem.build_linux_lfs_agent_files(
         copy_agent_source=True,
         output_path=agent_filesystem_root_path,
         install_info_str="",
-        config_path=pl.Path(""),
-    ),
+        config_path=config_path,
+    )
 
     container_tarball_path = output_path / "scalyr-agent.tar.gz"
 

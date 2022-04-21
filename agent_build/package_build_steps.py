@@ -2,7 +2,10 @@ import enum
 import subprocess
 from typing import List
 import pathlib as pl
+import json
+import logging
 
+logging.basicConfig(level=logging.DEBUG)
 
 from agent_build.tools import build_step
 from agent_build.tools import constants
@@ -11,10 +14,21 @@ _AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
 _AGENT_REQUIREMENTS_PATH = _AGENT_BUILD_PATH / "requirement-files"
 _AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
 
+_BASE_IMAGE_NAME_PREFIX = "agent_base_image"
+
+
+class PrepareBuildxBuilderStep(build_step.PrepareEnvironmentStep):
+    def __init__(self):
+        super(PrepareBuildxBuilderStep, self).__init__(
+            script_path=_AGENT_BUILD_DOCKER_PATH / "prepare_buildx_builder.py",
+            build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
+        )
+
 
 class DockerContainerBaseBuildStep(build_step.ArtifactStep):
+    BASE_IMAGE_TAG_SUFFIX: str
     TRACKED_FILE_GLOBS = [
-        _AGENT_BUILD_DOCKER_PATH / "Dockerfile.base-debian",
+        _AGENT_BUILD_DOCKER_PATH / "Dockerfile.base",
         _AGENT_BUILD_DOCKER_PATH / "install-base-image-dependencies.sh",
         _AGENT_BUILD_DOCKER_PATH / "install-common-dependencies.sh",
         _AGENT_BUILD_DOCKER_PATH / "install-build-dependencies.sh",
@@ -26,139 +40,116 @@ class DockerContainerBaseBuildStep(build_step.ArtifactStep):
 
     def __init__(
             self,
-            architecture: constants.Architecture,
-            result_image_name: str,
-            base_image_tag_suffix: str
+            platforms_to_build: List[str],
     ):
+
+        self.base_image_full_name = f"{_BASE_IMAGE_NAME_PREFIX}:{type(self).BASE_IMAGE_TAG_SUFFIX}"
+
+        base_step = PrepareBuildxBuilderStep()
+
         super(DockerContainerBaseBuildStep, self).__init__(
             script_path=_AGENT_BUILD_DOCKER_PATH / "build_agent_base_docker_images.py",
             build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
+            base_step=base_step,
             additional_settings={
-                "PLATFORM_TO_BUILD": architecture.as_docker_platform.value,
-                "RESULT_IMAGE_NAME": result_image_name,
-                "BASE_IMAGE_TAG_SUFFIX": base_image_tag_suffix,
+                "PLATFORMS_TO_BUILD": json.dumps(platforms_to_build),
+                "RESULT_IMAGE_NAME": self.base_image_full_name,
+                "BASE_IMAGE_TAG_SUFFIX": type(self).BASE_IMAGE_TAG_SUFFIX,
                 "COVERAGE_VERSION": "4.5.4"
-            }
+            },
         )
+
+
+class DebianContainerBaseBuildStep(DockerContainerBaseBuildStep):
+    BASE_IMAGE_TAG_SUFFIX = "slim"
+
+
+class AlpineContainerBaseBuildStep(DockerContainerBaseBuildStep):
+    BASE_IMAGE_TAG_SUFFIX = "alpine"
+
+
+DEBIAN_CONTAINER_BASE_BUILD_STEP = DebianContainerBaseBuildStep(
+    platforms_to_build=[
+        constants.Architecture.X86_64.as_docker_platform,
+        constants.Architecture.ARM64.as_docker_platform,
+        constants.Architecture.ARMV7.as_docker_platform
+    ]
+)
+
+ALPINE_CONTAINER_BASE_BUILD_STEP = AlpineContainerBaseBuildStep(
+    platforms_to_build=[
+        constants.Architecture.X86_64.as_docker_platform,
+        constants.Architecture.ARM64.as_docker_platform,
+        constants.Architecture.ARMV7.as_docker_platform
+    ]
+)
+
+TEST_DEBIAN_CONTAINER_BASE_BUILD_STEP = DebianContainerBaseBuildStep(
+    platforms_to_build=[
+        constants.Architecture.X86_64.as_docker_platform,
+    ]
+)
+
+TEST_ALPINE_CONTAINER_BASE_BUILD_STEP = AlpineContainerBaseBuildStep(
+    platforms_to_build=[
+        constants.Architecture.X86_64.as_docker_platform,
+    ]
+)
 
 
 class DockerContainerFinalBuildStep(build_step.ArtifactStep):
-    class BasePythonImageDistro(enum.Enum):
-        DEBIAN = "slim"
-        ALPINE = "alpine"
-
-    PYTHON_BASE_IMAGE_DISTRO: BasePythonImageDistro
-
+    TRACKED_FILE_GLOBS = [
+        pl.Path("agent_build/**/*"),
+        pl.Path("scalyr_agent/**/*"),
+        pl.Path("certs/**/*"),
+        pl.Path("VERSION"),
+    ]
     def __init__(
             self,
-            supported_architectures: List[constants.Architecture],
+            base_image_step: DockerContainerBaseBuildStep,
+            image_build_type: constants.PackageType
     ):
 
-        self._supported_architectures = supported_architectures
-
-        result_image_name = "agent_docker_base_image"
-
-        self._architecture_base_image_steps = {}
-        for arch in supported_architectures:
-            tag_suffix = type(self).PYTHON_BASE_IMAGE_DISTRO.value
-            result_image_name = f"{result_image_name}_{tag_suffix}"
-
-            base_step = DockerContainerBaseBuildStep(
-                architecture=arch,
-                result_image_name=result_image_name,
-                base_image_tag_suffix=tag_suffix
-            )
-
-            self._architecture_base_image_steps[result_image_name] = base_step
-
         super(DockerContainerFinalBuildStep, self).__init__(
-            script_path=_AGENT_BUILD_DOCKER_PATH / "build_agent_final_docker_images.py",
+            script_path=_AGENT_BUILD_DOCKER_PATH / "build_and_push_final_agent_docker_image.py",
             build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
-            additional_settings={},
-            dependency_steps=list(self._architecture_base_image_steps.values())
+            dependency_steps=[base_image_step],
+            additional_settings={
+                "BASE_IMAGE_TAG_SUFFIX": base_image_step.BASE_IMAGE_TAG_SUFFIX,
+                "BUILD_TYPE": image_build_type.value,
+            },
         )
 
-    def run(self):
-        super(DockerContainerFinalBuildStep, self).run()
+class DockerJsonContainerBuilder(DockerContainerFinalBuildStep):
+    """
+    An image for running on Docker configured to fetch logs via the file system (the container log
+    directory is mounted to the agent container.)  This is the preferred way of running on Docker.
+    This image is published to scalyr/scalyr-agent-docker-json.
+    """
 
-        from agent_build.tools import common
+    PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
+    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
 
-        for base_image_name, base_image_step in self._architecture_base_image_steps.items():
-            base_image_registry_output = base_image_step.output_directory / "output_registry"
-
-            base_image_registry_container = common.LocalRegistryContainer(
-                name="base_image_registry",
-                registry_port=5000,
-                registry_data_path=base_image_registry_output
-            )
-            base_image_registry_container.start()
+_PACKAGE_TYPE_TO_BUILDER = {
+    constants.PackageType.DOCKER_JSON: DockerJsonContainerBuilder
+}
 
 
-class BasePythonImageDistro(enum.Enum):
-    DEBIAN = "slim"
-    ALPINE = "alpine"
-
-def build(
-    supported_architectures: List[constants.Architecture],
-    base_python_image_distro: BasePythonImageDistro
+def build_final_docker(
+        build_type: constants.PackageType,
+        base_step: DockerContainerBaseBuildStep,
+        testing: bool = False
 ):
+    builder_cls = _PACKAGE_TYPE_TO_BUILDER[build_type]
 
-    base_result_image_name = "agent_docker_base_image"
-
-    from agent_build.tools import common
-
-    result_registry_container = common.LocalRegistryContainer(
-        "result_image_registry",
-        registry_port=5002,
-        registry_data_path=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/build_test")
+    builder = builder_cls(
+        base_image_step=base_step,
+        image_build_type=build_type
     )
 
-    result_registry_container.start()
+    builder.run()
 
-    architecture_base_image_steps = {}
-    for arch in supported_architectures:
-        tag_suffix = base_python_image_distro.value
-        base_result_image_name = f"{base_result_image_name}-{tag_suffix}-{arch.as_docker_platform.value}"
-
-        base_step = DockerContainerBaseBuildStep(
-            architecture=arch,
-            result_image_name=base_result_image_name,
-            base_image_tag_suffix=tag_suffix
-        )
-
-        base_step.run()
-
-        base_image_registry_output = base_step.output_directory / "output_registry"
-
-        base_image_registry_container = common.LocalRegistryContainer(
-            name="base_image_registry",
-            registry_port=5001,
-            registry_data_path=base_image_registry_output
-        )
-        base_image_registry_container.start()
-
-        full_base_image_name = f"localhost:5001/{base_result_image_name}"
-
-        subprocess.check_call([
-            "docker", "pull", full_base_image_name
-        ])
-
-        full_base_image_result_registry_name = f"localhost:5002/{base_result_image_name}"
-
-        subprocess.check_call([
-            "docker", "tag", full_base_image_name, full_base_image_result_registry_name
-        ])
-        subprocess.check_call([
-            "docker",
-            "push",
-            full_base_image_result_registry_name
-        ])
-
-        base_image_registry_container.kill()
-
-build(
-    supported_architectures=[
-        constants.Architecture.X86_64
-    ],
-    base_python_image_distro=BasePythonImageDistro.DEBIAN
+build_final_docker(
+    constants.PackageType.DOCKER_JSON,
+    base_step=TEST_DEBIAN_CONTAINER_BASE_BUILD_STEP,
 )

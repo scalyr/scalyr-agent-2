@@ -87,7 +87,6 @@ ALL_DEPLOYMENT_STEPS = {}
 
 _GLOBAL_ID_COUNTER = 0
 
-
 class ScriptBuildStep:
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
@@ -380,21 +379,6 @@ class ScriptBuildStep:
             self._base_step.run()
 
         logging.info(f"Run deployment step: {self.id}")
-        #logging.info(f"Run deployment step: {self.id},     step info:\n {self.overall_info_str}")
-
-        #constants.DEPLOYMENT_OUTPUTS_DIR.mkdir(exist_ok=True, parents=True)
-
-
-
-
-        # for p in constants.DEPLOYMENT_CACHES_DIR.glob("**/*"):
-        #     os.chown(p, os.getuid(), os.getgid())
-        #
-        # for p in constants.DEPLOYMENT_CACHES_DIR.glob("**/*"):
-        #     os.chown(p, os.getuid(), os.getgid())
-
-        # for p in self._output_directory.glob("**/*"):
-        #     os.chown(p, os.getuid(), os.getgid())
 
         # Create a temporary directory for the output of the current step.
         if self._temp_output_directory.is_dir():

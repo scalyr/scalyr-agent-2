@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 import pathlib as pl
 import shutil
 import re
