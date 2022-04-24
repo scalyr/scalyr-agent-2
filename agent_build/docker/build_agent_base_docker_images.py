@@ -24,7 +24,8 @@ def kill_registry_container():
 def main(
     platforms_to_build: List[str],
     result_image_name: str,
-    base_image_tag_suffix: str,
+    python_base_image_type: str,
+    python_base_image_name: str,
     coverage_version: str
 ):
     # Clear previously created container, ix exists
@@ -49,62 +50,56 @@ def main(
     # # it will be needed to the final image builder step.
     # ARCHITECTURE_INFO_FILE_OUTPUT_PATH.write_text(platforms_to_build)
 
+    result_image_final_name = f"localhost:5005/{result_image_name}"
 
+    platform_options = []
 
+    for p in platforms_to_build:
+        platform_options.append("--platform"),
+        platform_options.append(p)
 
-    def build_image(
-        build_test_version: bool
-    ):
+    subprocess.check_call([
+        "docker",
+        "buildx",
+        "build",
+        "-t",
+        result_image_final_name,
+        "-f",
+        f"{SOURCE_ROOT}/agent_build/docker/Dockerfile.base",
+        "--push",
+        "--build-arg",
+        f"PYTHON_BASE_IMAGE_TYPE={python_base_image_type}",
+        "--build-arg",
+        f"PYTHON_BASE_IMAGE_NAME={python_base_image_name}",
+        *platform_options,
+        str(SOURCE_ROOT)
+    ])
 
-        result_image_final_name = f"localhost:5005/{result_image_name}"
+    result_image_testing_final_name = f"{result_image_final_name}-testing"
 
-        platform_options = []
-
-        for p in platforms_to_build:
-            platform_options.append("--platform"),
-            platform_options.append(p)
-
-        subprocess.check_call([
-            "docker",
-            "buildx",
-            "build",
-            "-t",
-            result_image_final_name,
-            "-f",
-            f"{SOURCE_ROOT}/agent_build/docker/Dockerfile.base",
-            "--push",
-            "--build-arg",
-            f"BASE_IMAGE_SUFFIX={base_image_tag_suffix}",
-            *platform_options,
-            str(SOURCE_ROOT)
-        ])
-
-        result_image_testing_final_name = f"{result_image_final_name}-testing"
-
-        # subprocess.check_call([
-        #     "docker",
-        #     "buildx",
-        #     "build",
-        #     "-t",
-        #     result_image_testing_final_name,
-        #     "-f",
-        #     f"{SOURCE_ROOT}/agent_build/docker/Dockerfile.base-testing",
-        #     "--push",
-        #     "--build-arg",
-        #     f"BASE_IMAGE={result_image_final_name}",
-        #     "--build-arg",
-        #     f"COVERAGE_VERSION={coverage_version}",
-        #     *platform_options,
-        #     str(SOURCE_ROOT)
-        # ])
-
-    build_image(True)
+    # subprocess.check_call([
+    #     "docker",
+    #     "buildx",
+    #     "build",
+    #     "-t",
+    #     result_image_testing_final_name,
+    #     "-f",
+    #     f"{SOURCE_ROOT}/agent_build/docker/Dockerfile.base-testing",
+    #     "--push",
+    #     "--build-arg",
+    #     f"BASE_IMAGE={result_image_final_name}",
+    #     "--build-arg",
+    #     f"COVERAGE_VERSION={coverage_version}",
+    #     *platform_options,
+    #     str(SOURCE_ROOT)
+    # ])
 
 
 if __name__ == '__main__':
     main(
         platforms_to_build=json.loads(os.environ["PLATFORMS_TO_BUILD"]),
         result_image_name=os.environ["RESULT_IMAGE_NAME"],
-        base_image_tag_suffix=os.environ["BASE_IMAGE_TAG_SUFFIX"],
+        python_base_image_type=os.environ["PYTHON_BASE_IMAGE_TYPE"],
+        python_base_image_name=os.environ["PYTHON_BASE_IMAGE_NAME"],
         coverage_version=os.environ["COVERAGE_VERSION"]
     )

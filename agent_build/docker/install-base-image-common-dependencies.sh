@@ -1,6 +1,6 @@
 set -e
 
-if [ "$BASE_IMAGE_SUFFIX" = "slim" ]; then
+if [ "$PYTHON_BASE_IMAGE_TYPE" = "debian" ]; then
   # Workaround for weird build failure on Circle CI, see
   # https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
   ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split

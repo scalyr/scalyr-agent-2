@@ -22,11 +22,12 @@ from typing import Dict, List, Type
 
 
 from agent_build.tools import constants
-from agent_build import package_builders
 from tests.package_tests.internals import docker_test, k8s_test
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
+from agent_build.tools.build_step import SimpleBuildStep, ScriptBuildStep
+from agent_build.package_build_steps import DOCKER_IMAGE_BUILDERS, BuildStep
 
 _PARENT_DIR = pl.Path(__file__).parent
 __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
@@ -34,86 +35,84 @@ __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
 # The global collection of all test. It is used by CI aimed scripts in order to be able to perform those test just
 # by knowing the name of needed test.
 ALL_PACKAGE_TESTS: Dict[str, "Test"] = {}
-
-# Maps package test of some package to the builder of this package. Also needed for the GitHub Actions CI to
-# create a job matrix for a particular package tests.
-PACKAGE_BUILDER_TESTS: Dict[
-    package_builders.PackageBuilder, List["Test"]
-] = collections.defaultdict(list)
-
-
-class Test:
-    """
-    Particular package test. If combines information about the package type, architecture,
-    deployment and the system where test has to run.
-    """
-
-    def __init__(
-        self,
-        base_name: str,
-        package_builder: package_builders.PackageBuilder,
-        additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
-        deployment_architecture: constants.Architecture = None,
-    ):
-        """
-        :param base_name: Base name of the test.
-        :param package_builder: Builder instance to build the image.
-        :param additional_deployment_steps: Additional deployment steps that may be needed to perform the test.
-            They are additionally performed after the deployment steps of the package builder.
-        :param deployment_architecture: Architecture of the machine where the test's deployment has to be perform.
-            by default it is an architecture of the package builder.
-        """
-        self._base_name = base_name
-        self.package_builder = package_builder
-        self.architecture = deployment_architecture or package_builder.architecture
-
-        additional_deployment_steps = additional_deployment_steps or []
-
-        # since there may be needed to build the package itself first, we have to also deploy the steps
-        # from the package builder's deployment, to provide needed environment for the builder,
-        # so we add the steps from the builder's deployment first.
-        additional_deployment_steps = [
-            *[type(step) for step in package_builder.deployment.steps],
-            *additional_deployment_steps,
-        ]
-
-        self.deployment = deployments.Deployment(
-            name=self.unique_name,
-            step_classes=additional_deployment_steps,
-            architecture=deployment_architecture or package_builder.architecture,
-            base_docker_image=package_builder.base_docker_image,
-        )
-
-        if self.unique_name in ALL_PACKAGE_TESTS:
-            raise ValueError(
-                f"The package test with name: {self.unique_name} already exists."
-            )
-
-        # Add the current test to the global tests collection so it can be invoked from command line.
-        ALL_PACKAGE_TESTS[self.unique_name] = self
-        # Also add it to the package builders tests collection.
-        PACKAGE_BUILDER_TESTS[self.package_builder].append(self)
-
-    @property
-    def unique_name(self) -> str:
-        """
-        The unique name of the package test. It contains information about all specifics that the test has.
-        """
-        return f"{self.package_builder.name}_{self._base_name}".replace("-", "_")
+#
+# # Maps package test of some package to the builder of this package. Also needed for the GitHub Actions CI to
+# # create a job matrix for a particular package tests.
+# PACKAGE_BUILDER_TESTS: Dict[
+#     package_builders.PackageBuilder, List["Test"]
+# ] = collections.defaultdict(list)
 
 
-class DockerImagePackageTest(Test):
+# class Test:
+#     """
+#     Particular package test. If combines information about the package type, architecture,
+#     deployment and the system where test has to run.
+#     """
+#
+#     def __init__(
+#         self,
+#         base_name: str,
+#         package_builder_name: str,
+#         additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
+#         deployment_architecture: constants.Architecture = None,
+#     ):
+#         """
+#         :param base_name: Base name of the test.
+#         :param package_builder: Builder instance to build the image.
+#         :param additional_deployment_steps: Additional deployment steps that may be needed to perform the test.
+#             They are additionally performed after the deployment steps of the package builder.
+#         :param deployment_architecture: Architecture of the machine where the test's deployment has to be perform.
+#             by default it is an architecture of the package builder.
+#         """
+#         self._base_name = base_name
+#         self.package_builder = package_builder
+#         self.architecture = deployment_architecture or package_builder.architecture
+#
+#         additional_deployment_steps = additional_deployment_steps or []
+#
+#         # since there may be needed to build the package itself first, we have to also deploy the steps
+#         # from the package builder's deployment, to provide needed environment for the builder,
+#         # so we add the steps from the builder's deployment first.
+#         additional_deployment_steps = [
+#             *[type(step) for step in package_builder.deployment.steps],
+#             *additional_deployment_steps,
+#         ]
+#
+#         self.deployment = deployments.Deployment(
+#             name=self.unique_name,
+#             step_classes=additional_deployment_steps,
+#             architecture=deployment_architecture or package_builder.architecture,
+#             base_docker_image=package_builder.base_docker_image,
+#         )
+#
+#         if self.unique_name in ALL_PACKAGE_TESTS:
+#             raise ValueError(
+#                 f"The package test with name: {self.unique_name} already exists."
+#             )
+#
+#         # Add the current test to the global tests collection so it can be invoked from command line.
+#         ALL_PACKAGE_TESTS[self.unique_name] = self
+#         # Also add it to the package builders tests collection.
+#         PACKAGE_BUILDER_TESTS[self.package_builder].append(self)
+#
+#     @property
+#     def unique_name(self) -> str:
+#         """
+#         The unique name of the package test. It contains information about all specifics that the test has.
+#         """
+#         return f"{self.package_builder.name}_{self._base_name}".replace("-", "_")
+
+
+class DockerImagePackageTest(SimpleBuildStep):
+
+    BUILDER_NAME: str
     """
     Test for the agent docker images.
     """
 
     def __init__(
         self,
-        target_image_architectures: List[constants.Architecture],
-        base_name: str,
-        package_builder: package_builders.ContainerPackageBuilder,
-        additional_deployment_steps: List[Type[deployments.DeploymentStep]] = None,
-        deployment_architecture: constants.Architecture = None,
+        build_root: pl.Path,
     ):
         """
         :param target_image_architectures: List of architectures in which to perform the image tests.
@@ -124,22 +123,35 @@ class DockerImagePackageTest(Test):
         :param deployment_architecture: Architecture of the machine where the test's deployment has to be perform.
             by default it is an architecture of the package builder.
         """
+        self._builder_name = type(self).BUILDER_NAME
 
-        self.target_image_architecture = target_image_architectures
+        self._result_registry_host = "localhost:5005"
 
         super().__init__(
-            base_name,
-            package_builder,
-            additional_deployment_steps,
-            deployment_architecture=deployment_architecture,
+            name=type(self).get_test_name(),
+            build_root=build_root,
+            base_step=None,
         )
 
-        # Do the trick to help to static analyser.
-        self.package_builder: package_builders.ContainerPackageBuilder = package_builder
+    @classmethod
+    def get_test_name(cls):
+        return f"{cls.BUILDER_NAME}-test"
 
     @property
-    def unique_name(self) -> str:
-        return self._base_name
+    def all_cached_steps(self) -> List['BuildStep']:
+        steps = super(DockerImagePackageTest, self).all_cached_steps
+
+        # Since we have to build the docker image before the testing,
+        # then, for caching purposes, it's also important to return all steps
+        # that are used in the build process.
+
+        image_builder_step_cls = DOCKER_IMAGE_BUILDERS[self._builder_name]
+        steps.extend(
+            image_builder_step_cls.get_base_image_builder_step(
+                testing=True
+            )
+        )
+        return steps
 
     def run_test(
         self,
@@ -301,27 +313,10 @@ class DockerImagePackageTest(Test):
 
 # Create tests for the all docker images (json/syslog/api) and for k8s image.
 _docker_image_tests = []
-for builder in [
-    package_builders.DOCKER_JSON_CONTAINER_BUILDER_DEBIAN,
-    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN,
-    package_builders.DOCKER_API_CONTAINER_BUILDER_DEBIAN,
-    package_builders.K8S_CONTAINER_BUILDER_DEBIAN,
-    package_builders.DOCKER_JSON_CONTAINER_BUILDER_ALPINE,
-    package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
-    package_builders.DOCKER_API_CONTAINER_BUILDER_ALPINE,
-    package_builders.K8S_CONTAINER_BUILDER_ALPINE,
-]:
-    test = DockerImagePackageTest(
-        base_name=f"{builder.name}_test",
-        # Specify the builder that has to build the image.
-        package_builder=builder,
-        # Specify which architectures of the result image has to be tested.
-        target_image_architectures=[
-            constants.Architecture.X86_64,
-            constants.Architecture.ARM64,
-            constants.Architecture.ARMV7,
-        ],
-    )
+for builder_name in DOCKER_IMAGE_BUILDERS.keys():
+    class ImageTest(DockerImagePackageTest):
+        BUILDER_NAME = builder_name
+
     _docker_image_tests.append(test)
 
 (

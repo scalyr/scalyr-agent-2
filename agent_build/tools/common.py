@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import shutil
 from typing import List
 import pathlib as pl
 import sys
@@ -208,3 +208,15 @@ class LocalRegistryContainer(DockerContainer):
             ports=[f"{registry_port}:5000"],
             mounts=[f"{registry_data_path}:/var/lib/registry"],
         )
+
+
+def clean_agent_build_steps_output(
+        build_root: pl.Path
+):
+    """
+    Helper function that helps to clean output directories of the unfinished/failed build steps.
+    """
+    for child_path in build_root.iterdir():
+        # Delete all directories that start with '~' that means that they are not finished.
+        if child_path.is_dir() and child_path.name.startswith("~"):
+            shutil.rmtree(child_path)

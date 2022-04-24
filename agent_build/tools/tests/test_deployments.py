@@ -103,7 +103,7 @@ def test_example_deployment(example_deployment: deployments.Deployment, in_ci_cd
     if example_deployment.in_docker:
         # IF that's a in docker deployment, then look for a serialized docker result image.
         cached_docker_image_path = (
-            deployment_step_cache_path / example_deployment_step.result_image_name
+            deployment_step_cache_path / example_deployment_step.result_image
         )
         assert cached_docker_image_path.is_file()
     else:

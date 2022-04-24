@@ -1038,96 +1038,96 @@ class ContainerPackageBuilder2(LinuxFhsBasedPackageBuilder):
                 debug=True,
             )
 
-class K8sPackageBuilder(ContainerPackageBuilder):
-    """
-    An image for running the agent on Kubernetes.
-    """
-
-    PACKAGE_TYPE = constants.PackageType.K8S
-    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
-
-
-class DockerJsonPackageBuilder(ContainerPackageBuilder):
-    """
-    An image for running on Docker configured to fetch logs via the file system (the container log
-    directory is mounted to the agent container.)  This is the preferred way of running on Docker.
-    This image is published to scalyr/scalyr-agent-docker-json.
-    """
-
-    PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
-    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
-
-
-class DockerSyslogPackageBuilder(ContainerPackageBuilder):
-    """
-    An image for running on Docker configured to receive logs from other containers via syslog.
-    This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
-    backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
-    with the eventual migration.
-    """
-
-    PACKAGE_TYPE = constants.PackageType.DOCKER_SYSLOG
-    RESULT_IMAGE_NAMES = [
-        "scalyr-agent-docker-syslog",
-        "scalyr-agent-docker",
-    ]
-
-
-class DockerApiPackageBuilder(ContainerPackageBuilder):
-    """
-    An image for running on Docker configured to fetch logs via the Docker API using docker_raw_logs: false
-    configuration option.
-    """
-
-    PACKAGE_TYPE = constants.PackageType.DOCKER_API
-    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-api"]
-
-
-_CONFIGS_PATH = __SOURCE_ROOT__ / "docker"
-_AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
-
-# Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
-# create the filesystem for the image.
-DOCKER_JSON_CONTAINER_BUILDER_DEBIAN = DockerJsonPackageBuilder(
-    name="docker-json-debian",
-    config_path=_CONFIGS_PATH / "docker-json-config",
-    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-)
-DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
-    name="docker-json-alpine",
-    config_path=_CONFIGS_PATH / "docker-json-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-)
-
-DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN = DockerSyslogPackageBuilder(
-    name="docker-syslog-debian",
-    config_path=_CONFIGS_PATH / "docker-syslog-config",
-    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-)
-DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
-    name="docker-syslog-alpine",
-    config_path=_CONFIGS_PATH / "docker-syslog-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-)
-
-DOCKER_API_CONTAINER_BUILDER_DEBIAN = DockerApiPackageBuilder(
-    name="docker-api-debian",
-    config_path=_CONFIGS_PATH / "docker-api-config",
-    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-)
-DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
-    name="docker-api-alpine",
-    config_path=_CONFIGS_PATH / "docker-api-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-)
-
-K8S_CONTAINER_BUILDER_DEBIAN = K8sPackageBuilder(
-    name="k8s-debian",
-    config_path=_CONFIGS_PATH / "k8s-config",
-    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-)
-K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
-    name="k8s-alpine",
-    config_path=_CONFIGS_PATH / "k8s-config",
-    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-)
+# class K8sPackageBuilder(ContainerPackageBuilder):
+#     """
+#     An image for running the agent on Kubernetes.
+#     """
+#
+#     PACKAGE_TYPE = constants.PackageType.K8S
+#     RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
+#
+#
+# class DockerJsonPackageBuilder(ContainerPackageBuilder):
+#     """
+#     An image for running on Docker configured to fetch logs via the file system (the container log
+#     directory is mounted to the agent container.)  This is the preferred way of running on Docker.
+#     This image is published to scalyr/scalyr-agent-docker-json.
+#     """
+#
+#     PACKAGE_TYPE = constants.PackageType.DOCKER_JSON
+#     RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
+#
+#
+# class DockerSyslogPackageBuilder(ContainerPackageBuilder):
+#     """
+#     An image for running on Docker configured to receive logs from other containers via syslog.
+#     This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
+#     backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
+#     with the eventual migration.
+#     """
+#
+#     PACKAGE_TYPE = constants.PackageType.DOCKER_SYSLOG
+#     RESULT_IMAGE_NAMES = [
+#         "scalyr-agent-docker-syslog",
+#         "scalyr-agent-docker",
+#     ]
+#
+#
+# class DockerApiPackageBuilder(ContainerPackageBuilder):
+#     """
+#     An image for running on Docker configured to fetch logs via the Docker API using docker_raw_logs: false
+#     configuration option.
+#     """
+#
+#     PACKAGE_TYPE = constants.PackageType.DOCKER_API
+#     RESULT_IMAGE_NAMES = ["scalyr-agent-docker-api"]
+#
+#
+# _CONFIGS_PATH = __SOURCE_ROOT__ / "docker"
+# _AGENT_BUILD_DOCKER_PATH = constants.SOURCE_ROOT / "agent_build" / "docker"
+#
+# # Create builders for each scalyr agent docker image. Those builders will be executed in the Dockerfile to
+# # create the filesystem for the image.
+# DOCKER_JSON_CONTAINER_BUILDER_DEBIAN = DockerJsonPackageBuilder(
+#     name="docker-json-debian",
+#     config_path=_CONFIGS_PATH / "docker-json-config",
+#     base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+# )
+# DOCKER_JSON_CONTAINER_BUILDER_ALPINE = DockerJsonPackageBuilder(
+#     name="docker-json-alpine",
+#     config_path=_CONFIGS_PATH / "docker-json-config",
+#     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+# )
+#
+# DOCKER_SYSLOG_CONTAINER_BUILDER_DEBIAN = DockerSyslogPackageBuilder(
+#     name="docker-syslog-debian",
+#     config_path=_CONFIGS_PATH / "docker-syslog-config",
+#     base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+# )
+# DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE = DockerSyslogPackageBuilder(
+#     name="docker-syslog-alpine",
+#     config_path=_CONFIGS_PATH / "docker-syslog-config",
+#     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+# )
+#
+# DOCKER_API_CONTAINER_BUILDER_DEBIAN = DockerApiPackageBuilder(
+#     name="docker-api-debian",
+#     config_path=_CONFIGS_PATH / "docker-api-config",
+#     base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+# )
+# DOCKER_API_CONTAINER_BUILDER_ALPINE = DockerApiPackageBuilder(
+#     name="docker-api-alpine",
+#     config_path=_CONFIGS_PATH / "docker-api-config",
+#     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+# )
+#
+# K8S_CONTAINER_BUILDER_DEBIAN = K8sPackageBuilder(
+#     name="k8s-debian",
+#     config_path=_CONFIGS_PATH / "k8s-config",
+#     base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+# )
+# K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
+#     name="k8s-alpine",
+#     config_path=_CONFIGS_PATH / "k8s-config",
+#     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+# )

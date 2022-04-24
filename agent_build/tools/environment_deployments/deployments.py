@@ -171,7 +171,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         if not self.previous_step:
             return self.base_docker_image
 
-        return self.previous_step.initial_docker_image
+        #return self.previous_step.initial_docker_image
 
     @property
     def cache_key(self) -> str:

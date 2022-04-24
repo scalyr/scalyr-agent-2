@@ -27,6 +27,7 @@ from agent_build.tools import constants
 from agent_build.tools import common
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_step
+from agent_build.tools.build_step import DockerImageSpec
 
 common.init_logging()
 
@@ -40,7 +41,7 @@ def _get_docker_image_spec_or_none(
     if not docker_image:
         return None
 
-    return build_step.ScriptBuildStep.DockerImageSpec(
+    return DockerImageSpec(
         name=docker_image,
         architecture=constants.Architecture.X86_64
     )
@@ -97,16 +98,23 @@ def test_base_step(
         base_step_result_file_path = tmp_path / "base.txt"
         docker_image = None
 
-    build_root = pl.Path("/Users/arthur/work/agents/scalyr-agent-2/build_test")
-    base_step = build_step.PrepareEnvironmentStep(
-            script_path=_BASE_STEP_SCRIPTS[script_type],
-            build_root=build_root,
-            base_step=docker_image,
-            additional_settings={
-                "INPUT": "BASE",
-                "BASE_RESULT_FILE_PATH": str(base_step_result_file_path)
-            }
-        )
+    #build_root = pl.Path("/Users/arthur/work/agents/scalyr-agent-2/build_test")
+    build_root = tmp_path / "build_root"
+    base_step = build_step.ScriptBuildStep(
+        name="BaseTestStep",
+        script_path=_BASE_STEP_SCRIPTS[script_type],
+        build_root=build_root,
+        is_dependency_step=False,
+        base_step=docker_image,
+        additional_settings={
+            "INPUT": "BASE",
+            "BASE_RESULT_FILE_PATH": str(base_step_result_file_path)
+        }
+    )
+
+    # Check ids of all steps that are used by base step.
+    # That has to be only the id of the base step itself.
+    assert base_step.all_used_cached_step_ids == [base_step.id]
 
     if dependency_in_docker:
         dependency_docker_image = _get_docker_image_spec_or_none(
@@ -116,25 +124,39 @@ def test_base_step(
         dependency_docker_image = None
 
     # Create a dependency step. It has to produce a file that has to be used in the final step.
-    dependency_step = build_step.ArtifactStep(
+    dependency_step = build_step.ScriptBuildStep(
+        name="DependencyStep",
         script_path=_DEPENDENCY_STEP_SCRIPTS[dependency_script_type],
         build_root=build_root,
+        is_dependency_step=True,
         base_step=dependency_docker_image,
         additional_settings={
             "INPUT": "DEPENDENCY",
         }
     )
+    # Check all used ids for the dependency step.
+    # It does not have any previous steps, so it contain only its own id.
+    assert dependency_step.all_used_cached_step_ids == [dependency_step.id]
 
-    final_step = build_step.ArtifactStep(
+    final_step = build_step.ScriptBuildStep(
+        name="FinalStep",
         script_path=_FINAL_STEP_SCRIPTS[script_type],
         build_root=build_root,
         base_step=base_step,
+        is_dependency_step=True,
         dependency_steps=[dependency_step],
         additional_settings={
             "INPUT": "FINAL",
             "BASE_RESULT_FILE_PATH": str(base_step_result_file_path)
         }
     )
+
+    # Check all ids. For now, the result also has to contain ids of all previous steps.
+    assert final_step.all_used_cached_step_ids == [
+        *dependency_step.all_used_cached_step_ids,
+        *base_step.all_used_cached_step_ids,
+        final_step.id
+    ]
 
     final_step.run()
 
@@ -143,7 +165,7 @@ def test_base_step(
         result_file_content = subprocess.check_output([
             "docker",
             "run", "-i", "--rm",
-            base_step.result_image_name,
+            base_step.result_image.name,
             "cat",
             str(base_step_result_file_path)
         ]).decode()

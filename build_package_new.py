@@ -32,8 +32,7 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
-from agent_build.tools import constants
-from agent_build import package_builders
+from agent_build.package_build_steps import DOCKER_IMAGE_BUILDERS, run_docker_image_builder
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
@@ -47,7 +46,9 @@ if __name__ == "__main__":
     # Add subparsers for all packages except docker builders.
     subparsers = parser.add_subparsers(dest="package_name", required=True)
 
-    for builder_name, builder in package_builders.ALL_PACKAGE_BUILDERS.items():
+    all_package_builders = DOCKER_IMAGE_BUILDERS.copy()
+
+    for builder_name, builder in all_package_builders.items():
         package_parser = subparsers.add_parser(name=builder_name)
 
         # Define argument for all packages
@@ -84,18 +85,7 @@ if __name__ == "__main__":
         )
 
         # If that's a docker image builder, then add additional commands.
-        if isinstance(builder, package_builders.ContainerPackageBuilder):
-            # Add subparser for command that tell to the builder only to build the tarball with the image's filesystem
-            # This command is used by the source Dockerfile of the image to create agent's filesystem inside the image.
-
-            package_parser.add_argument(
-                "--only-filesystem-tarball",
-                dest="only_filesystem_tarball",
-                help="Build only the tarball with the filesystem of the agent. This argument has to accept"
-                "path to the directory where the tarball is meant to be built. "
-                "Used by the Dockerfile itself and does not required for the manual build.",
-            )
-
+        if builder_name in DOCKER_IMAGE_BUILDERS:
             package_parser.add_argument(
                 "--registry",
                 help="Registry (or repository) name where to push the result image.",
@@ -116,20 +106,12 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--coverage",
-                dest="coverage",
+                "--testing",
+                dest="testing",
                 action="store_true",
                 default=False,
-                help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
-            )
-
-            package_parser.add_argument(
-                "--platforms",
-                dest="platforms",
-                default=",".join(
-                    constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING
-                ),
-                help="Comma delimited list of platforms to build (and optionally push) the image for.",
+                help="Build test versions of the image that contain additional features, for example enabled coverage. "
+                     "Can be used in smoketests. Only works with docker/k8s.",
             )
 
         else:
@@ -153,26 +135,15 @@ if __name__ == "__main__":
 
     # Find the builder class.
     builder_name = args.package_name
-    package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
 
     # If that's a docker image builder handle their arguments too.
-    if isinstance(package_builder, package_builders.ContainerPackageBuilder):
-
-        if args.only_filesystem_tarball:
-            # Build only image filesystem.
-            package_builder.build_filesystem_tarball(
-                output_path=pl.Path(args.only_filesystem_tarball)
-            )
-            exit(0)
-
-        package_builder.build(
-            push=args.push,
+    if builder_name in DOCKER_IMAGE_BUILDERS:
+        run_docker_image_builder(
+            image_builder_name=builder_name,
             registry=args.registry,
             user=args.user,
             tags=args.tag or [],
-            use_test_version=args.coverage,
-            platforms=args.platforms.split(","),
+            push=args.push,
+            testing=args.testing
         )
         exit(0)
-
-    package_builder.build(locally=args.locally)

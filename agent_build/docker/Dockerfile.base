@@ -4,21 +4,22 @@
 # Suffix for the python dockerhub image. For now can be:
 #   - 'slim' for debian based image
 #   - 'alpine' for alpine based image.
-ARG BASE_IMAGE_SUFFIX
+ARG PYTHON_BASE_IMAGE_NAME
 
 # Install dependency packages for debian.
-FROM python:3.8.12-$BASE_IMAGE_SUFFIX as base
+FROM $PYTHON_BASE_IMAGE_NAME as base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-ARG BASE_IMAGE_SUFFIX
+ARG PYTHON_BASE_IMAGE_TYPE
 
-ADD agent_build/docker/install-common-dependencies.sh agent_build/docker/install-common-dependencies.sh
-RUN BASE_IMAGE_SUFFIX=$BASE_IMAGE_SUFFIX sh agent_build/docker/install-common-dependencies.sh
+
+ADD agent_build/docker/install-base-image-common-dependencies.sh agent_build/docker/install-base-image-common-dependencies.sh
+RUN PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-common-dependencies.sh
 
 FROM base as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-ARG BASE_IMAGE_SUFFIX
+ARG PYTHON_BASE_IMAGE
 ARG TARGETVARIANT
 ARG COVERAGE_VERSION
 
@@ -27,11 +28,12 @@ ADD agent_build/requirement-files/compression-requirements.txt agent_build/requi
 ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
 
 ADD agent_build/docker/install-base-image-dependencies.sh agent_build/docker/install-base-image-dependencies.sh
-ADD agent_build/docker/install-build-dependencies.sh agent_build/docker/install-build-dependencies.sh
-RUN BASE_IMAGE_SUFFIX=$BASE_IMAGE_SUFFIX sh agent_build/docker/install-build-dependencies.sh
+ADD agent_build/docker/install-base-image-build-dependencies.sh agent_build/docker/install-base-image-build-dependencies.sh
+ADD agent_build/docker/install-base-image-build-dependencies.sh agent_build/docker/install-base-image-rust.sh
 
-
-RUN TARGETVARIANT=$TARGETVARIANT BASE_IMAGE_SUFFIX=$BASE_IMAGE_SUFFIX sh agent_build/docker/install-base-image-dependencies.sh
+RUN PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-build-dependencies.sh
+RUN TARGETVARIANT=$TARGETVARIANT PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-rust.sh
+RUN TARGETVARIANT=$TARGETVARIANT PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-dependencies.sh
 
 # Install packages and tools that will be required during the final image build.
 FROM base as ready-base
