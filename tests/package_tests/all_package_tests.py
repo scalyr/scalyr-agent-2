@@ -27,7 +27,7 @@ from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
 from agent_build.tools.build_step import SimpleBuildStep, ScriptBuildStep
-from agent_build.package_build_steps import DOCKER_IMAGE_BUILDERS, BuildStep
+from agent_build.package_build_steps import IMAGE_BUILDS, BuildStep, FinalStep
 
 _PARENT_DIR = pl.Path(__file__).parent
 __SOURCE_ROOT__ = _PARENT_DIR.parent.parent.absolute()
@@ -103,16 +103,16 @@ ALL_PACKAGE_TESTS: Dict[str, "Test"] = {}
 #         return f"{self.package_builder.name}_{self._base_name}".replace("-", "_")
 
 
-class DockerImagePackageTest(SimpleBuildStep):
-
-    BUILDER_NAME: str
+class DockerImagePackageTest(FinalStep):
+    BUILD_NAME: str
     """
     Test for the agent docker images.
     """
 
     def __init__(
         self,
-        build_root: pl.Path,
+        scalyr_api_key: str,
+        name_suffix: str = None,
     ):
         """
         :param target_image_architectures: List of architectures in which to perform the image tests.
@@ -123,40 +123,28 @@ class DockerImagePackageTest(SimpleBuildStep):
         :param deployment_architecture: Architecture of the machine where the test's deployment has to be perform.
             by default it is an architecture of the package builder.
         """
-        self._builder_name = type(self).BUILDER_NAME
 
-        self._result_registry_host = "localhost:5005"
+        self._build_name = type(self).BUILD_NAME
+        build_cls = IMAGE_BUILDS[self._build_name]
+
+        self._registry_host = "localhost:5050"
+        self._tags = ["test"]
+
+        self._scalyr_api_key = scalyr_api_key
+        self._name_suffix = name_suffix
+
+        self._build = build_cls(
+            registry=self._registry_host,
+            tags=self._tags,
+            push=True
+        )
 
         super().__init__(
-            name=type(self).get_test_name(),
-            build_root=build_root,
-            base_step=None,
+            used_steps=self._build.all_used_cacheable_steps
         )
 
-    @classmethod
-    def get_test_name(cls):
-        return f"{cls.BUILDER_NAME}-test"
-
-    @property
-    def all_cached_steps(self) -> List['BuildStep']:
-        steps = super(DockerImagePackageTest, self).all_cached_steps
-
-        # Since we have to build the docker image before the testing,
-        # then, for caching purposes, it's also important to return all steps
-        # that are used in the build process.
-
-        image_builder_step_cls = DOCKER_IMAGE_BUILDERS[self._builder_name]
-        steps.extend(
-            image_builder_step_cls.get_base_image_builder_step(
-                testing=True
-            )
-        )
-        return steps
-
-    def run_test(
-        self,
-        scalyr_api_key: str,
-        name_suffix: str = None,
+    def _run(
+        self
     ):
         """
         Run test for the agent docker image.
@@ -172,18 +160,16 @@ class DockerImagePackageTest(SimpleBuildStep):
             name="agent_images_registry", registry_port=5050
         )
 
-        registry_host = "localhost:5050"
-
         def _test_pushed_image():
 
             # Test that all tags has been pushed to the registry.
             for tag in ["latest", "test", "debug"]:
                 logging.info(
-                    f"Test that the tag '{tag}' is pushed to the registry '{registry_host}'"
+                    f"Test that the tag '{tag}' is pushed to the registry '{self._registry_host}'"
                 )
 
-                for image_name in self.package_builder.RESULT_IMAGE_NAMES:
-                    full_image_name = f"{registry_host}/{image_name}:{tag}"
+                for image_name in self._build.RESULT_IMAGE_NAMES:
+                    full_image_name = f"{self._registry_host}/{image_name}:{tag}"
 
                     # Remove the local image first, if exists.
                     logging.info("    Remove existing image.")
@@ -201,7 +187,7 @@ class DockerImagePackageTest(SimpleBuildStep):
                             "nopass",
                             "--username",
                             "nouser",
-                            registry_host,
+                            self._registry_host,
                         ]
                     )
 
@@ -215,13 +201,13 @@ class DockerImagePackageTest(SimpleBuildStep):
                         )
 
                     # Check if the tested image contains needed distribution.
-                    if "debian" in self.unique_name:
+                    if "debian" in self._build_name:
                         expected_os_name = "debian"
-                    elif "alpine" in self.unique_name:
+                    elif "alpine" in self._build_name:
                         expected_os_name = "alpine"
                     else:
                         raise AssertionError(
-                            f"Test {self.unique_name} does not contain os name (bullseye or alpine)"
+                            f"Test does not contain os name (debian or alpine)"
                         )
 
                     # Get the content of the 'os-release' file from the image and verify the distribution name.
@@ -253,30 +239,34 @@ class DockerImagePackageTest(SimpleBuildStep):
 
             # Use any of variants of the image name to test it.
             local_registry_image_name = (
-                f"{registry_host}/{self.package_builder.RESULT_IMAGE_NAMES[0]}"
+                f"{self._registry_host}/{self._build.RESULT_IMAGE_NAMES[0]}"
             )
 
             # Start the tests for each architecture.
             # TODO: Make tests run in parallel.
-            for arch in self.target_image_architecture:
+            for arch in [
+                constants.Architecture.X86_64,
+                constants.Architecture.ARM64,
+                constants.Architecture.ARMV7
+            ]:
                 logging.info(
                     f"Start testing image '{local_registry_image_name}' with architecture "
-                    f"'{arch.as_docker_platform.value}'"
+                    f"'{arch.as_docker_platform}'"
                 )
 
-                if isinstance(self.package_builder, package_builders.K8sPackageBuilder):
+                if "k8s" in self._build_name:
                     k8s_test.run(
                         image_name=local_registry_image_name,
                         architecture=arch,
-                        scalyr_api_key=scalyr_api_key,
-                        name_suffix=name_suffix,
+                        scalyr_api_key=self._scalyr_api_key,
+                        name_suffix=self._name_suffix,
                     )
                 else:
                     docker_test.run(
                         image_name=local_registry_image_name,
                         architecture=arch,
-                        scalyr_api_key=scalyr_api_key,
-                        name_suffix=name_suffix,
+                        scalyr_api_key=self._scalyr_api_key,
+                        name_suffix=self._name_suffix,
                     )
 
         try:
@@ -289,9 +279,9 @@ class DockerImagePackageTest(SimpleBuildStep):
                     [
                         sys.executable,
                         "build_package_new.py",
-                        self.package_builder.name,
+                        self._build_name,
                         "--registry",
-                        registry_host,
+                        self._registry_host,
                         "--tag",
                         "latest",
                         "--tag",
@@ -306,26 +296,15 @@ class DockerImagePackageTest(SimpleBuildStep):
         finally:
             # Cleanup.
             # Removing registry container.
-            subprocess.check_call(["docker", "logout", registry_host])
+            subprocess.check_call(["docker", "logout", self._registry_host])
 
             subprocess.check_call(["docker", "image", "prune", "-f"])
 
 
-# Create tests for the all docker images (json/syslog/api) and for k8s image.
-_docker_image_tests = []
-for builder_name in DOCKER_IMAGE_BUILDERS.keys():
+DOCKER_IMAGE_TESTS = {}
+for build_name in IMAGE_BUILDS:
     class ImageTest(DockerImagePackageTest):
-        BUILDER_NAME = builder_name
+        BUILD_NAME = build_name
 
-    _docker_image_tests.append(test)
-
-(
-    DOCKER_JSON_TEST_DEBIAN,
-    DOCKER_SYSLOG_TEST_DEBIAN,
-    DOCKER_API_TEST_DEBIAN,
-    K8S_TEST_DEBIAN,
-    DOCKER_JSON_TEST_ALPINE,
-    DOCKER_SYSLOG_TEST_ALPINE,
-    DOCKER_API_TEST_ALPINE,
-    K8S_TEST_ALPINE,
-) = _docker_image_tests
+    test_name = f"{build_name}-test"
+    DOCKER_IMAGE_TESTS[test_name] = ImageTest

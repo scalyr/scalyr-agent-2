@@ -11,7 +11,8 @@ __SOURCE_ROOT__ = pl.Path(__file__).parent.parent.parent.absolute()
 
 sys.path.append(str(__SOURCE_ROOT__))
 
-from tests.package_tests import all_package_tests
+from tests.package_tests.all_package_tests import DOCKER_IMAGE_TESTS
+from agent_build.tools.constants import AGENT_BUILD_OUTPUT
 
 
 _TEST_CONFIG_PATH = pl.Path(__file__).parent / "credentials.json"
@@ -69,12 +70,14 @@ if __name__ == "__main__":
         dest="package_test_name", required=True
     )
 
-    for test_name, package_test in all_package_tests.ALL_PACKAGE_TESTS.items():
+    all_tests = DOCKER_IMAGE_TESTS.copy()
+
+    for test_name, package_test in all_tests.items():
 
         run_package_test_parser = package_test_subparsers.add_parser(test_name)
 
         run_package_test_parser.add_argument(
-            "--build-dir-path", dest="build_dir_path", required=False
+            "--build-root-dir", dest="build_root_dir", required=False
         )
         run_package_test_parser.add_argument(
             "--package-path", dest="package_path", required=False
@@ -101,19 +104,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "list":
-        names = [t.unique_name for t in all_package_tests.ALL_PACKAGE_TESTS.values()]
+        names = [t.unique_name for t in all_tests.values()]
         for test_name in sorted(names):
             print(test_name)
 
     if args.command == "package-test":
-        package_test = all_package_tests.ALL_PACKAGE_TESTS[args.package_test_name]
         scalyr_api_key = get_option("scalyr_api_key", args.scalyr_api_key)
+        package_test_cls = all_tests[args.package_test_name]
+        if args.build_root_dir:
+            build_root_path = pl.Path(args.build_root_dir)
+        else:
+            build_root_path = AGENT_BUILD_OUTPUT
 
-        if isinstance(package_test, all_package_tests.DockerImagePackageTest):
-            package_test.run_test(
+        if args.package_test_name in DOCKER_IMAGE_TESTS:
+            package_test = package_test_cls(
                 scalyr_api_key=scalyr_api_key,
                 name_suffix=get_option(
                     "name_suffix", default=str(datetime.datetime.now().timestamp())
                 ),
+            )
+            package_test.run(
+                build_root=build_root_path
             )
         exit(0)

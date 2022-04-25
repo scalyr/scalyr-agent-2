@@ -74,7 +74,7 @@ class DeploymentStepError(Exception):
 
 @dataclasses.dataclass
 class StepCICDSettings:
-    cached: bool = dataclasses.field(default=True)
+    cacheable: bool = dataclasses.field(default=False)
     prebuilt_in_separate_job: bool = dataclasses.field(default=False)
 
 
@@ -88,14 +88,15 @@ class BuildStep:
     TRACKED_FILE_GLOBS = []
     NO_CI_CD_CACHE = False
     NAME: str = None
+    CACHEABLE: bool = False
 
     def __init__(
         self,
-        build_root: pl.Path,
         name: str = None,
         dependency_steps: List['BuildStep'] = None,
         additional_settings: Dict[str, str] = None,
-        ci_cd_settings: StepCICDSettings = None
+        ci_cd_settings: StepCICDSettings = None,
+        global_steps_collection: List['BuildStep'] = None
     ):
         """
         :param deployment: The deployment instance where this step is added.
@@ -114,20 +115,26 @@ class BuildStep:
         # Collection of NAME-VALUE pairs to pass to the script.
         self._additional_settings = additional_settings or {}
 
-        # The root path where the step has to operate and create/locate needed files.
-        self._build_root = build_root
+        # # The root path where the step has to operate and create/locate needed files.
+        # self._build_root = build_root
 
         # Dict with all information about a step. All things whose change may affect work of this step, has to be
         # reflected here.
         self._overall_info: Optional[Dict] = None
-
         # List of paths of files which are used by this step.
         # Step calculates a checksum of those files in order to generate its unique id.
         self._tracked_file_paths = None
-
         self._base_step: Optional[BuildStep] = None
 
         self._ci_cd_settings = ci_cd_settings or StepCICDSettings()
+
+        # Directory path where this step (and maybe its nested steps) will store its result.
+        # Initialized only during the run of the step.
+        self._build_root: Optional[pl.Path] = None
+
+        if global_steps_collection is not None and self._ci_cd_settings.cacheable:
+            global_steps_collection.append(self)
+
 
     @property
     def output_directory(self) -> pl.Path:
@@ -204,7 +211,7 @@ class BuildStep:
         In other words, if step results has been cached by using one set of data and that data has been changed later,
         then the old cache does not reflect that changes and has to be invalidated.
         """
-        return {
+        self._overall_info = {
             "name": self.name,
             # List of all files that are used by step.
             "used_files": [str(p) for p in self.tracked_file_paths],
@@ -224,7 +231,7 @@ class BuildStep:
         """
         Returns dictionary with all information that is sensitive for the caching of that step.
         """
-        if self._overall_info:
+        if not self._overall_info:
             self._init_overall_info()
 
         return self._overall_info
@@ -236,7 +243,6 @@ class BuildStep:
             sort_keys=True,
             indent=4
         )
-
 
     @property
     def id(self) -> str:
@@ -258,24 +264,25 @@ class BuildStep:
         return f"{name}__{checksum}".lower()
 
     @property
-    def all_cached_steps(self) -> List['BuildStep']:
+    def all_used_cacheable_steps(self) -> List['BuildStep']:
         """
-        Return list that includes all steps (including current one), that are supposed to be cached.
+        Return list that includes all steps (including nested and the current one) that are used in that final step and
+        are supposed to be cached in CI/CD.
         """
-        all_steps = []
+        result_steps = []
         # Add all dependency steps:
         for ds in self._dependency_steps:
-            all_steps.extend(ds.all_cached_steps)
+            result_steps.extend(ds.all_used_cacheable_steps)
 
         # Add base step if presented.
         if self._base_step:
-            all_steps.extend(self._base_step.all_cached_steps)
+            result_steps.extend(self._base_step.all_used_cacheable_steps)
 
-        # Add this step itself, but only if it cached.
-        if self._ci_cd_settings.cached:
-            all_steps.append(self)
+        # Add this step itself, but only if it cacheable.
+        if self._ci_cd_settings.cacheable:
+            result_steps.append(self)
 
-        return all_steps
+        return result_steps
 
     @property
     def all_used_cached_step_ids(self) -> List[str]:
@@ -284,21 +291,19 @@ class BuildStep:
         This function is needed to use that ids in CI/CD and pre-fetch some of the cached results.
         """
 
-        return [step.id for step in self.all_cached_steps]
+        return [step.id for step in self.all_used_cacheable_steps]
 
     def _check_for_cached_result(self):
         return self.output_directory.exists()
 
-    def run(self, **additional_settings):
+    def run(self, build_root: pl.Path):
         """
         Run the step. Based on its initial data, it will be performed in docker or locally, on the current system.
         :param additional_input: Additional input to the step as that can be passed to constructor, but since this
             input is specified after the initialization of the step, it can not be cached.
         """
 
-        self._additional_settings.update(
-            additional_settings
-        )
+        self._build_root = build_root
 
         if self._check_for_cached_result():
             logging.info(
@@ -308,11 +313,11 @@ class BuildStep:
 
             # Run all dependency steps first.
             for step in self._dependency_steps:
-                step.run()
+                step.run(build_root=build_root)
 
             # Then also run the base step.
             if self._base_step:
-                self._base_step.run()
+                self._base_step.run(build_root=build_root)
 
             # Create a temporary directory for the output of the current step.
             if self._temp_output_directory.is_dir():
@@ -320,10 +325,11 @@ class BuildStep:
 
             self._temp_output_directory.mkdir(parents=True)
 
-            self._run()
             # Write step's info to a file in its output, for easier troubleshooting.
             info_file_path = self._temp_output_directory / "step_info.txt"
             info_file_path.write_text(self.overall_info_str)
+
+            self._run()
 
             if common.IN_CICD and type(self).NO_CI_CD_CACHE:
                 # If we are in Ci/CD and this step is marked to not save its result in cache, then
@@ -356,18 +362,18 @@ class SimpleBuildStep(BuildStep):
     def __init__(
         self,
         name: str,
-        build_root: pl.Path,
         base_step: Union['BuildStep', str] = None,
         dependency_steps: List['BuildStep'] = None,
         additional_settings: Dict[str, str] = None,
-        ci_cd_settings: StepCICDSettings = None
+        ci_cd_settings: StepCICDSettings = None,
+        global_steps_collection: List['BuildStep'] = None
     ):
         super(SimpleBuildStep, self).__init__(
             name=name,
-            build_root=build_root,
             dependency_steps=dependency_steps,
             additional_settings=additional_settings,
             ci_cd_settings=ci_cd_settings,
+            global_steps_collection=global_steps_collection
         )
 
         self._base_step = base_step
@@ -423,12 +429,12 @@ class ScriptBuildStep(BuildStep):
         self,
         name: str,
         script_path: pl.Path,
-        build_root: pl.Path,
         is_dependency_step: bool,
         base_step: Union['BuildStep', "ScriptBuildStep", DockerImageSpec] = None,
         dependency_steps: List['ScriptBuildStep'] = None,
         additional_settings: Dict[str, str] = None,
-        ci_cd_settings: StepCICDSettings = None
+        ci_cd_settings: StepCICDSettings = None,
+        global_steps_collection: List['BuildStep'] = None
     ):
         """
         :param deployment: The deployment instance where this step is added.
@@ -441,10 +447,10 @@ class ScriptBuildStep(BuildStep):
 
         super(ScriptBuildStep, self).__init__(
             name=name,
-            build_root=build_root,
             dependency_steps=dependency_steps,
             additional_settings=additional_settings,
-            ci_cd_settings=ci_cd_settings
+            ci_cd_settings=ci_cd_settings,
+            global_steps_collection=global_steps_collection
         )
 
         self._script_path = script_path
@@ -1321,4 +1327,34 @@ class BuildFpmPackageStep(ScriptBuildStep):
         self._add_input(
             "RESULT_PACKAGE_FILE_NAME", result_package_file_name,
         )
+
+
+class FinalStep:
+    def __init__(
+            self,
+            used_steps: List[BuildStep]
+    ):
+        self._used_steps = used_steps or []
+
+    @property
+    def all_used_cacheable_steps(self) -> List[BuildStep]:
+        result_steps = []
+        for s in self._used_steps:
+            result_steps.extend(s.all_used_cacheable_steps)
+
+        return result_steps
+
+    @property
+    def all_used_cacheable_steps_ids(self) -> List[str]:
+        return [s.id for s in self.all_used_cacheable_steps]
+
+    @abc.abstractmethod
+    def _run(self):
+        pass
+
+    def run(self, build_root: pl.Path):
+        for s in self._used_steps:
+            s.run(build_root=build_root)
+
+        self._run()
 

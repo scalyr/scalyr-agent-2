@@ -41,7 +41,6 @@ if __name__ == '__main__':
     prepare_agent_filesystem.build_linux_lfs_agent_files(
         copy_agent_source=True,
         output_path=agent_filesystem_root_path,
-        install_info_str="",
         config_path=config_path,
     )
 

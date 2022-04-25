@@ -217,8 +217,8 @@ def wait_for_workflow(workflow_id, timeout_time):
 def discard_outdated_workflows(workflow_infos):
     # type: (List) -> Dict
     """
-    Find workflows with the same names and keep only latest one.
-    The pipeline can contain multiple workflows with the same name
+    Find workflows.bc with the same names and keep only latest one.
+    The pipeline can contain multiple workflows.bc with the same name
     (this can happen, for example, if workflow was restarted manually).
     so we need to get the latest workflow.
     """
@@ -239,8 +239,8 @@ def wait_for_pipeline(
 ):
     # type: (int) -> Dict
     """
-    Wait for all workflows are finishedin the pipeline specified by 'pipeline number'.
-    :return: General information about all workflows from CircleCI.
+    Wait for all workflows.bc are finishedin the pipeline specified by 'pipeline number'.
+    :return: General information about all workflows.bc from CircleCI.
     """
 
     # wait until the 'state' field of the pipeline is 'created'.
@@ -269,24 +269,24 @@ def wait_for_pipeline(
 
         time.sleep(10)
 
-    # not a great idea, but it looks like we can get incomplete list of workflows,
+    # not a great idea, but it looks like we can get incomplete list of workflows.bc,
     # even if we wait for pipeline status = 'created'.
     # so we just wait a little to be sure that everything is created.
     time.sleep(10)
 
     pipeline_id = pipeline_info["id"]
 
-    # get pipeline workflows
+    # get pipeline workflows.bc
     pipeline_workflows = get_paginated_list(
         url=CIRCLE_API_URL + "/pipeline/" + str(pipeline_id) + "/workflow",
     )
-    # remove duplicated workflows and keep latest ones.
+    # remove duplicated workflows.bc and keep latest ones.
     latest_workflows = discard_outdated_workflows(pipeline_workflows)
 
     finished_workflows = dict()
     # wait for each workflow is successfully finished.
     for name, workflow in latest_workflows.items():
-        # If any of the workflows is not successful 'wait_for_workflow' will raise error.
+        # If any of the workflows.bc is not successful 'wait_for_workflow' will raise error.
 
         timeout_time = datetime.datetime.utcnow() + datetime.timedelta(
             seconds=CIRCLE_WAIT_TIMEOUT
@@ -357,7 +357,7 @@ def main(branch_name, artifacts_to_fetch, output_path, pipeline_parameters):
     # pipeline_number = 3292
 
     # time.sleep(20)
-    # wait for whole pipeline is finished and get all workflows.
+    # wait for whole pipeline is finished and get all workflows.bc.
     workflow_infos = wait_for_pipeline(pipeline_number=pipeline_number)
 
     # download artifacts.

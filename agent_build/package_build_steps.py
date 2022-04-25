@@ -1,3 +1,5 @@
+import argparse
+import collections
 import dataclasses
 import enum
 import functools
@@ -5,13 +7,15 @@ import subprocess
 import pathlib as pl
 import json
 import logging
-from typing import List, Dict, Type
+import sys
+from typing import List, Dict, Type, ClassVar
 
 logging.basicConfig(level=logging.DEBUG)
 
 from agent_build.tools import build_step
 from agent_build.tools import constants, common
-from agent_build.tools.build_step import StepCICDSettings, BuildStep
+from agent_build.tools.build_step import StepCICDSettings, BuildStep, FinalStep
+from agent_build.tools.constants import AGENT_BUILD_OUTPUT
 
 _AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
 _AGENT_REQUIREMENTS_PATH = _AGENT_BUILD_PATH / "requirement-files"
@@ -21,12 +25,14 @@ _BASE_IMAGE_NAME_PREFIX = "agent_base_image"
 
 _BUILDX_BUILDER_NAME = "agent_image_buildx_builder"
 
+ALL_CACHEABLE_STEPS = []
+
 
 class PrepareBuildxBuilderStep(build_step.SimpleBuildStep):
     def __init__(self):
         super(PrepareBuildxBuilderStep, self).__init__(
-            name="PrepareBuildxBuilder",
-            build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
+            name="prepare_buildx_builder",
+            global_steps_collection=ALL_CACHEABLE_STEPS
         )
 
     def _run(self):
@@ -57,9 +63,19 @@ class PrepareBuildxBuilderStep(build_step.SimpleBuildStep):
         ])
 
 
-class PythonBaseImage(enum.Enum):
-    DEBIAN = "python:3.8.12-slim"
-    ALPINE = "python:3.8.12-alpine"
+class DockerBaseImageDistroType(enum.Enum):
+    """
+    Type of the distribution which is used as base for the agent image.
+    """
+    DEBIAN = "debian"
+    ALPINE = "alpine"
+
+
+# Mapping of base image distributions types to actual docker images from the Dockerhub.
+_DOCKER_IMAGE_DISTRO_TO_IMAGE_NAME = {
+    DockerBaseImageDistroType.DEBIAN: "python:3.8.12-slim",
+    DockerBaseImageDistroType.ALPINE: "python:3.8.12-alpine"
+}
 
 
 class DockerContainerBaseBuildStep(build_step.ScriptBuildStep):
@@ -75,155 +91,159 @@ class DockerContainerBaseBuildStep(build_step.ScriptBuildStep):
         _AGENT_REQUIREMENTS_PATH / "docker-image-requirements.txt"
     ]
 
-
-
     def __init__(
             self,
             platforms_to_build: List[str],
-            python_base_image: PythonBaseImage,
+            base_image_distro_type: DockerBaseImageDistroType,
     ):
         base_step = PrepareBuildxBuilderStep()
+        self.base_image_distro_type = base_image_distro_type
+        self.platforms_to_build = platforms_to_build
 
         super(DockerContainerBaseBuildStep, self).__init__(
-            name="AgentDockerBaseImageBuild",
+            name="agent_docker_base_image_build",
             script_path=_AGENT_BUILD_DOCKER_PATH / "build_agent_base_docker_images.py",
-            build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
             base_step=base_step,
             is_dependency_step=True,
             additional_settings={
                 "PLATFORMS_TO_BUILD": json.dumps(platforms_to_build),
-                "RESULT_IMAGE_NAME": f"{_BASE_IMAGE_NAME_PREFIX}:{python_base_image.name.lower()}",
-                "PYTHON_BASE_IMAGE_TYPE": python_base_image.name.lower(),
-                "PYTHON_BASE_IMAGE_NAME": python_base_image.value,
+                "RESULT_IMAGE_NAME": f"{_BASE_IMAGE_NAME_PREFIX}:{base_image_distro_type.value}",
+                "PYTHON_BASE_IMAGE_TYPE": base_image_distro_type.value,
+                "PYTHON_BASE_IMAGE_NAME": _DOCKER_IMAGE_DISTRO_TO_IMAGE_NAME[base_image_distro_type],
                 "COVERAGE_VERSION": "4.5.4"
             },
             ci_cd_settings=StepCICDSettings(
+                cacheable=True,
                 prebuilt_in_separate_job=True
-            )
+            ),
+            global_steps_collection=ALL_CACHEABLE_STEPS
         )
 
 
-_DEFAULT_DOCKER_IMAGES_PLATFORMS = [
-    constants.Architecture.X86_64.as_docker_platform,
-    constants.Architecture.ARM64.as_docker_platform,
-    constants.Architecture.ARMV7.as_docker_platform
-]
-
-
-_DEBIAN_BASE_CONTAINER_BUILD_STEP = DockerContainerBaseBuildStep(
-    platforms_to_build=_DEFAULT_DOCKER_IMAGES_PLATFORMS,
-    python_base_image=PythonBaseImage.DEBIAN
-)
-
-
-_BASE_IMAGE_BUILD_STEPS = {}
-_TEST_BASE_IMAGE_BUILD_STEPS = {}
-
-for python_base_image in PythonBaseImage:
-    _BASE_IMAGE_BUILD_STEPS[python_base_image] = DockerContainerBaseBuildStep(
-        platforms_to_build=[
-            constants.Architecture.X86_64.as_docker_platform,
-            constants.Architecture.ARM64.as_docker_platform,
-            constants.Architecture.ARMV7.as_docker_platform
-        ],
-        python_base_image=python_base_image
-    )
-    _TEST_BASE_IMAGE_BUILD_STEPS[python_base_image] = DockerContainerBaseBuildStep(
-        platforms_to_build=[
-            constants.Architecture.X86_64.as_docker_platform
-        ],
-        python_base_image=python_base_image
-    )
-
-
-_TESTING_DOCKER_IMAGES_PLATFORMS = [
-    constants.Architecture.X86_64.as_docker_platform,
-]
-
-
 class DockerImageType(enum.Enum):
+    """
+    Type of the result agent docker image.
+    """
     DOCKER_JSON = "docker-json"
     DOCKER_SYSLOG = "docker-syslog"
     DOCKER_API = "docker-api"
     K8S = "k8s"
 
 
-class DockerContainerFinalBuildStep(build_step.SimpleBuildStep):
-    TRACKED_FILE_GLOBS = [
-        pl.Path("agent_build/**/*"),
-        pl.Path("scalyr_agent/**/*"),
-        pl.Path("certs/**/*"),
-        pl.Path("VERSION"),
-    ]
-    DOCKER_IMAGE_TYPE: DockerImageType
-    PYTHON_BASE_IMAGE: PythonBaseImage
+# Set of docker platforms that are supported by prod image.
+_PROD_DOCKER_IMAGES_PLATFORMS = [
+    constants.Architecture.X86_64.as_docker_platform,
+    constants.Architecture.ARM64.as_docker_platform,
+    constants.Architecture.ARMV7.as_docker_platform
+]
+
+_AGENT_BASE_IMAGE_BUILDER_STEPS = {
+    DockerBaseImageDistroType.DEBIAN: DockerContainerBaseBuildStep(
+        platforms_to_build=_PROD_DOCKER_IMAGES_PLATFORMS,
+        base_image_distro_type=DockerBaseImageDistroType.DEBIAN
+    ),
+    DockerBaseImageDistroType.ALPINE: DockerContainerBaseBuildStep(
+        platforms_to_build=_PROD_DOCKER_IMAGES_PLATFORMS,
+        base_image_distro_type=DockerBaseImageDistroType.DEBIAN
+    )
+}
+
+
+_PROD_DOCKER_IMAGES_PLATFORMS = [
+    constants.Architecture.X86_64.as_docker_platform,
+    constants.Architecture.ARM64.as_docker_platform,
+    constants.Architecture.ARMV7.as_docker_platform
+]
+_TESTING_DOCKER_IMAGES_PLATFORMS = [
+    constants.Architecture.X86_64.as_docker_platform,
+]
+
+
+# Names of the result dockerhub agent images according to a type of the image.
+_DOCKER_IMAGE_TYPES_TO_IMAGE_RESULT_NAMES = {
+    DockerImageType.DOCKER_JSON: ["scalyr-agent-docker-json"],
+    DockerImageType.DOCKER_SYSLOG: [
+            "scalyr-agent-docker-syslog",
+            "scalyr-agent-docker",
+        ],
+    DockerImageType.DOCKER_API: ["scalyr-agent-docker-api"],
+    DockerImageType.K8S: ["scalyr-k8s-agent"]
+}
+
+
+class ImageBuild(FinalStep):
+    BASE_IMAGE_DISTRO_TYPE: ClassVar[DockerBaseImageDistroType]
+    DOCKER_IMAGE_TYPE: ClassVar[DockerImageType]
     RESULT_IMAGE_NAMES: List[str]
 
     def __init__(
-            self,
-            registry: str = None,
-            user: str = None,
-            tags: List[str] = None,
-            push: bool = False,
-            testing: bool = False,
+        self,
+        registry: str = None,
+        user: str = None,
+        tags: List[str] = None,
+        push: bool = False,
+        platforms_to_build: List[str] = None
     ):
+        self.registry = registry
+        self.user = user
+        self.tags = tags or []
+        self.push = push
 
-        self._build_base_image_step = type(self).get_base_image_builder_step(
-            testing=testing
-        )
-
-        self._docker_image_type = type(self).DOCKER_IMAGE_TYPE
-        self._python_base_image = type(self).PYTHON_BASE_IMAGE
-        self._registry = registry
-        self._user = user
-        self._tags = tags
-        self._to_push = push
-        self._testing = testing
-
-        super(DockerContainerFinalBuildStep, self).__init__(
-            name="AgentDockerImageBuild",
-            build_root=pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output"),
-            dependency_steps=[self._build_base_image_step],
-            additional_settings={},
-            ci_cd_settings=StepCICDSettings(
-                # This step should not be cached in CI/CD
-                cached=False
-            )
-        )
-
-    @classmethod
-    def get_base_image_builder_step(cls, testing: bool):
-        if testing:
-            base_images = _BASE_IMAGE_BUILD_STEPS
+        if not platforms_to_build:
+            self._base_image_step = _AGENT_BASE_IMAGE_BUILDER_STEPS[type(self).BASE_IMAGE_DISTRO_TYPE]
+            self.platforms_to_build = self._base_image_step.platforms_to_build
         else:
-            base_images = _TEST_BASE_IMAGE_BUILD_STEPS
+            # If custom platforms are specified, then create a new instance of base image builder step with that
+            # platforms. That's mainly needed for testing.
+            self.platforms_to_build = platforms_to_build
+            self._base_image_step = DockerContainerBaseBuildStep(
+                platforms_to_build=self.platforms_to_build,
+                base_image_distro_type=type(self).BASE_IMAGE_DISTRO_TYPE
+            )
 
-        return base_images[cls.PYTHON_BASE_IMAGE]
-
+        # Also add step that prepares docker's buildx builder.
+        # This is needed when the base image step is got from cache and skipped, but we still need
+        # to configure the buildx builder to build the final image.
+        prepare_buildx_builder_step = PrepareBuildxBuilderStep()
+        super(ImageBuild, self).__init__(
+            used_steps=[
+                prepare_buildx_builder_step,
+                self._base_image_step
+            ]
+        )
 
     def _run(self):
-
-        base_image_registry_path = self._build_base_image_step.output_directory / "output_registry"
+        """
+        Build final agent docker image by using base image whish has to be built in the base image step.
+        """
+        base_image_registry_path = self._base_image_step.output_directory / "output_registry"
         base_image_registry_port = 5003
-        base_image_name = f"agent_base_image:{self._python_base_image.name.lower()}"
+        base_image_name = f"agent_base_image:{self._base_image_step.base_image_distro_type.name.lower()}"
         base_image_full_name = f"localhost:{base_image_registry_port}/{base_image_name}"
 
         tag_options = []
-        for image_name in type(self).RESULT_IMAGE_NAMES:
+        for image_name in _DOCKER_IMAGE_TYPES_TO_IMAGE_RESULT_NAMES[type(self).DOCKER_IMAGE_TYPE]:
 
             full_name = image_name
 
-            if self._user:
-                full_name = f"{self._user}/{full_name}"
+            if self.user:
+                full_name = f"{self.user}/{full_name}"
 
-            if self._registry:
-                full_name = f"{self._registry}/{full_name}"
+            if self.registry:
+                full_name = f"{self.registry}/{full_name}"
 
-            for tag in self._tags:
+            for tag in self.tags:
                 tag_options.extend([
                     "-t",
                     f"{full_name}:{tag}"
                 ])
+
+        platforms_options = []
+        for p in self.platforms_to_build:
+            platforms_options.extend([
+                "--platform",
+                p
+            ])
 
         command_options = [
             "docker",
@@ -233,22 +253,17 @@ class DockerContainerFinalBuildStep(build_step.SimpleBuildStep):
             "-f",
             str(constants.SOURCE_ROOT / "agent_build/docker/Dockerfile"),
             "--build-arg",
-            f"PYTHON_BASE_IMAGE={self._python_base_image.value}",
+            f"PYTHON_BASE_IMAGE={_DOCKER_IMAGE_DISTRO_TO_IMAGE_NAME[self._base_image_step.base_image_distro_type]}",
             "--build-arg",
-            f"DOCKER_IMAGE_TYPE={self._docker_image_type.value}",
+            f"DOCKER_IMAGE_TYPE={type(self).DOCKER_IMAGE_TYPE.value}",
             "--build-arg",
             f"BASE_IMAGE={base_image_full_name}",
+            *platforms_options,
             str(constants.SOURCE_ROOT)
         ]
 
-        if self._to_push:
+        if self.push:
             command_options.append("--push")
-
-        # result_registry = common.LocalRegistryContainer(
-        #     name="result_registry_container",
-        #     registry_port=5004,
-        #     registry_data_path=self._temp_output_directory
-        # )
 
         base_image_registry = common.LocalRegistryContainer(
             name="agent_base_registry",
@@ -262,73 +277,58 @@ class DockerContainerFinalBuildStep(build_step.SimpleBuildStep):
             ])
 
 
-class DockerJsonContainerBuildStep(DockerContainerFinalBuildStep):
-    DOCKER_IMAGE_TYPE = DockerImageType.DOCKER_JSON
-    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
+# Final collection of the docker image builds, where key - unique name of the build
+# and value - build class.
+IMAGE_BUILDS: Dict[str, Type[ImageBuild]] = {}
 
 
-class DockerSyslogContainerBuildStep(DockerContainerFinalBuildStep):
-    DOCKER_IMAGE_TYPE = DockerImageType.DOCKER_SYSLOG
-    RESULT_IMAGE_NAMES = [
-        "scalyr-agent-docker-syslog",
-        "scalyr-agent-docker",
-    ]
+# Dynamically enumerate all possible base images and image types to produce
+# final builds.
+for distro_type in DockerBaseImageDistroType:
+    for docker_image_type in DockerImageType:
+        class Build(ImageBuild):
+            BASE_IMAGE_DISTRO_TYPE = distro_type
+            DOCKER_IMAGE_TYPE = docker_image_type
+            RESULT_IMAGE_NAMES = _DOCKER_IMAGE_TYPES_TO_IMAGE_RESULT_NAMES[docker_image_type]
 
-
-class DockerApiContainerBuildStep(DockerContainerFinalBuildStep):
-    DOCKER_IMAGE_TYPE = DockerImageType.DOCKER_API
-    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-api"]
-
-
-class K8sContainerBuilderStep(DockerContainerBaseBuildStep):
-    DOCKER_IMAGE_TYPE = DockerImageType.K8S
-    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
-
-
-class DockerJsonContainerBuildStepDebian(DockerApiContainerBuildStep):
-    PYTHON_BASE_IMAGE = PythonBaseImage.DEBIAN
-
-
-_DOCKER_IMAGE_BUILDERS_CLASSES: Dict[DockerImageType, Type[DockerContainerFinalBuildStep]] = {
-    DockerImageType.DOCKER_JSON: DockerJsonContainerBuildStep,
-    DockerImageType.DOCKER_SYSLOG: DockerSyslogContainerBuildStep,
-    DockerImageType.DOCKER_API: DockerApiContainerBuildStep,
-    DockerImageType.K8S: K8sContainerBuilderStep,
-}
-
-
-DOCKER_IMAGE_BUILDERS: Dict[str, Type[DockerContainerFinalBuildStep]] = {}
-
-
-for docker_image_type in DockerImageType:
-    for python_base_image in PythonBaseImage:
-        builder_name = f"{docker_image_type.value}-{python_base_image.name.lower()}"
-        _docker_image_builder_cls = _DOCKER_IMAGE_BUILDERS_CLASSES[docker_image_type]
-
-        class DockerImageBuilder(_docker_image_builder_cls):
-            PYTHON_BASE_IMAGE = python_base_image
-
-        DOCKER_IMAGE_BUILDERS[builder_name] = DockerImageBuilder
+        build_name = f"{docker_image_type.value}-{distro_type.value}"
+        IMAGE_BUILDS[build_name] = Build
 
 
 
+a=10
 
-def run_docker_image_builder(
-    builder: BuildStep,
-    registry: str = None,
-    user: str = None,
-    tags:List[str] = None,
-    push: bool = False,
-    testing: bool = False
-):
 
-    builder_step_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
-    builder = builder_step_cls(
-        registry=registry,
-        user=user,
-        tags=tags or [],
-        push=push,
-        testing=testing
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_step_subparser = subparsers.add_parser("run-step")
+
+    cacheable_steps = {s.id: s for s in ALL_CACHEABLE_STEPS}
+    run_step_subparser.add_argument("id", choices=cacheable_steps.keys())
+    run_step_subparser.add_argument(
+        "--build-root_dir",
+        dest="build_root_dir",
+        required=False
     )
 
-    builder.run()
+    args = parser.parse_args()
+
+    if args.command == "run-step":
+        if args.id not in cacheable_steps:
+            print(f"Step with id {args.id} is not found.", file=sys.stderr)
+            exit(1)
+
+        step = cacheable_steps[args.id]
+        if args.build_root_dir:
+            build_root_path = pl.Path(args.build_root_dir)
+        else:
+            build_root_path = AGENT_BUILD_OUTPUT
+
+        step.run(
+            build_root=build_root_path
+        )
+

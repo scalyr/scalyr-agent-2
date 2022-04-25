@@ -59,7 +59,7 @@ def _test(
             "-v",
             "/var/lib/docker/containers:/var/lib/docker/containers",
             "--platform",
-            architecture.as_docker_platform.value,
+            architecture.as_docker_platform,
             image_name,
         ]
     )

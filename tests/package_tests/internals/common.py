@@ -126,6 +126,7 @@ class LogVerifier:
                 descriptions = "\n".join(
                     [check.description for check in self._checks_required_to_pass]
                 )
+                print(self._content)
                 raise TimeoutError(
                     f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}"
                 )

@@ -114,7 +114,7 @@ def test_base_step(
 
     # Check ids of all steps that are used by base step.
     # That has to be only the id of the base step itself.
-    assert base_step.all_used_cached_step_ids == [base_step.id]
+    assert base_step.all_used_cacheable_steps == [base_step.id]
 
     if dependency_in_docker:
         dependency_docker_image = _get_docker_image_spec_or_none(
@@ -136,7 +136,7 @@ def test_base_step(
     )
     # Check all used ids for the dependency step.
     # It does not have any previous steps, so it contain only its own id.
-    assert dependency_step.all_used_cached_step_ids == [dependency_step.id]
+    assert dependency_step.all_used_cacheable_steps == [dependency_step.id]
 
     final_step = build_step.ScriptBuildStep(
         name="FinalStep",
@@ -152,9 +152,9 @@ def test_base_step(
     )
 
     # Check all ids. For now, the result also has to contain ids of all previous steps.
-    assert final_step.all_used_cached_step_ids == [
-        *dependency_step.all_used_cached_step_ids,
-        *base_step.all_used_cached_step_ids,
+    assert final_step.all_used_cacheable_steps == [
+        *dependency_step.all_used_cacheable_steps,
+        *base_step.all_used_cacheable_steps,
         final_step.id
     ]
 
