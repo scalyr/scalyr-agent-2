@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Script which prints Circle CI usage data for the recent workflows.bc.
+Script which prints Circle CI usage data for the recent workflows.
 
 It relies on the following environment variables being set:
 
@@ -49,7 +49,7 @@ PRICE_PER_CREDIT = CREDIT_BUNDLE_PRICE / CREDIT_BUNDLE_UNIT_COUNT
 GITHUB_API_PRS_URL = "https://api.github.com/repos/{project_slug}/pulls"
 GITHUB_API_SEARCH_URL = "https://api.github.com/search/issues"
 CIRCLE_CI_API_INSIGHTS_URL = (
-    "https://circleci.com/api/v2/insights/{project_slug}/workflows.bc/{workflow}"
+    "https://circleci.com/api/v2/insights/{project_slug}/workflows/{workflow}"
 )
 CIRCLE_CI_WORKFLOW_VIEW_URL = "https://circleci.com/workflow-run/{workflow_id}"
 
@@ -264,8 +264,8 @@ if __name__ == "__main__":
         default="gh/scalyr/scalyr-agent-2",
     )
     parser.add_argument(
-        "--workflows.bc",
-        help="Name of the workflows.bc to print the usage data for (e.g. unittest,benchmarks,e2e).",
+        "--workflows",
+        help="Name of the workflows to print the usage data for (e.g. unittest,benchmarks,e2e).",
         default="unittest",
     )
     parser.add_argument(
