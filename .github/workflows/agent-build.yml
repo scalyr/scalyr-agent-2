@@ -42,7 +42,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '14'
-          cache: 'npm'
       - run: npm install @actions/cache
 
       - name: Upload cacheable steps from cache (if exist).
