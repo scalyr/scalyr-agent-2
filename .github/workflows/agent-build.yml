@@ -39,13 +39,11 @@ jobs:
         run: |
           echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
 
-      steps:
-        - uses: actions/checkout@v3
-        - uses: actions/setup-node@v3
-          with:
-            node-version: '14'
-            cache: 'npm'
-        - run: npm install @actions/cache
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+          cache: 'npm'
+      - run: npm install @actions/cache
 
       - name: Upload cacheable steps from cache (if exist).
         uses: actions/github-script@v6
