@@ -133,8 +133,8 @@ class DockerImageType(enum.Enum):
 # Set of docker platforms that are supported by prod image.
 _PROD_DOCKER_IMAGES_PLATFORMS = [
     constants.Architecture.X86_64.as_docker_platform,
-    constants.Architecture.ARM64.as_docker_platform,
-    constants.Architecture.ARMV7.as_docker_platform
+    # constants.Architecture.ARM64.as_docker_platform,
+    # constants.Architecture.ARMV7.as_docker_platform
 ]
 
 _AGENT_BASE_IMAGE_BUILDER_STEPS = {

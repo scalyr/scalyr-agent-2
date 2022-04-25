@@ -246,8 +246,8 @@ class DockerImagePackageTest(FinalStep):
             # TODO: Make tests run in parallel.
             for arch in [
                 constants.Architecture.X86_64,
-                constants.Architecture.ARM64,
-                constants.Architecture.ARMV7
+                # constants.Architecture.ARM64,
+                # constants.Architecture.ARMV7
             ]:
                 logging.info(
                     f"Start testing image '{local_registry_image_name}' with architecture "
