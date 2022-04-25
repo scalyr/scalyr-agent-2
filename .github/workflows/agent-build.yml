@@ -44,8 +44,6 @@ jobs:
           node-version: '14'
 
       - run: |
-          mkdir test
-          cd test
           npm install @actions/cache
           ls .
 
