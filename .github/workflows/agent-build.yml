@@ -53,6 +53,13 @@ jobs:
         run:
           python3 build_package_new.py ${{ matrix.build-name }} --build-root-dir . --platforms linux/amd64
 
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
+        with:
+          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+          action: save
+          cache-dir: .
+
 
 
 
