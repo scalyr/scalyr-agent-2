@@ -50,7 +50,7 @@ jobs:
           cache-dir: .
 
       - name: Build ${{ matrix.build-name }}
-        run:
+        run: |
           python3 build_package_new.py ${{ matrix.build-name }} --build-root-dir . --platforms linux/amd64
           ls step_outputs
 
