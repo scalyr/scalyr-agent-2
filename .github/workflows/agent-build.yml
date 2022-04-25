@@ -51,7 +51,7 @@ jobs:
 
       - name: Build ${{ matrix.build-name }}
         run:
-          python3 build_package_new.py ${{ matrix.build-name }} --platforms linux/amd64
+          python3 build_package_new.py ${{ matrix.build-name }} --build-root-dir . --platforms linux/amd64
 
 
 
