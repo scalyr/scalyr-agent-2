@@ -10,5 +10,6 @@ if [ "$PYTHON_BASE_IMAGE_TYPE" = "debian" ]; then
 
   apt-get update && apt-get install -y git tar curl
 else
-  apk update && apk add --virtual curl git
+  apk update && apk add --virtual common curl git
 fi
+
