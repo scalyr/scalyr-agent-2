@@ -44,6 +44,7 @@ jobs:
         id: set-result
         with:
           script: |
+            __original_require__('@actions/cache');
             console.log(cache);
           result-encoding: string
 
