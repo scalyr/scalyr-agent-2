@@ -96,6 +96,12 @@ if __name__ == "__main__":
             help="Additional suffix for the name of the agent instances.",
         )
 
+        run_package_test_parser.add_argument(
+            "--show-all-used-steps-ids",
+            dest="show_all_used_steps_ids",
+            action="store_true"
+        )
+
     get_tests_github_matrix_parser = subparsers.add_parser(
         "get-package-builder-tests-github-matrix"
     )
@@ -117,12 +123,18 @@ if __name__ == "__main__":
             build_root_path = AGENT_BUILD_OUTPUT
 
         if args.package_test_name in DOCKER_IMAGE_TESTS:
+
             package_test = package_test_cls(
                 scalyr_api_key=scalyr_api_key,
                 name_suffix=get_option(
                     "name_suffix", default=str(datetime.datetime.now().timestamp())
                 ),
             )
+
+            if args.show_all_used_steps_ids:
+                print(json.dumps(package_test.all_used_cacheable_steps_ids))
+                exit(0)
+
             package_test.run(
                 build_root=build_root_path
             )
