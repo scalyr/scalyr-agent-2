@@ -53,6 +53,7 @@ async function performDeployment() {
     const step_ids = JSON.parse(steps_ids_json_str);
 
     for (let id of step_ids) {
+        console.log(id);
         const stepDir = path.join(cacheDir, id);
         const cacheKey = `${id}-${cacheVersionSuffix}`;
         await handleStep(
