@@ -35,6 +35,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Get build cacheable steps
+        run: |
+          echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
+
+      - name: Upload cacheable steps from cache (if exist).
+        uses: actions/github-script@v6
+        id: set-result
+        with:
+          script: return "Hello!"
+          result-encoding: string
+
+
+
 
 
 #  test-images:
