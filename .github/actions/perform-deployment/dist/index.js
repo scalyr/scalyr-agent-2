@@ -57968,7 +57968,7 @@ async function performDeployment() {
 
     for (let id of step_ids) {
         console.log(id);
-        const stepDir = path.join(cacheDir, id);
+        const stepDir = path.join(cacheDir, "step_outputs", id);
         const cacheKey = `${id}-${cacheVersionSuffix}`;
         await handleStep(
             action,
