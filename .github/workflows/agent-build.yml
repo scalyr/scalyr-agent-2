@@ -43,7 +43,8 @@ jobs:
         uses: actions/github-script@v6
         id: set-result
         with:
-          script: return "Hello!"
+          script: |
+            const cache = require('@actions/cache');
           result-encoding: string
 
 
