@@ -57938,8 +57938,12 @@ async function handleStep(
 ) {
     if (action === "upload") {
         const result = await cache.restoreCache([stepPath], key);
+        if (result) {
+            console.log(`Step ${key} cache has been found.`);
+        }
     }
     else {
+        console.log(`Step ${key} cache has been saved.`);
         await cache.saveCache([stepPath], key);
     }
 }
@@ -57963,6 +57967,7 @@ async function performDeployment() {
     const step_ids = JSON.parse(steps_ids_json_str);
 
     for (let id of step_ids) {
+        console.log(id);
         const stepDir = path.join(cacheDir, id);
         const cacheKey = `${id}-${cacheVersionSuffix}`;
         await handleStep(
