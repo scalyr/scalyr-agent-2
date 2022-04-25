@@ -105,9 +105,7 @@ jobs:
       - name: Run build step.
         uses: ./.github/actions/run-build-step
         with:
-          command: python3 tests/package_tests/run_package_test.py package-test \
-           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}-test" \
-            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+          command: python3 tests/package_tests/run_package_test.py package-test "${{ matrix.image-type }}-${{ matrix.image-distro-name }}-test" --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}"
 
 #      - name: Run image test
 #        env:
