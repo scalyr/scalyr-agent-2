@@ -702,7 +702,7 @@ class BuildAlpineDockerBaseImageStep(BuildDockerBaseImageStep):
 # Create common test environment that will be used by GitHub Actions CI
 COMMON_TEST_ENVIRONMENT = Deployment(
     # Name of the deployment.
-    # Call the local './.github/actions/perform-deployment' action with this name.
+    # Call the local './.github/actions/cache-step' action with this name.
     "test_environment",
     step_classes=[InstallTestRequirementsDeploymentStep],
 )

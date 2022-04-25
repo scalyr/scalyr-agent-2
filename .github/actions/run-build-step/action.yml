@@ -1,0 +1,37 @@
+name: "Run build step"
+description: "Runs one of the build steps that are defined in the 'agent_build' package."
+
+inputs:
+  command:
+    description: "Command string to execute step."
+    required: true
+
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get build cacheable steps
+      id: get-steps-ids
+      shell: bash
+      run: |
+        echo "::set-output name=cacheable_steps_ids::$(${{ inputs.command }} --show-all-used-steps-ids)"
+
+    - name: Download all cached steps that are used by final step.
+      uses: ./.github/actions/cache-step
+      with:
+        step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+        action: upload
+        cache-dir: ./cache
+
+    - name: Build ${{ matrix.build-name }}
+      shell: bash
+      run: |
+        ${{ inputs.command }} --build-root-dir ./cache
+
+    - name: Save all cached steps, if needed.
+      uses: ./.github/actions/cache-step
+      with:
+        step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+        action: save
+        cache-dir: ./cache

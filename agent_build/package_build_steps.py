@@ -295,10 +295,6 @@ for distro_type in DockerBaseImageDistroType:
         IMAGE_BUILDS[build_name] = Build
 
 
-
-a=10
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()

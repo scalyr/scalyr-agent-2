@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
         if args.deployment_command == "get-deployment-all-cache-names":
             # A special command which is needed to perform the Github action located in
-            # '.github/actions/perform-deployment'. The command provides names of the caches of the deployment's steps,
+            # '.github/actions/cache-step'. The command provides names of the caches of the deployment's steps,
             # so the Github action knows what keys to use to cache the results of those steps.
 
             # Get cache names of from all steps and print them as JSON list. This format is required by the mentioned

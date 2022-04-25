@@ -65,7 +65,6 @@ def calculate_files_checksum(
     return sha256.hexdigest()
 
 
-
 class DeploymentStepError(Exception):
     """
     Special exception class for the step error.
@@ -79,6 +78,18 @@ class StepCICDSettings:
 
 
 class BuildStep:
+    @abc.abstractmethod
+    def run(self, build_root: pl.Path):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def all_used_cacheable_steps(self) -> List['IntermediateBuildStep']:
+        pass
+
+
+class IntermediateBuildStep(BuildStep):
+
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
         for example for the build. The deployment step can be performed directly on the current machine or inside the
@@ -93,7 +104,7 @@ class BuildStep:
     def __init__(
         self,
         name: str = None,
-        dependency_steps: List['BuildStep'] = None,
+        dependency_steps: List['IntermediateBuildStep'] = None,
         additional_settings: Dict[str, str] = None,
         ci_cd_settings: StepCICDSettings = None,
         global_steps_collection: List['BuildStep'] = None
@@ -288,15 +299,6 @@ class BuildStep:
 
         return result_steps
 
-    @property
-    def all_used_cached_step_ids(self) -> List[str]:
-        """
-        Return ids of this step and ids of all steps that are used by it.
-        This function is needed to use that ids in CI/CD and pre-fetch some of the cached results.
-        """
-
-        return [step.id for step in self.all_used_cacheable_steps]
-
     def _check_for_cached_result(self):
         return self.output_directory.exists()
 
@@ -355,7 +357,7 @@ class BuildStep:
         return globs
 
 
-class SimpleBuildStep(BuildStep):
+class SimpleBuildStep(IntermediateBuildStep):
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
         for example for the build. The deployment step can be performed directly on the current machine or inside the
@@ -366,8 +368,8 @@ class SimpleBuildStep(BuildStep):
     def __init__(
         self,
         name: str,
-        base_step: Union['BuildStep', str] = None,
-        dependency_steps: List['BuildStep'] = None,
+        base_step: Union['IntermediateBuildStep', str] = None,
+        dependency_steps: List['InstallBuildDependenciesStep'] = None,
         additional_settings: Dict[str, str] = None,
         ci_cd_settings: StepCICDSettings = None,
         global_steps_collection: List['BuildStep'] = None
@@ -421,7 +423,7 @@ class DockerImageSpec:
             common.check_call_with_log(["docker", "save", self.name], stdout=f)
 
 
-class ScriptBuildStep(BuildStep):
+class ScriptBuildStep(IntermediateBuildStep):
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
         for example for the build. The deployment step can be performed directly on the current machine or inside the
@@ -434,8 +436,8 @@ class ScriptBuildStep(BuildStep):
         name: str,
         script_path: pl.Path,
         is_dependency_step: bool,
-        base_step: Union['BuildStep', "ScriptBuildStep", DockerImageSpec] = None,
-        dependency_steps: List['ScriptBuildStep'] = None,
+        base_step: Union['IntermediateBuildStep', "ScriptBuildStep", DockerImageSpec] = None,
+        dependency_steps: List['IntermediateBuildStep'] = None,
         additional_settings: Dict[str, str] = None,
         ci_cd_settings: StepCICDSettings = None,
         global_steps_collection: List['BuildStep'] = None
@@ -656,15 +658,6 @@ class ScriptBuildStep(BuildStep):
         isolated directory with only files that are tracked by the step.
         """
 
-        #self._source_root = self.step_root / "source"
-
-        # os.chmod(constants.DEPLOYMENT_ISOLATED_ROOTS_DIR, constants.DEPLOYMENT_ISOLATED_ROOTS_DIR.stat().st_mode | stat.S_IEXEC)
-        # for p in constants.DEPLOYMENT_ISOLATED_ROOTS_DIR.glob("**/*"):
-        #     os.chown(p, os.getuid(), os.getgid())
-
-        # # Create new isolated source root and copy only tracked files there.
-        # self._source_root = constants.DEPLOYMENT_ISOLATED_ROOTS_DIR / self.id
-
         if self._source_root.is_dir():
             common.check_call_with_log(f"ls -al {self._source_root}/..", shell=True)
             shutil.rmtree(self._source_root)
@@ -677,8 +670,6 @@ class ScriptBuildStep(BuildStep):
             dest_path = self._source_root / file_path
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, dest_path)
-
-        a=10
 
     def _check_for_cached_result(self):
         exists = super(ScriptBuildStep, self)._check_for_cached_result()
@@ -759,20 +750,12 @@ class ScriptBuildStep(BuildStep):
                 *volumes_mapping,
                 "--platform",
                 base_image.architecture.as_docker_platform,
-                # "-v",
-                # f"{constants.DEPLOYMENT_OUTPUTS_DIR}:{in_docker_deployment_cache_dir}",
-                # "--mount",
-                # f"type=bind,source={self._source_root},target={self._in_docker_source_root_path}",
-                # "--mount",
-                # f"type=bind,source={constants.DEPLOYMENT_CACHES_DIR},target={in_docker_deployment_cache_dir}",
                 *env_variables_options,
                 "--workdir",
                 str(self._in_docker_source_root_path),
                 base_image.name,
                 *cmd_args
             ])
-
-            #constants.DEPLOYMENT_OUTPUTS_DIR.chmod(constants.DEPLOYMENT_OUTPUTS_DIR.stat().st_mode | stat.S_IEXEC)
 
             self._save_step_docker_container_as_image_if_needed(
                 container_name=container_name
@@ -781,143 +764,6 @@ class ScriptBuildStep(BuildStep):
             common.run_command([
                 "docker", "rm", "-f", container_name
             ])
-
-
-# class PrepareEnvironmentStep(ScriptBuildStep):
-#     """
-#     """
-#     def __init__(
-#         self,
-#         script_path: pl.Path,
-#         build_root: pl.Path,
-#         base_step: Union['PrepareEnvironmentStep', str] = None,
-#         dependency_steps: List['ScriptBuildStep'] = None,
-#         additional_settings: Dict[str, str] = None,
-#         ci_cd_settings: StepCICDSettings = None
-#     ):
-#
-#         super(PrepareEnvironmentStep, self).__init__(
-#             script_path=script_path,
-#             build_root=build_root,
-#             is_dependency_step=True,
-#             base_step=base_step,
-#             dependency_steps=dependency_steps,
-#             additional_settings=additional_settings,
-#             ci_cd_settings=ci_cd_settings
-#         )
-#
-#
-# class ArtifactStep(ScriptBuildStep):
-#     def __init__(
-#         self,
-#         script_path: pl.Path,
-#         build_root: pl.Path,
-#         base_step: Union['PrepareEnvironmentStep', str] = None,
-#         dependency_steps: List['ScriptBuildStep'] = None,
-#         additional_settings: Dict[str, str] = None,
-#         ci_cd_settings: StepCICDSettings = None
-#     ):
-#
-#         super(ArtifactStep, self).__init__(
-#             script_path=script_path,
-#             build_root=build_root,
-#             is_dependency_step=False,
-#             base_step=base_step,
-#             dependency_steps=dependency_steps,
-#             additional_settings=additional_settings,
-#         )
-
-
-class Deployment:
-    """
-    Abstraction which represents some final desired state of the environment which is defined by set of steps, which are
-    instances of the :py:class:`DeploymentStep`
-    """
-
-    def __init__(
-        self,
-        name: str,
-        step_classes: List[Type[ScriptBuildStep]],
-        architecture: constants.Architecture = constants.Architecture.UNKNOWN,
-        base_docker_image: str = None,
-        inputs: Dict = None
-    ):
-        """
-        :param name: Name of the deployment. Must be unique for the whole project.
-        :param step_classes: List of step classes. All those steps classes will be instantiated
-            by using current specifics.
-        :param architecture: Architecture of the machine where deployment and its steps has to be performed.
-        :param base_docker_image: Name of the docker image, if the deployment and all its steps has to be performed
-            inside that docker image.
-        """
-        self.name = name
-        self.architecture = architecture
-        self.base_docker_image = base_docker_image
-        self.cache_directory = constants.DEPLOYMENT_CACHES_DIR / self.name
-        self.output_directory = constants.DEPLOYMENT_OUTPUT / self.name
-
-        # List with instantiated steps.
-        self.steps = collections.OrderedDict()
-
-        for name, step_cls in step_classes.items():
-            step = step_cls.create(
-                architecture=architecture,
-                step_inputs=inputs
-                # specify previous step for the current step.
-            )
-            self.steps[name] = step
-
-        # Add this instance to the global collection of all deployments.
-        if self.name in ALL_DEPLOYMENTS:
-            raise ValueError(f"The deployment with name: {self.name} already exists.")
-
-        ALL_DEPLOYMENTS[self.name] = self
-
-    def get_step_by_alias(self, alias):
-        return self.steps[alias]
-
-    @property
-    def output_path(self) -> pl.Path:
-        """
-        Path to the directory where the deployment's steps can put their results.
-        """
-        return constants.DEPLOYMENT_OUTPUT / self.name
-
-    @property
-    def in_docker(self) -> bool:
-        """
-        Flag that shows whether this deployment has to be performed in docker or not.
-        """
-        # If the base image is defined, then this deployment is meant to be
-        # performed in docker.
-
-        return self.base_docker_image is not None
-
-    @property
-    def result_image_name(self) -> Optional[str]:
-        """
-        The name of the result image of the whole deployment if it has to be performed in docker. It's, logically,
-        just a result image name of the last step.
-        """
-        return self.steps[-1].result_image.lower()
-
-    def deploy(self):
-        """
-        Perform the deployment by running all deployment steps.
-        """
-
-        for step in self.steps.values():
-            step.run()
-
-
-# Special collection where all created deployments are stored. All of the  deployments are saved with unique name as
-# key, so it is possible to find any deployment by its name. The ability to find needed deployment step by its name is
-# crucial if we want to run it on the CI/CD.
-ALL_DEPLOYMENTS: Dict[str, "Deployment"] = {}
-
-
-def get_deployment_by_name(name: str) -> Deployment:
-    return ALL_DEPLOYMENTS[name]
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
@@ -933,415 +779,15 @@ class InstallTestRequirementsDeploymentStep(ScriptBuildStep):
         return globs
 
 
-_REL_DOCKER_BASE_IMAGE_STEP_PATH = _DEPLOYMENT_STEPS_PATH / "docker-base-images"
-_REL_AGENT_BUILD_DOCKER_PATH = _REL_AGENT_BUILD_PATH / "docker"
-
-
-_REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
-        _DEPLOYMENT_STEPS_PATH / "build_base_docker_image"
-)
-
-
-class BuildDockerBaseImageStep(ScriptBuildStep):
-    """
-    This deployment step is responsible for the building of the base image of the agent docker images.
-    It runs shell script that builds that base image and pushes it to the local registry that runs in container.
-    After push, registry is shut down, but it's data root is preserved. This step puts this
-    registry data root to the output of the deployment, so the builder of the final agent docker image can access this
-    output and fetch base images from registry root (it needs to start another registry and mount existing registry
-    root).
-    """
-
-    # Suffix of that python image, that is used as the base image for our base image.
-    # has to match one of the names from the 'agent_build/tools/environment_deployments/steps/build_base_docker_image'
-    # directory, except 'build_base_images_common_lib.sh', it is a helper library.
-    BASE_DOCKER_IMAGE_TAG_SUFFIX: str
-
-    @property
-    def script_path(self) -> pl.Path:
-        """
-        Resolve path to the base image builder script which depends on suffix on the base image.
-        """
-        return (
-            _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP
-            / f"{type(self).BASE_DOCKER_IMAGE_TAG_SUFFIX}.sh"
-        )
-
-    @property
-    def _tracked_file_globs(self) -> List[pl.Path]:
-        globs = super(BuildDockerBaseImageStep, self)._tracked_file_globs
-        # Track the dockerfile...
-        globs.append(_REL_AGENT_BUILD_DOCKER_PATH / "Dockerfile.base")
-        # and helper lib for base image builder.
-        globs.append(
-            _REL_DEPLOYMENT_BUILD_BASE_IMAGE_STEP / "build_base_images_common_lib.sh"
-        )
-        # .. and requirement files...
-        globs.append(
-            _REL_AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt"
-        )
-        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt")
-        globs.append(_REL_AGENT_REQUIREMENT_FILES_PATH / "main-requirements.txt")
-        return globs
-
-
-
-class BuildBusterDockerBaseImageStep(BuildDockerBaseImageStep):
-    """
-    Subclass that builds agent's base docker image based on debian buster (slim)
-    """
-
-    BASE_DOCKER_IMAGE_TAG_SUFFIX = "slim"
-
-
-class BuildAlpineDockerBaseImageStep(BuildDockerBaseImageStep):
-    """
-    Subclass that builds agent's base docker image based on alpine.
-    """
-
-    BASE_DOCKER_IMAGE_TAG_SUFFIX = "alpine"
-
-#
-# # Create common test environment that will be used by GitHub Actions CI
-# COMMON_TEST_ENVIRONMENT = Deployment(
-#     # Name of the deployment.
-#     # Call the local './.github/actions/perform-deployment' action with this name.
-#     "test_environment",
-#     step_classes=[InstallTestRequirementsDeploymentStep],
-# )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#########
-
-
-class PrepareBaseCentos(ScriptBuildStep):
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "prepare_base_centos.sh"
-
-
-class PrepareBaseUbuntu(ScriptBuildStep):
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "prepare_base_ubuntu.sh"
-
-
-# class BuildPythonCentosStep(ShellScriptDeploymentStep):
-#     BASE_STEP = PrepareBaseCentos
-#     IS_ARTIFACT_STEP = True
-#     SCRIPT_PATH = _REL_DEPLOYMENT_STEPS_PATH / "build_python.sh"
-#
-#     def __init__(
-#             self,
-#             base_os: str,
-#             docker_image: DeploymentStep.DockerImageSpec = None,
-#
-#     ):
-#
-#         if base_os == "centos:6":
-#             base_step_class = PrepareBaseCentos
-#         elif base_os == "ubuntu:20.04":
-#             base_step_class = PrepareBaseUbuntu
-#         else:
-#             raise ValueError(f"Wrong base os name: {base_os}.")
-#
-#         prepare_base = base_step_class(
-#             docker_image=docker_image
-#         )
-#         super(BuildPythonCentosStep, self).__init__(
-#             base_step=prepare_base,
-#             docker_image=docker_image
-#         )
-
-class InstallBuildDependenciesStepDistroType(enum.Enum):
-    CENTOS = "centos"
-    UBUNTU = "ubuntu"
-
-
-class InstallBuildDependenciesStep(ScriptBuildStep):
-
+class FinalStep(BuildStep):
     def __init__(
             self,
-            distro_type: InstallBuildDependenciesStepDistroType,
-            docker_image: DockerImageSpec = None,
-    ):
-
-        if distro_type == InstallBuildDependenciesStepDistroType.CENTOS:
-            script_name = "prepare_base_centos.sh"
-        elif distro_type == InstallBuildDependenciesStepDistroType.UBUNTU:
-            script_name = "prepare_base_ubuntu.sh"
-
-        super(InstallBuildDependenciesStep, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / script_name,
-            base_step=docker_image
-        )
-
-
-class BuildPythonStep(ScriptBuildStep):
-
-    is_dependency_step = True
-
-    def __init__(
-            self,
-            # distro_type: InstallBuildDependenciesStepDistroType,
-            # docker_image: str = None
-            initial_distro_step: ScriptBuildStep
-
-    ):
-
-        # install_builder_dependencies_step = InstallBuildDependenciesStep(
-        #     distro_type=distro_type,
-        #     docker_image=docker_image,
-        # )
-
-        super(BuildPythonStep, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / "build_python.sh",
-            base_step=initial_distro_step
-        )
-
-
-class PreparePythonBase(ScriptBuildStep):
-    def __init__(
-            self,
-            # distro_type: InstallBuildDependenciesStepDistroType,
-            # docker_image: DeploymentStep.DockerImageSpec = None
-            initial_distro_step: ScriptBuildStep
-    ):
-
-        # install_build_dependencies_step = InstallBuildDependenciesStep(
-        #     distro_type=distro_type,
-        #     docker_image=docker_image
-        # )
-
-        build_python_step = BuildPythonStep(
-            initial_distro_step=initial_distro_step
-        )
-
-        super(PreparePythonBase, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / "prepare_python_base.sh",
-            base_step=initial_distro_step,
-            dependency_steps=[build_python_step]
-        )
-
-
-class PrepareAgentPythonDependencies(ScriptBuildStep):
-    #BASE_STEP = PrepareBaseCentos
-    TRACKED_FILE_GLOBS = [_REL_AGENT_REQUIREMENT_FILES_PATH / "*.txt"]
-    is_dependency_step = True
-
-    def __init__(
-            self,
-            initial_distro_step: ScriptBuildStep
-    ):
-
-        base_python_step = PreparePythonBase(
-            initial_distro_step=initial_distro_step
-        )
-
-        super(PrepareAgentPythonDependencies, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / "prepare_agent_python-dependencies.sh",
-            base_step=base_python_step,
-        )
-
-    @property
-    def _tracked_file_globs(self) -> List[pl.Path]:
-        return super(PrepareAgentPythonDependencies, self)._tracked_file_globs
-
-
-class PrepareFrozenBinaryBuilderStep(ScriptBuildStep):
-
-    def __init__(
-        self,
-        # distro_type: InstallBuildDependenciesStepDistroType,
-        # docker_image: DeploymentStep.DockerImageSpec = None
-        initial_distro_step: ScriptBuildStep
-    ):
-
-        base_python_step = PreparePythonBase(
-            initial_distro_step=initial_distro_step
-        )
-
-        prepare_agent_deps_step = PrepareAgentPythonDependencies(
-            initial_distro_step=initial_distro_step
-        )
-
-        super(PrepareFrozenBinaryBuilderStep, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / "prepare_frozen_binary_builder.sh",
-            base_step=base_python_step,
-            dependency_steps=[prepare_agent_deps_step],
-        )
-
-
-class BuildPythonUbuntuStep(ScriptBuildStep):
-    BASE_STEP = PrepareBaseUbuntu
-    is_dependency_step = True
-    SCRIPT_PATH = _DEPLOYMENT_STEPS_PATH / "build_python.sh"
-
-
-class PrepareFpmBuilderStep(ScriptBuildStep):
-    #SCRIPT_PATH = _REL_DEPLOYMENT_STEPS_PATH / "prepare_fpm_builder.sh"
-
-    def __init__(
-        self,
-        # distro_type: InstallBuildDependenciesStepDistroType,
-        # docker_image: str = None
-        initial_distro_step: ScriptBuildStep
-    ):
-
-        base_python_step = PreparePythonBase(
-            initial_distro_step=initial_distro_step
-        )
-
-        super(PrepareFpmBuilderStep, self).__init__(
-            script_path=_DEPLOYMENT_STEPS_PATH / "prepare_fpm_builder.sh",
-            base_step=base_python_step,
-        )
-
-
-@dataclasses.dataclass
-class FrozenBinaryBuildSpec:
-    distro_type: InstallBuildDependenciesStepDistroType
-    docker_image: DockerImageSpec = None
-
-
-class BuildFrozenBinaryStep(ScriptBuildStep):
-    is_dependency_step = True
-    TRACKED_FILE_GLOBS = [
-        pl.Path("agent_build/**/*"),
-        pl.Path("scalyr_agent/**/*"),
-        pl.Path("config/**/*"),
-        pl.Path("docker/**/*"),
-        pl.Path("monitors/**/*"),
-        pl.Path("certs/**/*"),
-        pl.Path("VERSION"),
-        pl.Path("CHANGELOG.md"),
-        pl.Path("build_package_new.py"),
-    ]
-
-    def __init__(
-            self,
-            frozen_binary_build_spec: FrozenBinaryBuildSpec,
-            package_install_type: str
-    ):
-
-        centos_base_step = InstallBuildDependenciesStep(
-            distro_type=frozen_binary_build_spec.distro_type,
-            docker_image=frozen_binary_build_spec.docker_image
-        )
-
-        frozen_binaries_base_step = PrepareFrozenBinaryBuilderStep(
-            initial_distro_step=centos_base_step
-        )
-
-        super(BuildFrozenBinaryStep, self).__init__(
-            script_path=constants.SOURCE_ROOT / "agent_build/tools/environment_deployments/steps/build_frozen_binary.py",
-            base_step=frozen_binaries_base_step,
-        )
-
-        self._add_input(
-            "INSTALL_TYPE", package_install_type
-        )
-
-        # self._add_input(
-        #     "FROZEN_BINARY_FILE_NAME", frozen_binary_build_spec.frozen_binary_file_name
-        # )
-
-
-class BuildFpmPackageStep(ScriptBuildStep):
-    """
-    Base image builder for packages which are produced by the 'fpm' packager.
-    For example dep, rpm.
-    """
-    INSTALL_TYPE = "package"
-
-    def __init__(
-            self,
-            architecture: constants.Architecture,
-            result_package_file_name: str,
-            package_architecture: str,
-            fpm_package_type: str,
-            package_install_type: str,
-            variant: str = None,
-            no_versioned_file_name: bool = False,
-            frozen_binary_builder_spec: FrozenBinaryBuildSpec = None,
-    ):
-
-        self.architecture = architecture
-        self._variant = variant
-        self._no_versioned_file_name = no_versioned_file_name
-        self._result_package_filename = result_package_file_name
-        self._package_architecture = package_architecture
-        self._fpm_package_type = fpm_package_type
-
-        required_steps = []
-
-        if frozen_binary_builder_spec:
-            build_frozen_binary_step = BuildFrozenBinaryStep(
-                frozen_binary_build_spec=frozen_binary_builder_spec,
-                package_install_type=package_install_type
-            )
-
-            required_steps.append(build_frozen_binary_step)
-
-        ubuntu_base_step = InstallBuildDependenciesStep(
-            distro_type=InstallBuildDependenciesStepDistroType.UBUNTU,
-            docker_image=ScriptBuildStep.DockerImageSpec(
-                name="ubuntu:20.04",
-                architecture=constants.Architecture.X86_64
-            )
-        )
-
-        prepare_python_step = PreparePythonBase(
-            initial_distro_step=ubuntu_base_step
-        )
-
-        super(BuildFpmPackageStep, self).__init__(
-            script_path=pl.Path(constants.SOURCE_ROOT) / "agent_build/tools/environment_deployments/steps/build_fpm_package.py",
-            base_step=prepare_python_step,
-            dependency_steps=required_steps
-        )
-
-        self._add_input(
-            "FPM_PACKAGE_TYPE", fpm_package_type
-        )
-        self._add_input(
-            "VARIANT", variant
-        )
-        self._add_input(
-            "NO_VERSIONED_FILE_NAME", str(int(no_versioned_file_name))
-        )
-        self._add_input(
-            "PACKAGE_ARCHITECTURE", package_architecture
-        )
-        self._add_input(
-            "RESULT_PACKAGE_FILE_NAME", result_package_file_name,
-        )
-
-
-class FinalStep:
-    def __init__(
-            self,
-            used_steps: List[BuildStep]
+            used_steps: List[IntermediateBuildStep]
     ):
         self._used_steps = used_steps or []
 
     @property
-    def all_used_cacheable_steps(self) -> List[BuildStep]:
+    def all_used_cacheable_steps(self) -> List[IntermediateBuildStep]:
         result_steps = []
         for s in self._used_steps:
             result_steps.extend(s.all_used_cacheable_steps)

@@ -35,13 +35,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Get build cacheable steps
-        id: get-steps-ids
-        run: |
-          echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
-
-      - run: |
-          echo "1111 ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}"
+#      - name: Get build cacheable steps
+#        id: get-steps-ids
+#        run: |
+#          echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
+#
+#      - run: |
+#          echo "1111 ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}"
 
       - name: Set up QEMU
         id: qemu
@@ -50,24 +50,30 @@ jobs:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
-        with:
-          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
-          action: upload
-          cache-dir: ./cache
 
-      - name: Build ${{ matrix.build-name }}
-        run: |
-          python3 build_package_new.py ${{ matrix.build-name }} --build-root-dir ./cache
-          ls step_outputs
-
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
+      - name: Run build step.
+        uses: ./.github/actions/run-build-step
         with:
-          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
-          action: save
-          cache-dir: ./cache
+          command: python3 build_package_new.py ${{ matrix.build-name }}
+
+#      - name: Perform the deployment of the test environment
+#        uses: ./.github/actions/cache-step
+#        with:
+#          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+#          action: upload
+#          cache-dir: ./cache
+#
+#      - name: Build ${{ matrix.build-name }}
+#        run: |
+#          python3 build_package_new.py ${{ matrix.build-name }} --build-root-dir ./cache
+#          ls step_outputs
+#
+#      - name: Perform the deployment of the test environment
+#        uses: ./.github/actions/cache-step
+#        with:
+#          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+#          action: save
+#          cache-dir: ./cache
 
 
 
@@ -96,7 +102,7 @@ jobs:
 #          python-version: ${{ matrix.python-version }}
 #
 ##      - name: Perform the deployment of the test environment
-##        uses: ./.github/actions/perform-deployment
+##        uses: ./.github/actions/cache-step
 ##        with:
 ##          deployment-name: "test_environment"
 #
@@ -112,7 +118,7 @@ jobs:
 #          platforms: all
 #
 #      - name: Perform the build of the base docker image in the deployment.
-#        uses: ./.github/actions/perform-deployment
+#        uses: ./.github/actions/cache-step
 #        with:
 #          deployment-name: ${{ matrix.build-name }}
 #

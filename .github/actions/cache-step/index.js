@@ -16,9 +16,6 @@ const core = require('@actions/core');
 const cache = require('@actions/cache');
 const fs = require('fs');
 const path = require('path')
-// const child_process = require('child_process')
-// const buffer = require('buffer')
-// const readline = require('readline')
 
 
 async function handleStep(
