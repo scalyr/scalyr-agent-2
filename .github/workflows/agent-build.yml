@@ -44,7 +44,7 @@ jobs:
         id: set-result
         with:
           script: |
-            console.log(core);
+            console.log(cache);
           result-encoding: string
 
 
