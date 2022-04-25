@@ -49,6 +49,9 @@ jobs:
           action: upload
           cache-dir: .
 
+      - name: Build ${{ matrix.build-name }}
+        run:
+          python3 build_package_new.py ${{ matrix.build-name }}
 
 
 
