@@ -44,7 +44,7 @@ jobs:
         id: set-result
         with:
           script: |
-            const cache = require('@actions/cache');
+            const cache = require('@actions/core');
           result-encoding: string
 
 
