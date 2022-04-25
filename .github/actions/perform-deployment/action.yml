@@ -18,7 +18,7 @@ inputs:
   cache-version-suffix:
     description: "Cache key suffix. Can be changed when it is needed to invalidate the cache."
     required: false
-    default: v12
+    default: v18
 
 runs:
   using: 'node12'
