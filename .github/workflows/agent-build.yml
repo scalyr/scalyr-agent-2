@@ -42,7 +42,12 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '14'
-      - run: npm install @actions/cache
+
+      - run: |
+        mkdir test
+        cd test
+        npm install @actions/cache
+        ls .
 
       - name: Upload cacheable steps from cache (if exist).
         uses: actions/github-script@v6
