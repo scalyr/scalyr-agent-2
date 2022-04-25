@@ -1,7 +1,7 @@
-name: 'Perform deployment.'
+name: 'Cache-step'
 description: |
-  Prepares current machine by perfroming the set of the deployments, which are defined in the 'agent_build/tools/environment_deployments.deployments.py.' folder.
-  For more info, please look at the docs in the same file.'
+  Prepares current machine by perfroming the set of the build steps, which are defined in the 'agent_build' package.
+
 inputs:
   step-ids-json:
     description: "Name of the deployment"
