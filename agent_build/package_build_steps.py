@@ -144,7 +144,7 @@ _AGENT_BASE_IMAGE_BUILDER_STEPS = {
     ),
     DockerBaseImageDistroType.ALPINE: DockerContainerBaseBuildStep(
         platforms_to_build=_PROD_DOCKER_IMAGES_PLATFORMS,
-        base_image_distro_type=DockerBaseImageDistroType.DEBIAN
+        base_image_distro_type=DockerBaseImageDistroType.ALPINE
     )
 }
 
