@@ -33,7 +33,7 @@ sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
 from agent_build.package_build_steps import IMAGE_BUILDS
-from agent_build.tools.constants import AGENT_BUILD_OUTPUT
+from agent_build.tools.constants import AGENT_BUILD_OUTPUT, AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
@@ -119,12 +119,9 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--testing",
-                dest="testing",
-                action="store_true",
-                default=False,
-                help="Build test versions of the image that contain additional features, for example enabled coverage. "
-                     "Can be used in smoketests. Only works with docker/k8s.",
+                "--platforms",
+                dest="platforms",
+                help="Comma delimited list of platforms to build (and optionally push) the image for.",
             )
 
         else:
@@ -156,11 +153,16 @@ if __name__ == "__main__":
     # If that's a docker image builder handle their arguments too.
     if builder_name in IMAGE_BUILDS:
         build_cls = IMAGE_BUILDS[builder_name]
+        if args.platforms:
+            platforms_to_build = args.platforms.split(",")
+        else:
+            platforms_to_build = []
         build = build_cls(
             registry=args.registry,
             user=args.user,
             tags=args.tag or [],
-            push=args.push
+            push=args.push,
+            platforms_to_build=platforms_to_build
         )
         if args.show_all_used_steps_ids:
             print(json.dumps(build.all_used_cacheable_steps_ids))
