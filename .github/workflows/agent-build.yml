@@ -40,7 +40,8 @@ jobs:
         run: |
           echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
 
-
+      - run: |
+          echo "1111 ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}"
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
