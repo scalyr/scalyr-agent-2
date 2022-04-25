@@ -307,7 +307,7 @@ class BuildStep:
             input is specified after the initialization of the step, it can not be cached.
         """
 
-        self._build_root = build_root
+        self._build_root = build_root.absolute()
 
         if self._check_for_cached_result():
             logging.info(
