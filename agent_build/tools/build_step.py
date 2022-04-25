@@ -259,9 +259,13 @@ class BuildStep:
 
         checksum = sha256.hexdigest()
 
-        name = self.name
+        name = f"{self.name}__{checksum}".lower()
 
-        return f"{name}__{checksum}".lower()
+        # # Also reflect in the id that the step in not cacheable, so CI/CD can skip it.
+        # if not self._ci_cd_settings.cacheable:
+        #     name = f"{name}_skip_cache"
+
+        return name
 
     @property
     def all_used_cacheable_steps(self) -> List['BuildStep']:

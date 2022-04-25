@@ -36,25 +36,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Get build cacheable steps
+        id: get-steps-ids
         run: |
           echo "::set-output name=cacheable_steps_ids::$(python3 build_package_new.py ${{ matrix.build-name }} --show-all-used-steps-ids)"
 
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '14'
 
-      - run: |
-          npm install @actions/cache
-          ls .
-
-      - name: Upload cacheable steps from cache (if exist).
-        uses: actions/github-script@v6
-        id: set-result
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
         with:
-          script: |
-            __original_require__('@actions/cache');
-            console.log(cache);
-          result-encoding: string
+          step-ids-json: ${{ steps.get-steps-ids.outputs.cacheable_steps_ids }}
+          action: upload
+          cache-dir: .
 
 
 

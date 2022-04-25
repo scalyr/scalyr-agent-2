@@ -3,8 +3,16 @@ description: |
   Prepares current machine by perfroming the set of the deployments, which are defined in the 'agent_build/tools/environment_deployments.deployments.py.' folder.
   For more info, please look at the docs in the same file.'
 inputs:
-  deployment-name:
+  step-ids-json:
     description: "Name of the deployment"
+    required: true
+
+  action:
+    description: "Cache action to perform."
+    required: true
+
+  cache-dir:
+    description: "Cache directory."
     required: true
 
   cache-version-suffix:
