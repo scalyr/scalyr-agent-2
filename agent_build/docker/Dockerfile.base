@@ -29,7 +29,7 @@ ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-
 
 ADD agent_build/docker/install-base-image-dependencies.sh agent_build/docker/install-base-image-dependencies.sh
 ADD agent_build/docker/install-base-image-build-dependencies.sh agent_build/docker/install-base-image-build-dependencies.sh
-ADD agent_build/docker/install-base-image-build-dependencies.sh agent_build/docker/install-base-image-rust.sh
+ADD agent_build/docker/install-base-image-rust.sh agent_build/docker/install-base-image-rust.sh
 
 RUN PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-build-dependencies.sh
 RUN TARGETVARIANT=$TARGETVARIANT PYTHON_BASE_IMAGE_TYPE=$PYTHON_BASE_IMAGE_TYPE sh agent_build/docker/install-base-image-rust.sh

@@ -5,13 +5,6 @@
 
 set -e
 
-if [ "$TARGETVARIANT" != "v7" ]; then
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  PATH="/root/.cargo/bin:${PATH}"
-  rustup toolchain install nightly
-  rustup default nightly
-fi
-
 # orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
 # with pip environment markers since they are not specific enough.
 if [ "$TARGETVARIANT" = "v7" ] && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then
