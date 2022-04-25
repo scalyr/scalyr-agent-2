@@ -33,8 +33,15 @@ async function handleStep(
         }
     }
     else {
-        console.log(`Step ${key} cache has been saved.`);
-        await cache.saveCache([stepPath], key);
+        try {
+            await cache.saveCache([fullPath], cacheKey);
+            console.log(`Step ${key} cache has been saved.`);
+        } catch (error) {
+            console.warn(
+                `Can not save cache by key ${cacheKey}. 
+                It seems that seems that it has been saved somewhere else.\nOriginal message: ${error.message}`
+            )
+        }
     }
 }
 
