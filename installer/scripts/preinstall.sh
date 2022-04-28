@@ -19,7 +19,7 @@
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
 # Requirements
-MIN_REQ_PYTHON2_VERSION="2.6"
+MIN_REQ_PYTHON2_VERSION="2.7"
 MIN_REQ_PYTHON3_VERSION="3.5"
 
 echo "Searching for Python in Path: $PATH"
