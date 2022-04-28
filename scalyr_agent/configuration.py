@@ -703,6 +703,7 @@ class Configuration(object):
             "enable_worker_session_process_metrics_gather",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
+            "ignore_checkpoints_on_startup_path_globs"
         ]
 
         # get options (if any) from the other configuration object
