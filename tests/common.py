@@ -72,7 +72,8 @@ def _is_ubuntu_14_04():
     """
     Return True if we are running on Ubuntu 14.04.
     """
-    distro = platform.linux_distribution()  # pylint: disable=no-member
+    import distro
+    distro = distro.linux_distribution()  # pylint: disable=no-member
 
     return distro[0].lower() == "ubuntu" and distro[1] == "14.04"
 
