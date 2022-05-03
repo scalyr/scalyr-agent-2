@@ -146,6 +146,13 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "ubuntu",
         "default_python_package_name": "python",
     },
+    "ubuntu2204": {
+        "image_id": "ami-09d56f8956ab235b3",
+        "image_name": "Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+        "size_id": "m1.small",
+        "ssh_username": "ubuntu",
+        "default_python_package_name": "python",
+    },
     "debian1003": {
         "image_id": "ami-0b9a611a02047d3b1",
         "image_name": "Debian 10 Buster",
