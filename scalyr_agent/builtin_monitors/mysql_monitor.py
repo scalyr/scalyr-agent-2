@@ -1082,7 +1082,7 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome), typically on the host running MySQL.
 
-The Agent requires Python 2.7 or higher as of version 2.0.52 (2019). You can install the Agent on a host other than the one running MySQL. If you have to run this plugin on an older version of Python, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+The Agent requires Python 2.7 or higher as of version 2.0.52 (2019). You can install the Agent on a host other than the one running MySQL. If you must to run this plugin on an older version of Python, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 
 
 2\. Check requirements

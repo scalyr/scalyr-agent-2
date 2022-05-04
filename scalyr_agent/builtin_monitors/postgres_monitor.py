@@ -424,47 +424,84 @@ class PostgreSQLDb(object):
 class PostgresMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
     """
-# PostgreSQL Monitor
+# PostgreSQL
 
-The PostgreSQL monitor allows you to collect data about the usage and performance of your PostgreSQL server.
+Import performance and usage data from a PostgreSQL server.
 
-Each monitor can be configured to monitor a specific PostgreSQL database, thus allowing you to configure alerts and the
-dashboard entries independently (if desired) for each instance.
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Configuring PostgreSQL
 
-To use Scalyr's PostgreSQL monitor, you will first need to configure your PostgreSQL server to enable password
-authentication for a user as well as configure a user to connect to the database and gather the necessary data.
+## Installation
 
-To configure PostgreSQL for password authentication, you will need a line like the following in your pg_hba.conf
-file:
+1\. Install the Scalyr Agent
+
+If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome), typically on the host running PostgreSQL.
+
+The Agent requires Python 2.7 or higher as of version 2.0.52 (2019). You can install the Agent on a host other than the one running PostgreSQL. If you must run this plugin on an older version of Python, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
+
+2\. Check requirements
+
+You must have a PostgreSQL user account with password login. See the [CREATE ROLE](www.postgresql.org/docs/current/sql-createrole.html) documentation.
+
+You must also configure PostgreSQL for TCP/IP connections from the Scalyr Agent. Add a line similar to the following in your [pg_hba.conf](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html) file:
 
     host    all             all             127.0.0.1/32            md5
 
-To create a user and enable password authentication, please consult the PostgreSQL documentation.  For version
-9.3, that documentation can be found here:  http://www.postgresql.org/docs/9.3/static/sql-createrole.html
+You can verify your configuration. An example for user "statusmon", with password "getstatus":
 
-### Configuring the PostgreSQL monitor
+    $ psql -U statusmon -W postgres -h localhost
+    Password for user statusmon: <enter password>
+    psql (9.3.5)
+    SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
+    Type "help" for help.
 
-The PostgreSQL monitor is included with the Scalyr agent.  In order to configure it, you will need to add its monitor
-configuration to the Scalyr agent config file.
+    postgres=#
 
-A basic PostgreSQL monitor configuration entry might resemble:
+If the configuration is incorrect, or you entered an invalid password, you will see something like this:
 
-  monitors: [
-    {
-      module:              "scalyr_agent.builtin_monitors.postgres_monitor",
-      id:                  "mydb",
-      database_host:       "localhost",
-      database_name:       "<database>",
-      database_username:   "<username>",
-      database_password:   "<password>"
-    }
-  ]
+    $ psql -U statusmon -W postgres -h localhost
+    psql: FATAL:  password authentication failed for user "statusmon"
+    FATAL:  password authentication failed for user "statusmon"
 
-Note the `id` field in the configurations.  This is an optional field that allows you to specify an identifier
-specific to a particular instance of PostgreSQL and will make it easier to filter on metrics specific to that
-instance."""
+
+3\. If you grant the above permissions after the Scalyr Agent has started, restart:
+
+      sudo scalyr-agent-2 restart
+
+
+4\. Configure the Scalyr Agent to import PostgreSQL data
+
+Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
+
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for PostgreSQL:
+
+    monitors: [
+      {
+        module:              "scalyr_agent.builtin_monitors.postgres_monitor",
+        database_name:       "<database>",
+        database_username:   "<username>",
+        database_password:   "<password>"
+      }
+    ]
+
+
+Enter values from step **2** for the `database_name`, `database_username`, and `database_password` properties.
+
+This configuration assumes PostgreSQL is running on the same server as the Scalyr Agent (localhost), on port 5432. If not, set the server's socket file, or hostname (or IP address) and port number. See the `database_host` and `database_port` properties in [Configuration Options](#options) below. You can also add the `id` property, which is especially useful to distinguish multiple PostgreSQL instances running on the same host.
+
+
+5\. Save and confirm
+
+Save the `agent.json` file. The Scalyr Agent will detect changes within 30 seconds. Wait a few minutes for the Agent to begin sending PostgreSQL data.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > Postgres. You will see an overview of performance statistics, across all hosts running this plugin. The dashboard only shows some of the data collected. Go to Search view and query [monitor = 'postgres_monitor'](/events?filter=monitor%20%3D%20%27postgres_monitor%27) to view all data.
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
+"""
     # fmt: on
 
     def _initialize(self):
