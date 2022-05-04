@@ -56,7 +56,7 @@ __monitor__ = __name__
 define_config_option(
     __monitor__,
     "module",
-    "Always `scalyr_agent.builtin_monitors.mysql_monitor `",
+    "Always `scalyr_agent.builtin_monitors.mysql_monitor`",
     required_option=True,
 )
 define_config_option(
