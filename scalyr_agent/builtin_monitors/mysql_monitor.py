@@ -1068,45 +1068,26 @@ class MysqlDB(object):
 class MysqlMonitor(ScalyrMonitor):
     # fmt: off
     """
-# MySQL Monitor
+# MySQL
 
-This agent monitor plugin records performance and usage data from a MySQL server.
+Import performance and usage data from a MySQL server.
 
-NOTE: The MySQL monitor requires Python 2.7 or higher as of agent release 2.0.52. (This applies to the server on which the Scalyr Agent
-is running, which needn't necessarily be the same machine where the MySQL server is running.). If you need
-to monitor MySQL from a machine running an older version of Python, [let us know](mailto:support@scalyr.com).
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the `monitors` section of the Scalyr Agent configuration file (`/etc/scalyr/agent.json`).
-For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-## Sample Configuration
+## Installation
 
-To configure the MySQL monitor plugin, you will need the following information:
 
-- A MySQL user with administrative privileges. The user needs to be able to query the information_schema table,
-  as well as assorted global status information. See more information on which permissionsa are needed in the
-  section below.
-- The password for that user.
+1\. Install the Scalyr Agent
 
-Here is a sample configuration fragment:
+If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome), typically on the host running MySQL.
 
-    monitors: [
-      {
-         module:            "scalyr_agent.builtin_monitors.mysql_monitor",
-         database_socket:   "default",
-         database_username: "USERNAME",
-         database_password: "PASSWORD"
-      }
-    ]
+The Agent requires Python 2.7 or higher as of version 2.0.52 (2019). You can install the Agent on a host other than the one running MySQL. If you have to run this plugin on an older version of Python, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 
-This configuration assumes that MySQL is running on the same server as the Scalyr Agent, and is using the default
-MySQL socket. If not, you will need to specify the server's socket file, or hostname (or IP address) and port number;
-see Configuration Reference.
 
-## MySQL User Permissions
+2\. Check requirements
 
-As part of the metric gathering process, monitor executes the following queries:
+You must have a MySQL user and password with administrative privileges. This plugin runs the queries:
 
 * `SHOW ENGINE INNODB STATUS;`
 * `SHOW PROCESSLIST;`
@@ -1114,19 +1095,14 @@ As part of the metric gathering process, monitor executes the following queries:
 * `SHOW /*!50000 GLOBAL */ STATUS;`
 * `SHOW /*!50000 GLOBAL */ VARIABLES;`
 
-To be able to execute those queries, the user you use to authenticate needs a subset of administrative
-permissions which are documented below.
+You are strongly encouraged to create a dedicated user, for example `scalyr-agent-monitor`, with a limited set of permissions. See the Data Definition Language (DDL) example below. If you install this plugin on a MySQL replica or slave, and configure it to connect to a primary or master, only the `PROCESS` grant is necessary. See the [collect_replica_metrics](#options) configuration option, and set it to `false` in step **4** below.
 
-You are strongly encouraged to create a dedicated user with a limited set of permissions for this purpose
-(e.g. user named `scalyr-agent-monitor`).
+Keep in mind there are different versions and implementations of MySQL, such as MariaDB. You may have to consult your version's documentation, in particular for the correct name of the `SHOW SLAVE STATUS;` grant.
 
-Example below shows DDL you can use to create a new user with the needed permissions.
-
-    -- Create user used for monitoring by the scalyr agent
-    -- In this case we allow that user to log in remotely from any host (@'%') and localhost
-    -- (@'localhost'), but depending on where the agent and MySQL server is running, you want only want
-    -- to grant permissions to connect from localhost. In this case, you should remove the lines
-    -- which allow user to connect from any host (@'%').
+    -- Create a user for this plugin.
+    -- Allow remote login from any host (@'%'), and from localhost (@'localhost').
+    -- If the Agent and MySQL server are running on the same machine, and you only want to
+    -- connect from localhost, you can remove the line for any host (@'%').
     CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'localhost' IDENTIFIED BY 'your super secret and long password';
     CREATE USER IF NOT EXISTS 'scalyr-agent-monitor'@'%' IDENTIFIED BY 'your super secret and long password';
 
@@ -1135,18 +1111,18 @@ Example below shows DDL you can use to create a new user with the needed permiss
     REVOKE ALL PRIVILEGES, GRANT OPTION  FROM 'scalyr-agent-monitor'@'%';
 
     -- Grant necessary permissions
-    -- Needed for SHOW PROCESSLIST;
-    -- Needed for ENGINE INNODB STATUS;
-    -- Needed for SELECT VERSION();
-    -- Needed for SHOW /*!50000 GLOBAL */ STATUS;
-    -- Needed for SHOW /*!50000 GLOBAL */ VARIABLES;
+    -- Required for SHOW PROCESSLIST;
+    -- Required for ENGINE INNODB STATUS;
+    -- Required for SELECT VERSION();
+    -- Required for SHOW /*!50000 GLOBAL */ STATUS;
+    -- Required for SHOW /*!50000 GLOBAL */ VARIABLES;
     GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'localhost';
     GRANT PROCESS on *.* to 'scalyr-agent-monitor'@'%';
 
-    -- Permission grants below are only needed if collect_replica_metrics config option is True
-    -- and monitor is configured to connect to a replica and not a primary.
+    -- The grants below are only required if the collect_replica_metrics config option is True,
+    -- and the plugin is configured to connect to a replica or salve, not a primary or master.
 
-    -- Needed for SHOW SLAVE STATUS;
+    -- Required for SHOW SLAVE STATUS;
     GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'localhost';
     GRANT REPLICATION CLIENT ON *.* TO 'scalyr-agent-monitor'@'%';
 
@@ -1171,34 +1147,46 @@ Example below shows DDL you can use to create a new user with the needed permiss
     SHOW GRANTS FOR 'scalyr-agent-monitor'@'localhost';
     SHOW GRANTS FOR 'scalyr-agent-monitor'@'%';
 
-Keep in mind that there are some differences between different MySQL versions and implementations
-such as MariaDB so you may need to refer to the documentation for the version you are using to obtain
-the correct name of the grant which grants a permission for running `SHOW SLAVE STATUS;` command.
 
-If `collect_replica_metrics` monitor config option (available since scalyr agent v2.1.26) is set
-to `False` and monitor is configured to connect to a primary (master), user which is used to run
-the queries only needs the `PROCESS` permission and nothing else.
+3\. If you grant the above permissions after the Agent has started, restart:
 
-If you grant those permissions after the agent has already been started and established connection
-to the MySQL server, you will need to restart the agent (which in turn will restart the monitor and
-re-establish the connection) for the permission changes to take an affect.
+      sudo scalyr-agent-2 restart
 
-## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
-click the {{menuRef:Dashboards}} menu and select {{menuRef:MySQL}}. (The dashboard may not be listed until
-the agent begins sending MySQL data.) You will see an overview of MySQL performance statistics across all
-servers where you are running the MySQL plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a
-specific server.
+4\. Configure the Scalyr Agent to import MySQL data
 
-The dashboard shows only some of the data collected by the MySQL monitor plugin. To explore the full range
-of data collected, go to the Search page and search for [$monitor = 'mysql_monitor'](/events?filter=$monitor%20%3D%20%27mysql_monitor%27).
-This will show all data collected by this plugin, across all servers. You can use the {{menuRef:Refine search by}}
-dropdown to narrow your search to specific servers and monitors.
+Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
 
-The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
-[Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
-You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for mysql:
+
+    monitors: [
+      {
+         module:            "scalyr_agent.builtin_monitors.mysql_monitor",
+         database_socket:   "default",
+         database_username: "USERNAME",
+         database_password: "PASSWORD"
+      }
+    ]
+
+
+The `database_socket` property sets the location of the socket file. For example, `/var/run/mysqld_instance2/mysqld.sock`. If MySQL is running on the same server as the Scalyr Agent, you can usually set this to `default`, and this plugin will look for the file location.
+
+The values for  `database_username` and `database_password` are from step **2** above.
+
+See [Configuration Options](#options) below for more properties you can add. You can set a hostname or IP address, and a port number, instead of a socket file. You can also enable a Secure Socket Layer (SSL), and configure the plugin when connecting directly to a replica or slave.
+
+
+5\. Save and confirm
+
+Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Scalyr Agent to begin sending MySQL data.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > MySQL. You will see an overview of MySQL performance statistics across all
+servers running this plugin. The dashboard only shows some of the data collected by this plugin. To view all data, go to Search view and search for [monitor = 'mysql_monitor'](https://app.scalyr.com/events?filter=monitor+%3D+%27mysql_monitor%27).
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
 """
     # fmt: on
 
