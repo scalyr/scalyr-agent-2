@@ -59,9 +59,9 @@ define_metric(
 define_metric(
     __monitor__,
     "proc.stat.cpu",
-    "CPU counters in units of jiffies, where ``type`` can be one of ``user``, ``nice``, ``system``,  "
-    "``iowait``, ``irq``, ``softirq``, ``steal``, ``guest``.  As a rate, they should add up to  "
-    "``100*numcpus`` on the host.",
+    "CPU counters in units of jiffies, where `type` can be one of `user`, `nice`, `system`,  "
+    "`iowait`, `irq`, `softirq`, `steal`, `guest`.  As a rate, they should add up to  "
+    "`100*numcpus` on the host.",
     extra_fields={"type": ""},
     cumulative=True,
     category="General",
@@ -521,7 +521,7 @@ define_metric(
     category="Memory",
 )
 
-define_log_field(__monitor__, "monitor", "Always ``linux_system_metrics``.")
+define_log_field(__monitor__, "monitor", "Always `linux_system_metrics`.")
 define_log_field(
     __monitor__, "metric", 'The name of a metric being measured, e.g. "proc.stat.cpu".'
 )
@@ -531,9 +531,9 @@ define_config_option(
     __monitor__,
     "network_interface_prefixes",
     "The prefixes for the network interfaces to gather statistics for.  This is either a string "
-    "or a list of strings.  The prefix must be the entire string starting after ``/dev/`` and to the"
+    "or a list of strings.  The prefix must be the entire string starting after `/dev/` and to the"
     "regex defined by network_interface_suffix, which defaults to [0-9A-Z]+ (multiple digits or uppercase letters).  "
-    "For example, ``eth`` matches all devices starting with ``/dev/eth`` that end in a digit or an uppercase letter, "
+    "For example, `eth` matches all devices starting with `/dev/eth` that end in a digit or an uppercase letter, "
     "that is eth0, eth1, ethA, ethB and so on.",
 )
 define_config_option(
@@ -686,7 +686,7 @@ This agent monitor plugin records CPU consumption, memory usage, and other metri
 the agent is running.
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+simply add it to the `monitors` section of the Scalyr Agent configuration file (`/etc/scalyr/agent.json`).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 ## Sample Configuration
