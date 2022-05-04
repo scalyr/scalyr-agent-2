@@ -729,22 +729,44 @@ class SystemMetricsMonitor(
     """
 # Linux System Metrics
 
-This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
-the agent is running.
+Import CPU consumption, memory usage, and other metrics for a Linux server.
 
-@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the `monitors` section of the Scalyr Agent configuration file (`/etc/scalyr/agent.json`).
-For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Sample Configuration
 
-The linux_system_metrics plugin is configured automatically by the Scalyr Agent. You do not need to include
-this plugin in your configuration file.
+## Installation
 
-## Viewing Data
+1\. Install the Scalyr Agent
 
-You can see an overview of this data in the System dashboard. Click the {{menuRef:Dashboards}} menu and select
-{{menuRef:System}}. Use the dropdown near the top of the page to select the host whose data you'd like to view.
+If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on the Linux server.
+
+
+2\. Set configuration options
+
+This plugin is automatically configured on Agent installation. There are a few [Configuration Options](#options) you may wish to set:
+- By default this plugin collects statistics from network interfaces prefixed `eth`, followed by a suffix matching the regular expression `[0-9A-Z]+`. You can set a list of prefixes, and a regular expression for the suffix.
+- You can set a list of glob patterns for mounts to ignore.
+- You can expand metric collection beyond the locally mounted filesystems.
+
+To set an option, open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`. Find the `monitors: [ ... ]` section and the `{...}` stanza for Linux system metrics:
+
+    monitors: [
+      {
+         module:            "scalyr_agent.builtin_monitors.linux_system_metrics",
+      }
+    ]
+
+Add configuration options to the `{...}` stanza, then save the `agent.json` file. The Agent will detect changes within 30 seconds.
+
+
+3\. Confirm
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > system. You will see an overview of Linux system metrics, across all Linux servers running the Scalyr Agent. The dashboard only shows some of the data collected. Go to Search view and query [monitor = 'linux_system_metrics'](/events?filter=monitor+%3D+%27linux_system_metrics%27) to view all data.
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
     """
     # fmt: on
 
