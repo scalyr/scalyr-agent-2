@@ -126,9 +126,7 @@ define_metric(
     cumulative=True,
 )
 
-define_metric(
-    __monitor__, "app.threads", "Number of threads used by the process."
-)
+define_metric(__monitor__, "app.threads", "Number of threads used by the process.")
 
 define_metric(__monitor__, "app.nice", "Nice priority value for the process.")
 
@@ -233,9 +231,7 @@ define_log_field(
     "app",
     "Same as `instance`; created for compatibility with the original Scalyr Agent.",
 )
-define_log_field(
-    __monitor__, "metric", 'Name of the metric, e.g. "app.cpu".'
-)
+define_log_field(__monitor__, "metric", 'Name of the metric, e.g. "app.cpu".')
 define_log_field(__monitor__, "value", "Value of the metric.")
 
 

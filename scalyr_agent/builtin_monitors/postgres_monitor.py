@@ -240,9 +240,7 @@ define_log_field(__monitor__, "monitor", "Always `postgres_monitor`.")
 define_log_field(
     __monitor__, "instance", "The `id` value. See [Configuration Options](#options)."
 )
-define_log_field(
-    __monitor__, "metric", 'Name of the metric, e.g. "postgres.vars".'
-)
+define_log_field(__monitor__, "metric", 'Name of the metric, e.g. "postgres.vars".')
 define_log_field(__monitor__, "value", "Value of the metric.")
 
 
