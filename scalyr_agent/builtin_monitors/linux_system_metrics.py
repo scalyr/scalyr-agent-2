@@ -53,7 +53,7 @@ __monitor__ = __name__
 # These are the metrics collected, broken up by tcollector controllor:
 # We use the original tcollector documentation here has much as possible.
 define_metric(
-    __monitor__, "sys.cpu.count", "The number of CPUs on the system", category="General"
+    __monitor__, "sys.cpu.count", "Number of CPUs on the host.", category="General"
 )
 
 define_metric(
@@ -515,6 +515,14 @@ define_metric(
 )
 define_metric(
     __monitor__,
+    "df.1kblocks.free",
+    "Number of 1 kB blocks free, by mount and filesystem type.",
+    extra_fields={"mount": "", "fstype": ""},
+    unit="bytes:1024",
+    category="Disk Resources",
+)
+define_metric(
+    __monitor__,
     "df.inodes.total",
     "Number of inodes, by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
@@ -602,7 +610,10 @@ define_config_option(
 define_config_option(
     __monitor__,
     "ignore_mounts",
-    "List of glob patterns for mounts to ignore.",
+    "List of glob patterns for mounts to ignore. Defaults to "
+    "`["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"]`; typically these "
+    "are special docker, cgroup, and other related mount points. "
+    "To include them, set an `[]` empty list.",
     convert_to=ArrayOfStrings,
     default=["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"],
 )
@@ -745,7 +756,7 @@ If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.co
 
 This plugin is automatically configured on Agent installation. There are a few [Configuration Options](#options) you may wish to set:
 - By default this plugin collects statistics from network interfaces prefixed `eth`, followed by a suffix matching the regular expression `[0-9A-Z]+`. You can set a list of prefixes, and a regular expression for the suffix.
-- You can set a list of glob patterns for mounts to ignore.
+- You can set a list of glob patterns for mounts to ignore. The default configuration ignores `/sys/*`, `/dev*`, `/run*`, `/var/lib/docker/*`, and `/snap/*`. Typically these are special docker, cgroup, and other related mount points.
 - You can expand metric collection beyond the locally mounted filesystems.
 
 To set an option, open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`. Find the `monitors: [ ... ]` section and the `{...}` stanza for Linux system metrics:
