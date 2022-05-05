@@ -1031,7 +1031,7 @@ class ProcessList(object):
 
 class ProcessMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
+    r"""
 # Linux Process Metrics
 
 Import CPU consumption, memory usage, and other metrics for a process, or group of processes, on a Linux server.
