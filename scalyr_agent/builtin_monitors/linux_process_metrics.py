@@ -54,6 +54,16 @@ define_config_option(
 )
 define_config_option(
     __monitor__,
+    "id",
+    "An id, included with each event. Shows in the UI as a value for the `instance` "
+    "field. This is especially useful if you are running multiple instances of this "
+    "plugin to import metrics from multiple processes. Each instance has a separate "
+    "`{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`).",
+    required_option=True,
+    convert_to=six.text_type,
+)
+define_config_option(
+    __monitor__,
     "commandline",
     "A regular expression, matching on the command line output of `ps aux`, "
     "to identify the process of interest. If multiple processes match, only "
@@ -64,29 +74,36 @@ define_config_option(
 )
 define_config_option(
     __monitor__,
+    "aggregate_multiple_processes",
+    "Optional (defaults to `false`). When `true`, *all* processes matched by "
+    "`commandline` are included. Each metric is a summation of all matches.",
+    convert_to=bool,
+    default=False,
+)
+define_config_option(
+    __monitor__,
+    "include_child_processes",
+    "Optional (defaults to `false`). When `true`, all child processes matching "
+    "`commandline` processes are included. Each metric is a summation of all "
+    "processes (parent and children). This property is resursive; any children "
+    "of the child process(es) are also included.",
+    convert_to=bool,
+    default=False,
+)
+define_config_option(
+    __monitor__,
     "pid",
     "Process identifier. An alternative to `commandline` to specify a process. "
     "Ignored if `commandline` is set.",
     default=None,
     convert_to=six.text_type,
 )
-define_config_option(
-    __monitor__,
-    "id",
-    "An id, included with each event. Shows in the UI as a value for the `instance` "
-    "field. This is especially useful if you are running multiple instances of this "
-    "plugin to import metrics from multiple processes. Each instance has a separate "
-    "`{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`).",
-    required_option=True,
-    convert_to=six.text_type,
-)
+
 
 define_metric(
     __monitor__,
     "app.cpu",
-    "User-mode CPU usage, typically in 1/100ths of a second. The value is cumulative "
-    "since boot. See the `proc.stat.cpu` metric for the "
-    "[Linux System Metrics](https://app.scalyr.com/monitors/linux-system-metrics) plugin.",
+    "User-mode CPU usage, in 1/100ths of a second. The value is cumulative since boot.",
     extra_fields={"type": "user"},
     unit="secs:0.01",
     cumulative=True,
@@ -95,9 +112,7 @@ define_metric(
 define_metric(
     __monitor__,
     "app.cpu",
-    "System-mode CPU usage, typically in 1/100ths of a second. The value is cumulative "
-    "since boot. See the `proc.stat.cpu` metric for the "
-    "[Linux System Metrics](https://app.scalyr.com/monitors/linux-system-metrics) plugin.",
+    "System-mode CPU usage, in 1/100ths of a second. The value is cumulative since boot.",
     extra_fields={"type": "system"},
     unit="secs:0.01",
     cumulative=True,
@@ -201,7 +216,8 @@ define_metric(
 define_metric(
     __monitor__,
     "app.io.wait",
-    "Time waiting for I/O completion, typically in 1/100ths of a second. The value is cumulative since boot. See the `proc.stat.cpu` metric for the [Linux System Metrics](https://app.scalyr.com/monitors/linux-system-metrics) plugin.",
+    "Time waiting for I/O completion, in 1/100ths of a second. "
+    "The value is cumulative since boot.",
     unit="secs:0.01",
     cumulative=True,
 )
