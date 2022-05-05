@@ -737,7 +737,7 @@ class SystemMetricsMonitor(
     ScalyrMonitor
 ):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
+    r"""
 # Linux System Metrics
 
 Import CPU consumption, memory usage, and other metrics for a Linux server.

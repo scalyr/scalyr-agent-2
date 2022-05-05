@@ -1065,7 +1065,7 @@ class MysqlDB(object):
 
 class MysqlMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
 # MySQL
 
 Import performance and usage data from a MySQL server.

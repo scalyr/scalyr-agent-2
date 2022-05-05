@@ -421,7 +421,7 @@ class PostgreSQLDb(object):
 
 class PostgresMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
+    r"""
 # PostgreSQL
 
 Import performance and usage data from a PostgreSQL server.
