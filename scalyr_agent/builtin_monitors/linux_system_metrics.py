@@ -611,7 +611,7 @@ define_config_option(
     __monitor__,
     "ignore_mounts",
     "List of glob patterns for mounts to ignore. Defaults to "
-    "`["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"]`; typically these "
+    '`["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"]`; typically these '
     "are special docker, cgroup, and other related mount points. "
     "To include them, set an `[]` empty list.",
     convert_to=ArrayOfStrings,

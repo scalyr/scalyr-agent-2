@@ -85,7 +85,7 @@ define_config_option(
     "database_socket",
     "Location of the socket file, e.g. `/var/run/mysqld_instance2/mysqld.sock`. "
     "If MySQL is running on the same server as the Scalyr Agent, you can usually "
-    "set this to "default", and this plugin will look for the location.",
+    'set this to "default", and this plugin will look for the location.',
     convert_to=six.text_type,
 )
 define_config_option(
