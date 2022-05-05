@@ -7,32 +7,53 @@
 
 # Linux System Metrics
 
-This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
-the agent is running.
+Import CPU consumption, memory usage, and other metrics for a Linux server.
 
-@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Sample Configuration
 
-The linux_system_metrics plugin is configured automatically by the Scalyr Agent. You do not need to include
-this plugin in your configuration file.
+## Installation
 
-## Viewing Data
+1\. Install the Scalyr Agent
 
-You can see an overview of this data in the System dashboard. Click the {{menuRef:Dashboards}} menu and select
-{{menuRef:System}}. Use the dropdown near the top of the page to select the host whose data you'd like to view.
+If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on the Linux server.
+
+
+2\. Set configuration options
+
+This plugin is automatically configured on Agent installation. There are a few [Configuration Options](#options) you may wish to set:
+- By default this plugin collects statistics from network interfaces prefixed `eth`, followed by a suffix matching the regular expression `[0-9A-Z]+`. You can set a list of prefixes, and a regular expression for the suffix.
+- You can set a list of glob patterns for mounts to ignore. The default configuration ignores `/sys/*`, `/dev*`, `/run*`, `/var/lib/docker/*`, and `/snap/*`. Typically these are special docker, cgroup, and other related mount points.
+- You can expand metric collection beyond the locally mounted filesystems.
+
+To set an option, open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`. Find the `monitors: [ ... ]` section and the `{...}` stanza for Linux system metrics:
+
+    monitors: [
+      {
+         module:            "scalyr_agent.builtin_monitors.linux_system_metrics",
+      }
+    ]
+
+Add configuration options to the `{...}` stanza, then save the `agent.json` file. The Agent will detect changes within 30 seconds.
+
+
+3\. Confirm
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > system. You will see an overview of Linux system metrics, across all Linux servers running the Scalyr Agent. The dashboard only shows some of the data collected. Go to Search view and query [monitor = 'linux_system_metrics'](/events?filter=monitor+%3D+%27linux_system_metrics%27) to view all data.
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 
 <a name="options"></a>
 ## Configuration Options
 
 | Property                     | Description | 
 | ---                          | --- | 
-| `network_interface_prefixes` | The prefixes for the network interfaces to gather statistics for.  This is either a string or a list of strings.  The prefix must be the entire string starting after ``/dev/`` and to theregex defined by network_interface_suffix, which defaults to [0-9A-Z]+ (multiple digits or uppercase letters).  For example, ``eth`` matches all devices starting with ``/dev/eth`` that end in a digit or an uppercase letter, that is eth0, eth1, ethA, ethB and so on. | 
-| `network_interface_suffix`   | The suffix for network interfaces to gather statistics for.  This is a single regex that defaults to [0-9A-Z]+ - multiple digits or uppercase letters in a row.  This is appended to each of the network_interface_prefixes to create the full interface name when interating over network interfaces in /dev | 
-| `local_disks_only`           | (defaults to true) Limits the metrics to only locally mounted filesystems | 
-| `ignore_mounts`              | List of glob patterns for mounts to ignore | 
+| `network_interface_prefixes` | Optional (defaults to `eth`). A string, or a list of strings, specifying network interface prefixes. The prefix must be the full string after `/dev/`. For example, `eth` matches all devices starting with `/dev/eth`, and matches network interfaces named "eth0", "eth1", "ethA", "ethB", etc. | 
+| `network_interface_suffix`   | Optional (defaults to `[0-9A-Z]+`). Suffix for the network interfaces. This is a single regular expression, appended to each of the `network_interface_prefixes`, to create the full interface name. | 
+| `local_disks_only`           | Optional (defaults to `true`). Limits metric collection to locally mounted filesystems. | 
+| `ignore_mounts`              | List of glob patterns for mounts to ignore. Defaults to `["/sys/*", "/dev*", "/run*", "/var/lib/docker/*", "/snap/*"]`; typically these are special docker, cgroup, and other related mount points. To include them, set an `[]` empty list. | 
 
 <a name="events"></a>
 ## Event Reference
@@ -41,9 +62,9 @@ In the UI, each event has the fields:
 
 | Field     | Description | 
 | ---       | --- | 
-| `monitor` | Always ``linux_system_metrics``. | 
-| `metric`  | The name of a metric being measured, e.g. "proc.stat.cpu". | 
-| `value`   | The metric value. | 
+| `monitor` | Always `linux_system_metrics`. | 
+| `metric`  | Name of the metric, e.g. "proc.stat.cpu". Some metrics have additional fields; see the [Metrics Reference](#metrics). | 
+| `value`   | Value of the metric. | 
 
 <a name="metrics"></a>
 ## Metrics Reference
@@ -55,108 +76,110 @@ Metrics recorded by this plugin:
 
 | Metric                          | Fields | Description | 
 | ---                             | ---    | --- | 
-| `sys.cpu.count`                 |        | The number of CPUs on the system | 
-| `proc.stat.cpu`                 | `type` | CPU counters in units of jiffies, where ``type`` can be one of ``user``, ``nice``, ``system``,  ``iowait``, ``irq``, ``softirq``, ``steal``, ``guest``.  As a rate, they should add up to  ``100*numcpus`` on the host. | 
-| `proc.stat.intr`                |        | The number of interrupts since boot. | 
-| `proc.stat.ctxt`                |        | The number of context switches since boot. | 
-| `proc.stat.processes`           |        | The number of processes created since boot. | 
-| `proc.stat.procs_blocked`       |        | The number of processes currently blocked on I/O. | 
-| `proc.loadavg.1min`             |        | The load average over 1 minute. | 
-| `proc.loadavg.5min`             |        | The load average over 5 minutes. | 
-| `proc.loadavg.15min`            |        | The load average over 15 minutes. | 
-| `proc.loadavg.runnable`         |        | The number of runnable threads/processes. | 
-| `proc.loadavg.total_threads`    |        | The total number of threads/processes. | 
-| `proc.kernel.entropy_avail`     |        | The number of bits of entropy that can be read without blocking from /dev/random | 
-| `proc.uptime.total`             |        | The total number of seconds since boot. | 
-| `proc.uptime.now`               |        | The seconds since boot of idle time | 
+| `sys.cpu.count`                 |        | Number of CPUs on the host. | 
+| `proc.stat.cpu`                 | `type` | CPU counters in units of jiffies, by `type`. Type can be `user`, `nice`, `system`, `iowait`, `irq`, `softirq`, `steal`, or `guest`. Values are cumulative since boot. You can run the command `getconf CLK_TCK` to ascertain the time span of a jiffy. Typically, the return will be `100`; the counter increments 100x a second, and one jiffy is 10 ms. As a rate, the `type` values should add up to `100*numcpus` on the host. This PowerQuery will calculate the mean rate of one-minute intervals, over a one hour time span: `metric = 'proc.stat.cpu' serverHost = 'your-server-name' value > 0 | group ct=count(), rate = (max(value) - min(value))/60 by type, timebucket('1m') | filter ct == 2 | group mean(rate) by type`. Note: we sample metrics twice a minute; filtering for `ct == 2` eliminates noise, caused by jitter. | 
+| `proc.stat.intr`                |        | Number of interrupts. The value is cumulative since boot. | 
+| `proc.stat.ctxt`                |        | Number of context switches. The value is cumulative since boot. | 
+| `proc.stat.processes`           |        | Number of processes created. The value is cumulative since boot. | 
+| `proc.stat.procs_blocked`       |        | Number of processes currently blocked on I/O. | 
+| `proc.loadavg.1min`             |        | Load average over 1 minute. | 
+| `proc.loadavg.5min`             |        | Load average over 5 minutes. | 
+| `proc.loadavg.15min`            |        | Load average over 15 minutes. | 
+| `proc.loadavg.runnable`         |        | Number of runnable threads/processes. | 
+| `proc.loadavg.total_threads`    |        | Number of threads/processes. | 
+| `proc.kernel.entropy_avail`     |        | Bits of entropy that can be read without blocking from `/dev/random`. | 
+| `proc.uptime.total`             |        | Number of seconds since boot. | 
+| `proc.uptime.now`               |        | Seconds of idle time. The value is cumulative since boot. | 
 
 ### Virtual Memory Metrics
 
 | Metric                      | Description | 
 | ---                         | --- | 
-| `proc.vmstat.pgfault`       | The total number of minor page faults since boot. | 
-| `proc.vmstat.pgmajfault`    | The total number of major page faults since boot | 
-| `proc.vmstat.pswpin`        | The total number of processes swapped in since boot. | 
-| `proc.vmstat.pswpout`       | The total number of processes swapped out since boot. | 
-| `proc.vmstat.pgpgin`        | The total number of pages swapped in since boot. | 
-| `proc.vmstat.pgpgout`       | The total number of pages swapped out in since boot. | 
+| `proc.vmstat.pgfault`       | Number of minor page faults. The value is cumulative since boot. | 
+| `proc.vmstat.pgmajfault`    | Number of major page faults. The value is cumulative since boot. | 
+| `proc.vmstat.pswpin`        | Number of processes swapped in. The value is cumulative since boot. | 
+| `proc.vmstat.pswpout`       | Number of processes swapped out. The value is cumulative since boot. | 
+| `proc.vmstat.pgpgin`        | Number of pages swapped in. The value is cumulative since boot. | 
+| `proc.vmstat.pgpgout`       | Number of pages swapped out. The value is cumulative since boot. | 
 
 ### NUMA Metrics
 
 | Metric                       | Fields     | Description | 
 | ---                          | ---        | --- | 
 | `sys.numa.zoneallocs`        | `node`, \
-                                   `type`     | The number of pages allocated from the preferred node, either type=hit or type=miss. | 
-| `sys.numa.foreign_allocs`    | `node`     | The number of pages allocated from node because the preferred node did not have any free. | 
+                                   `type`     | Number of pages allocated on the node, by `node` and `type`. The value is cumulative since boot. Type is either `hit` (memory was successfully allocated on the intended node); or `miss` (memory was allocated on the node, despite the preference for a different node). | 
+| `sys.numa.foreign_allocs`    | `node`     | Number of pages allocated on the node because the preferred node had none free, by `node`. The value is cumulative since boot. Each increment also has a `type='miss'` increment for a different node in `sys.numa.zoneallocs`. | 
 | `sys.numa.allocation`        | `node`, \
-                                   `type`     | The number of pages allocated either type=locally or type=remotely for processes on this node. | 
+                                   `type`     | Number of pages allocated, by `node` and `type`. The value is cumulative since boot. Type is either 'locally', or 'remotely', for processes on this node. | 
 | `sys.numa.interleave`        | `node`, \
-                                   `type=hit` | The number of pages allocated successfully by the interleave strategy. | 
+                                   `type=hit` | Number of pages successfully allocated by the interleave strategy. The value is cumulative since boot. | 
 
 ### Sockets Metrics
 
 | Metric                          | Fields | Description | 
 | ---                             | ---    | --- | 
-| `net.sockstat.num_sockets`      |        | The total number of sockets allocated (only TCP). | 
-| `net.sockstat.num_timewait`     |        | The total number of TCP sockets currently in TIME_WAIT state. | 
-| `net.sockstat.sockets_inuse`    | `type` | The total number of sockets in use by type. | 
-| `net.sockstat.num_orphans`      |        | The total number of orphan TCP sockets (not attached to any file descriptor). | 
-| `net.sockstat.memory`           | `type` | Memory allocated for this socket type (in bytes). | 
-| `net.sockstat.ipfragqueues`     |        | The total number of IP flows for which there are currently fragments queued for reassembly. | 
+| `net.sockstat.num_sockets`      |        | Number of sockets allocated (only TCP). | 
+| `net.sockstat.num_timewait`     |        | Number of TCP sockets currently in TIME_WAIT state. | 
+| `net.sockstat.sockets_inuse`    | `type` | Number of sockets in use, by `type` (e.g. `tcp`, `udp`, `raw`, etc.). | 
+| `net.sockstat.num_orphans`      |        | Number of orphan TCP sockets (not attached to any file descriptor). | 
+| `net.sockstat.memory`           | `type` | Bytes allocated, by socket `type`. | 
+| `net.sockstat.ipfragqueues`     |        | Number of IP flows for which there are currently fragments queued for reassembly. | 
 
 ### Network Metrics
 
 | Metric                                | Fields       | Description | 
 | ---                                   | ---          | --- | 
-| `net.stat.tcp.abort`                  | `type`       | The total number of connections that the kernel had to abort due broken down by reason. | 
-| `net.stat.tcp.abort.failed`           |              | The total number of times the kernel failed to abort a connection because it didn't even have enough memory to reset it. | 
-| `net.stat.tcp.congestion.recovery`    | `type`       | The number of times the kernel detected spurious retransmits and was able to recover part or all of the CWND, broken down by how it recovered. | 
-| `net.stat.tcp.delayedack`             | `type`       | The number of delayed ACKs sent of different types. | 
-| `net.stat.tcp.failed_accept`          | `reason`     | The number of times a connection had to be dropped  after the 3WHS.  reason=full_acceptq indicates that the application isn't accepting connections fast enough.  You should see SYN cookies too. | 
-| `net.stat.tcp.invalid_sack`           | `type`       | The number of invalid SACKs we saw of diff types. (requires Linux v2.6.24-rc1 or newer) | 
-| `net.stat.tcp.memory.pressure`        |              | The number of times a socket entered the "memory pressure" mode. | 
-| `net.stat.tcp.memory.prune`           | `type`       | The number of times a socket had to discard received data due to low memory conditions, broken down by type. | 
-| `net.stat.tcp.packetloss.recovery`    | `type`       | The number of times we recovered from packet loss by type of recovery (e.g. fast retransmit vs SACK). | 
-| `net.stat.tcp.receive.queue.full`     |              | The number of times a received packet had to be dropped because the socket's receive queue was full (requires Linux v2.6.34-rc2 or newer) | 
-| `net.stat.tcp.reording`               | `detectedby` | The number of times we detected re-ordering broken down by how. | 
-| `net.stat.tcp.syncookies`             | `type`       | SYN cookies (both sent & received). | 
+| `net.stat.tcp.abort`                  | `type`       | Number of connections aborted by the kernel, by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L191) for `type` definitions. `type='out_of_memory'` is especially bad; the kernel dropped a connection due to too many orphaned sockets. Other types are normal (e.g. `type='timeout'`). | 
+| `net.stat.tcp.abort.failed`           |              | Number of times the kernel failed to abort a connection because it did not have enough memory to reset it. The value is cumulative since boot. | 
+| `net.stat.tcp.congestion.recovery`    | `type`       | Number of times the kernel detected spurious retransmits, and recovered all or part of the CWND, by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L179) for `type` definitions. | 
+| `net.stat.tcp.delayedack`             | `type`       | Number of delayed ACKs sent, by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L141) for `type` definitions. | 
+| `net.stat.tcp.failed_accept`          | `reason`     | Number of connections dropped after the 3WHS, by `reason`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L150) for `reason` definitions. A reason of `full_acceptq` indicates the application is not accepting connections fast enough; also check your SYN cookies. | 
+| `net.stat.tcp.invalid_sack`           | `type`       | Number of invalid SACKs, by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L215) for `type` definitions. (This metric requires Linux v2.6.24-rc1 or newer.) | 
+| `net.stat.tcp.memory.pressure`        |              | Number of times a socket entered the "memory pressure" mode. The value is cumulative since boot. | 
+| `net.stat.tcp.memory.prune`           | `type`       | Number of times a socket discarded received data, due to low memory conditions, by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L134) for `type` definitions. | 
+| `net.stat.tcp.packetloss.recovery`    | `type`       | Number of recoveries from packet loss, by `type` of recovery. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L134) for `type` definitions. | 
+| `net.stat.tcp.receive.queue.full`     |              | Number of times a received packet was dropped because the socket's receive queue was full. The value is cumulative since boot. (This metric requires Linux v2.6.34-rc2 or newer.) | 
+| `net.stat.tcp.reording`               | `detectedby` | Number of times we detected re-ordering, by `detectedby`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L169) for `detectedby` definitions. | 
+| `net.stat.tcp.syncookies`             | `type`       | Number of SYN cookies (both sent & received), by `type`. The value is cumulative since boot. See the [tcollector documentation](https://github.com/OpenTSDB/tcollector/blob/37ae920d83c1002da66b5201a5311b1714cb5c14/collectors/0/netstat.py#L126) for `type` definitions. | 
 
 ### Disk Requests Metrics
 
 | Metric                               | Fields | Description | 
 | ---                                  | ---    | --- | 
-| `iostat.disk.read_requests`          | `dev`  | The total number of reads completed by device | 
-| `iostat.disk.read_merged`            | `dev`  | The total number of reads merged by device | 
-| `iostat.disk.read_sectors`           | `dev`  | The total number of sectors read by device | 
-| `iostat.disk.msec_read`              | `dev`  | Time in msec spent reading by device | 
-| `iostat.disk.write_requests`         | `dev`  | The total number of writes completed by device | 
-| `iostat.disk.write_merged`           | `dev`  | The total number of writes merged by device | 
-| `iostat.disk.write_sectors`          | `dev`  | The total number of sectors written by device | 
-| `iostat.disk.msec_write`             | `dev`  | The total time in milliseconds spent writing by device | 
-| `iostat.disk.ios_in_progress`        | `dev`  | The number of I/O operations in progress by device | 
-| `iostat.disk.msec_total`             | `dev`  | The total time in milliseconds doing I/O by device. | 
-| `iostat.disk.msec_weighted_total`    | `dev`  | Weighted time doing I/O (multiplied by ios_in_progress) by device. | 
+| `iostat.disk.read_requests`          | `dev`  | Number of reads completed, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.read_merged`            | `dev`  | Number of reads merged, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.read_sectors`           | `dev`  | Number of sectors read, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.msec_read`              | `dev`  | Milliseconds spent reading, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.write_requests`         | `dev`  | TNumber of completed writes, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.write_merged`           | `dev`  | Number of writes merged, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.write_sectors`          | `dev`  | Number of sectors written, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.msec_write`             | `dev`  | Milliseconds spent writing, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.ios_in_progress`        | `dev`  | Number of I/O operations in progress, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.msec_total`             | `dev`  | Milliseconds performing I/O, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.msec_weighted_total`    | `dev`  | Weighted total: milliseconds performing I/O multiplied by `ios_in_progress`, by device (`dev`). The value is cumulative since boot. | 
 
 ### Disk Resources Metrics
 
 | Metric                 | Fields   | Description | 
 | ---                    | ---      | --- | 
 | `df.1kblocks.total`    | `mount`, \
-                             `fstype` | The total size of the file system broken down by mount and filesystem type. | 
+                             `fstype` | Size of the file system in 1 kB blocks, by mount and filesystem type. | 
 | `df.1kblocks.used`     | `mount`, \
-                             `fstype` | The number of blocks used broken down by mount and filesystem type. | 
+                             `fstype` | Number of 1 kB blocks used, by mount and filesystem type. | 
+| `df.1kblocks.free`     | `mount`, \
+                             `fstype` | Number of 1 kB blocks free, by mount and filesystem type. | 
 | `df.inodes.total`      | `mount`, \
-                             `fstype` | The number of inodes broken down by mount and filesystem type. | 
+                             `fstype` | Number of inodes, by mount and filesystem type. | 
 | `df.inodes.used`       | `mount`, \
-                             `fstype` | The number of used inodes broken down by mount and filesystem type. | 
+                             `fstype` | Number of used inodes, by mount and filesystem type. | 
 | `df.inodes.free`       | `mount`, \
-                             `fstype` | The number of free inodes broken down by mount and filesystem type. | 
+                             `fstype` | Number of free inodes, by mount and filesystem type. | 
 
 ### Memory Metrics
 
 | Metric                     | Description | 
 | ---                        | --- | 
-| `proc.meminfo.memtotal`    | The total number of 1 KB pages of RAM. | 
-| `proc.meminfo.memfree`     | The total number of unused 1 KB pages of RAM. This does not include the number of cached pages which can be used when allocating memory. | 
-| `proc.meminfo.cached`      | The total number of 1 KB pages of RAM being used to cache blocks from the filesystem.  These can be reclaimed as used to allocate memory as needed. | 
-| `proc.meminfo.buffers`     | The total number of 1 KB pages of RAM being used in system buffers. | 
+| `proc.meminfo.memtotal`    | Number of 1 kB pages of RAM. | 
+| `proc.meminfo.memfree`     | Number of unused 1 kB pages of RAM. This does not include cached pages, which can be used to allocate memory as needed. | 
+| `proc.meminfo.cached`      | Number of 1 kB pages of RAM used to cache blocks from the filesystem. These can be used to allocate memory as needed. | 
+| `proc.meminfo.buffers`     | Number of 1 KB pages of RAM being used in system buffers. | 
