@@ -1965,7 +1965,7 @@ jobs:
   package-test-deb:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.6
     steps:
       - package-test:
           distribution: "ubuntu2204"
