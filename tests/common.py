@@ -21,7 +21,6 @@ if False:  # NOSONAR
     from typing import Union
     from typing import Tuple
 
-import platform
 import subprocess
 
 import six
