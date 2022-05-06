@@ -695,7 +695,7 @@ commands:
           at: /tmp/workspace
       - restore_cache:
           name: "Restore Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-py310-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
       - run:
           name: Install Python Dependencies
           command: |
@@ -707,7 +707,7 @@ commands:
             python -m pip install --user -r tests/ami/requirements.txt
       - save_cache:
           name: "Save Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-py310-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
           paths:
             - "~/.cache/pip"
       - run:
