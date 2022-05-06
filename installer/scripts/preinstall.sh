@@ -18,29 +18,46 @@
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
+# Requirements
+MIN_REQ_PYTHON2_VERSION="2.7"
+MIN_REQ_PYTHON3_VERSION="3.5"
 
 echo "Checking Python version."
 
 is_python_valid() {
-  command=$1
-  version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
+  local command=$1
+  local version=$(/usr/bin/env "${command}" --version 2>&1 | grep -Eo "[0-9](.[0-9]+)+")
   exit_code=$?
 
   # shellcheck disable=SC2072,SC2071
   if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
     return 1
-  elif [[ "$version" < "2.6" ]]; then
-    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
-    return 1
-  elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
-    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
-    return 1
-  else
-    return 0
   fi
+
+  case ${version::1} in
+    2)
+      if test "$(echo "${version}" "${MIN_REQ_PYTHON2_VERSION}" | xargs -n1 | sort -V | head -n1)" == "$version" ; then
+        echo "- Python ${version} is found but the minimum version for Python 2 is 2.7."
+        return 1
+      fi
+      ;;
+    3)
+      if test "$(echo "${version}" "${MIN_REQ_PYTHON3_VERSION}" | xargs -n1 | sort -V | head -n1)" == "$version" ; then
+        echo "- Python ${version} is found but the minimum version for Python 3 is 3.5."
+        return 1
+      fi
+      ;;
+    *)
+      echo "- command $command found with unsupported major version $version."
+      return 1
+      ;;
+  esac
+
+  echo "+ Found Python $version [$command]"
+  return 0
 }
 
-if ! is_python_valid python && ! is_python_valid python2 && ! is_python_valid python3; then
+if ! is_python_valid python && ! is_python_valid python3 && ! is_python_valid python2; then
   echo -e "\e[31mSuitable Python interpreter not found.\e[0m"
   echo "You can install it by running command:"
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
