@@ -1493,7 +1493,9 @@ def create_scriptlets():
     with open(check_python_script_path, "r") as f:
         check_python_file_content = f.read()
 
-    code_to_paste = re.search(r"{{ start }}\n(.+){{ end }}", check_python_file_content, re.S).group(1)
+    code_to_paste = re.search(
+        r"{{ start }}\n(.+){{ end }}", check_python_file_content, re.S
+    ).group(1)
 
     def replace_code(script_name):
         """
