@@ -18,8 +18,7 @@
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
-{{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
-
+# {{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
 
 if ! is_python_valid "python" && ! is_python_valid "python2" && ! is_python_valid "python3" ; then
   echo "! Suitable Python interpreter not found."

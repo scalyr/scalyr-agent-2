@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-{{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
+# {{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
 
 # Return success if the current symlinks point to a valid Python interpreter (2.7, or >= 3.5)
 is_current_python_valid() {
   # Parse currently used python command from the shebang from currently configured main script.
+  # shellcheck disable=SC2155
   local command=$(cat /usr/share/scalyr-agent-2/bin/scalyr-agent-2 | head -n1 | grep -Eo "python[0-9]")
   local exit_code=$?
   # Get version of the current used Python.
   if [[ -z "${command}" || "${exit_code}" -ne "0" ]]; then return 1; fi
+  # shellcheck disable=SC2155
   local current_version=$(/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --report-python-version | grep -Eo "[0-9](.[0-9]+)+");
   exit_code=$?
   if [[ -z "${current_version}" || "${exit_code}" -ne "0" ]]; then return 1; fi

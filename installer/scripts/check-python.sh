@@ -1,3 +1,4 @@
+# shellcheck disable=SC2148
 # Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,7 @@
 
 # This piece of code has to be pasted into the preinstall.sh and postinstall.sh scripts and it is not meant
 # to be used as a standalone script.
-{{ start }}
+# {{ start }}
 # Verify the provided version of the Python meets the minimum requirements.
 test_python_version() {
   local command=$1
@@ -64,4 +65,4 @@ is_python_valid() {
   echo "+ command $command [$version] is found and matches the minimum required version - Success!"
   return 0
 }
-{{ end }}
+# {{ end }}

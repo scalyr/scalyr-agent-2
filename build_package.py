@@ -1494,7 +1494,7 @@ def create_scriptlets():
         check_python_file_content = f.read()
 
     code_to_paste = re.search(
-        r"{{ start }}\n(.+){{ end }}", check_python_file_content, re.S
+        r"# {{ start }}\n(.+)# {{ end }}", check_python_file_content, re.S
     ).group(1)
 
     def replace_code(script_name):
@@ -1507,7 +1507,7 @@ def create_scriptlets():
             content = f.read()
 
         final_content = re.sub(
-            r"{{ check-python }}[^\n]*",
+            r"# {{ check-python }}[^\n]*",
             code_to_paste,
             content,
         )
