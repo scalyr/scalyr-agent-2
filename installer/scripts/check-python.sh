@@ -39,7 +39,9 @@ is_python_valid() {
   local MIN_REQ_PYTHON2_VERSION="2.7"
   local MIN_REQ_PYTHON3_VERSION="3.5"
 
-  echo -e "\n. Searching for ${command} in Path:\n$PATH"
+  echo ""
+  echo ". Searching for ${command} in Path:"
+  echo "$PATH"
 
   version=$(/usr/bin/env "${command}" --version 2>&1 | grep -Eo "[0-9](.[0-9]+)+")
   local exit_code=$?
