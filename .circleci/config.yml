@@ -68,7 +68,7 @@ parameters:
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
-    default: "v15"
+    default: "v16"
   cache_version_py_dependencies:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
@@ -1965,12 +1965,12 @@ jobs:
   package-test-deb:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: cimg/python:3.6
+      - image: cimg/python:3.10
     steps:
       - package-test:
-          distribution: "ubuntu1804"
+          distribution: "ubuntu2204"
           agent_host_name_prefix: "package-test"
-          tox_target: agent_distributions_tests_ubuntu1804
+          tox_target: agent_distributions_tests_ubuntu2204
 
   # Circle CI jobs which build agent packages for each PR.
   package-build-deb:
@@ -2346,7 +2346,6 @@ workflows:
          <<: *master_and_release_only
      - package-test-deb:
          context: scalyr-agent
-         <<: *master_and_release_only
      - smoke-rpm-package-py2:
          context: scalyr-agent
          requires:
@@ -2361,12 +2360,10 @@ workflows:
          context: scalyr-agent
          requires:
            - package-test-deb
-         <<: *master_and_release_only
      - smoke-deb-package-py3:
          context: scalyr-agent
          requires:
            - package-test-deb
-         <<: *master_and_release_only
      - ami-tests-development:
           context: scalyr-agent
           requires:
