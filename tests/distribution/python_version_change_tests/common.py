@@ -138,25 +138,19 @@ def common_test_ubuntu_versions():
         "3.4.1",
         install_fails=True,
     )
-    print("2")
     common_version_test(
         runner, install_deb, remove_deb, "agent_main.py", "", "2.5.1", "3.4.1"
     )
-    print("3")
     common_version_test(
         runner, install_deb, remove_deb, "agent_main_py2.py", "2.5.1", "", "3.4.1"
     )
-    print("4")
     common_version_test(
         runner, install_deb, remove_deb, "agent_main_py3.py", "2.5.1", "2.5.1", ""
     )
-    print("5")
     common_version_test(runner, install_deb, remove_deb, "agent_main.py", "", "", "")
-    print("6")
     common_version_test(
         runner, install_deb, remove_deb, "agent_main_py2.py", "2.5.1", "", ""
     )
-    print("7")
     common_version_test(
         runner, install_deb, remove_deb, "agent_main.py", "", "2.5.1", ""
     )
