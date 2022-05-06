@@ -20,6 +20,7 @@ MIN_REQ_PYTHON3_VERSION="3.5"
 # Used below to execute a command to retrieve the Python interpreter version.
 run_and_check_persion_version() {
   local command=$1
+  # shellcheck disable=SC2155
   local version=$(${command} 2>&1 | grep -Eo "[0-9](.[0-9]+)+")
   exit_code=$?
 

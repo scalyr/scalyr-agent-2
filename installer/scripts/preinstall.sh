@@ -26,6 +26,7 @@ echo "Checking Python version."
 
 is_python_valid() {
   local command=$1
+  # shellcheck disable=SC2155
   local version=$(/usr/bin/env "${command}" --version 2>&1 | grep -Eo "[0-9](.[0-9]+)+")
   exit_code=$?
 
