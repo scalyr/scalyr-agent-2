@@ -601,6 +601,7 @@ commands:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: false
+          version: 20.10.12
 
       - install-cached-tox:
           target_name: << parameters.tox_target >>
