@@ -151,7 +151,7 @@ EC2_DISTRO_DETAILS_MAP = {
         "image_name": "Ubuntu Server 22.04 (HVM), SSD Volume Type",
         "size_id": "m1.small",
         "ssh_username": "ubuntu",
-        "default_python_package_name": "python",
+        "default_python_package_name": "python3",
     },
     "debian1003": {
         "image_id": "ami-0b9a611a02047d3b1",
