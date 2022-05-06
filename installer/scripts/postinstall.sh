@@ -13,44 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Requirements
-MIN_REQ_PYTHON2_VERSION="2.7"
-MIN_REQ_PYTHON3_VERSION="3.5"
-
 # Used below to execute a command to retrieve the Python interpreter version.
 run_and_check_persion_version() {
-  local command=$1
-  # shellcheck disable=SC2155
-  local version=$(${command} 2>&1 | grep -Eo "[0-9](.[0-9]+)+")
+  command=$1
+  version=$(${command} 2>&1 | grep -o "[0-9].[0-9]")
   exit_code=$?
 
   # shellcheck disable=SC2072,SC2071
   if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
     return 1
+  elif [[ "$version" < "2.6" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
+    return 1
+  elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
+    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
+    return 1
+  else
+    return 0
   fi
-
-  case ${version::1} in
-    2)
-      if test "$(echo "${version}" "${MIN_REQ_PYTHON2_VERSION}" | xargs -n1 | sort -V | head -n1)" == "$version" ; then
-        echo "- Python ${version} is found but the minimum version for Python 2 is 2.6."
-        return 1
-      fi
-      ;;
-    3)
-      if test "$(echo "${version}" "${MIN_REQ_PYTHON3_VERSION}" | xargs -n1 | sort -V | head -n1)" == "$version" ; then
-        echo "- Python ${version} is found but the minimum version for Python 3 is 3.5."
-        return 1
-      fi
-      ;;
-    *)
-      echo "- command $command found with unsupported major version $version."
-      return 1
-      ;;
-  esac
-
-  echo "+ Found Python $version"
-
-  return 0
 }
 
 # Checks to see if `/usr/bin/env $1` is a valid Python interpreter (2.6, 2.7, or >= 3.5)
@@ -76,26 +56,26 @@ check_python_version() {
   # Verify that a suitable Python version is available and set up the agent symlinks
   if is_python_valid python; then
     # 'python' command exists
-    echo "+ The Scalyr Agent will use the default system python binary (/usr/bin/env python)."
-  #  /usr/share/scalyr-agent-2/bin/scalyr-switch-python default
+    echo "The Scalyr Agent will use the default system python binary (/usr/bin/env python)."
+    /usr/share/scalyr-agent-2/bin/scalyr-switch-python default
     return 0
   fi
 
-  echo "- The default 'python' command not found, will try to use python3 binary (/usr/bin/env python3) for running the agent."
-  if is_python_valid python3; then
-    echo "+ The Scalyr Agent will use the python3 binary (/usr/bin/env python3)."
-     /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
-    return 0
-  fi
-
-  echo "- The 'python3' command not found, will try to use python2 binary (/usr/bin/env python2) for running the agent."
+  echo "The default 'python' command not found, will use python2 binary (/usr/bin/env python2) for running the agent."
   if is_python_valid python2; then
-    echo "+ The Scalyr Agent will use the python2 binary (/usr/bin/env python2)."
     /usr/share/scalyr-agent-2/bin/scalyr-switch-python python2
+    echo "The Scalyr Agent will use the python2 binary (/usr/bin/env python2)."
     return 0
   fi
 
-  echo "! Warning, no valid Python interpreter found."
+  echo "The 'python2' command not found, will use python3 binary (/usr/bin/env python3) for running the agent."
+  if is_python_valid python3; then
+    echo "The Scalyr Agent will use the python3 binary (/usr/bin/env python3)."
+    /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
+    return 0
+  fi
+
+  echo "Warning, no valid Python interpreter found."
 }
 
 # Function which ensures that the provided file path permissions for "group" match the
