@@ -88,7 +88,7 @@ Metrics recorded by this plugin:
 | `proc.loadavg.runnable`         |        | Number of runnable threads/processes. | 
 | `proc.loadavg.total_threads`    |        | Number of threads/processes. | 
 | `proc.kernel.entropy_avail`     |        | Bits of entropy that can be read without blocking from `/dev/random`. | 
-| `proc.uptime.total`             |        | Number of seconds since boot. | 
+| `proc.uptime.total`             |        | Seconds since boot. | 
 | `proc.uptime.now`               |        | Seconds of idle time. The value is cumulative since boot. | 
 
 ### Virtual Memory Metrics
@@ -150,7 +150,7 @@ Metrics recorded by this plugin:
 | `iostat.disk.read_merged`            | `dev`  | Number of reads merged, by device (`dev`). The value is cumulative since boot. | 
 | `iostat.disk.read_sectors`           | `dev`  | Number of sectors read, by device (`dev`). The value is cumulative since boot. | 
 | `iostat.disk.msec_read`              | `dev`  | Milliseconds spent reading, by device (`dev`). The value is cumulative since boot. | 
-| `iostat.disk.write_requests`         | `dev`  | TNumber of completed writes, by device (`dev`). The value is cumulative since boot. | 
+| `iostat.disk.write_requests`         | `dev`  | Number of completed writes, by device (`dev`). The value is cumulative since boot. | 
 | `iostat.disk.write_merged`           | `dev`  | Number of writes merged, by device (`dev`). The value is cumulative since boot. | 
 | `iostat.disk.write_sectors`          | `dev`  | Number of sectors written, by device (`dev`). The value is cumulative since boot. | 
 | `iostat.disk.msec_write`             | `dev`  | Milliseconds spent writing, by device (`dev`). The value is cumulative since boot. | 

@@ -141,7 +141,7 @@ define_metric(
 define_metric(
     __monitor__,
     "proc.uptime.total",
-    "Number of seconds since boot.",
+    "Seconds since boot.",
     cumulative=True,
     category="General",
 )
@@ -439,7 +439,7 @@ define_metric(
 define_metric(
     __monitor__,
     "iostat.disk.write_requests",
-    "TNumber of completed writes, by device (`dev`). The value is cumulative since boot.",
+    "Number of completed writes, by device (`dev`). The value is cumulative since boot.",
     extra_fields={"dev": ""},
     cumulative=True,
     category="Disk Requests",
