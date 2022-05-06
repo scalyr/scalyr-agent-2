@@ -1511,6 +1511,13 @@ def create_scriptlets():
             code_to_paste,
             content,
         )
+
+        if "\\n" in code_to_paste:
+            raise Exception(
+                "code_to_paste (%s) shouldn't contain new line character since re.sub "
+                "will replace it with actual new line character"
+                % (check_python_script_path)
+            )
         with open(script_name, "w") as f:
             f.write(final_content)
 
