@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_SUFFIX
 
 # Install dependency packages for debian.
-FROM python:3.8.12-slim as scalyr-dependencies-slim
+FROM python:3.8.13-slim as scalyr-dependencies-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y build-essential git tar curl
 
 
 # Install dependency packages for alpine.
-FROM python:3.8.12-alpine as scalyr-dependencies-alpine
+FROM python:3.8.13-alpine as scalyr-dependencies-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk update && apk add --virtual build-dependencies \
@@ -91,13 +91,13 @@ RUN rm /usr/local/lib/python3.8/_manylinux.py
 # Install packages and tools that will be required during the final image build.
 
 # Install tools for alpine
-FROM python:3.8.12-alpine as ready-base-alpine
+FROM python:3.8.13-alpine as ready-base-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk update && apk add --virtual curl git
 
 # Install tools for debian.
-FROM python:3.8.12-slim as ready-base-slim
+FROM python:3.8.13-slim as ready-base-slim
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
