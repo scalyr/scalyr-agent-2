@@ -103,9 +103,6 @@ JOBS_LOG_FILE_PATHS=()
 
 for job_pid in $(jobs -p)
 do
-    ps -ww -f "${job_pid}"
-    ps -ww -f "${job_pid}" | tail -1
-    ps -ww -f "${job_pid}" | tail -1 | tr -d "\n" | awk '{for(i=9;i<=NF;++i)printf $i""FS}'
     JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n" | awk '{for(i=9;i<=NF;++i)printf $i""FS}')
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
 
@@ -141,6 +138,8 @@ do
         echo "--------------------------------------------------------------------------------------"
     fi
 
+    echo ""
+    echo "Jobs still running: $(jobs -p | wc -l)"
     echo ""
     echo "============================================================================================"
 done
