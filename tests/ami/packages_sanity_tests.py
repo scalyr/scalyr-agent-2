@@ -341,7 +341,7 @@ def main(
     verbose=False,
     paramiko_debug_log=None,
 ):
-    # type: (str, str, str, str, str, str, str, bool, bool) -> None
+    # type: (str, str, str, str, str, str, str, bool, bool, Optional[str]) -> None
 
     if paramiko_debug_log:
         import paramiko
