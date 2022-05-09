@@ -26,7 +26,7 @@ jobs:
       matrix:
         image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
         image-distro-name: [ "debian", "alpine" ]
-        python-version: [ "3.8.12" ]
+        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
