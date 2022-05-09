@@ -695,7 +695,7 @@ commands:
           at: /tmp/workspace
       - restore_cache:
           name: "Restore Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-py310-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
       - run:
           name: Install Python Dependencies
           command: |
@@ -707,7 +707,7 @@ commands:
             python -m pip install --user -r tests/ami/requirements.txt
       - save_cache:
           name: "Save Python Dependencies cache"
-          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
+          key: deps-<<pipeline.parameters.cache_version_py_dependencies>>-py310-{{ .Branch }}-ami-tests-{{ checksum "tests/ami/requirements.txt" }}
           paths:
             - "~/.cache/pip"
       - run:
@@ -2261,7 +2261,7 @@ jobs:
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: cimg/python:3.6
+      - image: cimg/python:3.10
     # TODO: Remove resource_class and use default medium one if tests are still
     # failing with large
     resource_class: large
@@ -2274,7 +2274,7 @@ jobs:
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: cimg/python:3.6
+      - image: cimg/python:3.10
     # TODO: Remove resource_class and use default medium one if tests are still
     # failing with large
     resource_class: large
