@@ -956,7 +956,7 @@ class PidfileManager(object):
 
         # If the pid file was locked, we know the agent is still running.
         if was_locked:
-            self._log("Checked pidfile: exists")
+            self._log("Checked pidfile: exists (contains PID: {})".format(pid))
             return pid
 
         # If contents contains a single item (the pid), then we are using the latest version of the pidfile which
