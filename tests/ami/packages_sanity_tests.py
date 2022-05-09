@@ -86,6 +86,7 @@ import time
 import re
 import tempfile
 import shutil
+import logging
 
 import random
 import argparse
@@ -195,14 +196,14 @@ EC2_DISTRO_DETAILS_MAP = {
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.medium",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2016": {
         "image_id": "ami-06e455febb7d693eb",
         "image_name": "WindowsServer2016-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.medium",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
@@ -338,8 +339,15 @@ def main(
     additional_packages=None,
     destroy_node=False,
     verbose=False,
+    paramiko_debug_log=None,
 ):
-    # type: (str, str, str, str, str, str, str, bool, bool) -> None
+    # type: (str, str, str, str, str, str, str, bool, bool, Optional[str]) -> None
+
+    if paramiko_debug_log:
+        import paramiko
+
+        print("Will store paramiko debug log to file: %s" % (paramiko_debug_log))
+        paramiko.util.log_to_file(filename=paramiko_debug_log, level=logging.DEBUG)
 
     # deployment objects for package files will be stored here.
     file_upload_steps = []
@@ -458,8 +466,8 @@ def main(
     # All AMI tests should take less than 5 minutes, but in the last days (dec 1, 2020), they
     # started to take 10 minutes with multiple timeouts.
     if "windows" in distro.lower():
-        deploy_step_timeout = 440  # 320
-        deploy_overall_timeout = 460  # 320
+        deploy_step_timeout = 840  # 320
+        deploy_overall_timeout = 860  # 320
         cat_step_timeout = 10
         max_tries = 3
     else:
@@ -639,13 +647,26 @@ def destroy_node_and_cleanup(driver, node):
 
     print("")
     print(('Destroying node "%s"...' % (node.name)))
-    node.destroy()
+
+    try:
+        node.destroy()
+    except Exception as e:
+        if "does not exist" in str(e):
+            # Node already deleted, likely by another concurrent run. This error is not fatal so we
+            # just ignore it.
+            print(
+                "Failed to delete node, likely node was already deleted, ignoring error..."
+            )
+            print(str(e))
+        else:
+            raise e
 
     assert len(volumes) <= 1
     print("Cleaning up any left-over EBS volumes for this node...")
 
     # Give it some time for the volume to become detached from the node
-    time.sleep(10)
+    if volumes:
+        time.sleep(10)
 
     for volume in volumes:
         # Additional safety checks
@@ -773,6 +794,15 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--paramiko-debug-log",
+        help=(
+            "Optional file path where paramiko debug log should be saved. Debug log is only "
+            "enabled if this parameter is set."
+        ),
+        required=False,
+    )
+
     args = parser.parse_args(sys.argv[1:])
 
     if args.type == "install" and not args.to_version:
@@ -817,4 +847,5 @@ if __name__ == "__main__":
         additional_packages=args.additional_packages,
         destroy_node=not args.no_destroy_node,
         verbose=args.verbose,
+        paramiko_debug_log=args.paramiko_debug_log,
     )
