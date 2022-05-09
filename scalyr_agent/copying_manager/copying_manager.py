@@ -1530,11 +1530,15 @@ class CopyingManager(StoppableThread, LogWatcher):
                 if warn_on_stale:
                     log.warn(
                         "The checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  The log files will "
-                        "be copied starting at their current end. Checkpoint file content: %s",
+                        "be copied starting at their current end.",
                         checkpoints_path,
                         scalyr_util.format_time(checkpoints["time"]),
-                        json.dumps(checkpoints),
                         error_code="staleCheckpointFile",
+                    )
+                    log.warn(
+                        "Too stale checkpoint file '%s' content: %s",
+                        checkpoints_path,
+                        json.dumps(checkpoints),
                     )
                 continue
 
