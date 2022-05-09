@@ -1219,7 +1219,7 @@ class ContainerChecker(StoppableThread):
                             )
 
                 self.raw_logs[:] = [
-                    l for l in self.raw_logs if l["cid"] not in stopping
+                    line for line in self.raw_logs if line["cid"] not in stopping
                 ]
             else:
                 for logger in self.docker_loggers:
@@ -1231,11 +1231,11 @@ class ContainerChecker(StoppableThread):
                             )
 
                 self.docker_loggers[:] = [
-                    l for l in self.docker_loggers if l.cid not in stopping
+                    line for line in self.docker_loggers if line.cid not in stopping
                 ]
 
             self.docker_logs[:] = [
-                l for l in self.docker_logs if l["cid"] not in stopping
+                line for line in self.docker_logs if line["cid"] not in stopping
             ]
 
     def __start_loggers(self, starting):

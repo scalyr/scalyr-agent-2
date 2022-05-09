@@ -465,7 +465,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
         # Instead of that, we'll create intermediate image with all files and use it as base image.
 
         # To create an intermediate image, first we create container, put all needed files and commit it.
-        intermediate_image_name = f"agent-build-deployment-step-intermediate"
+        intermediate_image_name = "agent-build-deployment-step-intermediate"
 
         # Remove if such intermediate container exists.
         common.run_command(["docker", "rm", "-f", intermediate_image_name])
@@ -486,7 +486,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
             )
 
             # Copy used files to the intermediate container.
-            container_source_root = pl.Path(f"/tmp/agent_source")
+            container_source_root = pl.Path("/tmp/agent_source")
             common.run_command(
                 [
                     "docker",
