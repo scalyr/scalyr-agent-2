@@ -39,7 +39,7 @@ if [ "${TEST_OS}" != "linux" ] && [ "${TEST_OS}" != "windows" ]; then
     exit 1
 fi
 
-echo "Running AMI sanity tests concurrently in the background (this may take up to 5 minutes and no output may be produced by this script for up to 3 minutes)..."
+echo "Running AMI sanity tests concurrently in the background (this may take up to 10 minutes and no output may be produced by this script for up to 5 minutes)..."
 echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
 echo ""
 
@@ -103,6 +103,9 @@ JOBS_LOG_FILE_PATHS=()
 
 for job_pid in $(jobs -p)
 do
+    ps -ww -f "${job_pid}"
+    ps -ww -f "${job_pid}" | tail -1
+    ps -ww -f "${job_pid}" | tail -1 | tr -d "\n" | awk '{for(i=9;i<=NF;++i)printf $i""FS}'
     JOB_COMMAND_LINE_ARGS=$(ps -ww -f "${job_pid}" | tail -1 | tr -d "\n" | awk '{for(i=9;i<=NF;++i)printf $i""FS}')
     JOBS_COMMAND_LINE_ARGS[${job_pid}]=${JOB_COMMAND_LINE_ARGS}
 
