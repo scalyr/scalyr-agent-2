@@ -493,8 +493,8 @@ class TestKubernetesApi(ScalyrTestCase):
     def _get_expected_log_mesg(self, path, stack_trace_lines, response_content):
         """This helper method also serves as a assertion on the format for the log messages"""
         lines = ""
-        for l in stack_trace_lines:
-            lines += l.replace("\n", "\\n")
+        for line in stack_trace_lines:
+            lines += line.replace("\n", "\\n")
         return "k8s.query_api (rate limited): %s\\n\\n\\n%s\\n\\n%s" % (
             path,
             lines,

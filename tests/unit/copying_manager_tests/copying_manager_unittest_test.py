@@ -481,8 +481,8 @@ class TestDynamicLogPathTest(BaseTest):
 
     def append_log_lines(self, filename, *args):
         fp = open(filename, "a")
-        for l in args:
-            fp.write(l)
+        for line in args:
+            fp.write(line)
             fp.write("\n")
         fp.close()
 

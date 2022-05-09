@@ -209,7 +209,7 @@ class LogVerifier:
 
             # All checks are successful, stop the verification as successful.
             if len(self._checks_required_to_pass) == 0:
-                logging.info(f"All checks have passed.")
+                logging.info("All checks have passed.")
                 return
             else:
                 # There is still at least one unfinished required check. Wait and repeat the verification once more.

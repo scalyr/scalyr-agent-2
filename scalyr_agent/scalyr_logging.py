@@ -195,7 +195,9 @@ def get_logger_names():
     """
     Return name of all the currently instantiated and valid loggers.
     """
+    # pylint: disable=no-member
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    # pylint: enable=no-member
     logger_names = [logger.name for logger in loggers]
     return logger_names
 
