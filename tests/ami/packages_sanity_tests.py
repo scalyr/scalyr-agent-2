@@ -195,14 +195,14 @@ EC2_DISTRO_DETAILS_MAP = {
     "WindowsServer2019": {
         "image_id": "ami-0f9790554e2b6bc8d",
         "image_name": "WindowsServer2019-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.medium",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
     "WindowsServer2016": {
         "image_id": "ami-06e455febb7d693eb",
         "image_name": "WindowsServer2016-SSH",
-        "size_id": "t2.small",
+        "size_id": "t2.medium",
         "ssh_username": "Administrator",
         "default_python_package_name": "python2",
     },
