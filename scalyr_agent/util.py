@@ -2749,7 +2749,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         :return:
         """
         try:
-            return self._process  # type: ignore
+            return self._process  # type: ignore  # pylint: disable=no-member
         except:
             return None
 
@@ -2760,6 +2760,6 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         Return the PID of the manager's process.
         """
         try:
-            return self._process.pid  # type: ignore
+            return self._process.pid  # type: ignore  # pylint: disable=no-member
         except:
             return None

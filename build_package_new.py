@@ -147,7 +147,10 @@ if __name__ == "__main__":
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
-        loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        loggers = [
+            logging.getLogger(name)
+            for name in logging.root.manager.loggerDict  # pylint: disable=no-member
+        ]
         for logger in loggers:
             logger.setLevel(logging.DEBUG)
 
