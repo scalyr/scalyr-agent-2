@@ -11,8 +11,8 @@ coverage==4.5.4
 codecov==2.1.9
 decorator==4.4.1
 PyYAML==5.4.1; python_version >= '3.6'
-PyYAML==5.3.1; python_version == '3.5'
-PyYAML==5.3.1; python_version <= '2.7'
+PyYAML==5.4; python_version == '3.5'
+PyYAML==5.4; python_version <= '2.7'
 six==1.13.0
 docker==4.1.0
 # the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
