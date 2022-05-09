@@ -2122,7 +2122,7 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         compress_func = compressor.compress  # type: ignore
         decompress_func = decompressor.decompress  # type: ignore
     elif compression_algorithm == "lz4":
-        import lz4.frame as lz4
+        import lz4.frame as lz4  # pylint: disable=no-name-in-module
 
         # NOTE: Java implementation which we currently use on the server side doesn't support
         # dependent block stream.
