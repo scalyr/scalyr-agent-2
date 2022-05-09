@@ -1,59 +1,94 @@
 <!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
 
-# PostgreSQL Monitor
+# PostgreSQL
 
-The PostgreSQL monitor allows you to collect data about the usage and performance of your PostgreSQL server.
+Import performance and usage data from a PostgreSQL server.
 
-Each monitor can be configured to monitor a specific PostgreSQL database, thus allowing you to configure alerts and the
-dashboard entries independently (if desired) for each instance.
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Configuring PostgreSQL
 
-To use Scalyr's PostgreSQL monitor, you will first need to configure your PostgreSQL server to enable password
-authentication for a user as well as configure a user to connect to the database and gather the necessary data.
+## Installation
 
-To configure PostgreSQL for password authentication, you will need a line like the following in your pg_hba.conf
-file:
+1\. Install the Scalyr Agent
+
+If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome), typically on the host running PostgreSQL.
+
+The Agent requires Python 2.7 or higher as of version 2.0.52 (2019). You can install the Agent on a host other than the one running PostgreSQL. If you must run this plugin on an older version of Python, contact us at [support@scalyr.com](mailto:support@scalyr.com).
+
+
+2\. Check requirements
+
+You must have a PostgreSQL user account with password login. See the [CREATE ROLE](www.postgresql.org/docs/current/sql-createrole.html) documentation.
+
+You must also configure PostgreSQL for TCP/IP connections from the Scalyr Agent. Add a line similar to the following in your [pg_hba.conf](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html) file:
 
     host    all             all             127.0.0.1/32            md5
 
-To create a user and enable password authentication, please consult the PostgreSQL documentation.  For version
-9.3, that documentation can be found here:  http://www.postgresql.org/docs/9.3/static/sql-createrole.html
+You can verify your configuration. An example for user "statusmon", with password "getstatus":
 
-### Configuring the PostgreSQL monitor
+    $ psql -U statusmon -W postgres -h localhost
+    Password for user statusmon: <enter password>
+    psql (9.3.5)
+    SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
+    Type "help" for help.
 
-The PostgreSQL monitor is included with the Scalyr agent.  In order to configure it, you will need to add its monitor
-configuration to the Scalyr agent config file.
+    postgres=#
 
-A basic PostgreSQL monitor configuration entry might resemble:
+If the configuration is incorrect, or you entered an invalid password, you will see something like this:
 
-  monitors: [
-    {
-      module:              "scalyr_agent.builtin_monitors.postgres_monitor",
-      id:                  "mydb",
-      database_host:       "localhost",
-      database_name:       "<database>",
-      database_username:   "<username>",
-      database_password:   "<password>"
-    }
-  ]
+    $ psql -U statusmon -W postgres -h localhost
+    psql: FATAL:  password authentication failed for user "statusmon"
+    FATAL:  password authentication failed for user "statusmon"
 
-Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
-specific to a particular instance of PostgreSQL and will make it easier to filter on metrics specific to that
-instance.
+
+3\. If you grant the above permissions after the Scalyr Agent has started, restart:
+
+      sudo scalyr-agent-2 restart
+
+
+4\. Configure the Scalyr Agent to import PostgreSQL data
+
+Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
+
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for PostgreSQL:
+
+    monitors: [
+      {
+        module:              "scalyr_agent.builtin_monitors.postgres_monitor",
+        database_name:       "<database>",
+        database_username:   "<username>",
+        database_password:   "<password>"
+      }
+    ]
+
+
+Enter values from step **2** for the `database_name`, `database_username`, and `database_password` properties.
+
+This configuration assumes PostgreSQL is running on the same server as the Scalyr Agent (localhost), on port 5432. If not, set the server's socket file, or hostname (or IP address) and port number. See the `database_host` and `database_port` properties in [Configuration Options](#options) below. You can also add the `id` property, which is especially useful to distinguish multiple PostgreSQL instances running on the same host.
+
+
+5\. Save and confirm
+
+Save the `agent.json` file. The Scalyr Agent will detect changes within 30 seconds. Wait a few minutes for the Agent to begin sending PostgreSQL data.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > Postgres. You will see an overview of performance statistics, across all hosts running this plugin. The dashboard only shows some of the data collected. Go to Search view and query [monitor = 'postgres_monitor'](/events?filter=monitor%20%3D%20%27postgres_monitor%27) to view all data.
+
+For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 
 <a name="options"></a>
 ## Configuration Options
 
 | Property            | Description | 
 | ---                 | --- | 
-| `module`            | Always ``scalyr_agent.builtin_monitors.postgres_monitor `` | 
-| `id`                | Optional. Included in each log message generated by this monitor, as a field named ``instance``. Allows you to distinguish between values recorded by different monitors. This is especially useful if you are running multiple PostgreSQL instances on a single server; you can monitor each instance with a separate postgresql_monitor record in the Scalyr Agent configuration. | 
-| `database_host`     | Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data. | 
-| `database_port`     | Name of port on the host machine the agent will connect to PostgreSQL to retrieve monitoring data. | 
-| `database_name`     | Name of database the agent will connect to PostgreSQL to retrieve monitoring data. | 
-| `database_username` | Username which the agent uses to connect to PostgreSQL to retrieve monitoring data. | 
-| `database_password` | Password for connecting to PostgreSQL. | 
+| `module`            | Always `scalyr_agent.builtin_monitors.postgres_monitor` | 
+| `id`                | Optional. An id, included with each event. Shows in the UI as a value for the `instance` field. If you are running multiple instances of this plugin, id lets you distinguish between them. This is especially useful if you are running multiple PostgreSQL instances on a single server. Each instance has a separate `{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`). | 
+| `database_host`     | Optional (default to `localhost`). Name of the host on which PostgreSQL is running. | 
+| `database_port`     | Optional (defaults to `5432`). Port for PostgreSQL. | 
+| `database_name`     | Name of the PostgreSQL database the Scalyr Agent will connect to. | 
+| `database_username` | Username the Scalyr Agent connects with. | 
+| `database_password` | Password the Scalyr Agent connects with. | 
 
 <a name="events"></a>
 ## Event Reference
@@ -62,10 +97,10 @@ In the UI, each event has the fields:
 
 | Field      | Description | 
 | ---        | --- | 
-| `monitor`  | Always ``postgres_monitor``. | 
-| `instance` | The ``id`` value from the monitor configuration. | 
-| `metric`   | The name of a metric being measured, e.g. "postgres.vars". | 
-| `value`    | The metric value. | 
+| `monitor`  | Always `postgres_monitor`. | 
+| `instance` | The `id` value. See [Configuration Options](#options). | 
+| `metric`   | Name of the metric, e.g. "postgres.vars". | 
+| `value`    | Value of the metric. | 
 
 <a name="metrics"></a>
 ## Metrics Reference
@@ -77,25 +112,25 @@ Metrics recorded by this plugin:
 
 | Metric                             | Description | 
 | ---                                | --- | 
-| `postgres.database.connections`    | The number of current active connections.  The value is accurate to when the check was made. | 
+| `postgres.database.connections`    | Number of active connections. | 
 
 ### General Metrics
 
 | Metric                                | Fields              | Description | 
 | ---                                   | ---                 | --- | 
-| `postgres.database.transactions`      | `result=committed`  | The number of database transactions that have been committed.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.transactions`      | `result=rolledback` | The number of database transactions that have been rolled back.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.disk_blocks`       | `type=read`         | The number of disk blocks read into the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.disk_blocks`       | `type=hit`          | The number of disk blocks read that were found in the buffer cache.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.query_rows`        | `op=returned`       | The number of rows returned by all queries in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.query_rows`        | `op=fetched`        | The number of rows fetched by all queries in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.query_rows`        | `op=inserted`       | The number of rows inserted by all queries in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.query_rows`        | `op=updated`        | The number of rows updated by all queries in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.query_rows`        | `op=deleted`        | The number of rows deleted by all queries in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.temp_files`        |                     | The number of temporary files created by queries to the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.temp_bytes`        |                     | The total amount of data written to temporary files by queries to the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.deadlocks`         |                     | The number of deadlocks detected in the database.  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.blocks_op_time`    | `op=read`           | The amount of time data file blocks are read by clients in the database (in milliseconds).  The value is relative to postgres.database.stats_reset. | 
-| `postgres.database.blocks_op_time`    | `op=write`          | The amount of time data file blocks are written by clients in the database (in milliseconds).  The value is relative to postgres.database.stats_reset. | 
+| `postgres.database.transactions`      | `result=committed`  | Number of committed transactions. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.transactions`      | `result=rolledback` | Number of rolled back transactions. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.disk_blocks`       | `type=read`         | Number of disk blocks read from the database. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.disk_blocks`       | `type=hit`          | Number of disk blocks read from the buffer cache. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.query_rows`        | `op=returned`       | Number of rows returned by all queries. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.query_rows`        | `op=fetched`        | Number of rows fetched by all queries. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.query_rows`        | `op=inserted`       | Number of rows inserted by all queries. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.query_rows`        | `op=updated`        | Number of rows updated by all queries. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.query_rows`        | `op=deleted`        | Number of rows deleted by all queries. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.temp_files`        |                     | Number of temporary files created by queries to the database. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.temp_bytes`        |                     | Bytes written to temporary files by queries to the database. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.deadlocks`         |                     | Number of deadlocks detected. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.blocks_op_time`    | `op=read`           | Read time in milliseconds for file blocks read by clients. The value is cumulative until reset by `postgres.database.stats_reset`. | 
+| `postgres.database.blocks_op_time`    | `op=write`          | Write time in milliseconds for file blocks written by clients. The value is cumulative until reset by `postgres.database.stats_reset`. | 
 | `postgres.database.stats_reset`       |                     | The time at which database statistics were last reset. | 
-| `postgres.database.size`              |                     | The number of bytes the database is taking up on disk. | 
+| `postgres.database.size`              |                     | Size in bytes of the database. | 
