@@ -341,8 +341,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "tcp_message_delimiter",
-    "Which character sequence to use for a message delimiter / suffix (defaults to \\n). Some "
-    "implementations such as Python syslog handler one utilize null character (\\000) which allows "
+    "Which character sequence to use for a message delimiter / suffix (defaults to \\ n). Some "
+    "implementations such as Python syslog handler one utilize null character (\\ 000) which allows "
     "messages to contain new lines without using framing. If that is the case for you, set this "
     "option to \\000. Keep in mind that this value needs to be escaped when specified in the "
     "config option which means you need to use two backslashes instead of one.",

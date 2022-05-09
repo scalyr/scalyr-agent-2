@@ -677,6 +677,7 @@ class Configuration(object):
         @param other_config: Another configuration option.  If not None, this function will
         only print configuration options that are different between the two objects.
         """
+        # TODO/NOTE: This code doesn't handle JsonArray's correctly
         options = [
             "verify_server_certificate",
             "ca_cert_path",

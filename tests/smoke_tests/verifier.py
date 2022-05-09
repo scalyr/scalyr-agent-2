@@ -178,7 +178,7 @@ class AgentLogVerifier(AgentVerifier):
 
         print("Check start line contains correct version and revision string")
         match = re.search(
-            r"Starting scalyr agent... \(version=(.*?)\) \(revision=(.*?)\)",
+            r"Starting scalyr agent... \(version=(.*?)\ revision=(.*?)\)",
             local_agent_log_data,
         )
 
