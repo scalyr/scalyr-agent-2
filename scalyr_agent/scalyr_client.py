@@ -700,7 +700,7 @@ class ScalyrClientSession(object):
                 response_as_json = scalyr_util.json_decode(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
-                log.info(
+                log.warning(
                     "Failed to parse response of '%s' due to exception.  Closing connection, will "
                     "re-attempt",
                     scalyr_util.remove_newlines_and_truncate(response, 1000),
