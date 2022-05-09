@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.30 "TBD" - April 28, 2022
+## 2.1.30 "TBD" - May 12, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Apr 25, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
 --->
 
 Kubernetes:
