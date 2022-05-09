@@ -13,6 +13,9 @@ Kubernetes:
 Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
 
+Other:
+* Update agent start up log message to use format which is supported by the agent message parser.
+
 ## 2.1.29 "Auter" - Mar 15, 2022
 
 <!---

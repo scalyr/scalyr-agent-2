@@ -217,11 +217,9 @@ class MiscUtilsTestCase(ScalyrTestCase):
 
         self.assertTrue("Starting scalyr agent..." in msg)
         self.assertTrue("version=%s" % (SCALYR_VERSION) in msg)
-        self.assertTrue("Python version: %s" % (python_version_str) in msg)
-        self.assertTrue("OpenSSL version: %s" % (openssl_version) in msg)
-        self.assertTrue(
-            "default fs encoding: %s" % (sys.getfilesystemencoding()) in msg
-        )
+        self.assertTrue("Python version=%s" % (python_version_str) in msg)
+        self.assertTrue("OpenSSL version=%s" % (openssl_version) in msg)
+        self.assertTrue("default fs encoding=%s" % (sys.getfilesystemencoding()) in msg)
         self.assertTrue("revision=%s" % (build_revision) in msg)
-        self.assertTrue("locale: %s" % (locale) in msg)
-        self.assertTrue("LANG env variable: %s" % (lang_env_var) in msg)
+        self.assertTrue("locale=%s" % (locale) in msg)
+        self.assertTrue("LANG env variable=%s" % (lang_env_var) in msg)
