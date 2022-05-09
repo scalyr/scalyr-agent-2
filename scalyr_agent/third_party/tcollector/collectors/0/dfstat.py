@@ -17,7 +17,7 @@
 #
 # df.1kblocks.total      total size of fs
 # df.1kblocks.used       blocks used
-# df.1kblocks.available  blocks available
+# df.1kblocks.free       blocks available
 # df.inodes.total        number of inodes
 # df.inodes.used        number of inodes
 # df.inodes.free        number of inodes
