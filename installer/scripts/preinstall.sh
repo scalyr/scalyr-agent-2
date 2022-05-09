@@ -18,44 +18,20 @@
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
+# {{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
 
-echo "Checking Python version."
-
-is_python_valid() {
-  command=$1
-  version=$(/usr/bin/env "${command}" --version 2>&1 | grep -o "[0-9].[0-9]")
-  exit_code=$?
-
-  # shellcheck disable=SC2072,SC2071
-  if [[ -z "${version}" || "${exit_code}" -ne "0" ]]; then
-    return 1
-  elif [[ "$version" < "2.6" ]]; then
-    echo "Python ${version} is found but the minimum version for Python 2 is 2.6."
-    return 1
-  elif [[ "$version" > "3" && "$version" < "3.5" ]]; then
-    echo "Python ${version} is found but the minimum version for Python 3 is 3.5."
-    return 1
-  else
-    return 0
-  fi
-}
-
-if ! is_python_valid python && ! is_python_valid python2 && ! is_python_valid python3; then
-  echo -e "\e[31mSuitable Python interpreter not found.\e[0m"
-  echo "You can install it by running command:"
+if ! is_python_valid "python" && ! is_python_valid "python2" && ! is_python_valid "python3" ; then
+  echo "! Suitable Python interpreter not found."
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
   if [[ -f "/etc/os-release" ]]; then
+    echo "You can install it by running command:"
     found_distros=$(grep -E "^ID_LIKE=|^ID=" /etc/os-release)
     # debian and etc.
     if echo "${found_distros}" | grep -qE "debian|ubuntu"; then
-      echo "'apt install python'"
-      echo "or"
-      echo "apt install python3"
+      echo -e "'apt install python'\nor\n'apt install python3"
     # RHEL and etc.
     elif echo "${found_distros}" | grep -qE "rhel|centos|fedora"; then
-      echo "'yum install python2'"
-      echo "or"
-      echo "'yum install python3'"
+      echo -e "'yum install python2'\nor\n'yum install python3'"
     fi
   fi
   exit 1

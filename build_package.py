@@ -1487,9 +1487,42 @@ def create_scriptlets():
 
     scripts_path = os.path.join(__source_root__, "installer", "scripts")
 
-    shutil.copy(os.path.join(scripts_path, "preinstall.sh"), "preinstall.sh")
     shutil.copy(os.path.join(scripts_path, "preuninstall.sh"), "preuninstall.sh")
-    shutil.copy(os.path.join(scripts_path, "postinstall.sh"), "postinstall.sh")
+
+    check_python_script_path = os.path.join(scripts_path, "check-python.sh")
+    with open(check_python_script_path, "r") as f:
+        check_python_file_content = f.read()
+
+    code_to_paste = re.search(
+        r"# {{ start }}\n(.+)# {{ end }}", check_python_file_content, re.S
+    ).group(1)
+
+    def replace_code(script_name):
+        """
+        Replace placeholders in the package install scripts with the common code that checks python version.
+        This is needed to avoid duplication of the python check code in the pre and post install scripts.
+        """
+        script_path = os.path.join(scripts_path, script_name)
+        with open(script_path, "r") as f:
+            content = f.read()
+
+        final_content = re.sub(
+            r"# {{ check-python }}[^\n]*",
+            code_to_paste,
+            content,
+        )
+
+        if "\\n" in code_to_paste:
+            raise Exception(
+                "code_to_paste (%s) shouldn't contain new line character since re.sub "
+                "will replace it with actual new line character"
+                % (check_python_script_path)
+            )
+        with open(script_name, "w") as f:
+            f.write(final_content)
+
+    replace_code("preinstall.sh")
+    replace_code("postinstall.sh")
 
 
 def create_change_logs():

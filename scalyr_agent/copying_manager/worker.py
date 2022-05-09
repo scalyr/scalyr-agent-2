@@ -489,6 +489,14 @@ class CopyingManagerWorkerSession(
                         # on the ground and advance.
                         if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
+                                if (
+                                    "parseResponseFailed"
+                                    in self.__pending_add_events_task.__receive_response_status
+                                ):
+                                    log.error(
+                                        "Repeatedly failed to parse response due to exception.  Dropping events",
+                                        error_code="parseResponseFailed",
+                                    )
                                 self.__pending_add_events_task.completion_callback(
                                     LogFileProcessor.FAIL_AND_DROP
                                 )
@@ -578,6 +586,9 @@ class CopyingManagerWorkerSession(
                                 full_response = ""
                             else:
                                 (result, bytes_sent, full_response) = get_response()
+                                self.__pending_add_events_task.__receive_response_status = (
+                                    result
+                                )
                             blocking_response_time_end = time.time()
                             self.total_blocking_response_time += (
                                 blocking_response_time_end
@@ -614,6 +625,7 @@ class CopyingManagerWorkerSession(
                             if (
                                 result == "success"
                                 or "discardBuffer" in result
+                                or "parseResponseFailed" in result
                                 or "requestTooLarge" in result
                             ):
                                 next_add_events_task = None

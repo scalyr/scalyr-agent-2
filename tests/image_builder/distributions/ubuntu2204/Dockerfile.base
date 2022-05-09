@@ -1,0 +1,23 @@
+FROM ubuntu:22.04
+
+RUN rm /etc/apt/apt.conf.d/docker-clean
+RUN apt update
+RUN apt install -y apt-utils build-essential git
+
+RUN apt install -y python2 python2-dev curl
+RUN curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+RUN python2 get-pip.py
+
+RUN apt install -y python3 python3-pip python3-dev
+
+COPY dev-requirements.txt dev-requirements.txt
+ADD agent_build/requirement-files agent_build/requirement-files
+
+RUN python2 -m pip install -r dev-requirements.txt
+
+# so we create symlink to python3.5 with different name only to run tests.
+# We need newer version of pip since old version don't support manylinux wheels
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install -r dev-requirements.txt
+
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python_for_tests
