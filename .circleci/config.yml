@@ -736,6 +736,7 @@ commands:
             KEY_NAME: "circleci"
             PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
             PYTHONPATH: "."
+          no_output_timeout: 25m
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
             export SECRET_KEY=${AWS_SECRET_KEY}
