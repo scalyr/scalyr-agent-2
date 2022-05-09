@@ -56,6 +56,7 @@ version: 2.1
 orbs:
   slack: circleci/slack@3.4.2
   win: circleci/windows@2.4.0
+  rust: circleci/rust@1.6.0
 
 # Global workflow level parameters
 parameters:
@@ -2069,12 +2070,18 @@ jobs:
       size: "medium"
       # windows-server-2019-vs2019:previous
       version: "previous"
-      shell: powershell.exe
+      shell: bash
+    parameters:
+      python-version:
+        description: Version of the Python interpreter to use.
+        default: 3.10.4
+        type: string
     steps:
       - checkout
+      - rust/install
       - restore_cache:
           name: Restore Python installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}
+          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
 
       - restore_cache:
           name: Restore Wix cache
@@ -2082,6 +2089,7 @@ jobs:
 
       - run:
           name: Extract Wix.
+          shell: powershell.exe
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir wix311_binaries -Force
@@ -2092,13 +2100,14 @@ jobs:
 
       - run:
           name: Install python.
+          shell: powershell.exe
           command: |
             $ProgressPreference = "SilentlyContinue"
             mkdir python_installer -Force
-            if (!(Test-Path .\python_installer\python-3.8.10-amd64.exe -PathType Leaf)) {
-                wget -O .\python_installer\python-3.8.10-amd64.exe https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe
+            if (!(Test-Path .\python_installer\python-amd64.exe -PathType Leaf)) {
+                wget -O .\python_installer\python-amd64.exe https://www.python.org/ftp/python/<< parameters.python-version >>/python-<< parameters.python-version >>-amd64.exe
             }
-            python_installer\python-3.8.10-amd64.exe /quiet /passive
+            python_installer\python-amd64.exe /quiet /passive
 
       - save_cache:
           name: Save Wix Cache
@@ -2108,13 +2117,13 @@ jobs:
 
       - save_cache:
           name: Save Python Installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}
+          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
           paths:
             - "python_installer"
 
       - restore_cache:
           name: Restore Python Dependencies Cache
-          key: windows_python_installer-python-3.8.10-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-<< parameters.python-version >>-{{ .Branch }}-py-deps-cache
 
       - when:
           condition: << pipeline.parameters.agent_version >>
@@ -2141,6 +2150,7 @@ jobs:
                   cat VERSION
       - run:
           name: Build MSI package
+          shell: powershell.exe
           command: |
               $Env:WIX = ";C:\wix311;"
 
@@ -2157,10 +2167,10 @@ jobs:
 
               $PSDefaultParameterValues['*:ErrorAction']='Stop'
 
-              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
+              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
+              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe build_package.py win32
               ThrowOnNativeFailure
 
               mkdir package
@@ -2186,7 +2196,7 @@ jobs:
 
       - save_cache:
           name: Save Python Dependencies Cache
-          key: windows_python_installer-python-3.8.10-{{ .Branch }}-py-deps-cache
+          key: windows_python_installer-python-<< parameters.python-version >>-{{ .Branch }}-py-deps-cache
           paths:
             - C:\Users\circleci\AppData\Local\pip\Cache
 
