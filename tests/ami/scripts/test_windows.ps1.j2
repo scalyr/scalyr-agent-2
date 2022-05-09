@@ -208,6 +208,7 @@ if ("$status_output" -notmatch "windows_event_log_monitor\(\)")   { Throw "Can n
 
 # Verify event log monitor emitted some events
 $event_log_output=type "C:\Program Files (x86)\Scalyr\log\windows_event_log_monitor.log"
+echo $event_log_output
 
 if ("$event_log_output" -notmatch "EventLog")   { Throw "Event log monitor didnt emit any events" };
 if ("$event_log_output" -notmatch "EventID")   { Throw "Event log monitor didnt emit any events" };
