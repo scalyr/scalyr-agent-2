@@ -19,6 +19,7 @@ Bug fixes:
 Other:
 * Update the code to log non-fatal connection related errors which are retried under WARNING instead of ERROR log level.
 * Update agent start up log message to use format which is supported by the agent message parser.
+* Update base Python interpreter for Windows MSI package to 3.10.
 
 ## 2.1.29 "Auter" - Mar 15, 2022
 
