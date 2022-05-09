@@ -725,7 +725,7 @@ commands:
 
             ./tests/ami/cleanup_old_test_instances.py
       - run:
-          name: Run package tests on EC2 instances
+          name: Run package tests on EC2 instances (windows)
           environment:
             KEY_NAME: "circleci"
             PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
@@ -755,7 +755,7 @@ commands:
                     export VERBOSE="true"
                 fi
 
-                ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >>
+                ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >> "windows"
                 exit_code=$?
 
                 # We preserve logs of all the runs - we move logs to directory per run iteration
@@ -781,6 +781,64 @@ commands:
               fi
 
               exit 0
+      - run:
+          name: Run package tests on EC2 instances (linux)
+          environment:
+            KEY_NAME: "circleci"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PYTHONPATH: "."
+          command: |
+            export ACCESS_KEY=${AWS_ACCESS_KEY}
+            export SECRET_KEY=${AWS_SECRET_KEY}
+            export INSTALLER_SCRIPT_URL="<< parameters.installer_script_url >>"
+
+            # If testing type is "development" we use installer script which is built in another job.
+            if [ "<< parameters.test_type >>" = "development" ]; then
+              export INSTALLER_SCRIPT_URL="/tmp/workspace/installScalyrAgentV2.sh"
+            fi
+
+            set +e
+
+            max_attempts="2"
+            sleep_delay="15"
+
+            i=0
+            until [ "$i" -ge ${max_attempts} ]; do
+                echo "Running tests command"
+
+                # On subsequent runs we enable VERBOSE flag to perhaps make
+                # troubleshooting easier
+                if [ "${i}" -ge 1 ]; then
+                    export VERBOSE="true"
+                fi
+
+                ./scripts/circleci/run-ami-tests-in-bg.sh << parameters.test_type >> "linux"
+                exit_code=$?
+
+                # We preserve logs of all the runs - we move logs to directory per run iteration
+                mkdir -p outputs/run_$i/
+                cp outputs/*.log outputs/run_$i/
+                rm outputs/*.log
+
+                if [ "${exit_code}" -eq 0 ]; then
+                    echo "Command exited with 0, breaking from the loop."
+                    break
+                else
+                    echo "Command exited with non-zero status, retrying in ${sleep_delay} seconds..."
+                fi
+                i=$((i+1))
+                sleep ${sleep_delay}
+              done
+
+              set -e
+
+              if [ "${exit_code}" -ne 0 ]; then
+                  echo "Command failed to exit with zero exit code after 2 attempts, failing (exit_code=${exit_code})"
+                  exit 1
+              fi
+
+              exit 0
+ 
       - store_artifacts:
           path: outputs
 
