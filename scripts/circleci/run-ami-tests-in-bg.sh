@@ -77,9 +77,9 @@ else
 
   if [ "${TEST_OS}" == "windows" ]; then
     # Tests below install package which is built as part of a Circle CI job
-    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2012-install.log &
-    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2016-install.log &
-    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi &> outputs/WindowsServer2019-install.log &
+    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2012 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi --paramiko-debug-log=outputs/WindowsServer2012-install-paramiko.log &> outputs/WindowsServer2012-install.log &
+    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi --paramiko-debug-log=outputs/WindowsServer2016-install-paramiko.log &> outputs/WindowsServer2016-install.log &
+    python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi --paramiko-debug-log=outputs/WindowsServer2019-install-paramiko.log &> outputs/WindowsServer2019-install.log &
   elif [ "${TEST_OS}" == "linux" ]; then
     python tests/ami/packages_sanity_tests.py --distro=ubuntu2204 --type=install --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu2204-install.log &
 
@@ -110,6 +110,7 @@ do
     TEST_TYPE=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "type=" '{print $2}' | awk '{print $1}')
 
     JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
+    JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}-paramiko.log"
 done
 
 echo ""
@@ -121,6 +122,7 @@ for job_pid in $(jobs -p)
 do
     JOB_COMMAND_LINE_ARGS=${JOBS_COMMAND_LINE_ARGS[${job_pid}]}
     JOB_LOG_FILE_PATH=${JOBS_LOG_FILE_PATHS[${job_pid}]}
+    JOB_PARAMIKO_LOG_FILE_PATH=${JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]}
 
     echo ""
     echo "============================================================================================"
@@ -135,6 +137,9 @@ do
         echo "Showing output from ${JOB_LOG_FILE_PATH}:"
         echo "--------------------------------------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
+        echo "--------------------------------------------------------------------------------------"
+        echo "Showing paramiko debug output from ${JOB_PARAMIKO_LOG_FILE_PATH}:"
+        cat "${JOB_PARAMIKO_LOG_FILE_PATH}" || true
         echo "--------------------------------------------------------------------------------------"
     fi
 

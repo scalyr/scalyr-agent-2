@@ -86,6 +86,7 @@ import time
 import re
 import tempfile
 import shutil
+import logging
 
 import random
 import argparse
@@ -338,8 +339,15 @@ def main(
     additional_packages=None,
     destroy_node=False,
     verbose=False,
+    paramiko_debug_log=None,
 ):
     # type: (str, str, str, str, str, str, str, bool, bool) -> None
+
+    if paramiko_debug_log:
+        import paramiko
+
+        print("Will store paramiko debug log to file: %s" % (paramiko_debug_log))
+        paramiko.util.log_to_file(filename=paramiko_debug_log, level=logging.DEBUG)
 
     # deployment objects for package files will be stored here.
     file_upload_steps = []
@@ -786,6 +794,15 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--paramiko-debug-log",
+        help=(
+            "Optional file path where paramiko debug log should be saved. Debug log is only "
+            "enabled if this parameter is set."
+        ),
+        required=False,
+    )
+
     args = parser.parse_args(sys.argv[1:])
 
     if args.type == "install" and not args.to_version:
@@ -830,4 +847,5 @@ if __name__ == "__main__":
         additional_packages=args.additional_packages,
         destroy_node=not args.no_destroy_node,
         verbose=args.verbose,
+        paramiko_debug_log=args.paramiko_debug_log,
     )
