@@ -116,7 +116,7 @@ if ("$permissions_agent_json" -notmatch "Administrators") { Throw "Missing permi
 if ("$permissions_agent_d" -notmatch "Administrators") { Throw "Missing permission grant for Administrators for agent.d!" };
 
 Log-Message ""
-Log-Message "agent.json and agent.d/ config files permissions completed successfuly"
+Log-Message "agent.json and agent.d/ config files permissions completed successfully"
 Log-Message ""
 
 # Copy over agent.json with the API key set up
@@ -268,7 +268,7 @@ if ("$log_output" -notmatch "failedAgentMain") { Throw "Invalid ca cert path, ag
 if ("$log_output" -notmatch 'Invalid path "C:\\invalid\\ca_certs.crt" specified for the "ca_cert_path"') { Throw "Invalid ca cert path, agent shouldnt have started" };
 
 Log-Message ""
-Log-Message "agent.log output successfuly verified"
+Log-Message "agent.log output successfully verified"
 Log-Message ""
 
 Log-Message ""
@@ -309,7 +309,7 @@ if ("$status_output" -notmatch "Last copy response size:                   0") {
 if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedCertHostnameValidationFailed") { Throw "Invalid line found." };
 
 Log-Message ""
-Log-Message "Status output successfuly verified."
+Log-Message "Status output successfully verified."
 Log-Message ""
 
 Log-Message ""
@@ -323,7 +323,7 @@ if ("$log_output" -notmatch "because of server certificate validation error") { 
 if ("$log_output" -notmatch "This likely indicates a MITM attack") { Throw "Matching log line not found." };
 
 Log-Message ""
-Log-Message "agent.log output successfuly verified"
+Log-Message "agent.log output successfully verified"
 Log-Message ""
 
 Log-Message ""
@@ -352,7 +352,7 @@ if ("$status_output" -notmatch "Last copy response size:                   0") {
 if ("$status_output" -notmatch "Last copy response status:                 client/connectionFailedSSLError") { Throw "Invalid line found." };
 
 Log-Message ""
-Log-Message "Status output successfuly verified."
+Log-Message "Status output successfully verified."
 Log-Message ""
 
 Log-Message ""
@@ -366,7 +366,7 @@ if ("$log_output" -notmatch "due to some SSL error") { Throw "CA cert validation
 if ("$log_output" -notmatch "certificate verify failed") { Throw "CA cert validation should have failed" };
 
 Log-Message ""
-Log-Message "agent.log output successfuly verified"
+Log-Message "agent.log output successfully verified"
 Log-Message ""
 
 Log-Message ""
@@ -391,7 +391,7 @@ echo $log_output
 if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 512") { Throw "Matching win32_max_open_fds line not found" };
 
 Log-Message ""
-Log-Message "agent.log output successfuly verified"
+Log-Message "agent.log output successfully verified"
 Log-Message ""
 
 #
@@ -439,7 +439,7 @@ if ("$status_output" -notmatch "test999.txt.log") { Throw "test999.txt.log file 
 if ("$status_output" -notmatch "test1024.txt.log") { Throw "test1024.txt.log file not found in status output" };
 
 Log-Message ""
-Log-Message "Status output successfuly verified."
+Log-Message "Status output successfully verified."
 Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
@@ -465,5 +465,5 @@ echo $log_output
 if ("$log_output" -notmatch "win32_max_open_fds\(maxstdio\): 1024") { Throw "Matching win32_max_open_fds line not found" };
 
 Log-Message ""
-Log-Message "agent.log output successfuly verified"
+Log-Message "agent.log output successfully verified"
 Log-Message ""
