@@ -639,13 +639,26 @@ def destroy_node_and_cleanup(driver, node):
 
     print("")
     print(('Destroying node "%s"...' % (node.name)))
-    node.destroy()
+
+    try:
+        node.destroy()
+    except Exception as e:
+        if "does not exist" in str(e):
+            # Node already deleted, likely by another concurrent run. This error is not fatal so we
+            # just ignore it.
+            print(
+                "Failed to delete node, likely node was already deleted, ignoring error..."
+            )
+            print(str(e))
+        else:
+            raise e
 
     assert len(volumes) <= 1
     print("Cleaning up any left-over EBS volumes for this node...")
 
     # Give it some time for the volume to become detached from the node
-    time.sleep(10)
+    if volumes:
+        time.sleep(10)
 
     for volume in volumes:
         # Additional safety checks
