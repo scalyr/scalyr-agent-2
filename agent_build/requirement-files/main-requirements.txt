@@ -2,7 +2,7 @@
 # orjson is not available for armv7 + musl yet, but it's available for armv7 +
 # libc. we handle that in dockerfile since python environment markers are not
 # specific enough.
-orjson==3.6.7; python_version >= '3.7' and platform_system != 'Darwin'
+orjson==3.6.8; python_version >= '3.7' and platform_system != 'Darwin'
 orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 
