@@ -21,6 +21,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import re
+import socket
 
 if False:  # NOSONAR
     from typing import Union
@@ -2203,13 +2204,14 @@ def get_agent_start_up_message():
         date_parsing_library = "native python"
 
     msg = (
-        "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) "
-        "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s) "
-        "(date parsing library: %s)"
+        "Starting scalyr agent... (version=%s revision=%s) %s (hostname=%s) (Python version=%s) "
+        "(OpenSSL version=%s) (default fs encoding=%s) (locale=%s) (LANG env variable=%s) "
+        "(date parsing library=%s)"
         % (
             SCALYR_VERSION,
             build_revision,
             get_pid_tid(),
+            socket.gethostname(),
             python_version_str,
             openssl_version,
             sys.getfilesystemencoding(),

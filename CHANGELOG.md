@@ -11,7 +11,8 @@ Kubernetes:
 * Agent has been updated to periodically try to re-read Kubernetes authentication token value from ``/var/run/secrets/kubernetes.io/serviceaccount/token`` file on disk (every 5 minutes by default). This way agent also supports Kubernetes deployments where token files are periodically automatically refreshed / rotated (e.g. https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection).
 
 Other:
-* Update the code to log non-fatal connection errors which are retried under WARNING instead of ERROR log level.
+* Update the code to log non-fatal connection related errors which are retried under WARNING instead of ERROR log level.
+* Update agent start up log message to use format which is supported by the agent message parser.
 
 ## 2.1.29 "Auter" - Mar 15, 2022
 

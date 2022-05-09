@@ -26,6 +26,7 @@ import operator
 import signal
 import errno
 import fnmatch
+import json
 
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
@@ -1533,6 +1534,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                         checkpoints_path,
                         scalyr_util.format_time(checkpoints["time"]),
                         error_code="staleCheckpointFile",
+                    )
+                    log.warn(
+                        "Too stale checkpoint file '%s' content: %s",
+                        checkpoints_path,
+                        json.dumps(checkpoints),
                     )
                 continue
 
