@@ -26,6 +26,7 @@ import operator
 import signal
 import errno
 import fnmatch
+import json
 
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
@@ -1529,9 +1530,10 @@ class CopyingManager(StoppableThread, LogWatcher):
                 if warn_on_stale:
                     log.warn(
                         "The checkpoint file '%s' is too stale (written at '%s').  Ignoring it.  The log files will "
-                        "be copied starting at their current end.",
+                        "be copied starting at their current end. Checkpoint file content: %s",
                         checkpoints_path,
                         scalyr_util.format_time(checkpoints["time"]),
+                        json.dumps(checkpoints),
                         error_code="staleCheckpointFile",
                     )
                 continue
