@@ -2204,9 +2204,9 @@ def get_agent_start_up_message():
         date_parsing_library = "native python"
 
     msg = (
-        "Starting scalyr agent... (version=%s revision=%s) %s (hostname=%s Python version=%s "
-        "OpenSSL version=%s default fs encoding=%s locale=%s LANG env variable=%s "
-        "date parsing library=%s)"
+        "Starting scalyr agent... (version=%s revision=%s) %s (hostname=%s) (Python version=%s) "
+        "(OpenSSL version=%s) (default fs encoding=%s) (locale=%s) (LANG env variable=%s) "
+        "(date parsing library=%s)"
         % (
             SCALYR_VERSION,
             build_revision,
