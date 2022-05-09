@@ -83,7 +83,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             else:
                 expected_msg = (
                     r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
-                    "of '\*.scalyr.com', 'scalyr.com'"
+                    r"of '\*.scalyr.com', 'scalyr.com'"
                 )  # NOQA
 
             self.assertRaisesRegexp(

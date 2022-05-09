@@ -207,7 +207,6 @@ METRIC_CONFIG = dict  # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
 
-# pylint: disable=bad-whitespace
 # =================================================================================
 # ============================    Process CPU    ==================================
 # =================================================================================
@@ -438,7 +437,6 @@ _PROCESS_DISK_IO_METRICS = [
     # TODO: Additional attributes for this section
     #  * ...
 ]
-# pylint: enable=bad-whitespace
 
 METRICS = (
     _PROCESS_CPU_METRICS

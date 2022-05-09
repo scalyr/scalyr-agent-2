@@ -990,7 +990,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             command_options.extend(
                 [
                     "--build-arg",
-                    f"AGENT_BUILD_DEBUG=1",
+                    "AGENT_BUILD_DEBUG=1",
                 ]
             )
 

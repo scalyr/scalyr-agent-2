@@ -36,6 +36,8 @@ done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     echo_with_date "Provisioning didn't finish in 60 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "/var/log/cloud-init-output.log log file content"
+    cat "/var/log/cloud-init-output.log" || true
     exit 1
 fi
 

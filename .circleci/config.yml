@@ -2276,7 +2276,7 @@ jobs:
       - image: cimg/python:3.10
     # TODO: Remove resource_class and use default medium one if tests are still
     # failing with large
-    resource_class: large
+    resource_class: xlarge
     steps:
       - ami-tests:
           test_type: "stable"

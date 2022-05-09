@@ -161,7 +161,9 @@ def _gather_metric(method, attribute=None, transform=None):
             yield __NO_DISK_PERF__, None
 
     try:
-        gather_metric.__doc__ = doc(method, attribute)
+        gather_metric.__doc__ = doc(  # pylint: disable=too-many-format-args
+            method, attribute
+        )
     except ValueError as e:
         if "zero length field name in format" in str(e):
             pass
@@ -241,7 +243,6 @@ METRIC_CONFIG = dict  # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
 
-# pylint: disable=bad-whitespace
 # =================================================================================
 # ============================    System CPU    ===================================
 # =================================================================================
@@ -567,7 +568,6 @@ _DISK_USAGE_METRICS = [
         partion_disk_usage("free"),
     ),
 ]
-# pylint: enable=bad-whitespace
 
 METRICS = (
     _SYSTEM_CPU_METRICS
