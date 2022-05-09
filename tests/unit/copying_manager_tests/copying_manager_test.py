@@ -284,6 +284,25 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.assertEquals(1, len(lines))
         self.assertEquals("Third line", lines[0])
 
+    def test_retry_request_due_to_parse_failure(self):
+        controller = self.__create_test_instance()
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+
+        lines = self.__extract_lines(request)
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
+        responder_callback("parseResponseFailed")
+
+        (request, responder_callback) = controller.wait_for_rpc()
+
+        lines = self.__extract_lines(request)
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
     def test_request_too_large_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines("First line", "Second line")

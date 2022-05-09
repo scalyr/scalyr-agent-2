@@ -40,7 +40,7 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 WORKDIR /
 
 # Copy result files to a new base stage.
-FROM python:3.8.12-$BASE_IMAGE_SUFFIX as scalyr-base
+FROM python:3.8.13-$BASE_IMAGE_SUFFIX as scalyr-base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Copy Agent's Python dependencies. Those dependencies were built in the base image,
 # which is given by 'BASE_IMAGE' arg.

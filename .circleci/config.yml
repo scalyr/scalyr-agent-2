@@ -68,7 +68,7 @@ parameters:
   cache_version_docker_images:
     description: "Cache version suffix used for all the Docker image caches."
     type: string
-    default: "v15"
+    default: "v16"
   cache_version_py_dependencies:
     description: "Cache version suffix used for all the Python dependency caches."
     type: string
@@ -601,6 +601,7 @@ commands:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: false
+          version: 20.10.12
 
       - install-cached-tox:
           target_name: << parameters.tox_target >>
@@ -1971,9 +1972,9 @@ jobs:
       - image: cimg/python:3.6
     steps:
       - package-test:
-          distribution: "ubuntu1804"
+          distribution: "ubuntu2204"
           agent_host_name_prefix: "package-test"
-          tox_target: agent_distributions_tests_ubuntu1804
+          tox_target: agent_distributions_tests_ubuntu2204
 
   # Circle CI jobs which build agent packages for each PR.
   package-build-deb:

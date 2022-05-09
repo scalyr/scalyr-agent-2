@@ -700,7 +700,7 @@ class ScalyrClientSession(object):
                 response_as_json = scalyr_util.json_decode(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
-                log.error(
+                log.warning(
                     "Failed to parse response of '%s' due to exception.  Closing connection, will "
                     "re-attempt",
                     scalyr_util.remove_newlines_and_truncate(response, 1000),
@@ -1186,6 +1186,10 @@ class AddEventsRequest(object):
 
         # Used to record some performance timing data for debugging/analysis
         self.__timing_data = dict()
+
+        # Used to cache response status (from ScalyrClientSession.__receive_response)
+        # which is then used for special handling of specific timed-out requests
+        self.__receive_response_status = None
 
     @property
     def current_size(self):

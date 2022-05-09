@@ -103,7 +103,6 @@ def _mock_python_binary_version(python_binary_name, version):
         os.remove(six.text_type(binary_path_backup_path))
 
     if not version:
-        os.system("python2 --version")
         return
 
     if not binary_path.exists():
@@ -315,7 +314,7 @@ def common_test_python2(install_package_fn, install_next_version_fn):
     _assert_rc_d_symlinks_exist()
 
     # make sure that installer has found 'python2'.
-    assert "The default 'python' command not found, will use python2 binary" in stdout
+    assert "The Scalyr Agent will use the default system python2 binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to agent_main_py2.py
     assert _get_current_main_script_name() == "agent_main_py2.py"
@@ -354,8 +353,7 @@ def common_test_python3(install_package_fn, install_next_version_fn):
     _assert_rc_d_symlinks_exist()
 
     # make sure that installer has found 'python3'.
-    assert "The default 'python' command not found, will use python2 binary" in stdout
-    assert "The 'python2' command not found, will use python3 binary" in stdout
+    assert "The Scalyr Agent will use the default system python3 binary" in stdout
 
     # 'scalyr-agent-2-config' command must be a symlink to agent_main_py3.py
     assert _get_current_main_script_name() == "agent_main_py3.py"
