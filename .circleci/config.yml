@@ -2083,9 +2083,11 @@ jobs:
       version: "previous"
       shell: bash
     parameters:
+      # TODO: For some reasons Windows 2016 and 2016 AMI tests take x2 the time to complete with
+      # Python 3.10 so for now we stick with 3.8
       python-version:
         description: Version of the Python interpreter to use.
-        default: 3.10.4
+        default: 3.8.10
         type: string
     steps:
       - checkout
@@ -2177,10 +2179,10 @@ jobs:
 
               $PSDefaultParameterValues['*:ErrorAction']='Stop'
 
-              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe -m pip install -r win32\windows-build-requirements.txt
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe build_package.py win32
+              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
               ThrowOnNativeFailure
 
               mkdir package
