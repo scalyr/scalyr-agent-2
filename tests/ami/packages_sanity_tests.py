@@ -345,9 +345,21 @@ def main(
 
     if paramiko_debug_log:
         import paramiko
+        from libcloud.utils.logging import ExtraLogFormatter
 
-        print("Will store paramiko debug log to file: %s" % (paramiko_debug_log))
+        print(
+            "Will store paramiko and libcloud ssh debug log to file: %s"
+            % (paramiko_debug_log)
+        )
         paramiko.util.log_to_file(filename=paramiko_debug_log, level=logging.DEBUG)
+
+        # Also enable logging for Libcloud SSH module code
+        logger = logging.getLogger("libcloud.compute.ssh")
+
+        handler = logging.FileHandler(paramiko_debug_log)
+        handler.setFormatter(ExtraLogFormatter())
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
 
     # deployment objects for package files will be stored here.
     file_upload_steps = []
