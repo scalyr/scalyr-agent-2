@@ -13,6 +13,10 @@ Kubernetes:
 Docker images:
 * Upgrade Python used by Docker images from 3.8.12 to 3.8.13.
 
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
 Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
 
