@@ -86,19 +86,19 @@ else
     python tests/ami/packages_sanity_tests.py --distro=WindowsServer2016 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi --paramiko-debug-log=outputs/WindowsServer2016-install-paramiko.log &> outputs/WindowsServer2016-install.log &
     python tests/ami/packages_sanity_tests.py --distro=WindowsServer2019 --type=install --to-version=/tmp/workspace/ScalyrAgentInstaller.msi --paramiko-debug-log=outputs/WindowsServer2019-install-paramiko.log &> outputs/WindowsServer2019-install.log &
   elif [ "${TEST_OS}" == "linux" ]; then
-    python tests/ami/packages_sanity_tests.py --distro=ubuntu2204 --type=install --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu2204-install.log &
+    python tests/ami/packages_sanity_tests.py --distro=ubuntu2204 --type=install --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/ubuntu2204-install-paramiko.log  &> outputs/ubuntu2204-install.log &
 
     # Tests below install latest stable version using an installer script and then upgrade to a
     # version which was built as part of a Circle CI job
     # TODO: Uncomment once new release with post / pre install Python version fix has been released
-    #python tests/ami/packages_sanity_tests.py --distro=ubuntu2204 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu2204-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1804-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1604-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/ubuntu1404-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb &> outputs/debian1003-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos7-upgrade.log &
+    #python tests/ami/packages_sanity_tests.py --distro=ubuntu2204 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/ubuntu2204-upgrade-paramiko.log  &> outputs/ubuntu2204-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=ubuntu1804 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/ubuntu1804-upgrade-paramiko.log &> outputs/ubuntu1804-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=ubuntu1604 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/ubuntu1604-upgrade-paramiko.log &> outputs/ubuntu1604-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=ubuntu1404 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/ubuntu1404-upgrade-paramiko.log &> outputs/ubuntu1404-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=debian1003 --type=upgrade --from-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" --to-version=/tmp/workspace/scalyr-agent-2.deb --paramiko-debug-log=outputs/debian1003-upgrade-paramiko.log &> outputs/debian1003-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=centos7 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" --paramiko-debug-log=outputs/centos7-upgrade-paramiko.log &> outputs/centos7-upgrade.log &
     # python tests/ami/packages_sanity_tests.py --distro=centos8 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/centos8-upgrade.log &
-    python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/amazonlinux2-upgrade.log &
+    python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=upgrade --from-version=current --to-version=/tmp/workspace/scalyr-agent-2.rpm --installer-script-url="${INSTALLER_SCRIPT_URL}" --paramiko-debug-log=outputs/amazonlinux2-upgrade-paramiko.log &> outputs/amazonlinux2-upgrade.log &
   fi
 fi
 
