@@ -18,6 +18,11 @@
 #
 # Usage: run-ami-tests-in-bg-sh [stable|development]
 #
+
+echo_with_date() {
+    date +"[%Y-%m-%d %H:%M:%S] $*"
+}
+
 # Create directory which output log files will be saved
 mkdir -p outputs
 
@@ -25,27 +30,27 @@ TEST_TYPE="$1"
 TEST_OS="$2"
 
 if [ -z "${INSTALLER_SCRIPT_URL}" ]; then
-    echo "INSTALLER_SCRIPT_URL environment variable not set"
+    echo_with_date "INSTALLER_SCRIPT_URL environment variable not set"
     exit 1
 fi
 
 if [ "${TEST_TYPE}" != "stable" ] && [ "${TEST_TYPE}" != "development" ]; then
-    echo "Test type: 'stable' or 'development' must be specified."
+    echo_with_date "Test type: 'stable' or 'development' must be specified."
     exit 1
 fi
 
 if [ "${TEST_OS}" != "linux" ] && [ "${TEST_OS}" != "windows" ]; then
-    echo "Test OS: 'linux' or 'windows' must be specified."
+    echo_with_date "Test OS: 'linux' or 'windows' must be specified."
     exit 1
 fi
 
-echo "Running AMI sanity tests concurrently in the background (this may take up to 10 minutes and no output may be produced by this script for up to 5 minutes)..."
-echo "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
-echo ""
+echo_with_date "Running AMI sanity tests concurrently in the background (this may take up to 10 minutes and no output may be produced by this script for up to 5 minutes)..."
+echo_with_date "Using INSTALLER_SCRIPT_URL=${INSTALLER_SCRIPT_URL}"
+echo_with_date ""
 
 # We run sanity test for each image concurrently in background
 if [ "${TEST_TYPE}" == "stable" ]; then
-  echo "Run sanity tests for the stable package versions."
+  echo_with_date "Run sanity tests for the stable package versions."
   # For Windows tests we need to download latest stable version from the repo and use that
   curl -o VERSION -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/VERSION
   LATEST_VERSION=$(cat VERSION)
@@ -73,7 +78,7 @@ if [ "${TEST_TYPE}" == "stable" ]; then
     python tests/ami/packages_sanity_tests.py --distro=amazonlinux2 --type=install --to-version=current --installer-script-url="${INSTALLER_SCRIPT_URL}" &> outputs/amazonlinux2-install.log &
   fi
 else
-  echo "Run sanity tests for the new packages from the current revision."
+  echo_with_date "Run sanity tests for the new packages from the current revision."
 
   if [ "${TEST_OS}" == "windows" ]; then
     # Tests below install package which is built as part of a Circle CI job
@@ -123,7 +128,7 @@ do
     JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}-paramiko.log"
 done
 
-echo ""
+echo_with_date ""
 
 FAIL_COUNTER=0
 
@@ -136,42 +141,42 @@ do
     JOB_LOG_FILE_PATH=${JOBS_LOG_FILE_PATHS[${job_pid}]}
     JOB_PARAMIKO_LOG_FILE_PATH=${JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]}
 
-    echo ""
-    echo "============================================================================================"
-    echo ""
+    echo_with_date ""
+    echo_with_date "============================================================================================"
+    echo_with_date ""
 
     if wait "${job_pid}"; then
-        echo "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo_with_date "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 
-        echo "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" failed: \"${JOB_COMMAND_LINE_ARGS}\"."
-        echo "Showing output from ${JOB_LOG_FILE_PATH}:"
-        echo "--------------------------------------------------------------------------------------"
+        echo_with_date "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" failed: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo_with_date "Showing output from ${JOB_LOG_FILE_PATH}:"
+        echo_with_date "--------------------------------------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
-        echo "--------------------------------------------------------------------------------------"
-        echo "Showing paramiko debug output from ${JOB_PARAMIKO_LOG_FILE_PATH}:"
+        echo_with_date "--------------------------------------------------------------------------------------"
+        echo_with_date "Showing paramiko debug output from ${JOB_PARAMIKO_LOG_FILE_PATH}:"
         cat "${JOB_PARAMIKO_LOG_FILE_PATH}" || true
-        echo "--------------------------------------------------------------------------------------"
+        echo_with_date "--------------------------------------------------------------------------------------"
     fi
 
-    echo ""
-    echo "Jobs still running: $(jobs -p | wc -l)"
-    echo ""
-    echo "============================================================================================"
+    echo_with_date ""
+    echo_with_date "Jobs still running: $(jobs -p | wc -l)"
+    echo_with_date ""
+    echo_with_date "============================================================================================"
 done
 
 # Exit with error if some of the jobs failed.
 if [ "${FAIL_COUNTER}" -ne 0 ];
 then
-    echo ""
-    echo "${FAIL_COUNTER} of the AMI tests failed. Please check the output logs above."
-    echo "NOTE: Output for all the jobs are also available as job build artifacts."
-    echo ""
+    echo_with_date ""
+    echo_with_date "${FAIL_COUNTER} of the AMI tests failed. Please check the output logs above."
+    echo_with_date "NOTE: Output for all the jobs are also available as job build artifacts."
+    echo_with_date ""
     exit 1
 else
-    echo ""
-    echo "All the AMI tests have completed successfully."
-    echo ""
+    echo_with_date ""
+    echo_with_date "All the AMI tests have completed successfully."
+    echo_with_date ""
     exit 0
 fi
