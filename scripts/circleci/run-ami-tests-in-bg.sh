@@ -98,8 +98,12 @@ else
 fi
 
 # Store command line args and log paths for all the jobs for a friendlier output on failure
+JOB_DISTRO_NAMES=()
+JOB_TEST_TYPES=()
 JOBS_COMMAND_LINE_ARGS=()
 JOBS_LOG_FILE_PATHS=()
+
+sleep 4
 
 for job_pid in $(jobs -p)
 do
@@ -108,6 +112,9 @@ do
 
     DISTRO_NAME=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "distro=" '{print $2}' | awk '{print $1}')
     TEST_TYPE=$(echo "${JOB_COMMAND_LINE_ARGS}" | awk -F "type=" '{print $2}' | awk '{print $1}')
+
+    JOB_DISTRO_NAMES[${job_pid}]="${DISTRO_NAME}"
+    JOB_TEST_TYPES[${job_pid}]="${TEST_TYPE}"
 
     JOBS_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}.log"
     JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]="outputs/${DISTRO_NAME}-${TEST_TYPE}-paramiko.log"
@@ -120,6 +127,8 @@ FAIL_COUNTER=0
 # Wait for all the jobs to finish
 for job_pid in $(jobs -p)
 do
+    JOB_TEST_TYPE=${JOB_TEST_TYPES[${job_pid}]}
+    JOB_DISTRO_NAME=${JOB_DISTRO_NAMES[${job_pid}]}
     JOB_COMMAND_LINE_ARGS=${JOBS_COMMAND_LINE_ARGS[${job_pid}]}
     JOB_LOG_FILE_PATH=${JOBS_LOG_FILE_PATHS[${job_pid}]}
     JOB_PARAMIKO_LOG_FILE_PATH=${JOBS_PARAMIKO_LOG_FILE_PATHS[${job_pid}]}
@@ -129,11 +138,11 @@ do
     echo ""
 
     if wait "${job_pid}"; then
-        echo "Job finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" finished successfully: \"${JOB_COMMAND_LINE_ARGS}\"."
     else
         ((FAIL_COUNTER=FAIL_COUNTER+1))
 
-        echo "Job failed: \"${JOB_COMMAND_LINE_ARGS}\"."
+        echo "Job \"${JOB_TEST_TYPE}\" for OS \"${JOB_DISTRO_NAME}\" failed: \"${JOB_COMMAND_LINE_ARGS}\"."
         echo "Showing output from ${JOB_LOG_FILE_PATH}:"
         echo "--------------------------------------------------------------------------------------"
         cat "${JOB_LOG_FILE_PATH}" || true
