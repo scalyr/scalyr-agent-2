@@ -75,6 +75,9 @@ function GetMSIVersion {
 # when it is started as a service.
 [Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "Machine")
 
+# Increase service startup timeout for tests
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control" -Name ServicesPipeTimeout -Value 60000 -Type DWord
+
 $msi_version=GetMSIVersion -MSI .\install_package.msi
 # Method returns an object so we need to cast it to a String
 $msi_version="$msi_version".Trim()
