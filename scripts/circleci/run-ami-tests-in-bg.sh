@@ -103,6 +103,9 @@ JOB_TEST_TYPES=()
 JOBS_COMMAND_LINE_ARGS=()
 JOBS_LOG_FILE_PATHS=()
 
+# NOTE: Circle CI uses pyenv exec to spawn python process so we need to wait here a bit so we
+# capture right command line args to display for JOB_COMMAND_LINE_ARGS variable.
+# This only affects display and nothing else.
 sleep 4
 
 for job_pid in $(jobs -p)
