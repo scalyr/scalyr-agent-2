@@ -325,6 +325,8 @@ class ScalyrAgent(object):
 
         self.__config_file_path = config_file_path
 
+        no_check_remote = command_options.no_check_remote
+
         try:
             log_warnings = command not in ["status", "stop"]
             self.__config = self.__read_and_verify_config(
@@ -369,8 +371,6 @@ class ScalyrAgent(object):
             os.getcwd(),
             command_options.no_change_user,
         )
-
-        no_check_remote = command_options.no_check_remote
 
         # noinspection PyBroadException
         try:
