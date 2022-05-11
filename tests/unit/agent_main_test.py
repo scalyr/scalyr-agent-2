@@ -350,6 +350,59 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     ".*" + re.escape("Warning, skipping copying log lines.")
                 )
 
+    def test_no_check_remote_command_line_option(self):
+        from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use default value of False
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = False
+
+        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
+        self.assertEqual(return_code, 7)
+        agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use overridden value of True
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = True
+
+        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
+        self.assertEqual(return_code, 7)
+        agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
     def test_check_remote_if_no_tty(self):
         from scalyr_agent.agent_main import ScalyrAgent
 
