@@ -1048,6 +1048,15 @@ class K8sPackageBuilder(ContainerPackageBuilder):
     RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
 
 
+class K8sWithOpenMetricsMonitorsPackageBuilder(ContainerPackageBuilder):
+    """
+    An image for running the agent on Kubernetes.
+    """
+
+    PACKAGE_TYPE = constants.PackageType.K8S
+    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent-with-om-monitors"]
+
+
 class DockerJsonPackageBuilder(ContainerPackageBuilder):
     """
     An image for running on Docker configured to fetch logs via the file system (the container log
@@ -1130,5 +1139,16 @@ K8S_CONTAINER_BUILDER_DEBIAN = K8sPackageBuilder(
 K8S_CONTAINER_BUILDER_ALPINE = K8sPackageBuilder(
     name="k8s-alpine",
     config_path=_CONFIGS_PATH / "k8s-config",
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+)
+
+K8S_CONTAINER_WITH_OM_MONITORS_BUILDER_DEBIAN = K8sWithOpenMetricsMonitorsPackageBuilder(
+    name="k8s-with-om-monitors-debian",
+    config_path=_CONFIGS_PATH / "k8s-config-with-om-monitors",
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+)
+K8S_CONTAINER_WITH_OM_MONITORS_BUILDER_ALPINE = K8sWithOpenMetricsMonitorsPackageBuilder(
+    name="k8s-with-om-monitors-alpine",
+    config_path=_CONFIGS_PATH / "k8s-config-with-om-monitors",
     base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
 )

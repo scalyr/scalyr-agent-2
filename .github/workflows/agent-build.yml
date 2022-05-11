@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-with-om-monitors" ]
         image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.12" ]
 
@@ -69,7 +69,7 @@ jobs:
           driver-opts: network=host
 
       - name: Start minikube for the test of the kubernetes build
-        if: matrix.image-type == 'k8s'
+        if: matrix.image-type == 'k8s' || matrix.image-type == 'k8s-with-om-monitors'
         shell: bash
         run: |
           minikube start
@@ -96,11 +96,11 @@ jobs:
           channel: '#cloud-tech'
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' || github.ref == 'refs/heads/new_k8s_om_monitors_docker_image' }}
     needs:
       - test-images
 
-    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
+    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@new_k8s_om_monitors_docker_image
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}
