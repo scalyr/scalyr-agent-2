@@ -383,7 +383,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         mock_command = "inner_run_with_checks"
         mock_command_options = mock.Mock()
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         return_code = agent.main(mock_config_path, mock_command, mock_command_options)
         self.assertEqual(return_code, 7)
@@ -393,7 +393,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to True)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = mock.Mock()
@@ -433,7 +433,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = None
