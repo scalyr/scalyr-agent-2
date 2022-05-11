@@ -466,7 +466,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = True
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = mock.Mock()
@@ -486,7 +486,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = True
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = None
