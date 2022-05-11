@@ -370,8 +370,7 @@ class ScalyrAgent(object):
             command_options.no_change_user,
         )
 
-        if command_options.no_check_remote is not None:
-            no_check_remote = True
+        no_check_remote = command_options.no_check_remote
 
         # noinspection PyBroadException
         try:
