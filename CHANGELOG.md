@@ -16,6 +16,7 @@ Docker images:
 Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
 * Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
 
 Other:
 * Update the code to log non-fatal connection related errors which are retried under WARNING instead of ERROR log level.
