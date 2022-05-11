@@ -26,8 +26,8 @@ echo_with_date() {
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 CLOUD_INIT_RESULT_FILE="/run/cloud-init/result.json"
-# We use higher value for rpm due to often timeouts on Amazon Linux
-MAX_WAIT_COUNTER=40 # we wait a maximum of 40 x 2 seconds for provision to finish
+# We use higher value for rpm due to often timeouts on Amazon Linux 2
+MAX_WAIT_COUNTER=50 # we wait a maximum of 50 x 2 seconds for provision to finish
 
 WAIT_COUNTER=0
 while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_COUNTER} ]; do
