@@ -1,18 +1,58 @@
 apiVersion: v1
 kind: ConfigMap
 data:
-  SCALYR_K8S_CLUSTER_NAME: <your_cluster_name>
-  #
-  # EU customers must uncomment this next line:
-  # SCALYR_SERVER: "https://upload.eu.scalyr.com"
-  #
-  # Define any other environment variables for config variables that are "environment aware".
-  # Most environment variables start with "SCALYR_"
-  # See https://www.scalyr.com/help/scalyr-agent#environmentAware for more details.
-  #
-  # Example:
-  # SCALYR_K8S_EVENTS_DISABLE: "true"
-  #
+  SCALYR_K8S_CLUSTER_NAME: kubecon-2023-demo
+  SCALYR_SERVER: "https://upload.eu.scalyr.com"
+  SCALYR_K8S_EVENTS_DISABLE: "false"
+  SCALYR_K8S_IGNORE_NAMESPACES: ""
 metadata:
   name: scalyr-config
   namespace: scalyr
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scalyr-config-agent-d
+  namespace: scalyr
+data:
+  global-disable-k8s-cert-validation.json: |
+    {
+      "k8s_verify_api_queries": false,
+      "k8s_verify_kubelet_queries": false,
+    }
+  docker.json: |
+    {
+      "monitors": [
+        {
+          "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+        }
+      ]
+    }
+  k8s-events.json: |
+    {
+      "monitors": [
+        {
+          "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+          //"ignore_master": false,
+        }
+      ]
+    }
+  k8s-openmetrics-monitor.json: |
+    {
+        "monitors":
+        [
+            {
+              module:  "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+              include_node_name: true,
+              include_cluster_name: true,
+              logger_include_node_name: false,
+              verify_https: false,
+              scrape_kubernetes_api_metrics: true,
+              kubernetes_api_metrics_scrape_interval: 60,
+              scrape_kubernetes_api_cadvisor_metrics: true,
+              kubernetes_api_cadvisor_metrics_scrape_interval: 60,
+              sample_interval: 60,
+              scrape_interval: 60
+          }
+      ]
+    }

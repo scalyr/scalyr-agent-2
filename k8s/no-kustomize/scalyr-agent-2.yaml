@@ -50,7 +50,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: scalyr/scalyr-k8s-agent:2.1.29
+        image: scalyr/scalyr-k8s-agent:c59a5af444e03ec09df3175483d2a5518f7ecb5e
         imagePullPolicy: Always
         name: scalyr-agent
         resources:
@@ -59,6 +59,8 @@ spec:
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
+        - name: scalyr-config-agent-d
+          mountPath: /etc/scalyr-agent-2/agent.d
         - mountPath: /var/lib/docker/containers
           name: varlibdockercontainers
           readOnly: true
@@ -89,6 +91,9 @@ spec:
       serviceAccountName: scalyr-service-account
       terminationGracePeriodSeconds: 30
       volumes:
+      - name: scalyr-config-agent-d
+        configMap:
+          name: scalyr-config-agent-d
       - hostPath:
           path: /var/lib/docker/containers
           type: ""
