@@ -128,7 +128,7 @@ class LogVerifier:
                 )
                 raise TimeoutError(
                     f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}.\n"
-                    "Logs accumulated so far:\n\n{self._content}"
+                    f"Logs accumulated so far:\n\n{self._content}"
                 )
 
             # Get new content of the log file.
