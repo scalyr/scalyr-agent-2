@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.30 "TBD" - May 12, 2022
+## 2.1.30 "Heturn" - May 12, 2022
 
 <!---
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
@@ -9,6 +9,7 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
 
 Kubernetes:
 * Agent has been updated to periodically try to re-read Kubernetes authentication token value from ``/var/run/secrets/kubernetes.io/serviceaccount/token`` file on disk (every 5 minutes by default). This way agent also supports Kubernetes deployments where token files are periodically automatically refreshed / rotated (e.g. https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection).
+* Fix an edge case with handling empty ``resourceVersion`` value in the Kubernetes Events Monitor.
 
 Docker images:
 * Upgrade Python used by Docker images from 3.8.12 to 3.8.13.

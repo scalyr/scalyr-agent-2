@@ -128,7 +128,7 @@ jobs:
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="8"
+          export RETRY_ATTEMPTS="10"
           export SLEEP_DELAY="10"
 
           # Verify agent is running

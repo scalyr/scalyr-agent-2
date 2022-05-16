@@ -774,7 +774,14 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                             resource_version = metadata.get("resourceVersion", None)
                             if resource_version is not None:
                                 resource_version = int(resource_version)
-                            if resource_version and resource_version <= last_resource:
+
+                            # NOTE: In some scenarios last_resource can be None.
+                            # In such scenario, we skip this check
+                            if (
+                                resource_version
+                                and last_resource
+                                and resource_version <= last_resource
+                            ):
                                 global_log.log(
                                     scalyr_logging.DEBUG_LEVEL_2,
                                     "Skipping older resource events",
