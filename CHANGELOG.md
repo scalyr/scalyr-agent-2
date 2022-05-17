@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.31 "TBD" - TBD, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on June 17, 2022 23:04 -0800
+--->
+
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
+Bug fixes:
+* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
+
 ## 2.1.30 "Heturn" - May 17, 2022
 
 <!---
@@ -14,14 +28,8 @@ Kubernetes:
 Docker images:
 * Upgrade Python used by Docker images from 3.8.12 to 3.8.13.
 
-Windows:
-* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
-* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
-
 Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
-* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
-* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
 
 Other:
 * Update the code to log connection related errors which are retried and are not fatal under WARNING instead of ERROR log level.
