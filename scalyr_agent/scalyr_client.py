@@ -578,7 +578,7 @@ class ScalyrClientSession(object):
                     hasattr(error, "errno")
                     and error.errno is not None  # pylint: disable=no-member
                 ):
-                    log.error(
+                    log.warning(
                         'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                         "will re-attempt",
                         self.__full_address,
@@ -638,7 +638,7 @@ class ScalyrClientSession(object):
 
                 bytes_received = len(response)
             except six.moves.http_client.HTTPException as httpError:
-                log.error(
+                log.warning(
                     "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
                     % (httpError.__class__.__name__),
                     error_code="requestFailed",
@@ -651,7 +651,7 @@ class ScalyrClientSession(object):
                     hasattr(error, "errno")
                     and error.errno is not None  # pylint: disable=no-member
                 ):
-                    log.error(
+                    log.warning(
                         'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
                         "connection, will re-attempt",
                         self.__full_address,
@@ -680,7 +680,7 @@ class ScalyrClientSession(object):
             )
 
             if status_code == 429:
-                log.error(
+                log.warning(
                     'Received "too busy" response from server.  Will re-attempt',
                     error_code="serverTooBusy",
                 )
@@ -688,7 +688,7 @@ class ScalyrClientSession(object):
 
             # If we got back an empty result, that often means the connection has been closed or reset.
             if len(response) == 0:
-                log.error(
+                log.warning(
                     "Received empty response, server may have reset connection.  Will re-attempt",
                     error_code="emptyResponse",
                 )
