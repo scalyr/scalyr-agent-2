@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.1.30 "Heturn" - May 17, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
 --->
 
 Kubernetes:
