@@ -350,8 +350,78 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     ".*" + re.escape("Warning, skipping copying log lines.")
                 )
 
+    def test_no_check_remote_command_line_option(self):
+        from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use default value of False
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = False
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use overridden value of True
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = True
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
     def test_check_remote_if_no_tty(self):
         from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+        mock_isatty_false = mock.Mock(return_value=False)
 
         mock_config = mock.Mock()
 
@@ -374,31 +444,41 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         mock_command_options = mock.Mock()
         mock_command_options.no_check_remote = True
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
 
         # tty is available, command option is not set, should default to False
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
         mock_command = "inner_run_with_checks"
         mock_command_options = mock.Mock()
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
 
         # tty is not available (stdout.isatty returns False), should use check_remote_if_no_tty
         # config option value (config option is set to True)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
-        mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = True
 
@@ -413,12 +493,11 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = False
 
@@ -433,7 +512,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = None
