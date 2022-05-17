@@ -414,13 +414,34 @@ class Configuration(object):
 
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
-            # add in the profile log if we have enabled profiling
-            if self.enable_profiling:
+            # add in the profile logs if we have enabled profiling
+            if self.enable_profiling and self.__log_warnings:
+                self.__logger.info(
+                    "Profiling is enabled, will ingest CPU profiling (%s) and memory "
+                    "profiling (%s) data by default"
+                    % (self.profile_log_name, self.memory_profile_log_name),
+                    limit_once_per_x_secs=86400,
+                    limit_key="profiling-enabled-ingest",
+                )
+
+                # 1. CPU profiling
                 profile_config = JsonObject(
                     path=self.profile_log_name,
                     copy_from_start=True,
                     staleness_threshold_secs=20 * 60,
-                    parser="scalyrAgentProfiling",
+                    parser="scalyrAgentCpuProfiling",
+                )
+                self.__verify_log_entry_and_set_defaults(
+                    profile_config, description="CPU profile log config"
+                )
+                self.__log_configs.append(profile_config)
+
+                # 2. Memory profiling
+                profile_config = JsonObject(
+                    path=self.memory_profile_log_name,
+                    copy_from_start=True,
+                    staleness_threshold_secs=20 * 60,
+                    parser="scalyrAgentMemoryProfiling",
                 )
                 self.__verify_log_entry_and_set_defaults(
                     profile_config, description="CPU profile log config"
@@ -656,6 +677,7 @@ class Configuration(object):
         @param other_config: Another configuration option.  If not None, this function will
         only print configuration options that are different between the two objects.
         """
+        # TODO/NOTE: This code doesn't handle JsonArray's correctly
         options = [
             "verify_server_certificate",
             "ca_cert_path",
@@ -962,6 +984,10 @@ class Configuration(object):
     @property
     def k8s_service_account_namespace(self):
         return self.__get_config().get_string("k8s_service_account_namespace")
+
+    @property
+    def k8s_token_re_read_interval(self):
+        return self.__get_config().get_int("k8s_token_re_read_interval")
 
     @property
     def k8s_log_api_responses(self):
@@ -1584,6 +1610,31 @@ class Configuration(object):
         return self.__get_config().get_int("full_checkpoint_interval_in_seconds")
 
     @property
+    def ignore_checkpoints_on_startup_path_globs(self):
+        """
+        Returns the configuration value for 'ignore_checkpoints_on_startup_path_globs'.
+
+        This config option allows user to specify a list of path globs for file paths which
+        checkpoint data is ignored when reading checkpoints state on agent startup.
+
+        This comes handy in situations where checkpoint file is persisted across runs (e.g. in a
+        default Kubernetes deployment where we want to persist checkpoints for actual container
+        logs which are stored on the host and are persisted across pod restarts to avoid duplicate
+        data on restart), but not all the files which are referenced in the checkpoints file as
+        also persisted across restarts.
+
+        An example of such log files are agent log files which are ephemeral to the container and
+        stored in /var/log/scalyr-agent-2/*.log.
+
+        We don't want to re-use previous checkpoints for those files on agent restart (new pod
+        creation) since they are invalid and refer to old log files from a previous container so
+        we simply ignore those are ingest those logs from the begining.
+        """
+        return self.__get_config().get_json_array(
+            "ignore_checkpoints_on_startup_path_globs"
+        )
+
+    @property
     def minimum_scan_interval(self):
         """Returns the configuration value for 'minimum_scan_interval'."""
         return self.__get_config().get_int(
@@ -2182,6 +2233,16 @@ class Configuration(object):
             env_aware=True,
         )
 
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "ignore_checkpoints_on_startup_path_globs",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
+
         self.__verify_or_set_optional_string(
             config,
             "max_send_rate_enforcement",
@@ -2365,7 +2426,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "max_sequence_number",
-            1024 ** 4,
+            1024**4,
             description,
             apply_defaults,
             env_aware=True,
@@ -2711,6 +2772,15 @@ class Configuration(object):
             config,
             "k8s_service_account_namespace",
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # In seconds, defaults to every 5 minutes
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_token_re_read_interval",
+            5 * 60,
             description,
             apply_defaults,
             env_aware=True,

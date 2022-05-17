@@ -22,6 +22,7 @@ import re
 import time
 import warnings
 import platform
+import tempfile
 from string import Template
 from collections import OrderedDict
 
@@ -35,6 +36,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sNamespaceFilter,
     PodInfo,
 )
+
 from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
@@ -49,6 +51,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     ContainerChecker,
     _ignore_old_dead_container,
     construct_metrics_container_name,
+    CRIEnumerator,
 )
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
@@ -56,11 +59,14 @@ from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
+from tests.unit.monitor_utils.k8s_test import KubernetesApi
 from tests.unit.configuration_test import TestConfigurationBase
 from tests.unit.copying_manager_tests.copying_manager_test import FakeMonitor
 from scalyr_agent.test_base import skipIf
 
 import mock
+import requests
+import requests_mock
 from mock import patch
 from six.moves import range
 
@@ -1165,3 +1171,297 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
                 "monitor": None,
             },
         )
+
+
+class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
+    def test_get_containers_with_caching_and_dynamic_pod_metadata_update(self):
+        """
+        Mocking based test case which verifies that CRIEnumerator._get_containers() correctly
+        handles dynamic pod metadata updates when working with KubernetesCache.
+
+        Keep in mind that this method just exercised the public API of KubernetesCache and assumes
+        KubernetesCache expiration logic is implemented correctly (that's verified by a separate
+        test case for that abstraction).
+        """
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        pod_info_1 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={},
+            container_names=["random-logger"],
+            annotations={"log.config.scalyr.com/attributes.parser": "test-4"},
+            controller=None,
+        )
+        pod_info_2 = PodInfo(
+            name="loggen-58c5486566-fdmzf",
+            namespace="default",
+            uid="5ef12d19-d8e5-4280-9cdf-a80bae251c68",
+            node_name="test-node",
+            labels={},
+            container_names=["random-logger"],
+            annotations={"log.config.scalyr.com/attributes.parser": "test-5"},
+            controller=None,
+        )
+
+        def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
+            result = [("loggen-58c5486566-fdmzf", "default", "random-logger", "cont-1")]
+            return result
+
+        k8s_cache = mock.Mock()
+        k8s_cache.pod_access_counter = 0
+
+        def mock_k8s_cache_pod(
+            namespace,
+            name,
+            current_time=None,
+            allow_expired=True,
+            query_options=None,
+            ignore_k8s_api_exception=True,
+        ):
+            self.assertFalse(
+                allow_expired,
+                "allow_expired needs to be False for dynamic updates to work correctly",
+            )
+
+            if k8s_cache.pod_access_counter == 0:
+                result = pod_info_1
+            elif k8s_cache.pod_access_counter == 1:
+                result = pod_info_2
+            else:
+                raise AssertionError("Unsupported counter value")
+
+            k8s_cache.pod_access_counter += 1
+            return result
+
+        k8s_cache.pod.side_effect = mock_k8s_cache_pod
+
+        cri = CRIEnumerator(
+            global_config=global_config,
+            agent_pod=mock.Mock,
+            k8s_api_url="mock",
+            query_filesystem=True,
+            node_name="node-1",
+            kubelet_api_host_ip="localhost",
+            kubelet_api_url_template="https://${host_ip}:10250",
+        )
+        cri._get_containers_from_filesystem = mock_get_containers_from_filesystem
+        self.assertEqual(k8s_cache.pod_access_counter, 0)
+
+        result = cri._get_containers(k8s_cache=k8s_cache)
+        self.assertEqual(k8s_cache.pod_access_counter, 1)
+        self.assertEqual(
+            result["cont-1"]["k8s_info"]["pod_info"].annotations,
+            {"log.config.scalyr.com/attributes.parser": "test-4"},
+        )
+
+        self.assertEqual(k8s_cache.pod_access_counter, 1)
+        result = cri._get_containers(k8s_cache=k8s_cache)
+        self.assertEqual(k8s_cache.pod_access_counter, 2)
+        self.assertEqual(
+            result["cont-1"]["k8s_info"]["pod_info"].annotations,
+            {"log.config.scalyr.com/attributes.parser": "test-5"},
+        )
+
+
+class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTestCase):
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=1)
+
+        token_file_path = self._write_mock_config(token_re_read_interval=1)
+
+        # Write initial token value
+        self._write_mock_token(token_file_path, "token1")
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        k8s = KubernetesApi.create_instance(global_config=global_config)
+
+        # 1. On initial read we should read first token
+        self.assertEqual(k8s.token, "token1")
+        self.assertEqual(k8s.token, "token1")
+        self.assertEqual(k8s.token, "token1")
+
+        # Update the token
+        self._write_mock_token(token_file_path, "token2")
+
+        self.assertEqual(k8s.token, "token1")
+
+        # 2. After the token has been updated, the code should eventually re-read a new token
+        mock_time.advance_time(increment_by=2)
+
+        self.assertEqual(k8s.token, "token2")
+        self.assertEqual(k8s.token, "token2")
+
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_kubernetes_api_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=1)
+
+        token_file_path = self._write_mock_config(token_re_read_interval=1)
+
+        # Write initial token value
+        self._write_mock_token(token_file_path, "k8s-token1")
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        session = requests.Session()
+        adapter = requests_mock.Adapter()
+        session.mount("mock://", adapter)
+
+        expected_headers_token = ""
+
+        def custom_request_matcher(request):
+            """
+            Custom matcher which verify headers contain the correct auth token.
+            """
+            return "Authorization" in request.headers and request.headers[
+                "Authorization"
+            ] == "Bearer %s" % (expected_headers_token)
+
+        adapter.register_uri(
+            "GET",
+            "mock://test.com/test?pretty=0",
+            text="{}",
+            additional_matcher=custom_request_matcher,
+        )
+
+        k8s_api_url = "mock://test.com"
+
+        k8s = KubernetesApi.create_instance(
+            global_config=global_config,
+            k8s_api_url=k8s_api_url,
+            verify_api_queries=False,
+        )
+        k8s._session = session
+
+        # Token is read lazily on first request
+        expected_headers_token = "k8s-token1"
+
+        self.assertIsNone(k8s._token)
+        k8s.query_api("/test")
+
+        # Verify token has been read on initial request
+        self.assertEqual(k8s._token, "k8s-token1")
+
+        # Write a new token and verify it will be read after the timeout has been reached
+        self._write_mock_token(token_file_path, "k8s-token2")
+
+        k8s.query_api("/test")
+        self.assertEqual(k8s._token, "k8s-token1")
+
+        # Increment time simulate timeout being reached
+        mock_time.advance_time(increment_by=2)
+
+        expected_headers_token = "k8s-token2"
+
+        k8s.query_api("/test")
+        self.assertEqual(k8s._token, "k8s-token2")
+
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    @mock.patch("scalyr_agent.monitor_utils.k8s.time", new_callable=FakeClock)
+    def test_kubelet_api_re_read_token_every_x_seconds(self, mock_time):
+        mock_time.advance_time(set_to=5)
+
+        token_file_path = self._write_mock_config(token_re_read_interval=5)
+
+        # Write initial token value
+        self._write_mock_token(token_file_path, "kubelet-token1")
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        session = requests.Session()
+        adapter = requests_mock.Adapter()
+        session.mount("mock://", adapter)
+
+        expected_headers_token = ""
+
+        def custom_request_matcher(request):
+            """
+            Custom matcher which verify headers contain the correct auth token.
+            """
+            return "Authorization" in request.headers and request.headers[
+                "Authorization"
+            ] == "Bearer %s" % (expected_headers_token)
+
+        adapter.register_uri(
+            "GET",
+            "mock://test.com:10250/test",
+            text="{}",
+            additional_matcher=custom_request_matcher,
+        )
+
+        k8s_api_url = "mock://test.com"
+
+        k8s = KubernetesApi.create_instance(
+            global_config=global_config,
+            k8s_api_url=k8s_api_url,
+            verify_api_queries=False,
+        )
+        k8s._session = session
+
+        kubelet_url_template = Template("mock://${host_ip}:10250")
+
+        kubelet = KubeletApi(
+            k8s=k8s,
+            host_ip="test.com",
+            node_name="node-1",
+            verify_https=False,
+            kubelet_url_template=kubelet_url_template,
+        )
+        kubelet._session = session
+
+        # Token is read lazily on first request
+        expected_headers_token = "kubelet-token1"
+
+        self.assertIsNone(k8s._token)
+        kubelet.query_api("/test")
+
+        # Verify token has been read on initial request
+        self.assertEqual(k8s._token, "kubelet-token1")
+
+        # Write a new token and verify it will be read after the timeout has been reached
+        self._write_mock_token(token_file_path, "kubelet-token2")
+
+        kubelet.query_api("/test")
+        self.assertEqual(k8s._token, "kubelet-token1")
+
+        mock_time.advance_time(increment_by=6)
+        expected_headers_token = "kubelet-token2"
+
+        kubelet.query_api("/test")
+        self.assertEqual(k8s._token, "kubelet-token2")
+
+    def _write_mock_config(self, token_re_read_interval=1):
+        _, token_file_path = tempfile.mkstemp()
+
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            k8s_service_account_token: "%s"
+            k8s_token_re_read_interval: %s,
+          }
+        """
+            % (token_file_path, token_re_read_interval)
+        )
+
+        return token_file_path
+
+    def _write_mock_token(self, file_path, token):
+        with open(file_path, "w") as fp:
+            fp.write(token)

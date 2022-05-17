@@ -21,6 +21,7 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
+import argparse
 import errno
 import fcntl
 import sys
@@ -103,20 +104,20 @@ class PosixPlatformController(PlatformController):
         return True
 
     def add_options(self, options_parser):
+        # type: (argparse.ArgumentParser) -> None
         """Invoked by the main method to allow the platform to add in platform-specific options to the
         OptionParser used to parse the commandline options.
 
         @param options_parser:
         @type options_parser: optparse.OptionParser
         """
-        options_parser.add_option(
+        options_parser.add_argument(
             "-p",
             "--pid-file",
             dest="pid_file",
             help="The path storing the running agent's process id.  Only used if config cannot be parsed.",
         )
-        options_parser.add_option(
-            "",
+        options_parser.add_argument(
             "--no-change-user",
             action="store_true",
             dest="no_change_user",
@@ -127,6 +128,7 @@ class PosixPlatformController(PlatformController):
         )
 
     def consume_options(self, options):
+        # type: (argparse.Namespace) -> None
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
 
@@ -290,6 +292,11 @@ class PosixPlatformController(PlatformController):
         # Do the first fork.
 
         debug_logger("Forking service")
+
+        # Flush standard outputs before the fork. If not flushed, then all output, that is done before fork,
+        # will be duplicated by child process.
+        sys.stdout.flush()
+        sys.stderr.flush()
         try:
             pid = os.fork()
             if pid > 0:
@@ -740,7 +747,7 @@ class PosixPlatformController(PlatformController):
                 return 1
 
         if not quiet:
-            # Warning, do not change this output.  The config_main.py file looks for this message when
+            # Warning, do not change this output.  The agent_config.py file looks for this message when
             # upgrading a tarball install to make sure the agent was running.
             print("Agent has stopped.")
 
@@ -949,7 +956,7 @@ class PidfileManager(object):
 
         # If the pid file was locked, we know the agent is still running.
         if was_locked:
-            self._log("Checked pidfile: exists")
+            self._log("Checked pidfile: exists (contains PID: {})".format(pid))
             return pid
 
         # If contents contains a single item (the pid), then we are using the latest version of the pidfile which

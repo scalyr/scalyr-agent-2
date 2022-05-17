@@ -229,9 +229,9 @@ define_config_option(
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API. This is only used when `mode` is set to `docker` to look up container "
     "names by their ids.  WARNING, you must also set the `api_socket` configuration option in the "
-    "docker monitor to this same value.\n"
+    "docker monitor to this same value."
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using "
-    "the -v parameter, e.g.\n"
+    "the -v parameter, e.g."
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
@@ -341,8 +341,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "tcp_message_delimiter",
-    "Which character sequence to use for a message delimiter / suffix (defaults to \\n). Some "
-    "implementations such as Python syslog handler one utilize null character (\\000) which allows "
+    "Which character sequence to use for a message delimiter / suffix (defaults to \\ n). Some "
+    "implementations such as Python syslog handler one utilize null character (\\ 000) which allows "
     "messages to contain new lines without using framing. If that is the case for you, set this "
     "option to \\000. Keep in mind that this value needs to be escaped when specified in the "
     "config option which means you need to use two backslashes instead of one.",

@@ -1,18 +1,81 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.27 "" - Feb 12, 2022
+## 2.1.31 "TBD" - May 17, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 12, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
+--->
+
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
+Bug fixes:
+* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
+
+## 2.1.30 "Heturn" - May 17, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
+--->
+
+Kubernetes:
+* Agent has been updated to periodically try to re-read Kubernetes authentication token value from ``/var/run/secrets/kubernetes.io/serviceaccount/token`` file on disk (every 5 minutes by default). This way agent also supports Kubernetes deployments where token files are periodically automatically refreshed / rotated (e.g. https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection).
+* Fix an edge case with handling empty ``resourceVersion`` value in the Kubernetes Events Monitor.
+
+Docker images:
+* Upgrade Python used by Docker images from 3.8.12 to 3.8.13.
+
+Bug fixes:
+* Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
+
+Other:
+* Update the code to log connection related errors which are retried and are not fatal under WARNING instead of ERROR log level.
+* Update agent start up log message to use format which is supported by the agent message parser.
+
+## 2.1.29 "Auter" - Mar 15, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 15, 2022 23:04 -0800
+--->
+
+Docker images:
+* Kubernetes Docker image (``scalyr-k8s-agent``) has been updated to ignore checkpoint data for ephemeral log files (anything matching ``/var/log/scalyr-agent-2/*.log``) on agent start up. Those log files are ephemeral (aka only available during container runtime) which means we don't want to re-use checkpoints for those log files across pod restarts (recreations). Previously, those checkpoints were preserved across restarts which meant that on subsequent pod restarts some of the early internal agent log messages produced by the agent during start up phase were not ingested.
+
+Bug fixes:
+* Kubernetes monitor now correctly dynamically detects pod metadata changes (e.g. annotations) when using containerd runtime. Previously metadata updates were not detected dynamically which meant agent needed to be restarted to pick up any metadata changes (such as Scalyr related annotations).
+
+## 2.1.28 "Dryria" - Feb 23, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 23, 2022 23:04 -0800
+--->
+
+Improvements:
+* Docker and Kubernetes monitors now support parsing date and time information from the container log lines with custom timezones (aka non UTC).
+
+Docker images:
+* Docker images now include udatetime time dependency which should speed up parsing date and time information from Docker container log lines.
+* Upgrade zstandard and orjson dependency used by the Docker image.
+
+## 2.1.27 "Thonia" - Jan 27, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 27, 2022 23:04 -0800
 --->
 
 Improvements:
 * Add new ``debug_level_logger_names`` config option. With this config option user can specify a list of logger names for which to set debug log level for. Previously user could only set debug level for all the loggers. This comes handy when we want to set debug level for a single of subset of loggers (e.g. for a single monitor).
+* If profiling is enabled (``enable_profiling`` configuration option), memory profiling data will be ingested by default (CPU profiling data was already being ingested when profiling was enabled, but not memory one).
 
 Docker images:
 * Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
-* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye.
+* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye (11).
+
+Bug fixes:
+* Fix a bug with the URL monitor not working correctly with POST methods when ``request_data`` was specified under Python 3.
 
 Other:
 * Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.

@@ -27,9 +27,12 @@ import datetime
 
 from libcloud.utils.iso8601 import parse_date
 
+# pylint: disable=import-error
 from packages_sanity_tests import INSTANCE_NAME_STRING
 from packages_sanity_tests import get_libcloud_driver
 from packages_sanity_tests import destroy_node_and_cleanup
+
+# pylint: enable=import-error
 
 #  from packages_sanity_tests import destroy_node_and_cleanup
 

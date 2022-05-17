@@ -26,7 +26,8 @@ echo_with_date() {
 # Give it some time to finish provisioning process. It's possible that we can SSH in before
 # cloud-init fully finished
 CLOUD_INIT_RESULT_FILE="/run/cloud-init/result.json"
-MAX_WAIT_COUNTER=30 # we wait a maximum of 30 x 2 seconds for provision to finish
+# We use higher value for rpm due to often timeouts on Amazon Linux 2
+MAX_WAIT_COUNTER=50 # we wait a maximum of 50 x 2 seconds for provision to finish
 
 WAIT_COUNTER=0
 while [ ! -f "${CLOUD_INIT_RESULT_FILE}" ] && [ ${WAIT_COUNTER} -lt ${MAX_WAIT_COUNTER} ]; do
@@ -37,6 +38,8 @@ done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     echo_with_date "Provisioning didn't finish in 60 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "/var/log/cloud-init-output.log log file content"
+    cat "/var/log/cloud-init-output.log" || true
     exit 1
 fi
 
@@ -56,6 +59,17 @@ echo_with_date ""
 id
 echo_with_date ""
 echo_with_date "==========================="
+
+# If it is a centos 8, then change repo source to centos vault.
+# That is needed because centos 8 is EOL and its repos are not maintained.
+if grep 'PRETTY_NAME="CentOS Linux 8 (Core)"' /etc/os-release; then
+  sudo sed 's~mirror.centos.org~vault.centos.org~g'  -i /etc/yum.repos.d/CentOS-Base.repo
+  sudo sed 's~mirror.centos.org~vault.centos.org~g'  -i /etc/yum.repos.d/CentOS-AppStream.repo
+  sudo sed 's~#baseurl~baseurl~g'  -i /etc/yum.repos.d/CentOS-Base.repo
+  sudo sed 's~#baseurl~baseurl~g'  -i /etc/yum.repos.d/CentOS-AppStream.repo
+  sudo sed 's~mirrorlist=~#mirrorlist=~g'  -i /etc/yum.repos.d/CentOS-Base.repo
+  sudo sed 's~mirrorlist=~#mirrorlist=~g'  -i /etc/yum.repos.d/CentOS-AppStream.repo
+fi
 
 sudo yum install -y wget iptables-services
 sudo yum install -y "{{python_package}}"
@@ -145,8 +159,8 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify build_info file with build metadata is present
 echo_with_date ""
-echo_with_date "Verifying build_info file exists"
-cat /usr/share/scalyr-agent-2/build_info || (echo_with_date "build_info file is missing" ; exit 1)
+echo_with_date "Verifying install_info.json file exists"
+cat /usr/share/scalyr-agent-2/py/scalyr_agent/install_info.json || (echo_with_date "install_info.json file is missing" ; exit 1)
 echo_with_date ""
 
 # Verify rc*.d symlinks are in place

@@ -195,7 +195,9 @@ def get_logger_names():
     """
     Return name of all the currently instantiated and valid loggers.
     """
+    # pylint: disable=no-member
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    # pylint: enable=no-member
     logger_names = [logger.name for logger in loggers]
     return logger_names
 
@@ -373,6 +375,7 @@ class AgentLogger(logging.Logger):
         extra_fields=None,
         monitor=None,
         monitor_id_override=None,
+        timestamp=None,
     ):
         """Emits a metric and its value to the underlying log to be transmitted to Scalyr.
 
@@ -398,6 +401,9 @@ class AgentLogger(logging.Logger):
             of reporting this one value.  The base monitor name will remain unchanged.
         @type metric_name: six.text_type
         @raise UnsupportedValueType: If the value type is not one of the supported types.
+        @param timestamp: Optional timestamp in milliseconds to use for this log record. If not specified, it uses
+            current time when creating a Record object. Comes handy when you want to use the same timestamp for
+            multiple metrics.
         """
         if monitor is None:
             monitor = self.__monitor
@@ -462,6 +468,7 @@ class AgentLogger(logging.Logger):
             string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
+            timestamp=timestamp,
         )
         string_buffer.close()
 
@@ -482,6 +489,7 @@ class AgentLogger(logging.Logger):
         monitor_id_override=None,
         force_stdout=False,
         force_stderr=False,
+        timestamp=None,
     ):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
@@ -554,8 +562,14 @@ class AgentLogger(logging.Logger):
         else:
             __thread_local__.last_error_for_monitor = None
 
+        extra = extra or {}
+        # TODO / NOTE: Add support for using timestamp from "extra_fields" field for metrics
+        # (if available)
+        if timestamp:
+            extra["timestamp"] = timestamp
+
         # pylint: disable=assignment-from-no-return
-        if extra is not None:
+        if extra:
             result = logging.Logger._log(self, level, msg, args, exc_info, extra)
         elif exc_info is not None:
             result = logging.Logger._log(self, level, msg, args, exc_info)
@@ -629,6 +643,14 @@ class AgentLogger(logging.Logger):
             result.metric_log_for_monitor.increment_counter(reported_lines=1)
         if result.error_for_monitor is not None:
             result.error_for_monitor.increment_counter(errors=1)
+
+        # If custom timestamp is provided we use that
+        timestamp = getattr(result, "timestamp", None)
+        if timestamp:
+            timestamp_s = timestamp / 1000
+            timestamp_ms = timestamp % 1000
+            result.created = timestamp_s
+            result.msecs = timestamp_ms
 
         if self.__keep_last_record:
             self.__last_record = result
@@ -879,10 +901,13 @@ class BaseFormatter(logging.Formatter):
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
         if getattr(record, "rate_limited_dropped_records", 0) > 0:
-            result = ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s" % (
-                record.rate_limited_dropped_records,
-                "monitor_log_write_rate",
-                logging.Formatter.format(self, record),
+            result = (
+                ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
+                % (
+                    record.rate_limited_dropped_records,
+                    "monitor_log_write_rate",
+                    logging.Formatter.format(self, record),
+                )
             )
         else:
             result = logging.Formatter.format(self, record)
@@ -1871,10 +1896,14 @@ class UnsupportedValueType(Exception):
                 % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
-            message = 'Unsupported metric value type of "%s" with value "%s" for metric="%s". ' "Only int, long, float, and str are supported." % (
-                six.text_type(type(metric_value)),
-                six.text_type(metric_value),
-                metric_name,
+            message = (
+                'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
+                "Only int, long, float, and str are supported."
+                % (
+                    six.text_type(type(metric_value)),
+                    six.text_type(metric_value),
+                    metric_name,
+                )
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (

@@ -56,6 +56,8 @@ from scalyr_agent.line_matcher import LineMatcher
 
 from scalyr_agent.scalyr_client import Event
 
+from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch
+
 # 2->TODO use io library
 from io import BytesIO
 from os import listdir
@@ -98,7 +100,7 @@ def _parse_cri_log(line):
         return None, None, None, None
 
     # parse the timestamp
-    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(line[:index])
+    timestamp = rfc3339_to_nanoseconds_since_epoch(line[:index])
     if timestamp is None:
         return None, None, None, None
 
@@ -710,9 +712,7 @@ class LogFileIterator(object):
                 original_timestamp = attrs.pop(self.__json_timestamp_key, None)
 
                 if original_timestamp:
-                    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                        original_timestamp
-                    )
+                    timestamp = rfc3339_to_nanoseconds_since_epoch(original_timestamp)
 
                     if (
                         self.__include_raw_timestamp_field

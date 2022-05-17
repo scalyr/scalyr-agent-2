@@ -18,6 +18,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import json
+
 from flask import request
 
 try:
@@ -26,6 +28,7 @@ except ImportError:
     from scalyr_agent.__scalyr__ import SCALYR_VERSION
 
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
+from scalyr_agent.json_lib.objects import JsonArray
 from scalyr_agent.test_base import ScalyrMockHttpServerTestCase
 
 import mock
@@ -42,6 +45,14 @@ def assert_user_agent_header():
 def mock_view_func_200():
     assert_user_agent_header()
     return "yay, success!"
+
+
+def mock_view_func_200_post():
+    assert request.headers["key1"] == "value1"
+    assert request.headers["Content-Type"] == "application/json"
+    assert request.json == {"foo": "bar", "bar": "baz"}
+    assert_user_agent_header()
+    return "yay, success post!"
 
 
 def mock_view_func_200_multiline():
@@ -67,6 +78,11 @@ class UrLMonitorTest(ScalyrMockHttpServerTestCase):
         # Register mock route
         cls.mock_http_server_thread.app.add_url_rule(
             "/200", view_func=mock_view_func_200
+        )
+        cls.mock_http_server_thread.app.add_url_rule(
+            "/200_post",
+            view_func=mock_view_func_200_post,
+            methods=["POST"],
         )
         cls.mock_http_server_thread.app.add_url_rule(
             "/200_long", view_func=mock_view_func_200_long_response
@@ -209,3 +225,35 @@ class UrLMonitorTest(ScalyrMockHttpServerTestCase):
         self.assertEqual(call_kwargs["extra_fields"]["url"], url)
         self.assertEqual(call_kwargs["extra_fields"]["status"], 500)
         self.assertEqual(call_kwargs["extra_fields"]["request_method"], "GET")
+
+    def test_gather_sample_200_success_POST_with_data(self):
+        url = "http://%s:%s/200_post" % (
+            self.mock_http_server_thread.host,
+            self.mock_http_server_thread.port,
+        )
+
+        monitor_config = {
+            "module": "shell_monitor",
+            "url": url,
+            "request_method": "POST",
+            "max_characters": 100,
+            "request_headers": JsonArray(
+                {"header": "Content-Type", "value": "application/json"},
+                {"header": "key1", "value": "value1"},
+            ),
+            "request_data": json.dumps({"foo": "bar", "bar": "baz"}),
+        }
+        mock_logger = mock.Mock()
+        monitor = UrlMonitor(monitor_config, mock_logger)
+
+        monitor.gather_sample()
+        call_args_list = mock_logger.emit_value.call_args_list[0]
+        call_args = call_args_list[0]
+        call_kwargs = call_args_list[1]
+
+        self.assertEqual(mock_logger.error.call_count, 0)
+        self.assertEqual(call_args[0], "response")
+        self.assertEqual(call_args[1], "yay, success post!")
+        self.assertEqual(call_kwargs["extra_fields"]["url"], url)
+        self.assertEqual(call_kwargs["extra_fields"]["status"], 200)
+        self.assertEqual(call_kwargs["extra_fields"]["request_method"], "POST")

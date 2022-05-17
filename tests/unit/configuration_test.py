@@ -290,7 +290,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.max_line_size, 49900)
         self.assertEquals(config.max_log_offset_size, 200000000)
         self.assertEquals(config.max_existing_log_offset_size, 200000000)
-        self.assertEquals(config.max_sequence_number, 1024 ** 4)
+        self.assertEquals(config.max_sequence_number, 1024**4)
         self.assertEquals(config.line_completion_wait_time, 5)
         self.assertEquals(config.read_page_size, 64 * 1024)
         self.assertEquals(config.internal_parse_max_line_size, config.read_page_size)

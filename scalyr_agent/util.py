@@ -21,6 +21,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import re
+import socket
 
 if False:  # NOSONAR
     from typing import Union
@@ -93,11 +94,6 @@ except ImportError:
     import md5  # type: ignore
 
     new_md5 = False
-
-# Those imports have been moved in #494 so this alias is left here is place just in case for
-# backward compatibility reasons
-from scalyr_agent.date_parsing_utils import rfc3339_to_nanoseconds_since_epoch  # NOQA
-from scalyr_agent.date_parsing_utils import rfc3339_to_datetime  # NOQA
 
 
 ORJSON_NOT_AVAILABLE_MSG = """
@@ -658,7 +654,7 @@ def microseconds_since_epoch(date_time, epoch=None):
     delta = date_time - epoch
 
     # 86400 is 24 * 60 * 60 e.g. total seconds in a day
-    return delta.microseconds + (delta.seconds + delta.days * 86400) * 10 ** 6
+    return delta.microseconds + (delta.seconds + delta.days * 86400) * 10**6
 
 
 def seconds_since_epoch(date_time, epoch=None):
@@ -672,7 +668,7 @@ def seconds_since_epoch(date_time, epoch=None):
 
     @rtype float
     """
-    return microseconds_since_epoch(date_time) / 10.0 ** 6
+    return microseconds_since_epoch(date_time) / 10.0**6
 
 
 def format_time(time_value):
@@ -792,11 +788,11 @@ def parse_data_rate_string(value):
         if numerator == "K":
             value = value * base
         elif numerator == "M":
-            value = value * base ** 2
+            value = value * base**2
         elif numerator == "G":
-            value = value * base ** 3
+            value = value * base**3
         elif numerator == "T":
-            value = value * base ** 4
+            value = value * base**4
 
         if bit_or_byte == "b":
             raise ValueError(
@@ -2087,7 +2083,7 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         compress_func = compressor.compress  # type: ignore
         decompress_func = decompressor.decompress  # type: ignore
     elif compression_algorithm == "lz4":
-        import lz4.frame as lz4
+        import lz4.frame as lz4  # pylint: disable=no-name-in-module
 
         # NOTE: Java implementation which we currently use on the server side doesn't support
         # dependent block stream.
@@ -2147,6 +2143,8 @@ def get_agent_start_up_message():
     """
     Return a message which is logged on agent start up.
     """
+    from scalyr_agent.date_parsing_utils import udatetime
+
     python_version_str = sys.version.replace("\n", "")
     build_revision = get_build_revision()
     openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
@@ -2161,15 +2159,27 @@ def get_agent_start_up_message():
         used_locale,
     ) = get_language_code_coding_and_locale()
 
-    msg = "Starting scalyr agent... (version=%s) (revision=%s) %s (Python version: %s) " "(OpenSSL version: %s) (default fs encoding: %s) (locale: %s) (LANG env variable: %s)" % (
-        SCALYR_VERSION,
-        build_revision,
-        get_pid_tid(),
-        python_version_str,
-        openssl_version,
-        sys.getfilesystemencoding(),
-        used_locale,
-        lang_env_var,
+    if udatetime:
+        date_parsing_library = "udatetime"
+    else:
+        date_parsing_library = "native python"
+
+    msg = (
+        "Starting scalyr agent... (version=%s revision=%s) %s (hostname=%s) (Python version=%s) "
+        "(OpenSSL version=%s) (default fs encoding=%s) (locale=%s) (LANG env variable=%s) "
+        "(date parsing library=%s)"
+        % (
+            SCALYR_VERSION,
+            build_revision,
+            get_pid_tid(),
+            socket.gethostname(),
+            python_version_str,
+            openssl_version,
+            sys.getfilesystemencoding(),
+            used_locale,
+            lang_env_var,
+            date_parsing_library,
+        )
     )
 
     return msg
@@ -2700,7 +2710,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         :return:
         """
         try:
-            return self._process  # type: ignore
+            return self._process  # type: ignore  # pylint: disable=no-member
         except:
             return None
 
@@ -2711,6 +2721,6 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         Return the PID of the manager's process.
         """
         try:
-            return self._process.pid  # type: ignore
+            return self._process.pid  # type: ignore  # pylint: disable=no-member
         except:
             return None

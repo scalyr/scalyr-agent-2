@@ -82,8 +82,13 @@ with open(os.path.join(FIXTURES_DIR, "jmx_exporter_zookeeper_1.txt"), "r") as fp
     MOCK_DATA_5 = fp.read()
 
 
+MOCK_TIMESTAMP_S = 123456789
+MOCK_TIMESTAMP_MS = MOCK_TIMESTAMP_S * 1000
+
+
 class OpenMetricsMonitorTestCase(ScalyrTestCase):
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_success_mock_data_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -101,17 +106,25 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "http_requests_total",
             3,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363000},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name1", 1555, extra_fields={}
+            "some.metric.name1",
+            1555,
+            extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name2", 1556, extra_fields={"timestamp": 123456789}
+            "some.metric.name2",
+            1556,
+            extra_fields={"timestamp": 123456789},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "http_requests_total",
             4,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363001},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "traefik_entrypoint_request_duration_seconds_count",
@@ -122,9 +135,11 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "method": "GET",
                 "protocol": "http",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_success_mock_data_1_extra_fields(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -149,16 +164,19 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "foo1": "bar1",
                 "foo2": "bar2",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "some.metric.name1",
             1555,
             extra_fields={"foo1": "bar1", "foo2": "bar2"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "some.metric.name2",
             1556,
             extra_fields={"timestamp": 123456789, "foo1": "bar1", "foo2": "bar2"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
@@ -198,6 +216,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_success_mock_data_jmx_exporter_kafka_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_3, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -215,19 +234,23 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "kafka_server_replicafetchermanager_minfetchrate",
             0.0,
             extra_fields={"clientId": "Replica"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_network_requestmetrics_totaltimems",
             1.0,
             extra_fields={"request": "JoinGroup"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_network_requestmetrics_totaltimems",
             0.1,
             extra_fields={"request": "GroupCoordinator"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_success_mock_data_jmx_exporter_kafka_2(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_4, headers=MOCK_RESPONSE_HEADERS_TEXT)
 
@@ -249,7 +272,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger.warn.assert_called_with(
             'Parsed more than 2000 metrics (4900) for URL https://my.host:8080/metrics. You are strongly encouraged to filter metrics at the source or set "metric_name_exclude_list" monitor configuration option to avoid excessive number of metrics being ingested.',
             limit_once_per_x_secs=86400,
-            limit_key="https://my.host:8080/metrics",
+            limit_key="max-metrics-https://my.host:8080/metrics",
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_server_socketservermetrics_io_wait_ratio",
@@ -259,11 +282,13 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "network_processor": "3",
                 "timestamp": 123456789,
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_network_socketserver_memorypoolavailable",
             9.223372036854776e18,
             extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_log_log_logstartoffset",
@@ -272,9 +297,29 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "topic": "sample-streams-KSTREAM-AGGREGATE-STATE-STORE-0000000002-repartition",
                 "partition": "0",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
-        # 2. Metric extra_field filters
+        # 2. All metrics are excluded - warning should be emitted
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "url": MOCK_URL,
+            "metric_name_include_list": [],
+        }
+        mock_logger = mock.Mock()
+        monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
+        monitor.gather_sample()
+        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 20)
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+
+        mock_logger.warn.assert_called_with(
+            "Server returned 4900 metrics, but none were included. This likely means that filters specified as part of the plugin configuration are too restrictive and need to be relaxed.",
+            limit_once_per_x_secs=86400,
+            limit_key="no-metrics-https://my.host:8080/metrics",
+        )
+
+        # 3. Metric extra_field filters
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
@@ -310,6 +355,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "topic": "connect-status",
                 "partition": "0",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_server_fetcherlagmetrics_consumerlag",
@@ -319,20 +365,23 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "partition": "0",
                 "topic": "connect-status",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "kafka_log_log_numlogsegments",
             1.0,
             extra_fields={"topic": "connect-status", "partition": "0"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
         mock_logger.emit_value.assert_any_call(
             "kafka_log_log_logstartoffset",
             0.0,
             extra_fields={"topic": "connect-status", "partition": "3"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
-        # 2. Metric extra_field filters (matches any metric name)
+        # 4. Metric extra_field filters (matches any metric name)
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "url": MOCK_URL,
@@ -355,6 +404,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             self.assertEqual(call_kwargs["extra_fields"]["topic"], "connect-status")
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_success_mock_data_jmx_exporter_zookeeper_1(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_5, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -374,6 +424,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "replicaid": "2",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "zookeeper_leader",
@@ -381,6 +432,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "replicaid": "3",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "zookeeper_leader",
@@ -388,11 +440,13 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "replicaid": "2",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "zookeeper_requeststalelatencycheck",
             0.0,
             extra_fields={"membertype": "Follower", "replicaid": "2"},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "jvm_info",
@@ -402,6 +456,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "vendor": "Azul Systems, Inc.",
                 "runtime": "OpenJDK Runtime Environment",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "jvm_memory_pool_bytes_used",
@@ -409,6 +464,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "pool": "CodeHeap 'profiled nmethods'",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "jvm_memory_pool_bytes_used",
@@ -416,16 +472,19 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             extra_fields={
                 "pool": "Compressed Class Space",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "jvm_bar_1",
             1.8446744073709552e19,
             extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "jvm_bar_2",
             6e08,
             extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
@@ -446,6 +505,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_metric_name_include_list(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -464,10 +524,16 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 3)
 
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name1", 1555, extra_fields={}
+            "some.metric.name1",
+            1555,
+            extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name2", 1556, extra_fields={"timestamp": 123456789}
+            "some.metric.name2",
+            1556,
+            extra_fields={"timestamp": 123456789},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "traefik_entrypoint_request_duration_seconds_count",
@@ -478,9 +544,11 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
                 "method": "GET",
                 "protocol": "http",
             },
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_metric_name_exclude_list(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -502,14 +570,17 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "http_requests_total",
             3,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363000},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "http_requests_total",
             4,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363001},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_metric_name_include_list_and_exclude_list(self, m):
         # Both exclude_list and include_list options are specified, but exclude_list has higher priority
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_TEXT)
@@ -529,7 +600,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
         self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
         monitor_config = {
@@ -556,14 +627,17 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "http_requests_total",
             3,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363000},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
             "http_requests_total",
             4,
             extra_fields={"method": "post", "code": "400", "timestamp": 1395066363001},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_non_supported_metric_types(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_2, headers=MOCK_RESPONSE_HEADERS_TEXT)
         monitor_config = {
@@ -578,13 +652,20 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.emit_value.call_count, 2)
 
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name1", 1555, extra_fields={}
+            "some.metric.name1",
+            1555,
+            extra_fields={},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
         mock_logger.emit_value.assert_any_call(
-            "some.metric.name2", 1556, extra_fields={"timestamp": 123456789}
+            "some.metric.name2",
+            1556,
+            extra_fields={"timestamp": 123456789},
+            timestamp=MOCK_TIMESTAMP_MS,
         )
 
     @requests_mock.Mocker()
+    @mock.patch("time.time", mock.MagicMock(return_value=MOCK_TIMESTAMP_S))
     def test_gather_sample_non_supported_protobuf_format(self, m):
         m.get(MOCK_URL, text=MOCK_DATA_1, headers=MOCK_RESPONSE_HEADERS_PROTOBUF)
         monitor_config = {

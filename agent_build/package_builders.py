@@ -28,7 +28,6 @@ import sys
 import stat
 import os
 import re
-import io
 import platform
 import subprocess
 import logging
@@ -279,57 +278,69 @@ class PackageBuilder(abc.ABC):
         )
 
     @property
-    def _build_info(self) -> Optional[str]:
-        """Returns a string containing the package build info."""
+    def _build_info(self) -> Dict:
+        """Returns a dict containing the package build info."""
 
-        build_info_buffer = io.StringIO()
+        build_info = {}
 
-        # We need to execute the git command in the source root.
-        # Add in the e-mail address of the user building it.
+        original_dir = os.getcwd()
+
         try:
-            packager_email = (
-                common.check_output_with_log(
-                    "git config user.email", shell=True, cwd=str(__SOURCE_ROOT__)
+            # We need to execute the git command in the source root.
+            os.chdir(__SOURCE_ROOT__)
+            # Add in the e-mail address of the user building it.
+            try:
+                packager_email = (
+                    subprocess.check_output("git config user.email", shell=True)
+                    .decode()
+                    .strip()
+                )
+            except subprocess.CalledProcessError:
+                packager_email = "unknown"
+
+            build_info["packaged_by"] = packager_email
+
+            # Determine the last commit from the log.
+            commit_id = (
+                subprocess.check_output(
+                    "git log --summary -1 | head -n 1 | cut -d ' ' -f 2", shell=True
                 )
                 .decode()
                 .strip()
             )
-        except subprocess.CalledProcessError:
-            packager_email = "unknown"
 
-        print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
+            build_info["latest_commit"] = commit_id
 
-        # Determine the last commit from the log.
-        commit_id = (
-            common.check_output_with_log(
-                "git log --summary -1 | head -n 1 | cut -d ' ' -f 2",
-                shell=True,
-                cwd=__SOURCE_ROOT__,
+            # Include the branch just for safety sake.
+            branch = (
+                subprocess.check_output("git branch | cut -d ' ' -f 2", shell=True)
+                .decode()
+                .strip()
             )
-            .decode()
-            .strip()
-        )
+            build_info["from_branch"] = branch
 
-        print("Latest commit: %s" % commit_id.strip(), file=build_info_buffer)
-
-        # Include the branch just for safety sake.
-        branch = (
-            common.check_output_with_log(
-                "git branch | cut -d ' ' -f 2", shell=True, cwd=__SOURCE_ROOT__
+            # Add a timestamp.
+            build_info["build_time"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S UTC", time.gmtime()
             )
-            .decode()
-            .strip()
-        )
-        print("From branch: %s" % branch.strip(), file=build_info_buffer)
 
-        # Add a timestamp.
-        print(
-            "Build time: %s"
-            % str(time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())),
-            file=build_info_buffer,
-        )
+            return build_info
+        finally:
+            os.chdir(original_dir)
 
-        return build_info_buffer.getvalue()
+    @property
+    def _install_info(self) -> Dict:
+        """
+        Get dict with installation info.
+        """
+        return {"build_info": self._build_info, "install_type": type(self).INSTALL_TYPE}
+
+    @property
+    def _install_info_str(self) -> str:
+        """
+        Get json serialized string with installation info.
+        """
+        return json.dumps(self._install_info, indent=4, sort_keys=True)
 
     @staticmethod
     def _add_config(
@@ -405,13 +416,12 @@ class PackageBuilder(abc.ABC):
 
         # Create package info file. It will be read by agent in order to determine the package type and install root.
         # See '__determine_install_root_and_type' function in scalyr_agent/__scalyr__.py file.
-        package_info_file = self._intermediate_results_path / "package_info.json"
+        install_info_file = self._intermediate_results_path / "install_info.json"
 
-        package_info = {"install_type": type(self).INSTALL_TYPE}
-        package_info_file.write_text(json.dumps(package_info))
+        install_info_file.write_text(self._install_info_str)
 
         # Add this package_info file in the 'scalyr_agent' package directory, near the __scalyr__.py file.
-        add_data = {str(package_info_file): "scalyr_agent"}
+        add_data = {str(install_info_file): "scalyr_agent"}
 
         # Add monitor modules as hidden imports, since they are not directly imported in the agent's code.
         all_builtin_monitor_module_names = [
@@ -559,10 +569,6 @@ class PackageBuilder(abc.ABC):
 
         self._agent_install_root_path.mkdir(parents=True)
 
-        # Write build_info file.
-        build_info_path = self._agent_install_root_path / "build_info"
-        build_info_path.write_text(self._build_info)
-
         # Copy the monitors directory.
         monitors_path = self._agent_install_root_path / "monitors"
         shutil.copytree(__SOURCE_ROOT__ / "monitors", monitors_path)
@@ -597,6 +603,10 @@ class PackageBuilder(abc.ABC):
             agent_config_executable_path.symlink_to(
                 pl.Path("..", "py", "scalyr_agent", "config_main.py")
             )
+
+            # Write install_info file inside the "scalyr_agent" package.
+            build_info_path = source_code_path / "scalyr_agent" / "install_info.json"
+            build_info_path.write_text(self._install_info_str)
 
             # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
             recursively_delete_dirs_by_name(
@@ -875,6 +885,19 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         # to the local registry.
         buildx_builder_name = "agent_image_buildx_builder"
 
+        # print docker and buildx version
+        docker_version_output = (
+            common.check_output_with_log(["docker", "version"]).decode().strip()
+        )
+        logging.info(f"Using docker version:\n{docker_version_output}\n")
+
+        buildx_version_output = (
+            common.check_output_with_log(["docker", "buildx", "version"])
+            .decode()
+            .strip()
+        )
+        logging.info(f"Using buildx version {buildx_version_output}")
+
         # check if builder already exists.
         ls_output = (
             common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
@@ -957,7 +980,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             "--build-arg",
             f"BUILDER_NAME={self.name}",
             "--build-arg",
-            f"BASE_IMAGE=localhost:5000/{base_image_name}",
+            f"BASE_IMAGE=localhost:5005/{base_image_name}",
             "--build-arg",
             f"BASE_IMAGE_SUFFIX={base_image_tag_suffix}",
         ]
@@ -967,7 +990,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
             command_options.extend(
                 [
                     "--build-arg",
-                    f"AGENT_BUILD_DEBUG=1",
+                    "AGENT_BUILD_DEBUG=1",
                 ]
             )
 
@@ -1002,7 +1025,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         # Create container with local image registry. And mount existing registry root with base images.
         registry_container = build_in_docker.LocalRegistryContainer(
             name="agent_image_output_registry",
-            registry_port=5000,
+            registry_port=5005,
             registry_data_path=registry_data_path,
         )
 

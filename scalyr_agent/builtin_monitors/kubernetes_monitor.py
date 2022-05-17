@@ -77,6 +77,7 @@ import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 from scalyr_agent.util import StoppableThread, HistogramTracker
+from scalyr_agent.date_parsing_utils import rfc3339_to_datetime
 
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -95,8 +96,8 @@ define_config_option(
     __monitor__,
     "container_name",
     "Optional (defaults to None). Defines a regular expression that matches the name given to the "
-    "container running the scalyr-agent.\n"
-    "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n",
+    "container running the scalyr-agent."
+    "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.",
     convert_to=six.text_type,
     default=None,
 )
@@ -126,8 +127,8 @@ define_config_option(
     "api_socket",
     "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
     "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
-    "`docker_api_socket` configuration option in the syslog monitor to this same value\n"
-    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n"
+    "`docker_api_socket` configuration option in the syslog monitor to this same value."
+    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g."
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
@@ -138,7 +139,7 @@ define_config_option(
     "docker_api_version",
     "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
     "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
-    "syslog monitor to this same value\n",
+    "syslog monitor to this same value.",
     convert_to=six.text_type,
     default="auto",
 )
@@ -174,7 +175,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "max_previous_lines",
-    "Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n"
+    "Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs."
     "when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.",
     convert_to=int,
     default=5000,
@@ -183,7 +184,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "readback_buffer_size",
-    "Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n"
+    "Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk."
     "when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file "
     "was sent to Scalyr.",
     convert_to=int,
@@ -198,7 +199,7 @@ define_config_option(
     'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
     'to push logs to this one using the syslog Docker log plugin.  Currently, "syslog" is the '
     "preferred method due to bugs/issues found with the docker API.  It is not the default to protect "
-    "legacy behavior.\n",
+    "legacy behavior.",
     convert_to=six.text_type,
     default="docker_api",
 )
@@ -931,7 +932,7 @@ def _split_datetime_from_line(line):
     dt = datetime.datetime.utcnow()
     pos = line.find(" ")
     if pos > 0:
-        dt = scalyr_util.rfc3339_to_datetime(line[0:pos])
+        dt = rfc3339_to_datetime(line[0:pos])
         log_line = line[pos + 1 :]
 
     return (dt, log_line)
@@ -2189,13 +2190,25 @@ class CRIEnumerator(ContainerEnumerator):
         try:
             # see if we should query the container list from the filesystem or the kubelet API
             if self._query_filesystem:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Retrieving containers from filesystem",
+                )
                 container_info = self._get_containers_from_filesystem(
                     k8s_namespaces_to_include
                 )
             else:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2, "Retrieving containers from Kubelet"
+                )
                 container_info = self._get_containers_from_kubelet(
                     k8s_namespaces_to_include
                 )
+
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_2,
+                "Found %s non-excluded containers" % (len(container_info)),
+            )
 
             # process the container info
             for pod_name, pod_namespace, cname, cid in container_info:
@@ -2246,10 +2259,14 @@ class CRIEnumerator(ContainerEnumerator):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
+                    # NOTE: CRIEnumerator doesn't utilize ControlledCacheWarmer so it's important
+                    # we use allow_expired=False here otherwise we will always read cached entry
+                    # even if it's stale
                     pod = k8s_cache.pod(
                         pod_namespace,
                         pod_name,
                         current_time,
+                        allow_expired=False,
                         ignore_k8s_api_exception=True,
                     )
                     if pod:
@@ -2290,6 +2307,10 @@ class CRIEnumerator(ContainerEnumerator):
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Found non-excluded container: %s" % (str(result[cid])),
+                )
         except Exception as e:
             global_log.error(
                 "Error querying containers %s - %s"
@@ -2657,6 +2678,11 @@ class ContainerChecker(object):
             # self.__verify_service_account()
 
             if self.__controlled_warmer is not None:
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Using ControlledCacheWarmer instance: %s"
+                    % (self.__controlled_warmer),
+                )
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
                 self.__controlled_warmer.start()
 
@@ -2916,15 +2942,20 @@ class ContainerChecker(object):
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
-                            pass
-                            # Don't log any warnings here for now
-                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                            # pod_namespace = info["k8s_info"].get(
-                            #     "pod_namespace", "invalid_namespace"
-                            # )
-                            # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
-                            #                      limit_once_per_x_secs=300,
-                            #                      limit_key='check-container-pod-info-%s' % cid)
+                            # For now this message is only logged under debug and not warning
+                            pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            pod_namespace = info["k8s_info"].get(
+                                "pod_namespace", "invalid_namespace"
+                            )
+                            # NOTE(Tomaz): To avoid logger key cache from growing very large we
+                            # should likely periodically remove old entries.
+                            self._logger.log(
+                                scalyr_logging.DEBUG_LEVEL_2,
+                                "No pod info for container %s.  pod: '%s/%s'"
+                                % (_get_short_cid(cid), pod_namespace, pod_name),
+                                limit_once_per_x_secs=300,
+                                limit_key="check-container-pod-info-%s" % cid,
+                            )
 
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
@@ -2986,6 +3017,11 @@ class ContainerChecker(object):
                             self.__log_watcher.update_log_config(
                                 self.__module.module_name, new_config
                             )
+                else:
+                    self._logger.log(
+                        scalyr_logging.DEBUG_LEVEL_2,
+                        "log watcher not set, can't update log config for changed containers",
+                    )
             except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
@@ -3019,9 +3055,11 @@ class ContainerChecker(object):
                             self.__module.module_name, path
                         )
 
-            self.raw_logs[:] = [l for l in self.raw_logs if l["cid"] not in stopping]
+            self.raw_logs[:] = [
+                line for line in self.raw_logs if line["cid"] not in stopping
+            ]
             self.docker_logs[:] = [
-                l for l in self.docker_logs if l["cid"] not in stopping
+                line for line in self.docker_logs if line["cid"] not in stopping
             ]
 
     def __start_loggers(self, starting, k8s_cache):
@@ -4342,6 +4380,7 @@ cluster.
         time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
+            self._logger.debug("Starting ContainerChecker")
             self.__container_checker.start()
 
         k8s_cache = self.__get_k8s_cache()

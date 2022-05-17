@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scalyr-agent-extra-config
+  namespace: scalyr
+data:
+  # We ingest debug log for ease of troubleshooting
+  k8s-logs.json: |
+    {
+        "logs":
+        [
+            {
+                path: "/var/log/scalyr-agent-2/agent_debug.log",
+                copy_from_start: true
+          }
+        ]
+    }
+  k8s-openmetrics-monitor.json: |
+    {
+        "monitors":
+        [
+            {
+              module:  "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+              include_node_name: true,
+              include_cluster_name: true,
+              logger_include_node_name: false,
+              verify_https: false,
+              scrape_kubernetes_api_metrics: true,
+              kubernetes_api_metrics_scrape_interval: 20,
+              scrape_kubernetes_api_cadvisor_metrics: true,
+              kubernetes_api_cadvisor_metrics_scrape_interval: 20,
+              sample_interval: 20,
+              scrape_interval: 60
+          }
+        ]
+    }

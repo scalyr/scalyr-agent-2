@@ -1,3 +1,5 @@
-apache-libcloud==3.4.1
-paramiko==2.7.2
-Jinja2==2.11.3
+# Includes paramiko >= 2.9.0 workaround
+git+https://github.com/scalyr/libcloud.git@paramiko_2_9_compatibility_requests_2200#egg=apache-libcloud
+#apache-libcloud==3.4.1
+paramiko==2.10.4
+Jinja2==3.0.3

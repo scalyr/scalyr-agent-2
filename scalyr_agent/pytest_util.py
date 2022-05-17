@@ -78,7 +78,6 @@ if PYTEST_BENCH_FORCE_UNIT:
 
         return prefix, scale
 
-
 else:
 
     def pytest_benchmark_scale_unit(config, unit, benchmarks, best, worst, sort):

@@ -13,6 +13,8 @@ fairly simple interface for the plugins so that users will have a lot of freedom
 
 ## Setting up your environment:
 
+You can accelerate development by using Docker to create the environment. See the following [repo](https://github.com/scalyr/scalyr-monitor-tool) for more information
+
 To develop a Monitor Plugin, we strongly recommend you use `pip` and `virtualenv` to set up your development
 environment on a machine that does not already have Scalyr Agent 2 installed. If you would prefer to either
 use `git` to clone the Scalyr Agent 2 source code or develop against the Scalyr Agent 2 package already installed on

@@ -351,7 +351,14 @@ define_config_option(
 define_config_option(
     __monitor__,
     "include_node_name",
-    "Set to true to include node name as an additional attribute with each metric log line.",
+    "Set to true to include Kubernetes node name as an additional attribute with each metric log line.",
+    convert_to=bool,
+    default=False,
+)
+define_config_option(
+    __monitor__,
+    "include_cluster_name",
+    "Set to true to include Kubernetes cluster name as an additional attribute with each metric log line.",
     convert_to=bool,
     default=False,
 )
@@ -463,6 +470,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             DEFAULT_KUBERNETES_API_CADVISOR_METRICS_SCRAPE_INTERVAL,
         )
         self.__include_node_name = self._config.get("include_node_name", False)
+        self.__include_cluster_name = self._config.get("include_cluster_name", False)
 
         self.__k8s_api_url = self._global_config.k8s_api_url
 
@@ -487,6 +495,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self._kubelet = None
 
         self.__static_monitors_started = False
+
+        self.__previous_running_monitors_count = 0
 
     @property
     def k8s(self):
@@ -529,10 +539,6 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
 
     def gather_sample(self):
-        self._logger.info(
-            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running"
-        )
-
         if not self.__static_monitors_started:
             # On first iteration we schedule static global monitors which are not dynamically
             # updated. We intentionally do that here and don't override start() method to avoid
@@ -541,18 +547,55 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             self.__static_monitors_started = True
 
         self.__schedule_dynamic_open_metrics_monitors()
+        self.__log_running_stats()
+
+    def __log_running_stats(self):
+        # We log a message either if the value from the previous run changes or every X minutes
+        if self.__previous_running_monitors_count != len(self.__running_monitors):
+            limit_once_per_x_secs = None
+            limit_key = None
+        else:
+            limit_once_per_x_secs = 10 * 60
+            limit_key = "k8s-om-mon-info"
+
+        self._logger.info(
+            f"There are currently {len(self.__running_monitors)} dynamic and {len(self.__static_running_monitors)} static open metrics monitors running",
+            limit_once_per_x_secs=limit_once_per_x_secs,
+            limit_key=limit_key,
+        )
+
+        self.__previous_running_monitors_count = len(self.__running_monitors)
 
     def __get_node_name(self):
         """
-        Gets the node name of the node running the agent from downward API
+        Gets the node name of the node running the agent from downward API.
         """
-        if not compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME"):
+        node_name = compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME", None)
+
+        if not node_name:
             self._logger.warn(
                 "SCALYR_K8S_NODE_NAME environment variable is not set, monitor will "
                 "not work correctly."
             )
 
-        return compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
+        return node_name
+
+    def __get_cluster_name(self):
+        """
+        Gets name of the cluster this agent i srunning on.
+        """
+        # TODO: Similar to the old monitor, we could fall back to querying Kubelet in case this
+        # environment variable is not available (but it should really be available since it's
+        # documented in the docs and example config as required).
+        cluster_name = compat.os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME")
+
+        if not cluster_name:
+            self._logger.warn(
+                "SCALYR_K8S_CLUSTER_NAME environment variable is not set, monitor will "
+                "not work correctly."
+            )
+
+        return cluster_name
 
     def __get_monitor_config_and_log_config(
         self,
@@ -568,6 +611,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
         include_node_name: bool = False,
+        include_cluster_name: bool = False,
     ) -> Tuple[dict, dict]:
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
@@ -607,10 +651,16 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             ),
         }
 
+        extra_fields = {}
+
         if include_node_name:
-            monitor_config["extra_fields"] = JsonObject(
-                {"node": self.__get_node_name()}
-            )
+            extra_fields["k8s-node"] = self.__get_node_name()
+
+        if include_cluster_name:
+            extra_fields["k8s-cluster"] = self.__get_cluster_name()
+
+        if extra_fields:
+            monitor_config["extra_fields"] = JsonObject(extra_fields)
 
         # NOTE: This monitor is only supported on Linux platform
         log_path = os.path.join(self._global_config.agent_log_path, log_filename)
@@ -672,6 +722,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                     "kubernetes_api_metric_component_value_include_list"
                 ),
                 include_node_name=self.__include_node_name,
+                include_cluster_name=self.__include_cluster_name,
             )
 
             monitor = monitors_manager.add_monitor(
@@ -714,6 +765,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                     "kubernetes_api_cadvisor_metric_component_value_include_list"
                 ),
                 include_node_name=self.__include_node_name,
+                include_cluster_name=self.__include_cluster_name,
             )
 
             monitor = monitors_manager.add_monitor(
@@ -748,7 +800,11 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         k8s_pods = self.__get_k8s_pods()
         node_name = self.__get_node_name()
 
-        self._logger.info(f"Found {len(k8s_pods)} pods on node {node_name}")
+        self._logger.info(
+            f"Found {len(k8s_pods)} pods on node {node_name}",
+            limit_once_per_x_secs=10 * 60,
+            limit_key="k8s-om-mon-sched-1",
+        )
 
         # Maps scrape URL to the corresponding monitor config and K8sPod
         scrape_configs: Dict[str, Tuple[OpenMetricsMonitorConfig, K8sPod]] = {}
@@ -759,8 +815,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_config = self.__get_monitor_config_for_pod(pod=pod)
 
             if scrape_config:
-                self._logger.info(
-                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
+                self._logger.debug(
+                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})',
                 )
                 assert (
                     scrape_config.scrape_url not in scrape_configs
@@ -776,9 +832,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         to_remove_scrape_urls = current_scrape_urls.difference(new_scrape_urls)
 
         node_name = self.__get_node_name()
-        self._logger.info(
-            f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
-        )
+
+        if to_add_scrape_urls or to_remove_scrape_urls:
+            self._logger.info(
+                f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}"
+            )
+        else:
+            # If nothing has changed, we use rate limit log to avoid spamming
+            self._logger.info(
+                f"Found {len(new_scrape_urls)} URL(s) to scrape for node {node_name}, unchanged={unchanged_scrape_urls}, to add={to_add_scrape_urls}, to remove={to_remove_scrape_urls}",
+                limit_once_per_x_secs=10 * 60,
+                limit_key="k8s-om-mon-sched-3",
+            )
 
         for scrape_url in sorted(to_remove_scrape_urls):
             self.__remove_monitor(scrape_url=scrape_url)
@@ -789,7 +854,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         end_ts = time.time()
         self._logger.info(
-            f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds."
+            f"Scheduling monitors took {(end_ts - start_ts):.3f} seconds.",
+            limit_once_per_x_secs=10 * 60,
+            limit_key="k8s-om-mon-sched-4",
         )
 
     def __add_monitor(
@@ -816,6 +883,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
             include_node_name=self.__include_node_name,
+            include_cluster_name=self.__include_cluster_name,
         )
 
         monitors_manager = get_monitors_manager()

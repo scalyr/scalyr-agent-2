@@ -31,6 +31,7 @@ from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.scalyr_monitor import MonitorConfig
 from scalyr_agent.json_lib.objects import JsonArray, JsonObject
 
+import six
 import mock
 
 EXPECTED_BASE_HEADERS = list(
@@ -105,7 +106,12 @@ class UrlMonitorTestRequest(unittest.TestCase):
         url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "POST")
-        self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
+
+        if six.PY3:
+            self.assertEqual(actual_request.data, b"{fakejsonthatisnotlegit}")
+        else:
+            self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
+
         self.assertEqual(
             sorted(actual_request.header_items()),
             sorted(
@@ -122,6 +128,9 @@ class UrlMonitorTestRequest(unittest.TestCase):
             "request_headers": "not legit headers",
             "module": self.module,
         }
+
+        if six.PY3:
+            config_data["request_data"] = b"{fakejsonthatisnotlegit}"
 
         config = MonitorConfig(content=config_data)
         self.assertRaises(

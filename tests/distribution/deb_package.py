@@ -20,7 +20,7 @@ from __future__ import absolute_import
 import pytest
 
 from tests.utils.dockerized import dockerized_case
-from tests.image_builder.distributions.ubuntu import UbuntuBuilder
+from tests.image_builder.distributions.ubuntu2204 import UbuntuBuilder
 
 
 @pytest.mark.usefixtures("agent_environment")

@@ -25,6 +25,8 @@ import time
 import operator
 import signal
 import errno
+import fnmatch
+import json
 
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
@@ -781,6 +783,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # prepare and read checkpoints.
                 # read all checkpoints from the manager's previous run and combine them into one mater file.
                 checkpoints = self.__find_and_read_checkpoints(warn_on_stale=True)
+                checkpoints = self.__process_checkpoints_on_startup(checkpoints)
+
                 if checkpoints:
                     self.__consolidate_checkpoints(checkpoints)
                 else:
@@ -846,10 +850,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 # For multi processing mode we also include pids of all the spawned processes
                 if self.__config.use_multiprocess_workers:
-                    msg = "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s" % (
-                        worker_sessions_count,
-                        os.getpid(),
-                        ", ".join([str(pid) for pid in worker_session_process_ids]),
+                    msg = (
+                        "Copying manager started. Total worker sessions: %s, Agent Pid: %s, Worker Session Processes Pids: %s"
+                        % (
+                            worker_sessions_count,
+                            os.getpid(),
+                            ", ".join([str(pid) for pid in worker_session_process_ids]),
+                        )
                     )
                 else:
                     msg = (
@@ -880,7 +887,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                             "Start removing finished log matchers",
                         )
                         self.__remove_logs_scheduled_for_deletion()
-                        self.__purge_finished_log_matchers()
+                        removed = self.__purge_finished_log_matchers()
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Removed %s finished log matchers" % (removed),
+                        )
                         log.log(
                             scalyr_logging.DEBUG_LEVEL_2,
                             "Done removing finished log matchers",
@@ -1072,16 +1083,24 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__lock.release()
 
     def __purge_finished_log_matchers(self):
+        # type: () -> int
         """
         Removes from the list of log matchers any log matchers that are finished
+
+        Returns number of finished matches which have been removed.
         """
         # make a shallow copy for iteration
         matchers = self.__dynamic_matchers.copy()
+
+        removed = 0
 
         for path, m in six.iteritems(matchers):
             if m.is_finished():
                 self.remove_log_path(SCHEDULED_DELETION, path)
                 self.__dynamic_matchers.pop(path, None)
+                removed += 1
+
+        return removed
 
     @staticmethod
     def _merge_checkpoints(checkpoints_to_merge):  # type: (List[Dict]) -> Dict
@@ -1398,6 +1417,40 @@ class CopyingManager(StoppableThread, LogWatcher):
             CONSOLIDATED_CHECKPOINTS_FILE_NAME,
         )
 
+    def __process_checkpoints_on_startup(self, checkpoints):
+        # type: (dict) -> dict
+        """
+        Process checkpoints on startup and ignore any entries which should be ignored based on the
+        "ignore_checkpoints_on_startup_path_globs" config option value.
+
+        NOTE: This method should only be called once on startup before doing any other work (aka in
+        the run() method before consolidating the checkpoints and doing any other work).
+        """
+        checkpoints = checkpoints or {}
+        ignore_checkpoints_on_startup_path_globs = (
+            self.__config.ignore_checkpoints_on_startup_path_globs
+        )
+
+        def path_matches_any_glob(file_path):
+            for glob in ignore_checkpoints_on_startup_path_globs:
+                if fnmatch.fnmatch(file_path, glob):
+                    return True
+
+            return False
+
+        checkpoint_file_paths = list(checkpoints.keys())
+
+        for file_path in checkpoint_file_paths:
+            if path_matches_any_glob(file_path=file_path):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    'Ignoring startup checkpoint data for log file "%s" due to ignore_checkpoints_on_startup_path_globs config option value (%s). Will ingest this file from the beginning.'
+                    % (file_path, ignore_checkpoints_on_startup_path_globs),
+                )
+                del checkpoints[file_path]
+
+        return checkpoints
+
     def __consolidate_checkpoints(self, checkpoints):
         # type: (Dict) -> None
         """
@@ -1481,6 +1534,11 @@ class CopyingManager(StoppableThread, LogWatcher):
                         checkpoints_path,
                         scalyr_util.format_time(checkpoints["time"]),
                         error_code="staleCheckpointFile",
+                    )
+                    log.warn(
+                        "Too stale checkpoint file '%s' content: %s",
+                        checkpoints_path,
+                        json.dumps(checkpoints),
                     )
                 continue
 

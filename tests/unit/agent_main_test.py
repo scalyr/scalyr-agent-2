@@ -16,6 +16,10 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
+import sys
+import subprocess
+import platform
 import re
 from io import open
 import functools
@@ -28,6 +32,8 @@ from scalyr_agent import __scalyr__
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent import agent_main, agent_status
 from scalyr_agent.scalyr_client import create_client
+
+import pytest
 
 __all__ = ["AgentMainTestCase"]
 
@@ -43,8 +49,14 @@ CORRECT_INIT_PRAGMA = """
 ### END INIT INFO
 """
 
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+AGENT_MAIN = os.path.abspath(os.path.join(BASE_DIR, "../../scalyr_agent/agent_main.py"))
+
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
+    @pytest.mark.skipif(
+        platform.system() == "Windows", reason="This test is not for Windows."
+    )
     @mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL)
     def test_create_client_ca_file_and_intermediate_certs_file_doesnt_exist(self):
         from scalyr_agent.agent_main import ScalyrAgent
@@ -97,7 +109,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             ValueError, expected_msg, functools.partial(create_client, config)
         )
 
-    def test_ca_cert_files_checks_are_skipped_under_dev_and_msi_install(self):
+    def test_ca_cert_files_checks_are_skipped_under_dev(self):
         # Skip those checks under dev and msi install because those final generated certs files
         # are not present under dev install
 
@@ -128,8 +140,18 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
             self.assertTrue(create_client(config=config))
 
+    @pytest.mark.skipif(
+        platform.system() != "Windows", reason="This test has to run on Windows."
+    )
+    def test_ca_cert_files_checks_are_skipped_under_windows(self):
+
+        from scalyr_agent.agent_main import ScalyrAgent
+        from scalyr_agent.platform_controller import PlatformController
+
         # 2. MSI install (only intermediate_certs_path check should be skipped)
-        with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.MSI_INSTALL):
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL
+        ):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
@@ -328,8 +350,78 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     ".*" + re.escape("Warning, skipping copying log lines.")
                 )
 
+    def test_no_check_remote_command_line_option(self):
+        from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use default value of False
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = False
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use overridden value of True
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = True
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
     def test_check_remote_if_no_tty(self):
         from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+        mock_isatty_false = mock.Mock(return_value=False)
 
         mock_config = mock.Mock()
 
@@ -352,31 +444,41 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         mock_command_options = mock.Mock()
         mock_command_options.no_check_remote = True
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
 
         # tty is available, command option is not set, should default to False
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
         mock_command = "inner_run_with_checks"
         mock_command_options = mock.Mock()
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
 
         # tty is not available (stdout.isatty returns False), should use check_remote_if_no_tty
         # config option value (config option is set to True)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
-        mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = True
 
@@ -391,12 +493,11 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = False
 
@@ -411,7 +512,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = None
@@ -444,6 +545,36 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
+    def test_no_log_messages_printed_on_config_parse_on_status_stop(self):
+        log_levels = [
+            b"INFO",
+            b"DEBUG",
+            b"WARN",
+            b"ERROR",
+        ]
+
+        # Both status and stop command should not produce any log messages on config parse
+        for command in ["status", "stop"]:
+            process = subprocess.Popen(
+                [sys.executable, AGENT_MAIN, command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            stdout, stderr = process.communicate()
+
+            for log_level in log_levels:
+                self.assertFalse(
+                    log_level in stdout,
+                    "Found %s log message in command output which should not be there"
+                    % (log_level),
+                )
+                self.assertFalse(
+                    log_level in stderr,
+                    "Found %s log message in command output which should not be there"
+                    % (log_level),
+                )
 
     def _write_mock_config(self):
         _, tmp_path = tempfile.mkstemp()

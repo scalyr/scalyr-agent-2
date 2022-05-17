@@ -1,0 +1,1 @@
+@"%~dp0\scalyr-agent-2.exe" config %*

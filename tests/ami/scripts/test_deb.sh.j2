@@ -36,6 +36,8 @@ done
 
 if [ ! -f "${CLOUD_INIT_RESULT_FILE}" ]; then
     echo_with_date "Provisioning didn't finish in 60 seconds (file ${CLOUD_INIT_RESULT_FILE} doesn't exist), failing..."
+    echo_with_date "/var/log/cloud-init-output.log log file content"
+    cat "/var/log/cloud-init-output.log" || true
     exit 1
 fi
 
@@ -143,8 +145,8 @@ sudo scalyr-agent-2 status -v | grep linux_process_metrics
 
 # Verify build_info file with build metadata is present
 echo_with_date ""
-echo_with_date "Verifying build_info file exists"
-cat /usr/share/scalyr-agent-2/build_info || (echo_with_date "build_info file is missing" ; exit 1)
+echo_with_date "Verifying install_info.json file exists"
+cat /usr/share/scalyr-agent-2/py/scalyr_agent/install_info.json || (echo_with_date "install_info.json file is missing" ; exit 1)
 echo_with_date ""
 
 # Verify rc*.d symlinks are in place

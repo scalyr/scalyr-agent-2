@@ -90,10 +90,7 @@ def verify_server_certificate(config):
     :return:
     """
     is_dev_install = __scalyr__.INSTALL_TYPE == __scalyr__.DEV_INSTALL
-    is_dev_or_msi_install = __scalyr__.INSTALL_TYPE in [
-        __scalyr__.DEV_INSTALL,
-        __scalyr__.MSI_INSTALL,
-    ]
+    is_dev_install_or_windows = is_dev_install or platform.system() == "Windows"
 
     ca_file = config.ca_cert_path
     intermediate_certs_file = config.intermediate_certs_path
@@ -108,7 +105,7 @@ def verify_server_certificate(config):
 
     # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
     # under the MSI / Windows install
-    if not is_dev_or_msi_install and not os.path.isfile(intermediate_certs_file):
+    if not is_dev_install_or_windows and not os.path.isfile(intermediate_certs_file):
         raise ValueError(
             'Invalid path "%s" specified for the '
             '"intermediate_certs_path" config '
@@ -581,7 +578,7 @@ class ScalyrClientSession(object):
                     hasattr(error, "errno")
                     and error.errno is not None  # pylint: disable=no-member
                 ):
-                    log.error(
+                    log.warning(
                         'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                         "will re-attempt",
                         self.__full_address,
@@ -641,7 +638,7 @@ class ScalyrClientSession(object):
 
                 bytes_received = len(response)
             except six.moves.http_client.HTTPException as httpError:
-                log.error(
+                log.warning(
                     "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
                     % (httpError.__class__.__name__),
                     error_code="requestFailed",
@@ -654,7 +651,7 @@ class ScalyrClientSession(object):
                     hasattr(error, "errno")
                     and error.errno is not None  # pylint: disable=no-member
                 ):
-                    log.error(
+                    log.warning(
                         'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
                         "connection, will re-attempt",
                         self.__full_address,
@@ -683,7 +680,7 @@ class ScalyrClientSession(object):
             )
 
             if status_code == 429:
-                log.error(
+                log.warning(
                     'Received "too busy" response from server.  Will re-attempt',
                     error_code="serverTooBusy",
                 )
@@ -691,7 +688,7 @@ class ScalyrClientSession(object):
 
             # If we got back an empty result, that often means the connection has been closed or reset.
             if len(response) == 0:
-                log.error(
+                log.warning(
                     "Received empty response, server may have reset connection.  Will re-attempt",
                     error_code="emptyResponse",
                 )
@@ -703,7 +700,7 @@ class ScalyrClientSession(object):
                 response_as_json = scalyr_util.json_decode(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
-                log.error(
+                log.warning(
                     "Failed to parse response of '%s' due to exception.  Closing connection, will "
                     "re-attempt",
                     scalyr_util.remove_newlines_and_truncate(response, 1000),
@@ -1189,6 +1186,10 @@ class AddEventsRequest(object):
 
         # Used to record some performance timing data for debugging/analysis
         self.__timing_data = dict()
+
+        # Used to cache response status (from ScalyrClientSession.__receive_response)
+        # which is then used for special handling of specific timed-out requests
+        self.__receive_response_status = None
 
     @property
     def current_size(self):
