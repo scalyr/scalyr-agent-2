@@ -15,6 +15,9 @@ Bug fixes:
 * Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
 * Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
 
+Other:
+* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
+
 ## 2.1.30 "Heturn" - May 17, 2022
 
 <!---
@@ -76,9 +79,6 @@ Docker images:
 
 Bug fixes:
 * Fix a bug with the URL monitor not working correctly with POST methods when ``request_data`` was specified under Python 3.
-
-Other:
-* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
 
 ## 2.1.26 "Yavin" - Jan 12, 2022
 
