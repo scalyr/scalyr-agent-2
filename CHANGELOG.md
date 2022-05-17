@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.30 "Heturn" - May 12, 2022
+## 2.1.30 "Heturn" - May 17, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
 --->
 
 Kubernetes:
@@ -18,7 +18,7 @@ Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
 
 Other:
-* Update the code to log non-fatal connection related errors which are retried under WARNING instead of ERROR log level.
+* Update the code to log connection related errors which are retried and are not fatal under WARNING instead of ERROR log level.
 * Update agent start up log message to use format which is supported by the agent message parser.
 
 ## 2.1.29 "Auter" - Mar 15, 2022
