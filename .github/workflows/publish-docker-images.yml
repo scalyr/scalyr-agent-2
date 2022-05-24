@@ -52,7 +52,7 @@ jobs:
           driver-opts: network=host
 
       - name: Perform the build of the base docker image in the deployment.
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/cache-step
         with:
           deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
 

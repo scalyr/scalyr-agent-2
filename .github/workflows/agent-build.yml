@@ -24,10 +24,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
-        image-distro-name: [ "debian", "alpine" ]
+        image-type: [ "docker-json" ]
+        image-distro-name: [ "debian" ]
+#        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+#        image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.12" ]
-
     env:
       DOCKER_BUILDKIT: 1
       # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
@@ -43,7 +44,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/cache-step
         with:
           deployment-name: "test_environment"
 
@@ -58,10 +59,6 @@ jobs:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
-      - name: Perform the build of the base docker image in the deployment.
-        uses: ./.github/actions/perform-deployment
-        with:
-          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
@@ -69,18 +66,23 @@ jobs:
           driver-opts: network=host
 
       - name: Start minikube for the test of the kubernetes build
-        if: matrix.image-type == 'k8s'
+        if: contains(matrix.image-type, 'k8s')
         shell: bash
         run: |
           minikube start
 
-      - name: Run image test
+      - name: Run build step.
+        uses: ./.github/actions/execute-builder
+        with:
+          builder-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}-test
+          build-root-dir: ./cache
+
+      - name: Build ${{ matrix.build-name }}
+        shell: bash
         env:
           SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
         run: |
-          python3 tests/package_tests/run_package_test.py package-test \
-           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
-            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+          python3 tests/package_tests/run_package_test.py package-test "${{ matrix.image-type }}-${{ matrix.image-distro-name }}-test" --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" --build-root-dir ./cache
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
