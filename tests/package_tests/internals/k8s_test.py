@@ -22,8 +22,7 @@ import time
 import sys
 import logging
 
-
-from agent_build.tools import constants
+import agent_build.tools.common
 from tests.package_tests.internals.common import SOURCE_ROOT
 from tests.package_tests.internals.common import (
     AgentLogRequestStatsLineCheck,
@@ -86,7 +85,7 @@ def _delete_k8s_objects():
 
 def _test(
     image_name: str,
-    architecture: constants.Architecture,
+    architecture: agent_build.tools.common.Architecture,
     scalyr_api_key: str,
     name_suffix: str = None,
 ):
@@ -210,7 +209,7 @@ def _test(
 
 def run(
     image_name: str,
-    architecture: constants.Architecture,
+    architecture: agent_build.tools.common.Architecture,
     scalyr_api_key: str,
     name_suffix: str = None,
 ):
