@@ -15,7 +15,7 @@
 # This is a new package build script which uses new package  build logic.
 # usage:
 #       build_package_new.py <name of the package> --output-dir <output directory>
-
+import json
 import logging
 import pathlib as pl
 import argparse
@@ -32,8 +32,8 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
-from agent_build.tools import constants
-from agent_build import package_builders
+from agent_build.agent_builders import IMAGE_BUILDS
+from agent_build.tools.common import AGENT_BUILD_OUTPUT
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
@@ -47,7 +47,9 @@ if __name__ == "__main__":
     # Add subparsers for all packages except docker builders.
     subparsers = parser.add_subparsers(dest="package_name", required=True)
 
-    for builder_name, builder in package_builders.ALL_PACKAGE_BUILDERS.items():
+    all_package_builders = IMAGE_BUILDS.copy()
+
+    for builder_name, builder in all_package_builders.items():
         package_parser = subparsers.add_parser(name=builder_name)
 
         # Define argument for all packages
@@ -83,19 +85,20 @@ if __name__ == "__main__":
             help="Enable debug mode with additional logging.",
         )
 
+        package_parser.add_argument(
+            "--show-all-used-steps-ids",
+            dest="show_all_used_steps_ids",
+            action="store_true"
+        )
+
+        package_parser.add_argument(
+            "--build-root-dir",
+            dest="build_root_dir",
+            required=False
+        )
+
         # If that's a docker image builder, then add additional commands.
-        if isinstance(builder, package_builders.ContainerPackageBuilder):
-            # Add subparser for command that tell to the builder only to build the tarball with the image's filesystem
-            # This command is used by the source Dockerfile of the image to create agent's filesystem inside the image.
-
-            package_parser.add_argument(
-                "--only-filesystem-tarball",
-                dest="only_filesystem_tarball",
-                help="Build only the tarball with the filesystem of the agent. This argument has to accept"
-                "path to the directory where the tarball is meant to be built. "
-                "Used by the Dockerfile itself and does not required for the manual build.",
-            )
-
+        if builder_name in IMAGE_BUILDS:
             package_parser.add_argument(
                 "--registry",
                 help="Registry (or repository) name where to push the result image.",
@@ -116,20 +119,15 @@ if __name__ == "__main__":
             )
 
             package_parser.add_argument(
-                "--coverage",
-                dest="coverage",
-                action="store_true",
-                default=False,
-                help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+                "--platforms",
+                dest="platforms",
+                help="Comma delimited list of platforms to build (and optionally push) the image for.",
             )
 
             package_parser.add_argument(
-                "--platforms",
-                dest="platforms",
-                default=",".join(
-                    constants.AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING
-                ),
-                help="Comma delimited list of platforms to build (and optionally push) the image for.",
+                "--testing",
+                action="store_true",
+                required=False
             )
 
         else:
@@ -156,26 +154,31 @@ if __name__ == "__main__":
 
     # Find the builder class.
     builder_name = args.package_name
-    package_builder = package_builders.ALL_PACKAGE_BUILDERS[builder_name]
+    if args.build_root_dir:
+        build_root_path = pl.Path(args.build_root_dir)
+    else:
+        build_root_path = AGENT_BUILD_OUTPUT
 
     # If that's a docker image builder handle their arguments too.
-    if isinstance(package_builder, package_builders.ContainerPackageBuilder):
-
-        if args.only_filesystem_tarball:
-            # Build only image filesystem.
-            package_builder.build_filesystem_tarball(
-                output_path=pl.Path(args.only_filesystem_tarball)
-            )
-            exit(0)
-
-        package_builder.build(
-            push=args.push,
+    if builder_name in IMAGE_BUILDS:
+        build_cls = IMAGE_BUILDS[builder_name]
+        if args.platforms:
+            platforms_to_build = args.platforms.split(",")
+        else:
+            platforms_to_build = []
+        build = build_cls(
             registry=args.registry,
             user=args.user,
             tags=args.tag or [],
-            use_test_version=args.coverage,
-            platforms=args.platforms.split(","),
+            push=args.push,
+            platforms_to_build=platforms_to_build,
+            testing=args.testing
         )
+        if args.show_all_used_steps_ids:
+            print(json.dumps(build.all_used_cacheable_steps_ids))
+            exit(0)
+        else:
+            build.run(
+                build_root=build_root_path
+            )
         exit(0)
-
-    package_builder.build(locally=args.locally)

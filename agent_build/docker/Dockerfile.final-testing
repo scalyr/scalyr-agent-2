@@ -1,0 +1,7 @@
+# This Dockerfile overrides a final agent docker image, so it can be used for testing.
+ARG BASE_IMAGE
+
+FROM $BASE_IMAGE as scalyr
+MAINTAINER Scalyr Inc <support@scalyr.com>
+# Since test version of the image uses coverage, add command that runs the Agent with enabled coverage.
+CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", "--no-fork", "--no-change-user", "start"]

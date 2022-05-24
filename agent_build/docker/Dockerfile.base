@@ -1,117 +1,40 @@
 # Base image that creates all necessary dependencies for the scalyr-agent docker image.
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
-# Suffix for the python dockerhub image. For now can be:
-#   - 'slim' for debian based image
-#   - 'alpine' for alpine based image.
-ARG BASE_IMAGE_SUFFIX
+# Suffix for the python dockerhub image. For now can be: python:slim or python:alpine
+ARG PYTHON_BASE_IMAGE_NAME
 
-# Install dependency packages for debian.
-FROM python:3.8.13-slim as scalyr-dependencies-slim
+FROM $PYTHON_BASE_IMAGE_NAME as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-# Workaround for weird build failure on Circle CI, see
-# https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
-RUN ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split
-RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
-RUN ln -s /bin/rm /usr/sbin/rm
-RUN ln -s /bin/tar /usr/sbin/tar
-
-RUN apt-get update && apt-get install -y build-essential git tar curl
-
-
-# Install dependency packages for alpine.
-FROM python:3.8.13-alpine as scalyr-dependencies-alpine
-MAINTAINER Scalyr Inc <support@scalyr.com>
-
-RUN apk update && apk add --virtual build-dependencies \
-    binutils \
-    build-base \
-    gcc \
-    g++ \
-    make \
-    curl \
-    python3-dev \
-    patchelf \
-    git
-
-# Install rust and cargo. It is needed to build some of the Python dependencies of the agent.
-# NOTE: We don't use "-" at the end since context names which end just with "-" don't appear to
-# be valid anymore with new Docker / buildx versions. See https://github.com/scalyr/scalyr-agent-2/pull/845
-# for details
-FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install nightly
-RUN rustup default nightly
-
-# There's no precompiled rust installation for armv7 so we replace the previous stage with this and do nothing.
-FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rustv7
-# Do nothing
-
-# Use one of the two previous stages according to the TARGETVARIANT suffix.
-# if TARGETVARIANT is 'v7', then we use stage without rust.
-# IMPORTANT: that may be needed to revise if new architectures are added.
-FROM scalyr-dependencies-rust$TARGETVARIANT as scalyr-dependencies
-
+ARG PYTHON_BASE_IMAGE_NAME
+# Build-it argument of the docker builder itself that contains variant of the current target architecture.
 ARG TARGETVARIANT
-ARG COVERAGE_VERSION
-ARG BASE_IMAGE_SUFFIX
+# Set this env. variable to build test version of the agent image.
+ARG TESTING
+
+ADD agent_build/docker/install-base-image-build-dependencies.sh agent_build/docker/install-base-image-build-dependencies.sh
+RUN PYTHON_BASE_IMAGE_NAME=$PYTHON_BASE_IMAGE_NAME sh agent_build/docker/install-base-image-build-dependencies.sh
+
+ADD agent_build/docker/install-base-image-rust.sh agent_build/docker/install-base-image-rust.sh
+RUN TARGETVARIANT=$TARGETVARIANT sh agent_build/docker/install-base-image-rust.sh
 
 ADD agent_build/requirement-files/docker-image-requirements.txt agent_build/requirement-files/docker-image-requirements.txt
 ADD agent_build/requirement-files/compression-requirements.txt agent_build/requirement-files/compression-requirements.txt
 ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
 
-# orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
-# with pip environment markers since they are not specific enough.
-RUN if [ "$TARGETVARIANT" = "v7" ] && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then sed -i '/^orjson/d' agent_build/requirement-files/main-requirements.txt; fi
-
-# Right now we don't support lz4 on server side yet so we don't include this dependency since it doesn't offer pre built
-# wheel and it substantially slows down base image build
-RUN sed -i '/^lz4/d' agent_build/requirement-files/compression-requirements.txt
-
-# Workaround so we can use pre-built orjson wheel for musl. We need to pin pip to older version for
-# manylinux2014 wheel format to work.
-# See https://github.com/ijl/orjson/issues/8 for details.
-# If we don't that and we include orjson and zstandard, we need rust chain and building the image
-# will be very slow due to cross compilation in emulated environment (QEMU)
-# TODO: Remove once orjson and zstandard musl wheel is available - https://github.com/pypa/auditwheel/issues/305#issuecomment-922251777
-RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py
-
-# Install agent dependencies.
-RUN pip3 install --upgrade pip
-RUN pip3 --no-cache-dir install --root /tmp/dependencies -r agent_build/requirement-files/docker-image-requirements.txt
-
-# Install coverage if its version if specified. Only used in testing.
-RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
-
-# Clean up files which were installed to use manylinux2014 workaround
-RUN rm /usr/local/lib/python3.8/_manylinux.py
+ADD agent_build/docker/install-base-image-agent-dependencies.sh agent_build/docker/install-base-image-agent-dependencies.sh
+RUN TARGETVARIANT=$TARGETVARIANT PYTHON_BASE_IMAGE_NAME=$PYTHON_BASE_IMAGE_NAME TESTING=$TESTING sh agent_build/docker/install-base-image-agent-dependencies.sh
 
 # Install packages and tools that will be required during the final image build.
-
-# Install tools for alpine
-FROM python:3.8.13-alpine as ready-base-alpine
+FROM $PYTHON_BASE_IMAGE_NAME
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-RUN apk update && apk add --virtual curl git
+ARG PYTHON_BASE_IMAGE_NAME
 
-# Install tools for debian.
-FROM python:3.8.13-slim as ready-base-slim
-MAINTAINER Scalyr Inc <support@scalyr.com>
-
-# Workaround for weird build failure on Circle CI, see
-# https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
-RUN ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split
-RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
-RUN ln -s /bin/rm /usr/sbin/rm
-RUN ln -s /bin/tar /usr/sbin/tar
-
-RUN apt-get update && apt-get install -y git tar curl
-
-# Create a final base stage from one of the prefious OS-specific stages.
-FROM ready-base-$BASE_IMAGE_SUFFIX
+ADD agent_build/docker/install-base-image-dependencies.sh agent_build/docker/install-base-image-dependencies.sh
+RUN PYTHON_BASE_IMAGE_NAME=$PYTHON_BASE_IMAGE_NAME sh agent_build/docker/install-base-image-dependencies.sh
 
 # Copy Agent's Python dependencies, so they also can be used in the final image build.
-COPY --from=scalyr-dependencies  /tmp/dependencies/ /tmp/dependencies/
+COPY --from=scalyr-dependencies  /tmp/dependencies/. /tmp/dependencies
 WORKDIR /

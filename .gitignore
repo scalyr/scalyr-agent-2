@@ -26,8 +26,8 @@ var/
 scalyr-agent-2-*/
 /tests/config.yml
 tests/package_tests/credentials.json
-!.github/actions/perform-deployment/dist
-.github/actions/perform-deployment/node_modules
+!.github/actions/execute-builder/dist
+.github/actions/execute-step-runner/node_modules
 /agent_build_output
 
 # Installer logs

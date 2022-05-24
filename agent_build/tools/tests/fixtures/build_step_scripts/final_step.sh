@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is used by "ShellScriptDeploymentStep"
-# (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/deployments.py"
+set -e
 
-# This script is used in the deployment step that build base image for the bullseye(debian) based agent docker images.
-# This file is sourced by one of the actual shell scripts that has to build the base image.
+DEPENDENCY_STEP_OUTPUT="$1"
 
-# source main library, all needed functions are in there.
-. "$SOURCE_ROOT/agent_build/tools/environment_deployments/steps/build_base_docker_image/build_base_images_common_lib.sh"
+cat "${BASE_RESULT_FILE_PATH}" >> "$STEP_OUTPUT_PATH/result.txt"
+echo "" >> "$STEP_OUTPUT_PATH/result.txt"
 
-build_all_base_images slim
+cat "${DEPENDENCY_STEP_OUTPUT}/result.txt" >> "$STEP_OUTPUT_PATH/result.txt"
+echo "" >> "$STEP_OUTPUT_PATH/result.txt"
+
+echo "${INPUT}_shell" | tr -d "\n" >> "$STEP_OUTPUT_PATH/result.txt"
