@@ -163,6 +163,7 @@ from __future__ import absolute_import
 from typing import Dict
 from typing import List
 from typing import Tuple
+from typing import Any
 from typing import Optional
 
 import os
@@ -662,7 +663,6 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         # NOTE: k8s-node and k8s-cluster are special attributes so they always need to override
         # any custom attributes specified by the end user using "attributes" annotation
-
         if include_node_name:
             extra_fields["k8s-node"] = self.__get_node_name()
 
@@ -1007,6 +1007,14 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         return result
 
+    def __validate_dict_str_str(self, data: Dict[Any, Any]) -> bool:
+        """
+        Method which validates that all the key and values in teh dictionary are of a string type.
+        """
+        return all(isinstance(key, six.text_type) for key in data.keys()) and all(
+            isinstance(value, six.text_type) for value in data.values()
+        )
+
     def __get_monitor_config_for_pod(
         self, pod: K8sPod
     ) -> Optional[OpenMetricsMonitorConfig]:
@@ -1056,14 +1064,24 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 attributes = json_decode(attributes)
             except ValueError as e:
                 self._logger.warn(
-                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Error: {e}'
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Error: {e}.'
                 )
                 attributes = {}
 
+            # Validate value is an object / dictionary
             if not isinstance(attributes, dict):
                 attributes_type = type(attributes)
                 self._logger.warn(
-                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected value to be an object/dictionary, got {attributes_type}'
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected value to be an object/dictionary, got {attributes_type}.'
+                )
+                attributes = {}
+
+            # Validate all the keys and values are of a string type
+            valid_attributes_values = self.__validate_dict_str_str(data=attributes)
+
+            if not valid_attributes_values:
+                self._logger.warn(
+                    f'Failed to validate "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected all the keys and values to be a string.'
                 )
 
         if pod.status_phase != "running":

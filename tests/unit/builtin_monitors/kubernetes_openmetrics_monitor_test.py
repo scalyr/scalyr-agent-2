@@ -23,9 +23,11 @@ from io import open
 import mock
 
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
-    KubernetesOpenMetricsMonitor,
-    SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
     PROMETHEUS_ANNOTATION_SCRAPE_PATH,
+    SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
+    SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
+    KubernetesOpenMetricsMonitor,
+    K8sPod,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -114,6 +116,99 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             global_config=global_config,
         )
         self.assertTrue(isinstance(monitor._logger.name, mock.Mock))
+
+    def test__get_monitor_config_for_pod_invalid_attributes_annotation(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        monitor._logger = mock_logger
+
+        uid = "uid"
+        name = "name"
+        namespace = "ns"
+        labels = None
+        status_phase = "unknown"
+        ips = []
+
+        base_annotations = {
+            SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE: "true",
+        }
+
+        # 1. value not valid JSON
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "not json". Error: Expecting value: line 1 column 1 (char 0)."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "not json"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 2. value not an object
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "[1, 2, 3]". Expected value to be an object/dictionary, got <class 'list'>."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "[1, 2, 3]"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 3. not all keys and values are string
+        expected_message = """Failed to validate "attributes" annotation for pod ns/name (uid). Attributes value "{'a': '1', 'b': 2, 'c': []}". Expected all the keys and values to be a string."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = '{"a": "1", "b": 2, "c": []}'
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
 
     def test_get_monitor_and_log_config(self):
         monitor_config = {
