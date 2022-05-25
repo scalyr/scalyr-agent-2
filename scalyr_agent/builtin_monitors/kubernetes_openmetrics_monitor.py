@@ -151,11 +151,6 @@ API endpoints.
 This monitor will only work correctly if the agent is deployed as a DaemonSet. That's because each
 monitor instance will only discover metrics endpoints which are local to the node the agent is
 running on.
-
-## TODO
-
-- [ ] Should we include node name (+cluster name - scalyr_k8s_cluster_name ?) with each metric? We
-      already do in the monitor name, so we could just define a special parser for it.
 """
 
 from __future__ import absolute_import
