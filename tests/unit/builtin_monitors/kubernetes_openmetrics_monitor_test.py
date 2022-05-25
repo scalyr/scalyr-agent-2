@@ -24,6 +24,7 @@ import mock
 
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     PROMETHEUS_ANNOTATION_SCRAPE_PATH,
+    PROMETHEUS_ANNOTATION_SCRAPE_PORT,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
     SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
     KubernetesOpenMetricsMonitor,
@@ -135,12 +136,18 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         uid = "uid"
         name = "name"
         namespace = "ns"
-        labels = None
+        labels = {
+            "app": "my-app",
+            "test.bar/bar": "three",
+            "pod-template-hash": "barr",
+            "app.kubernetes.io/instance": "instance-1",
+        }
         status_phase = "unknown"
         ips = []
 
         base_annotations = {
             SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE: "true",
+            PROMETHEUS_ANNOTATION_SCRAPE_PORT: "8080",
         }
 
         # 1. value not valid JSON
@@ -209,6 +216,41 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
 
         self.assertEqual(mock_logger.warn.call_count, 1)
         mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 4. valid values, including template substitution
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[
+            SCALYR_AGENT_ANNOTATION_ATTRIBUTES
+        ] = '{"app": "test", "template-app": "${pod_labels_app}", "three": "${pod_labels_test_bar_bar}", "invalid": "${pod_labels_doesnt_exist}", "instance": "${pod_labels_app_kubernetes_io_instance}"}'
+
+        expected_attributes = {
+            "app": "test",
+            "template-app": "my-app",
+            "three": "three",
+            "invalid": "${pod_labels_doesnt_exist}",
+            "instance": "instance-1",
+        }
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=["127.0.0.1"],
+            status_phase="running",
+        )
+        monitor_config = (
+            monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(
+                pod=k8s_pod
+            )
+        )
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(monitor_config.attributes, expected_attributes)
 
     def test_get_monitor_and_log_config(self):
         monitor_config = {

@@ -167,6 +167,7 @@ from typing import Any
 from typing import Optional
 
 import os
+import re
 import time
 
 from string import Template
@@ -407,6 +408,9 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_exclude_list"
 )
+
+# A regex to determine whether a string contains template directives
+TEMPLATE_RE = re.compile(r"\${[^}]+}")
 
 
 @dataclass
@@ -1015,6 +1019,51 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             isinstance(value, six.text_type) for value in data.values()
         )
 
+    def __get_attributes_template_context(self, pod: K8sPod) -> Dict[str, str]:
+        """
+        Return dictionary with a template context which can be used for variable substitution in
+        "attributes" pod annotation values.
+
+        For consistency we use the same approach as we use for Kubernetes log "attributes" annotation
+        and rename_logfile.
+
+        For example:
+
+            ...
+            k8s.monitor.config.scalyr.com/attributes: '{"app": "${pod_labels_app}"}'
+            ..
+
+        In this case, the value of the pod "app" label would be used.
+        """
+        context = {}
+
+        # 1. Add labels
+        labels = pod.labels or {}
+        label_key = "pod_labels_"
+
+        for label, value in labels.items():
+            # NOTE: Special characters in template names are not supported so we remap them to "_"
+            sanitized_label = (
+                label.replace("/", "_").replace(".", "_").replace("-", "_")
+            )
+            context[label_key + sanitized_label] = value
+
+        return context
+
+    def __render_attributes_templates(
+        self, pod: K8sPod, attributes: Dict[str, str]
+    ) -> Dict[str, str]:
+        """
+        Render any templates in the "attributes" annotation values.
+        """
+        template_context = self.__get_attributes_template_context(pod=pod)
+
+        for key, value in attributes.items():
+            if TEMPLATE_RE.search(value):
+                attributes[key] = Template(value).safe_substitute(template_context)
+
+        return attributes
+
     def __get_monitor_config_for_pod(
         self, pod: K8sPod
     ) -> Optional[OpenMetricsMonitorConfig]:
@@ -1057,6 +1106,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         attributes = pod.annotations.get(SCALYR_AGENT_ANNOTATION_ATTRIBUTES, {})
+        self.__get_attributes_template_context(pod=pod)
 
         if attributes:
             # attributes annotation field needs to contain JSON string
@@ -1083,6 +1133,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 self._logger.warn(
                     f'Failed to validate "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected all the keys and values to be a string.'
                 )
+                attributes = {}
+
+            # At the end, perform any optional Template substitution
+            attributes = self.__render_attributes_templates(
+                pod=pod, attributes=attributes
+            )
 
         if pod.status_phase != "running":
             self._logger.debug(
