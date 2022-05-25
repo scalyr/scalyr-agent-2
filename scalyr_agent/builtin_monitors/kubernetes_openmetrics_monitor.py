@@ -384,9 +384,9 @@ KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
 )
 
 # Annotation related constants
-PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
-PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
-PROMETHEUS_ANNOTATION_SCAPE_PATH = "prometheus.io/path"
+PROMETHEUS_ANNOTATION_SCRAPE_PORT = "prometheus.io/port"
+PROMETHEUS_ANNOTATION_SCRAPE_SCHEME = "prometheus.io/scheme"
+PROMETHEUS_ANNOTATION_SCRAPE_PATH = "prometheus.io/path"
 SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "k8s.monitor.config.scalyr.com/scrape"
 
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
@@ -1018,13 +1018,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         scrape_scheme = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
+            PROMETHEUS_ANNOTATION_SCRAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
         )
         scrape_port = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_PORT, DEFAULT_SCRAPE_PORT
+            PROMETHEUS_ANNOTATION_SCRAPE_PORT, DEFAULT_SCRAPE_PORT
         )
         scrape_path = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_PATH, DEFAULT_SCRAPE_PATH
+            PROMETHEUS_ANNOTATION_SCRAPE_PATH, DEFAULT_SCRAPE_PATH
         )
 
         node_ip = pod.ips[0] if pod.ips else None
