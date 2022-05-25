@@ -42,7 +42,8 @@ monitor:
     * ``k8s.monitor.config.scalyr.com/verify_https`` (optional) - Set to false to disable remote SSL
       cert and hostname validation.
     * ``k8s.monitor.config.scalyr.com/attributes`` (optional) - Optional JSON object with the attributes
-      (key/value pairs) which get included with every metric.
+      (key/value pairs) which get included with every metric. Template syntax is supported for attribute
+      values. Right now only pod labels are available in the template context.
       scrape requests. Defaults to 10 seconds.
     * ``k8s.monitor.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
@@ -80,7 +81,7 @@ for the exporter pod:
             k8s.monitor.config.scalyr.com/scrape:          'true'
             k8s.monitor.config.scalyr.com/scrape_interval: '120'
             k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
-            k8s.monitor.config.scalyr.com/attributes:      '{"app": "node-exporter"}'
+            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "region": "eu"}'
         spec:
         containers:
         - args:
