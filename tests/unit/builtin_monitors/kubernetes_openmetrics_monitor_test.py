@@ -25,7 +25,7 @@ import mock
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     KubernetesOpenMetricsMonitor,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
-    PROMETHEUS_ANNOTATION_SCAPE_PATH,
+    PROMETHEUS_ANNOTATION_SCRAPE_PATH,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -67,7 +67,7 @@ for index, pod in enumerate(
 ):
     if pod["metadata"]["name"] == "arm-exporter-sv7rk":
         pod["metadata"]["annotations"][
-            PROMETHEUS_ANNOTATION_SCAPE_PATH
+            PROMETHEUS_ANNOTATION_SCRAPE_PATH
         ] = "/test/new/path"
 
 
@@ -135,6 +135,14 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "sample_interval": 10,
             "log_filename": "foo.log",
             "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
             "ca_file": None,
             "headers": None,
             "include_node_name": True,
@@ -149,7 +157,12 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         expected_monitor_config = {
             "ca_file": None,
             "extra_fields": JsonObject(
-                {"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
             ),
             "headers": JsonObject({}),
             "id": "one",

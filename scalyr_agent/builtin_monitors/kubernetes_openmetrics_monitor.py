@@ -39,6 +39,10 @@ monitor:
     * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint.
       Defaults to 60 seconds.
     * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out.
+    * ``k8s.monitor.config.scalyr.com/verify_https`` (optional) - Set to false to disable remote SSL
+      cert and hostname validation.
+    * ``k8s.monitor.config.scalyr.com/attributes`` (optional) - Optional JSON object with the attributes
+      (key/value pairs) which get included with every metric.
       scrape requests. Defaults to 10 seconds.
     * ``k8s.monitor.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
@@ -76,6 +80,7 @@ for the exporter pod:
             k8s.monitor.config.scalyr.com/scrape:          'true'
             k8s.monitor.config.scalyr.com/scrape_interval: '120'
             k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
+            k8s.monitor.config.scalyr.com/attributes:      '{"app": "node-exporter"}'
         spec:
         containers:
         - args:
@@ -172,6 +177,7 @@ from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.util import json_decode
 from scalyr_agent.monitors_manager import get_monitors_manager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.monitor_utils.k8s import KubernetesApi
@@ -390,9 +396,10 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
 SCALYR_AGENT_ANNOTATION_SCRAPE_TIMEOUT = "k8s.monitor.config.scalyr.com/scrape_timeout"
 # Set to False to disable ssl cert and hostname verification for a specific exporter (only applies
 # if that exporter is using https scheme)
-SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP = (
+SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTPS = (
     "k8s.monitor.config.scalyr.com/verify_https"
 )
+SCALYR_AGENT_ANNOTATION_ATTRIBUTES = "k8s.monitor.config.scalyr.com/attributes"
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_include_list"
 )
@@ -418,6 +425,7 @@ class OpenMetricsMonitorConfig(object):
     scrape_interval: int
     scrape_timeout: int
     verify_https: bool
+    attributes: Dict[str, str]
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
 
@@ -600,6 +608,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         log_filename: str,
         scrape_timeout: int = None,
         verify_https: str = None,
+        attributes: Dict[str, str] = None,
         ca_file: str = None,
         headers: dict = None,
         metric_name_include_list: List[str] = None,
@@ -611,6 +620,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
         """
+        attributes = attributes or {}
+
         if scrape_timeout is None:
             scrape_timeout = self.__scrape_timeout
 
@@ -647,6 +658,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         }
 
         extra_fields = {}
+        extra_fields.update(attributes)
+
+        # NOTE: k8s-node and k8s-cluster are special attributes so they always need to override
+        # any custom attributes specified by the end user using "attributes" annotation
 
         if include_node_name:
             extra_fields["k8s-node"] = self.__get_node_name()
@@ -818,6 +833,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 ), f"Found duplicated scrape url {scrape_config.scrape_url} for pod {pod.namespace}/{pod.name} ({pod.uid})"
                 scrape_configs[scrape_config.scrape_url] = (scrape_config, pod)
 
+        # TODO: Also re-schedule in case the config changes, not just the URL. In most cases, but
+        # not all, config change will also result in URL change.
         # Schedule monitors as necessary (add any new ones and remove obsolete ones)
         current_scrape_urls = set(self.__running_monitors.keys())
         new_scrape_urls = set(scrape_configs.keys())
@@ -874,6 +891,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             sample_interval=scrape_config.scrape_interval or self.__scrape_interval,
             scrape_timeout=scrape_config.scrape_timeout,
             verify_https=scrape_config.verify_https,
+            attributes=scrape_config.attributes,
             log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
@@ -1025,10 +1043,28 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         node_ip = pod.ips[0] if pod.ips else None
         verify_https = (
             pod.annotations.get(
-                SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP, str(self.__verify_https)
+                SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTPS, str(self.__verify_https)
             ).lower()
             == "true"
         )
+
+        attributes = pod.annotations.get(SCALYR_AGENT_ANNOTATION_ATTRIBUTES, {})
+
+        if attributes:
+            # attributes annotation field needs to contain JSON string
+            try:
+                attributes = json_decode(attributes)
+            except ValueError as e:
+                self._logger.warn(
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Error: {e}'
+                )
+                attributes = {}
+
+            if not isinstance(attributes, dict):
+                attributes_type = type(attributes)
+                self._logger.warn(
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected value to be an object/dictionary, got {attributes_type}'
+                )
 
         if pod.status_phase != "running":
             self._logger.debug(
@@ -1110,6 +1146,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_interval=scrape_interval,
             scrape_timeout=scrape_timeout,
             verify_https=verify_https,
+            attributes=attributes,
             metric_name_include_list=metric_name_include_list,
             metric_name_exclude_list=metric_name_exclude_list,
         )
