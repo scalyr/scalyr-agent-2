@@ -29,6 +29,7 @@ from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
     KubernetesOpenMetricsMonitor,
     K8sPod,
+    TemplateWithSpecialCharacters,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -817,3 +818,16 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_monitors_manager.remove_monitor.assert_any_call(
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_arm-exporter-sv7rk"
         )
+
+    def test_template_with_special_characters(self):
+        context = {
+            "foo": "bar2",
+            "foo.bar/baz-foo": "test2",
+            "FooA": "bar3",
+            "foo-d": "food",
+        }
+        template = (
+            "test hello $world foo ${foo} bar ${foo.bar/baz-foo} ${FooA} f1 ${foo-d}"
+        )
+        result = TemplateWithSpecialCharacters(template).safe_substitute(context)
+        self.assertEqual(result, "test hello $world foo bar2 bar test2 bar3 f1 food")

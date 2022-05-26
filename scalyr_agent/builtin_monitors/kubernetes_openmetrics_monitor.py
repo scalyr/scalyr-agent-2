@@ -446,13 +446,15 @@ class TemplateWithSpecialCharacters(Template):
     since they are only used on Kubernetes with Docker Image which utilizes Python 3).
     """
 
+    # Based on https://github.com/python/cpython/blob/main/Lib/string.py#L74
+
     delimiter = "$"
     pattern = r"""
     \$(?:
-      (?P<escaped>\$) |   # Escape sequence of two delimiters
-      (?P<named>[_a-z][_a-z0-9\-\.\/]*]*)      |   # delimiter and a Python identifier
-      {(?P<braced>[_a-z][_a-z0-9\-\.\/]*)}   |   # delimiter and a braced identifier
-      (?P<invalid>)              # Other ill-formed delimiter exprs
+      (?P<escaped>\$)                             |   # Escape sequence of two delimiters
+      (?P<named>(?a:[_a-z][_a-z0-9\-\.\/]*))      |   # delimiter and a Python identifier
+      {(?P<braced>(?a:[_a-z][_a-z0-9\-\.\/]*))}   |   # delimiter and a braced identifier
+      (?P<invalid>)                                   # Other ill-formed delimiter exprs
     )
     """
 
