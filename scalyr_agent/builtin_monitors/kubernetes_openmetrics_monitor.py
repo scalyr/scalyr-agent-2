@@ -81,7 +81,7 @@ for the exporter pod:
             k8s.monitor.config.scalyr.com/scrape:          'true'
             k8s.monitor.config.scalyr.com/scrape_interval: '120'
             k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
-            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "region": "eu"}'
+            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
         spec:
         containers:
         - args:
@@ -434,6 +434,27 @@ class OpenMetricsMonitorConfig(object):
     attributes: Dict[str, str]
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
+
+
+class TemplateWithSpecialCharacters(Template):
+    """
+    Custom template class which also supports ".", "/" and "-" characters. This way regular Kubernetes
+    annotation keys such as, for example "app.kubernetes.io/instance", don't need to be transformed
+    or sanitized.
+
+    NOTE: This class only supports Python 3 (Open Metrics monitor rely on and use Python 3 only code
+    since they are only used on Kubernetes with Docker Image which utilizes Python 3).
+    """
+
+    delimiter = "$"
+    pattern = r"""
+    \$(?:
+      (?P<escaped>\$) |   # Escape sequence of two delimiters
+      (?P<named>[_a-z][_a-z0-9\-\.\/]*]*)      |   # delimiter and a Python identifier
+      {(?P<braced>[_a-z][_a-z0-9\-\.\/]*)}   |   # delimiter and a braced identifier
+      (?P<invalid>)              # Other ill-formed delimiter exprs
+    )
+    """
 
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
@@ -1043,11 +1064,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         label_key = "pod_labels_"
 
         for label, value in labels.items():
-            # NOTE: Special characters in template names are not supported so we remap them to "_"
-            sanitized_label = (
-                label.replace("/", "_").replace(".", "_").replace("-", "_")
-            )
-            context[label_key + sanitized_label] = value
+            context[label_key + label] = value
 
         return context
 
@@ -1061,7 +1078,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         for key, value in attributes.items():
             if TEMPLATE_RE.search(value):
-                attributes[key] = Template(value).safe_substitute(template_context)
+                attributes[key] = TemplateWithSpecialCharacters(value).safe_substitute(
+                    template_context
+                )
 
         return attributes
 
