@@ -39,6 +39,11 @@ monitor:
     * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint.
       Defaults to 60 seconds.
     * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out.
+    * ``k8s.monitor.config.scalyr.com/verify_https`` (optional) - Set to false to disable remote SSL
+      cert and hostname validation.
+    * ``k8s.monitor.config.scalyr.com/attributes`` (optional) - Optional JSON object with the attributes
+      (key/value pairs) which get included with every metric. Template syntax is supported for attribute
+      values. Right now only pod labels are available in the template context.
       scrape requests. Defaults to 10 seconds.
     * ``k8s.monitor.config.scalyr.com/metric_name_include_list`` (optional) - Comma delimited list
       of metric names to include when scraping.
@@ -76,6 +81,7 @@ for the exporter pod:
             k8s.monitor.config.scalyr.com/scrape:          'true'
             k8s.monitor.config.scalyr.com/scrape_interval: '120'
             k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
+            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
         spec:
         containers:
         - args:
@@ -151,11 +157,6 @@ API endpoints.
 This monitor will only work correctly if the agent is deployed as a DaemonSet. That's because each
 monitor instance will only discover metrics endpoints which are local to the node the agent is
 running on.
-
-## TODO
-
-- [ ] Should we include node name (+cluster name - scalyr_k8s_cluster_name ?) with each metric? We
-      already do in the monitor name, so we could just define a special parser for it.
 """
 
 from __future__ import absolute_import
@@ -163,9 +164,11 @@ from __future__ import absolute_import
 from typing import Dict
 from typing import List
 from typing import Tuple
+from typing import Any
 from typing import Optional
 
 import os
+import re
 import time
 
 from string import Template
@@ -177,6 +180,7 @@ from scalyr_agent import ScalyrMonitor
 from scalyr_agent import define_config_option
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.util import json_decode
 from scalyr_agent.monitors_manager import get_monitors_manager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.monitor_utils.k8s import KubernetesApi
@@ -384,9 +388,9 @@ KUBERNETES_OPEN_METRICS_MONITOR_MODULE = (
 )
 
 # Annotation related constants
-PROMETHEUS_ANNOTATION_SCAPE_PORT = "prometheus.io/port"
-PROMETHEUS_ANNOTATION_SCAPE_SCHEME = "prometheus.io/scheme"
-PROMETHEUS_ANNOTATION_SCAPE_PATH = "prometheus.io/path"
+PROMETHEUS_ANNOTATION_SCRAPE_PORT = "prometheus.io/port"
+PROMETHEUS_ANNOTATION_SCRAPE_SCHEME = "prometheus.io/scheme"
+PROMETHEUS_ANNOTATION_SCRAPE_PATH = "prometheus.io/path"
 SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE = "k8s.monitor.config.scalyr.com/scrape"
 
 SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
@@ -395,15 +399,19 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_INTERVAL = (
 SCALYR_AGENT_ANNOTATION_SCRAPE_TIMEOUT = "k8s.monitor.config.scalyr.com/scrape_timeout"
 # Set to False to disable ssl cert and hostname verification for a specific exporter (only applies
 # if that exporter is using https scheme)
-SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP = (
+SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTPS = (
     "k8s.monitor.config.scalyr.com/verify_https"
 )
+SCALYR_AGENT_ANNOTATION_ATTRIBUTES = "k8s.monitor.config.scalyr.com/attributes"
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_include_list"
 )
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_exclude_list"
 )
+
+# A regex to determine whether a string contains template directives
+TEMPLATE_RE = re.compile(r"\${[^}]+}")
 
 
 @dataclass
@@ -423,8 +431,32 @@ class OpenMetricsMonitorConfig(object):
     scrape_interval: int
     scrape_timeout: int
     verify_https: bool
+    attributes: Dict[str, str]
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
+
+
+class TemplateWithSpecialCharacters(Template):
+    """
+    Custom template class which also supports ".", "/" and "-" characters. This way regular Kubernetes
+    annotation keys such as, for example "app.kubernetes.io/instance", don't need to be transformed
+    or sanitized.
+
+    NOTE: This class only supports Python 3 (Open Metrics monitor rely on and use Python 3 only code
+    since they are only used on Kubernetes with Docker Image which utilizes Python 3).
+    """
+
+    # Based on https://github.com/python/cpython/blob/main/Lib/string.py#L74
+
+    delimiter = "$"
+    pattern = r"""
+    \$(?:
+      (?P<escaped>\$)                        |   # Escape sequence of two delimiters
+      (?P<named>[_a-z][_a-z0-9\-\.\/]*)      |   # delimiter and a Python identifier
+      {(?P<braced>[_a-z][_a-z0-9\-\.\/]*)}   |   # delimiter and a braced identifier
+      (?P<invalid>)                              # Other ill-formed delimiter exprs
+    )
+    """
 
 
 class KubernetesOpenMetricsMonitor(ScalyrMonitor):
@@ -605,6 +637,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         log_filename: str,
         scrape_timeout: int = None,
         verify_https: str = None,
+        attributes: Dict[str, str] = None,
         ca_file: str = None,
         headers: dict = None,
         metric_name_include_list: List[str] = None,
@@ -616,6 +649,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Return monitor config dictionary and log config dictionary for the provided arguments.
         """
+        attributes = attributes or {}
+
         if scrape_timeout is None:
             scrape_timeout = self.__scrape_timeout
 
@@ -652,7 +687,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         }
 
         extra_fields = {}
+        extra_fields.update(attributes)
 
+        # NOTE: k8s-node and k8s-cluster are special attributes so they always need to override
+        # any custom attributes specified by the end user using "attributes" annotation
         if include_node_name:
             extra_fields["k8s-node"] = self.__get_node_name()
 
@@ -823,6 +861,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 ), f"Found duplicated scrape url {scrape_config.scrape_url} for pod {pod.namespace}/{pod.name} ({pod.uid})"
                 scrape_configs[scrape_config.scrape_url] = (scrape_config, pod)
 
+        # TODO: Also re-schedule in case the config changes, not just the URL. In most cases, but
+        # not all, config change will also result in URL change.
         # Schedule monitors as necessary (add any new ones and remove obsolete ones)
         current_scrape_urls = set(self.__running_monitors.keys())
         new_scrape_urls = set(scrape_configs.keys())
@@ -879,6 +919,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             sample_interval=scrape_config.scrape_interval or self.__scrape_interval,
             scrape_timeout=scrape_config.scrape_timeout,
             verify_https=scrape_config.verify_https,
+            attributes=scrape_config.attributes,
             log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
             metric_name_include_list=scrape_config.metric_name_include_list,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
@@ -994,6 +1035,57 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         return result
 
+    def __validate_dict_str_str(self, data: Dict[Any, Any]) -> bool:
+        """
+        Method which validates that all the key and values in teh dictionary are of a string type.
+        """
+        return all(isinstance(key, six.text_type) for key in data.keys()) and all(
+            isinstance(value, six.text_type) for value in data.values()
+        )
+
+    def __get_attributes_template_context(self, pod: K8sPod) -> Dict[str, str]:
+        """
+        Return dictionary with a template context which can be used for variable substitution in
+        "attributes" pod annotation values.
+
+        For consistency we use the same approach as we use for Kubernetes log "attributes" annotation
+        and rename_logfile.
+
+        For example:
+
+            ...
+            k8s.monitor.config.scalyr.com/attributes: '{"app": "${pod_labels_app}"}'
+            ..
+
+        In this case, the value of the pod "app" label would be used.
+        """
+        context = {}
+
+        # 1. Add labels
+        labels = pod.labels or {}
+        label_key = "pod_labels_"
+
+        for label, value in labels.items():
+            context[label_key + label] = value
+
+        return context
+
+    def __render_attributes_templates(
+        self, pod: K8sPod, attributes: Dict[str, str]
+    ) -> Dict[str, str]:
+        """
+        Render any templates in the "attributes" annotation values.
+        """
+        template_context = self.__get_attributes_template_context(pod=pod)
+
+        for key, value in attributes.items():
+            if TEMPLATE_RE.search(value):
+                attributes[key] = TemplateWithSpecialCharacters(value).safe_substitute(
+                    template_context
+                )
+
+        return attributes
+
     def __get_monitor_config_for_pod(
         self, pod: K8sPod
     ) -> Optional[OpenMetricsMonitorConfig]:
@@ -1018,22 +1110,57 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
 
         scrape_scheme = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
+            PROMETHEUS_ANNOTATION_SCRAPE_SCHEME, DEFAULT_SCRAPE_SCHEME
         )
         scrape_port = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_PORT, DEFAULT_SCRAPE_PORT
+            PROMETHEUS_ANNOTATION_SCRAPE_PORT, DEFAULT_SCRAPE_PORT
         )
         scrape_path = pod.annotations.get(
-            PROMETHEUS_ANNOTATION_SCAPE_PATH, DEFAULT_SCRAPE_PATH
+            PROMETHEUS_ANNOTATION_SCRAPE_PATH, DEFAULT_SCRAPE_PATH
         )
 
         node_ip = pod.ips[0] if pod.ips else None
         verify_https = (
             pod.annotations.get(
-                SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTP, str(self.__verify_https)
+                SCALYR_AGENT_ANNOTATION_SCRAPE_VERIFY_HTTPS, str(self.__verify_https)
             ).lower()
             == "true"
         )
+
+        attributes = pod.annotations.get(SCALYR_AGENT_ANNOTATION_ATTRIBUTES, {})
+        self.__get_attributes_template_context(pod=pod)
+
+        if attributes:
+            # attributes annotation field needs to contain JSON string
+            try:
+                attributes = json_decode(attributes)
+            except ValueError as e:
+                self._logger.warn(
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Error: {e}.'
+                )
+                attributes = {}
+
+            # Validate value is an object / dictionary
+            if not isinstance(attributes, dict):
+                attributes_type = type(attributes)
+                self._logger.warn(
+                    f'Failed to JSON decode "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected value to be an object/dictionary, got {attributes_type}.'
+                )
+                attributes = {}
+
+            # Validate all the keys and values are of a string type
+            valid_attributes_values = self.__validate_dict_str_str(data=attributes)
+
+            if not valid_attributes_values:
+                self._logger.warn(
+                    f'Failed to validate "attributes" annotation for pod {pod.namespace}/{pod.name} ({pod.uid}). Attributes value "{attributes}". Expected all the keys and values to be a string.'
+                )
+                attributes = {}
+
+            # At the end, perform any optional Template substitution
+            attributes = self.__render_attributes_templates(
+                pod=pod, attributes=attributes
+            )
 
         if pod.status_phase != "running":
             self._logger.debug(
@@ -1115,6 +1242,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             scrape_interval=scrape_interval,
             scrape_timeout=scrape_timeout,
             verify_https=verify_https,
+            attributes=attributes,
             metric_name_include_list=metric_name_include_list,
             metric_name_exclude_list=metric_name_exclude_list,
         )

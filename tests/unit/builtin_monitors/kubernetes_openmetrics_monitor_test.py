@@ -23,9 +23,13 @@ from io import open
 import mock
 
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
-    KubernetesOpenMetricsMonitor,
+    PROMETHEUS_ANNOTATION_SCRAPE_PATH,
+    PROMETHEUS_ANNOTATION_SCRAPE_PORT,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
-    PROMETHEUS_ANNOTATION_SCAPE_PATH,
+    SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
+    KubernetesOpenMetricsMonitor,
+    K8sPod,
+    TemplateWithSpecialCharacters,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -67,7 +71,7 @@ for index, pod in enumerate(
 ):
     if pod["metadata"]["name"] == "arm-exporter-sv7rk":
         pod["metadata"]["annotations"][
-            PROMETHEUS_ANNOTATION_SCAPE_PATH
+            PROMETHEUS_ANNOTATION_SCRAPE_PATH
         ] = "/test/new/path"
 
 
@@ -115,6 +119,140 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertTrue(isinstance(monitor._logger.name, mock.Mock))
 
+    def test__get_monitor_config_for_pod_invalid_attributes_annotation(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        monitor._logger = mock_logger
+
+        uid = "uid"
+        name = "name"
+        namespace = "ns"
+        labels = {
+            "app": "my-app",
+            "test.bar/bar": "three",
+            "pod-template-hash": "barr",
+            "app.kubernetes.io/instance": "instance-1",
+        }
+        status_phase = "unknown"
+        ips = []
+
+        base_annotations = {
+            SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE: "true",
+            PROMETHEUS_ANNOTATION_SCRAPE_PORT: "8080",
+        }
+
+        # 1. value not valid JSON
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "not json". Error: Expecting value: line 1 column 1 (char 0)."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "not json"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 2. value not an object
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "[1, 2, 3]". Expected value to be an object/dictionary, got <class 'list'>."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "[1, 2, 3]"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 3. not all keys and values are string
+        expected_message = """Failed to validate "attributes" annotation for pod ns/name (uid). Attributes value "{'a': '1', 'b': 2, 'c': []}". Expected all the keys and values to be a string."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = '{"a": "1", "b": 2, "c": []}'
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 4. valid values, including template substitution
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[
+            SCALYR_AGENT_ANNOTATION_ATTRIBUTES
+        ] = '{"app": "test", "template-app": "${pod_labels_app}", "three": "${pod_labels_test.bar/bar}", "invalid": "${pod_labels_doesnt_exist}", "instance": "${pod_labels_app.kubernetes.io/instance}"}'
+
+        expected_attributes = {
+            "app": "test",
+            "template-app": "my-app",
+            "three": "three",
+            "invalid": "${pod_labels_doesnt_exist}",
+            "instance": "instance-1",
+        }
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=["127.0.0.1"],
+            status_phase="running",
+        )
+        monitor_config = (
+            monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(
+                pod=k8s_pod
+            )
+        )
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(monitor_config.attributes, expected_attributes)
+
     def test_get_monitor_and_log_config(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
@@ -135,6 +273,14 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "sample_interval": 10,
             "log_filename": "foo.log",
             "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
             "ca_file": None,
             "headers": None,
             "include_node_name": True,
@@ -149,7 +295,12 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         expected_monitor_config = {
             "ca_file": None,
             "extra_fields": JsonObject(
-                {"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
             ),
             "headers": JsonObject({}),
             "id": "one",
@@ -667,3 +818,16 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_monitors_manager.remove_monitor.assert_any_call(
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_arm-exporter-sv7rk"
         )
+
+    def test_template_with_special_characters(self):
+        context = {
+            "foo": "bar2",
+            "foo.bar/baz-foo": "test2",
+            "FooA": "bar3",
+            "foo-d": "food",
+        }
+        template = (
+            "test hello $world foo ${foo} bar ${foo.bar/baz-foo} ${FooA} f1 ${foo-d}"
+        )
+        result = TemplateWithSpecialCharacters(template).safe_substitute(context)
+        self.assertEqual(result, "test hello $world foo bar2 bar test2 bar3 f1 food")
