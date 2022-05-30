@@ -34,6 +34,7 @@ import os
 import sys
 import time
 import random
+import hashlib
 from threading import Lock
 
 import six
@@ -120,6 +121,9 @@ class ScalyrMonitor(StoppableThread):
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config["module"]
+        self.short_hash = hashlib.sha256(self.monitor_name.encode("utf-8")).hexdigest()[
+            :10
+        ]
 
         # Holds raw monitor name without the part which are specific to monitor instances
         if "." in monitor_config["module"]:
@@ -468,6 +472,17 @@ class ScalyrMonitor(StoppableThread):
         if self.__metric_log_open:
             self._logger.closeMetricLog()
             self.__metric_log_open = False
+
+    def get_calculate_rate_metric_names(self):
+        """
+        Return a list of metric names for this monitor for which rate should be calculated on the
+        agent side.
+
+        This method can either return value which is read from the monitor config or it can obtain
+        a list of those metric names dynamically (e.g. from the OpenMetrics metric schema / type or
+        similar).
+        """
+        return []
 
     # 2->TODO '_is_stopped' name is reserved in python3
     def _is_thread_stopped(self):

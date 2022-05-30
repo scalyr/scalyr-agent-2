@@ -30,6 +30,8 @@ __author__ = "czerwin@scalyr.com"
 
 if False:  # NOSONAR
     from typing import Dict
+    from typing import Optional
+    from typing import Union
 
     # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa
     from scalyr_agent.scalyr_monitor import ScalyrMonitor
@@ -43,6 +45,7 @@ import time
 import threading
 import io
 import inspect
+from collections import defaultdict
 
 import six
 
@@ -69,6 +72,30 @@ DEBUG_LEVEL_2 = 7
 DEBUG_LEVEL_3 = 6
 DEBUG_LEVEL_4 = 5
 DEBUG_LEVEL_5 = 4
+
+# Stores metric values and timestamp for the metrics which we calculate per second rate on the
+# agent.
+# Maps <monitor name short hash>.<metric name> to a tuple (<timestamp_of_previous_colection>,
+# <previously_collected_value>).
+# To avoid collisions across monitors (same metric name can be used by multiple monitors), we prefix
+# metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class> name). We
+# use a short hash and not fully qualified monitor name to reduce memory usage a bit.
+RATE_CALCULATION_METRIC_VALUES = defaultdict(lambda: (None, None))
+
+# If the time delta between previous metric value and current metric value is longer than this
+# amount of seconds (11 minutes by default), we will ignore previous value and not calculate the
+# rate with old metric value.
+MAX_RATE_TIMESTAMP_DELTA_SECONDS = 11 * 60
+
+# If we track rate for more than this many metrics, a warning will be emitted.
+MAX_RATE_METRICS_COUNT_WARN = 5000
+
+MAX_RATE_METRIC_WARN_MESSAGE = """
+Tracking client side rate for over %s metrics. Tracking and calculating rate for that many metrics
+could add overhead in terms of CPU and memory usage.
+""".strip() % (
+    MAX_RATE_METRICS_COUNT_WARN
+)
 
 
 # noinspection PyPep8Naming
@@ -368,6 +395,143 @@ class AgentLogger(logging.Logger):
         # right level.
         __log_manager__.add_logger_instance(self)
 
+    def _should_calculate_metric_rate(self, monitor, metric_name):
+        # type: (ScalyrMonitor, str) -> bool
+        """
+        Return True if client side rate should be calculated for the provided metric.
+        """
+        if not monitor or not monitor._global_config:
+            return False
+
+        config_calculate_rate_metric_names = (
+            monitor._global_config.calculate_rate_metric_names
+        )
+        monitor_calculate_rate_metric_names = monitor.get_calculate_rate_metric_names()
+
+        return (
+            metric_name in config_calculate_rate_metric_names
+            or metric_name in monitor_calculate_rate_metric_names
+        )
+
+    def _calculate_metric_rate(
+        self, monitor, metric_name, metric_value, timestamp=None
+    ):
+        # type: (ScalyrMonitor, str, Union[int, float], Optional[int]) -> Optional[float]
+        """
+        Calculate rate for the provided metric name (if configured to do so).
+
+        :param monitor: Monitor instance.
+        :param metric_name: Metric name,
+        :param metric_value: Metric value.
+        :param timestamp: Optional metric timestamp in ms.
+        """
+        if not self._should_calculate_metric_rate(
+            monitor=monitor, metric_name=metric_name
+        ):
+            return None
+
+        if timestamp:
+            timestamp_s = timestamp / 1000
+        else:
+            timestamp_s = timestamp or int(time.time())
+
+        if not isinstance(metric_value, (int, float)):
+            limit_key = "%s-nan" % (metric_name)
+            monitor._logger.warn(
+                'Metric "%s" is not a number. Cannot calculate rate.' % (metric_name),
+                limit_once_per_x_secs=86400,
+                limit_key=limit_key,
+            )
+            return None
+
+        # To avoid collisions across multiple monitors (same metric name being used by multiple
+        # monitors), we prefix data in internal dictionary with the short hash of the fully
+        # qualified monitor name
+        dict_key = monitor.short_hash + "." + metric_name
+
+        (
+            previous_collection_timestamp,
+            previous_metric_value,
+        ) = RATE_CALCULATION_METRIC_VALUES[dict_key]
+
+        if previous_collection_timestamp is None or previous_metric_value is None:
+            # If this is first time we see this metric, we just store the value sine we don't have
+            # previous sample yet to be able to calculate rate
+            monitor._logger.debug(
+                'No previous data yet for metric "%s", unable to calculate rate yet.'
+                % (metric_name)
+            )
+
+            RATE_CALCULATION_METRIC_VALUES[dict_key] = (timestamp_s, metric_value)
+            return None
+
+        if timestamp_s <= previous_collection_timestamp:
+            monitor._logger.debug(
+                'Current timestamp for metric "%s" is smaller or equal to current timestamp, cant'
+                "calculate rate (timestamp_previous=%s,timestamp_current=%s)"
+                % (metric_name, previous_collection_timestamp, timestamp_s)
+            )
+            return None
+
+        # If time delta between previous and current collection timestamp is too large, we ignore
+        # the previous value (but we still store the latest value for future rate calculations)
+        if (
+            timestamp_s - previous_collection_timestamp
+        ) >= MAX_RATE_TIMESTAMP_DELTA_SECONDS:
+            monitor._logger.debug(
+                'Time delta between previous and current metric collection timestamp for metric "%s"'
+                "is larger than %s seconds, ignoring rate calculation (timestamp_previous=%s,timestamp_current=%s)"
+                % (
+                    metric_name,
+                    MAX_RATE_TIMESTAMP_DELTA_SECONDS,
+                    previous_collection_timestamp,
+                    timestamp_s,
+                )
+            )
+
+            RATE_CALCULATION_METRIC_VALUES[dict_key] = (timestamp_s, metric_value)
+            return None
+
+        # NOTE: Metrics for which we calculate rates need to be counters. This means they
+        # should be increasing over time. If new value is < old value, we skip calculation (same
+        # as the current server side implementation)
+        if metric_value < previous_metric_value:
+            monitor._logger.debug(
+                'Current metric value for metric "%s" is smaller than previous value (current_value=%s,previous_value=%s)'
+                % (metric_name, metric_value, previous_metric_value)
+            )
+            return None
+
+        rate_value = round(
+            (metric_value - previous_metric_value)
+            / (timestamp_s - previous_collection_timestamp),
+            5,
+        )
+
+        RATE_CALCULATION_METRIC_VALUES[dict_key] = (timestamp_s, metric_value)
+
+        if len(RATE_CALCULATION_METRIC_VALUES) > MAX_RATE_METRICS_COUNT_WARN:
+            # Warn if we are tracking rate for a large number of metrics which could cause
+            # performance issues / overhead
+            monitor._logger.warn(
+                MAX_RATE_METRIC_WARN_MESSAGE,
+                limit_once_per_x_secs=86400,
+                limit_key="rate-max-count-reached",
+            )
+
+        monitor._logger.debug(
+            'Calculated rate "%s" for metric "%s" (previous_collection_timestamp=%s,previous_metric_value=%s,current_timestamp=%s,current_value=%s)'
+            % (
+                rate_value,
+                metric_name,
+                previous_collection_timestamp,
+                previous_metric_value,
+                timestamp_s,
+                metric_value,
+            ),
+        )
+        return rate_value
+
     def emit_value(
         self,
         metric_name,
@@ -439,8 +603,7 @@ class AgentLogger(logging.Logger):
             )
             return
 
-        string_buffer = io.StringIO()
-        string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
+        extra_fields_string_buffer = io.StringIO()
 
         if extra_fields is not None:
             # In (C)Python (2) dict keys are not sorted / ordering is not guaranteed so to ensure
@@ -460,17 +623,39 @@ class AgentLogger(logging.Logger):
                     field_name, is_metric=False, logger=self
                 )
 
-                string_buffer.write(
+                extra_fields_string_buffer.write(
                     " %s=%s" % (field_name, util.json_encode(field_value))
                 )
 
         self.info(
-            string_buffer.getvalue(),
+            "%s %s" % (metric_name, util.json_encode(metric_value))
+            + extra_fields_string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
             timestamp=timestamp,
         )
-        string_buffer.close()
+        # string_buffer.close()
+
+        # Calculate and emit metric per second rate value (if configured and available for this
+        # metric.
+        # For consistency with server side, we add "_rate" suffix to the calculated rates.
+        # For example: calculate_rate_metric_names -> calculate_rate_metric_names_rate
+        metric_rate_value = self._calculate_metric_rate(
+            monitor, metric_name, metric_value, timestamp
+        )
+
+        if metric_rate_value:
+            # NOTE: We include extra_fields from the original metric, but that may not be needed
+            metric_name_rate = "%s_rate" % (metric_name)
+            self.info(
+                "%s %s" % (metric_name_rate, util.json_encode(metric_rate_value))
+                + extra_fields_string_buffer.getvalue(),
+                metric_log_for_monitor=monitor,
+                monitor_id_override=monitor_id_override,
+                timestamp=timestamp,
+            )
+
+        extra_fields_string_buffer.close()
 
     def _log(
         self,
