@@ -34,6 +34,7 @@ import threading
 import time
 import traceback
 import functools
+import sys
 from string import Template
 from io import open
 
@@ -350,6 +351,15 @@ define_config_option(
     convert_to=six.text_type,
 )
 
+# NOTE: On Windows on newer Python 3 versions, BlockingIOError is thrown instead of
+# socket.error with EAGAIN when there is no data to be read yet on non blocking socket. And this
+# error is not instanceof socket.error!
+# https://docs.python.org/3/library/exceptions.html#BlockingIOError
+if sys.version_info >= (3, 4, 0):
+    NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS = (BlockingIOError,)
+else:
+    NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS = ()
+
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
@@ -522,6 +532,8 @@ class SyslogRequestParser(object):
                 self.is_closed = True
         except socket.timeout:
             self._socket_error = True
+            return None
+        except NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS:
             return None
         except socket.error as e:
             if e.errno == errno.EAGAIN:

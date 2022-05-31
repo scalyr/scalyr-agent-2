@@ -2091,7 +2091,7 @@ jobs:
       - checkout
       - restore_cache:
           name: Restore Python installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
+          key: windows-v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
 
       - restore_cache:
           name: Restore Wix cache
@@ -2127,7 +2127,7 @@ jobs:
 
       - save_cache:
           name: Save Python Installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
+          key: windows--v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
           paths:
             - "python_installer"
 
