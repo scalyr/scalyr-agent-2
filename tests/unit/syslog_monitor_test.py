@@ -935,9 +935,7 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
             mock_socket_recv.counter += 1
 
             if mock_socket_recv.counter < 3:
-                e = socket.error("EAGAIN", errno.EAGAIN)
-                e.errno = errno.EAGAIN
-                raise e
+                raise socket.error(errno.EAGAIN, "EAGAIN")
 
             return "data1"
 
