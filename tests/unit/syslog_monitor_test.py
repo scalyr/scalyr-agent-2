@@ -31,6 +31,7 @@ import unittest
 import logging
 import uuid
 import os
+import errno
 from io import open
 from io import StringIO
 import threading
@@ -924,6 +925,55 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         # Verify internal state is correctly reset
         self.assertEqual(parser._remaining, bytearray())
         self.assertEqual(parser._offset, 0)
+
+
+class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
+    def test_eagain_is_handled_correctly(self):
+        mock_socket = mock.Mock()
+
+        def mock_socket_recv(buffer_size=1024):
+            mock_socket_recv.counter += 1
+
+            if mock_socket_recv.counter < 3:
+                e = socket.error("EAGAIN", errno.EAGAIN)
+                e.errno = errno.EAGAIN
+                raise e
+
+            return "data1"
+
+        mock_socket_recv.counter = 0
+        mock_socket.recv = mock_socket_recv
+
+        parser = SyslogRequestParser(socket=mock_socket, max_buffer_size=64)
+        self.assertIsNone(parser.read())
+        self.assertEqual(mock_socket_recv.counter, 1)
+        self.assertIsNone(parser.read())
+        self.assertEqual(mock_socket_recv.counter, 2)
+        self.assertEqual(parser.read(), "data1")
+        self.assertEqual(mock_socket_recv.counter, 3)
+
+    @skipIf(sys.version_info < (3, 0, 0), "Skipping under Python 2")
+    def test_eagain_is_handled_correctly_python3(self):
+        mock_socket = mock.Mock()
+
+        def mock_socket_recv(buffer_size=1024):
+            mock_socket_recv.counter += 1
+
+            if mock_socket_recv.counter < 3:
+                raise BlockingIOError("EAGAIN")
+
+            return "data2"
+
+        mock_socket_recv.counter = 0
+        mock_socket.recv = mock_socket_recv
+
+        parser = SyslogRequestParser(socket=mock_socket, max_buffer_size=64)
+        self.assertIsNone(parser.read())
+        self.assertEqual(mock_socket_recv.counter, 1)
+        self.assertIsNone(parser.read())
+        self.assertEqual(mock_socket_recv.counter, 2)
+        self.assertEqual(parser.read(), "data2")
+        self.assertEqual(mock_socket_recv.counter, 3)
 
 
 class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
