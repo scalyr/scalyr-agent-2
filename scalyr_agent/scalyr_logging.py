@@ -73,21 +73,22 @@ DEBUG_LEVEL_3 = 6
 DEBUG_LEVEL_4 = 5
 DEBUG_LEVEL_5 = 4
 
-# Stores metric values and timestamp for the metrics which we calculate per second rate on the
+# Stores metric values and timestamp for the metrics which we calculate per second rate in the
 # agent.
 # Maps <monitor name + monitor instance id short hash>.<metric name> to a tuple
 # (<timestamp_of_previous_colection>, <previously_collected_value>).
 # To avoid collisions across monitors (same metric name can be used by multiple monitors), we prefix
-# metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class> name). We
-# use a short hash and not fully qualified monitor name to reduce memory usage a bit.
-# NOTE: Those values are not large but we should probably still implement some kind of watch dog
-# timer where we periodically purge out entries for values which are older than MAX_RATE_TIMESTAMP_DELTA_SECONDS
+# metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class name>) +
+# monitor instance id. We use a short hash and not fully qualified monitor name to reduce memory
+# usage a bit.
+# NOTE: Those values are not large, but we should probably still implement some kind of watch dog
+# job where we periodically purge out entries for values which are older than MAX_RATE_TIMESTAMP_DELTA_SECONDS
 # (since those won't be used for calculation anyway).
 RATE_CALCULATION_METRIC_VALUES = defaultdict(lambda: (None, None))
 
-# If the time delta between previous metric value and current metric value is longer than this
-# amount of seconds (11 minutes by default), we will ignore previous value and not calculate the
-# rate with old metric value.
+# If the time delta between previous metric collection timestamp value and current metric collection
+# timestamp value is longer than this amount of seconds (11 minutes by default), we will ignore
+# previous value and not calculate the rate with old / stale metric value.
 MAX_RATE_TIMESTAMP_DELTA_SECONDS = 11 * 60
 
 # If we track rate for more than this many metrics, a warning will be emitted.
@@ -443,7 +444,19 @@ class AgentLogger(logging.Logger):
     ):
         # type: (ScalyrMonitor, str, Union[int, float], Optional[int]) -> Optional[float]
         """
-        Calculate rate for the provided metric name (if configured to do so).
+        Calculate per second rate for the provided metric name (if configured to do so).
+
+        The formula used is:
+
+            (<current metric value> - <previous metric value>) / (<current collection timestamp in s> - <previous collection timestamp in s>)
+
+        This method also takes into account and handles the following scenarios:
+
+            - Metric value is not a number
+            - New metric value is smaller than previous one
+            - New metric collection timestamp is smaller or equal to the previous one
+            - Time delta between current and previous metric collection timestamp is larged than the
+              defined upper bound
 
         :param monitor: Monitor instance.
         :param metric_name: Metric name,
