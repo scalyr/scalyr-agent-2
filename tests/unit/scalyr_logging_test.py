@@ -228,6 +228,46 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         )
         monitor_logger.closeMetricLog()
 
+    def test_metric_logging_reserved_extra_field_names_are_sanitized(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        extra_fields = {
+            # Reserved field names
+            "logfile": "logfile",
+            "monitor": "monitor",
+            "metric": "metric",
+            "value": "value",
+            "instance": "instance",
+            "severity": "severity",
+            # Non reserved field names
+            "foo": "bar",
+            "bar": "baz",
+        }
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+        monitor_logger.emit_value("test_name", 5, extra_fields)
+
+        self.assertEquals(monitor_instance.reported_lines, 1)
+
+        # The value should only appear in the metric log file and not the main one.
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="test_name 5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name 5 bar="baz" foo="bar" instance_="instance" logfile_="logfile" metric_="metric" monitor_="monitor" severity_="severity" value_="value"',
+        )
+
+        monitor_logger.closeMetricLog()
+
     def test_metric_logging_extra_fields_are_sorted(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")

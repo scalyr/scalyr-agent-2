@@ -97,6 +97,19 @@ could add overhead in terms of CPU and memory usage.
     MAX_RATE_METRICS_COUNT_WARN
 )
 
+# Stores a list of "reserved" event level attribute names. If we detect metric extra field with this
+# name we sanitize / escape it by adding "_" suffix to the field name. This way we avoid possible
+# collisions with those special / reserved names which could break some tsdb related queries and
+# functionality.
+RESERVED_EVENT_ATTRIBUTE_NAMES = [
+    "logfile",
+    "monitor",
+    "metric",
+    "value",
+    "instance",
+    "severity",
+]
+
 
 # noinspection PyPep8Naming
 def getLogger(name):
@@ -906,6 +919,17 @@ class AgentLogger(logging.Logger):
             self.__monitor = None
 
     @staticmethod
+    def sanitize_metric_field_name(name):
+        """
+        Method which takes care of sanitizing metric field names which are considered special /
+        reserved.
+        """
+        if not name.endswith("_") and name in RESERVED_EVENT_ATTRIBUTE_NAMES:
+            name = name + "_"
+
+        return name
+
+    @staticmethod
     def force_valid_metric_or_field_name(name, is_metric=True, logger=None):
         """Forces the given metric or field name to be valid.
 
@@ -917,6 +941,9 @@ class AgentLogger(logging.Logger):
 
         If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
 
+        This method also ensures any "reserved" event level field names (monitor, metric, value, logfile, serverHost) are
+        sanitized by adding "_" suffix (for consistency with server side parsing).
+
         @param name: The metric name
         @type name: six.text_type
         @param is_metric: Whether or not the name is a metric or field name
@@ -925,6 +952,7 @@ class AgentLogger(logging.Logger):
         @rtype: six.text_type
         """
         if AgentLogger.__metric_or_field_name_rule.match(name) is not None:
+            name = AgentLogger.sanitize_metric_field_name(name=name)
             return name
 
         if is_metric and logger is not None:
@@ -950,6 +978,8 @@ class AgentLogger(logging.Logger):
 
         if not re.match(r"^[_a-zA-Z]", name):
             name = "sa_" + name
+
+        name = AgentLogger.sanitize_metric_field_name(name=name)
         return re.sub(r"[^\w\-\.]", "_", name)
 
     def report_values(self, values, monitor=None):
