@@ -196,6 +196,11 @@ class ScalyrMonitor(StoppableThread):
             "metric_name_blacklist", convert_to=ArrayOfStrings, default=[]
         )
 
+        # List of metric names for which per second rates should be calculated in the agent
+        self._calculate_rate_metric_name = self._config.get(
+            "calculate_rate_metric_names", convert_to=ArrayOfStrings, default=[]
+        )
+
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
         # than sleeping the full sample_interval_secs time.
         self._adjust_sleep_by_gather_time = False
@@ -488,7 +493,7 @@ class ScalyrMonitor(StoppableThread):
         a list of those metric names dynamically (e.g. from the OpenMetrics metric schema / type or
         similar).
         """
-        return []
+        return self._calculate_rate_metric_name
 
     # 2->TODO '_is_stopped' name is reserved in python3
     def _is_thread_stopped(self):

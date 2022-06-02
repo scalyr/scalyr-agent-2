@@ -27,6 +27,7 @@ from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     PROMETHEUS_ANNOTATION_SCRAPE_PORT,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
     SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
+    SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES,
     KubernetesOpenMetricsMonitor,
     K8sPod,
     TemplateWithSpecialCharacters,
@@ -73,6 +74,9 @@ for index, pod in enumerate(
         pod["metadata"]["annotations"][
             PROMETHEUS_ANNOTATION_SCRAPE_PATH
         ] = "/test/new/path"
+        pod["metadata"]["annotations"][
+            SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES
+        ] = "metric5,metric6"
 
 
 class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
@@ -285,6 +289,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "headers": None,
             "include_node_name": True,
             "include_cluster_name": True,
+            "calculate_rate_metric_names": ["metric1", "metric2"],
         }
         (
             monitor_config,
@@ -308,6 +313,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_component_value_include_list": JsonObject({}),
             "metric_name_exclude_list": [],
             "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": ["metric1", "metric2"],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "sample_interval": 10,
             "timeout": 10,
@@ -786,6 +792,12 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
                 "url"
             ],
             "http://10.5.5.5.141:9243/test/new/path",
+        )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
+                "calculate_rate_metric_names"
+            ],
+            ["metric5", "metric6"],
         )
 
         # 4. And now API returns no pods which means all the monitors should be removed
