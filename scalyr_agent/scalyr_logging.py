@@ -111,6 +111,15 @@ RESERVED_EVENT_ATTRIBUTE_NAMES = [
 ]
 
 
+def clear_rate_cache():
+    """
+    Clear internal cache where we store metric values we need to calculate per second rates for
+    whitelisted metrics.
+    """
+    global RATE_CALCULATION_METRIC_VALUES
+    RATE_CALCULATION_METRIC_VALUES = defaultdict(lambda: (None, None))
+
+
 # noinspection PyPep8Naming
 def getLogger(name):
     """Returns a logger instance to use for the given name that implements the Scalyr agent's extra logging features.
@@ -480,7 +489,7 @@ class AgentLogger(logging.Logger):
 
         if timestamp_s <= previous_collection_timestamp:
             monitor._logger.debug(
-                'Current timestamp for metric "%s" is smaller or equal to current timestamp, cant'
+                'Current timestamp for metric "%s" is smaller or equal to current timestamp, cant '
                 "calculate rate (timestamp_previous=%s,timestamp_current=%s)"
                 % (metric_name, previous_collection_timestamp, timestamp_s)
             )
