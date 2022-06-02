@@ -471,7 +471,7 @@ class AgentLogger(logging.Logger):
         if timestamp:
             timestamp_s = timestamp / 1000
         else:
-            timestamp_s = timestamp or int(time.time())
+            timestamp_s = int(time.time())
 
         if not isinstance(metric_value, (int, float)):
             limit_key = "%s-nan" % (metric_name)
@@ -672,7 +672,6 @@ class AgentLogger(logging.Logger):
             monitor_id_override=monitor_id_override,
             timestamp=timestamp,
         )
-        # string_buffer.close()
 
         # Calculate and emit metric per second rate value (if configured and available for this
         # metric.
