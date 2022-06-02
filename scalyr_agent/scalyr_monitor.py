@@ -121,9 +121,15 @@ class ScalyrMonitor(StoppableThread):
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config["module"]
-        self.short_hash = hashlib.sha256(self.monitor_name.encode("utf-8")).hexdigest()[
-            :10
-        ]
+        # NOTE: In case there is only one monitor configured without "id" attribute defined, the
+        # value will be set to empty string. In case there are multiple monitor configs defined, but
+        # the user doesn't explicitly set "id" attribute for those, config index (number) will be
+        # used.
+        self.monitor_id = str(monitor_config.get("id", "") or "default")
+        # Short hash of this monitor instance which is unique across all the monitors
+        self.short_hash = hashlib.sha256(
+            self.monitor_name.encode("utf-8") + b":" + self.monitor_id.encode("utf-8")
+        ).hexdigest()[:10]
 
         # Holds raw monitor name without the part which are specific to monitor instances
         if "." in monitor_config["module"]:

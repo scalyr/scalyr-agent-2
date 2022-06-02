@@ -75,11 +75,14 @@ DEBUG_LEVEL_5 = 4
 
 # Stores metric values and timestamp for the metrics which we calculate per second rate on the
 # agent.
-# Maps <monitor name short hash>.<metric name> to a tuple (<timestamp_of_previous_colection>,
-# <previously_collected_value>).
+# Maps <monitor name + monitor instance id short hash>.<metric name> to a tuple
+# (<timestamp_of_previous_colection>, <previously_collected_value>).
 # To avoid collisions across monitors (same metric name can be used by multiple monitors), we prefix
 # metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class> name). We
 # use a short hash and not fully qualified monitor name to reduce memory usage a bit.
+# NOTE: Those values are not large but we should probably still implement some kind of watch dog
+# timer where we periodically purge out entries for values which are older than MAX_RATE_TIMESTAMP_DELTA_SECONDS
+# (since those won't be used for calculation anyway).
 RATE_CALCULATION_METRIC_VALUES = defaultdict(lambda: (None, None))
 
 # If the time delta between previous metric value and current metric value is longer than this
