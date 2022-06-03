@@ -33,8 +33,8 @@ import mock
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
-from scalyr_agent.scalyr_logging import MAX_RATE_TIMESTAMP_DELTA_SECONDS
-from scalyr_agent.scalyr_logging import MAX_RATE_METRICS_COUNT_WARN
+from scalyr_agent.metrics.base import clear_internal_cache
+from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import skipIf
 
@@ -46,11 +46,11 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
         self.__logger.set_keep_last_record(False)
 
-        scalyr_logging.clear_rate_cache()
+        clear_internal_cache()
 
     def tearDown(self):
         super(ScalyrLoggingTest, self).tearDown()
-        scalyr_logging.clear_rate_cache()
+        clear_internal_cache()
 
     def test_output_to_file(self):
         self.__logger.info("Hello world")
@@ -777,7 +777,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_instance._global_config.calculate_rate_metric_names = []
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
-        for index in range(0, MAX_RATE_METRICS_COUNT_WARN + 1):
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
             monitor_instance._global_config.calculate_rate_metric_names.append(
                 "test_name_%s" % (index)
             )
@@ -794,7 +794,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
         ts = 1
 
-        for index in range(0, MAX_RATE_METRICS_COUNT_WARN + 1):
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
             monitor_logger.emit_value(
                 "test_name_%s" % (index),
                 20,
@@ -802,10 +802,10 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
                 timestamp=(ts * index) * 1000,
             )
 
-        for index in range(0, MAX_RATE_METRICS_COUNT_WARN + 1):
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
             monitor_logger.emit_value(
                 "test_name_%s" % (index),
-                20,
+                30,
                 extra_fields,
                 timestamp=(ts * index + 2) * 1000,
             )
@@ -813,8 +813,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.assertLogFileDoesntContainsLineRegex(
             file_path=metric_file_path, expression="test_name_1_rate1"
         )
+
+        # NOTE: Actual reported metrics should be * 3 since we emit two metrics and for each metric
+        # expect the first one, rate is calculated and emited
         self.assertEquals(
-            monitor_instance.reported_lines, (MAX_RATE_METRICS_COUNT_WARN + 1) * 2
+            monitor_instance.reported_lines,
+            (RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN * 3) + 2,
         )
         monitor_instance._logger.warn.assert_called_with(
             "Tracking client side rate for over 5000 metrics. Tracking and calculating rate for that many metrics\ncould add overhead in terms of CPU and memory usage.",
@@ -892,7 +896,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             "test_name_2",
             130,
             extra_fields,
-            timestamp=(MAX_RATE_TIMESTAMP_DELTA_SECONDS + 60) * 1000,
+            timestamp=(RateMetricFunction.MAX_RATE_TIMESTAMP_DELTA_SECONDS + 60) * 1000,
         )
 
         self.assertEquals(monitor_instance.reported_lines, 4)
@@ -952,8 +956,6 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_success(self):
-        scalyr_logging.clear_rate_cache()
-
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
