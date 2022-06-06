@@ -120,6 +120,7 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.metrics.base import clear_internal_cache
 from scalyr_agent import config_main
 from scalyr_agent import compat
 import scalyr_agent.monitors_manager
@@ -325,6 +326,8 @@ class ScalyrAgent(object):
 
         self.__config_file_path = config_file_path
 
+        no_check_remote = command_options.no_check_remote
+
         try:
             log_warnings = command not in ["status", "stop"]
             self.__config = self.__read_and_verify_config(
@@ -369,9 +372,6 @@ class ScalyrAgent(object):
             os.getcwd(),
             command_options.no_change_user,
         )
-
-        if command_options.no_check_remote is not None:
-            no_check_remote = True
 
         # noinspection PyBroadException
         try:
@@ -1502,6 +1502,9 @@ class ScalyrAgent(object):
                             current_time,
                         )
                     )
+
+                    # Clear metrics functions related cache
+                    clear_internal_cache()
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(

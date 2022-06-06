@@ -302,7 +302,13 @@ class OpenMetricsMonitor(ScalyrMonitor):
         # used for that metric
         timestamp_ms = round(time.time() * 1000)
 
+        start_ts = time.time()
         metrics = self._scrape_metrics(self.__url)
+        end_ts = time.time()
+
+        self._logger.debug(
+            f"Scraping and parsing metrics for url {self.__url} took {(end_ts - start_ts):.3f} seconds."
+        )
 
         for metric_name, extra_fields, metric_value in metrics:
             extra_fields.update(self.__base_extra_fields or {})

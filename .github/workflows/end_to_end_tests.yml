@@ -338,9 +338,9 @@ jobs:
 
           # 4. Verify java app JMX metrics
           echo "Java JMX metrics events metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" runtime="'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" runtime="'
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull

@@ -16,6 +16,7 @@ spec:
         prometheus.io/scrape:             'true'
         prometheus.io/port:               '9404'
         k8s.monitor.config.scalyr.com/scrape: 'true'
+        k8s.monitor.config.scalyr.com/attributes: '{"attribute1": "value1", "app": "${pod_labels_app}"}'
     spec:
       hostNetwork: true
       hostPID: true

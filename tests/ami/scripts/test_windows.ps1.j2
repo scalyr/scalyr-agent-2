@@ -76,7 +76,7 @@ function GetMSIVersion {
 [Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "Machine")
 
 # Increase service startup timeout for tests
-Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control" -Name ServicesPipeTimeout -Value 60000 -Type DWord
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control" -Name ServicesPipeTimeout -Value 80000 -Type DWord
 
 $msi_version=GetMSIVersion -MSI .\install_package.msi
 # Method returns an object so we need to cast it to a String
@@ -266,10 +266,12 @@ Log-Message "Verifying agent.log"
 Log-Message ""
 
 $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+echo $log_output
 
 if ("$log_output" -notmatch "ca_cert_path: C:\\invalid\\ca_certs.crt") { Throw "Invalid ca cert path, agent shouldnt have started" };
 if ("$log_output" -notmatch "failedAgentMain") { Throw "Invalid ca cert path, agent shouldnt have started" };
 if ("$log_output" -notmatch 'Invalid path "C:\\invalid\\ca_certs.crt" specified for the "ca_cert_path"') { Throw "Invalid ca cert path, agent shouldnt have started" };
+#if ("$log_output" -notmatch 'Terminating agent, please fix the error and restart the agent') { Throw "Invalid ca cert path, agent shouldnt have started" };
 
 Log-Message ""
 Log-Message "agent.log output successfully verified"
@@ -427,7 +429,7 @@ For ($i=0; $i -le $files_to_create; $i++) {
     #Add-Content c:\logs\test$i.txt.log "line $i"
 }
 
-Start-Sleep 5
+Start-Sleep 10
 
 Log-Message ""
 Log-Message "Verifying agent status output"

@@ -1,6 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.31 "TBD" - May 17, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
+--->
+
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
+Bug fixes:
+* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
+* Fix a bug in syslog monitor on Windows under Python 3 which would prevent TCP handler from working.
+
+Other:
+* Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
+
 ## 2.1.30 "Heturn" - May 17, 2022
 
 <!---

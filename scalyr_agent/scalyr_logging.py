@@ -71,6 +71,20 @@ DEBUG_LEVEL_4 = 5
 DEBUG_LEVEL_5 = 4
 
 
+# Stores a list of "reserved" event level attribute names. If we detect metric extra field with this
+# name we sanitize / escape it by adding "_" suffix to the field name. This way we avoid possible
+# collisions with those special / reserved names which could break some tsdb related queries and
+# functionality.
+RESERVED_EVENT_ATTRIBUTE_NAMES = [
+    "logfile",
+    "monitor",
+    "metric",
+    "value",
+    "instance",
+    "severity",
+]
+
+
 # noinspection PyPep8Naming
 def getLogger(name):
     """Returns a logger instance to use for the given name that implements the Scalyr agent's extra logging features.
@@ -439,8 +453,7 @@ class AgentLogger(logging.Logger):
             )
             return
 
-        string_buffer = io.StringIO()
-        string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
+        extra_fields_string_buffer = io.StringIO()
 
         if extra_fields is not None:
             # In (C)Python (2) dict keys are not sorted / ordering is not guaranteed so to ensure
@@ -460,17 +473,46 @@ class AgentLogger(logging.Logger):
                     field_name, is_metric=False, logger=self
                 )
 
-                string_buffer.write(
+                extra_fields_string_buffer.write(
                     " %s=%s" % (field_name, util.json_encode(field_value))
                 )
 
         self.info(
-            string_buffer.getvalue(),
+            "%s %s" % (metric_name, util.json_encode(metric_value))
+            + extra_fields_string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
             timestamp=timestamp,
         )
-        string_buffer.close()
+
+        # Run and calculate any functions which should be applied (as configured) to this metric
+        from scalyr_agent.metrics.base import get_functions_for_metric
+
+        function_instances = get_functions_for_metric(
+            monitor=monitor, metric_name=metric_name
+        )
+
+        derived_metrics_to_emit = []
+        for function_instance in function_instances:
+            metric_tuples = function_instance.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                metric_value=metric_value,
+                timestamp=timestamp,
+            )
+            derived_metrics_to_emit.extend(metric_tuples or [])
+
+        # NOTE: We always include original extra_fields (if any) for any derived metrics
+        for derived_metric_name, derived_metric_value in derived_metrics_to_emit:
+            self.info(
+                "%s %s" % (derived_metric_name, util.json_encode(derived_metric_value))
+                + extra_fields_string_buffer.getvalue(),
+                metric_log_for_monitor=monitor,
+                monitor_id_override=monitor_id_override,
+                timestamp=timestamp,
+            )
+
+        extra_fields_string_buffer.close()
 
     def _log(
         self,
@@ -721,6 +763,17 @@ class AgentLogger(logging.Logger):
             self.__monitor = None
 
     @staticmethod
+    def sanitize_metric_field_name(name):
+        """
+        Method which takes care of sanitizing metric field names which are considered special /
+        reserved.
+        """
+        if not name.endswith("_") and name in RESERVED_EVENT_ATTRIBUTE_NAMES:
+            name = name + "_"
+
+        return name
+
+    @staticmethod
     def force_valid_metric_or_field_name(name, is_metric=True, logger=None):
         """Forces the given metric or field name to be valid.
 
@@ -732,6 +785,9 @@ class AgentLogger(logging.Logger):
 
         If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
 
+        This method also ensures any "reserved" event level field names (monitor, metric, value, logfile, serverHost) are
+        sanitized by adding "_" suffix (for consistency with server side parsing).
+
         @param name: The metric name
         @type name: six.text_type
         @param is_metric: Whether or not the name is a metric or field name
@@ -740,6 +796,7 @@ class AgentLogger(logging.Logger):
         @rtype: six.text_type
         """
         if AgentLogger.__metric_or_field_name_rule.match(name) is not None:
+            name = AgentLogger.sanitize_metric_field_name(name=name)
             return name
 
         if is_metric and logger is not None:
@@ -765,6 +822,8 @@ class AgentLogger(logging.Logger):
 
         if not re.match(r"^[_a-zA-Z]", name):
             name = "sa_" + name
+
+        name = AgentLogger.sanitize_metric_field_name(name=name)
         return re.sub(r"[^\w\-\.]", "_", name)
 
     def report_values(self, values, monitor=None):
