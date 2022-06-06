@@ -797,7 +797,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
                 "calculate_rate_metric_names"
             ],
-            ["metric5", "metric6"],
+            ["openmetrics_monitor:metric5", "openmetrics_monitor:metric6"],
         )
 
         # 4. And now API returns no pods which means all the monitors should be removed

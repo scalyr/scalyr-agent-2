@@ -78,12 +78,13 @@ for the exporter pod:
             app.kubernetes.io/component: exporter
             app.kubernetes.io/name: node-exporter
         annotations:
-            prometheus.io/scrape:                          'true'
-            prometheus.io/port:                            '9100'
-            k8s.monitor.config.scalyr.com/scrape:          'true'
-            k8s.monitor.config.scalyr.com/scrape_interval: '120'
-            k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
-            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
+            prometheus.io/scrape:                                     'true'
+            prometheus.io/port:                                       '9100'
+            k8s.monitor.config.scalyr.com/scrape:                     'true'
+            k8s.monitor.config.scalyr.com/scrape_interval:            '120'
+            k8s.monitor.config.scalyr.com/scrape_timeout:              '5'
+            k8s.monitor.config.scalyr.com/attributes:                  '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
+            k8s.monitor.config.scalyr.com/calculate_rate_metric_names: 'docker.cpu_usage_total_seconds,docker.memory_usage_total'
         spec:
         containers:
         - args:
@@ -1257,6 +1258,14 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         calculate_rate_metric_names = (
             calculate_rate_metric_names and calculate_rate_metric_names.split(",") or []
         )
+
+        # We prefix each metric name by the monitor name. This makes end user annotation based
+        # configuration a bit nicer since the user doesn't need to specify the monitor name itself
+        # there
+        calculate_rate_metric_names = [
+            "%s:%s" % ("openmetrics_monitor", metric_name)
+            for metric_name in calculate_rate_metric_names
+        ]
 
         return OpenMetricsMonitorConfig(
             scrape_url=scrape_url,

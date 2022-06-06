@@ -121,6 +121,10 @@ class ScalyrMonitor(StoppableThread):
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config["module"]
+        # Includes just the monitor module name. For example, if the full module name is
+        # "scalyr_agent.builtin_monitors.symlink_file_monitor", module name would be
+        # "symlink_file_monitor"
+        self.monitor_module_name = self.monitor_name.split(".")[-1]
         # NOTE: In case there is only one monitor configured without "id" attribute defined, the
         # value will be set to empty string. In case there are multiple monitor configs defined, but
         # the user doesn't explicitly set "id" attribute for those, config index (number) will be

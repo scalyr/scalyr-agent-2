@@ -779,7 +779,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
         for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
             monitor_instance._global_config.calculate_rate_metric_names.append(
-                "test_name_%s" % (index)
+                "fake_monitor_module:test_name_%s" % (index)
             )
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -829,7 +829,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_metric_value_not_a_number(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -869,7 +871,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_invalid_timestamp(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -904,7 +908,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_new_metric_smaller_than_previous(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -930,7 +936,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_not_whitelisted(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -957,7 +965,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_success(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
-        monitor_instance._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
 
         # NOTE: We close the fd here because we open it again below. This way file deletion at
@@ -1022,14 +1032,20 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     ):
         # Ensure there are no collisions in case two monitors use the same metric name
         monitor_instance_1 = ScalyrLoggingTest.FakeMonitor("testing-one")
-        monitor_instance_1._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance_1._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
 
         # Same monitor name, but a different instance id
         monitor_instance_2 = ScalyrLoggingTest.FakeMonitor("testing-one", "two")
-        monitor_instance_2._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance_2._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
 
         monitor_instance_3 = ScalyrLoggingTest.FakeMonitor("testing-two")
-        monitor_instance_3._global_config.calculate_rate_metric_names = ["test_name_2"]
+        monitor_instance_3._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
 
         metric_file_fd_1, metric_file_path_1 = tempfile.mkstemp(".log")
         metric_file_fd_2, metric_file_path_2 = tempfile.mkstemp(".log")
@@ -1127,6 +1143,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         def __init__(self, name, monitor_id=None):
             self.__name = name
             self.monitor_id = str(monitor_id or "default")
+            self.monitor_module_name = "fake_monitor_module"
             self.short_hash = hashlib.sha256(
                 self.__name.encode("utf-8") + b":" + self.monitor_id.encode("utf-8")
             ).hexdigest()[:10]

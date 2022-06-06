@@ -240,14 +240,16 @@ could add overhead in terms of CPU and memory usage.
         if not monitor or not monitor._global_config:
             return False
 
+        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
+
         config_calculate_rate_metric_names = (
             monitor._global_config.calculate_rate_metric_names
         )
         monitor_calculate_rate_metric_names = monitor.get_calculate_rate_metric_names()
 
         return (
-            metric_name in config_calculate_rate_metric_names
-            or metric_name in monitor_calculate_rate_metric_names
+            config_entry_key in config_calculate_rate_metric_names
+            or config_entry_key in monitor_calculate_rate_metric_names
         )
 
     @classmethod
