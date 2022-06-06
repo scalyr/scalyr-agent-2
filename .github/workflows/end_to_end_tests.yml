@@ -341,9 +341,11 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" runtime="'
 
           # Client side calculated per second rate metrics
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_threads_started_total "'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_memory_pool_allocated_bytes_total "'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "process_cpu_seconds_total_rate "'
+          # NOTE: There is no easy way to assert on the actual rate metric value here (we have unit tests for that)
+          # so we just assert that the metric is present.
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_threads_started_total_rate" "app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_memory_pool_allocated_bytes_total_rate" "app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "process_cpu_seconds_total_rate" "app=\"java-hello-world\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
