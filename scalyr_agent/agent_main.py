@@ -120,6 +120,7 @@ from scalyr_agent.platform_controller import (
 )
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.metrics.base import clear_internal_cache
 from scalyr_agent import config_main
 from scalyr_agent import compat
 import scalyr_agent.monitors_manager
@@ -1501,6 +1502,9 @@ class ScalyrAgent(object):
                             current_time,
                         )
                     )
+
+                    # Clear metrics functions related cache
+                    clear_internal_cache()
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(

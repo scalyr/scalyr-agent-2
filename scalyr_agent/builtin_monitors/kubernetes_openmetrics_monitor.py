@@ -49,6 +49,8 @@ monitor:
       of metric names to include when scraping.
     * ``k8s.monitor.config.scalyr.com/metric_name_exclude_list`` (optional) - Comma delimited list
       of metric names to exclude from scraping.
+    * ``k8s.monitor.config.scalyr.com/calculate_rate_metric_names`` (optional) - Comma delimited list
+      of metric names for which per-second rates should be calculated in the agent.
 
 "prometheus.io/*" annotations are de-facto annotations used by various other Prometheus metrics
 exporters auto discovery mechanisms.
@@ -76,12 +78,13 @@ for the exporter pod:
             app.kubernetes.io/component: exporter
             app.kubernetes.io/name: node-exporter
         annotations:
-            prometheus.io/scrape:                          'true'
-            prometheus.io/port:                            '9100'
-            k8s.monitor.config.scalyr.com/scrape:          'true'
-            k8s.monitor.config.scalyr.com/scrape_interval: '120'
-            k8s.monitor.config.scalyr.com/scrape_timeout:  '5'
-            k8s.monitor.config.scalyr.com/attributes:      '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
+            prometheus.io/scrape:                                     'true'
+            prometheus.io/port:                                       '9100'
+            k8s.monitor.config.scalyr.com/scrape:                     'true'
+            k8s.monitor.config.scalyr.com/scrape_interval:            '120'
+            k8s.monitor.config.scalyr.com/scrape_timeout:              '5'
+            k8s.monitor.config.scalyr.com/attributes:                  '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
+            k8s.monitor.config.scalyr.com/calculate_rate_metric_names: 'docker.cpu_usage_total_seconds,docker.memory_usage_total'
         spec:
         containers:
         - args:
@@ -409,6 +412,11 @@ SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_INCLUDE_LIST = (
 SCALYR_AGENT_ANNOTATION_SCRAPE_METRICS_NAME_EXCLUDE_LIST = (
     "k8s.monitor.config.scalyr.com/metric_name_exclude_list"
 )
+# A list of metric names for which rates should be calculated on the agent
+SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES = (
+    "k8s.monitor.config.scalyr.com/calculate_rate_metric_names"
+)
+
 
 # A regex to determine whether a string contains template directives
 TEMPLATE_RE = re.compile(r"\${[^}]+}")
@@ -434,6 +442,7 @@ class OpenMetricsMonitorConfig(object):
     attributes: Dict[str, str]
     metric_name_include_list: List[str]
     metric_name_exclude_list: List[str]
+    calculate_rate_metric_names: List[str]
 
 
 class TemplateWithSpecialCharacters(Template):
@@ -643,6 +652,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         metric_name_include_list: List[str] = None,
         metric_name_exclude_list: List[str] = None,
         metric_component_value_include_list: dict = None,
+        calculate_rate_metric_names: List[str] = None,
         include_node_name: bool = False,
         include_cluster_name: bool = False,
     ) -> Tuple[dict, dict]:
@@ -668,6 +678,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         if metric_component_value_include_list is None:
             metric_component_value_include_list = {}
 
+        if calculate_rate_metric_names is None:
+            calculate_rate_metric_names = []
+
         monitor_config = {
             "module": OPEN_METRICS_MONITOR_MODULE,
             "id": monitor_id,
@@ -684,6 +697,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             "metric_component_value_include_list": JsonObject(
                 metric_component_value_include_list
             ),
+            "calculate_rate_metric_names": calculate_rate_metric_names,
         }
 
         extra_fields = {}
@@ -854,7 +868,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
             if scrape_config:
                 self._logger.debug(
-                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})',
+                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid}) with scrape config "{scrape_config}"',
                 )
                 assert (
                     scrape_config.scrape_url not in scrape_configs
@@ -922,6 +936,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             attributes=scrape_config.attributes,
             log_filename=f"openmetrics_monitor-{node_name}-{pod.name}.log",
             metric_name_include_list=scrape_config.metric_name_include_list,
+            calculate_rate_metric_names=scrape_config.calculate_rate_metric_names,
             metric_name_exclude_list=scrape_config.metric_name_exclude_list,
             include_node_name=self.__include_node_name,
             include_cluster_name=self.__include_cluster_name,
@@ -1237,6 +1252,21 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             metric_name_exclude_list and metric_name_exclude_list.split(",") or []
         )
 
+        calculate_rate_metric_names = pod.annotations.get(
+            SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES, None
+        )
+        calculate_rate_metric_names = (
+            calculate_rate_metric_names and calculate_rate_metric_names.split(",") or []
+        )
+
+        # We prefix each metric name by the monitor name. This makes end user annotation based
+        # configuration a bit nicer since the user doesn't need to specify the monitor name itself
+        # there
+        calculate_rate_metric_names = [
+            "%s:%s" % ("openmetrics_monitor", metric_name)
+            for metric_name in calculate_rate_metric_names
+        ]
+
         return OpenMetricsMonitorConfig(
             scrape_url=scrape_url,
             scrape_interval=scrape_interval,
@@ -1245,4 +1275,5 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             attributes=attributes,
             metric_name_include_list=metric_name_include_list,
             metric_name_exclude_list=metric_name_exclude_list,
+            calculate_rate_metric_names=calculate_rate_metric_names,
         )

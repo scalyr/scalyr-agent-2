@@ -70,6 +70,7 @@ DEBUG_LEVEL_3 = 6
 DEBUG_LEVEL_4 = 5
 DEBUG_LEVEL_5 = 4
 
+
 # Stores a list of "reserved" event level attribute names. If we detect metric extra field with this
 # name we sanitize / escape it by adding "_" suffix to the field name. This way we avoid possible
 # collisions with those special / reserved names which could break some tsdb related queries and
@@ -452,8 +453,7 @@ class AgentLogger(logging.Logger):
             )
             return
 
-        string_buffer = io.StringIO()
-        string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
+        extra_fields_string_buffer = io.StringIO()
 
         if extra_fields is not None:
             # In (C)Python (2) dict keys are not sorted / ordering is not guaranteed so to ensure
@@ -473,17 +473,46 @@ class AgentLogger(logging.Logger):
                     field_name, is_metric=False, logger=self
                 )
 
-                string_buffer.write(
+                extra_fields_string_buffer.write(
                     " %s=%s" % (field_name, util.json_encode(field_value))
                 )
 
         self.info(
-            string_buffer.getvalue(),
+            "%s %s" % (metric_name, util.json_encode(metric_value))
+            + extra_fields_string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
             timestamp=timestamp,
         )
-        string_buffer.close()
+
+        # Run and calculate any functions which should be applied (as configured) to this metric
+        from scalyr_agent.metrics.base import get_functions_for_metric
+
+        function_instances = get_functions_for_metric(
+            monitor=monitor, metric_name=metric_name
+        )
+
+        derived_metrics_to_emit = []
+        for function_instance in function_instances:
+            metric_tuples = function_instance.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                metric_value=metric_value,
+                timestamp=timestamp,
+            )
+            derived_metrics_to_emit.extend(metric_tuples or [])
+
+        # NOTE: We always include original extra_fields (if any) for any derived metrics
+        for derived_metric_name, derived_metric_value in derived_metrics_to_emit:
+            self.info(
+                "%s %s" % (derived_metric_name, util.json_encode(derived_metric_value))
+                + extra_fields_string_buffer.getvalue(),
+                metric_log_for_monitor=monitor,
+                monitor_id_override=monitor_id_override,
+                timestamp=timestamp,
+            )
+
+        extra_fields_string_buffer.close()
 
     def _log(
         self,
