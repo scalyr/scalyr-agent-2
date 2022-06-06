@@ -14,8 +14,8 @@
 # ------------------------------------------------------------------------
 
 """
-This module contains various functions which can be applied to metrics to calculate various derived
-values (e.g. rates, aggregations, etc).
+This module contains various functions which can be applied to metrics to calculate derived values
+such as rates, derivatives, aggregations, etc.
 """
 
 if False:
@@ -51,6 +51,12 @@ class MetricFunction(six.with_metaclass(ABCMeta)):
         # type: (ScalyrMonitor, six.text_type, Union[int, float], Optional[int]) -> Optional[List[Tuple[str, float]]]
         """
         Run function on the provided metric and return any derived metrics which should be emitted.
+
+        :param monitor: ScalyrMonitor instance.
+        :param metric_name: Metric name.
+        :param metric_value: Metric value.
+        :param timestamp: Optional timestamp of metric collection in ms. If not provided, we
+                          default to current time.
         """
         pass
 
@@ -58,7 +64,7 @@ class MetricFunction(six.with_metaclass(ABCMeta)):
     def clear_cache(cls):
         # type: () -> None
         """
-        Clear any internal cache used by the class.
+        Clear any internal cache used by the class (if any).
         """
         pass
 

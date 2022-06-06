@@ -41,13 +41,13 @@ LOG = getLogger(__name__)
 
 
 # Stores a list of class instance (singleton) for each available metric function.
-# TODO: Once we only support Python 3 use registry / adapter pattern
+# TODO: Once we only support Python 3 use registry / adapter pattern.
 FUNCTIONS_REGISTRY = {
     "rate": RateMetricFunction(),
 }
 
-# Stores cached list of MetricFunction class instances for the provided monitor and metric name
-# This cache needs to be invalidated each time config is reloaded and a chance is found.
+# Stores cached list of MetricFunction class instances for the provided monitor and metric name.
+# This cache needs to be invalidated each time config is reloaded and config change is detected.
 MONITOR_METRIC_TO_FUNCTIONS_CACHE = (
     {}
 )  # type: Dict[six.text_type, List[MetricFunction]]
@@ -59,10 +59,6 @@ def get_functions_for_metric(monitor, metric_name):
     Return a list of class instances for functions which should be applied to this metric.
 
     TODO:
-
-      - [ ] To speed things up, we should cache this result per metric name or similar (this does
-           increase the complexity though since we would need to invalidate the cache on each
-           config reload and similar).
       - [ ] To speed up the common case then there are no functions defined, we should short circuit
            in such scenario.
     """
