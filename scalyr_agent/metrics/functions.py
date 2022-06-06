@@ -36,6 +36,10 @@ import six
 
 
 class MetricFunction(six.with_metaclass(ABCMeta)):
+    # Suffix which get's added to the derived metric name. For example, if metric name is
+    # "cpu.seconds_total", derived rate metric would be named "cpu.seconds_total_rate"
+    METRIC_SUFFIX = ""  # type: str
+
     @classmethod
     @abstractmethod
     def should_calculate(cls, monitor, metric_name):
@@ -70,6 +74,8 @@ class MetricFunction(six.with_metaclass(ABCMeta)):
 
 
 class RateMetricFunction(MetricFunction):
+    METRIC_SUFFIX = "_rate"
+
     # Stores metric values and timestamp for the metrics which we calculate per second rate in the
     # agent.
     # Maps <monitor name + monitor instance id short hash>.<metric name> to a tuple
@@ -221,7 +227,7 @@ could add overhead in terms of CPU and memory usage.
             ),
         )
 
-        rate_metric_name = "%s_rate" % (metric_name)
+        rate_metric_name = "%s%s" % (metric_name, cls.METRIC_SUFFIX)
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
         return result
