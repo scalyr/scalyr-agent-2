@@ -867,7 +867,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
             if scrape_config:
                 self._logger.debug(
-                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})',
+                    f'Found scrape url "{scrape_config.scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid}) with scrape config "{scrape_config}"',
                 )
                 assert (
                     scrape_config.scrape_url not in scrape_configs
