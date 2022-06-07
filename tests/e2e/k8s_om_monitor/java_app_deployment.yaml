@@ -12,12 +12,13 @@ spec:
     metadata:
       labels:
         app: java-hello-world
+        app.kubernetes.io/instance: java-hello-world-1
       annotations:
         prometheus.io/scrape:             'true'
         prometheus.io/port:               '9404'
         k8s.monitor.config.scalyr.com/scrape: 'true'
         k8s.monitor.config.scalyr.com/scrape_interval: '30'
-        k8s.monitor.config.scalyr.com/attributes: '{"attribute1": "value1", "app": "${pod_labels_app}"}'
+        k8s.monitor.config.scalyr.com/attributes: '{"attribute1": "value1", "app": "${pod_labels_app}", "app_instance": "${pod_labels_app.kubernetes.io/instance}"}'
         k8s.monitor.config.scalyr.com/calculate_rate_metric_names: 'jvm_threads_started_total,jvm_memory_pool_allocated_bytes_total,process_cpu_seconds_total'
     spec:
       hostNetwork: true
