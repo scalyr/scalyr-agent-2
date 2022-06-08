@@ -13,21 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import pathlib as pl
-import sys
+set -e
 
-output_dir = pl.Path(os.environ["STEP_OUTPUT_PATH"])
-result_file_path = output_dir / "result.txt"
+cached_result_path="$STEP_OUTPUT_PATH/result.txt"
 
-base_step_file = pl.Path(os.environ["BASE_RESULT_FILE_PATH"])
-base_step_result = base_step_file.read_text()
+echo "${INPUT}" > "$cached_result_path"
+echo "shell" >> "$cached_result_path"
 
-dependency_step_output = pl.Path(sys.argv[1])
-dependency_result_file = dependency_step_output / "result.txt"
-dependency_result = dependency_result_file.read_text()
-
-step_input = os.environ["INPUT"]
-result_file_path.write_text(
-    f"{base_step_result}\n{dependency_result}\n{step_input}_python"
-)
+if [ -f "/docker" ]; then
+  echo "docker" >> "$cached_result_path"
+fi

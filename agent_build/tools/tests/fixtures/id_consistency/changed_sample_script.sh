@@ -1,5 +1,4 @@
-#!/bin/sh
-# Copyright 2014-2021 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import pathlib as pl
-
-output_dir = pl.Path(os.environ["STEP_OUTPUT_PATH"])
-result_file_path = output_dir / "result.txt"
-
-input_value = os.environ["INPUT"]
-result_file_path.write_text(f"{input_value}_python")
+echo "TEST2"

@@ -1,5 +1,4 @@
-#!/bin/sh
-# Copyright 2014-2021 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
-
-DEPENDENCY_STEP_OUTPUT="$1"
-
-cat "${BASE_RESULT_FILE_PATH}" >> "$STEP_OUTPUT_PATH/result.txt"
-echo "" >> "$STEP_OUTPUT_PATH/result.txt"
-
-cat "${DEPENDENCY_STEP_OUTPUT}/result.txt" >> "$STEP_OUTPUT_PATH/result.txt"
-echo "" >> "$STEP_OUTPUT_PATH/result.txt"
-
-echo "${INPUT}_shell" | tr -d "\n" >> "$STEP_OUTPUT_PATH/result.txt"
+echo "TEST"
