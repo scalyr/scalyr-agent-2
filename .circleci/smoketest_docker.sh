@@ -110,7 +110,7 @@ agent_image="scalyr-agent-${log_mode}"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
-python3 build_package_new.py "${log_mode}-debian" --tag "local_image" --coverage --platforms linux/amd64
+python3 build_package_new.py "${log_mode}-debian" --tag "local_image" --testing --platforms linux/amd64
 docker image ls
 
 
