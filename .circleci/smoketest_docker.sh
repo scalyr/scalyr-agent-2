@@ -119,7 +119,7 @@ docker run -d --name ${contname_agent} \
 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
 -v /var/run/docker.sock:/var/scalyr/docker.sock \
 ${jsonlog_containers_mount} ${syslog_driver_portmap} \
-"${agent_image}:local_image"
+"${agent_image}:local_image-testing"
 
 # Capture agent short container ID
 agent_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_agent")

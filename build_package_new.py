@@ -32,7 +32,7 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
-from agent_build.agent_builders import IMAGE_BUILDS
+from agent_build.agent_builders import IMAGE_BUILDERS
 from agent_build.tools.common import AGENT_BUILD_OUTPUT
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
@@ -47,9 +47,11 @@ if __name__ == "__main__":
     # Add subparsers for all packages except docker builders.
     subparsers = parser.add_subparsers(dest="package_name", required=True)
 
-    all_package_builders = IMAGE_BUILDS.copy()
+    all_builders = {
+        **IMAGE_BUILDERS
+    }
 
-    for builder_name, builder in all_package_builders.items():
+    for builder_name, builder_cls in all_builders.items():
         package_parser = subparsers.add_parser(name=builder_name)
 
         # Define argument for all packages
@@ -86,19 +88,13 @@ if __name__ == "__main__":
         )
 
         package_parser.add_argument(
-            "--show-all-used-steps-ids",
-            dest="show_all_used_steps_ids",
-            action="store_true"
-        )
-
-        package_parser.add_argument(
             "--build-root-dir",
             dest="build_root_dir",
             required=False
         )
 
         # If that's a docker image builder, then add additional commands.
-        if builder_name in IMAGE_BUILDS:
+        if builder_name in IMAGE_BUILDERS:
             package_parser.add_argument(
                 "--registry",
                 help="Registry (or repository) name where to push the result image.",
@@ -127,7 +123,9 @@ if __name__ == "__main__":
             package_parser.add_argument(
                 "--testing",
                 action="store_true",
-                required=False
+                required=False,
+                help="Produce test version of the agent docker image, which includes additional features such "
+                     "coverage measuring tool"
             )
 
         else:
@@ -160,13 +158,14 @@ if __name__ == "__main__":
         build_root_path = AGENT_BUILD_OUTPUT
 
     # If that's a docker image builder handle their arguments too.
-    if builder_name in IMAGE_BUILDS:
-        build_cls = IMAGE_BUILDS[builder_name]
+    if builder_name in IMAGE_BUILDERS:
+        builder_cls = IMAGE_BUILDERS[builder_name]
+
         if args.platforms:
             platforms_to_build = args.platforms.split(",")
         else:
             platforms_to_build = []
-        build = build_cls(
+        build = builder_cls(
             registry=args.registry,
             user=args.user,
             tags=args.tag or [],
@@ -174,11 +173,7 @@ if __name__ == "__main__":
             platforms_to_build=platforms_to_build,
             testing=args.testing
         )
-        if args.show_all_used_steps_ids:
-            print(json.dumps(build.all_used_cacheable_steps_ids))
-            exit(0)
-        else:
-            build.run(
-                build_root=build_root_path
-            )
+        build.run(
+            build_root=build_root_path
+        )
         exit(0)

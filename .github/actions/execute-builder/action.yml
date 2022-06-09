@@ -1,19 +1,19 @@
-name: 'Execute step runner.'
+name: 'Execute builder'
 description: |
   Prepares current machine by perfroming the set of 'Steps', which are defined in the 'agent_build' folder.
 inputs:
   builder-name:
-    description: "Name of the step runner"
+    description: "Name of the builder"
     required: true
 
   build-root-dir:
-    description: "Directory where runner steps will store their results."
+    description: "Directory where builder's steps will store their results."
     required: true
 
   cache-version-suffix:
     description: "Cache key suffix. Can be changed when it is needed to invalidate the cache."
     required: false
-    default: v34
+    default: v35
 
 runs:
   using: 'node12'

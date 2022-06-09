@@ -122,7 +122,7 @@ echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
 cp .circleci/scalyr-agent-2-with-extra-config.yaml .
-perl -pi.bak -e 's#image\:\s+(\S+)#image: scalyr-k8s-agent:local_k8s_image#' scalyr-agent-2-with-extra-config.yaml
+perl -pi.bak -e 's#image\:\s+(\S+)#image: scalyr-k8s-agent:local_k8s_image-testing#' scalyr-agent-2-with-extra-config.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-with-extra-config.yaml
 
 kubectl create -f ./scalyr-agent-2-with-extra-config.yaml

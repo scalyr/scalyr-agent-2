@@ -93,17 +93,6 @@ if __name__ == "__main__":
             help="Additional suffix for the name of the agent instances.",
         )
 
-        run_package_test_parser.add_argument(
-            "--show-all-used-steps-ids",
-            dest="show_all_used_steps_ids",
-            action="store_true"
-        )
-
-    get_tests_github_matrix_parser = subparsers.add_parser(
-        "get-package-builder-tests-github-matrix"
-    )
-    get_tests_github_matrix_parser.add_argument("package_name")
-
     args = parser.parse_args()
 
     if args.command == "list":
@@ -127,10 +116,6 @@ if __name__ == "__main__":
                     "name_suffix", default=str(datetime.datetime.now().timestamp())
                 ),
             )
-
-            if args.show_all_used_steps_ids:
-                print(json.dumps(package_test.all_used_cacheable_steps_ids))
-                exit(0)
 
             package_test.run(
                 build_root=build_root_path

@@ -47,6 +47,7 @@ def main(
     result_image_name: str,
     python_base_image_name: str,
 ):
+
     # Clear previously created container, ix exists
     kill_registry_container()
 

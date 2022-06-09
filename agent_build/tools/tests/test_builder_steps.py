@@ -67,7 +67,7 @@ def test_docker_images():
             f"BASE_IMAGE_NAME={image_name}",
             "-t",
             test_image_name,
-            str(_BUILD_STEPS_DIR)
+            str(_FIXTURES_PATH)
         ])
 
         result[script_type] = test_image_name
@@ -103,7 +103,6 @@ def create_artifact_step(
             additional_settings={
                 "INPUT": "TEST_ARTIFACT_STEP",
             },
-            cacheable=True
         )
 
         return step
@@ -157,10 +156,12 @@ def test_artifact_step(
         script_type=script_type,
         in_docker=in_docker
     )
-    with mock.patch.object(step2, "_run", wraps=step2._run) as _run_mock:
-        step2.run(build_root=build_root_path)
-        # The internal "_run" method has to be skipped, since we reused existing results.
-        assert _run_mock.call_count == 0
+
+    step2.run(build_root=build_root_path)
+    # with mock.patch.object(step2, "_run", wraps=step2._run) as _run_mock:
+    #     step2.run(build_root=build_root_path)
+    #     # The internal "_run" method has to be skipped, since we reused existing results.
+    #     assert _run_mock.call_count == 0
 
 
 @pytest.fixture
@@ -192,7 +193,6 @@ def create_environment_step(test_docker_images):
                 "INPUT": "TEST_ENVIRONMENT_STEP",
                 "RESULT_FILE_PATH": str(result_file_path),
             },
-            cacheable=True
         )
         return step
 
@@ -314,18 +314,10 @@ def test_complex_step(
         result_file_path=base_step_result_file_path
     )
 
-    # Check ids of all steps that are used by base step.
-    # That has to be only the id of the base step itself.
-    assert base_step.all_used_cacheable_steps_ids == [base_step.id]
-
     dependency_step = create_artifact_step(
         script_type=dependency_script_type,
         in_docker=dependency_in_docker
     )
-
-    # Check all used ids for the dependency step.
-    # It does not have any previous steps, so it contain only its own id.
-    assert dependency_step.all_used_cacheable_steps_ids == [dependency_step.id]
 
     scripts_path = _FIXTURES_PATH / "complex_step"
     if script_type == "shell":
@@ -342,19 +334,9 @@ def test_complex_step(
             "INPUT": "FINAL_ARTIFACT_STEP",
             "BASE_RESULT_FILE_PATH": str(base_step_result_file_path)
         },
-        cacheable=True,
     )
 
-    # Check all ids. For now, the result also has to contain ids of all previous steps.
-    assert final_step.all_used_cacheable_steps_ids == [
-        *dependency_step.all_used_cacheable_steps_ids,
-        *base_step.all_used_cacheable_steps_ids,
-        final_step.id
-    ]
-
     build_root = tmp_path / "build_root"
-    build_root = pl.Path("/Users/arthur/work/agents/scalyr-agent-2/build_test")
-
 
     final_step.run(
         build_root=build_root
@@ -405,7 +387,7 @@ def test_steps_id_consistency(tmp_path):
         additional_settings={
             "NAME": "VALUE"
         },
-        )
+    )
 
     assert step.id == same_step.id
 

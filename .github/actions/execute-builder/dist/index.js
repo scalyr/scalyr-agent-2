@@ -58036,12 +58036,10 @@ async function executeBuilder() {
     const executeStepsRunnerScriptPath = path.join(".github", "actions", "execute-builder", "helper.py");
     // Run special github-related helper command which returns names for ids of all steps, which are used in the current
     // runner.
-    console.log("RUUN");
     const output = child_process.execFileSync(
         "python3",
         [executeStepsRunnerScriptPath, builderName, "get-cacheable-steps-ids"]
     );
-    console.log("RUUN2");
     // Read and decode names from json.
     const json_encoded_step_ids = buffer.Buffer.from(output, 'utf8').toString();
     const steps_ids = JSON.parse(json_encoded_step_ids);
@@ -58057,17 +58055,14 @@ async function executeBuilder() {
             cacheVersionSuffix
         );
     }
-    console.log("RUUN3");
 
     // Run the step. Also provide cache directory, if there are some found caches, then the step
     // has to reuse them.
     child_process.execFileSync(
         "python3",
-        [executeStepsRunnerScriptPath, builderName, "execute", "--build-root-dir", buildRootDir],
+        [executeStepsRunnerScriptPath, builderName, "execute-cacheable-steps", "--build-root-dir", buildRootDir],
         {stdio: 'inherit'}
     );
-
-    console.log("RUUN4");
 
     // Run through the cache folder and save any cached directory within, that is not yet cached.
     //const filenames = fs.readdirSync(finalCacheDir);
@@ -58081,16 +58076,13 @@ async function executeBuilder() {
             cacheVersionSuffix,
         );
     }
-        console.log("RUUN5");
 }
 
 
 async function run() {
     // Entry function. Just catch any error and pass it to GH Actions.
   try {
-      console.log('HELLO');
       await executeBuilder();
-      console.log('BYE');
   } catch (error) {
     core.setFailed(error.message);
   }
