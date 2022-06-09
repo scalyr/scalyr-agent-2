@@ -24,10 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json" ]
-        image-distro-name: [ "debian" ]
-#        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
-#        image-distro-name: [ "debian", "alpine" ]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.12" ]
     env:
       DOCKER_BUILDKIT: 1
