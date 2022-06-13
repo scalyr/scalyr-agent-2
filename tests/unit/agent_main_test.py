@@ -591,3 +591,52 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     @staticmethod
     def fake_get_useage_info():
         return 0, 0, 0
+
+
+class TestAgentMainArgumentParsing:
+
+    def __init__(self):
+        self.agent_main_path = os.path.join(__scalyr__.get_install_root(), "scalyr_agent", "agent_main.py")
+
+    def test_help(self):
+
+
+
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+             subprocess.check_output(
+                [
+                    sys.executable,
+                    self.agent_main_path,
+                    "-h",
+                ],
+                stderr=subprocess.PIPE,
+            ).decode()
+
+        assert "usage: agent_main.py [-h] [-c FILE]" in err_info.value.stderr.decode()
+
+    def test_no_command(self):
+        agent_main_path = os.path.join(__scalyr__.get_install_root(), "scalyr_agent", "agent_main.py")
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+             subprocess.check_output(
+                [
+                    sys.executable,
+                    self.agent_main_path,
+                    "-c",
+                    "path/to/config"
+                ],
+                stderr=subprocess.PIPE,
+            ).decode()
+
+        assert "usage: agent_main.py {start,stop,status,restart,condrestart" in err_info.value.stderr.decode()
+
+    def test_windows_service(self):
+        agent_main_path = os.path.join(__scalyr__.get_install_root(), "scalyr_agent", "agent_main.py")
+        subprocess.check_call(
+            [
+                sys.executable,
+                self.agent_main_path,
+                "service"
+            ],
+            stderr=subprocess.PIPE,
+        ).decode()
+

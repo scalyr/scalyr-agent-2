@@ -2217,7 +2217,14 @@ if __name__ == "__main__":
     my_controller.add_options(parser)
 
     # Parse the main command by command parser.
-    command_args, other_argv = command_parser.parse_known_args()
+    raw_args = command_parser.parse_known_args()
+
+    # If argument parser ends with error, it does not exit automatically and just returns None.
+    if not raw_args:
+        command_parser.print_help(file=sys.stderr)
+        exit(1)
+
+    command_args, other_argv = raw_args
 
     # If command is not specified, then we just print usage of the this script.
     if command_args.command is None:
