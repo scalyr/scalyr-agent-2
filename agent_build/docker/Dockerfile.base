@@ -42,8 +42,8 @@ RUN apk update && apk add --virtual build-dependencies \
 FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install nightly
-RUN rustup default nightly
+RUN rustup toolchain install nightly-2022-04-14
+RUN rustup default nightly-2022-04-14
 
 # There's no precompiled rust installation for armv7 so we replace the previous stage with this and do nothing.
 FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rustv7
