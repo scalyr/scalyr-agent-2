@@ -55,7 +55,7 @@ jobs:
         id: qemu
         uses: docker/setup-qemu-action@27d0a4f181a40b142cce983c5393082c365d1480 # v1.2.0
         with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
+          image: tonistiigi/binfmt:master
           platforms: all
 
       - name: Perform the build of the base docker image in the deployment.
