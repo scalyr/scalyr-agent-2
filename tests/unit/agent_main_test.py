@@ -666,4 +666,7 @@ class TestAgentMainArgumentParsing:
             self._run_command_get_output(["service"])
 
         # The service return an error, but at least we know that the script processes this case right.
-        assert "The service process could not connect to the service controller." in err_info.value.stderr.decode()
+        assert (
+            "The service process could not connect to the service controller."
+            in err_info.value.stderr.decode()
+        )
