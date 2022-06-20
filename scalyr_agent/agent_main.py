@@ -2178,11 +2178,7 @@ if __name__ == "__main__":
         usage="scalyr-agent-2 [options] ({})".format("|".join(commands)),
     )
 
-    parser.add_argument(
-        "command",
-        help="Agent command to run",
-        choices=commands
-    )
+    parser.add_argument("command", help="Agent command to run", choices=commands)
 
     parser.add_argument(
         "-c",

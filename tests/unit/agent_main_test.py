@@ -620,85 +620,39 @@ class TestAgentMainArgumentParsing:
                 "-h",
             ]
         )
-        assert """usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version|config)
 
-positional arguments:
-  {start,stop,status,restart,condrestart,version,config}
-                        Agent command to run
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -c FILE, --config-file FILE
-                        Read configuration from FILE
-  --extra-config-dir PATH
-                        An extra directory to check for configuration files
-  -q, --quiet           Only print error messages when running the start,
-                        stop, and condrestart commands
-  -v, --verbose         For status command, prints detailed information about
-                        running agent.
-  -H, --health_check    For status command, prints health check status. Return
-                        code will be 0 for a passing check, and 2 for failing
-  --format STATUS_FORMAT
-                        Format to use (text / json) for the agent status
-                        command.
-  --no-fork             For the run command, does not fork the program to the
-                        background.
-  --no-check-remote-server
-                        For the start command, does not perform the first
-                        check to see if the agent can communicate with the
-                        Scalyr servers. The agent will just keep trying to
-                        contact it in the background until it is successful.
-                        This is useful if the network is not immediately
-                        available when the agent starts.
-  -p PID_FILE, --pid-file PID_FILE
-                        The path storing the running agent's process id. Only
-                        used if config cannot be parsed.
-  --no-change-user      Forces agent to not change which user is executing
-                        agent. Requires the right user is already being used.
-                        This is used internally to prevent infinite loops in
-                        changing to the correct user. Users should not need to
-                        set this option.
-""" in output
+        assert "{start,stop,status,restart,condrestart,version,config" in output
+        assert "-c FILE, --config-file FILE" in output
+        assert "-c FILE, --config-file FILE" in output
 
     def test_empty_command(self):
         with pytest.raises(subprocess.CalledProcessError) as err_info:
-            self._run_command_get_output(
-                []
-            )
+            self._run_command_get_output([])
 
         assert err_info.value.returncode == 2
-        assert err_info.value.stderr.decode() == """usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version|config)
-agent_main.py: error: the following arguments are required: command
-"""
+        assert (
+            "agent_main.py: error: the following arguments are required: command"
+            in err_info.value.stderr.decode()
+        )
 
     def test_optional_arg_without_positional(self):
         with pytest.raises(subprocess.CalledProcessError) as err_info:
-            self._run_command_get_output(
-                ["--config", "path"]
-            )
+            self._run_command_get_output(["--config", "path"])
 
         assert err_info.value.returncode == 2
-        assert err_info.value.stderr.decode() == """usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version|config)
+        assert (
+            err_info.value.stderr.decode()
+            == """usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version|config)
 agent_main.py: error: the following arguments are required: command
 """
-
-    def test_config(self):
-        output = self._run_command_get_output(
-            ["config", "-h"]
         )
 
-        assert """usage: agent_main.py [-h] [-c FILE] [--set-key-from-stdin] [--set-key API_KEY]
-                     [--set-scalyr-server SCALYR_SERVER]
-                     [--set-server-host SERVER_HOST]
-                     [--set-user EXECUTING_USER]
-                     [--upgrade-tarball UPGRADE_TARBALL]
-                     [--preserve-old-install] [--import-config IMPORT_CONFIG]
-                     [--export-config EXPORT_CONFIG]
-                     [--docker-create-custom-dockerfile CREATE_CUSTOM_DOCKERFILE]
-                     [--k8s-create-custom-dockerfile CREATE_CUSTOM_K8S_DOCKERFILE]
-                     [--set-python {default,python,python2,python3}]
-                     [--report-python-version]
-""" in output
+    def test_config(self):
+        output = self._run_command_get_output(["config", "-h"])
+
+        # Verify that some config-specific options are there.
+        assert "--set-user EXECUTING_USER" in output
+        assert "--export-config EXPORT_CONFIG" in output
 
     @pytest.mark.skipif(
         platform.system() != "Windows",
