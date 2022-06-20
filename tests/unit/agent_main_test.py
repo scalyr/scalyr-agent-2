@@ -661,6 +661,9 @@ class TestAgentMainArgumentParsing:
         reason="Skip windows service test on non-Windows systems.",
     )
     def test_windows_service(self):
-        output = self._run_command_get_output(["service"])
 
-        assert output == "111"
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output(["service"])
+
+        # The service return an error, but at least we know that the script processes this case right.
+        assert "The service process could not connect to the service controller." in err_info.value.stderr.decode()
