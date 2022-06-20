@@ -2151,8 +2151,38 @@ if __name__ == "__main__":
     )
     command_parser.add_argument("command", choices=commands)
 
+    # Parse the main command by command parser.
+    raw_args = command_parser.parse_known_args()
+
+    # If argument parser ends with error, it does not exit automatically and just returns None.
+    if raw_args:
+        args, other_argv = raw_args
+        if args.command == "service":
+            # Windows specific command that tell to start Agent's Windows service.
+            from scalyr_agent import platform_windows
+
+            # Create fully valid command line args so the Windows service could handle it properly.
+            argv = [sys.argv[0]]
+            argv.extend(other_argv)
+            platform_windows.parse_options(argv)
+            exit(0)
+
+        if args.command == "config":
+            # Add the config option. So we can configure the agent from the same executable.
+            # It has to save us from building multiple frozen binaries, when packaging.
+            config_main.parse_config_options(other_argv)
+            exit(0)
+
     # Also create parser for the agent command line.
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        usage="scalyr-agent-2 [options] ({})".format("|".join(commands)),
+    )
+
+    parser.add_argument(
+        "command",
+        help="Agent command to run",
+        choices=commands
+    )
 
     parser.add_argument(
         "-c",
@@ -2216,38 +2246,7 @@ if __name__ == "__main__":
     )
     my_controller.add_options(parser)
 
-    # Parse the main command by command parser.
-    raw_args = command_parser.parse_known_args()
-
-    # If argument parser ends with error, it does not exit automatically and just returns None.
-    if not raw_args:
-        command_parser.print_help(file=sys.stderr)
-        exit(1)
-
-    command_args, other_argv = raw_args
-
-    # If command is not specified, then we just print usage of the this script.
-    if command_args.command is None:
-        parser.print_help(file=sys.stderr)
-        exit(1)
-
-    if command_args.command == "service":
-        # Windows specific command that tell to start Agent's Windows service.
-        from scalyr_agent import platform_windows
-
-        # Create fully valid command line args so the Windows service could handle it properly.
-        argv = [sys.argv[0]]
-        argv.extend(other_argv)
-        platform_windows.parse_options(argv)
-        exit(0)
-
-    if command_args.command == "config":
-        # Add the config option. So we can configure the agent from the same executable.
-        # It has to save us from building multiple frozen binaries, when packaging.
-        config_main.parse_config_options(other_argv)
-        exit(0)
-
-    options = parser.parse_args(args=other_argv)
+    options = parser.parse_args()
 
     my_controller.consume_options(options)
 
@@ -2259,7 +2258,7 @@ if __name__ == "__main__":
     main_rc = 1
     try:
         main_rc = ScalyrAgent(my_controller).main(
-            options.config_filename, command_args.command, options
+            options.config_filename, options.command, options
         )
     except Exception as mainExcept:
         print(six.text_type(mainExcept), file=sys.stderr)
