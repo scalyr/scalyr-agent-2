@@ -623,29 +623,31 @@ class TestAgentMainArgumentParsing:
 
         assert "{start,stop,status,restart,condrestart,version,config" in output
         assert "-c FILE, --config-file FILE" in output
-        assert "-c FILE, --config-file FILE" in output
 
     def test_empty_command(self):
         with pytest.raises(subprocess.CalledProcessError) as err_info:
             self._run_command_get_output([])
 
         assert err_info.value.returncode == 2
-        assert (
-            "agent_main.py: error: the following arguments are required: command"
-            in err_info.value.stderr.decode()
-        )
+
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
 
     def test_optional_arg_without_positional(self):
         with pytest.raises(subprocess.CalledProcessError) as err_info:
             self._run_command_get_output(["--config", "path"])
 
         assert err_info.value.returncode == 2
-        assert (
-            err_info.value.stderr.decode()
-            == """usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version|config)
-agent_main.py: error: the following arguments are required: command
-"""
-        )
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
 
     def test_config(self):
         output = self._run_command_get_output(["config", "-h"])
