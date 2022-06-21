@@ -977,6 +977,9 @@ class ContainerChecker(StoppableThread):
             target=self.check_containers, name="Container Checker"
         )
 
+        self.docker_loggers = []
+        self.raw_logs = []
+
     def start(self):
         self.__load_checkpoints()
         self.containers = _get_containers(
