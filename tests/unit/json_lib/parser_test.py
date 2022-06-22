@@ -24,7 +24,11 @@ import unittest
 
 import pytest
 
-from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException, JsonArray, JsonObject
+from scalyr_agent.json_lib.parser import (
+    TextScanner,
+    JsonParser,
+    JsonParseException,
+)
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -343,7 +347,9 @@ class JsonParserTests(ScalyrTestCase):
         with pytest.raises(JsonParseException) as err_info:
             JsonParser.parse(json_data)
 
-        assert "Expected string literal for object attribute name (got ']')" in str(err_info.value)
+        assert "Expected string literal for object attribute name (got ']')" in str(
+            err_info.value
+        )
 
     def test_trailing_comment(self):
         json_data = """
@@ -362,7 +368,7 @@ class JsonParserTests(ScalyrTestCase):
 
         assert data.to_dict() == {
             "api_key": "<key>",
-            "monitors": [{"module": "my_module"}]
+            "monitors": [{"module": "my_module"}],
         }
 
 

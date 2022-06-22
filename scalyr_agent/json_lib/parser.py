@@ -225,7 +225,7 @@ class JsonParser(object):
         if next_char is not None:
             raise JsonParseException(
                 "Expecting EOF, got '{}'".format(next_char),
-                position=self.__scanner.position
+                position=self.__scanner.position,
             )
 
         return value
@@ -311,7 +311,11 @@ class JsonParser(object):
                 self.__scanner.read_uchar()
                 return result_object
             else:
-                return self.__error("Expected string literal for object attribute name (got '{}')".format(c))
+                return self.__error(
+                    "Expected string literal for object attribute name (got '{}')".format(
+                        c
+                    )
+                )
 
             if key is not None:
                 key = six.ensure_text(key)
