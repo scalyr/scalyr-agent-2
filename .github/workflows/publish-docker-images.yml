@@ -18,6 +18,9 @@ on:
       DOCKER_HUB_PASSWORD:
         required: true
 
+permissions:
+  contents: read
+
 env:
   DOCKER_BUILDKIT: 1
   # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.

@@ -3,6 +3,9 @@ name: Docker Images Build
 
 on: [push]
 
+permissions:
+  contents: read
+
 # Agent Docker image tests
 #
 # To test this workflow with your branch, make the following changes:
