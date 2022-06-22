@@ -226,7 +226,9 @@ class JsonParser(object):
         next_char = self.__peek_next_non_whitespace()
         if next_char is not None:
             raise JsonParseException(
-                "Expecting EOF, got '{}'".format(next_char),
+                "Expecting end of the parsed document at the character '{}', got character '{}' instead".format(
+                    self.__scanner.position, next_char
+                ),
                 position=self.__scanner.position,
             )
 

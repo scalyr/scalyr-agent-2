@@ -292,7 +292,10 @@ class JsonParserTests(ScalyrTestCase):
         with pytest.raises(JsonParseException) as err_info:
             JsonParser.parse(json_data)
 
-        assert "Expecting EOF, got 'f'" in str(err_info.value)
+        assert (
+            "Expecting end of the parsed document at the character '105', got character 'f' instead"
+            in str(err_info.value)
+        )
 
     def test_comma_at_the_end(self):
         json_data = """
@@ -305,7 +308,10 @@ class JsonParserTests(ScalyrTestCase):
         with pytest.raises(JsonParseException) as err_info:
             JsonParser.parse(json_data)
 
-        assert "Expecting EOF, got ','" in str(err_info.value)
+        assert (
+            "Expecting end of the parsed document at the character '114', got character ',' instead"
+            in str(err_info.value)
+        )
 
     def test_commented_start_of_the_object(self):
         """
@@ -330,7 +336,10 @@ class JsonParserTests(ScalyrTestCase):
         with pytest.raises(JsonParseException) as err_info:
             JsonParser.parse(json_data)
 
-        assert "Expecting EOF, got 'm'" in str(err_info.value)
+        assert (
+            "Expecting end of the parsed document at the character '451', got character 'm' instead"
+            in str(err_info.value)
+        )
 
     def test_commented_list_beginning(self):
         json_data = """
