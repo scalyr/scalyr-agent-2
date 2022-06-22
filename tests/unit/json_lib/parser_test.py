@@ -22,6 +22,8 @@ __author__ = "czerwin@scalyr.com"
 
 import unittest
 
+import pytest
+
 from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -272,6 +274,67 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x.get("b"), 3)
         self.assertEquals(x.get("c"), True)
         self.assertEquals(x.get("d"), "Hello")
+
+    def test_commented_start_of_the_object(self):
+        """
+        Since the JSON parser supports comments, there may be the case where the beginning of the object is
+        (accidentally) commented, so the internal fields of that object are parsed as fields of the external object.
+        :return:
+        """
+        data = """
+            {
+              api_key: ",key."
+              // server_attributes: {       // the beginning of the nested object is commented.
+                 serverHost: "HOST",        // the 'serverHost' field is wrongly parsed as a filed of outer object.
+              }                             // this brackets are treated as end of the whole JSON document.
+            
+              // Everything that remains is just ignored, bad.
+              monitors: [
+                {
+                   module:  "my_module",
+                },
+              ]
+            }
+"""
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(data)
+
+        assert "Parser has processed the input data but has not reached its end. " \
+               "Parsing stopped at 456, characters left unread: 120. " \
+               "Please check the document for errors and " \
+               "also pay attention to the commented lines" in str(err_info.value)
+
+    def test_commented_list_beginning(self):
+        json = """
+                {
+                    list: [
+                        // nested_list: [
+                            1,
+                            2,
+                            3
+                        ]
+                    ]
+                }
+                """
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json)
+
+        assert "Expected string literal for object attribute name (got ']')" in str(err_info.value)
+
+    def test_t(self):
+        data = """
+        {
+          api_key: ",key."
+          monitors: [
+            {
+               module:  "my_module",
+            },
+          ]
+        }
+        // comment
+        """
+
+        JsonParser.parse(data)
 
 
 def main():
