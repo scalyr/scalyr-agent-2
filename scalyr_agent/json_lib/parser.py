@@ -224,11 +224,7 @@ class JsonParser(object):
         next_char = self.__peek_next_non_whitespace()
         if next_char is not None:
             raise JsonParseException(
-                "Parser has processed the input data but has not reached its end. "
-                "Parsing stopped at {}, characters left unread: {}. "
-                "Please check the document for errors and also pay attention to the commented lines".format(
-                    self.__scanner.position, self.__scanner.characters_remaining
-                ),
+                "Expecting EOF, got '{}'".format(next_char),
                 position=self.__scanner.position
             )
 

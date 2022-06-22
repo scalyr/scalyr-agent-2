@@ -24,7 +24,7 @@ import unittest
 
 import pytest
 
-from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException
+from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException, JsonArray, JsonObject
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -275,20 +275,47 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x.get("c"), True)
         self.assertEquals(x.get("d"), "Hello")
 
+    def test_unexpected_object_end(self):
+        json_data = """
+            {
+                api_key: ",key."
+                field1: 1,
+            }
+                filed2: 2
+            }
+        """
+
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert "Expecting EOF, got 'f'" in str(err_info.value)
+
+    def test_comma_at_the_end(self):
+        json_data = """
+            {
+                api_key: "<key>"
+                field1: 1,
+                field2: 2
+            },
+        """
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert "Expecting EOF, got ','" in str(err_info.value)
+
     def test_commented_start_of_the_object(self):
         """
         Since the JSON parser supports comments, there may be the case where the beginning of the object is
         (accidentally) commented, so the internal fields of that object are parsed as fields of the external object.
-        :return:
         """
-        data = """
+        json_data = """
             {
               api_key: ",key."
               // server_attributes: {       // the beginning of the nested object is commented.
                  serverHost: "HOST",        // the 'serverHost' field is wrongly parsed as a filed of outer object.
               }                             // this brackets are treated as end of the whole JSON document.
             
-              // Everything that remains is just ignored, bad.
+              // Everything that remains is just ignored, that's bad.
               monitors: [
                 {
                    module:  "my_module",
@@ -297,15 +324,12 @@ class JsonParserTests(ScalyrTestCase):
             }
 """
         with pytest.raises(JsonParseException) as err_info:
-            JsonParser.parse(data)
+            JsonParser.parse(json_data)
 
-        assert "Parser has processed the input data but has not reached its end. " \
-               "Parsing stopped at 456, characters left unread: 120. " \
-               "Please check the document for errors and " \
-               "also pay attention to the commented lines" in str(err_info.value)
+        assert "Expecting EOF, got 'm'" in str(err_info.value)
 
     def test_commented_list_beginning(self):
-        json = """
+        json_data = """
                 {
                     list: [
                         // nested_list: [
@@ -317,14 +341,14 @@ class JsonParserTests(ScalyrTestCase):
                 }
                 """
         with pytest.raises(JsonParseException) as err_info:
-            JsonParser.parse(json)
+            JsonParser.parse(json_data)
 
         assert "Expected string literal for object attribute name (got ']')" in str(err_info.value)
 
-    def test_t(self):
-        data = """
+    def test_trailing_comment(self):
+        json_data = """
         {
-          api_key: ",key."
+          api_key: "<key>"
           monitors: [
             {
                module:  "my_module",
@@ -334,7 +358,12 @@ class JsonParserTests(ScalyrTestCase):
         // comment
         """
 
-        JsonParser.parse(data)
+        data = JsonParser.parse(json_data)
+
+        assert data.to_dict() == {
+            "api_key": "<key>",
+            "monitors": [{"module": "my_module"}]
+        }
 
 
 def main():
