@@ -226,10 +226,11 @@ class JsonParser(object):
         next_char = self.__peek_next_non_whitespace()
         if next_char is not None:
             raise JsonParseException(
-                "Expecting end of the parsed document at the character '{}', got character '{}' instead".format(
-                    self.__scanner.position, next_char
+                "Expecting end of the parsed document but got character '{}' instead.".format(
+                    next_char
                 ),
                 position=self.__scanner.position,
+                line_number=self.__scanner.line_number,
             )
 
         return value

@@ -293,8 +293,8 @@ class JsonParserTests(ScalyrTestCase):
             JsonParser.parse(json_data)
 
         assert (
-            "Expecting end of the parsed document at the character '105', got character 'f' instead"
-            in str(err_info.value)
+            "Expecting end of the parsed document but got character 'f' instead. (line 6, byte position 105)"
+            == str(err_info.value)
         )
 
     def test_comma_at_the_end(self):
@@ -309,8 +309,8 @@ class JsonParserTests(ScalyrTestCase):
             JsonParser.parse(json_data)
 
         assert (
-            "Expecting end of the parsed document at the character '114', got character ',' instead"
-            in str(err_info.value)
+            "Expecting end of the parsed document but got character ',' instead. (line 6, byte position 114)"
+            == str(err_info.value)
         )
 
     def test_commented_start_of_the_object(self):
@@ -337,8 +337,8 @@ class JsonParserTests(ScalyrTestCase):
             JsonParser.parse(json_data)
 
         assert (
-            "Expecting end of the parsed document at the character '451', got character 'm' instead"
-            in str(err_info.value)
+            "Expecting end of the parsed document but got character 'm' instead. (line 9, byte position 451)"
+            == str(err_info.value)
         )
 
     def test_commented_list_beginning(self):
