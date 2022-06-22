@@ -210,9 +210,32 @@ class JsonParser(object):
         input_text = six.ensure_text(input_text)
         return JsonParser(
             TextScanner(input_text), True, check_duplicate_keys
-        ).parse_value()
+        ).parse_root_value()
 
-    def parse_value(self):
+    def parse_root_value(self):
+        """
+        Parse the whole JSON document and perform additional error checks.
+        """
+        value = self.__parse_value()
+
+        # Check if there's no remaining characters are left in the input data.
+        # That may be the case where:
+        # - Extra closing curly bracket is accidentally added before the actual end of the JSON object.
+        # - The beginning of a nested object is accidentally commented out (parser supports comments) and all data
+        #       that goes after the next closing curly brackets '}' is ignored.
+        next_char = self.__peek_next_non_whitespace()
+        if next_char is not None:
+            raise JsonParseException(
+                "Expecting end of the parsed document but got character '{}' instead.".format(
+                    next_char
+                ),
+                position=self.__scanner.position,
+                line_number=self.__scanner.line_number,
+            )
+
+        return value
+
+    def __parse_value(self):
         """Parses a Json value from the input."""
         start_pos = self.__scanner.position
         try:
@@ -293,7 +316,11 @@ class JsonParser(object):
                 self.__scanner.read_uchar()
                 return result_object
             else:
-                return self.__error("Expected string literal for object attribute name")
+                return self.__error(
+                    "Expected string literal for object attribute name (got '{}')".format(
+                        c
+                    )
+                )
 
             if key is not None:
                 key = six.ensure_text(key)
@@ -310,7 +337,7 @@ class JsonParser(object):
             if self.check_duplicate_keys and result_object.__contains__(key):
                 self.__error("Duplicate key [" + key + "]", object_start)
 
-            result_object.put(key, self.parse_value())
+            result_object.put(key, self.__parse_value())
 
             c = self.__peek_next_non_whitespace()
 
@@ -349,7 +376,7 @@ class JsonParser(object):
             # TODO:  If we ever want to put in annotated supported, uncomment the pos lines.
             # value_start_pos = self.__scanner.position
 
-            array.add(self.parse_value())
+            array.add(self.__parse_value())
             # value_end_pos = self.__scanner.position
             # value_comma_pos = -1
 

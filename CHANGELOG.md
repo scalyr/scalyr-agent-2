@@ -17,6 +17,7 @@ Bug fixes:
 * Fix a bug in syslog monitor on Windows under Python 3 which would prevent TCP handler from working.
 * Fixed agent checkpoint selection bug that could cause old log files to be re-uploaded.
 * Small bug with command line argument parsing for the Agent. Agent raised unhandled exception instead of normal argparse error message when agent main command wasn't specified.
+* Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
 
 Docker images:
 * Temporarily disable ``orjson`` JSON library for the arm64 platform of the Agent's alpine docker image due to upstream build errors.
