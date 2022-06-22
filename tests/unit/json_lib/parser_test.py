@@ -318,7 +318,7 @@ class JsonParserTests(ScalyrTestCase):
               // server_attributes: {       // the beginning of the nested object is commented.
                  serverHost: "HOST",        // the 'serverHost' field is wrongly parsed as a filed of outer object.
               }                             // this brackets are treated as end of the whole JSON document.
-            
+
               // Everything that remains is just ignored, that's bad.
               monitors: [
                 {
