@@ -219,8 +219,10 @@ class JsonParser(object):
         value = self.__parse_value()
 
         # Check if there's no remaining characters are left in the input data.
-        # That may be the case where the beginning of a nested object is accidentally commented out (parser
-        # supports comments) and all data that goes after the next closing curly brackets '}' is ignored.
+        # That may be the case where:
+        # - Extra closing curly bracket is accidentally added before the actual end of the JSON object.
+        # - The beginning of a nested object is accidentally commented out (parser supports comments) and all data
+        #       that goes after the next closing curly brackets '}' is ignored.
         next_char = self.__peek_next_non_whitespace()
         if next_char is not None:
             raise JsonParseException(
