@@ -6,4 +6,4 @@ orjson==3.7.2; python_version >= '3.7' and platform_system != 'Darwin'
 orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 
-requests==2.20.0
+requests==2.25.1

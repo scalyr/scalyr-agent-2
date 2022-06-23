@@ -1016,6 +1016,7 @@ jobs:
             python.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
       - run:
           name: Run Unit Tests under Python 3.10
+          no_output_timeout: 8m
           command: |
             # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
             # after the tox commands finishes. That's why we use the redirect workaround. Sadly
@@ -1034,7 +1035,6 @@ jobs:
             cat output
 
             exit ${EXIT_CODE}
-          no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
