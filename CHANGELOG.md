@@ -16,9 +16,16 @@ Bug fixes:
 * Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
 * Fix a bug in syslog monitor on Windows under Python 3 which would prevent TCP handler from working.
 * Fixed agent checkpoint selection bug that could cause old log files to be re-uploaded.
+* Small bug with command line argument parsing for the Agent. Agent raised unhandled exception instead of normal argparse error message when agent main command wasn't specified.
+* Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
+
+Docker images:
+* Temporarily disable ``orjson`` JSON library for the arm64 platform of the Agent's alpine docker image due to upstream build errors.
 
 Other:
 * Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
+* Upgrade dependency ``requests`` library to 2.25.1.
+
 
 ## 2.1.30 "Heturn" - May 17, 2022
 
