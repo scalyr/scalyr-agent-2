@@ -67,7 +67,7 @@ ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-
 # with pip environment markers since they are not specific enough.
 # We also remove installation of the orjson for alpine/arm64, since its build is not possible for now due to upstream error.
 # TODO add it back when issue is fixed or orjson bindings for musl/arm64 are available on pypi.
-RUN if ([ "$TARGETVARIANT" = "v7" ] || [ "$TARGETARCH" = "arm64" ])  && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then sed -i '/^orjson/d' agent_build/requirement-files/main-requirements.txt; fi
+RUN if [ "$TARGETVARIANT" = "v7" ] && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then sed -i '/^orjson/d' agent_build/requirement-files/main-requirements.txt; fi
 
 # Right now we don't support lz4 on server side yet so we don't include this dependency since it doesn't offer pre built
 # wheel and it substantially slows down base image build
