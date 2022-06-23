@@ -22,7 +22,13 @@ __author__ = "czerwin@scalyr.com"
 
 import unittest
 
-from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException
+import pytest
+
+from scalyr_agent.json_lib.parser import (
+    TextScanner,
+    JsonParser,
+    JsonParseException,
+)
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -272,6 +278,107 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x.get("b"), 3)
         self.assertEquals(x.get("c"), True)
         self.assertEquals(x.get("d"), "Hello")
+
+    def test_unexpected_object_end(self):
+        json_data = """
+            {
+                api_key: ",key."
+                field1: 1,
+            }
+                filed2: 2
+            }
+        """
+
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert (
+            "Expecting end of the parsed document but got character 'f' instead. (line 6, byte position 105)"
+            == str(err_info.value)
+        )
+
+    def test_comma_at_the_end(self):
+        json_data = """
+            {
+                api_key: "<key>"
+                field1: 1,
+                field2: 2
+            },
+        """
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert (
+            "Expecting end of the parsed document but got character ',' instead. (line 6, byte position 114)"
+            == str(err_info.value)
+        )
+
+    def test_commented_start_of_the_object(self):
+        """
+        Since the JSON parser supports comments, there may be the case where the beginning of the object is
+        (accidentally) commented, so the internal fields of that object are parsed as fields of the external object.
+        """
+        json_data = """
+            {
+              api_key: ",key."
+              // server_attributes: {       // the beginning of the nested object is commented.
+                 serverHost: "HOST",        // the 'serverHost' field is wrongly parsed as a filed of outer object.
+              }                             // this brackets are treated as end of the whole JSON document.
+
+              // Everything that remains is just ignored, that's bad.
+              monitors: [
+                {
+                   module:  "my_module",
+                },
+              ]
+            }
+"""
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert (
+            "Expecting end of the parsed document but got character 'm' instead. (line 9, byte position 451)"
+            == str(err_info.value)
+        )
+
+    def test_commented_list_beginning(self):
+        json_data = """
+                {
+                    list: [
+                        // nested_list: [
+                            1,
+                            2,
+                            3
+                        ]
+                    ]
+                }
+                """
+        with pytest.raises(JsonParseException) as err_info:
+            JsonParser.parse(json_data)
+
+        assert "Expected string literal for object attribute name (got ']')" in str(
+            err_info.value
+        )
+
+    def test_trailing_comment(self):
+        json_data = """
+        {
+          api_key: "<key>"
+          monitors: [
+            {
+               module:  "my_module",
+            },
+          ]
+        }
+        // comment
+        """
+
+        data = JsonParser.parse(json_data)
+
+        assert data.to_dict() == {
+            "api_key": "<key>",
+            "monitors": [{"module": "my_module"}],
+        }
 
 
 def main():

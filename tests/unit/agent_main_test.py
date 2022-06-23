@@ -591,3 +591,82 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     @staticmethod
     def fake_get_useage_info():
         return 0, 0, 0
+
+
+class TestAgentMainArgumentParsing:
+    """
+    Test various command line inputs to the agent_main.py script.
+    """
+
+    def setup(self):
+        self.agent_main_path = os.path.join(
+            __scalyr__.get_install_root(), "scalyr_agent", "agent_main.py"
+        )
+
+    def _run_command_get_output(self, cmd):
+
+        final_commands = [sys.executable, self.agent_main_path]
+        final_commands.extend(cmd)
+        output = subprocess.check_output(
+            final_commands,
+            stderr=subprocess.PIPE,
+        ).decode()
+
+        return output
+
+    def test_help(self):
+        output = self._run_command_get_output(
+            [
+                "-h",
+            ]
+        )
+
+        assert "{start,stop,status,restart,condrestart,version,config" in output
+        assert "-c FILE, --config-file FILE" in output
+
+    def test_empty_command(self):
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output([])
+
+        assert err_info.value.returncode == 2
+
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
+
+    def test_optional_arg_without_positional(self):
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output(["--config", "path"])
+
+        assert err_info.value.returncode == 2
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
+
+    def test_config(self):
+        output = self._run_command_get_output(["config", "-h"])
+
+        # Verify that some config-specific options are there.
+        assert "--set-user EXECUTING_USER" in output
+        assert "--export-config EXPORT_CONFIG" in output
+
+    @pytest.mark.skipif(
+        platform.system() != "Windows",
+        reason="Skip windows service test on non-Windows systems.",
+    )
+    def test_windows_service(self):
+
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output(["service"])
+
+        # The service return an error, but at least we know that the script processes this case right.
+        assert (
+            "The service process could not connect to the service controller."
+            in err_info.value.stderr.decode()
+        )
