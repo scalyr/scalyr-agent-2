@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: windows-scalyr-agent
+  name: winscaler-config-agent-d
+  namespace: scalyr
+data:
+  "kubernetes.json": |
+    {
+      "monitors":[
+        {
+          "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor"
+        },
+        {
+          "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+          "report_container_metrics": true,
+          "report_k8s_metrics": true
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: windows-scalyr-agent
+  name: windows-scalyr-agent
+  namespace: scalyr
+spec:
+  selector:
+    matchLabels:
+      app: windows-scalyr-agent
+  template:
+    metadata:
+      labels:
+        app: windows-scalyr-agent
+    spec:
+      containers:
+      - name: winscaler
+        image: winscaler:latest
+        env:
+          - name: SCALYR_SERVER
+            value: agent.scalyr.com
+          - name: SCALYR_API_KEY
+            value: <putyourapikeyhere>
+          - name: SCALYR_K8S_CLUSTER_NAME
+            value: winscaler-test
+          - name: SCALYR_K8S_VERIFY_KUBELET_QUERIES
+            value: "true"
+          - name: SCALYR_K8S_API_URL
+            value: https://kubernetes.default.svc.cluster.local
+          - name: "SCALYR_K8S_NODE_NAME"
+            valueFrom:
+              fieldRef:
+                fieldPath: "spec.nodeName"
+                apiVersion: "v1"
+          - name: "SCALYR_K8S_POD_NAME"
+            valueFrom:
+              fieldRef:
+                fieldPath: "metadata.name"
+                apiVersion: "v1"
+          - name: "SCALYR_K8S_POD_NAMESPACE"
+            valueFrom:
+              fieldRef:
+                fieldPath: "metadata.namespace"
+                apiVersion: "v1"
+          - name: "SCALYR_K8S_POD_UID"
+            valueFrom:
+              fieldRef:
+                fieldPath: "metadata.uid"
+                apiVersion: "v1"
+          - name: "SCALYR_K8S_KUBELET_HOST_IP"
+            valueFrom:
+              fieldRef:
+                fieldPath: "status.hostIP"
+                apiVersion: "v1"
+        volumeMounts:
+          - name: varlogpods
+            mountPath: "/var/log/pods"
+            readOnly: true
+          - name: varlogcontainers
+            mountPath: "/var/log/containers"
+            readOnly: true
+          - name: "scalyr-config-agent-d"
+            mountPath: "/etc/scalyr-agent-2/agent.d"
+      nodeSelector:
+        kubernetes.io/os: windows
+      tolerations:
+      - key: "kubernetes.azure.com/scalesetpriority"
+        operator: "Equal"
+        value: "spot"
+        effect: "NoSchedule"
+      volumes:
+      - name: "varlogpods"
+        hostPath:
+          path: "/var/log/pods"
+      - name: "varlogcontainers"
+        hostPath:
+          path: "/var/log/containers"
+      - name: "scalyr-config-agent-d"
+        configMap:
+          name: winscaler-config-agent-d
+          defaultMode: 0600
+      dnsPolicy: "ClusterFirst"
+      automountServiceAccountToken: true
+      serviceAccountName: scalyr-scalyr-agent-sa # use service account from default scalyr helm installation
