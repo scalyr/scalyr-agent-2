@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.31 "Irati" - Jun 8, 2022
+## 2.1.31 "Irati" - Jun 24, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 8, 2022 23:04 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 24, 2022 23:04 -0800
 --->
 
 Windows:
@@ -20,12 +20,11 @@ Bug fixes:
 * Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
 
 Docker images:
-* Temporarily disable ``orjson`` JSON library for the arm64 platform of the Agent's alpine docker image due to upstream build errors.
+* Upgrade orjson dependency
 
 Other:
 * Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
 * Upgrade dependency ``requests`` library to 2.25.1.
-
 
 ## 2.1.30 "Heturn" - May 17, 2022
 
