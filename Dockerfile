@@ -10,7 +10,7 @@ RUN pip install --upgrade --no-cache-dir \
     orjson==3.6.8 \
     zstandard==0.17.0  \
     lz4==4.0.0 \
-    requests==2.20.0 \
+    requests==2.25.1 \
     docker==4.1.0 \
     psutil
 
