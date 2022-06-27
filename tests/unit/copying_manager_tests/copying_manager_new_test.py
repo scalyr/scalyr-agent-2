@@ -16,7 +16,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-
+import json
 import time
 import os
 import platform
@@ -570,6 +570,58 @@ class TestBasic(CopyingManagerTest):
 
         assert manager.worker_sessions_log_processors_count == len(files)
         assert manager.matchers_log_processor_count == len(files)
+
+    def test_multiple_checkpoint_files_with_the_same_log_file(self):
+        (test_file,), manager = self._init_manager(1)
+
+        # write something and stop in order to create checkpoint files.
+        test_file.append_lines("line1")
+
+        assert set(self._wait_for_rpc_and_respond()) == set(["line1"])
+
+        # Stop the copying manager and save its resulting checkpoints and save them for later.
+        manager.stop_manager()
+        first_run_checkpoints = manager.consolidated_checkpoints
+
+        # recreate the manager, in order to simulate a new start and write new line.
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
+
+        manager.start_manager()
+        test_file.append_lines("line2")
+        assert set(self._wait_for_rpc_and_respond()) == set(["line2"])
+        manager.stop_manager()
+        # get checkpoints from the last run
+        checkpoints = manager.consolidated_checkpoints
+
+        # Now get the preserved checkpoints from the first run and make their timestamp bigger
+        # than in last checkpoints. Even if the write timestamp is bigger in the first checkpoints,
+        # the copying manager has to pick checkpoints from the second run, because the second run checkpoints
+        # have to have bigger timestamps for particular log files rather than overall write timestamp.
+
+        first_run_checkpoints["time"] = checkpoints["time"] + 1
+
+        # Inject invalid checkpoint as an active checkpoint from some very "distant" worker, which is not presented
+        # anymore, but its checkpoints are still have to be processed. By using active checkpoint, we also testing
+        # the edge case where the active checkpoints are presented but the "main" checkpoints are not.
+        injected_checkpoints_path = (
+            manager.consolidated_checkpoints_path.parent
+            / "active-checkpoints-worker-10-0.json"
+        )
+        injected_checkpoints_path.write_text(
+            six.ensure_text(json.dumps(first_run_checkpoints))
+        )
+
+        # recreate the manager, in order to simulate a new start and write new line.
+        self._instance = manager = TestableCopyingManager(self._env_builder.config, [])
+
+        manager.start_manager()
+
+        # write new line and only this line has to be read by the copying manager.
+        test_file.append_lines("line3")
+
+        assert set(self._wait_for_rpc_and_respond()) == set(["line3"])
+
+        manager.stop()
 
 
 class CopyingMangerUnitTest(ScalyrTestCase):

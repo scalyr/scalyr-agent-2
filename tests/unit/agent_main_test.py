@@ -350,8 +350,78 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     ".*" + re.escape("Warning, skipping copying log lines.")
                 )
 
+    def test_no_check_remote_command_line_option(self):
+        from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use default value of False
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = False
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+
+        mock_config = mock.Mock()
+
+        platform_controller = mock.Mock()
+        platform_controller.default_paths = mock.Mock()
+
+        agent = ScalyrAgent(platform_controller)
+        agent._ScalyrAgent__config = mock_config
+        agent._ScalyrAgent__read_and_verify_config = mock.Mock()
+        agent._ScalyrAgent__perform_config_checks = mock.Mock()
+        agent._ScalyrAgent__run = mock.Mock()
+
+        agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
+
+        agent._ScalyrAgent__run.return_value = 7
+        mock_config_path = self._write_mock_config()
+
+        # should use overridden value of True
+        mock_command = "inner_run_with_checks"
+        mock_command_options = mock.Mock()
+        mock_command_options.no_check_remote = True
+
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+
     def test_check_remote_if_no_tty(self):
         from scalyr_agent.agent_main import ScalyrAgent
+
+        mock_isatty_true = mock.Mock(return_value=True)
+        mock_isatty_false = mock.Mock(return_value=False)
 
         mock_config = mock.Mock()
 
@@ -374,31 +444,41 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         mock_command_options = mock.Mock()
         mock_command_options.no_check_remote = True
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
 
         # tty is available, command option is not set, should default to False
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
         mock_command = "inner_run_with_checks"
         mock_command_options = mock.Mock()
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
-        return_code = agent.main(mock_config_path, mock_command, mock_command_options)
-        self.assertEqual(return_code, 7)
-        agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
+        mock_stdout = mock.Mock()
+        mock_stdout.isatty = mock_isatty_true
+
+        with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
+            return_code = agent.main(
+                mock_config_path, mock_command, mock_command_options
+            )
+            self.assertEqual(return_code, 7)
+            agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
 
         # tty is not available (stdout.isatty returns False), should use check_remote_if_no_tty
         # config option value (config option is set to True)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
-        mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = True
 
@@ -413,12 +493,11 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = mock.Mock()
-        mock_isatty.return_value = False
-        mock_stdout.isatty = mock_isatty
+        mock_stdout.isatty = mock_isatty_false
 
         mock_config.check_remote_if_no_tty = False
 
@@ -433,7 +512,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # config option value (config option is set to False)
         agent._ScalyrAgent__perform_config_checks.reset_mock()
 
-        mock_command_options.no_check_remote = None
+        mock_command_options.no_check_remote = False
 
         mock_stdout = mock.Mock()
         mock_isatty = None
@@ -512,3 +591,82 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     @staticmethod
     def fake_get_useage_info():
         return 0, 0, 0
+
+
+class TestAgentMainArgumentParsing:
+    """
+    Test various command line inputs to the agent_main.py script.
+    """
+
+    def setup(self):
+        self.agent_main_path = os.path.join(
+            __scalyr__.get_install_root(), "scalyr_agent", "agent_main.py"
+        )
+
+    def _run_command_get_output(self, cmd):
+
+        final_commands = [sys.executable, self.agent_main_path]
+        final_commands.extend(cmd)
+        output = subprocess.check_output(
+            final_commands,
+            stderr=subprocess.PIPE,
+        ).decode()
+
+        return output
+
+    def test_help(self):
+        output = self._run_command_get_output(
+            [
+                "-h",
+            ]
+        )
+
+        assert "{start,stop,status,restart,condrestart,version,config" in output
+        assert "-c FILE, --config-file FILE" in output
+
+    def test_empty_command(self):
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output([])
+
+        assert err_info.value.returncode == 2
+
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
+
+    def test_optional_arg_without_positional(self):
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output(["--config", "path"])
+
+        assert err_info.value.returncode == 2
+        # TODO: stderr can not be got from exception in Python 2. Remove that after is it dropped.
+        if sys.version_info >= (3,):
+            assert (
+                "agent_main.py: error: the following arguments are required: command"
+                in err_info.value.stderr.decode()
+            )
+
+    def test_config(self):
+        output = self._run_command_get_output(["config", "-h"])
+
+        # Verify that some config-specific options are there.
+        assert "--set-user EXECUTING_USER" in output
+        assert "--export-config EXPORT_CONFIG" in output
+
+    @pytest.mark.skipif(
+        platform.system() != "Windows",
+        reason="Skip windows service test on non-Windows systems.",
+    )
+    def test_windows_service(self):
+
+        with pytest.raises(subprocess.CalledProcessError) as err_info:
+            self._run_command_get_output(["service"])
+
+        # The service return an error, but at least we know that the script processes this case right.
+        assert (
+            "The service process could not connect to the service controller."
+            in err_info.value.stderr.decode()
+        )

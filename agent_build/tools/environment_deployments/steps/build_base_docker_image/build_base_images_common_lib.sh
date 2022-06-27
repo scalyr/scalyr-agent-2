@@ -129,6 +129,7 @@ build_all_base_images() {
       --build-arg "BASE_IMAGE_SUFFIX=$base_image_tag_suffix" \
       $coverage_arg \
       "${PLATFORMS_DOCKER_BUILX_ARGS}" \
+      --memory 7g \
       "$SOURCE_ROOT"
 
   }

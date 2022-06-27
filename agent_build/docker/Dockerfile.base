@@ -55,6 +55,7 @@ FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rustv7
 FROM scalyr-dependencies-rust$TARGETVARIANT as scalyr-dependencies
 
 ARG TARGETVARIANT
+ARG TARGETARCH
 ARG COVERAGE_VERSION
 ARG BASE_IMAGE_SUFFIX
 

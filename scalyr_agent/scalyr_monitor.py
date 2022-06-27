@@ -34,6 +34,7 @@ import os
 import sys
 import time
 import random
+import hashlib
 from threading import Lock
 
 import six
@@ -120,6 +121,19 @@ class ScalyrMonitor(StoppableThread):
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config["module"]
+        # Includes just the monitor module name. For example, if the full module name is
+        # "scalyr_agent.builtin_monitors.symlink_file_monitor", module name would be
+        # "symlink_file_monitor"
+        self.monitor_module_name = self.monitor_name.split(".")[-1]
+        # NOTE: In case there is only one monitor configured without "id" attribute defined, the
+        # value will be set to empty string. In case there are multiple monitor configs defined, but
+        # the user doesn't explicitly set "id" attribute for those, config index (number) will be
+        # used.
+        self.monitor_id = str(monitor_config.get("id", "") or "default")
+        # Short hash of this monitor instance which is unique across all the monitors
+        self.short_hash = hashlib.sha256(
+            self.monitor_name.encode("utf-8") + b":" + self.monitor_id.encode("utf-8")
+        ).hexdigest()[:10]
 
         # Holds raw monitor name without the part which are specific to monitor instances
         if "." in monitor_config["module"]:
@@ -184,6 +198,11 @@ class ScalyrMonitor(StoppableThread):
         # List of metrics name which shouldn't be logged and sent to Scalyr
         self._metric_name_blacklist = self._config.get(
             "metric_name_blacklist", convert_to=ArrayOfStrings, default=[]
+        )
+
+        # List of metric names for which per second rates should be calculated in the agent
+        self._calculate_rate_metric_name = self._config.get(
+            "calculate_rate_metric_names", convert_to=ArrayOfStrings, default=[]
         )
 
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
@@ -468,6 +487,17 @@ class ScalyrMonitor(StoppableThread):
         if self.__metric_log_open:
             self._logger.closeMetricLog()
             self.__metric_log_open = False
+
+    def get_calculate_rate_metric_names(self):
+        """
+        Return a list of metric names for this monitor for which rate should be calculated on the
+        agent side.
+
+        This method can either return value which is read from the monitor config or it can obtain
+        a list of those metric names dynamically (e.g. from the OpenMetrics metric schema / type or
+        similar).
+        """
+        return self._calculate_rate_metric_name
 
     # 2->TODO '_is_stopped' name is reserved in python3
     def _is_thread_stopped(self):

@@ -1,10 +1,35 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.30 "TBD" - May 12, 2022
+## 2.1.31 "Irati" - Jun 24, 2022
 
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 12, 2022 23:04 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 24, 2022 23:04 -0800
+--->
+
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
+Bug fixes:
+* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
+* Fix a bug in syslog monitor on Windows under Python 3 which would prevent TCP handler from working.
+* Fixed agent checkpoint selection bug that could cause old log files to be re-uploaded.
+* Small bug with command line argument parsing for the Agent. Agent raised unhandled exception instead of normal argparse error message when agent main command wasn't specified.
+* Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
+
+Docker images:
+* Upgrade orjson dependency
+
+Other:
+* Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
+* Upgrade dependency ``requests`` library to 2.25.1.
+
+## 2.1.30 "Heturn" - May 17, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
 --->
 
 Kubernetes:
@@ -18,7 +43,7 @@ Bug fixes:
 * Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
 
 Other:
-* Update the code to log non-fatal connection related errors which are retried under WARNING instead of ERROR log level.
+* Update the code to log connection related errors which are retried and are not fatal under WARNING instead of ERROR log level.
 * Update agent start up log message to use format which is supported by the agent message parser.
 
 ## 2.1.29 "Auter" - Mar 15, 2022

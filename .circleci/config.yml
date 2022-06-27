@@ -900,7 +900,7 @@ jobs:
           fail_only: true
           only_for_branches: master
 
-  unittest-38-windows:
+  unittest-310-windows:
     # TODO: That's a temporary in-line definition from slack orb. We can remove it once
     # https://github.com/CircleCI-Public/slack-orb/pull/152 is merged
     parameters:
@@ -971,7 +971,7 @@ jobs:
           ID of channel if set, overrides webhook's default channel setting
 
       python_version:
-        default: 3.8.10
+        default: 3.10.4
         type: string
         description: "Version of Python interpreter to use."
 
@@ -997,7 +997,7 @@ jobs:
             choco install python --version "${PYTHON}" --yes --limit-output --no-progress
 
             # Add Python we installed to PATH and make sure it has precedence over system Python
-            echo "export PATH=\"/c/Python38:/c/Python38/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python38/Scripts:$PATH\"" >> $BASH_ENV
+            echo "export PATH=\"/c/Python310:/c/Python310/Scripts:/c/Users/circleci/AppData/Roaming/Python/Python310/Scripts:$PATH\"" >> $BASH_ENV
       - save_cache:
           name: Save Chocolatey Cache
           key: deps-v4-<< pipeline.parameters.cache_version_py_dependencies >>-choco-{{ .Branch }}-<< parameters.python_version >>-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
@@ -1015,13 +1015,14 @@ jobs:
             python.exe -m pip install --user --upgrade "tox==<< pipeline.parameters.default_tox_version >>"
             python.exe -m pip install --user --upgrade "pip==<< pipeline.parameters.default_pip_version >>"
       - run:
-          name: Run Unit Tests under Python 3.8
+          name: Run Unit Tests under Python 3.10
+          no_output_timeout: 8m
           command: |
             # NOTE: If we don't redirect the output, Windows this step doesn't correctly exit even
             # after the tox commands finishes. That's why we use the redirect workaround. Sadly
             # this means we don't see output immediately as it produced (using redirect + tee also
             # results in the job not exiting when tox command finishes).
-            tox.exe -epy3.8-windows-unit-tests > output 2>&1
+            tox.exe -epy3.10-windows-unit-tests > output 2>&1
             EXIT_CODE=$?
             cat output
 
@@ -1029,12 +1030,11 @@ jobs:
               exit ${EXIT_CODE}
             fi
 
-            tox.exe -epy3.8-windows-unit-tests-windows-platform > output 2>&1
+            tox.exe -epy3.10-windows-unit-tests-windows-platform > output 2>&1
             EXIT_CODE=$?
             cat output
 
             exit ${EXIT_CODE}
-          no_output_timeout: 4m
       - save_cache:
           name: Save Python Dependencies Cache
           key: deps-v3-<< pipeline.parameters.cache_version_py_dependencies >>-tox-{{ .Branch }}-<< parameters.python_version >>-windows-{{ checksum "dev-requirements.txt" }}-{{ checksum "agent_build/requirement-files/compression-requirements.txt" }}-{{ checksum "agent_build/requirement-files/testing-requirements.txt" }}
@@ -2085,13 +2085,13 @@ jobs:
     parameters:
       python-version:
         description: Version of the Python interpreter to use.
-        default: 3.8.10
+        default: 3.10.4
         type: string
     steps:
       - checkout
       - restore_cache:
           name: Restore Python installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
+          key: windows-v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
 
       - restore_cache:
           name: Restore Wix cache
@@ -2127,7 +2127,7 @@ jobs:
 
       - save_cache:
           name: Save Python Installer Cache
-          key: windows-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
+          key: windows--v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
           paths:
             - "python_installer"
 
@@ -2177,10 +2177,10 @@ jobs:
 
               $PSDefaultParameterValues['*:ErrorAction']='Stop'
 
-              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe -m pip install -r win32\windows-build-requirements.txt
+              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe -m pip install -r win32\windows-build-requirements.txt
 
               # TODO: This step doesn't correctly exit with non zero on failure
-              C:\Users\circleci\AppData\Local\Programs\Python\Python38\python.exe build_package.py win32
+              C:\Users\circleci\AppData\Local\Programs\Python\Python310\python.exe build_package.py win32
               ThrowOnNativeFailure
 
               mkdir package
@@ -2352,7 +2352,7 @@ workflows:
          context: scalyr-agent
      - unittest-38-osx:
          context: scalyr-agent
-     - unittest-38-windows:
+     - unittest-310-windows:
          context: scalyr-agent
  smoke-tests:
    <<: *skip_release_build_branch_push
@@ -2486,6 +2486,22 @@ workflows:
    jobs:
      - send-circle-ci-usage-report
 
+ hourly-windows-ami-tests:
+   triggers:
+     - schedule:
+         cron: "0 * * * *"
+         filters:
+           branches:
+             only:
+               - win_py30_changes
+   jobs:
+     - ami-tests-development-windows:
+         context: scalyr-agent
+         requires:
+            - build-windows-package
+     - build-windows-package
+     - build-linux-packages-and-installer-script
+
  # We run AMI based package install tests which utilize installer script on
  # daily basis.
  # This helps us detect various installer script and other potential upstream
@@ -2511,7 +2527,7 @@ workflows:
          context: scalyr-agent
      - unittest-38-osx:
          context: scalyr-agent
-     - unittest-38-windows:
+     - unittest-310-windows:
          context: scalyr-agent
      - build-linux-packages-and-installer-script
      - build-windows-package
