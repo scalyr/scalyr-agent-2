@@ -1048,7 +1048,7 @@ class K8sPackageBuilder(ContainerPackageBuilder):
     RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
 
 
-class K8sWithOpenMetricsMonitorsPackageBuilder(ContainerPackageBuilder):
+class K8sWithOpenMetricsMonitorsPackageBuilder(K8sPackageBuilder):
     """
     An image for running the agent on Kubernetes with Kubernetes Open Metrics monitor enabled.
     """
@@ -1057,7 +1057,7 @@ class K8sWithOpenMetricsMonitorsPackageBuilder(ContainerPackageBuilder):
     RESULT_IMAGE_NAMES = ["scalyr-k8s-agent-with-openmetrics-monitor"]
 
 
-class DockerJsonPackageBuilder(ContainerPackageBuilder):
+class DockerJsonPackageBuilder(K8sPackageBuilder):
     """
     An image for running on Docker configured to fetch logs via the file system (the container log
     directory is mounted to the agent container.)  This is the preferred way of running on Docker.
