@@ -123,7 +123,7 @@ class LogVerifier:
         while True:
             # Protect this function from hanging by adding timeout.
             if datetime.datetime.now() >= timeout_time:
-                descriptions = "\n\t".join(
+                descriptions = "\n\t -".join(
                     [check.description for check in self._checks_required_to_pass]
                 )
                 raise TimeoutError(
