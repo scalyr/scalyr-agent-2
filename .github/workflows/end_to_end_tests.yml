@@ -49,6 +49,7 @@ jobs:
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
@@ -215,6 +216,7 @@ jobs:
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
