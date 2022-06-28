@@ -123,12 +123,13 @@ class LogVerifier:
         while True:
             # Protect this function from hanging by adding timeout.
             if datetime.datetime.now() >= timeout_time:
-                descriptions = "\n".join(
+                descriptions = "\n\t".join(
                     [check.description for check in self._checks_required_to_pass]
                 )
                 raise TimeoutError(
-                    f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}.\n"
-                    f"Logs accumulated so far:\n\n{self._content}"
+                    f"Timeout of {timeout} seconds reached. The conditions of the next verifiers have not been met:\n\t{descriptions}.\n"
+                    f"Logs accumulated so far:\n\n{self._content}\n"
+                    f"Remaining data:\n\n{self._remaining_data}"
                 )
 
             # Get new content of the log file.
