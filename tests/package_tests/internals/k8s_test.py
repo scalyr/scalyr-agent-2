@@ -177,8 +177,6 @@ def _test(
             "-100",
             "/var/log/scalyr-agent-2/agent.log",
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
     )
 
     logging.info(f"agent.log output 10 seconds after starting the agent:\n{output}")
