@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.31 "Irati" - Jun 27, 2022
+## 2.1.31 "Irati" - Jun 28, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 24, 2022 13:29 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
 --->
 
 Windows:
