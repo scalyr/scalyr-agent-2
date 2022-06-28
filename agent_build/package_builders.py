@@ -1050,7 +1050,7 @@ class K8sPackageBuilder(ContainerPackageBuilder):
 
 class K8sWithOpenMetricsMonitorsPackageBuilder(ContainerPackageBuilder):
     """
-    An image for running the agent on Kubernetes.
+    An image for running the agent on Kubernetes with Kubernetes Open Metrics monitor enabled.
     """
 
     PACKAGE_TYPE = constants.PackageType.K8S
