@@ -19,7 +19,6 @@ RUN ln -s /bin/tar /usr/sbin/tar
 
 RUN apt-get update && apt-get install -y build-essential git tar curl
 
-
 # Install dependency packages for alpine.
 FROM python:3.8.13-alpine as scalyr-dependencies-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
@@ -35,24 +34,7 @@ RUN apk update && apk add --virtual build-dependencies \
     patchelf \
     git
 
-# Install rust and cargo. It is needed to build some of the Python dependencies of the agent.
-# NOTE: We don't use "-" at the end since context names which end just with "-" don't appear to
-# be valid anymore with new Docker / buildx versions. See https://github.com/scalyr/scalyr-agent-2/pull/845
-# for details
-FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install nightly
-RUN rustup default nightly
-
-# There's no precompiled rust installation for armv7 so we replace the previous stage with this and do nothing.
-FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies-rustv7
-# Do nothing
-
-# Use one of the two previous stages according to the TARGETVARIANT suffix.
-# if TARGETVARIANT is 'v7', then we use stage without rust.
-# IMPORTANT: that may be needed to revise if new architectures are added.
-FROM scalyr-dependencies-rust$TARGETVARIANT as scalyr-dependencies
+FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies
 
 ARG TARGETVARIANT
 ARG TARGETARCH
