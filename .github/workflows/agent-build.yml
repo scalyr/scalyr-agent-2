@@ -77,6 +77,14 @@ jobs:
         run: |
           minikube start
 
+          echo ""
+          echo "kubectl version"
+          kubectl version
+          echo ""
+          echo "kubectl cluster-info"
+          echo ""
+          kubectl cluster-info
+
       - name: Run image test
         env:
           SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
