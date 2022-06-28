@@ -27,65 +27,52 @@ runs:
   steps:
     - name: Create minikube Kubernetes ${{ inputs.k8s_version }} Cluster
       id: create-minikube-cluster
-      # TODO: Workaround until conditions are supported natively
-      # See https://github.com/actions/runner/issues/834
-      uses: ChristopherHX/conditional@b4a9649204f81002ec9a4ef7d4bf7d6b2ab7fa55
+      if: ${{ inputs.k8s_version != '' && inputs.k8s_version != 'v1.24.0' }}
+      uses: manusa/actions-setup-minikube@f6ceea1a32df47f602b1345bd8ad7da7c5824cbf # v2.4.3
       with:
-        if: ${{ inputs.k8s_version != '' && inputs.k8s_version != 'v1.24.0' }}
-        step: |
-          uses: manusa/actions-setup-minikube@f6ceea1a32df47f602b1345bd8ad7da7c5824cbf # v2.4.3
-          with:
-            minikube version: '${{ inputs.minikube_version }}'
-            kubernetes version: '${{ inputs.k8s_version }}'
-            github token: '${{ inputs.github_token }}'
-            driver: '${{ inputs.minikube_driver }}'
-            start args: '--container-runtime=${{ inputs.container_runtime }}'
+        minikube version: '${{ inputs.minikube_version }}'
+        kubernetes version: '${{ inputs.k8s_version }}'
+        github token: '${{ inputs.github_token }}'
+        driver: '${{ inputs.minikube_driver }}'
+        start args: '--container-runtime=${{ inputs.container_runtime }}'
 
     - name: Create minikube Kubernetes ${{ inputs.k8s_version }} Cluster
       id: create-minikube-cluster-124
-      # TODO: Workaround until conditions are supported natively
-      # See https://github.com/actions/runner/issues/834
-      uses: ChristopherHX/conditional@b4a9649204f81002ec9a4ef7d4bf7d6b2ab7fa55
+      if: ${{ inputs.k8s_version != '' && inputs.k8s_version == 'v1.24.0' }}
+      uses: manusa/actions-setup-minikube@f6ceea1a32df47f602b1345bd8ad7da7c5824cbf # v2.4.3
       with:
-        if: ${{ inputs.k8s_version != '' && inputs.k8s_version == 'v1.24.0' }}
-        step: |
-          uses: manusa/actions-setup-minikube@f6ceea1a32df47f602b1345bd8ad7da7c5824cbf # v2.4.3
-          with:
-            minikube version: '${{ inputs.minikube_version }}'
-            kubernetes version: '${{ inputs.k8s_version }}'
-            github token: '${{ inputs.github_token }}'
-            driver: '${{ inputs.minikube_driver }}'
-            start args: ''
+        minikube version: '${{ inputs.minikube_version }}'
+        kubernetes version: '${{ inputs.k8s_version }}'
+        github token: '${{ inputs.github_token }}'
+        driver: '${{ inputs.minikube_driver }}'
+        start args: ''
 
     - name: Print minikube environment info
       id: print-k8s-cluster-info
-      uses: ChristopherHX/conditional@b4a9649204f81002ec9a4ef7d4bf7d6b2ab7fa55
-      with:
-        if: ${{ inputs.k8s_version != '' }}
-        step: |
-          shell: bash
-          run: |
-            echo "kubectl version"
-            kubectl version
-            echo ""
-            echo "minikube addions"
-            echo ""
-            minikube addons list
-            echo ""
-            echo "kubectl get nodes"
-            echo ""
-            kubectl get nodes
-            echo ""
-            echo "kubectl cluster-info"
-            echo ""
-            kubectl cluster-info
-            echo ""
-            echo "kubectl get pods -A"
-            echo ""
-            kubectl get pods -A
+      if: ${{ inputs.k8s_version != '' }}
+      shell: bash
+      run: |
+        echo "kubectl version"
+        kubectl version
+        echo ""
+        echo "minikube addions"
+        echo ""
+        minikube addons list
+        echo ""
+        echo "kubectl get nodes"
+        echo ""
+        kubectl get nodes
+        echo ""
+        echo "kubectl cluster-info"
+        echo ""
+        kubectl cluster-info
+        echo ""
+        echo "kubectl get pods -A"
+        echo ""
+        kubectl get pods -A
 
-            export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
-            echo ""
-            echo "kubectl describe node"
-            echo ""
-            kubectl describe node ${NODE_NAME}
+        export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
+        echo ""
+        echo "kubectl describe node"
+        echo ""
+        kubectl describe node ${NODE_NAME}
