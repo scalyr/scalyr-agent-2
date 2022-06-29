@@ -163,7 +163,7 @@ def _test(
     # Wait a little.
     time.sleep(10)
 
-    # Long any output which might have occured during the startup phase to help troubleshooting
+    # Log any output which might have occured during the startup phase to help troubleshooting
     # failures
     output = check_output_with_log(
         [
