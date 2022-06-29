@@ -123,11 +123,13 @@ class LogVerifier:
         while True:
             # Protect this function from hanging by adding timeout.
             if datetime.datetime.now() >= timeout_time:
-                descriptions = "\n".join(
+                descriptions = "\n\t -".join(
                     [check.description for check in self._checks_required_to_pass]
                 )
                 raise TimeoutError(
-                    f"Timeout. The conditions of the next verifiers have not been met:\n{descriptions}"
+                    f"Timeout of {timeout} seconds reached. The conditions of the next verifiers have not been met:\n\t{descriptions}.\n"
+                    f"Logs accumulated so far:\n\n{self._content}\n"
+                    f"Remaining data:\n\n{self._remaining_data}"
                 )
 
             # Get new content of the log file.
@@ -332,11 +334,22 @@ class AssertAgentLogLineIsNotAnErrorCheck(LogVerifierCheck):
                         "socket.gaierror: [Errno -3] Temporary failure in name resolution",
                     ]
                     for error_to_ignore in errors_to_ignore:
-                        if error_to_ignore in stack_trace_lines[-1]:
+                        if error_to_ignore in stack_trace:
                             to_fail = False
                             whole_error = "".join([line, stack_trace])
                             ignored_errors.append(whole_error)
                             break
+
+                # For now we ignore those errors since we have different tests for K8s OM
+                # Monitors
+                if "ERROR [monitor:kubernetes_openmetrics_monitor()]" in line:
+                    to_fail = False
+
+                    stack_trace_lines = get_stack_trace_lines()
+                    stack_trace = "".join(stack_trace_lines)
+
+                    whole_error = "".join([line, stack_trace])
+                    ignored_errors.append(whole_error)
 
                 if to_fail:
                     return (

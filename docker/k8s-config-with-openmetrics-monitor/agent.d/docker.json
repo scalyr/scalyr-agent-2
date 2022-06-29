@@ -1,0 +1,7 @@
+{
+  "monitors":[
+    {
+      "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+    }
+  ]
+}

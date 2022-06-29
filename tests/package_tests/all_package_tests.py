@@ -310,6 +310,8 @@ for builder in [
     package_builders.DOCKER_SYSLOG_CONTAINER_BUILDER_ALPINE,
     package_builders.DOCKER_API_CONTAINER_BUILDER_ALPINE,
     package_builders.K8S_CONTAINER_BUILDER_ALPINE,
+    package_builders.K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_DEBIAN,
+    package_builders.K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_ALPINE,
 ]:
     test = DockerImagePackageTest(
         base_name=f"{builder.name}_test",
@@ -333,4 +335,6 @@ for builder in [
     DOCKER_SYSLOG_TEST_ALPINE,
     DOCKER_API_TEST_ALPINE,
     K8S_TEST_ALPINE,
+    K8S_OM_MONITORS_TEST_DEBIAN,
+    K8S_OM_MONITORS_TEST_ALPINE,
 ) = _docker_image_tests

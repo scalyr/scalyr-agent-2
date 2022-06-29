@@ -27,9 +27,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-with-openmetrics-monitor" ]
         image-distro-name: [ "debian", "alpine" ]
-        python-version: [ "3.8.12" ]
+        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
@@ -72,10 +72,18 @@ jobs:
           driver-opts: network=host
 
       - name: Start minikube for the test of the kubernetes build
-        if: matrix.image-type == 'k8s'
+        if: matrix.image-type == 'k8s' || matrix.image-type == 'k8s-with-openmetrics-monitor'
         shell: bash
         run: |
           minikube start
+
+          echo ""
+          echo "kubectl version"
+          kubectl version
+          echo ""
+          echo "kubectl cluster-info"
+          echo ""
+          kubectl cluster-info
 
       - name: Run image test
         env:
