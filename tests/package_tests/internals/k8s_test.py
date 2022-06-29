@@ -24,6 +24,7 @@ import logging
 
 
 from agent_build.tools import constants
+from agent_build.tools.common import check_output_with_log
 from tests.package_tests.internals.common import SOURCE_ROOT
 from tests.package_tests.internals.common import (
     AgentLogRequestStatsLineCheck,
@@ -161,6 +162,24 @@ def _test(
 
     # Wait a little.
     time.sleep(10)
+
+    # Log any output which might have occured during the startup phase to help troubleshooting
+    # failures
+    output = check_output_with_log(
+        [
+            "kubectl",
+            "exec",
+            pod_name,
+            "--container",
+            "scalyr-agent",
+            "--",
+            "head",
+            "-100",
+            "/var/log/scalyr-agent-2/agent.log",
+        ],
+    )
+
+    logging.info(f"agent.log output 10 seconds after starting the agent:\n{output}")
 
     # Execute tail -f command on the agent.log inside the pod to read its content.
     agent_log_tail_process = subprocess.Popen(
