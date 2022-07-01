@@ -189,7 +189,7 @@ jobs:
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@c3fbf9902f3f7ec3fff8ff4798eeb2067dd32981 # v1.2.2
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
@@ -358,7 +358,7 @@ jobs:
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@c3fbf9902f3f7ec3fff8ff4798eeb2067dd32981 # v1.2.2
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
