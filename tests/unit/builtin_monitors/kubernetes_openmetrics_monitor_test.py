@@ -871,7 +871,8 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "kubernetes_openmetrics_monitor exiting because it's not enabled (k8s_explorer_enable config option is not set to true)"
         )
 
-    def test_kubernetes_events_enabled_when_explorer_enabled(self):
+    @mock.patch("scalyr_agent.builtin_monitors.kubernetes_events_monitor.global_log")
+    def test_kubernetes_events_enabled_when_explorer_enabled(self, mock_global_log):
         global_config = mock.Mock()
         global_config.agent_log_path = MOCK_AGENT_LOG_PATH
         global_config.k8s_include_namespaces = []
@@ -882,28 +883,38 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             return_value=(None, None)
         )
 
+        mock_global_log.reset_mock()
+
         global_config.k8s_explorer_enable = False
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
             "k8s_events_disable": True,
         }
+        self.assertEqual(mock_global_log.info.call_count, 0)
         monitor = KubernetesEventsMonitor(
             monitor_config=monitor_config,
             logger=mock_logger,
             global_config=global_config,
         )
-        monitor._initialize()
+        self.assertEqual(mock_global_log.info.call_count, 0)
         self.assertTrue(monitor._KubernetesEventsMonitor__disable_monitor)
+
+        mock_global_log.reset_mock()
 
         global_config.k8s_explorer_enable = True
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
             "k8s_events_disable": True,
         }
+        self.assertEqual(mock_global_log.info.call_count, 0)
         monitor = KubernetesEventsMonitor(
             monitor_config=monitor_config,
             logger=mock_logger,
             global_config=global_config,
         )
-        monitor._initialize()
-        self.assertFalse(monitor._KubernetesEventsMonitor__disable_monitor)
+
+        self.assertEqual(mock_global_log.info.call_count, 1)
+        mock_global_log.info.assert_called_with(
+            "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
+        )
+        self.assertEqual(mock_global_log.info.call_count, 1)
