@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import os
+import sys
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
@@ -13,6 +15,7 @@ from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import QualifiedName
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 from mock import patch, Mock
 import six
@@ -270,6 +273,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         self.assertEquals(type(event_object_filter), ArrayOfStrings)
         self.assertEquals(elems, list(event_object_filter))
 
+    @skipIf(sys.version_info < (3, 6, 0), "Skipping under Python 2")
     def test_k8s_explorer_enable(self):
         def _assert_environment_variable(env_var_name, env_var_value, expected_value):
             os.environ[env_var_name] = env_var_value
