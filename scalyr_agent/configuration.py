@@ -1635,6 +1635,16 @@ class Configuration(object):
         )
 
     @property
+    def calculate_rate_metric_names(self):
+        """
+        Returns the configuration value for 'calculate_rate_metric_names'.
+
+        This value should include a list of metric name (global across all the monitors for which)
+        rate value should be calculated on the agent side.
+        """
+        return self.__get_config().get_json_array("calculate_rate_metric_names")
+
+    @property
     def minimum_scan_interval(self):
         """Returns the configuration value for 'minimum_scan_interval'."""
         return self.__get_config().get_int(
@@ -2242,7 +2252,15 @@ class Configuration(object):
             separators=[None, ","],
             env_aware=True,
         )
-
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "calculate_rate_metric_names",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
         self.__verify_or_set_optional_string(
             config,
             "max_send_rate_enforcement",

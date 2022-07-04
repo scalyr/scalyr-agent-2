@@ -1878,9 +1878,9 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 5,
-            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]
             }
-        """
+"""
         )
         mock_logger = Mock()
         config = self._create_test_configuration_instance(logger=mock_logger)
@@ -1899,7 +1899,7 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 9900,
-            workers: [{"sessions":10, "api_key": "foo1234", "id": "one"}]},
+            workers: [{"sessions":10, "api_key": "foo1234", "id": "one"}],
             }
         """
         )
@@ -1956,7 +1956,7 @@ class TestConfiguration(TestConfigurationBase):
             """{
             api_key: "hi there",
             max_line_size: 49900,
-            workers: [{"workers":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"workers":2, "api_key": "foo1234", "id": "one"}]
             }
         """
         )
@@ -1997,7 +1997,7 @@ class TestConfiguration(TestConfigurationBase):
             api_key: "hi there",
             max_line_size: 49900,
             debug_level: 5,
-            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]}
+            workers: [{"sessions":2, "api_key": "foo1234", "id": "one"}]
             }
         """
         )
