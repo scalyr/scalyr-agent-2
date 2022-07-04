@@ -193,6 +193,8 @@ from scalyr_agent import compat
 
 __monitor__ = __name__
 
+GLOBAL_LOG = scalyr_logging.getLogger(__name__)
+
 # Default config option values
 DEFAULT_SCRAPE_INTERVAL = 60.0
 DEFAULT_SCRAPE_TIMEOUT = 10
@@ -538,6 +540,17 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self.__static_monitors_started = False
 
         self.__previous_running_monitors_count = 0
+
+        self.__enable_monitor = self._global_config.k8s_explorer_enable
+
+
+    def run(self):
+        if not self.__enable_monitor:
+            GLOBAL_LOG.info("kubernetes_openmetrics_monitor exiting because it's not enabled "
+                            "(k8s_explorer_enable config option is not set to true)")
+            return None
+
+        return super(KubernetesOpenMetricsMonitor, self).run()
 
     @property
     def k8s(self):

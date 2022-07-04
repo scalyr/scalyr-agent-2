@@ -270,6 +270,42 @@ class TestConfigurationK8s(TestConfigurationBase):
         self.assertEquals(type(event_object_filter), ArrayOfStrings)
         self.assertEquals(elems, list(event_object_filter))
 
+    def test_k8s_explorer_enable(self):
+        def _assert_environment_variable(env_var_name, env_var_value, expected_value):
+            os.environ[env_var_name] = env_var_value
+            self._write_file_with_separator_conversion(
+                """ {
+                api_key: "hi there",
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+                    }
+                ]
+              }
+            """
+            )
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            test_manager = MonitorsManager(config, FakePlatform([]))
+            k8s_openmetrics_monitor = test_manager.monitors[0]
+            self.assertEquals(
+                expected_value,
+                k8s_openmetrics_monitor._KubernetesOpenMetricsMonitor__enable_monitor,
+            )
+
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "true", True)
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "True", True)
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "TRUE", True)
+
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "false", False)
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "False", False)
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "False", False)
+
+        # Test default value is False
+        _assert_environment_variable("SCALYR_K8S_EXPLORER_ENABLE", "", False)
+
     def test_k8s_events_disable(self):
         def _assert_environment_variable(env_var_name, env_var_value, expected_value):
             os.environ[env_var_name] = env_var_value

@@ -382,11 +382,17 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             legacy_disable = "false"
 
         # Note, accepting just a single `t` here due to K8s ConfigMap issues with having a value of `true`
-        self.__disable_monitor = (
+        self.__disable_monitor = bool(
             legacy_disable == "true"
             or legacy_disable == "t"
             or self._global_config.k8s_events_disable
         )
+
+        # NOTE: Right now Kubernetes Explorer functionality also needs data from Kubernetes events
+        # monitor so in case explorer functionality is enabled, we also enable events monitor
+        if self._global_config.k8s_explorer_enable:
+            global_log.info("k8s_explorer_enable config option is set to true, enabling kubernetes events monitor")
+            self.__disable_monitor = False
 
     def open_metric_log(self):
         """Override open_metric_log to prevent a metric log from being created for the Kubernetes Events Monitor
