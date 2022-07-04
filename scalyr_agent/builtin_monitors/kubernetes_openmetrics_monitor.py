@@ -38,9 +38,9 @@ monitor:
       building scrapper URL.
     * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint.
       Defaults to 60 seconds.
-    * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out.
+    * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out. This should be at least 5-10 seconds shorter than scrape interval.
     * ``k8s.monitor.config.scalyr.com/verify_https`` (optional) - Set to false to disable remote SSL
-      cert and hostname validation.
+      cert and hostname validation for this endpoint.
     * ``k8s.monitor.config.scalyr.com/attributes`` (optional) - Optional JSON object with the attributes
       (key/value pairs) which get included with every metric. Template syntax is supported for attribute
       values. Right now only pod labels are available in the template context.
@@ -271,7 +271,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "scrape_timeout",
-    "Timeout for scrape HTTP requests. Defaults to 10 seconds.",
+    "Timeout for scrape HTTP requests. Defaults to 10 seconds. This should be at least 5-10 seconds shorter than scrape interval.",
     convert_to=int,
     default=DEFAULT_SCRAPE_TIMEOUT,
 )
