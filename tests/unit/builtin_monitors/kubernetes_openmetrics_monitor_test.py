@@ -32,7 +32,9 @@ from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
     K8sPod,
     TemplateWithSpecialCharacters,
 )
-from scalyr_agent.builtin_monitors.kubernetes_events_monitor import KubernetesEventsMonitor
+from scalyr_agent.builtin_monitors.kubernetes_events_monitor import (
+    KubernetesEventsMonitor,
+)
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
 from scalyr_agent.test_base import ScalyrTestCase
@@ -845,7 +847,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         result = TemplateWithSpecialCharacters(template).safe_substitute(context)
         self.assertEqual(result, "test hello $world foo bar2 bar test2 bar3 f1 food")
 
-    @mock.patch("scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor.GLOBAL_LOG")
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor.GLOBAL_LOG"
+    )
     def test_run_monitor_is_disabled(self, mock_global_log):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
@@ -863,7 +867,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_global_log.info.call_count, 0)
         self.assertIsNone(monitor.run())
         self.assertEqual(mock_global_log.info.call_count, 1)
-        mock_global_log.info.assert_called_with("kubernetes_openmetrics_monitor exiting because it's not enabled (k8s_explorer_enable config option is not set to true)")
+        mock_global_log.info.assert_called_with(
+            "kubernetes_openmetrics_monitor exiting because it's not enabled (k8s_explorer_enable config option is not set to true)"
+        )
 
     def test_kubernetes_events_enabled_when_explorer_enabled(self):
         global_config = mock.Mock()
@@ -872,7 +878,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         global_config.k8s_ignore_namespaces = []
         mock_logger = mock.Mock()
 
-        KubernetesEventsMonitor._get_log_rotation_configuration = mock.Mock(return_value=(None, None))
+        KubernetesEventsMonitor._get_log_rotation_configuration = mock.Mock(
+            return_value=(None, None)
+        )
 
         global_config.k8s_explorer_enable = False
         monitor_config = {

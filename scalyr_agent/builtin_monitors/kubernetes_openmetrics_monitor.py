@@ -543,11 +543,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         self.__enable_monitor = self._global_config.k8s_explorer_enable
 
-
     def run(self):
         if not self.__enable_monitor:
-            GLOBAL_LOG.info("kubernetes_openmetrics_monitor exiting because it's not enabled "
-                            "(k8s_explorer_enable config option is not set to true)")
+            GLOBAL_LOG.info(
+                "kubernetes_openmetrics_monitor exiting because it's not enabled "
+                "(k8s_explorer_enable config option is not set to true)"
+            )
             return None
 
         return super(KubernetesOpenMetricsMonitor, self).run()
