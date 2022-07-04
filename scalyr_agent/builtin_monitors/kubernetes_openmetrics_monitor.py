@@ -38,9 +38,9 @@ monitor:
       building scrapper URL.
     * ``k8s.monitor.config.scalyr.com/scrape_interval`` (optional) - How often to scrape this endpoint.
       Defaults to 60 seconds.
-    * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out.
+    * ``k8s.monitor.config.scalyr.com/scrape_timeout`` (optional) - How long to wait before timing out. This should be at least 5-10 seconds shorter than scrape interval.
     * ``k8s.monitor.config.scalyr.com/verify_https`` (optional) - Set to false to disable remote SSL
-      cert and hostname validation.
+      cert and hostname validation for this endpoint.
     * ``k8s.monitor.config.scalyr.com/attributes`` (optional) - Optional JSON object with the attributes
       (key/value pairs) which get included with every metric. Template syntax is supported for attribute
       values. Right now only pod labels are available in the template context.
@@ -193,6 +193,8 @@ from scalyr_agent import compat
 
 __monitor__ = __name__
 
+GLOBAL_LOG = scalyr_logging.getLogger(__name__)
+
 # Default config option values
 DEFAULT_SCRAPE_INTERVAL = 60.0
 DEFAULT_SCRAPE_TIMEOUT = 10
@@ -269,7 +271,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "scrape_timeout",
-    "Timeout for scrape HTTP requests. Defaults to 10 seconds.",
+    "Timeout for scrape HTTP requests. Defaults to 10 seconds. This should be at least 5-10 seconds shorter than scrape interval.",
     convert_to=int,
     default=DEFAULT_SCRAPE_TIMEOUT,
 )
@@ -287,7 +289,7 @@ define_config_option(
     "scrape_kubernetes_api_cadvisor_metrics",
     "Set to True to enable scraping metrics from /metrics/cadvisor Kubernetes API endpoint.",
     convert_to=bool,
-    default=False,
+    default=True,
 )
 
 define_config_option(
@@ -538,6 +540,18 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         self.__static_monitors_started = False
 
         self.__previous_running_monitors_count = 0
+
+        self.__enable_monitor = self._global_config.k8s_explorer_enable
+
+    def run(self):
+        if not self.__enable_monitor:
+            GLOBAL_LOG.info(
+                "kubernetes_openmetrics_monitor exiting because it's not enabled "
+                "(k8s_explorer_enable config option is not set to true)"
+            )
+            return None
+
+        return super(KubernetesOpenMetricsMonitor, self).run()
 
     @property
     def k8s(self):

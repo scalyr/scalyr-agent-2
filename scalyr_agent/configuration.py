@@ -1034,6 +1034,10 @@ class Configuration(object):
         return self.__get_config().get_bool("k8s_events_disable")
 
     @property
+    def k8s_explorer_enable(self):
+        return self.__get_config().get_bool("k8s_explorer_enable")
+
+    @property
     def k8s_ratelimit_cluster_num_agents(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int("k8s_ratelimit_cluster_num_agents")
@@ -2887,6 +2891,15 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "k8s_events_disable",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_explorer_enable",
             False,
             description,
             apply_defaults,
