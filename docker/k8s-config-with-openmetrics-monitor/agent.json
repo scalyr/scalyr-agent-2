@@ -1,0 +1,20 @@
+// Configuration for the Scalyr Agent while running on Kubernetes. For help:
+//
+// https://www.scalyr.com/help/scalyr-agent-2
+
+{
+  // Note:  It is assumed that another file such as `agent.d/api-key.json`
+  // will contain the api key for the user's Scalyr account.
+
+  // No need for system and agent monitors.  The k8 plugin will gather
+  // metrics on the container running the agent.
+  implicit_metric_monitor: false,
+  implicit_agent_process_metrics_monitor: false,
+
+  // Checkpoints file is persisted across pod restarts to ensure we don't
+  // emit duplicate lines for container logs on on pod restart, but we don't
+  // want to persist checkpoint data for ephemeral log files (aka log files
+  // which are not persisted across restarts and are ephemeral to the
+  // container - think anything in /var/log/scalyr-agent-2/*.log)
+  ignore_checkpoints_on_startup_path_globs: ["/var/log/scalyr-agent-2/*.log"],
+}

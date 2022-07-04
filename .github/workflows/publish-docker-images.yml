@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "k8s" ]
+        image-type: [ "docker-json", "docker-syslog", "k8s", "k8s-with-openmetrics-monitor" ]
         image-distro-name: [ "debian", "alpine" ]
 
     steps:
@@ -50,7 +50,7 @@ jobs:
           platforms: all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
+        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6 # v2.0.0
         with:
           driver-opts: network=host
 
@@ -80,7 +80,7 @@ jobs:
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
@@ -116,7 +116,7 @@ jobs:
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
