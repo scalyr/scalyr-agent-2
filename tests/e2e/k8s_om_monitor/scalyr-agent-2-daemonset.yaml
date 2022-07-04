@@ -69,8 +69,6 @@ spec:
               name: extraconfig
             # We want to use custom config for the Kubernetes OpenMetrics monitor
             # and not one bundled with the agent
-            - mountPath: /etc/scalyr-agent-2/agent.d/k8s_open_metrics_monitor.json
-              name: devnull
             - mountPath: /var/lib/docker/containers
               name: varlibdockercontainers
               readOnly: true
@@ -92,6 +90,12 @@ spec:
                 - -H
             initialDelaySeconds: 60
             periodSeconds: 60
+          # We want to use custom config for the Kubernetes OpenMetrics monitor
+          # and not one bundled with the agent.
+          lifecycle:
+            postStart:
+              exec:
+                command: ["rm", "/etc/scalyr-agent-2/agent.d/k8s_open_metrics_monitor.json"]
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -119,10 +123,6 @@ spec:
             path: /var/run/docker.sock
             type: ''
           name: dockersock
-        - hostPath:
-            path: /dev/null
-            type: ''
-          name: devnull
         - hostPath:
             path: /tmp/scalyr-agent-2
             type: DirectoryOrCreate
