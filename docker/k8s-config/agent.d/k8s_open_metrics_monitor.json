@@ -9,7 +9,7 @@
       logger_include_node_name: false,
       // Switch to true once preview phase is over
       verify_https: false,
-      scrape_kubernetes_api_metrics: true,
+      scrape_kubernetes_api_metrics: false,
       kubernetes_api_metrics_scrape_interval: 60,
       scrape_kubernetes_api_cadvisor_metrics: true,
       kubernetes_api_cadvisor_metrics_scrape_interval: 60,
