@@ -289,7 +289,7 @@ define_config_option(
     "scrape_kubernetes_api_cadvisor_metrics",
     "Set to True to enable scraping metrics from /metrics/cadvisor Kubernetes API endpoint.",
     convert_to=bool,
-    default=False,
+    default=True,
 )
 
 define_config_option(
