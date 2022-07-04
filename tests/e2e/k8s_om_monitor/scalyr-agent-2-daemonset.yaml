@@ -23,6 +23,10 @@ spec:
               value: "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor()"
             - name: SCALYR_K8S_EXPLORER_ENABLE
               value: "true"
+            - name: SCALYR_K8S_VERIFY_KUBELET_QUERIES
+              value: "false"
+            - name: SCALYR_K8S_VERIFY_API_QUERIES
+              value: "false"
             - name: SCALYR_API_KEY
               valueFrom:
                 secretKeyRef:
