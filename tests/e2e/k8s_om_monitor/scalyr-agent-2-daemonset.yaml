@@ -21,6 +21,8 @@ spec:
               value: "/etc/scalyr-agent-2/agent-extra.d"
             - name: SCALYR_DEBUG_LEVEL_LOGGER_NAMES
               value: "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor()"
+            - name: SCALYR_K8S_EXPLORER_ENABLE
+              value: "true"
             - name: SCALYR_API_KEY
               valueFrom:
                 secretKeyRef:
