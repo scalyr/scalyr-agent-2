@@ -20,7 +20,7 @@ docker==4.1.0
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 requests==2.20.0
-ujson==1.35
+ujson==5.2.0
 orjson==3.6.7; python_version >= '3.6'
 orjson==2.0.11; python_version == '3.5'
 # Needed by MockHTTPServer class and related tests
