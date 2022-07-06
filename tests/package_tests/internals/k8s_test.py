@@ -181,7 +181,8 @@ def _test(
         ],
     )
 
-    logging.info(f"agent.log output 10 seconds after starting the agent:\n{output}")
+    logging.info(f"agent.log output 10 seconds after starting the agent:")
+    logging.info(output)
 
     # Execute tail -f command on the agent.log inside the pod to read its content.
     agent_log_tail_process = subprocess.Popen(
