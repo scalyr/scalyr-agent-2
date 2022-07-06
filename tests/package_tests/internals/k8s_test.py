@@ -121,6 +121,8 @@ def _test(
             "configmap",
             "scalyr-config",
             f"--from-literal=SCALYR_K8S_CLUSTER_NAME={cluster_name}",
+            f"--from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES=false",
+            f"--from-literal=SCALYR_K8S_VERIFY_API_QUERIES=false",
         ]
     )
 
