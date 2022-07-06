@@ -121,8 +121,8 @@ def _test(
             "configmap",
             "scalyr-config",
             f"--from-literal=SCALYR_K8S_CLUSTER_NAME={cluster_name}",
-            f"--from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES=false",
-            f"--from-literal=SCALYR_K8S_VERIFY_API_QUERIES=false",
+            "--from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES=false",
+            "--from-literal=SCALYR_K8S_VERIFY_API_QUERIES=false",
         ]
     )
 
@@ -181,9 +181,9 @@ def _test(
         ],
     )
 
-    logging.info(f"agent.log output 10 seconds after starting the agent:")
+    logging.info("agent.log output 10 seconds after starting the agent:")
 
-    for output_line in output.split(b"\b"):
+    for output_line in output.split(b"\n"):
         logging.info(output_line)
     logging.info("----------------------")
 
