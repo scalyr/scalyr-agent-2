@@ -457,6 +457,8 @@ class OpenMetricsMonitor(ScalyrMonitor):
                 # float
                 metric_value = float(metric_value)  # type: ignore
                 metric_value = int(metric_value)  # type: ignore
+            elif metric_value == "NaN":
+                continue
             elif metric_value == "+Inf":
                 pass
             else:
