@@ -918,3 +918,78 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
         )
         self.assertEqual(mock_global_log.info.call_count, 1)
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor.GLOBAL_LOG"
+    )
+    def test_warning_logged_on_missing_mandatory_monitor(self, mock_global_log):
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        global_config.k8s_include_namespaces = []
+        global_config.k8s_ignore_namespaces = []
+        mock_logger = mock.Mock()
+
+        KubernetesEventsMonitor._get_log_rotation_configuration = mock.Mock(
+            return_value=(None, None)
+        )
+
+        mock_global_log.reset_mock()
+
+        global_config.k8s_explorer_enable = False
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+
+        # 1. has node_exporter
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_node_exporter-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+
+        # 2. has node-exporter
+        mock_global_log.reset_mock()
+
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_node-exporter-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+
+        # 3. doesn't have node exporter
+        mock_global_log.reset_mock()
+
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_foobar-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 1)
+
+        # 3. doesn't have node exporter, warnings silenced
+        mock_global_log.reset_mock()
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+            "silence_mandatory_monitors_warnings": True,
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_foobar-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)
