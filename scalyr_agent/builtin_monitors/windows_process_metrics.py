@@ -511,7 +511,9 @@ class ProcessMonitor(ScalyrMonitor):
     """
     # fmt: on
 
-    def __init__(self, monitor_config, logger, **kw):
+    def __init__(
+        self, monitor_config, logger, sample_interval_secs=None, global_config=None
+    ):
         """TODO: Function documentation"""
         if psutil is None:
             raise UnsupportedSystem(
@@ -521,10 +523,11 @@ class ProcessMonitor(ScalyrMonitor):
                 "  pip install psutil",
             )
 
-        sampling_rate = kw.get("sampling_interval_secs", 30)
-        global_config = kw.get("global_config")
         super(ProcessMonitor, self).__init__(
-            monitor_config, logger, sampling_rate, global_config=global_config
+            monitor_config=monitor_config,
+            logger=logger,
+            sample_interval_secs=sample_interval_secs,
+            global_config=global_config,
         )
         self.__process = None
 
