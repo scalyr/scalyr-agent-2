@@ -61,10 +61,9 @@ global_log = scalyr_logging.getLogger(__name__)
 CONFIG_OPTIONS = [
     dict(
         option_name="module",
-        option_description="A ScalyrAgent plugin monitor module",
+        option_description="Always ``scalyr_agent.builtin_monitors.windows_system_metrics``",
         convert_to=six.text_type,
         required_option=True,
-        default="windows_system_metrics",
     )
 ]
 
