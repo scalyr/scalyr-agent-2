@@ -19,6 +19,7 @@ import mock
 
 from scalyr_agent.test_base import ScalyrTestCase
 
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.builtin_monitors.windows_process_metrics import ProcessMonitor
 
 __all__ = ["WindowsProcessMetricsMonitorTestCase"]
@@ -39,6 +40,7 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
             "id": "id1",
+            "pid": "$$",
         }
         monitor = ProcessMonitor(monitor_config, logger=mock_logger)
         self.assertEqual(monitor._sample_interval_secs, 30)
@@ -47,6 +49,7 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
             "id": "id1",
+            "pid": "$$",
             "sample_interval": 90,
         }
         monitor = ProcessMonitor(monitor_config, logger=mock_logger)
@@ -56,12 +59,52 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
             "id": "id1",
+            "pid": "$$",
             "sample_interval": 90,
         }
         monitor = ProcessMonitor(
             monitor_config, logger=mock_logger, sample_interval_secs=66
         )
         self.assertEqual(monitor._sample_interval_secs, 66)
+
+    def test_error_is_thrown_on_invalid_config(self):
+        mock_logger = mock.Mock()
+
+        # 1. neither pid nor commandline is specified
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
+            "id": "id1",
+            "sample_interval": 90,
+        }
+
+        expected_msg = r'Either "pid" or "commandline" monitor config option needs to be specified \(but not both\)'
+        self.assertRaisesRegex(
+            BadMonitorConfiguration,
+            expected_msg,
+            ProcessMonitor,
+            monitor_config,
+            logger=mock_logger,
+            sample_interval_secs=66,
+        )
+
+        # 2. both arguments are specified
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
+            "id": "id1",
+            "pid": "$$",
+            "commandline": "apache",
+            "sample_interval": 90,
+        }
+
+        expected_msg = r'Either "pid" or "commandline" monitor config option needs to be specified \(but not both\)'
+        self.assertRaisesRegex(
+            BadMonitorConfiguration,
+            expected_msg,
+            ProcessMonitor,
+            monitor_config,
+            logger=mock_logger,
+            sample_interval_secs=66,
+        )
 
     @mock.patch("scalyr_agent.builtin_monitors.windows_process_metrics.psutil")
     @mock.patch("scalyr_agent.builtin_monitors.windows_process_metrics.global_log")

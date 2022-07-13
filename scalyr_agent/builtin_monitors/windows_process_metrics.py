@@ -86,7 +86,7 @@ except ImportError:
 
 import six
 
-from scalyr_agent import ScalyrMonitor, UnsupportedSystem
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
 from scalyr_agent import scalyr_logging
 
@@ -538,6 +538,18 @@ class ProcessMonitor(ScalyrMonitor):
         self.__id = self._config.get(
             "id", required_field=True, convert_to=six.text_type
         )
+
+        if not self._config.get("commandline") and not self._config.get("pid"):
+            raise BadMonitorConfiguration(
+                'Either "pid" or "commandline" monitor config option needs to be specified (but not both)',
+                "commandline",
+            )
+
+        if self._config.get("commandline") and self._config.get("pid"):
+            raise BadMonitorConfiguration(
+                'Either "pid" or "commandline" monitor config option needs to be specified (but not both)',
+                "commandline",
+            )
 
     def _select_target_process(self):
         """TODO: Function documentation"""
