@@ -9,6 +9,7 @@ Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
 
 Windows:
 * Fix bug in Windows System Metrics and Windows Process Metrics monitor where user wasn't able to override / change default sampling rating of 30 seconds (``sample_interval`` monitor config option).
+* Update Windows Process metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
 
 Other:
 * Support for Python 2.6 has been dropped.

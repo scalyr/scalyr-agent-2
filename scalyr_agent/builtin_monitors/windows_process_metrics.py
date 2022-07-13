@@ -88,6 +88,9 @@ import six
 
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem
 from scalyr_agent import define_config_option, define_metric, define_log_field
+from scalyr_agent import scalyr_logging
+
+global_log = scalyr_logging.getLogger(__name__)
 
 
 #
@@ -552,7 +555,6 @@ class ProcessMonitor(ScalyrMonitor):
         self.__process = process
 
     def gather_sample(self):
-        """TODO: Function documentation"""
         try:
             self._select_target_process()
             for idx, metric in enumerate(METRICS):
@@ -572,3 +574,14 @@ class ProcessMonitor(ScalyrMonitor):
                 )
         except psutil.NoSuchProcess:
             self.__process = None
+
+            commandline = self._config.get("commandline", None)
+            pid = self._config.get("pid", None)
+
+            # commandline has precedence over pid
+            if commandline:
+                global_log.warn(
+                    'Unable to find process with commandline "%s"' % (commandline)
+                )
+            elif pid:
+                global_log.warn('Unable to find process with pid "%s"' % (pid))

@@ -24,6 +24,10 @@ from scalyr_agent.builtin_monitors.windows_process_metrics import ProcessMonitor
 __all__ = ["WindowsProcessMetricsMonitorTestCase"]
 
 
+class MockNoSuchProcess(Exception):
+    pass
+
+
 class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
     @mock.patch(
         "scalyr_agent.builtin_monitors.windows_process_metrics.psutil", mock.Mock()
@@ -58,3 +62,46 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
             monitor_config, logger=mock_logger, sample_interval_secs=66
         )
         self.assertEqual(monitor._sample_interval_secs, 66)
+
+    @mock.patch("scalyr_agent.builtin_monitors.windows_process_metrics.psutil")
+    @mock.patch("scalyr_agent.builtin_monitors.windows_process_metrics.global_log")
+    def test_process_not_found_warning_is_logged(self, mock_global_log, mock_psutil):
+        mock_psutil.NoSuchProcess = MockNoSuchProcess
+        mock_logger = mock.Mock()
+
+        # 1. pid specified
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
+            "id": "id1",
+            "pid": "$$",
+        }
+        monitor = ProcessMonitor(monitor_config, logger=mock_logger)
+        monitor._select_target_process = mock.Mock(
+            side_effect=MockNoSuchProcess("error")
+        )
+
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor.gather_sample()
+        mock_global_log.warn.assert_called_with('Unable to find process with pid "$$"')
+        self.assertEqual(mock_global_log.warn.call_count, 1)
+
+        # 2. commandline specified
+        mock_global_log.reset_mock()
+        mock_logger.reset_mock()
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_process_metrics",
+            "id": "id1",
+            "commandline": "apache",
+        }
+        monitor = ProcessMonitor(monitor_config, logger=mock_logger)
+        monitor._select_target_process = mock.Mock(
+            side_effect=MockNoSuchProcess("error")
+        )
+
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor.gather_sample()
+        mock_global_log.warn.assert_called_with(
+            'Unable to find process with commandline "apache"'
+        )
+        self.assertEqual(mock_global_log.warn.call_count, 1)
