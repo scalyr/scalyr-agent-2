@@ -223,6 +223,8 @@ DEFAULT_SCRAPE_SCHEME = "http"
 DEFAULT_SCRAPE_PORT = None
 DEFAULT_SCRAPE_PATH = "/metrics"
 
+CONFIG_DOCS_URL = "https://app.scalyr.com/help/scalyr-agent-k8s-explorer"
+
 define_config_option(
     __monitor__,
     "module",
@@ -380,6 +382,14 @@ define_config_option(
     default=True,
 )
 
+define_config_option(
+    __monitor__,
+    "silence_mandatory_monitors_warnings",
+    "True to silence warnings about mandatory pods not being scraped. This should be set to True when non-default / non-standard resource names are used for node-exporter DaemonSet and kube-state-metrics Deployment.",
+    convert_to=bool,
+    default=False,
+)
+
 KUBERNETES_API_METRICS_URL = Template(
     "${k8s_api_url}/api/v1/nodes/${node_name}/proxy/metrics"
 )
@@ -514,6 +524,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         )
         self.__include_node_name = self._config.get("include_node_name", False)
         self.__include_cluster_name = self._config.get("include_cluster_name", False)
+        self.__silence_mandatory_monitors_warnings = self._config.get(
+            "silence_mandatory_monitors_warnings", False
+        )
 
         self.__k8s_api_url = self._global_config.k8s_api_url
 
@@ -603,6 +616,48 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         self.__schedule_dynamic_open_metrics_monitors()
         self.__log_running_stats()
+
+        if self.__static_monitors_started:
+            self.__check_mandatory_monitors_are_running()
+
+    def __check_mandatory_monitors_are_running(self):
+        """
+        This method checks that the monitors which scrape node-exporter and kube-state-metrics
+        exporter pods are running.
+
+        Those two exporters are needed for the complete Kubernetes Explorer experience.
+
+        NOTE: kube-state-metrics exporter is a Deployment which only runs on a single node and
+        node-exporter is a DaemonSet.
+
+        Keep in mind that this check only covers default / standard setups and doesn't handle
+        scenario where non-standard resource names are used.
+        """
+        if self.__silence_mandatory_monitors_warnings:
+            return
+
+        has_node_exporter_monitor = False
+
+        monitor_names = self.__running_monitors.values()
+        for monitor_name in monitor_names:
+            if "node_exporter" in monitor_name or "node-exporter" in monitor_name:
+                has_node_exporter_monitor = True
+                break
+
+        if not has_node_exporter_monitor:
+            GLOBAL_LOG.warn(
+                'Could not find running OpenMetrics monitor for "node-exporter" '
+                "Deployment. Scraping node-exporter is mandatory for a complete "
+                "Kubernetes Explorer experience. For information on how to configure "
+                "scraping of node-exporter Deployment pod, please visit "
+                f"{CONFIG_DOCS_URL}",
+                limit_once_per_x_secs=(1 * 60 * 60),
+                limit_key="node_exporter_monitor_not_found",
+            )
+
+        # TODO: Also implement kube-state-metrics check - this is harder since it's a Deployment
+        # which doesn't run on every node which means we need to introduce lightweight consensus /
+        # store metadata in k8s and query it here
 
     def __log_running_stats(self):
         # We log a message either if the value from the previous run changes or every X minutes
