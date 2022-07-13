@@ -4650,7 +4650,16 @@ def perform_str_substitution(str_value, substitutions):
     @rtype: str or unicode
     """
     result = str_value
-    for (var_name, value) in six.iteritems(substitutions):
+
+    # NOTE: Right now out substitution code also supports partial substitutions which means we can't
+    # use regular expression directly, but we need to sort substitutions variables by length (desc)
+    # before we perform substitutions to ensure we use the correct substitution variable in case
+    # multiple variables share the same prefix.
+    # For example: $SCALYR_FOO_VAR1, $SCALYR_FOO_VAR2, $SCALYR_FOO
+    substitutions_variable_names = sorted(substitutions.keys(), key=len, reverse=True)
+
+    for var_name in substitutions_variable_names:
+        value = substitutions[var_name]
         result = result.replace("$%s" % var_name, value)
     return result
 
