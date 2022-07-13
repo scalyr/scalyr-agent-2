@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.33 "TBD" - Aug 28, 2022
+
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
+--->
+
+Windows:
+* Fix bug in Windows System Metrics and Windows Process Metrics monitor where user wasn't able to override / change default sampling rating of 30 seconds (``sample_interval`` monitor config option).
+* Update Windows Process Metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
+* Update Windows Process Metrics monitor to throw an error in case invalid monitor configuration is specified (neither "pid" nor "commandline" config option is specified or both config options which are mutually exclusive are specified).
+
+Other:
+* Support for Python 2.6 has been dropped.
+
 ## 2.1.31 "Irati" - Jun 28, 2022
 
 <!---
