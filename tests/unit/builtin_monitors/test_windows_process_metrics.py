@@ -78,7 +78,7 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
         }
 
         expected_msg = r'Either "pid" or "commandline" monitor config option needs to be specified \(but not both\)'
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             BadMonitorConfiguration,
             expected_msg,
             ProcessMonitor,
@@ -97,7 +97,7 @@ class WindowsProcessMetricsMonitorTestCase(ScalyrTestCase):
         }
 
         expected_msg = r'Either "pid" or "commandline" monitor config option needs to be specified \(but not both\)'
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             BadMonitorConfiguration,
             expected_msg,
             ProcessMonitor,
