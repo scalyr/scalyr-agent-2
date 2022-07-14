@@ -1249,6 +1249,40 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.api_key, "hibye")
 
+    def test_import_vars_substitution_common_prefix(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            import_vars: [ "TEST_FOO", "TEST_FOO_VAR1", "TEST_FOO_VAR", "TEST_FOO_VAR2", "SCALYR_DEVICE", "SCALYR_DEVICE_BAR" ],
+            api_key: "key",
+            server_attributes: {
+                "serverHost": "bar",
+                "var1": "$TEST_FOO_VAR1",
+                "var2": "$TEST_FOO_VAR2",
+                "var3": "$TEST_FOO",
+                "var4": "$TEST_FOO_VAR",
+                "var5": "hi$SCALYR_DEVICE"
+                "var6": "hi$SCALYR_DEVICE_BAR"
+            }
+          }
+        """
+        )
+        os.environ["TEST_FOO_VAR1"] = "foovar1"
+        os.environ["TEST_FOO_VAR2"] = "foovar2"
+        os.environ["TEST_FOO"] = "abc"
+        os.environ["TEST_FOO_VAR"] = "defg"
+        os.environ["SCALYR_DEVICE"] = "device"
+        os.environ["SCALYR_DEVICE_BAR"] = "bar"
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        self.assertEqual(config.server_attributes["var1"], "foovar1")
+        self.assertEqual(config.server_attributes["var2"], "foovar2")
+        self.assertEqual(config.server_attributes["var3"], "abc")
+        self.assertEqual(config.server_attributes["var4"], "defg")
+        self.assertEqual(config.server_attributes["var5"], "hidevice")
+        self.assertEqual(config.server_attributes["var6"], "hibar")
+
     def test_substitution_with_default(self):
         self._write_file_with_separator_conversion(
             """ {

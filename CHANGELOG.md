@@ -12,6 +12,9 @@ Windows:
 * Update Windows Process Metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
 * Update Windows Process Metrics monitor to throw an error in case invalid monitor configuration is specified (neither "pid" nor "commandline" config option is specified or both config options which are mutually exclusive are specified).
 
+Bug fixes:
+* Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+
 Other:
 * Support for Python 2.6 has been dropped.
 

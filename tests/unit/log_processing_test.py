@@ -490,7 +490,6 @@ class TestLogFileIterator(ScalyrTestCase):
 
     # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
     @skipIf(platform.system() == "Windows", "Skipping tests under Windows")
-    @skipIf(sys.version_info[:2] == (2, 6), "Skipping under Python 2.6")
     def test_losing_read_access(self):
         self.append_file(self.__path, b"L001\n", b"L002\n")
         restore_access = self.remove_read_access()
@@ -2872,16 +2871,15 @@ class TestLogMatcher(ScalyrTestCase):
 
     def test_matches_recursive_glob(self):
         # Recursive "**" glob patterns are only supported on Python 2.6 and above.
-        if sys.version_info >= (2, 6):
-            matcher = LogMatcher(
-                self.__config, self._create_log_config(self.__glob_recursive)
-            )
-            processors = matcher.find_matches(dict(), dict())
-            self.assertEqual(len(processors), 2)
-            self.assertEqual(processors[0].get_log_path(), self.__path_three)
-            self.assertEqual(processors[1].get_log_path(), self.__path_four)
+        matcher = LogMatcher(
+            self.__config, self._create_log_config(self.__glob_recursive)
+        )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEqual(len(processors), 2)
+        self.assertEqual(processors[0].get_log_path(), self.__path_three)
+        self.assertEqual(processors[1].get_log_path(), self.__path_four)
 
-            self._close_processors(processors)
+        self._close_processors(processors)
 
     def test_ignores_stale_file(self):
         staleness_threshold = 300  # 5 mins
