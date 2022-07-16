@@ -121,6 +121,8 @@ def _test(
             "configmap",
             "scalyr-config",
             f"--from-literal=SCALYR_K8S_CLUSTER_NAME={cluster_name}",
+            "--from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES=false",
+            "--from-literal=SCALYR_K8S_VERIFY_API_QUERIES=false",
         ]
     )
 
@@ -161,7 +163,7 @@ def _test(
     )
 
     # Wait a little.
-    time.sleep(10)
+    time.sleep(15)
 
     # Log any output which might have occured during the startup phase to help troubleshooting
     # failures
@@ -174,12 +176,16 @@ def _test(
             "scalyr-agent",
             "--",
             "head",
-            "-100",
+            "-200",
             "/var/log/scalyr-agent-2/agent.log",
         ],
     )
 
-    logging.info(f"agent.log output 10 seconds after starting the agent:\n{output}")
+    logging.info("agent.log output 10 seconds after starting the agent:")
+
+    for output_line in output.split(b"\n"):
+        logging.info(output_line)
+    logging.info("----------------------")
 
     # Execute tail -f command on the agent.log inside the pod to read its content.
     agent_log_tail_process = subprocess.Popen(

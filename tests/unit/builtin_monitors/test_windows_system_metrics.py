@@ -13,13 +13,15 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 import mock
 
 from scalyr_agent.test_base import ScalyrTestCase
 
-from scalyr_agent.builtin_monitors.windows_system_metrics import _gather_metric
 from scalyr_agent.builtin_monitors.windows_system_metrics import __NO_DISK_PERF__
+from scalyr_agent.builtin_monitors.windows_system_metrics import _gather_metric
+from scalyr_agent.builtin_monitors.windows_system_metrics import SystemMonitor
 
 __all__ = ["WindowsSystemMetricsMonitorTestCase"]
 
@@ -55,3 +57,34 @@ class WindowsSystemMetricsMonitorTestCase(ScalyrTestCase):
         result = list(_gather_metric(method="disk_io_counters")())
 
         self.assertEqual(result[0][0], __NO_DISK_PERF__)
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.windows_system_metrics.psutil", mock.Mock()
+    )
+    def test_custom_sample_interval(self):
+        mock_logger = mock.Mock()
+
+        # 1. Default interval
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_system_metrics"
+        }
+        monitor = SystemMonitor(monitor_config, logger=mock_logger)
+        self.assertEqual(monitor._sample_interval_secs, 30)
+
+        # 2. Custom interval overriden via monitor config option
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_system_metrics",
+            "sample_interval": 90,
+        }
+        monitor = SystemMonitor(monitor_config, logger=mock_logger)
+        self.assertEqual(monitor._sample_interval_secs, 90)
+
+        # 3. Overriden via constructor argument (only when used programtically)
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.windows_system_metrics",
+            "sample_interval": 90,
+        }
+        monitor = SystemMonitor(
+            monitor_config, logger=mock_logger, sample_interval_secs=66
+        )
+        self.assertEqual(monitor._sample_interval_secs, 66)

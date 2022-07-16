@@ -1,6 +1,15 @@
 # Release Notes
 
-## 2.1.21 "TBD" - April 2021, 2021
+This document describes any large or breaking / backward incompatible changes made in a specific
+Scalyr Agent release.
+
+In case there is no entry for a specific release in this file, it means no large or backward
+incompatible changes have been made in that release.
+
+For a list of all the changes in a particular release, please refer to the changelog file -
+https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
+
+## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 * This is the last release that still supports Python 2.6. This version of the agent will emit a
   warning if running under Python 2.6.

@@ -34,8 +34,6 @@ limitations under the License.
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from __future__ import print_function
-
 __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
@@ -63,10 +61,9 @@ global_log = scalyr_logging.getLogger(__name__)
 CONFIG_OPTIONS = [
     dict(
         option_name="module",
-        option_description="A ScalyrAgent plugin monitor module",
+        option_description="Always ``scalyr_agent.builtin_monitors.windows_system_metrics``",
         convert_to=six.text_type,
         required_option=True,
-        default="windows_system_metrics",
     )
 ]
 
@@ -602,7 +599,9 @@ class SystemMonitor(ScalyrMonitor):
     """
     # fmt: on
 
-    def __init__(self, config, logger, **kwargs):
+    def __init__(
+        self, monitor_config, logger, sample_interval_secs=None, global_config=None
+    ):
         """TODO: Fucntion documentation"""
         if psutil is None:
             raise UnsupportedSystem(
@@ -611,10 +610,11 @@ class SystemMonitor(ScalyrMonitor):
                 "can be done with the following command:"
                 "  pip install psutil",
             )
-        sampling_rate = kwargs.get("sampling_interval_secs", 30)
-        global_config = kwargs.get("global_config")
         super(SystemMonitor, self).__init__(
-            config, logger, sampling_rate, global_config=global_config
+            monitor_config=monitor_config,
+            logger=logger,
+            sample_interval_secs=sample_interval_secs,
+            global_config=global_config,
         )
 
     def gather_sample(self):
