@@ -20,7 +20,6 @@ import os
 import sys
 
 import pytest
-import yaml
 import six
 
 from scalyr_agent import compat
@@ -81,6 +80,13 @@ def test_config(request, agent_env_settings_fields):
     """
     config_path = request.config.getoption("--test-config")
     if config_path and Path(config_path).exists():
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError(
+                "Missing pyyaml dependency, you can install it using pip:\n\tpip install pyyaml"
+            )
+
         config_path = Path(config_path)
         with config_path.open("r") as f:
             config = yaml.safe_load(f)
