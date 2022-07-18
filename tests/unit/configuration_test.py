@@ -2152,6 +2152,7 @@ class TestConfiguration(TestConfigurationBase):
             self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
     @skipIf(sys.version_info < (3, 5, 0), "Skipping tests under Python < 3.5")
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(current_json_lib, "json")
