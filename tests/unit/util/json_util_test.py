@@ -273,7 +273,7 @@ class TestDefaultJsonLibrary(ScalyrTestCase):
 
         reload(scalyr_agent.util)
 
-        self.assertEqual(scalyr_agent.util.get_json_lib(), "jsoj")
+        self.assertEqual(scalyr_agent.util.get_json_lib(), "json")
 
 
 def main():
