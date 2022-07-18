@@ -23,9 +23,17 @@ from io import open
 import mock
 
 from scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor import (
-    KubernetesOpenMetricsMonitor,
+    PROMETHEUS_ANNOTATION_SCRAPE_PATH,
+    PROMETHEUS_ANNOTATION_SCRAPE_PORT,
     SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE,
-    PROMETHEUS_ANNOTATION_SCAPE_PATH,
+    SCALYR_AGENT_ANNOTATION_ATTRIBUTES,
+    SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES,
+    KubernetesOpenMetricsMonitor,
+    K8sPod,
+    TemplateWithSpecialCharacters,
+)
+from scalyr_agent.builtin_monitors.kubernetes_events_monitor import (
+    KubernetesEventsMonitor,
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitors_manager import set_monitors_manager
@@ -67,8 +75,11 @@ for index, pod in enumerate(
 ):
     if pod["metadata"]["name"] == "arm-exporter-sv7rk":
         pod["metadata"]["annotations"][
-            PROMETHEUS_ANNOTATION_SCAPE_PATH
+            PROMETHEUS_ANNOTATION_SCRAPE_PATH
         ] = "/test/new/path"
+        pod["metadata"]["annotations"][
+            SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES
+        ] = "metric5,metric6"
 
 
 class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
@@ -115,6 +126,140 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         )
         self.assertTrue(isinstance(monitor._logger.name, mock.Mock))
 
+    def test__get_monitor_config_for_pod_invalid_attributes_annotation(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        monitor._logger = mock_logger
+
+        uid = "uid"
+        name = "name"
+        namespace = "ns"
+        labels = {
+            "app": "my-app",
+            "test.bar/bar": "three",
+            "pod-template-hash": "barr",
+            "app.kubernetes.io/instance": "instance-1",
+        }
+        status_phase = "unknown"
+        ips = []
+
+        base_annotations = {
+            SCALYR_AGENT_ANNOTATION_SCRAPE_ENABLE: "true",
+            PROMETHEUS_ANNOTATION_SCRAPE_PORT: "8080",
+        }
+
+        # 1. value not valid JSON
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "not json". Error: Expecting value: line 1 column 1 (char 0)."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "not json"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 2. value not an object
+        expected_message = """Failed to JSON decode "attributes" annotation for pod ns/name (uid). Attributes value "[1, 2, 3]". Expected value to be an object/dictionary, got <class 'list'>."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = "[1, 2, 3]"
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 3. not all keys and values are string
+        expected_message = """Failed to validate "attributes" annotation for pod ns/name (uid). Attributes value "{'a': '1', 'b': 2, 'c': []}". Expected all the keys and values to be a string."""
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = '{"a": "1", "b": 2, "c": []}'
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=ips,
+            status_phase=status_phase,
+        )
+        monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(pod=k8s_pod)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        mock_logger.warn.assert_called_once_with(expected_message)
+
+        mock_logger.reset_mock()
+
+        # 4. valid values, including template substitution
+        self.assertEqual(mock_logger.warn.call_count, 0)
+
+        annotations = copy.copy(base_annotations)
+        annotations[
+            SCALYR_AGENT_ANNOTATION_ATTRIBUTES
+        ] = '{"app": "test", "template-app": "${pod_labels_app}", "three": "${pod_labels_test.bar/bar}", "invalid": "${pod_labels_doesnt_exist}", "instance": "${pod_labels_app.kubernetes.io/instance}"}'
+
+        expected_attributes = {
+            "app": "test",
+            "template-app": "my-app",
+            "three": "three",
+            "invalid": "${pod_labels_doesnt_exist}",
+            "instance": "instance-1",
+        }
+
+        k8s_pod = K8sPod(
+            uid=uid,
+            name=name,
+            namespace=namespace,
+            labels=labels,
+            annotations=annotations,
+            ips=["127.0.0.1"],
+            status_phase="running",
+        )
+        monitor_config = (
+            monitor._KubernetesOpenMetricsMonitor__get_monitor_config_for_pod(
+                pod=k8s_pod
+            )
+        )
+        self.assertEqual(mock_logger.warn.call_count, 0)
+        self.assertEqual(monitor_config.attributes, expected_attributes)
+
     def test_get_monitor_and_log_config(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
@@ -135,10 +280,19 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "sample_interval": 10,
             "log_filename": "foo.log",
             "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
             "ca_file": None,
             "headers": None,
             "include_node_name": True,
             "include_cluster_name": True,
+            "calculate_rate_metric_names": ["metric1", "metric2"],
         }
         (
             monitor_config,
@@ -149,7 +303,12 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         expected_monitor_config = {
             "ca_file": None,
             "extra_fields": JsonObject(
-                {"k8s-node": "test-node-name", "k8s-cluster": "test-cluster-name"}
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
             ),
             "headers": JsonObject({}),
             "id": "one",
@@ -157,6 +316,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_component_value_include_list": JsonObject({}),
             "metric_name_exclude_list": [],
             "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": ["metric1", "metric2"],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "sample_interval": 10,
             "timeout": 10,
@@ -636,6 +796,12 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             ],
             "http://10.5.5.5.141:9243/test/new/path",
         )
+        self.assertEqual(
+            mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
+                "calculate_rate_metric_names"
+            ],
+            ["openmetrics_monitor:metric5", "openmetrics_monitor:metric6"],
+        )
 
         # 4. And now API returns no pods which means all the monitors should be removed
         mock_kubelet.query_pods = mock.Mock(return_value={})
@@ -667,3 +833,163 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_monitors_manager.remove_monitor.assert_any_call(
             "scalyr_agent.builtin_monitors.openmetrics_monitor-node1_arm-exporter-sv7rk"
         )
+
+    def test_template_with_special_characters(self):
+        context = {
+            "foo": "bar2",
+            "foo.bar/baz-foo": "test2",
+            "FooA": "bar3",
+            "foo-d": "food",
+        }
+        template = (
+            "test hello $world foo ${foo} bar ${foo.bar/baz-foo} ${FooA} f1 ${foo-d}"
+        )
+        result = TemplateWithSpecialCharacters(template).safe_substitute(context)
+        self.assertEqual(result, "test hello $world foo bar2 bar test2 bar3 f1 food")
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor.GLOBAL_LOG"
+    )
+    def test_run_monitor_is_disabled(self, mock_global_log):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        global_config.k8s_explorer_enable = False
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        self.assertIsNone(monitor.run())
+        self.assertEqual(mock_global_log.info.call_count, 1)
+        mock_global_log.info.assert_called_with(
+            "kubernetes_openmetrics_monitor exiting because it's not enabled (k8s_explorer_enable config option is not set to true)"
+        )
+
+    @mock.patch("scalyr_agent.builtin_monitors.kubernetes_events_monitor.global_log")
+    def test_kubernetes_events_enabled_when_explorer_enabled(self, mock_global_log):
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        global_config.k8s_include_namespaces = []
+        global_config.k8s_ignore_namespaces = []
+        mock_logger = mock.Mock()
+
+        KubernetesEventsMonitor._get_log_rotation_configuration = mock.Mock(
+            return_value=(None, None)
+        )
+
+        mock_global_log.reset_mock()
+
+        global_config.k8s_explorer_enable = False
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+            "k8s_events_disable": True,
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesEventsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        self.assertTrue(monitor._KubernetesEventsMonitor__disable_monitor)
+
+        mock_global_log.reset_mock()
+
+        global_config.k8s_explorer_enable = True
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+            "k8s_events_disable": True,
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesEventsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+
+        self.assertEqual(mock_global_log.info.call_count, 1)
+        mock_global_log.info.assert_called_with(
+            "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
+        )
+        self.assertEqual(mock_global_log.info.call_count, 1)
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor.GLOBAL_LOG"
+    )
+    def test_warning_logged_on_missing_mandatory_monitor(self, mock_global_log):
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        global_config.k8s_include_namespaces = []
+        global_config.k8s_ignore_namespaces = []
+        mock_logger = mock.Mock()
+
+        KubernetesEventsMonitor._get_log_rotation_configuration = mock.Mock(
+            return_value=(None, None)
+        )
+
+        mock_global_log.reset_mock()
+
+        global_config.k8s_explorer_enable = False
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+
+        # 1. has node_exporter
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_node_exporter-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+
+        # 2. has node-exporter
+        mock_global_log.reset_mock()
+
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_node-exporter-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+
+        # 3. doesn't have node exporter
+        mock_global_log.reset_mock()
+
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_foobar-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 1)
+
+        # 3. doesn't have node exporter, warnings silenced
+        mock_global_log.reset_mock()
+
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+            "silence_mandatory_monitors_warnings": True,
+        }
+        self.assertEqual(mock_global_log.info.call_count, 0)
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+        monitor._KubernetesOpenMetricsMonitor__running_monitors = {
+            "http://192.168.1.10:9100/metrics": "scalyr_agent.builtin_monitors.openmetrics_monitor-homelab-k8s-pi4b-4g-worker-1_foobar-xmsw5",
+        }
+        self.assertEqual(mock_global_log.warn.call_count, 0)
+        monitor._KubernetesOpenMetricsMonitor__check_mandatory_monitors_are_running()
+        self.assertEqual(mock_global_log.warn.call_count, 0)

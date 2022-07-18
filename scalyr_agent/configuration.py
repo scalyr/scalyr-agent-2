@@ -1034,6 +1034,10 @@ class Configuration(object):
         return self.__get_config().get_bool("k8s_events_disable")
 
     @property
+    def k8s_explorer_enable(self):
+        return self.__get_config().get_bool("k8s_explorer_enable")
+
+    @property
     def k8s_ratelimit_cluster_num_agents(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int("k8s_ratelimit_cluster_num_agents")
@@ -1633,6 +1637,16 @@ class Configuration(object):
         return self.__get_config().get_json_array(
             "ignore_checkpoints_on_startup_path_globs"
         )
+
+    @property
+    def calculate_rate_metric_names(self):
+        """
+        Returns the configuration value for 'calculate_rate_metric_names'.
+
+        This value should include a list of metric name (global across all the monitors for which)
+        rate value should be calculated on the agent side.
+        """
+        return self.__get_config().get_json_array("calculate_rate_metric_names")
 
     @property
     def minimum_scan_interval(self):
@@ -2242,7 +2256,15 @@ class Configuration(object):
             separators=[None, ","],
             env_aware=True,
         )
-
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "calculate_rate_metric_names",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
         self.__verify_or_set_optional_string(
             config,
             "max_send_rate_enforcement",
@@ -2869,6 +2891,15 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "k8s_events_disable",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_explorer_enable",
             False,
             description,
             apply_defaults,
@@ -4619,7 +4650,16 @@ def perform_str_substitution(str_value, substitutions):
     @rtype: str or unicode
     """
     result = str_value
-    for (var_name, value) in six.iteritems(substitutions):
+
+    # NOTE: Right now out substitution code also supports partial substitutions which means we can't
+    # use regular expression directly, but we need to sort substitutions variables by length (desc)
+    # before we perform substitutions to ensure we use the correct substitution variable in case
+    # multiple variables share the same prefix.
+    # For example: $SCALYR_FOO_VAR1, $SCALYR_FOO_VAR2, $SCALYR_FOO
+    substitutions_variable_names = sorted(substitutions.keys(), key=len, reverse=True)
+
+    for var_name in substitutions_variable_names:
+        value = substitutions[var_name]
         result = result.replace("$%s" % var_name, value)
     return result
 

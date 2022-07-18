@@ -4,16 +4,16 @@ echo ""
 
 scalyr-agent-2 stop;
 
-Start-Sleep 2
+Start-Sleep 5
 
 Get-Process -Name ScalyrAgentService -ErrorAction Continue 2> $null
 
 if ($?)
 {
-    Write-Error -Message "The Scalyr agent is still running even after the the service has been stopped." -ErrorAction Stop
+    Write-Error -Message "The Scalyr agent is still running even after the service has been stopped." -ErrorAction Stop
 }
 
-echo "Tailling last 50 lines of log"
+echo "Tailing last 50 lines of log"
 echo "-----------------------------"
 Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Tail 50 -ErrorAction SilentlyContinue
 echo "-----------------------------"

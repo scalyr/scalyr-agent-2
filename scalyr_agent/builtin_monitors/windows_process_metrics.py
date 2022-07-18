@@ -86,8 +86,11 @@ except ImportError:
 
 import six
 
-from scalyr_agent import ScalyrMonitor, UnsupportedSystem
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
+from scalyr_agent import scalyr_logging
+
+global_log = scalyr_logging.getLogger(__name__)
 
 
 #
@@ -511,7 +514,9 @@ class ProcessMonitor(ScalyrMonitor):
     """
     # fmt: on
 
-    def __init__(self, monitor_config, logger, **kw):
+    def __init__(
+        self, monitor_config, logger, sample_interval_secs=None, global_config=None
+    ):
         """TODO: Function documentation"""
         if psutil is None:
             raise UnsupportedSystem(
@@ -521,10 +526,11 @@ class ProcessMonitor(ScalyrMonitor):
                 "  pip install psutil",
             )
 
-        sampling_rate = kw.get("sampling_interval_secs", 30)
-        global_config = kw.get("global_config")
         super(ProcessMonitor, self).__init__(
-            monitor_config, logger, sampling_rate, global_config=global_config
+            monitor_config=monitor_config,
+            logger=logger,
+            sample_interval_secs=sample_interval_secs,
+            global_config=global_config,
         )
         self.__process = None
 
@@ -532,6 +538,18 @@ class ProcessMonitor(ScalyrMonitor):
         self.__id = self._config.get(
             "id", required_field=True, convert_to=six.text_type
         )
+
+        if not self._config.get("commandline") and not self._config.get("pid"):
+            raise BadMonitorConfiguration(
+                'Either "pid" or "commandline" monitor config option needs to be specified (but not both)',
+                "commandline",
+            )
+
+        if self._config.get("commandline") and self._config.get("pid"):
+            raise BadMonitorConfiguration(
+                'Either "pid" or "commandline" monitor config option needs to be specified (but not both)',
+                "commandline",
+            )
 
     def _select_target_process(self):
         """TODO: Function documentation"""
@@ -549,7 +567,6 @@ class ProcessMonitor(ScalyrMonitor):
         self.__process = process
 
     def gather_sample(self):
-        """TODO: Function documentation"""
         try:
             self._select_target_process()
             for idx, metric in enumerate(METRICS):
@@ -569,3 +586,14 @@ class ProcessMonitor(ScalyrMonitor):
                 )
         except psutil.NoSuchProcess:
             self.__process = None
+
+            commandline = self._config.get("commandline", None)
+            pid = self._config.get("pid", None)
+
+            # commandline has precedence over pid
+            if commandline:
+                global_log.warn(
+                    'Unable to find process with commandline "%s"' % (commandline)
+                )
+            elif pid:
+                global_log.warn('Unable to find process with pid "%s"' % (pid))

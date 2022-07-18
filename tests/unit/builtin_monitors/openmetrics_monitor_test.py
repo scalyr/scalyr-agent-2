@@ -98,7 +98,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 5)
 
@@ -150,7 +150,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 5)
 
@@ -226,7 +226,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 6)
 
@@ -262,13 +262,10 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 20)
+        self.assertEqual(mock_logger.debug.call_count, 1)
+        self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 4900)
 
-        mock_logger.warn.assert_any_call(
-            'Failed to cast metric "kafka_server_socketservermetrics_reauthentication_latency_avg" value "NaN" to int: invalid literal for int() with base 10: \'NaN\''
-        )
         mock_logger.warn.assert_called_with(
             'Parsed more than 2000 metrics (4900) for URL https://my.host:8080/metrics. You are strongly encouraged to filter metrics at the source or set "metric_name_exclude_list" monitor configuration option to avoid excessive number of metrics being ingested.',
             limit_once_per_x_secs=86400,
@@ -309,8 +306,8 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 20)
+        self.assertEqual(mock_logger.debug.call_count, 1)
+        self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
         mock_logger.warn.assert_called_with(
@@ -344,8 +341,8 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 19)
+        self.assertEqual(mock_logger.debug.call_count, 1)
+        self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 20)
 
         mock_logger.emit_value.assert_any_call(
@@ -395,8 +392,8 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
-        self.assertEqual(mock_logger.warn.call_count, 19)
+        self.assertEqual(mock_logger.debug.call_count, 1)
+        self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 55)
 
         for call in mock_logger.emit_value.call_args_list:
@@ -414,7 +411,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 144)
 
@@ -500,7 +497,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger.warn.assert_called_with(
             "Failed to fetch metrics from https://my.host:8080/metrics: status_code=404,body=bar"
         )
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
@@ -519,7 +516,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 3)
 
@@ -562,7 +559,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 2)
 
@@ -599,7 +596,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 
@@ -619,7 +616,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 2)
 
@@ -647,7 +644,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 3)
+        self.assertEqual(mock_logger.debug.call_count, 3 + 1)
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(mock_logger.emit_value.call_count, 2)
 
@@ -675,7 +672,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
         mock_logger = mock.Mock()
         monitor = OpenMetricsMonitor(monitor_config=monitor_config, logger=mock_logger)
         monitor.gather_sample()
-        self.assertEqual(mock_logger.debug.call_count, 0)
+        self.assertEqual(mock_logger.debug.call_count, 1)
         self.assertEqual(mock_logger.warn.call_count, 1)
         self.assertEqual(mock_logger.emit_value.call_count, 0)
 

@@ -26,11 +26,15 @@ __author__ = "czerwin@scalyr.com"
 import os
 import logging
 import tempfile
+import hashlib
 
 import mock
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+from scalyr_agent.scalyr_monitor import ScalyrMonitor
+from scalyr_agent.metrics.base import clear_internal_cache
+from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import skipIf
 
@@ -41,6 +45,12 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.__log_path = self.agent_log_path
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
         self.__logger.set_keep_last_record(False)
+
+        clear_internal_cache()
+
+    def tearDown(self):
+        super(ScalyrLoggingTest, self).tearDown()
+        clear_internal_cache()
 
     def test_output_to_file(self):
         self.__logger.info("Hello world")
@@ -223,6 +233,46 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             file_path=metric_file_path,
             expression=expected_line_prefix + "5 foo=5 timestamp=1650021068016",
         )
+        monitor_logger.closeMetricLog()
+
+    def test_metric_logging_reserved_extra_field_names_are_sanitized(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        extra_fields = {
+            # Reserved field names
+            "logfile": "logfile",
+            "monitor": "monitor",
+            "metric": "metric",
+            "value": "value",
+            "instance": "instance",
+            "severity": "severity",
+            # Non reserved field names
+            "foo": "bar",
+            "bar": "baz",
+        }
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+        monitor_logger.emit_value("test_name", 5, extra_fields)
+
+        self.assertEquals(monitor_instance.reported_lines, 1)
+
+        # The value should only appear in the metric log file and not the main one.
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="test_name 5"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name 5 bar="baz" foo="bar" instance_="instance" logfile_="logfile" metric_="metric" monitor_="monitor" severity_="severity" value_="value"',
+        )
+
         monitor_logger.closeMetricLog()
 
     def test_metric_logging_extra_fields_are_sorted(self):
@@ -721,15 +771,393 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             sys.stderr.write = stderr_bkp
             self.ran_std_output = False
 
-    class FakeMonitor(object):
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_warn_on_too_many_metrics_cached(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = []
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
+            monitor_instance._global_config.calculate_rate_metric_names.append(
+                "fake_monitor_module:test_name_%s" % (index)
+            )
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        extra_fields = {"foo1": "bar1"}
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        ts = 1
+
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
+            monitor_logger.emit_value(
+                "test_name_%s" % (index),
+                20,
+                extra_fields,
+                timestamp=(ts * index) * 1000,
+            )
+
+        for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
+            monitor_logger.emit_value(
+                "test_name_%s" % (index),
+                30,
+                extra_fields,
+                timestamp=(ts * index + 2) * 1000,
+            )
+
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="test_name_1_rate1"
+        )
+
+        # NOTE: Actual reported metrics should be * 3 since we emit two metrics and for each metric
+        # expect the first one, rate is calculated and emited
+        self.assertEquals(
+            monitor_instance.reported_lines,
+            (RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN * 3) + 2,
+        )
+        monitor_instance._logger.warn.assert_called_with(
+            "Tracking client side rate for over 5000 metrics. Tracking and calculating rate for that many metrics\ncould add overhead in terms of CPU and memory usage.",
+            limit_key="rate-max-count-reached",
+            limit_once_per_x_secs=86400,
+        )
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_metric_metric_value_not_a_number(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        extra_fields = {"foo1": "bar1"}
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        monitor_logger.emit_value(
+            "test_name_2", "nan1", extra_fields, timestamp=10 * 1000
+        )
+        monitor_logger.emit_value(
+            "test_name_2", "nan2", extra_fields, timestamp=20 * 1000
+        )
+        monitor_logger.emit_value(
+            "test_name_2", "nan3", extra_fields, timestamp=30 * 1000
+        )
+
+        self.assertEquals(monitor_instance.reported_lines, 3)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 "nan1" foo1="bar1"'
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 "nan2" foo1="bar1"'
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 "nan3" foo1="bar1"'
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="test_name_2_rate"
+        )
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_metric_invalid_timestamp(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        extra_fields = {"foo1": "bar1"}
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        monitor_logger.emit_value("test_name_2", 100, extra_fields, timestamp=10 * 1000)
+
+        # Current timestamp = previous_timestamp, should not report a value
+        monitor_logger.emit_value("test_name_2", 110, extra_fields, timestamp=10 * 1000)
+
+        # Current timestamp < previous_timestamp, should not report a value
+        monitor_logger.emit_value("test_name_2", 120, extra_fields, timestamp=9 * 1000)
+
+        # Time delta between previous and currect collection timestamp is too large, rate should not
+        # be calculated
+        monitor_logger.emit_value(
+            "test_name_2",
+            130,
+            extra_fields,
+            timestamp=(RateMetricFunction.MAX_RATE_TIMESTAMP_DELTA_SECONDS + 60) * 1000,
+        )
+
+        self.assertEquals(monitor_instance.reported_lines, 4)
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_new_metric_smaller_than_previous(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        extra_fields = {"foo1": "bar1"}
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        monitor_logger.emit_value("test_name_2", 100, extra_fields, timestamp=10 * 1000)
+
+        # Current metric value is < previous metric value (100)
+        monitor_logger.emit_value("test_name_2", 99, extra_fields, timestamp=20 * 1000)
+
+        self.assertEquals(monitor_instance.reported_lines, 2)
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="test_name_1_rate"
+        )
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_metric_not_whitelisted(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        extra_fields = {"foo1": "bar1"}
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        # Metric for which we don't calculate rate
+        monitor_logger.emit_value("test_name_1", 20, extra_fields)
+        monitor_logger.emit_value("test_name_1", 20, extra_fields)
+        monitor_logger.emit_value("test_name_1", 30, extra_fields)
+
+        self.assertEquals(monitor_instance.reported_lines, 3)
+
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="test_name_1_rate"
+        )
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_metric_success(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        # Metric for which we do calculate rate
+        extra_fields = {"foo2": "bar2"}
+
+        ts1 = 10
+        ts2 = 70
+        ts3 = 130
+        ts4 = 190
+
+        monitor_logger.emit_value("test_name_2", 20, extra_fields, timestamp=ts1 * 1000)
+        monitor_logger.emit_value("test_name_2", 30, extra_fields, timestamp=ts2 * 1000)
+        monitor_logger.emit_value("test_name_2", 40, extra_fields, timestamp=ts3 * 1000)
+        monitor_logger.emit_value(
+            "test_name_2", 100, extra_fields, timestamp=ts4 * 1000
+        )
+
+        # There should be 3 rate metrics emitted (total metrics emitted - 1)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 20 foo2="bar2"'
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 30 foo2="bar2"'
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 40 foo2="bar2"'
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2 100 foo2="bar2"'
+        )
+
+        # (30 - 20) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.16667 foo2="bar2"',
+        )
+
+        # (40 - 30) / (130 - 70)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.16667 foo2="bar2"',
+        )
+
+        # (100 - 40) / (190 - 130)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression='test_name_2_rate 1.0 foo2="bar2"'
+        )
+        self.assertEquals(monitor_instance.reported_lines, 4 + 3)
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_no_collision_two_monitors_same_metric_name(
+        self,
+    ):
+        # Ensure there are no collisions in case two monitors use the same metric name
+        monitor_instance_1 = ScalyrLoggingTest.FakeMonitor("testing-one")
+        monitor_instance_1._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+
+        # Same monitor name, but a different instance id
+        monitor_instance_2 = ScalyrLoggingTest.FakeMonitor("testing-one", "two")
+        monitor_instance_2._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+
+        monitor_instance_3 = ScalyrLoggingTest.FakeMonitor("testing-two")
+        monitor_instance_3._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2"
+        ]
+
+        metric_file_fd_1, metric_file_path_1 = tempfile.mkstemp(".log")
+        metric_file_fd_2, metric_file_path_2 = tempfile.mkstemp(".log")
+        metric_file_fd_3, metric_file_path_3 = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd_1)
+        os.close(metric_file_fd_2)
+        os.close(metric_file_fd_3)
+
+        extra_fields = {}
+
+        monitor_logger_1 = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(testing-one)"
+        )
+        monitor_logger_1.openMetricLogForMonitor(metric_file_path_1, monitor_instance_1)
+        monitor_logger_2 = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(testing-one-two)"
+        )
+        monitor_logger_2.openMetricLogForMonitor(metric_file_path_2, monitor_instance_2)
+
+        monitor_logger_3 = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(testing-two)"
+        )
+        monitor_logger_3.openMetricLogForMonitor(metric_file_path_3, monitor_instance_3)
+
+        ts1 = 10
+        ts2 = 70
+
+        monitor_logger_1.emit_value(
+            "test_name_2", 20, extra_fields, timestamp=ts1 * 1000
+        )
+        monitor_logger_1.emit_value(
+            "test_name_2", 30, extra_fields, timestamp=ts2 * 1000
+        )
+
+        self.assertEquals(monitor_instance_1.reported_lines, 2 + 1)
+
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_1,
+            expression="test_name_2 20",
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_1,
+            expression="test_name_2 30",
+        )
+
+        # (30 - 20) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_1,
+            expression="test_name_2_rate 0.16667",
+        )
+
+        monitor_logger_2.emit_value(
+            "test_name_2", 80, extra_fields, timestamp=ts1 * 1000
+        )
+        monitor_logger_2.emit_value(
+            "test_name_2", 81, extra_fields, timestamp=ts2 * 1000
+        )
+
+        self.assertEquals(monitor_instance_2.reported_lines, 2 + 1)
+
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_2,
+            expression="test_name_2 80",
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_2,
+            expression="test_name_2 81",
+        )
+
+        # (81 - 80) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_2,
+            expression="test_name_2_rate 0.01667",
+        )
+
+        monitor_logger_3.emit_value(
+            "test_name_2", 90, extra_fields, timestamp=ts1 * 1000
+        )
+        monitor_logger_3.emit_value(
+            "test_name_2", 95, extra_fields, timestamp=ts2 * 1000
+        )
+
+        # (90 - 95) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path_3,
+            expression="test_name_2_rate 0.08333",
+        )
+
+    class FakeMonitor(ScalyrMonitor):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""
 
-        def __init__(self, name):
+        def __init__(self, name, monitor_id=None):
             self.__name = name
+            self.monitor_id = str(monitor_id or "default")
+            self.monitor_module_name = "fake_monitor_module"
+            self.short_hash = hashlib.sha256(
+                self.__name.encode("utf-8") + b":" + self.monitor_id.encode("utf-8")
+            ).hexdigest()[:10]
             self.reported_lines = 0
             self.errors = 0
             self._logger = mock.Mock()
             self._metric_name_blacklist = []
+
+            mock_config = mock.Mock()
+            mock_config.calculate_rate_metric_names = []
+            self._global_config = mock_config
+
+        def get_calculate_rate_metric_names(self):
+            return []
 
         def increment_counter(self, reported_lines=0, errors=0):
             """Increment some of the counters pertaining to the performance of this monitor."""

@@ -10,6 +10,10 @@ on:
   schedule:
     - cron: '0 4 * * *'
 
+permissions:
+  actions: write  # Needed for skip-duplicate-jobs job
+  contents: read
+
 jobs:
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
   # same file set which has already passed, etc.
@@ -20,7 +24,7 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75dd6564bb646f95277dc8c3b80612e46a4a1ea # v3.4.1
+        uses: fkirc/skip-duplicate-actions@9d116fa7e55f295019cfab7e3ab72b478bcf7fdd # v4.0.0
         with:
           cancel_others: 'true'
           github_token: ${{ github.token }}
@@ -45,15 +49,16 @@ jobs:
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Setup Python 3.8
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         id: setup-python
         with:
           python-version: 3.8
@@ -184,7 +189,7 @@ jobs:
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
@@ -211,15 +216,16 @@ jobs:
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Setup Python 3.8
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         id: setup-python
         with:
           python-version: 3.8
@@ -336,16 +342,23 @@ jobs:
 
           # 4. Verify java app JMX metrics
           echo "Java JMX metrics events metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" runtime="'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_error 0.0 app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jmx_scrape_cached_beans 0.0 app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_info 1.0 app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\" runtime="'
+
+          # Client side calculated per second rate metrics
+          # NOTE: There is no easy way to assert on the actual rate metric value here (we have unit tests for that)
+          # so we just assert that the metric is present.
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_threads_started_total_rate" "app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "jvm_memory_pool_allocated_bytes_total_rate" "app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'" $logfile contains "java-hello-world" "process_cpu_seconds_total_rate" "app=\"java-hello-world\" app_instance=\"java-hello-world-1\" attribute1=\"value1\" k8s-cluster=\"'${K8S_CLUSTER_NAME}'\" k8s-node=\"'${K8S_NODE_NAME}'\""'
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
         # requests and that's why we need this special conditional and check for github.head_ref in
         # case of PRs
         if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@e4e71685b9b239384b0f676a63c32367f59c2522 # v1.2.2
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
