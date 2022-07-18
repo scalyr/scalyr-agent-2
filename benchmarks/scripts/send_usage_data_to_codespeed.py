@@ -113,7 +113,7 @@ METRICS_COUNTERS = {
 # Once we drop support for Python 2, we can switch back to numpy
 def calculate_percentile(data, percentile):
     size = len(data)
-    return sorted(data)[math.ceil((size * percentile) / 100) - 1]
+    return sorted(data)[int(math.ceil((size * percentile) / 100)) - 1]
 
 
 def calculate_stddev(data):
