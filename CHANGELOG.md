@@ -16,7 +16,7 @@ Bug fixes:
 * Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
 
 Docker images:
-* Upgrade various dependencies: orjson, requests, zstandard, lz4
+* Upgrade various dependencies: orjson, requests, zstandard, lz4.
 
 Other:
 * Support for Python 2.6 has been dropped.
