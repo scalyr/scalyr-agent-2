@@ -182,7 +182,9 @@ trap print_debugging_info_on_exit EXIT
 echo ""
 echo "::group::Begin synchronous verifier"
 echo ""
-docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
+# XXX Do not merge this change into master without verifying it works correctly in circleci first!
+# the change in question: removal of `-i` from the docker run command below.
+docker run ${syslog_driver_option} -t --name ${contname_verifier} ${smoketest_image} \
 bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
