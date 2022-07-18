@@ -20,6 +20,7 @@ Docker images:
 
 Other:
 * Support for Python 2.6 has been dropped.
+* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
 
 ## 2.1.31 "Irati" - Jun 28, 2022
 

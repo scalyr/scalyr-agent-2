@@ -624,7 +624,7 @@ class Configuration(object):
             return
 
         # Set json library based on the config value. If "auto" is provided this means we use
-        # default behavior which is try to use ujson and if that's not available fall back to
+        # default behavior which is try to use orjson and if that's not available fall back to
         # stdlib json
         json_library = self.json_library
         current_json_library = scalyr_util.get_json_lib()
@@ -2158,10 +2158,10 @@ class Configuration(object):
             config,
             "json_library",
             "auto",
-            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json and orjson",
             apply_defaults,
             env_aware=True,
-            valid_values=["auto", "json", "ujson", "orjson"],
+            valid_values=["auto", "json", "orjson"],
         )
         self.__verify_or_set_optional_bool(
             config,
