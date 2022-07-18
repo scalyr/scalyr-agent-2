@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.32 "TBD" - Aug 28, 2022
+## 2.1.32 "Occao" - July 20, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 20, 2022 12:29 -0800
 --->
 
 Windows:
@@ -14,6 +14,9 @@ Windows:
 
 Bug fixes:
 * Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+
+Docker images:
+* Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.
 
 Other:
 * Support for Python 2.6 has been dropped.
