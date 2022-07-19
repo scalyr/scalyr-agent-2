@@ -1,4 +1,4 @@
-# Copyright 2105 Scalyr Inc.
+# Copyright 2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -136,6 +136,14 @@ define_config_option(
     "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above.",
     default=None,
     convert_to=six.text_type,
+)
+
+define_config_option(
+    __monitor__,
+    "json",
+    "Optional (defaults to ``False``). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above.",
+    default=False,
+    convert_to=bool,
 )
 
 
@@ -386,6 +394,7 @@ class NewApi(Api):
                 finally:
                     self.__bookmark_lock.release()
 
+                flags = win32evtlog.EvtSubscribeStartAtOldestRecord # FIXME Remove
                 error_message = None
                 try:
                     handle = win32evtlog.EvtSubscribe(
@@ -639,6 +648,37 @@ class NewApi(Api):
             self.__bookmark_lock.release()
 
 
+class NewJsonApi(NewApi):
+    def __init__(self, config, logger, channels):
+        super(NewJsonApi, self).__init__(config, logger, channels)
+
+        self._render_context = win32evtlog.EvtCreateRenderContext(
+            win32evtlog.EvtRenderContextSystem
+        )
+
+    def log_event(self, event):
+        values = win32evtlog.EvtRender(
+            event,
+            win32evtlog.EvtRenderEventValues,
+            Context=self._render_context
+        )
+
+        metadata = win32evtlog.EvtOpenPublisherMetadata(
+            values[win32evtlog.EvtSystemProviderName][0]
+        )
+
+        event_xml = win32evtlog.EvtFormatMessage(
+            metadata,
+            event,
+            win32evtlog.EvtFormatMessageXml
+        )
+
+        # FIXME STOPPED
+        print(event_xml)
+        import sys
+        sys.exit(0)
+
+
 class WindowEventLogMonitor(ScalyrMonitor):
     # fmt: off
     """
@@ -789,7 +829,8 @@ and System sources:
                     "Sources and Events not supported with the new EvtLog API.  Please use the 'channels' configuration option instead"
                 )
 
-            result = NewApi(self._config, self._logger, channels)
+            api_class = NewJsonApi if self._config.get('json') else NewApi
+            result = api_class(self._config, self._logger, channels)
         else:
             if channels:
                 msg = (
@@ -829,7 +870,7 @@ and System sources:
         self.__update_checkpoints()
 
     def _check_and_emit_info_and_warning_messages(self):
-        if isinstance(self.__api, NewApi):
+        if isinstance(self.__api, (NewApi, NewJsonApi)):
             self._logger.info("Using new Evt API")
 
             maximum_records = self._config.get("maximum_records_per_source")
