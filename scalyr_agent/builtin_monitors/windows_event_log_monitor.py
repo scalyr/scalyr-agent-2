@@ -18,10 +18,13 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import os
+import json
+import logging
 import threading
 import time
 
 import six
+import xmltodict
 
 try:
     import win32api
@@ -394,7 +397,6 @@ class NewApi(Api):
                 finally:
                     self.__bookmark_lock.release()
 
-                flags = win32evtlog.EvtSubscribeStartAtOldestRecord # FIXME Remove
                 error_message = None
                 try:
                     handle = win32evtlog.EvtSubscribe(
@@ -656,6 +658,17 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtRenderContextSystem
         )
 
+        # Ref: https://docs.microsoft.com/en-us/windows/win32/eventlog/event-types
+        #      https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-eventlogrecord
+        self._levels = {
+            0x00: logging.INFO, # Not defined in docs
+            0x01: logging.ERROR,
+            0x02: logging.WARNING,
+            0x04: logging.INFO,
+            0x08: logging.INFO, # Audit Success
+            0x10: logging.INFO, # Audit Failure
+        }
+
     def log_event(self, event):
         values = win32evtlog.EvtRender(
             event,
@@ -667,16 +680,38 @@ class NewJsonApi(NewApi):
             values[win32evtlog.EvtSystemProviderName][0]
         )
 
-        event_xml = win32evtlog.EvtFormatMessage(
-            metadata,
-            event,
-            win32evtlog.EvtFormatMessageXml
+        event_json = xmltodict.parse(
+            win32evtlog.EvtFormatMessage(
+                metadata,
+                event,
+                win32evtlog.EvtFormatMessageXml
+            )
         )
 
         # FIXME STOPPED
-        print(event_xml)
-        import sys
-        sys.exit(0)
+
+        self._logger.log(
+            self._levels[values[win32evtlog.EvtSystemLevel][0]],
+            json.dumps(event_json)
+        )
+
+        '''
+        self.__bookmark_lock.acquire()
+        try:
+            if "Channel" in vals:
+                channel = vals["Channel"]
+                bookmark = None
+                if channel not in self.__bookmarks:
+                    self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
+
+                bookmark = self.__bookmarks[channel]
+                win32evtlog.EvtUpdateBookmark(bookmark, event)
+        finally:
+            self.__bookmark_lock.release()
+        '''
+
+        #import sys
+        #sys.exit(0)
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
