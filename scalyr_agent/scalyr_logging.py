@@ -489,7 +489,8 @@ class AgentLogger(logging.Logger):
         from scalyr_agent.metrics.base import get_functions_for_metric
 
         function_instances = get_functions_for_metric(
-            monitor=monitor, metric_name=metric_name
+            monitor=monitor,
+            metric_name=metric_name,
         )
 
         derived_metrics_to_emit = []
@@ -498,6 +499,7 @@ class AgentLogger(logging.Logger):
                 monitor=monitor,
                 metric_name=metric_name,
                 metric_value=metric_value,
+                extra_fields=extra_fields,
                 timestamp=timestamp,
             )
             derived_metrics_to_emit.extend(metric_tuples or [])

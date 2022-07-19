@@ -64,12 +64,19 @@ def get_functions_for_metric(monitor, metric_name):
     """
     cache_key = "%s.%s" % (monitor.short_hash, metric_name)
 
+    # NOTE: Since there can be tons of different unique extra_fields values for a specific metric
+    # and as such permutations, we have first level cache for monitor and metric name here. Having
+    # cache entry for each possible monitor name, metric name, extra_fields values would result in
+    # a cache which can grow too large. And we do still want some kind of cache since having no
+    # cache would result in running this "should_calculate()" logic for every single emitted metric
+    # which is expensive.
     if cache_key not in MONITOR_METRIC_TO_FUNCTIONS_CACHE:
         result = []
 
         for function_instance in FUNCTIONS_REGISTRY.values():
-            if function_instance.should_calculate(
-                monitor=monitor, metric_name=metric_name
+            if function_instance.should_calculate_for_monitor_and_metric(
+                monitor=monitor,
+                metric_name=metric_name,
             ):
                 result.append(function_instance)
 

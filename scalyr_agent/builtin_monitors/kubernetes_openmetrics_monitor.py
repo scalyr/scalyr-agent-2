@@ -85,6 +85,9 @@ for the exporter pod:
             k8s.monitor.config.scalyr.com/scrape_timeout:              '5'
             k8s.monitor.config.scalyr.com/attributes:                  '{"app": "${pod_labels_app}", "instance": "{pod_labels_app.kubernetes.io/instance}", "region": "eu"}'
             k8s.monitor.config.scalyr.com/calculate_rate_metric_names: 'docker.cpu_usage_total_seconds,docker.memory_usage_total'
+            # Or for metrics which have the same metric name, but multiple different extra field values.
+            k8s.monitor.config.scalyr.com/calculate_rate_metric_names: 'node_cpu_seconds_total:mode=user,node_cpu_seconds_total:mode=system'
+
         spec:
         containers:
         - args:

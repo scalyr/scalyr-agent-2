@@ -1645,6 +1645,17 @@ class Configuration(object):
 
         This value should include a list of metric name (global across all the monitors for which)
         rate value should be calculated on the agent side.
+
+        Example values:
+
+        1) Metric name without extra fields:
+          - openmetrics_monitor:metric1
+          - openmetrics_monitor:metric2
+
+        2) Metric name with extra fields (in this case, rate will only be calculated for metric)
+           where extra field "mode" value matches "user" and "kernel":
+          - openmetrics_monitor:docker.cpu_usage_seconds_total:mode=user
+          - openmetrics_monitor:docker.cpu_usage_seconds_total:mode=kernel
         """
         return self.__get_config().get_json_array("calculate_rate_metric_names")
 

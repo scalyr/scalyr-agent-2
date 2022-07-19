@@ -25,6 +25,7 @@ import socket
 
 if False:  # NOSONAR
     from typing import Union
+    from typing import Dict
     from typing import Tuple
     from typing import Callable
     from typing import Optional
@@ -2724,3 +2725,27 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
             return self._process.pid  # type: ignore  # pylint: disable=no-member
         except:
             return None
+
+
+def get_hash_for_flat_dictionary(data):
+    # type: (Dict[str, Union[int, bool, six.text_type]]) -> six.text_type
+    """
+    Calculate hash for the provided dictionary which needs to be flat (aka no nested values).
+
+    NOTE: Result of this function is not stable across Python interpreters since it results on
+    hash() function.
+
+    In case we ever require stable results across runs, we should change hash() function to sha256
+    hash or similar.
+
+    NOTE: Dictionary must not be nested and can only contain simple values (numbers, strings,
+    booleans).
+    """
+    data = data or {}
+
+    # NOTE: We use hash over hashlib since it's faster. Keep in mind that result of hash is Python
+    # interpreter instance specific and is not stable acros the run. This is fine in our case where
+    # we only store this hash in memory of a single process (and we never serialize / write it out
+    # to disk or similar). With hash() function, there is also a larger chance of a collision, but
+    # that's fine here.
+    return six.text_type(hash(frozenset(data.items())))
