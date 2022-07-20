@@ -3,10 +3,10 @@ name: "Kubernetes End to End Tests"
 on:
   push:
     branches:
-      - master
+      - arthur/new-checks
   pull_request:
     branches:
-      - master
+      - arthur/new-checks
   schedule:
     - cron: '0 4 * * *'
 
@@ -179,10 +179,18 @@ jobs:
           echo ""
 
           # Verify Kubernetes Events Monitor events are ingested
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "\"kind\":\"Event\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "\"kind\":\"Pod\""'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "involvedObject"'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" "NodeReady"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Event\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Pod\""'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "involvedObject"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "NodeReady"'
+
+          agent_status=$(kubectl --namespace=scalyr exec -i ${SCALYR_AGENT_POD_NAME} --container scalyr-agent -- scalyr-agent-2 status -v)
+          k8s_event_log_files_number=$(echo "$agent_status" | grep -c 'Path /var/log/scalyr-agent-2/kubernetes_events.log: copied')
+
+          if [ "$k8s_event_log_files_number" != 1 ]; then
+            echo "Kubernetes event monitor log has to be handled by the agent 1 time, but it got ${k8s_event_log_files_number}"
+            exit 1
+          fi
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
