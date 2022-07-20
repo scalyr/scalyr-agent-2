@@ -89,12 +89,9 @@ def _test(
     )
 
     # Quick check for the `scalyr-agent-2-config script.
-    export_config_output = subprocess.check_output([
-        *docker_exec_command,
-        "scalyr-agent-2-config",
-        "--export-config",
-        "-"
-    ])
+    export_config_output = subprocess.check_output(
+        [*docker_exec_command, "scalyr-agent-2-config", "--export-config", "-"]
+    )
 
     assert len(export_config_output) > 0
 
