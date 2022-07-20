@@ -1141,7 +1141,12 @@ def import_config(config_src, config_file_path, configuration):
         if config_src != "-":
             in_tar = tarfile.open(config_src, "r:gz")
         else:
-            in_tar = tarfile.open(fileobj=sys.stdin, mode="r|gz")
+            if sys.version_info < (3,):
+                file_obj = sys.stdin
+            else:
+                file_obj = sys.stdin.buffer
+
+            in_tar = tarfile.open(fileobj=file_obj, mode="r|gz")
 
         # Track which files were in the tarball so that we can delete unused ones later.
         used_files = dict()
@@ -1153,7 +1158,10 @@ def import_config(config_src, config_file_path, configuration):
         # current config.
         for x in in_tar.getmembers():
             used_files[get_canonical_name(x.name)] = True
-            in_tar.chown(existing_config_tarinfo, x.name)
+            if sys.version_info < (3, 0):
+                in_tar.chown(existing_config_tarinfo, x.name)
+            else:
+                in_tar.chown(existing_config_tarinfo, x.name, False)
 
         in_tar.close()
 

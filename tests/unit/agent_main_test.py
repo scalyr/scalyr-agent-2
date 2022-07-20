@@ -686,14 +686,12 @@ class TestConfigArgumentParsing:
 
         self.extracted_config_path = os.path.join(self.result_dir_path, "agent.json")
 
-        self.config = {"api_key": "key"}
-
     def teardown(self):
         shutil.rmtree(self.output_dir)
 
-    def _write_config(self):
+    def _write_config(self, config):
         with open(self.config_path, "w") as f:
-            f.write(six.ensure_text(json.dumps(self.config)))
+            f.write(six.ensure_text(json.dumps(config)))
 
     def _extract_result(self, tar_obj):
         os.mkdir(self.result_dir_path)
@@ -706,11 +704,14 @@ class TestConfigArgumentParsing:
             os.chdir(orig_cwd)
             tar_obj.close()
 
-    def test_export_config(self):
+    def test_export_and_import_config(self):
         """
         Test scalyr-agent-3 config --export-config command.
         """
-        self._write_config()
+
+        original_config = {"api_key": "key"}
+
+        self._write_config(config=original_config)
 
         subprocess.check_call(
             [
@@ -732,13 +733,35 @@ class TestConfigArgumentParsing:
         with open(self.extracted_config_path, "r") as f:
             extracted_config = json.load(f)
 
-        assert extracted_config == self.config
+        assert extracted_config == original_config
 
-    def test_export_config_to_stdout(self):
+        # Change original config and them import it back.
+        changed_config = {"api_key": "key2"}
+        self._write_config(config=changed_config)
+
+        subprocess.check_call(
+            [
+                _AGENT_MAIN_PATH,
+                "config",
+                "--import-config",
+                self.output_file,
+                "--config-file",
+                self.config_path,
+            ]
+        )
+
+        with open(self.config_path, "r") as f:
+            imported_config = json.loads(six.ensure_text(f.read()))
+
+        assert imported_config == original_config
+
+    def test_export_and_import_config_stdout(self):
         """
         Test scalyr-agent-3 config --export-config command, but from stdout.
         """
-        self._write_config()
+
+        original_config = {"api_key": "key"}
+        self._write_config(config=original_config)
 
         output = subprocess.check_output(
             [
@@ -751,7 +774,11 @@ class TestConfigArgumentParsing:
             ]
         )
 
-        tar = tarfile.open(fileobj=io.BytesIO(output))
+        # Write zipped config back to file and
+        with open(self.output_file, "wb") as f:
+            f.write(output)
+
+        tar = tarfile.open(self.output_file)
         self._extract_result(tar)
 
         assert os.path.isfile(self.extracted_config_path)
@@ -759,4 +786,26 @@ class TestConfigArgumentParsing:
         with open(self.extracted_config_path, "r") as f:
             extracted_config = json.load(f)
 
-        assert extracted_config == self.config
+        assert extracted_config == original_config
+
+        # Change original config and them import it back.
+        changed_config = {"api_key": "key2"}
+        self._write_config(config=changed_config)
+
+        with open(self.output_file, "rb") as f:
+            subprocess.check_call(
+                [
+                    _AGENT_MAIN_PATH,
+                    "config",
+                    "--import-config",
+                    "-",
+                    "--config-file",
+                    self.config_path,
+                ],
+                stdin=f,
+            )
+
+        with open(self.config_path, "r") as f:
+            imported_config = json.loads(six.ensure_text(f.read()))
+
+        assert imported_config == original_config
