@@ -16,7 +16,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import io
 import os
 import shutil
 import sys
@@ -715,6 +714,7 @@ class TestConfigArgumentParsing:
 
         subprocess.check_call(
             [
+                sys.executable,
                 _AGENT_MAIN_PATH,
                 "config",
                 "--export-config",
@@ -741,6 +741,7 @@ class TestConfigArgumentParsing:
 
         subprocess.check_call(
             [
+                sys.executable,
                 _AGENT_MAIN_PATH,
                 "config",
                 "--import-config",
@@ -765,6 +766,7 @@ class TestConfigArgumentParsing:
 
         output = subprocess.check_output(
             [
+                sys.executable,
                 _AGENT_MAIN_PATH,
                 "config",
                 "--export-config",
@@ -795,6 +797,7 @@ class TestConfigArgumentParsing:
         with open(self.output_file, "rb") as f:
             subprocess.check_call(
                 [
+                    sys.executable,
                     _AGENT_MAIN_PATH,
                     "config",
                     "--import-config",
