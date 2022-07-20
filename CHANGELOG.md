@@ -14,6 +14,7 @@ Windows:
 
 Bug fixes:
 * Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+* Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status. 
 
 Docker images:
 * Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.

@@ -672,11 +672,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
 
-            if self.__log_watcher:
-                self.log_config = self.__log_watcher.add_log_config(
-                    self.module_name, self.log_config
-                )
-
             # First instance of k8s api uses the main rate limiter.  Leader election related API calls to the k8s
             # masters will go through this api/rate limiter.
             k8s_api_main = KubernetesApi.create_instance(
