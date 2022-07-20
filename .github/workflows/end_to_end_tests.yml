@@ -366,24 +366,32 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#cloud-tech'
 
-  smoke-docker-json:
+  docker-smoketest:
+    name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - log_mode: json
+            timeout: 150
+          - log_mode: syslog
+            timeout: 150
+          - log_mode: api
+            timeout: 200
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-
       - name: Setup Python 3.8
         uses: actions/setup-python@v4
         id: setup-python
         with:
           python-version: 3.8
           cache: 'pip'
-
       - name: Install Python Dependencies
         run: |
           pip install -r dev-requirements.txt
           pip install "apache-libcloud==3.4.1"
-
       - name: Run Tests (with coverage)
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
@@ -391,4 +399,4 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
         run: |
-          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-json 150
+          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
