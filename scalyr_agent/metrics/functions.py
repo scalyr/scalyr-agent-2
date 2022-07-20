@@ -39,10 +39,19 @@ import six
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
 from scalyr_agent.util import get_flat_dictionary_memory_usage
+from scalyr_agent.timing import get_empty_stats_dict
+from scalyr_agent.timing import record_timing_stats_for_function_call
 from scalyr_agent.scalyr_logging import getLogger
 from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 LOG = getLogger(__name__)
+
+# How often (in seconds) to log various internal cache and function timing related statistics
+FUNCTION_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
+
+# Dictionary which stores timing / run time information for "RateMetricFunction.calculate()"
+# method
+RATE_METRIC_CALCULATE_RUNTIME_STATS = get_empty_stats_dict()
 
 
 class MetricFunction(six.with_metaclass(ABCMeta)):
@@ -138,7 +147,18 @@ could add overhead in terms of CPU and memory usage.
         )
     )
 
+    LAZY_PRINT_TIMING_MIN = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["min"]
+    )
+    LAZY_PRINT_TIMING_MAX = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["max"]
+    )
+    LAZY_PRINT_TIMING_AVG = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["avg"]
+    )
+
     @classmethod
+    @record_timing_stats_for_function_call(RATE_METRIC_CALCULATE_RUNTIME_STATS, 0.001)
     def calculate(
         cls, monitor, metric_name, metric_value, extra_fields=None, timestamp=None
     ):
@@ -283,12 +303,22 @@ could add overhead in terms of CPU and memory usage.
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
 
+        # Periodically print cache size and function timing information
         LOG.info(
             "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
             cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
             cls.LAZY_PRINT_CACHE_SIZE_BYTES,
             limit_key="mon-met-rate-cache-stats",
-            limit_once_per_x_secs=(6 * 60 * 60),
+            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
+        )
+
+        LOG.info(
+            "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
+            cls.LAZY_PRINT_TIMING_MIN,
+            cls.LAZY_PRINT_TIMING_MAX,
+            cls.LAZY_PRINT_TIMING_AVG,
+            limit_key="mon-rate-calc-timing-stats",
+            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
         )
 
         return result
