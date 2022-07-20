@@ -2127,7 +2127,7 @@ jobs:
 
       - save_cache:
           name: Save Python Installer Cache
-          key: windows--v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
+          key: windows-v2-python-installer-cache-{{ .Branch }}-<< parameters.python-version >>
           paths:
             - "python_installer"
 

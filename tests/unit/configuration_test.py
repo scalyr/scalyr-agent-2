@@ -1249,6 +1249,40 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.api_key, "hibye")
 
+    def test_import_vars_substitution_common_prefix(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            import_vars: [ "TEST_FOO", "TEST_FOO_VAR1", "TEST_FOO_VAR", "TEST_FOO_VAR2", "SCALYR_DEVICE", "SCALYR_DEVICE_BAR" ],
+            api_key: "key",
+            server_attributes: {
+                "serverHost": "bar",
+                "var1": "$TEST_FOO_VAR1",
+                "var2": "$TEST_FOO_VAR2",
+                "var3": "$TEST_FOO",
+                "var4": "$TEST_FOO_VAR",
+                "var5": "hi$SCALYR_DEVICE"
+                "var6": "hi$SCALYR_DEVICE_BAR"
+            }
+          }
+        """
+        )
+        os.environ["TEST_FOO_VAR1"] = "foovar1"
+        os.environ["TEST_FOO_VAR2"] = "foovar2"
+        os.environ["TEST_FOO"] = "abc"
+        os.environ["TEST_FOO_VAR"] = "defg"
+        os.environ["SCALYR_DEVICE"] = "device"
+        os.environ["SCALYR_DEVICE_BAR"] = "bar"
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        self.assertEqual(config.server_attributes["var1"], "foovar1")
+        self.assertEqual(config.server_attributes["var2"], "foovar2")
+        self.assertEqual(config.server_attributes["var3"], "abc")
+        self.assertEqual(config.server_attributes["var4"], "defg")
+        self.assertEqual(config.server_attributes["var5"], "hidevice")
+        self.assertEqual(config.server_attributes["var6"], "hibar")
+
     def test_substitution_with_default(self):
         self._write_file_with_separator_conversion(
             """ {
@@ -2117,7 +2151,8 @@ class TestConfiguration(TestConfigurationBase):
             )
             self.assertRaisesRegexp(BadConfiguration, expected_msg, config.parse)
 
-    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
+    @skipIf(sys.version_info < (3, 5, 0), "Skipping tests under Python < 3.5")
+    @skipIf(platform.system() == "Darwin", "Skipping under OSX")
     def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(current_json_lib, "json")
@@ -2137,11 +2172,11 @@ class TestConfiguration(TestConfigurationBase):
         new_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(new_json_lib, "json")
 
-        # auth should fall back to ujson again
+        # auth should fall back to orjson again
         self._write_file_with_separator_conversion(
             """{
              api_key: "hi there",
-            json_library: "ujson"
+            json_library: "orjson"
           }
         """
         )
@@ -2151,7 +2186,7 @@ class TestConfiguration(TestConfigurationBase):
         config.apply_config()
 
         new_json_lib = scalyr_util.get_json_lib()
-        self.assertEqual(new_json_lib, "ujson")
+        self.assertEqual(new_json_lib, "orjson")
 
     @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_apply_config_without_parse(self):

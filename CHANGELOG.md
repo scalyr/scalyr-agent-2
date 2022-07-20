@@ -1,10 +1,31 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.31 "Irati" - Jun 8, 2022
+## 2.1.32 "Occao" - July 20, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 8, 2022 23:04 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 20, 2022 12:29 -0800
+--->
+
+Windows:
+* Fix bug in Windows System Metrics and Windows Process Metrics monitor where user wasn't able to override / change default sampling rating of 30 seconds (``sample_interval`` monitor config option).
+* Update Windows Process Metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
+* Update Windows Process Metrics monitor to throw an error in case invalid monitor configuration is specified (neither "pid" nor "commandline" config option is specified or both config options which are mutually exclusive are specified).
+
+Bug fixes:
+* Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+
+Docker images:
+* Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.
+
+Other:
+* Support for Python 2.6 has been dropped.
+* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
+
+## 2.1.31 "Irati" - Jun 28, 2022
+
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
 --->
 
 Windows:
@@ -20,12 +41,11 @@ Bug fixes:
 * Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
 
 Docker images:
-* Temporarily disable ``orjson`` JSON library for the arm64 platform of the Agent's alpine docker image due to upstream build errors.
+* Upgrade orjson dependency
 
 Other:
 * Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
 * Upgrade dependency ``requests`` library to 2.25.1.
-
 
 ## 2.1.30 "Heturn" - May 17, 2022
 

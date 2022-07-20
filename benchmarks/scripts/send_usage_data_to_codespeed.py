@@ -55,6 +55,7 @@ if False:  # NOSONAR
 
 import os
 import sys
+import math
 import time
 import logging
 import signal
@@ -65,7 +66,6 @@ from datetime import datetime
 from collections import defaultdict
 
 import six
-import numpy as np
 import psutil
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
@@ -107,6 +107,21 @@ METRICS_COUNTERS = {
     "io_read_count_bytes": Metric(name="app.disk.bytes", _type="read"),
     "io_write_count_bytes": Metric(name="app.disk.bytes", _type="write"),
 }  # type: Dict[str, Metric]
+
+
+# Custom functions so we don't need to rely old and vulnerable numpy version under Python 2.
+# Once we drop support for Python 2, we can switch back to numpy
+def calculate_percentile(data, percentile):
+    size = len(data)
+    return sorted(data)[int(math.ceil((size * percentile) / 100)) - 1]
+
+
+def calculate_stddev(data):
+    n = len(data)
+    mean = sum(data) / n
+    var = sum((x - mean) ** 2 for x in data) / n
+    std_dev = var**0.5
+    return std_dev
 
 
 def bytes_to_megabytes(value):
@@ -331,10 +346,10 @@ def main(
 
         values = captured_values[metric_name]
 
-        percentile_999 = np.percentile(values, 99.9)
+        percentile_999 = calculate_percentile(values, 99.9)
         minimum = min(values)
         maximum = max(values)
-        std_dev = np.std(values)
+        std_dev = calculate_stddev(values)
 
         result[metric_name] = {
             "value": percentile_999,

@@ -624,7 +624,7 @@ class Configuration(object):
             return
 
         # Set json library based on the config value. If "auto" is provided this means we use
-        # default behavior which is try to use ujson and if that's not available fall back to
+        # default behavior which is try to use orjson and if that's not available fall back to
         # stdlib json
         json_library = self.json_library
         current_json_library = scalyr_util.get_json_lib()
@@ -1032,6 +1032,10 @@ class Configuration(object):
     @property
     def k8s_events_disable(self):
         return self.__get_config().get_bool("k8s_events_disable")
+
+    @property
+    def k8s_explorer_enable(self):
+        return self.__get_config().get_bool("k8s_explorer_enable")
 
     @property
     def k8s_ratelimit_cluster_num_agents(self):
@@ -2154,10 +2158,10 @@ class Configuration(object):
             config,
             "json_library",
             "auto",
-            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json and orjson",
             apply_defaults,
             env_aware=True,
-            valid_values=["auto", "json", "ujson", "orjson"],
+            valid_values=["auto", "json", "orjson"],
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -2887,6 +2891,15 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "k8s_events_disable",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_explorer_enable",
             False,
             description,
             apply_defaults,
@@ -4637,7 +4650,16 @@ def perform_str_substitution(str_value, substitutions):
     @rtype: str or unicode
     """
     result = str_value
-    for (var_name, value) in six.iteritems(substitutions):
+
+    # NOTE: Right now out substitution code also supports partial substitutions which means we can't
+    # use regular expression directly, but we need to sort substitutions variables by length (desc)
+    # before we perform substitutions to ensure we use the correct substitution variable in case
+    # multiple variables share the same prefix.
+    # For example: $SCALYR_FOO_VAR1, $SCALYR_FOO_VAR2, $SCALYR_FOO
+    substitutions_variable_names = sorted(substitutions.keys(), key=len, reverse=True)
+
+    for var_name in substitutions_variable_names:
+        value = substitutions[var_name]
         result = result.replace("$%s" % var_name, value)
     return result
 
