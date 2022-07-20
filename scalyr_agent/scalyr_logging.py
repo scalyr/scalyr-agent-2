@@ -30,6 +30,8 @@ __author__ = "czerwin@scalyr.com"
 
 if False:  # NOSONAR
     from typing import Dict
+    from typing import Optional
+    from typing import Callable
 
     # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa
     from scalyr_agent.scalyr_monitor import ScalyrMonitor
@@ -1987,3 +1989,21 @@ class UnsupportedValueType(Exception):
                 )
             )
         Exception.__init__(self, message)
+
+
+class LazyOnPrintEvaluatedFunction(object):
+    """
+    Wrapper for function which is evaluated lazily once __str__ called on this object.
+
+    This is primarily meant to be used with scalyr_logging.log function when using limit_once_per_x_secs
+    and we only want function to be evaluated when limit has not been reached (aka so we don't incur
+    overhead on each log.log function call when no logging is to be performed due to rate limit being
+    reached).
+    """
+
+    def __init__(self, func):
+        # type: (Callable, Optional[bool]) -> None
+        self.__func = func
+
+    def __str__(self):
+        return six.text_type(self.__func())

@@ -38,6 +38,11 @@ from itertools import chain
 import six
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
+from scalyr_agent.util import get_flat_dictionary_memory_usage
+from scalyr_agent.scalyr_logging import getLogger
+from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
+
+LOG = getLogger(__name__)
 
 
 class MetricFunction(six.with_metaclass(ABCMeta)):
@@ -122,6 +127,15 @@ Tracking client side rate for over %s metrics. Tracking and calculating rate for
 could add overhead in terms of CPU and memory usage.
     """.strip() % (
         MAX_RATE_METRICS_COUNT_WARN
+    )
+
+    LAZY_PRINT_CACHE_SIZE_LENGTH = LazyOnPrintEvaluatedFunction(
+        lambda: len(RateMetricFunction.RATE_CALCULATION_METRIC_VALUES)
+    )
+    LAZY_PRINT_CACHE_SIZE_BYTES = LazyOnPrintEvaluatedFunction(
+        lambda: get_flat_dictionary_memory_usage(
+            RateMetricFunction.RATE_CALCULATION_METRIC_VALUES
+        )
     )
 
     @classmethod
@@ -268,6 +282,15 @@ could add overhead in terms of CPU and memory usage.
         rate_metric_name = "%s%s" % (metric_name, cls.METRIC_SUFFIX)
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
+
+        LOG.info(
+            "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
+            cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
+            cls.LAZY_PRINT_CACHE_SIZE_BYTES,
+            limit_key="mon-met-rate-cache-stats",
+            limit_once_per_x_secs=(6 * 60 * 60),
+        )
+
         return result
 
     @classmethod

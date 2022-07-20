@@ -2749,3 +2749,19 @@ def get_hash_for_flat_dictionary(data):
     # to disk or similar). With hash() function, there is also a larger chance of a collision, but
     # that's fine here.
     return six.text_type(hash(frozenset(data.items())))
+
+
+def get_flat_dictionary_memory_usage(data):
+    # type: (dict) -> int
+    """
+    Return approximate memory usage (bytes) for the provided dictionary.
+
+    This function only supports flat dictionaries aka dictionaries with simple types.
+    """
+    # Raw dictionary size
+    size = sys.getsizeof(data)
+    # Size for the actual keys and values
+    size += sum(map(sys.getsizeof, data.values())) + sum(
+        map(sys.getsizeof, data.keys())
+    )
+    return size

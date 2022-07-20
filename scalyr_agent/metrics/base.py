@@ -33,11 +33,19 @@ if False:
 
 import six
 
+from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.metrics.functions import MetricFunction
 from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.scalyr_logging import getLogger
+from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 LOG = getLogger(__name__)
+
+# How often (in seconds) to log various internal cache related statistics
+# NOTE: Using moving / rolling windows with numpy would be nicer, but numpy dependency is not so
+# light weight so we want to avoid using it at this point.
+CACHE_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
+CACHE_STATS_LOG_INTERVAL_SECONDS = 1
 
 
 # Stores a list of class instance (singleton) for each available metric function.
@@ -51,6 +59,14 @@ FUNCTIONS_REGISTRY = {
 MONITOR_METRIC_TO_FUNCTIONS_CACHE = (
     {}
 )  # type: Dict[six.text_type, List[MetricFunction]]
+
+
+LAZY_PRINT_CACHE_SIZE_LENGTH = LazyOnPrintEvaluatedFunction(
+    lambda: len(MONITOR_METRIC_TO_FUNCTIONS_CACHE)
+)
+LAZY_PRINT_CACHE_SIZE_BYTES = LazyOnPrintEvaluatedFunction(
+    lambda: get_flat_dictionary_memory_usage(MONITOR_METRIC_TO_FUNCTIONS_CACHE)
+)
 
 
 def get_functions_for_metric(monitor, metric_name):
@@ -81,6 +97,14 @@ def get_functions_for_metric(monitor, metric_name):
                 result.append(function_instance)
 
         MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key] = result
+
+    LOG.info(
+        "agent_monitor_metric_to_function_cache_stats cache_entries=%s,cache_size_bytes=%s",
+        LAZY_PRINT_CACHE_SIZE_LENGTH,
+        LAZY_PRINT_CACHE_SIZE_BYTES,
+        limit_key="mon-met-cache-stats",
+        limit_once_per_x_secs=CACHE_STATS_LOG_INTERVAL_SECONDS,
+    )
 
     return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]
 
