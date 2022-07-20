@@ -317,7 +317,6 @@ class NewApi(Api):
                 {"channel": ["Application", "System", "Security"], "query": "*"}
             ]
 
-        self.__bookmark_lock = threading.Lock()
         self.__channels = channels
         self.__channel_list = []
         self._session = None
@@ -330,7 +329,8 @@ class NewApi(Api):
                     seen[channel] = 1
                     self.__channel_list.append(channel)
 
-        self.__bookmarks = {}
+        self._bookmarks = {}
+        self._bookmark_lock = threading.Lock()
 
     def _open_remote_session_if_necessary(self, server, config):
         """
@@ -390,12 +390,12 @@ class NewApi(Api):
                 bookmark = None
                 try:
                     # unless we have a bookmark for this channel
-                    self.__bookmark_lock.acquire()
-                    if channel in self.__bookmarks:
+                    self._bookmark_lock.acquire()
+                    if channel in self._bookmarks:
                         flags = win32evtlog.EvtSubscribeStartAfterBookmark
-                        bookmark = self.__bookmarks[channel]
+                        bookmark = self._bookmarks[channel]
                 finally:
-                    self.__bookmark_lock.release()
+                    self._bookmark_lock.release()
 
                 error_message = None
                 try:
@@ -438,7 +438,7 @@ class NewApi(Api):
             checkpoints["bookmarks"] = {}
 
         for channel, bookmarkXml in six.iteritems(checkpoints["bookmarks"]):
-            self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
+            self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
 
         # subscribe to the events
         self._subscribe_to_events()
@@ -450,14 +450,14 @@ class NewApi(Api):
     def update_checkpoints(self):
         self._checkpoints["api"] = "new"
 
-        self.__bookmark_lock.acquire()
+        self._bookmark_lock.acquire()
         try:
-            for channel, bookmark in six.iteritems(self.__bookmarks):
+            for channel, bookmark in six.iteritems(self._bookmarks):
                 self._checkpoints["bookmarks"][channel] = win32evtlog.EvtRender(
                     bookmark, win32evtlog.EvtRenderBookmark
                 )
         finally:
-            self.__bookmark_lock.release()
+            self._bookmark_lock.release()
 
     def stop(self):
         """
@@ -636,18 +636,15 @@ class NewApi(Api):
 
         self._logger.emit_value("EventLog", provider, extra_fields=vals)
 
-        self.__bookmark_lock.acquire()
+        self._bookmark_lock.acquire()
         try:
             if "Channel" in vals:
                 channel = vals["Channel"]
-                bookmark = None
-                if channel not in self.__bookmarks:
-                    self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
-
-                bookmark = self.__bookmarks[channel]
-                win32evtlog.EvtUpdateBookmark(bookmark, event)
+                if channel not in self._bookmarks:
+                    self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
+                win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
         finally:
-            self.__bookmark_lock.release()
+            self._bookmark_lock.release()
 
 
 class NewJsonApi(NewApi):
@@ -688,30 +685,19 @@ class NewJsonApi(NewApi):
             )
         )
 
-        # FIXME STOPPED
-
         self._logger.log(
             self._levels[values[win32evtlog.EvtSystemLevel][0]],
             json.dumps(event_json)
         )
 
-        '''
-        self.__bookmark_lock.acquire()
+        self._bookmark_lock.acquire()
         try:
-            if "Channel" in vals:
-                channel = vals["Channel"]
-                bookmark = None
-                if channel not in self.__bookmarks:
-                    self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
-
-                bookmark = self.__bookmarks[channel]
-                win32evtlog.EvtUpdateBookmark(bookmark, event)
+            channel = values[win32evtlog.EvtSystemChannel][0]
+            if channel not in self._bookmarks:
+                self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
+            win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
         finally:
-            self.__bookmark_lock.release()
-        '''
-
-        #import sys
-        #sys.exit(0)
+            self._bookmark_lock.release()
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
@@ -866,6 +852,10 @@ and System sources:
 
             api_class = NewJsonApi if self._config.get('json') else NewApi
             result = api_class(self._config, self._logger, channels)
+
+            # FIXME STOPPED Not overwriting the default of scalyrAgentLog, why?
+            #               Based on similar override in scalyr_agent/builtin_monitors/linux_process_metrics.py
+            self.log_config['parser'] = 'foo'
         else:
             if channels:
                 msg = (
@@ -884,6 +874,17 @@ and System sources:
             result = OldApi(self._config, self._logger, source_list, event_filter)
 
         return result
+
+    # FIXME Not working, unclear why
+    #def open_metric_log(self):
+    #    class JsonFormatter:
+    #        def format(self, record) -> str:
+    #            return '{"json":"here"}'
+    #
+    #    super(WindowEventLogMonitor, self).open_metric_log()
+    #    scalyr_logging.MetricLogHandler.get_handler_for_path(self.log_config['path']) \
+    #        .setFormatter(JsonFormatter())
+    #    return True
 
     def run(self):
         self.__load_checkpoints()
