@@ -1068,7 +1068,12 @@ def export_config(config_dest, config_file_path, configuration):
         if config_dest != "-":
             out_tar = tarfile.open(config_dest, mode="w:gz")
         else:
-            out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
+            if sys.version_info < (3,):
+                file_obj = sys.stdout
+            else:
+                file_obj = sys.stdout.buffer
+
+            out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
         out_tar.add(os.path.basename(config_file_path))
 
         for x in glob.glob(os.path.join(fragment_dir, "*.json")):
@@ -1184,7 +1189,11 @@ def create_custom_dockerfile(
     if tarball_path != "-":
         out_tar = tarfile.open(tarball_path, mode="w:gz")
     else:
-        out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
+        if sys.version_info < (3,):
+            file_obj = sys.stdout
+        else:
+            file_obj = sys.stdout.buffer
+        out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
 
     # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
     # by this current agent install.  We want the version of this install in order to make sure the new docker image

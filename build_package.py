@@ -1153,7 +1153,7 @@ def build_base_files(install_type, base_configs="config"):
     )
     os.chdir("..")
 
-    # Create symlinks for the two commands
+    # Create symlinks for the agent_main
     os.chdir("bin")
 
     make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")

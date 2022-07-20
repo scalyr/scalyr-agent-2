@@ -599,9 +599,10 @@ class PackageBuilder(abc.ABC):
                 pl.Path("..", "py", "scalyr_agent", "agent_main.py")
             )
 
-            agent_config_executable_path = bin_path / "scalyr-agent-2-config"
-            agent_config_executable_path.symlink_to(
-                pl.Path("..", "py", "scalyr_agent", "config_main.py")
+            # Copy the backward compatibility "scalyr-agent-2-config" script.
+            shutil.copy2(
+                constants.SOURCE_ROOT / "agent_build/linux/scalyr-agent-2-config",
+                bin_path,
             )
 
             # Write install_info file inside the "scalyr_agent" package.
