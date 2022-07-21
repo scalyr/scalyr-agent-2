@@ -3179,7 +3179,7 @@ class Configuration(object):
             config, "disable_leak_config_reload", None, description, apply_defaults
         )
 
-        # How often to long instrumentation related stats using INFO log level to agent.log
+        # How often to log instrumentation related stats using INFO log level to agent.log
         # (in seconds)
         # NOTE: To avoid large overhead of logging this stats often, this value should not be
         # set lower than 10-30 minutes in production environments
