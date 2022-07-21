@@ -349,12 +349,18 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
     def test_metric_logging_metric_name_blacklist_actual_monitor_class(self):
         from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
+        global_config = mock.Mock()
+        global_config.instrumentation_stats_log_interval = 300
+        global_config.calculate_rate_metric_names = []
+
         monitor_1_config = {"module": "foo1", "metric_name_blacklist": ["a", "b"]}
         monitor_1_logger = scalyr_logging.getLogger(
             "scalyr_agent.builtin_monitors.foo1(1)"
         )
         monitor_1 = ScalyrMonitor(
-            monitor_config=monitor_1_config, logger=monitor_1_logger
+            monitor_config=monitor_1_config,
+            logger=monitor_1_logger,
+            global_config=global_config,
         )
 
         metric_file_fd, monitor_1_metric_file_path = tempfile.mkstemp(".log")
@@ -368,7 +374,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             "scalyr_agent.builtin_monitors.foo2(1)"
         )
         monitor_2 = ScalyrMonitor(
-            monitor_config=monitor_2_config, logger=monitor_1_logger
+            monitor_config=monitor_2_config,
+            logger=monitor_1_logger,
+            global_config=global_config,
         )
 
         metric_file_fd, monitor_2_metric_file_path = tempfile.mkstemp(".log")
@@ -1297,6 +1305,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
             mock_config = mock.Mock()
             mock_config.calculate_rate_metric_names = []
+            mock_config.instrumentation_stats_log_interval = 300
             self._global_config = mock_config
 
         def get_calculate_rate_metric_names(self):

@@ -390,9 +390,12 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         # NOTE: Right now Kubernetes Explorer functionality also needs data from Kubernetes events
         # monitor so in case explorer functionality is enabled, we also enable events monitor
-        if self._global_config.k8s_explorer_enable:
+        if self.__disable_monitor and self._global_config.k8s_explorer_enable:
+            # NOTE: In case
             global_log.info(
-                "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
+                "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor",
+                limit_once_per_x_secs=(12 * 60 * 60),
+                limit_key="k8s-ev-expr-enabled",
             )
             self.__disable_monitor = False
 

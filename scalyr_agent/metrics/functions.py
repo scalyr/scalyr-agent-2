@@ -46,9 +46,6 @@ from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 LOG = getLogger(__name__)
 
-# How often (in seconds) to log various internal cache and function timing related statistics
-FUNCTION_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
-
 # Dictionary which stores timing / run time information for "RateMetricFunction.calculate()"
 # method
 RATE_METRIC_CALCULATE_RUNTIME_STATS = get_empty_stats_dict()
@@ -304,22 +301,28 @@ could add overhead in terms of CPU and memory usage.
         result = [(rate_metric_name, rate_value)]
 
         # Periodically print cache size and function timing information
-        LOG.info(
-            "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
-            cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
-            cls.LAZY_PRINT_CACHE_SIZE_BYTES,
-            limit_key="mon-met-rate-cache-stats",
-            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
+        log_interval = (
+            monitor._global_config
+            and monitor._global_config.instrumentation_stats_log_interval
+            or 0
         )
+        if log_interval > 0:
+            LOG.info(
+                "agent_instrumentation_stats key=monitor_rate_metric_calculation_values_cache_stats cache_entries=%s cache_size_bytes=%s",
+                cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
+                cls.LAZY_PRINT_CACHE_SIZE_BYTES,
+                limit_key="mon-met-rate-cache-stats",
+                limit_once_per_x_secs=log_interval,
+            )
 
-        LOG.info(
-            "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
-            cls.LAZY_PRINT_TIMING_MIN,
-            cls.LAZY_PRINT_TIMING_MAX,
-            cls.LAZY_PRINT_TIMING_AVG,
-            limit_key="mon-rate-calc-timing-stats",
-            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
-        )
+            LOG.info(
+                "agent_instrumentation_stats key=agent_rate_func_calculate_timing_stats avg=%s min=%s max=%s",
+                cls.LAZY_PRINT_TIMING_MIN,
+                cls.LAZY_PRINT_TIMING_MAX,
+                cls.LAZY_PRINT_TIMING_AVG,
+                limit_key="mon-rate-calc-timing-stats",
+                limit_once_per_x_secs=log_interval,
+            )
 
         return result
 

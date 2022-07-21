@@ -43,9 +43,6 @@ from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 LOG = getLogger(__name__)
 
-# How often (in seconds) to log various internal cache related statistics
-CACHE_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
-
 
 # Stores a list of class instance (singleton) for each available metric function.
 # TODO: Once we only support Python 3 use registry / adapter pattern.
@@ -116,21 +113,30 @@ def get_functions_for_metric(monitor, metric_name):
         MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key] = result
 
     # Periodically print cache size and function timing information
-    LOG.info(
-        "agent_monitor_metric_to_function_cache_stats cache_entries=%s,cache_size_bytes=%s",
-        LAZY_PRINT_CACHE_SIZE_LENGTH,
-        LAZY_PRINT_CACHE_SIZE_BYTES,
-        limit_key="mon-met-cache-stats",
-        limit_once_per_x_secs=CACHE_STATS_LOG_INTERVAL_SECONDS,
+    # NOTE: We don't have direct access to global config here so we access it via monitor. An
+    # alternative would be to use a module level variable which is updated during config load and
+    # re-load process (as initially implemented in https://github.com/scalyr/scalyr-agent-2/pull/942)
+    log_interval = (
+        monitor._global_config
+        and monitor._global_config.instrumentation_stats_log_interval
+        or 0
     )
-    LOG.info(
-        "agent_get_function_for_metric_timing_stats avg=%s,min=%s,max=%s",
-        LAZY_PRINT_TIMING_MIN,
-        LAZY_PRINT_TIMING_MAX,
-        LAZY_PRINT_TIMING_AVG,
-        limit_key="mon-met-timing-stats",
-        limit_once_per_x_secs=CACHE_STATS_LOG_INTERVAL_SECONDS,
-    )
+    if log_interval > 0:
+        LOG.info(
+            "agent_instrumentation_stats key=monitor_metric_to_function_cache_stats cache_entries=%s cache_size_bytes=%s",
+            LAZY_PRINT_CACHE_SIZE_LENGTH,
+            LAZY_PRINT_CACHE_SIZE_BYTES,
+            limit_key="mon-met-cache-stats",
+            limit_once_per_x_secs=log_interval,
+        )
+        LOG.info(
+            "agent_instrumentation_stats key=agent_get_function_for_metric_timing_stats avg=%s min=%s max=%s",
+            LAZY_PRINT_TIMING_MIN,
+            LAZY_PRINT_TIMING_MAX,
+            LAZY_PRINT_TIMING_AVG,
+            limit_key="mon-met-timing-stats",
+            limit_once_per_x_secs=log_interval,
+        )
 
     return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]
 
