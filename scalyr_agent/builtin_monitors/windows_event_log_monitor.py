@@ -690,7 +690,7 @@ class NewJsonApi(NewApi):
             self._bookmark_lock.release()
 
 
-def _convert_json_array_to_object(obj: dict):
+def _convert_json_array_to_object(obj):
     for k, v in obj.items():
         if isinstance(v, dict):
             _convert_json_array_to_object(v)
@@ -876,7 +876,7 @@ and System sources:
 
     def open_metric_log(self):
         class DummyFormatter:
-            def format(self, record) -> str:
+            def format(self, record):
                 return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
 
         rv = super(WindowEventLogMonitor, self).open_metric_log()
