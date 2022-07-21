@@ -114,21 +114,23 @@ def get_functions_for_metric(monitor, metric_name):
         MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key] = result
 
     # Periodically print cache size and function timing information
-    LOG.info(
-        "agent_monitor_metric_to_function_cache_stats cache_entries=%s,cache_size_bytes=%s",
-        LAZY_PRINT_CACHE_SIZE_LENGTH,
-        LAZY_PRINT_CACHE_SIZE_BYTES,
-        limit_key="mon-met-cache-stats",
-        limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
-    )
-    LOG.info(
-        "agent_get_function_for_metric_timing_stats avg=%s,min=%s,max=%s",
-        LAZY_PRINT_TIMING_MIN,
-        LAZY_PRINT_TIMING_MAX,
-        LAZY_PRINT_TIMING_AVG,
-        limit_key="mon-met-timing-stats",
-        limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
-    )
+    log_interval = instrumentation_constants.get_instrumentation_log_interval()
+    if log_interval > 0:
+        LOG.info(
+            "agent_monitor_metric_to_function_cache_stats cache_entries=%s,cache_size_bytes=%s",
+            LAZY_PRINT_CACHE_SIZE_LENGTH,
+            LAZY_PRINT_CACHE_SIZE_BYTES,
+            limit_key="mon-met-cache-stats",
+            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+        )
+        LOG.info(
+            "agent_get_function_for_metric_timing_stats avg=%s,min=%s,max=%s",
+            LAZY_PRINT_TIMING_MIN,
+            LAZY_PRINT_TIMING_MAX,
+            LAZY_PRINT_TIMING_AVG,
+            limit_key="mon-met-timing-stats",
+            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+        )
 
     return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]
 

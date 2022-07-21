@@ -3172,10 +3172,11 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "instrumentation_stats_log_interval",
-            (12 * 60 * 60),
+            # defaults to disabled
+            0,
             description,
             apply_defaults,
-            min_value=10,
+            min_value=0,
             env_aware=True,
         )
 

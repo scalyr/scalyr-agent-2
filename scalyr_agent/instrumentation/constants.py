@@ -18,7 +18,9 @@ __all__ = [
 ]
 
 # How often (in seconds) to log various internal cache related statistics
-INSTRUMENTATION_STATS_LOG_INTERVAL_SECONDS = 12 * 60 * 60
+# Defaults to 0 aka logging is disabled. In production this value should be set to value > 10
+# minutes to avoid overhead
+INSTRUMENTATION_STATS_LOG_INTERVAL_SECONDS = 0
 
 
 def get_instrumentation_log_interval():

@@ -302,22 +302,24 @@ could add overhead in terms of CPU and memory usage.
         result = [(rate_metric_name, rate_value)]
 
         # Periodically print cache size and function timing information
-        LOG.info(
-            "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
-            cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
-            cls.LAZY_PRINT_CACHE_SIZE_BYTES,
-            limit_key="mon-met-rate-cache-stats",
-            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
-        )
+        log_interval = instrumentation_constants.get_instrumentation_log_interval()
+        if log_interval > 0:
+            LOG.info(
+                "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
+                cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
+                cls.LAZY_PRINT_CACHE_SIZE_BYTES,
+                limit_key="mon-met-rate-cache-stats",
+                limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+            )
 
-        LOG.info(
-            "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
-            cls.LAZY_PRINT_TIMING_MIN,
-            cls.LAZY_PRINT_TIMING_MAX,
-            cls.LAZY_PRINT_TIMING_AVG,
-            limit_key="mon-rate-calc-timing-stats",
-            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
-        )
+            LOG.info(
+                "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
+                cls.LAZY_PRINT_TIMING_MIN,
+                cls.LAZY_PRINT_TIMING_MAX,
+                cls.LAZY_PRINT_TIMING_AVG,
+                limit_key="mon-rate-calc-timing-stats",
+                limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+            )
 
         return result
 
