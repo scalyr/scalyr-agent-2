@@ -25,19 +25,33 @@ import random
 from functools import wraps
 from timeit import default_timer as timer
 
+from scalyr_agent.scalyr_logging import getLogger
+
 __all__ = [
     "get_empty_stats_dict",
     "reset_stats_dict",
     "record_timing_stats_for_function_call",
 ]
 
+LOG = getLogger(__name__)
+
+# After how many samples we should reset the stats dict. This is done to avoid unncessary growing
+# of the values in the stats dict and prevent potential overflows
+STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL = 10000
+
 
 def should_sample(sample_rate):
+    # type: (float) -> bool
     return random.random() < sample_rate
 
 
 def get_empty_stats_dict():
     # type: () -> Dict[str, float]
+    """
+    Return empty dictionary used for holding function timing stats information.
+
+    TODO: Once we move to Python 3 only, use a dataclass instead.
+    """
     return reset_stats_dict({})
 
 
@@ -50,12 +64,12 @@ def reset_stats_dict(stats_dict):
     stats_dict["max"] = float("-inf")
     stats_dict["avg"] = 0.0
     stats_dict["sum"] = 0.0
-    stats_dict["count"] = 0.0
+    stats_dict["count"] = 0
     return stats_dict
 
 
 # TODO: Eventually add dependency on numpy or similar and utilize running / moving mean + percentiles
-def record_timing_stats_for_function_call(stats_obj, sample_rate):
+def record_timing_stats_for_function_call(stats_dict, sample_rate):
     """
     Utility decorator which records records function timing related information (how long the function
     took to complete in milliseconds) into the provided stats dictionary.
@@ -88,17 +102,22 @@ def record_timing_stats_for_function_call(stats_obj, sample_rate):
             # functions), we periodically reset the stats. Keep in mind that this is not ideal and
             # using moving / running values with a particular window size would be better, but that
             # would require us to add a dependency on numpy or a similar library.
-            stats_obj["count"] += 1
-            stats_obj["sum"] += duration_ms
-            stats_obj["avg"] = stats_obj["sum"] / stats_obj["count"]
+            stats_dict["count"] += 1
+            stats_dict["sum"] += duration_ms
+            stats_dict["avg"] = stats_dict["sum"] / stats_dict["count"]
 
-            if duration_ms < stats_obj["min"]:
-                stats_obj["min"] = duration_ms
-            if duration_ms > stats_obj["max"]:
-                stats_obj["max"] = duration_ms
+            if duration_ms < stats_dict["min"]:
+                stats_dict["min"] = duration_ms
+            if duration_ms > stats_dict["max"]:
+                stats_dict["max"] = duration_ms
 
-            if stats_obj["count"] >= 10000:
-                reset_stats_dict(stats_obj)
+            if stats_dict["count"] >= STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL:
+                LOG.debug(
+                    "Reseting stats dict %s after %s samples",
+                    stats_dict,
+                    STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL,
+                )
+                reset_stats_dict(stats_dict)
 
             return result
 
