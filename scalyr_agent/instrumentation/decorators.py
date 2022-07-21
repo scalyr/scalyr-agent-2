@@ -39,7 +39,7 @@ def should_sample(sample_rate):
 # TODO: Eventually add dependency on numpy or similar and utilize running / moving mean + percentiles
 def time_function_call(stats_dict, sample_rate):
     """
-    Utility decorator which records records function timing related information (how long the function
+    Utility decorator which records function timing related information (how long the function
     took to complete in milliseconds) into the provided stats dictionary.
 
     The following values are tracked / record:
