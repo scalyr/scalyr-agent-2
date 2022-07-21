@@ -41,7 +41,6 @@ from scalyr_agent.util import get_hash_for_flat_dictionary
 from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
 from scalyr_agent.instrumentation.decorators import time_function_call
-from scalyr_agent.instrumentation import constants as instrumentation_constants
 from scalyr_agent.scalyr_logging import getLogger
 from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
@@ -302,14 +301,14 @@ could add overhead in terms of CPU and memory usage.
         result = [(rate_metric_name, rate_value)]
 
         # Periodically print cache size and function timing information
-        log_interval = instrumentation_constants.get_instrumentation_log_interval()
+        log_interval = monitor._global_config.instrumentation_stats_log_interval or 0
         if log_interval > 0:
             LOG.info(
                 "agent_instrumentation_stats key=monitor_rate_metric_calculation_values_cache_stats cache_entries=%s cache_size_bytes=%s",
                 cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
                 cls.LAZY_PRINT_CACHE_SIZE_BYTES,
                 limit_key="mon-met-rate-cache-stats",
-                limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+                limit_once_per_x_secs=log_interval,
             )
 
             LOG.info(
@@ -318,7 +317,7 @@ could add overhead in terms of CPU and memory usage.
                 cls.LAZY_PRINT_TIMING_MAX,
                 cls.LAZY_PRINT_TIMING_AVG,
                 limit_key="mon-rate-calc-timing-stats",
-                limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+                limit_once_per_x_secs=log_interval,
             )
 
         return result

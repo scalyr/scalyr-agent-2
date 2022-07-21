@@ -36,7 +36,6 @@ import six
 from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
 from scalyr_agent.instrumentation.decorators import time_function_call
-from scalyr_agent.instrumentation import constants as instrumentation_constants
 from scalyr_agent.metrics.functions import MetricFunction
 from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.scalyr_logging import getLogger
@@ -114,14 +113,17 @@ def get_functions_for_metric(monitor, metric_name):
         MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key] = result
 
     # Periodically print cache size and function timing information
-    log_interval = instrumentation_constants.get_instrumentation_log_interval()
+    # NOTE: We don't have direct access to global config here so we access it via monitor. An
+    # alternative would be to use a module level variable which is updated during config load and
+    # re-load process (as initially implemented in https://github.com/scalyr/scalyr-agent-2/pull/942)
+    log_interval = monitor._global_config.instrumentation_stats_log_interval or 0
     if log_interval > 0:
         LOG.info(
             "agent_instrumentation_stats key=monitor_metric_to_function_cache_stats cache_entries=%s cache_size_bytes=%s",
             LAZY_PRINT_CACHE_SIZE_LENGTH,
             LAZY_PRINT_CACHE_SIZE_BYTES,
             limit_key="mon-met-cache-stats",
-            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+            limit_once_per_x_secs=log_interval,
         )
         LOG.info(
             "agent_instrumentation_stats key=agent_get_function_for_metric_timing_stats avg=%s min=%s max=%s",
@@ -129,7 +131,7 @@ def get_functions_for_metric(monitor, metric_name):
             LAZY_PRINT_TIMING_MAX,
             LAZY_PRINT_TIMING_AVG,
             limit_key="mon-met-timing-stats",
-            limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
+            limit_once_per_x_secs=log_interval,
         )
 
     return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]

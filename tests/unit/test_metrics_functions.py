@@ -101,6 +101,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
             "openmetrics_monitor:metric2",
@@ -119,6 +120,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
             "openmetrics_monitor:metric2",
@@ -196,6 +198,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
             "openmetrics_monitor:metric2",
@@ -363,6 +366,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
             "openmetrics_monitor:metric2",
@@ -406,6 +410,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
             "openmetrics_monitor:metric2",
