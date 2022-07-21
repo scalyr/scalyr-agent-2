@@ -927,7 +927,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
 
         self.assertEqual(mock_global_log.info.call_count, 1)
         mock_global_log.info.assert_called_with(
-            "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
+            "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor",
+            limit_key="k8s-ev-expr-enabled",
+            limit_once_per_x_secs=43200,
         )
         self.assertEqual(mock_global_log.info.call_count, 1)
 
