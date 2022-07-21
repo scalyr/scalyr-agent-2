@@ -116,7 +116,11 @@ def get_functions_for_metric(monitor, metric_name):
     # NOTE: We don't have direct access to global config here so we access it via monitor. An
     # alternative would be to use a module level variable which is updated during config load and
     # re-load process (as initially implemented in https://github.com/scalyr/scalyr-agent-2/pull/942)
-    log_interval = monitor._global_config.instrumentation_stats_log_interval or 0
+    log_interval = (
+        monitor._global_config
+        and monitor._global_config.instrumentation_stats_log_interval
+        or 0
+    )
     if log_interval > 0:
         LOG.info(
             "agent_instrumentation_stats key=monitor_metric_to_function_cache_stats cache_entries=%s cache_size_bytes=%s",

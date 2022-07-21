@@ -301,7 +301,11 @@ could add overhead in terms of CPU and memory usage.
         result = [(rate_metric_name, rate_value)]
 
         # Periodically print cache size and function timing information
-        log_interval = monitor._global_config.instrumentation_stats_log_interval or 0
+        log_interval = (
+            monitor._global_config
+            and monitor._global_config.instrumentation_stats_log_interval
+            or 0
+        )
         if log_interval > 0:
             LOG.info(
                 "agent_instrumentation_stats key=monitor_rate_metric_calculation_values_cache_stats cache_entries=%s cache_size_bytes=%s",
