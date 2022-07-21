@@ -36,7 +36,6 @@ The following libraries are included:
   * [chardet](#chardet)
   * [urllib3](#urllib3)
   * [python-dateutil](#dateutil)
-  * [xmltodict](#xmltodict)
 
 ## tcollector<a name="tcollector"> (LGPL v3)
 
@@ -163,10 +162,3 @@ A dependency of Requests.
 ## python-dateutil<a name="dateutil"> (Apache 2.0)
 
 Used for parsing RFC3339 date strings with custom timezones.
-
-## xmltodict<a name="xmltodict"> (MIT)
-
-A project that supports conversions between XML and JSON.  For additional details, please visit the
-[xmltodict github repository](https://github.com/martinblech/xmltodict).
-
-The `windows_event_logger` monitor depends on this library.
