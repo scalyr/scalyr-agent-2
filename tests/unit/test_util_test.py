@@ -25,7 +25,6 @@ import ssl
 import sys
 import locale
 import platform
-import io
 
 import mock
 import six
@@ -237,7 +236,7 @@ class MiscUtilsTestCase(ScalyrTestCase):
         lazy_func = LazyOnPrintEvaluatedFunction(func)
         self.assertEqual(func.counter, 0)
 
-        fake_file = io.StringIO()
+        fake_file = six.StringIO()
 
         # Only calling str / %s on func should cause it to be evaluated
         print(lazy_func, file=fake_file)
