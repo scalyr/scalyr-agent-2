@@ -1159,6 +1159,11 @@ class ScalyrAgent(object):
                 # verify server certificates.
                 verify_server_certificate(self.__config)
 
+                # set initial constant value based on the config option
+                update_instrumentation_log_interval(
+                    self.__config.instrumentation_stats_log_interval
+                )
+
                 def start_worker_thread(config, logs_initial_positions=None):
                     wt = self.__create_worker_thread(config)
                     # attach callbacks before starting monitors
