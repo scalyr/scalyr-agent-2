@@ -17,6 +17,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import datetime
 import os
 import json
 import logging
@@ -655,17 +656,6 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtRenderContextSystem
         )
 
-        # Ref: https://docs.microsoft.com/en-us/windows/win32/eventlog/event-types
-        #      https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-eventlogrecord
-        self._levels = {
-            0x00: logging.INFO, # Not defined in docs
-            0x01: logging.ERROR,
-            0x02: logging.WARNING,
-            0x04: logging.INFO,
-            0x08: logging.INFO, # Audit Success
-            0x10: logging.INFO, # Audit Failure
-        }
-
     def log_event(self, event):
         values = win32evtlog.EvtRender(
             event,
@@ -685,10 +675,12 @@ class NewJsonApi(NewApi):
             )
         )
 
-        self._logger.log(
-            self._levels[values[win32evtlog.EvtSystemLevel][0]],
-            json.dumps(event_json)
-        )
+        # Populate the record here with fields that would normally be added by the log formatter,
+        # this avoids having to unmarshal and remarshal later in the log formatter.
+        # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
+        event_json['timestamp'] = datetime.datetime.utcnow().isoformat(' ')
+        event_json['name'] = self._logger.name
+        self._logger.emit_value("unused", json.dumps(event_json))
 
         self._bookmark_lock.acquire()
         try:
@@ -787,7 +779,6 @@ and System sources:
         self.__api = self.__get_api(sources, event_types, channels)
 
     def __load_checkpoints(self):
-
         checkpoints = None
         try:
             checkpoints = scalyr_util.read_file_as_json(
@@ -853,9 +844,8 @@ and System sources:
             api_class = NewJsonApi if self._config.get('json') else NewApi
             result = api_class(self._config, self._logger, channels)
 
-            # FIXME STOPPED Not overwriting the default of scalyrAgentLog, why?
-            #               Based on similar override in scalyr_agent/builtin_monitors/linux_process_metrics.py
-            self.log_config['parser'] = 'foo'
+            if api_class == NewJsonApi:
+                self.log_config['parser'] = 'dottedJson'
         else:
             if channels:
                 msg = (
@@ -875,16 +865,19 @@ and System sources:
 
         return result
 
-    # FIXME Not working, unclear why
-    #def open_metric_log(self):
-    #    class JsonFormatter:
-    #        def format(self, record) -> str:
-    #            return '{"json":"here"}'
-    #
-    #    super(WindowEventLogMonitor, self).open_metric_log()
-    #    scalyr_logging.MetricLogHandler.get_handler_for_path(self.log_config['path']) \
-    #        .setFormatter(JsonFormatter())
-    #    return True
+    def open_metric_log(self):
+        class DummyFormatter:
+            def format(self, record) -> str:
+                return record.message[len('unused ')+1:-1].replace('\\"', '"')
+
+        rv = super(WindowEventLogMonitor, self).open_metric_log()
+        if not rv:
+            return rv
+
+        if isinstance(self.__api, NewJsonApi):
+            scalyr_logging.MetricLogHandler.get_handler_for_path(self.log_config['path']) \
+                .setFormatter(DummyFormatter())
+        return True
 
     def run(self):
         self.__load_checkpoints()
