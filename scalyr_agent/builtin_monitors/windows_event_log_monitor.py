@@ -20,7 +20,6 @@ from __future__ import absolute_import
 import datetime
 import os
 import json
-import logging
 import threading
 import time
 
@@ -658,9 +657,7 @@ class NewJsonApi(NewApi):
 
     def log_event(self, event):
         values = win32evtlog.EvtRender(
-            event,
-            win32evtlog.EvtRenderEventValues,
-            Context=self._render_context
+            event, win32evtlog.EvtRenderEventValues, Context=self._render_context
         )
 
         metadata = win32evtlog.EvtOpenPublisherMetadata(
@@ -669,9 +666,7 @@ class NewJsonApi(NewApi):
 
         event_json = xmltodict.parse(
             win32evtlog.EvtFormatMessage(
-                metadata,
-                event,
-                win32evtlog.EvtFormatMessageXml
+                metadata, event, win32evtlog.EvtFormatMessageXml
             )
         )
 
@@ -681,8 +676,8 @@ class NewJsonApi(NewApi):
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
         # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
-        event_json['timestamp'] = datetime.datetime.utcnow().isoformat(' ')
-        event_json['name'] = self._logger.name
+        event_json["timestamp"] = datetime.datetime.utcnow().isoformat(" ")
+        event_json["name"] = self._logger.name
         self._logger.emit_value("unused", json.dumps(event_json))
 
         self._bookmark_lock.acquire()
@@ -855,11 +850,11 @@ and System sources:
                     "Sources and Events not supported with the new EvtLog API.  Please use the 'channels' configuration option instead"
                 )
 
-            api_class = NewJsonApi if self._config.get('json') else NewApi
+            api_class = NewJsonApi if self._config.get("json") else NewApi
             result = api_class(self._config, self._logger, channels)
 
             if api_class == NewJsonApi:
-                self.log_config['parser'] = 'dottedJson'
+                self.log_config["parser"] = "dottedJson"
         else:
             if channels:
                 msg = (
@@ -882,15 +877,16 @@ and System sources:
     def open_metric_log(self):
         class DummyFormatter:
             def format(self, record) -> str:
-                return record.message[len('unused ')+1:-1].replace('\\"', '"')
+                return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
 
         rv = super(WindowEventLogMonitor, self).open_metric_log()
         if not rv:
             return rv
 
         if isinstance(self.__api, NewJsonApi):
-            scalyr_logging.MetricLogHandler.get_handler_for_path(self.log_config['path']) \
-                .setFormatter(DummyFormatter())
+            scalyr_logging.MetricLogHandler.get_handler_for_path(
+                self.log_config["path"]
+            ).setFormatter(DummyFormatter())
         return True
 
     def run(self):
