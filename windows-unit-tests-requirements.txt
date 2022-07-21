@@ -25,3 +25,4 @@ flask==1.1.1; python_version < '3.8'
 pathlib2==2.3.5; python_version <= '2.7'
 requests-mock==1.9.3
 psutil==5.7.0
+xmltodict==0.13.0
