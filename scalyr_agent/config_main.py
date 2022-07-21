@@ -1068,7 +1068,12 @@ def export_config(config_dest, config_file_path, configuration):
         if config_dest != "-":
             out_tar = tarfile.open(config_dest, mode="w:gz")
         else:
-            out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
+            if sys.version_info < (3,):
+                file_obj = sys.stdout
+            else:
+                file_obj = sys.stdout.buffer
+
+            out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
         out_tar.add(os.path.basename(config_file_path))
 
         for x in glob.glob(os.path.join(fragment_dir, "*.json")):
@@ -1136,7 +1141,12 @@ def import_config(config_src, config_file_path, configuration):
         if config_src != "-":
             in_tar = tarfile.open(config_src, "r:gz")
         else:
-            in_tar = tarfile.open(fileobj=sys.stdin, mode="r|gz")
+            if sys.version_info < (3,):
+                file_obj = sys.stdin
+            else:
+                file_obj = sys.stdin.buffer
+
+            in_tar = tarfile.open(fileobj=file_obj, mode="r|gz")
 
         # Track which files were in the tarball so that we can delete unused ones later.
         used_files = dict()
@@ -1148,7 +1158,10 @@ def import_config(config_src, config_file_path, configuration):
         # current config.
         for x in in_tar.getmembers():
             used_files[get_canonical_name(x.name)] = True
-            in_tar.chown(existing_config_tarinfo, x.name)
+            if sys.version_info < (3, 0):
+                in_tar.chown(existing_config_tarinfo, x.name)
+            else:
+                in_tar.chown(existing_config_tarinfo, x.name, False)
 
         in_tar.close()
 
@@ -1184,7 +1197,11 @@ def create_custom_dockerfile(
     if tarball_path != "-":
         out_tar = tarfile.open(tarball_path, mode="w:gz")
     else:
-        out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
+        if sys.version_info < (3,):
+            file_obj = sys.stdout
+        else:
+            file_obj = sys.stdout.buffer
+        out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
 
     # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
     # by this current agent install.  We want the version of this install in order to make sure the new docker image

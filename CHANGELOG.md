@@ -15,6 +15,8 @@ Windows:
 Bug fixes:
 * Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
 * Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status. 
+* Fix a bug in scalyr-agent-2-config ``--export-config``, ``import-config`` options caused by Python 2 and 3 code incompatibility.
+* Fix a bug with the wrong executable ``scalyr-agent-2-config`` in Docker and Kubernetes, due to which it could not be used.
 
 Docker images:
 * Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.

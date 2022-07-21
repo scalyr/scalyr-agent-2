@@ -88,6 +88,13 @@ def _test(
         stdout=subprocess.PIPE,
     )
 
+    # Quick check for the `scalyr-agent-2-config script.
+    export_config_output = subprocess.check_output(
+        [*docker_exec_command, "scalyr-agent-2-config", "--export-config", "-"]
+    )
+
+    assert len(export_config_output) > 0
+
     # Read lines from agent.log. Create pipe reader to read lines from the previously created tail process.
 
     # Also set the mode for the process' std descriptor as non-blocking.
