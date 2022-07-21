@@ -675,6 +675,9 @@ class NewJsonApi(NewApi):
             )
         )
 
+        # Dataset does not currently support arrays/lists, hence must convert to dicts/objects.
+        _convert_json_array_to_object(event_json)
+
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
         # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
@@ -690,6 +693,17 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
         finally:
             self._bookmark_lock.release()
+
+
+def _convert_json_array_to_object(obj: dict):
+    for k, v in obj.items():
+        if isinstance(v, dict):
+            _convert_json_array_to_object(v)
+        elif isinstance(v, list):
+            obj[k] = {}
+            for i in range(len(v)):
+                obj[k][str(i)] = v[i]
+                _convert_json_array_to_object(v[i])
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
