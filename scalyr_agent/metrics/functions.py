@@ -305,7 +305,7 @@ could add overhead in terms of CPU and memory usage.
         log_interval = instrumentation_constants.get_instrumentation_log_interval()
         if log_interval > 0:
             LOG.info(
-                "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
+                "agent_instrumentation_stats key=monitor_rate_metric_calculation_values_cache_stats cache_entries=%s cache_size_bytes=%s",
                 cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
                 cls.LAZY_PRINT_CACHE_SIZE_BYTES,
                 limit_key="mon-met-rate-cache-stats",
@@ -313,7 +313,7 @@ could add overhead in terms of CPU and memory usage.
             )
 
             LOG.info(
-                "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
+                "agent_instrumentation_stats key=agent_rate_func_calculate_timing_stats avg=%s min=%s max=%s",
                 cls.LAZY_PRINT_TIMING_MIN,
                 cls.LAZY_PRINT_TIMING_MAX,
                 cls.LAZY_PRINT_TIMING_AVG,
