@@ -36,15 +36,13 @@ import six
 from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
 from scalyr_agent.instrumentation.decorators import time_function_call
+from scalyr_agent.instrumentation import constants as instrumentation_constants
 from scalyr_agent.metrics.functions import MetricFunction
 from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.scalyr_logging import getLogger
 from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 LOG = getLogger(__name__)
-
-# How often (in seconds) to log various internal cache related statistics
-CACHE_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
 
 
 # Stores a list of class instance (singleton) for each available metric function.
@@ -121,7 +119,7 @@ def get_functions_for_metric(monitor, metric_name):
         LAZY_PRINT_CACHE_SIZE_LENGTH,
         LAZY_PRINT_CACHE_SIZE_BYTES,
         limit_key="mon-met-cache-stats",
-        limit_once_per_x_secs=CACHE_STATS_LOG_INTERVAL_SECONDS,
+        limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
     )
     LOG.info(
         "agent_get_function_for_metric_timing_stats avg=%s,min=%s,max=%s",
@@ -129,7 +127,7 @@ def get_functions_for_metric(monitor, metric_name):
         LAZY_PRINT_TIMING_MAX,
         LAZY_PRINT_TIMING_AVG,
         limit_key="mon-met-timing-stats",
-        limit_once_per_x_secs=CACHE_STATS_LOG_INTERVAL_SECONDS,
+        limit_once_per_x_secs=instrumentation_constants.get_instrumentation_log_interval(),
     )
 
     return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]

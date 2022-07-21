@@ -1222,6 +1222,10 @@ class Configuration(object):
         return self.__get_config().get_float("config_change_check_interval")
 
     @property
+    def instrumentation_stats_log_interval(self):
+        return self.__get_config().get_int("instrumentation_stats_log_interval")
+
+    @property
     def overall_stats_log_interval(self):
         return self.__get_config().get_float("overall_stats_log_interval")
 
@@ -3159,6 +3163,20 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_int(
             config, "disable_leak_config_reload", None, description, apply_defaults
+        )
+
+        # How often to long instrumentation related stats using INFO log level to agent.log
+        # (in seconds)
+        # NOTE: To avoid large overhead of logging this stats often, this value should not be
+        # set lower than 10-30 minutes in production environments
+        self.__verify_or_set_optional_int(
+            config,
+            "instrumentation_stats_log_interval",
+            (12 * 60 * 60),
+            description,
+            apply_defaults,
+            min_value=10,
+            env_aware=True,
         )
 
         self.__verify_or_set_optional_float(

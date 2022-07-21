@@ -121,6 +121,8 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent.metrics.base import clear_internal_cache
+from scalyr_agent.instrumentation.constants import update_instrumentation_log_interval
+
 from scalyr_agent import config_main
 from scalyr_agent import compat
 import scalyr_agent.monitors_manager
@@ -1496,6 +1498,13 @@ class ScalyrAgent(object):
 
                     # Clear metrics functions related cache
                     clear_internal_cache()
+
+                    # Update module level constant (if needed). We need to do this here since we
+                    # don't have access to the global config instance in that module and we also
+                    # don't want to create a cyclic dependency there
+                    update_instrumentation_log_interval(
+                        self.__config.instrumentation_stats_log_interval
+                    )
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(
