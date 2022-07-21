@@ -32,7 +32,7 @@ def get_empty_stats_dict():
 
 
 def reset_stats_dict(stats_dict):
-    # type: Dict[str, float] -> None
+    # type: (Dict[str, float]) -> None
     """
     Reset values for the provided function run time stats dictionary.
     """
