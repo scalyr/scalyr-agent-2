@@ -414,6 +414,20 @@ class Configuration(object):
 
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
+            if (
+                self.__log_warnings
+                and self.instrumentation_stats_log_interval > 0
+                and self.instrumentation_stats_log_interval < (30 * 60 * 60)
+            ):
+                self.__logger.info(
+                    "Instrumentation logging is enabled (instrumentation_stats_log_interval config "
+                    "option), but logging interval is "
+                    "set lower than 30 minutes. To avoid overhead you are advised to "
+                    "set this interval to 30 minutes or more in production.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="instrumentation-interval-too-low",
+                )
+
             # add in the profile logs if we have enabled profiling
             if self.enable_profiling and self.__log_warnings:
                 self.__logger.info(
