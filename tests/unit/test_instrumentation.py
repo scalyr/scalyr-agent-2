@@ -14,9 +14,9 @@
 
 import mock
 
-from scalyr_agent.timing import get_empty_stats_dict
-from scalyr_agent.timing import reset_stats_dict
-from scalyr_agent.timing import record_timing_stats_for_function_call
+from scalyr_agent.instrumentation.timing import get_empty_stats_dict
+from scalyr_agent.instrumentation.timing import reset_stats_dict
+from scalyr_agent.instrumentation.decorators import time_function_call
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -31,17 +31,21 @@ class TimingModuleTestCase(ScalyrTestCase):
 
     def test_reset_stats_dict(self):
         stats_dict = get_empty_stats_dict()
+        stats_dict["min"] = 1
+        stats_dict["max"] = 10
         stats_dict["count"] = 20
         stats_dict["sum"] = 300
 
         reset_stats_dict(stats_dict=stats_dict)
+        self.assertEqual(stats_dict["min"], float("+inf"))
+        self.assertEqual(stats_dict["max"], float("-inf"))
         self.assertEqual(stats_dict["count"], 0)
         self.assertEqual(stats_dict["sum"], 0)
 
-    def test_record_timing_stats_for_function_sample_interval(self):
+    def test_time_function_decorator_sample_interval(self):
         stats_dict = get_empty_stats_dict()
 
-        @record_timing_stats_for_function_call(stats_dict, 1)
+        @time_function_call(stats_dict, 1)
         def mock_timed_function_1():
             return True
 
@@ -51,7 +55,7 @@ class TimingModuleTestCase(ScalyrTestCase):
 
         stats_dict = get_empty_stats_dict()
 
-        @record_timing_stats_for_function_call(stats_dict, 0.1)
+        @time_function_call(stats_dict, 0.1)
         def mock_timed_function_2():
             return True
 
@@ -60,13 +64,16 @@ class TimingModuleTestCase(ScalyrTestCase):
             self.assertTrue(mock_timed_function_2())
         self.assertTrue(stats_dict["count"] >= 2)
 
-    @mock.patch("scalyr_agent.timing.timer")
-    @mock.patch("scalyr_agent.timing.STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL", 6)
-    def test_record_timing_stats_for_function_timing_stats(self, mock_timer):
+    @mock.patch("scalyr_agent.instrumentation.decorators.timer")
+    @mock.patch(
+        "scalyr_agent.instrumentation.decorators.STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL",
+        6,
+    )
+    def test_time_function_decorator_timing_stats(self, mock_timer):
         mock_timer.side_effect = [0, 10, 10, 15, 20, 32, 30, 40, 40, 50, 0, 0]
         stats_dict = get_empty_stats_dict()
 
-        @record_timing_stats_for_function_call(stats_dict, 1)
+        @time_function_call(stats_dict, 1)
         def mock_timed_function():
             return True
 

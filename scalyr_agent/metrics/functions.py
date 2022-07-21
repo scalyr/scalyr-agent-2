@@ -39,8 +39,8 @@ import six
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
 from scalyr_agent.util import get_flat_dictionary_memory_usage
-from scalyr_agent.timing import get_empty_stats_dict
-from scalyr_agent.timing import record_timing_stats_for_function_call
+from scalyr_agent.instrumentation.timing import get_empty_stats_dict
+from scalyr_agent.instrumentation.decorators import time_function_call
 from scalyr_agent.scalyr_logging import getLogger
 from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
@@ -158,7 +158,7 @@ could add overhead in terms of CPU and memory usage.
     )
 
     @classmethod
-    @record_timing_stats_for_function_call(RATE_METRIC_CALCULATE_RUNTIME_STATS, 0.001)
+    @time_function_call(RATE_METRIC_CALCULATE_RUNTIME_STATS, 0.001)
     def calculate(
         cls, monitor, metric_name, metric_value, extra_fields=None, timestamp=None
     ):

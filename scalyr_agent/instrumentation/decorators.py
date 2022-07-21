@@ -12,25 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module contains various utility code and functions for recording various code run time and
-timing based information.
-"""
-
-if False:
-    from typing import Dict
-
 import random
 
 from functools import wraps
 from timeit import default_timer as timer
 
+from scalyr_agent.instrumentation.timing import reset_stats_dict
 from scalyr_agent.scalyr_logging import getLogger
 
 __all__ = [
-    "get_empty_stats_dict",
-    "reset_stats_dict",
-    "record_timing_stats_for_function_call",
+    "time_function_call",
 ]
 
 LOG = getLogger(__name__)
@@ -45,31 +36,8 @@ def should_sample(sample_rate):
     return random.random() < sample_rate
 
 
-def get_empty_stats_dict():
-    # type: () -> Dict[str, float]
-    """
-    Return empty dictionary used for holding function timing stats information.
-
-    TODO: Once we move to Python 3 only, use a dataclass instead.
-    """
-    return reset_stats_dict({})
-
-
-def reset_stats_dict(stats_dict):
-    # type: Dict[str, float] -> None
-    """
-    Reset values for the provided function run time stats dictionary.
-    """
-    stats_dict["min"] = float("inf")
-    stats_dict["max"] = float("-inf")
-    stats_dict["avg"] = 0.0
-    stats_dict["sum"] = 0.0
-    stats_dict["count"] = 0
-    return stats_dict
-
-
 # TODO: Eventually add dependency on numpy or similar and utilize running / moving mean + percentiles
-def record_timing_stats_for_function_call(stats_dict, sample_rate):
+def time_function_call(stats_dict, sample_rate):
     """
     Utility decorator which records records function timing related information (how long the function
     took to complete in milliseconds) into the provided stats dictionary.
@@ -113,7 +81,7 @@ def record_timing_stats_for_function_call(stats_dict, sample_rate):
 
             if stats_dict["count"] >= STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL:
                 LOG.debug(
-                    "Reseting stats dict %s after %s samples",
+                    "Resetting stats dict %s after %s samples",
                     stats_dict,
                     STATS_DICT_SAMPLE_COUNT_RESET_INTERVAL,
                 )

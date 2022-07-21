@@ -34,8 +34,8 @@ if False:
 import six
 
 from scalyr_agent.util import get_flat_dictionary_memory_usage
-from scalyr_agent.timing import get_empty_stats_dict
-from scalyr_agent.timing import record_timing_stats_for_function_call
+from scalyr_agent.instrumentation.timing import get_empty_stats_dict
+from scalyr_agent.instrumentation.decorators import time_function_call
 from scalyr_agent.metrics.functions import MetricFunction
 from scalyr_agent.metrics.functions import RateMetricFunction
 from scalyr_agent.scalyr_logging import getLogger
@@ -85,7 +85,7 @@ LAZY_PRINT_TIMING_AVG = LazyOnPrintEvaluatedFunction(
 )
 
 
-@record_timing_stats_for_function_call(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS, 0.001)
+@time_function_call(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS, 0.001)
 def get_functions_for_metric(monitor, metric_name):
     # type: (ScalyrMonitor, six.text_type) -> List[MetricFunction]
     """
