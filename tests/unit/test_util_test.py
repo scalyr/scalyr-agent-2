@@ -227,8 +227,6 @@ class MiscUtilsTestCase(ScalyrTestCase):
         self.assertTrue("locale=%s" % (locale) in msg)
         self.assertTrue("LANG env variable=%s" % (lang_env_var) in msg)
 
-
-class MiscUtilsTestCase(ScalyrTestCase):
     def test_lazy_on_print_evaluated_function(self):
         def func():
             func.counter += 1
