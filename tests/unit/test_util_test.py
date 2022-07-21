@@ -16,6 +16,7 @@
 #
 
 from __future__ import absolute_import
+from __future__ import print_function
 
 from io import open
 
@@ -34,6 +35,7 @@ from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 from scalyr_agent.build_info import get_build_revision
+from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
 
 __all__ = ["LogCaptureClassTestCase"]
 
@@ -223,3 +225,22 @@ class MiscUtilsTestCase(ScalyrTestCase):
         self.assertTrue("revision=%s" % (build_revision) in msg)
         self.assertTrue("locale=%s" % (locale) in msg)
         self.assertTrue("LANG env variable=%s" % (lang_env_var) in msg)
+
+    def test_lazy_on_print_evaluated_function(self):
+        def func():
+            func.counter += 1
+            return "test"
+
+        func.counter = 0
+
+        lazy_func = LazyOnPrintEvaluatedFunction(func)
+        self.assertEqual(func.counter, 0)
+
+        fake_file = six.StringIO()
+
+        # Only calling str / %s on func should cause it to be evaluated
+        print(lazy_func, file=fake_file)
+        print(lazy_func, file=fake_file)
+        self.assertEqual(lazy_func.__str__(), "test")
+        self.assertEqual(fake_file.getvalue(), "test\ntest\n")
+        self.assertEqual(func.counter, 3)

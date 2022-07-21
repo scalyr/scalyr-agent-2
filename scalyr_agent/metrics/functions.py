@@ -21,8 +21,10 @@ such as rates, derivatives, aggregations, etc.
 if False:
     from typing import Optional
     from typing import List
-    from typing import Union
     from typing import Tuple
+    from typing import Dict
+    from typing import Any
+    from typing import Union
 
     from scalyr_agent.scalyr_monitor import ScalyrMonitor  # NOQA
 
@@ -31,8 +33,25 @@ import time
 from abc import ABCMeta
 from abc import abstractmethod
 from collections import defaultdict
+from itertools import chain
 
 import six
+
+from scalyr_agent.util import get_hash_for_flat_dictionary
+from scalyr_agent.util import get_flat_dictionary_memory_usage
+from scalyr_agent.instrumentation.timing import get_empty_stats_dict
+from scalyr_agent.instrumentation.decorators import time_function_call
+from scalyr_agent.scalyr_logging import getLogger
+from scalyr_agent.scalyr_logging import LazyOnPrintEvaluatedFunction
+
+LOG = getLogger(__name__)
+
+# How often (in seconds) to log various internal cache and function timing related statistics
+FUNCTION_STATS_LOG_INTERVAL_SECONDS = 6 * 60 * 60
+
+# Dictionary which stores timing / run time information for "RateMetricFunction.calculate()"
+# method
+RATE_METRIC_CALCULATE_RUNTIME_STATS = get_empty_stats_dict()
 
 
 class MetricFunction(six.with_metaclass(ABCMeta)):
@@ -42,8 +61,20 @@ class MetricFunction(six.with_metaclass(ABCMeta)):
 
     @classmethod
     @abstractmethod
-    def should_calculate(cls, monitor, metric_name):
+    def should_calculate_for_monitor_and_metric(cls, monitor, metric_name):
         # type: (ScalyrMonitor, six.text_type) -> bool
+        """
+        Return True if rate should be calculated for the provided monitor and metric name.
+
+        This function is used for internal (monitor_name, metric_name) cache and additional filtering
+        which takes extra_field values into account is performed when "calculate()" method is called.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def should_calculate(cls, monitor, metric_name, extra_fields=None):
+        # type: (ScalyrMonitor, six.text_type, Optional[Dict[str, Any]]) -> bool
         """
         Return True if this function should be calculated for the provided metric.
         """
@@ -51,14 +82,17 @@ class MetricFunction(six.with_metaclass(ABCMeta)):
 
     @classmethod
     @abstractmethod
-    def calculate(cls, monitor, metric_name, metric_value, timestamp):
-        # type: (ScalyrMonitor, six.text_type, Union[int, float], Optional[int]) -> Optional[List[Tuple[str, float]]]
+    def calculate(
+        cls, monitor, metric_name, metric_value, extra_fields=None, timestamp=None
+    ):
+        # type: (ScalyrMonitor, six.text_type, Union[int, float], Optional[Dict[str,Any]], Optional[int]) -> Optional[List[Tuple[str, float]]]
         """
         Run function on the provided metric and return any derived metrics which should be emitted.
 
         :param monitor: ScalyrMonitor instance.
         :param metric_name: Metric name.
         :param metric_value: Metric value.
+        :param extra_fields: Optional dictionary with metric extra fields.
         :param timestamp: Optional timestamp of metric collection in ms. If not provided, we
                           default to current time.
         """
@@ -78,7 +112,7 @@ class RateMetricFunction(MetricFunction):
 
     # Stores metric values and timestamp for the metrics which we calculate per second rate in the
     # agent.
-    # Maps <monitor name + monitor instance id short hash>.<metric name> to a tuple
+    # Maps <monitor name + monitor instance id short hash>.<metric name>.<extra fields hash> to a tuple
     # (<timestamp_of_previous_colection>, <previously_collected_value>).
     # To avoid collisions across monitors (same metric name can be used by multiple monitors), we prefix
     # metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class name>) +
@@ -95,7 +129,7 @@ class RateMetricFunction(MetricFunction):
     MAX_RATE_TIMESTAMP_DELTA_SECONDS = 11 * 60
 
     # If we track rate for more than this many metrics, a warning will be emitted.
-    MAX_RATE_METRICS_COUNT_WARN = 5000
+    MAX_RATE_METRICS_COUNT_WARN = 15000
 
     MAX_RATE_METRIC_WARN_MESSAGE = """
 Tracking client side rate for over %s metrics. Tracking and calculating rate for that many metrics
@@ -104,8 +138,30 @@ could add overhead in terms of CPU and memory usage.
         MAX_RATE_METRICS_COUNT_WARN
     )
 
+    LAZY_PRINT_CACHE_SIZE_LENGTH = LazyOnPrintEvaluatedFunction(
+        lambda: len(RateMetricFunction.RATE_CALCULATION_METRIC_VALUES)
+    )
+    LAZY_PRINT_CACHE_SIZE_BYTES = LazyOnPrintEvaluatedFunction(
+        lambda: get_flat_dictionary_memory_usage(
+            RateMetricFunction.RATE_CALCULATION_METRIC_VALUES
+        )
+    )
+
+    LAZY_PRINT_TIMING_MIN = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["min"]
+    )
+    LAZY_PRINT_TIMING_MAX = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["max"]
+    )
+    LAZY_PRINT_TIMING_AVG = LazyOnPrintEvaluatedFunction(
+        lambda: RATE_METRIC_CALCULATE_RUNTIME_STATS["avg"]
+    )
+
     @classmethod
-    def calculate(cls, monitor, metric_name, metric_value, timestamp=None):
+    @time_function_call(RATE_METRIC_CALCULATE_RUNTIME_STATS, 0.001)
+    def calculate(
+        cls, monitor, metric_name, metric_value, extra_fields=None, timestamp=None
+    ):
         """
         Calculate per second rate for the provided metric name (if configured to do so).
 
@@ -124,8 +180,14 @@ could add overhead in terms of CPU and memory usage.
         :param monitor: Monitor instance.
         :param metric_name: Metric name,
         :param metric_value: Metric value.
+        :param extra_fields: Optional metric extra fields.
         :param timestamp: Optional metric timestamp in ms.
         """
+        if not cls.should_calculate(
+            monitor=monitor, metric_name=metric_name, extra_fields=extra_fields
+        ):
+            return None
+
         if timestamp:
             timestamp_s = timestamp / 1000
         else:
@@ -142,8 +204,11 @@ could add overhead in terms of CPU and memory usage.
 
         # To avoid collisions across multiple monitors (same metric name being used by multiple
         # monitors), we prefix data in internal dictionary with the short hash of the fully
-        # qualified monitor name
-        dict_key = monitor.short_hash + "." + metric_name
+        # qualified monitor name.
+        # Since same metric name can be used by values with different extra fields, we also include
+        # extra fields as part of the dictionary key.
+        extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
+        dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
 
         (
             previous_collection_timestamp,
@@ -154,8 +219,8 @@ could add overhead in terms of CPU and memory usage.
             # If this is first time we see this metric, we just store the value sine we don't have
             # previous sample yet to be able to calculate rate
             monitor._logger.debug(
-                'No previous data yet for metric "%s", unable to calculate rate yet.'
-                % (metric_name)
+                'No previous data yet for metric "%s", unable to calculate rate yet (extra_fields=%s).'
+                % (metric_name, extra_fields)
             )
 
             cls.RATE_CALCULATION_METRIC_VALUES[dict_key] = (timestamp_s, metric_value)
@@ -164,8 +229,13 @@ could add overhead in terms of CPU and memory usage.
         if timestamp_s <= previous_collection_timestamp:
             monitor._logger.debug(
                 'Current timestamp for metric "%s" is smaller or equal to current timestamp, cant '
-                "calculate rate (timestamp_previous=%s,timestamp_current=%s)"
-                % (metric_name, previous_collection_timestamp, timestamp_s)
+                "calculate rate (timestamp_previous=%s,timestamp_current=%s,extra_fields=%s)"
+                % (
+                    metric_name,
+                    previous_collection_timestamp,
+                    timestamp_s,
+                    str(extra_fields),
+                )
             )
             return None
 
@@ -176,12 +246,13 @@ could add overhead in terms of CPU and memory usage.
         ) >= cls.MAX_RATE_TIMESTAMP_DELTA_SECONDS:
             monitor._logger.debug(
                 'Time delta between previous and current metric collection timestamp for metric "%s"'
-                "is larger than %s seconds, ignoring rate calculation (timestamp_previous=%s,timestamp_current=%s)"
+                "is larger than %s seconds, ignoring rate calculation (timestamp_previous=%s,timestamp_current=%s,extra_fields=%s)"
                 % (
                     metric_name,
                     cls.MAX_RATE_TIMESTAMP_DELTA_SECONDS,
                     previous_collection_timestamp,
                     timestamp_s,
+                    str(extra_fields),
                 )
             )
 
@@ -193,13 +264,13 @@ could add overhead in terms of CPU and memory usage.
         # as the current server side implementation)
         if metric_value < previous_metric_value:
             monitor._logger.debug(
-                'Current metric value for metric "%s" is smaller than previous value (current_value=%s,previous_value=%s)'
-                % (metric_name, metric_value, previous_metric_value)
+                'Current metric value for metric "%s" is smaller than previous value (current_value=%s,previous_value=%s,extra_fields=%s)'
+                % (metric_name, metric_value, previous_metric_value, str(extra_fields))
             )
             return None
 
         rate_value = round(
-            (metric_value - previous_metric_value)
+            (float(metric_value) - previous_metric_value)
             / (timestamp_s - previous_collection_timestamp),
             5,
         )
@@ -216,7 +287,7 @@ could add overhead in terms of CPU and memory usage.
             )
 
         monitor._logger.debug(
-            'Calculated rate "%s" for metric "%s" (previous_collection_timestamp=%s,previous_metric_value=%s,current_timestamp=%s,current_value=%s)'
+            'Calculated rate "%s" for metric "%s" (previous_collection_timestamp=%s,previous_metric_value=%s,current_timestamp=%s,current_value=%s,extra_fields=%s)'
             % (
                 rate_value,
                 metric_name,
@@ -224,33 +295,114 @@ could add overhead in terms of CPU and memory usage.
                 previous_metric_value,
                 timestamp_s,
                 metric_value,
+                str(extra_fields),
             ),
         )
 
         rate_metric_name = "%s%s" % (metric_name, cls.METRIC_SUFFIX)
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
+
+        # Periodically print cache size and function timing information
+        LOG.info(
+            "agent_monitor_rate_metric_calculation_values_cache_stats cache_entries=%s,cache_size_bytes=%s",
+            cls.LAZY_PRINT_CACHE_SIZE_LENGTH,
+            cls.LAZY_PRINT_CACHE_SIZE_BYTES,
+            limit_key="mon-met-rate-cache-stats",
+            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
+        )
+
+        LOG.info(
+            "agent_rate_func_calculate_timing_stats avg=%s,min=%s,max=%s",
+            cls.LAZY_PRINT_TIMING_MIN,
+            cls.LAZY_PRINT_TIMING_MAX,
+            cls.LAZY_PRINT_TIMING_AVG,
+            limit_key="mon-rate-calc-timing-stats",
+            limit_once_per_x_secs=FUNCTION_STATS_LOG_INTERVAL_SECONDS,
+        )
+
         return result
 
     @classmethod
-    def should_calculate(cls, monitor, metric_name):
+    def should_calculate_for_monitor_and_metric(cls, monitor, metric_name):
         """
-        Return True if client side rate should be calculated for the provided metric.
+        Return True if rate should be calculated for the provided monitor and metric name.
+
+        This function is used for internal (monitor_name, metric_name) cache and additional filtering
+        which takes extra_field values into account is performed when "calculate()" method is called.
         """
         if not monitor or not monitor._global_config:
             return False
-
-        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
 
         config_calculate_rate_metric_names = (
             monitor._global_config.calculate_rate_metric_names
         )
         monitor_calculate_rate_metric_names = monitor.get_calculate_rate_metric_names()
 
-        return (
-            config_entry_key in config_calculate_rate_metric_names
-            or config_entry_key in monitor_calculate_rate_metric_names
+        # Partial entry key without extra fields suffix
+        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
+
+        for config_value in chain(
+            config_calculate_rate_metric_names, monitor_calculate_rate_metric_names
+        ):
+            has_extra_fields_filter = config_value.count(":") == 2
+
+            if has_extra_fields_filter:
+                config_value_without_extra_fields_filter = config_value.rsplit(":", 1)[
+                    0
+                ]
+            else:
+                config_value_without_extra_fields_filter = config_value
+
+            # Direct simple metric name only match with no additional extra fields filters
+            if config_value_without_extra_fields_filter == config_entry_key:
+                return True
+
+        return False
+
+    @classmethod
+    def should_calculate(cls, monitor, metric_name, extra_fields=None):
+        """
+        Return True if client side rate should be calculated for the provided metric name and
+        extra_fields values.
+        """
+        extra_fields = extra_fields or {}
+
+        if not monitor or not monitor._global_config:
+            return False
+
+        config_calculate_rate_metric_names = (
+            monitor._global_config.calculate_rate_metric_names
         )
+        monitor_calculate_rate_metric_names = monitor.get_calculate_rate_metric_names()
+
+        # Config values follow this notation: <monitor module name>:<metric name>:<optional extra field value>
+        # For example: openmetrics_monitor:docker.cpu_usage_seconds_total:mode=kernel
+
+        # Partial entry key without extra fields suffix
+        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
+
+        for config_value in chain(
+            config_calculate_rate_metric_names, monitor_calculate_rate_metric_names
+        ):
+            # Direct simple metric name only match
+            if config_value == config_entry_key:
+                return True
+            elif (
+                extra_fields
+                and config_value.count(":") == 2
+                and config_value.count("=") == 1
+            ):
+                config_extra_field_name, config_extra_field_value = config_value.split(
+                    ":"
+                )[-1].split("=")
+                if (
+                    extra_fields.get(config_extra_field_name, None)
+                    == config_extra_field_value
+                ):
+                    return True
+
+        return False
 
     @classmethod
     def clear_cache(cls):

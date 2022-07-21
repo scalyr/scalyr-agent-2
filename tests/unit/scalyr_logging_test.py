@@ -776,6 +776,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         monitor_instance._global_config.calculate_rate_metric_names = []
         metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+        RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN = 500
 
         for index in range(0, RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN + 1):
             monitor_instance._global_config.calculate_rate_metric_names.append(
@@ -821,7 +822,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             (RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN * 3) + 2,
         )
         monitor_instance._logger.warn.assert_called_with(
-            "Tracking client side rate for over 5000 metrics. Tracking and calculating rate for that many metrics\ncould add overhead in terms of CPU and memory usage.",
+            "Tracking client side rate for over 15000 metrics. Tracking and calculating rate for that many metrics\ncould add overhead in terms of CPU and memory usage.",
             limit_key="rate-max-count-reached",
             limit_once_per_x_secs=86400,
         )
@@ -963,7 +964,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         )
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
-    def test_emit_value_metric_rate_calculation_metric_success(self):
+    def test_emit_value_metric_rate_calculation_metric_no_unique_extra_fields_success(
+        self,
+    ):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
         monitor_instance._global_config.calculate_rate_metric_names = [
             "fake_monitor_module:test_name_2"
@@ -1025,6 +1028,146 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             file_path=metric_file_path, expression='test_name_2_rate 1.0 foo2="bar2"'
         )
         self.assertEquals(monitor_instance.reported_lines, 4 + 3)
+
+    @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
+    def test_emit_value_metric_rate_calculation_metric_with_unique_extra_fields_success(
+        self,
+    ):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._global_config.calculate_rate_metric_names = [
+            "fake_monitor_module:test_name_2:mode=user",
+            "fake_monitor_module:test_name_2:mode=kernel",
+        ]
+        metric_file_fd, metric_file_path = tempfile.mkstemp(".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+
+        # Metric for which we do calculate rate
+        ts1 = 10
+        ts2 = 70
+        ts3 = 130
+        ts4 = 190
+
+        extra_fields = {"foo2": "bar2", "mode": "user"}
+
+        monitor_logger.emit_value("test_name_2", 10, extra_fields, timestamp=ts1 * 1000)
+        monitor_logger.emit_value("test_name_2", 12, extra_fields, timestamp=ts2 * 1000)
+        monitor_logger.emit_value("test_name_2", 19, extra_fields, timestamp=ts3 * 1000)
+        monitor_logger.emit_value("test_name_2", 33, extra_fields, timestamp=ts4 * 1000)
+
+        extra_fields = {"foo2": "bar2", "mode": "kernel"}
+
+        monitor_logger.emit_value("test_name_2", 20, extra_fields, timestamp=ts1 * 1000)
+        monitor_logger.emit_value("test_name_2", 32, extra_fields, timestamp=ts2 * 1000)
+        monitor_logger.emit_value("test_name_2", 35, extra_fields, timestamp=ts3 * 1000)
+        monitor_logger.emit_value("test_name_2", 40, extra_fields, timestamp=ts4 * 1000)
+
+        # Metric for which we don't calculate rate and should be ignored
+        extra_fields = {"foo2": "bar2", "mode": "total"}
+
+        monitor_logger.emit_value("test_name_2", 11, extra_fields, timestamp=ts1 * 1000)
+        monitor_logger.emit_value("test_name_2", 12, extra_fields, timestamp=ts2 * 1000)
+        monitor_logger.emit_value("test_name_2", 13, extra_fields, timestamp=ts3 * 1000)
+        monitor_logger.emit_value("test_name_2", 14, extra_fields, timestamp=ts4 * 1000)
+
+        # There should be 3 rate metrics emitted (total metrics emitted - 1)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 10 foo2="bar2" mode="user"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 12 foo2="bar2" mode="user"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 19 foo2="bar2" mode="user"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 33 foo2="bar2" mode="user"',
+        )
+
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 20 foo2="bar2" mode="kernel"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 32 foo2="bar2" mode="kernel"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 35 foo2="bar2" mode="kernel"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 40 foo2="bar2" mode="kernel"',
+        )
+
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 11 foo2="bar2" mode="total"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 12 foo2="bar2" mode="total"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 13 foo2="bar2" mode="total"',
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2 14 foo2="bar2" mode="total"',
+        )
+
+        # mode=user
+        # (12 - 10) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.03333 foo2="bar2" mode="user"',
+        )
+
+        # (19 - 12) / (130 - 70)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.11667 foo2="bar2" mode="user"',
+        )
+
+        # (33 - 19) / (190 - 130)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.23333 foo2="bar2" mode="user"',
+        )
+
+        # mode=kernel
+        # (32 - 20) / (70 - 10)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.2 foo2="bar2" mode="kernel"',
+        )
+
+        # (35 - 32) / (130 - 70)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.05 foo2="bar2" mode="kernel"',
+        )
+
+        # (40 - 35) / (190 - 130)
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path,
+            expression='test_name_2_rate 0.08333 foo2="bar2" mode="kernel"',
+        )
+
+        self.assertEquals(monitor_instance.reported_lines, 4 + 4 + 4 + 3 + 3)
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_no_collision_two_monitors_same_metric_name(

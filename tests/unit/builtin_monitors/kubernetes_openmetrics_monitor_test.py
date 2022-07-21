@@ -79,7 +79,7 @@ for index, pod in enumerate(
         ] = "/test/new/path"
         pod["metadata"]["annotations"][
             SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES
-        ] = "metric5,metric6"
+        ] = "metric5,metric6,metric7:label=value"
 
 
 class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
@@ -292,7 +292,11 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "headers": None,
             "include_node_name": True,
             "include_cluster_name": True,
-            "calculate_rate_metric_names": ["metric1", "metric2"],
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+            ],
         }
         (
             monitor_config,
@@ -316,7 +320,11 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_component_value_include_list": JsonObject({}),
             "metric_name_exclude_list": [],
             "metric_name_include_list": ["*"],
-            "calculate_rate_metric_names": ["metric1", "metric2"],
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+            ],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
             "sample_interval": 10,
             "timeout": 10,
@@ -800,7 +808,11 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             mock_monitors_manager.add_monitor.call_args_list[0][1]["monitor_config"][
                 "calculate_rate_metric_names"
             ],
-            ["openmetrics_monitor:metric5", "openmetrics_monitor:metric6"],
+            [
+                "openmetrics_monitor:metric5",
+                "openmetrics_monitor:metric6",
+                "openmetrics_monitor:metric7:label=value",
+            ],
         )
 
         # 4. And now API returns no pods which means all the monitors should be removed
