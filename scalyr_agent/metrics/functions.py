@@ -317,9 +317,9 @@ could add overhead in terms of CPU and memory usage.
 
             LOG.info(
                 "agent_instrumentation_stats key=agent_rate_func_calculate_timing_stats avg=%s min=%s max=%s",
+                cls.LAZY_PRINT_TIMING_AVG,
                 cls.LAZY_PRINT_TIMING_MIN,
                 cls.LAZY_PRINT_TIMING_MAX,
-                cls.LAZY_PRINT_TIMING_AVG,
                 limit_key="mon-rate-calc-timing-stats",
                 limit_once_per_x_secs=log_interval,
             )
