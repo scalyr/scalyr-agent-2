@@ -115,15 +115,20 @@ class RateMetricFunction(MetricFunction):
     # metric name with a short hash of the monitor FQDN (<monitor module>.<monitor class name>) +
     # monitor instance id. We use a short hash and not fully qualified monitor name to reduce memory
     # usage a bit.
-    # NOTE: Those values are not large, but we should probably still implement some kind of watch dog
-    # job where we periodically purge out entries for values which are older than MAX_RATE_TIMESTAMP_DELTA_SECONDS
-    # (since those won't be used for calculation anyway).
+    # TODO: Perhaps we could store values ordered by timestamp to make clean up faster.
     RATE_CALCULATION_METRIC_VALUES = defaultdict(lambda: (None, None))
 
     # If the time delta between previous metric collection timestamp value and current metric collection
     # timestamp value is longer than this amount of seconds (11 minutes by default), we will ignore
     # previous value and not calculate the rate with old / stale metric value.
     MAX_RATE_TIMESTAMP_DELTA_SECONDS = 11 * 60
+
+    # Periodically when a clean up routine runs we delete any values with timestamp older than
+    # this threshold.
+    DELETE_OLD_VALUES_THRESHOLD_SECONDS = 30 * 60
+
+    # Stores the timestamp (in seconds) when the clean up routine last ran
+    LAST_CLEANUP_RUNTIME_TS = 0
 
     # If we track rate for more than this many metrics, a warning will be emitted.
     MAX_RATE_METRICS_COUNT_WARN = 15000
@@ -185,10 +190,12 @@ could add overhead in terms of CPU and memory usage.
         ):
             return None
 
+        now_s = int(time.time())
+
         if timestamp:
             timestamp_s = timestamp / 1000
         else:
-            timestamp_s = int(time.time())
+            timestamp_s = now_s
 
         if not isinstance(metric_value, (int, float)):
             limit_key = "%s-nan" % (metric_name)
@@ -300,6 +307,25 @@ could add overhead in terms of CPU and memory usage.
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
 
+        # Periodically we run clean up routine to remove stale entries. We perform this on this
+        # function call which means it may occasionally add some overhead to this method call.
+        # If we did it in a background thread or similar this would complicate thread safety
+        # aspects and mean we would need to obtain a lock on every emit_value() call which may be
+        # even more expensive.
+        # TODO (longer term): To simplify and speed up things we should perhaps have an instance of
+        # RateMetricFunction per monitor. This would also help us avoid any thread safety issues
+        # (monitor already runs in a separate dedicated thread).
+        metric_functions_cleanup_interval = (
+            monitor._global_config
+            and monitor._global_config.metric_functions_cleanup_interval
+            or 0
+        )
+
+        if metric_functions_cleanup_interval > 0 and (
+            cls.LAST_CLEANUP_RUNTIME_TS <= (now_s - metric_functions_cleanup_interval)
+        ):
+            cls._remove_old_entries(monitor=monitor)
+
         # Periodically print cache size and function timing information
         log_interval = (
             monitor._global_config
@@ -406,6 +432,42 @@ could add overhead in terms of CPU and memory usage.
                     return True
 
         return False
+
+    @classmethod
+    def _remove_old_entries(cls, monitor):
+        # type: (ScalyrMonitor) -> None
+        """
+        This function removes old entries for values with the timestamps which are older than the
+        defined threshold.
+
+        TODO: Thread safety?
+        """
+        now_s = int(time.time())
+        LAST_CLEANUP_RUNTIME_TS = now_s
+
+        monitor._logger.debug(
+            "Running periodic clean up routine for RateMetricFunction"
+        )
+
+        entries_pre_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+
+        delete_threshold_ts = now_s - cls.DELETE_OLD_VALUES_THRESHOLD_SECONDS
+
+        for dict_key in list(cls.RATE_CALCULATION_METRIC_VALUES.keys()):
+            timestamp_s = cls.RATE_CALCULATION_METRIC_VALUES[dict_key][0]
+            if timestamp_s <= delete_threshold_ts:
+                cls.RATE_CALCULATION_METRIC_VALUES.pop(dict_key, None)
+
+        entries_post_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+        monitor._logger.info(
+            "RateMetricFunction clean up routine finished (removed_entries=%s,"
+            "entries_pre_cleanup=%s,entries_post_cleanup=%s)"
+            % (
+                (entries_pre_cleanup - entries_post_cleanup),
+                entries_pre_cleanup,
+                entries_post_cleanup,
+            )
+        )
 
     @classmethod
     def clear_cache(cls):

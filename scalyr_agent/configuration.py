@@ -1240,6 +1240,10 @@ class Configuration(object):
         return self.__get_config().get_int("instrumentation_stats_log_interval")
 
     @property
+    def metric_functions_cleanup_interval(self):
+        return self.__get_config().get_int("metric_functions_cleanup_interval")
+
+    @property
     def overall_stats_log_interval(self):
         return self.__get_config().get_float("overall_stats_log_interval")
 
@@ -3188,6 +3192,17 @@ class Configuration(object):
             "instrumentation_stats_log_interval",
             # defaults to disabled
             0,
+            description,
+            apply_defaults,
+            min_value=0,
+            env_aware=True,
+        )
+
+        # How often (in seconds) clean up routine should run for metric functions functionality
+        self.__verify_or_set_optional_int(
+            config,
+            "metric_functions_cleanup_interval",
+            (30 * 60 * 60),
             description,
             apply_defaults,
             min_value=0,
