@@ -3202,7 +3202,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "metric_functions_cleanup_interval",
-            (30 * 60 * 60),
+            (30 * 60),
             description,
             apply_defaults,
             min_value=0,
