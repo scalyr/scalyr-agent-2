@@ -673,6 +673,11 @@ class NewJsonApi(NewApi):
         # Dataset does not currently support arrays/lists, hence must convert to dicts/objects.
         _convert_json_array_to_object(event_json)
 
+        # If safe, strip off the @ / # prefixes xmltodict uses to prevent conflicts.
+        # Ref: json.dumps(xmltodict.parse('<entry>foo<text>bar</text></entry>'))
+        #        => '{"entry": {"text": "bar", "#text": "foo"}}'
+        _strip_xmltodict_prefixes(event_json)
+
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
         # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
@@ -699,6 +704,24 @@ def _convert_json_array_to_object(obj):
             for i in range(len(v)):
                 obj[k][str(i)] = v[i]
                 _convert_json_array_to_object(v[i])
+
+
+def _strip_xmltodict_prefixes(obj):
+    keys = list(obj.keys())
+    changes = []
+    for k in keys:
+        if k[0] == "@" and k[1:] not in keys + [c[1] for c in changes]:
+            changes += [(k, k[1:])]
+        elif k == "#text" and "Text" not in keys + [c[1] for c in changes]:
+            changes += [("#text", "Text")]
+
+    for old, new in changes:
+        obj[new] = obj[old]
+        del obj[old]
+
+    for v in obj.values():
+        if isinstance(v, dict):
+            _strip_xmltodict_prefixes(v)
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
