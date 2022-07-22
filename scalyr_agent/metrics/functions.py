@@ -443,7 +443,7 @@ could add overhead in terms of CPU and memory usage.
         TODO: Thread safety?
         """
         now_s = int(time.time())
-        LAST_CLEANUP_RUNTIME_TS = now_s
+        cls.LAST_CLEANUP_RUNTIME_TS = now_s
 
         monitor._logger.debug(
             "Running periodic clean up routine for RateMetricFunction"

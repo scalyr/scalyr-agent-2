@@ -554,6 +554,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         }
 
         func._remove_old_entries(monitor=monitor)
+        self.assertEqual(RateMetricFunction.LAST_CLEANUP_RUNTIME_TS, now_ts)
         self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 3)
         self.assertTrue("one" in func.RATE_CALCULATION_METRIC_VALUES)
         self.assertTrue("two" in func.RATE_CALCULATION_METRIC_VALUES)
