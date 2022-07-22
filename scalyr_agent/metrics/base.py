@@ -131,9 +131,9 @@ def get_functions_for_metric(monitor, metric_name):
         )
         LOG.info(
             "agent_instrumentation_stats key=agent_get_function_for_metric_timing_stats avg=%s min=%s max=%s",
+            LAZY_PRINT_TIMING_AVG,
             LAZY_PRINT_TIMING_MIN,
             LAZY_PRINT_TIMING_MAX,
-            LAZY_PRINT_TIMING_AVG,
             limit_key="mon-met-timing-stats",
             limit_once_per_x_secs=log_interval,
         )

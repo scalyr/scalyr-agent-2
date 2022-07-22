@@ -350,6 +350,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
         global_config = mock.Mock()
+        global_config.metric_functions_cleanup_interval = 0
         global_config.instrumentation_stats_log_interval = 300
         global_config.calculate_rate_metric_names = []
 
@@ -1305,6 +1306,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
             mock_config = mock.Mock()
             mock_config.calculate_rate_metric_names = []
+            mock_config.metric_functions_cleanup_interval = 0
             mock_config.instrumentation_stats_log_interval = 300
             self._global_config = mock_config
 

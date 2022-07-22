@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+
 from collections import OrderedDict
 
 import mock
@@ -101,6 +103,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
         monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
@@ -120,6 +123,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
         monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
@@ -198,6 +202,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
         monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
@@ -366,6 +371,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
         monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
@@ -410,6 +416,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         monitor.short_hash = "hashhash"
         monitor.get_calculate_rate_metric_names.return_value = []
         monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
         monitor._global_config.instrumentation_stats_log_interval = 10
         monitor._global_config.calculate_rate_metric_names = [
             "openmetrics_monitor:metric1",
@@ -523,3 +530,33 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
             monitor=monitor, metric_name=metric_name, extra_fields=extra_fields
         )
         self.assertTrue(result)
+
+    def test_old_entries_cleanup(self):
+        now_ts = int(time.time())
+
+        monitor = mock.Mock()
+        monitor.monitor_module_name = "openmetrics_monitor"
+        monitor.short_hash = "hashhash"
+        monitor.get_calculate_rate_metric_names.return_value = []
+        monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 60
+        monitor._global_config.instrumentation_stats_log_interval = 10
+
+        func = RateMetricFunction()
+        RateMetricFunction.DELETE_OLD_VALUES_THRESHOLD_SECONDS = 60
+        RateMetricFunction.RATE_CALCULATION_METRIC_VALUES = {
+            "one": (now_ts, 1),
+            "two": (now_ts - 10, 1),
+            "three": (now_ts - 50, 1),
+            "four": (now_ts - 70, 1),
+            "five": (now_ts - 80, 1),
+            "six": (now_ts - 90, 1),
+        }
+
+        self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 6)
+        func._remove_old_entries(monitor=monitor)
+        self.assertEqual(RateMetricFunction.LAST_CLEANUP_RUNTIME_TS, now_ts)
+        self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 3)
+        self.assertTrue("one" in func.RATE_CALCULATION_METRIC_VALUES)
+        self.assertTrue("two" in func.RATE_CALCULATION_METRIC_VALUES)
+        self.assertTrue("three" in func.RATE_CALCULATION_METRIC_VALUES)
