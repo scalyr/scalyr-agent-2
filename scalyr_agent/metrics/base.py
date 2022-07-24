@@ -94,6 +94,8 @@ def get_functions_for_metric(monitor, metric_name):
     """
     cache_key = "%s:%s" % (monitor.short_hash, metric_name)
 
+    # TODO: Use LRU cache with limited max size
+
     # NOTE: Since there can be tons of different unique extra_fields values for a specific metric
     # and as such permutations, we have first level cache for monitor and metric name here. Having
     # cache entry for each possible monitor name, metric name, extra_fields values would result in
