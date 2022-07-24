@@ -476,9 +476,9 @@ could add overhead in terms of CPU and memory usage.
         duration_ms = (end_ts - start_ts) * 1000
 
         monitor._logger.info(
-            "RateMetricFunction clean up routine finished (removed_entries=%s,"
-            "entries_pre_cleanup=%s,entries_post_cleanup=%s,bytes_pre_cleanup=%s,"
-            "bytes_post_cleanup=%s,duration_ms=%s)"
+            "RateMetricFunction clean up routine finished (removed_entries=%s "
+            "entries_pre_cleanup=%s entries_post_cleanup=%s bytes_pre_cleanup=%s "
+            "bytes_post_cleanup=%s duration_ms=%s)"
             % (
                 (entries_pre_cleanup - entries_post_cleanup),
                 entries_pre_cleanup,
