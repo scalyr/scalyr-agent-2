@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.32 "Occao" - July 20, 2022
+## 2.1.32 "Occao" - July 20, 2022 - In development
 
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 20, 2022 12:29 -0800
@@ -24,6 +24,7 @@ Docker images:
 Other:
 * Support for Python 2.6 has been dropped.
 * Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
+* Update agent log messages to include full name of the module which produced the message.
 
 ## 2.1.31 "Irati" - Jun 28, 2022
 
