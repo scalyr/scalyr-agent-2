@@ -72,13 +72,13 @@ LAZY_PRINT_CACHE_SIZE_BYTES = LazyOnPrintEvaluatedFunction(
 )
 
 LAZY_PRINT_TIMING_MIN = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["min"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["min"], 4)
 )
 LAZY_PRINT_TIMING_MAX = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["max"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["max"], 4)
 )
 LAZY_PRINT_TIMING_AVG = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["avg"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["avg"], 4)
 )
 
 

@@ -485,7 +485,7 @@ could add overhead in terms of CPU and memory usage.
                 entries_post_cleanup,
                 bytes_pre_cleanup,
                 bytes_post_cleanup,
-                duration_ms,
+                round(duration_ms, 4),
             )
         )
 
