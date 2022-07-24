@@ -40,6 +40,7 @@ import six
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
 from scalyr_agent.util import get_flat_dictionary_memory_usage
+from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
 from scalyr_agent.instrumentation.decorators import time_function_call
 from scalyr_agent.scalyr_logging import getLogger
@@ -453,6 +454,9 @@ could add overhead in terms of CPU and memory usage.
         start_ts = timer()
 
         entries_pre_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+        bytes_pre_cleanup = get_flat_dictionary_memory_usage(
+            cls.RATE_CALCULATION_METRIC_VALUES
+        )
 
         delete_threshold_ts = now_s - cls.DELETE_OLD_VALUES_THRESHOLD_SECONDS
 
@@ -462,17 +466,23 @@ could add overhead in terms of CPU and memory usage.
                 cls.RATE_CALCULATION_METRIC_VALUES.pop(dict_key, None)
 
         entries_post_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+        bytes_post_cleanup = get_flat_dictionary_memory_usage(
+            cls.RATE_CALCULATION_METRIC_VALUES
+        )
 
         end_ts = timer()
         duration_ms = (end_ts - start_ts) * 1000
 
         monitor._logger.info(
             "RateMetricFunction clean up routine finished (removed_entries=%s,"
-            "entries_pre_cleanup=%s,entries_post_cleanup=%s,duration_ms=%s)"
+            "entries_pre_cleanup=%s,entries_post_cleanup=%s,bytes_pre_cleanup=%s,"
+            "bytes_post_cleanup=%s,duration_ms=%s)"
             % (
                 (entries_pre_cleanup - entries_post_cleanup),
                 entries_pre_cleanup,
                 entries_post_cleanup,
+                bytes_pre_cleanup,
+                bytes_post_cleanup,
                 duration_ms,
             )
         )
