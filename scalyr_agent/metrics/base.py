@@ -92,7 +92,7 @@ def get_functions_for_metric(monitor, metric_name):
       - [ ] To speed up the common case then there are no functions defined, we should short circuit
            in such scenario.
     """
-    cache_key = "%s.%s" % (monitor.short_hash, metric_name)
+    cache_key = "%s:%s" % (monitor.short_hash, metric_name)
 
     # NOTE: Since there can be tons of different unique extra_fields values for a specific metric
     # and as such permutations, we have first level cache for monitor and metric name here. Having
