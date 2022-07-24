@@ -145,7 +145,7 @@ class Collector(object):
             if out:
                 LOG.debug("reading %s got %d bytes on stderr", self.name, len(out))
                 for line in out.splitlines():
-                    LOG.warning("%s: %s", self.name, line)
+                    LOG.warning("%s: %s", self.name, six.ensure_text(line))
         except IOError as error:
             (err, msg) = error.args
             if err != errno.EAGAIN:
