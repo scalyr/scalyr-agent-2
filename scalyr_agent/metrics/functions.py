@@ -133,7 +133,9 @@ class RateMetricFunction(MetricFunction):
     LAST_CLEANUP_RUNTIME_TS = 0
 
     # If we track rate for more than this many metrics, a warning will be emitted.
-    MAX_RATE_METRICS_COUNT_WARN = 15000
+    # With average metric name and value (timestamp, value) taking around 240 bytes, that means
+    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes)
+    MAX_RATE_METRICS_COUNT_WARN = 20000
 
     MAX_RATE_METRIC_WARN_MESSAGE = """
 Tracking client side rate for over %s metrics. Tracking and calculating rate for that many metrics
