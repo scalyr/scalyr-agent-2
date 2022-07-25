@@ -34,6 +34,7 @@ from abc import ABCMeta
 from abc import abstractmethod
 from collections import defaultdict
 from itertools import chain
+from timeit import default_timer as timer
 
 import six
 
@@ -131,12 +132,19 @@ class RateMetricFunction(MetricFunction):
     LAST_CLEANUP_RUNTIME_TS = 0
 
     # If we track rate for more than this many metrics, a warning will be emitted.
-    MAX_RATE_METRICS_COUNT_WARN = 15000
+    # With average metric name and value (timestamp, value) taking around 240 bytes, that means
+    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes)
+    MAX_RATE_METRICS_COUNT_WARN = 20000
+
+    # Hard limit on how many values will be stored in RATE_CALCULATION_METRIC_VALUES
+    MAX_RATE_METRIC_HARD_LIMIT = 30000
 
     MAX_RATE_METRIC_WARN_MESSAGE = """
 Tracking client side rate for over %s metrics. Tracking and calculating rate for that many metrics
 could add overhead in terms of CPU and memory usage.
-    """.strip() % (
+    """.strip().replace(
+        "\n", " "
+    ) % (
         MAX_RATE_METRICS_COUNT_WARN
     )
 
@@ -190,6 +198,32 @@ could add overhead in terms of CPU and memory usage.
         ):
             return None
 
+        # To avoid collisions across multiple monitors (same metric name being used by multiple
+        # monitors), we prefix data in internal dictionary with the short hash of the fully
+        # qualified monitor name.
+        # Since same metric name can be used by values with different extra fields, we also include
+        # extra fields as part of the dictionary key.
+        extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
+        dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
+
+        # If internal dictionary has reached max size and we encounter a new metric, we refuse
+        # calculation and storing the value to protect from excessive memory growth
+        if (
+            len(cls.RATE_CALCULATION_METRIC_VALUES) >= cls.MAX_RATE_METRIC_HARD_LIMIT
+            and dict_key not in cls.RATE_CALCULATION_METRIC_VALUES
+        ):
+            monitor._logger.warn(
+                'Reached a maximum of "%s" values store. Refusing calculation to avoid memory from '
+                "growing excesively large.",
+                cls.MAX_RATE_METRIC_HARD_LIMIT,
+                limit_once_per_x_secs=(30 * 60),
+                limit_key="rate-value-cache-max-size-reached",
+            )
+
+            cls._cleanup_old_entries(monitor=monitor)
+
+            return None
+
         now_s = int(time.time())
 
         if timestamp:
@@ -205,14 +239,6 @@ could add overhead in terms of CPU and memory usage.
                 limit_key=limit_key,
             )
             return None
-
-        # To avoid collisions across multiple monitors (same metric name being used by multiple
-        # monitors), we prefix data in internal dictionary with the short hash of the fully
-        # qualified monitor name.
-        # Since same metric name can be used by values with different extra fields, we also include
-        # extra fields as part of the dictionary key.
-        extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
-        dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
 
         (
             previous_collection_timestamp,
@@ -315,16 +341,7 @@ could add overhead in terms of CPU and memory usage.
         # TODO (longer term): To simplify and speed up things we should perhaps have an instance of
         # RateMetricFunction per monitor. This would also help us avoid any thread safety issues
         # (monitor already runs in a separate dedicated thread).
-        metric_functions_cleanup_interval = (
-            monitor._global_config
-            and monitor._global_config.metric_functions_cleanup_interval
-            or 0
-        )
-
-        if metric_functions_cleanup_interval > 0 and (
-            cls.LAST_CLEANUP_RUNTIME_TS <= (now_s - metric_functions_cleanup_interval)
-        ):
-            cls._remove_old_entries(monitor=monitor)
+        cls._cleanup_old_entries(monitor=monitor)
 
         # Periodically print cache size and function timing information
         log_interval = (
@@ -434,22 +451,47 @@ could add overhead in terms of CPU and memory usage.
         return False
 
     @classmethod
-    def _remove_old_entries(cls, monitor):
+    def _cleanup_old_entries(cls, monitor):
         # type: (ScalyrMonitor) -> None
         """
         This function removes old entries for values with the timestamps which are older than the
         defined threshold.
 
+        Function only runs if more than "metric_functions_cleanup_interval" seconds have passed
+        since the last cleanup interval.
+
         TODO: Thread safety?
         """
         now_s = int(time.time())
+
+        metric_functions_cleanup_interval = (
+            monitor._global_config
+            and monitor._global_config.metric_functions_cleanup_interval
+            or 0
+        )
+
+        if not (
+            metric_functions_cleanup_interval > 0
+            and (
+                cls.LAST_CLEANUP_RUNTIME_TS
+                <= (now_s - metric_functions_cleanup_interval)
+            )
+        ):
+            # Not enough time has passed yet since the last clean up
+            return None
+
         cls.LAST_CLEANUP_RUNTIME_TS = now_s
 
         monitor._logger.debug(
             "Running periodic clean up routine for RateMetricFunction"
         )
 
+        start_ts = timer()
+
         entries_pre_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+        bytes_pre_cleanup = get_flat_dictionary_memory_usage(
+            cls.RATE_CALCULATION_METRIC_VALUES
+        )
 
         delete_threshold_ts = now_s - cls.DELETE_OLD_VALUES_THRESHOLD_SECONDS
 
@@ -459,13 +501,24 @@ could add overhead in terms of CPU and memory usage.
                 cls.RATE_CALCULATION_METRIC_VALUES.pop(dict_key, None)
 
         entries_post_cleanup = len(cls.RATE_CALCULATION_METRIC_VALUES)
+        bytes_post_cleanup = get_flat_dictionary_memory_usage(
+            cls.RATE_CALCULATION_METRIC_VALUES
+        )
+
+        end_ts = timer()
+        duration_ms = (end_ts - start_ts) * 1000
+
         monitor._logger.info(
-            "RateMetricFunction clean up routine finished (removed_entries=%s,"
-            "entries_pre_cleanup=%s,entries_post_cleanup=%s)"
+            "RateMetricFunction clean up routine finished (removed_entries=%s "
+            "entries_pre_cleanup=%s entries_post_cleanup=%s bytes_pre_cleanup=%s "
+            "bytes_post_cleanup=%s duration_ms=%s)"
             % (
                 (entries_pre_cleanup - entries_post_cleanup),
                 entries_pre_cleanup,
                 entries_post_cleanup,
+                bytes_pre_cleanup,
+                bytes_post_cleanup,
+                round(duration_ms, 4),
             )
         )
 
