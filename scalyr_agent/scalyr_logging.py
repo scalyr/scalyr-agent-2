@@ -1017,12 +1017,17 @@ class AgentLogFormatter(BaseFormatter):
         # differentiate between log messages which share the same module name, but a different
         # package
         if "pathname" in record.__dict__.keys():
-            record.fqname = (
-                record.pathname[record.pathname.rfind("scalyr_agent") :]
-                .replace(os.path.sep, ".")
-                .replace(".pyc", "")
-                .replace(".py", "")
-            )
+            agent_module_loc = record.pathname.rfind("scalyr_agent")
+            if agent_module_loc != -1:
+                record.fqname = (
+                    record.pathname[record.pathname.rfind("scalyr_agent") :]
+                    .replace(os.path.sep, ".")
+                    .replace(".pyc", "")
+                    .replace(".py", "")
+                )
+            else:
+                # Files without scalyr_agent module (e.g. tests - we only include file name)
+                record.fqname = record.filename.replace(".pyc", "").replace(".py", "")
         else:
             record.fqname = record.filename
 

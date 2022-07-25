@@ -80,7 +80,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.__logger.info("Test line %d", 5)
         expression = (
             r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3}Z INFO \[core\] "
-            r"\[.*\.py:\d+\] Test line 5"
+            r"\[.*\:\d+\] Test line 5"
         )
         self.assertLogFileContainsLineRegex(expression=expression)
 
