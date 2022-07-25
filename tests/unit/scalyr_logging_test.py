@@ -578,21 +578,33 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             use_disk=True,
             logs_directory=os.path.dirname(self.__log_path),
             agent_log_file_path=self.__log_path,
-            max_write_burst=250,
+            max_write_burst=300,
             log_write_rate=0,
         )
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
 
         string_300 = "a" * 300
 
+        # Should only skip 2 lines (dropped 1 message + dropped message 2)
         self.__logger.info("First message")
         self.assertLogFileContainsLineRegex(expression="First message")
 
-        self.__logger.info("Dropped message %s", string_300)
-        self.assertLogFileDoesntContainsLineRegex(expression="Dropped message")
+        self.__logger.info("Dropped message 1 %s", string_300)
+        self.assertLogFileDoesntContainsLineRegex(expression="Dropped message 1")
+
+        self.__logger.info("Dropped message 2 %s", string_300)
+        self.assertLogFileDoesntContainsLineRegex(expression="Dropped message 2")
 
         self.__logger.info("Second message")
-        self.assertLogFileDoesntContainsLineRegex(expression="Second message")
+        self.assertLogFileContainsRegex(expression="Second message")
+        # Log write is low so all those messages should be dropped as well
+        for index in range(0, 100):
+            self.__logger.info("Third %s" % (index))
+
+        self.assertLogFileDoesntContainsLineRegex(expression="Third ")
+        self.assertLogFileContainsRegex(
+            "Warning, skipped writing 2 log lines due to limit set by"
+        )
 
     def test_rate_limit_no_write_rate(self):
         """
