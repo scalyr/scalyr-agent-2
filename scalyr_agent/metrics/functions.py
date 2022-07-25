@@ -40,7 +40,6 @@ import six
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
 from scalyr_agent.util import get_flat_dictionary_memory_usage
-from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
 from scalyr_agent.instrumentation.decorators import time_function_call
 from scalyr_agent.scalyr_logging import getLogger
