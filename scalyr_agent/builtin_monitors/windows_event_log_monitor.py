@@ -17,12 +17,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import datetime
 import os
-import json
 import threading
 import time
 
+import orjson
 import six
 import xmltodict
 
@@ -681,9 +680,9 @@ class NewJsonApi(NewApi):
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
         # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
-        event_json["timestamp"] = datetime.datetime.utcnow().isoformat(" ")
+        event_json["timestamp"] = event_json["Event"]["System"]["TimeCreated"]["SystemTime"]
         event_json["name"] = self._logger.name
-        self._logger.emit_value("unused", json.dumps(event_json))
+        self._logger.emit_value("unused", orjson.dumps(event_json).decode("utf-8"))
 
         self._bookmark_lock.acquire()
         try:
