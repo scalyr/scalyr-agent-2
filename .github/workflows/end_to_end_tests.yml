@@ -412,7 +412,7 @@ jobs:
           cp .circleci/.coveragerc_ci .coveragerc
 
           # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#/home/circleci/scalyr-agent-2/#g" .coverage
+          sed -i "s#/usr/share/scalyr-agent-2/py/#$(pwd)#g" .coverage
 
           # Submit it to codecov.io
           coverage xml --rcfile=.coveragerc -i -o coverage.xml
