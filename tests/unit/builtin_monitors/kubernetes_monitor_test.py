@@ -700,7 +700,7 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
                 result = api.query_stats()
                 self.assertEqual(result, {})
                 self.assertLogFileContainsLineRegex(
-                    r".*WARNING \[core\] \[k8s.py:\d+\] Accessing Kubelet with an unverified HTTPS request\."
+                    r".*WARNING \[core\] \[scalyr_agent.monitor_utils.k8s:\d+\] Accessing Kubelet with an unverified HTTPS request\."
                 )
                 self.assertFalse(new_err.getvalue())
                 self.assertFalse(new_out.getvalue())

@@ -1007,12 +1007,30 @@ class AgentLogFormatter(BaseFormatter):
         # define a custom findCaller method to actually fix the problem.
         BaseFormatter.__init__(
             self,
-            "%(asctime)s %(levelname)s [%(component)s] [%(filename)s:%(lineno)d] "
+            "%(asctime)s %(levelname)s [%(component)s] [%(fqname)s:%(lineno)d] "
             "%(error_message)s%(message)s%(stack_token)s",
             "agent_formatter",
         )
 
     def format(self, record):
+        # Add in a fully qualified module name which contains package suffix. This allows us to
+        # differentiate between log messages which share the same module name, but a different
+        # package
+        if "pathname" in record.__dict__.keys():
+            agent_module_loc = record.pathname.rfind("scalyr_agent")
+            if agent_module_loc != -1:
+                record.fqname = (
+                    record.pathname[record.pathname.rfind("scalyr_agent") :]
+                    .replace(os.path.sep, ".")
+                    .replace(".pyc", "")
+                    .replace(".py", "")
+                )
+            else:
+                # Files without scalyr_agent module (e.g. tests - we only include file name)
+                record.fqname = record.filename.replace(".pyc", "").replace(".py", "")
+        else:
+            record.fqname = record.filename
+
         # Optionally add in the error code if there is one present.
         if record.error_code is not None:
             record.error_message = '[error="%s"] ' % record.error_code
