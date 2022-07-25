@@ -206,8 +206,8 @@ could add overhead in terms of CPU and memory usage.
         extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
         dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
 
-        # If internal dictionary has reached mas size and we encounter a new metric, we refuse
-        # calculation and storing the values to protect from excesive memory growth
+        # If internal dictionary has reached max size and we encounter a new metric, we refuse
+        # calculation and storing the value to protect from excessive memory growth
         if (
             len(cls.RATE_CALCULATION_METRIC_VALUES) >= cls.MAX_RATE_METRIC_HARD_LIMIT
             and dict_key not in cls.RATE_CALCULATION_METRIC_VALUES
