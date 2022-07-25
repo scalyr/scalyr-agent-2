@@ -120,7 +120,7 @@ def get_functions_for_metric(monitor, metric_name):
     # a cache which can grow too large. And we do still want some kind of cache since having no
     # cache would result in running this "should_calculate()" logic for every single emitted metric
     # which is expensive.
-    if not MONITOR_METRIC_TO_FUNCTIONS_CACHE.get(cache_key):
+    if MONITOR_METRIC_TO_FUNCTIONS_CACHE.get(cache_key) is None:
         result = []
 
         for function_instance in FUNCTIONS_REGISTRY.values():

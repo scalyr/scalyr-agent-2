@@ -19,6 +19,7 @@ from collections import OrderedDict
 import mock
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
+from scalyr_agent.metrics.base import MONITOR_METRIC_TO_FUNCTIONS_CACHE
 from scalyr_agent.metrics.base import get_functions_for_metric
 from scalyr_agent.metrics.base import clear_internal_cache
 from scalyr_agent.metrics.functions import RateMetricFunction
@@ -114,8 +115,18 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
 
         # Invalid metric name (metric name not in allowlist)
         metric_name = "metric_invalid"
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 0)
         funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
         self.assertEqual(funcs, [])
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
+        self.assertEqual(
+            MONITOR_METRIC_TO_FUNCTIONS_CACHE.data["hashhash:metric_invalid"], (0, [])
+        )
+
+        # Verify cache works also for empty []
+        funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
+        self.assertEqual(funcs, [])
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
 
     def test_rate_metric_function_metric_name_without_extra_fields(self):
         monitor = mock.Mock()
@@ -146,9 +157,12 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         metric_name = "metric1"
         extra_fields = {}
 
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 0)
         funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
         self.assertEqual(len(funcs), 1)
         self.assertTrue(isinstance(funcs[0], RateMetricFunction))
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
+        self.assertTrue("hashhash:metric1" in MONITOR_METRIC_TO_FUNCTIONS_CACHE.data)
 
         func = funcs[0]
         func.clear_cache()
