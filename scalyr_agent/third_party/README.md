@@ -36,6 +36,7 @@ The following libraries are included:
   * [chardet](#chardet)
   * [urllib3](#urllib3)
   * [python-dateutil](#dateutil)
+  * [repoze.lru](#repoze.lru)
 
 ## tcollector<a name="tcollector"> (LGPL v3)
 
@@ -158,7 +159,10 @@ A dependency of Requests.
 
 A dependency of Requests.
 
-
 ## python-dateutil<a name="dateutil"> (Apache 2.0)
 
 Used for parsing RFC3339 date strings with custom timezones.
+
+## repoze.lru<a name="repoze-lru"> (Modified BSD)
+
+Used for LRU cache functionality (can be removed once we drop support for Python 2).

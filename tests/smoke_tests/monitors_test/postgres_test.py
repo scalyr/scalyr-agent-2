@@ -117,7 +117,7 @@ def _test(request, python_version):
 
     # wait for agent logs about postgres monitor is started.
     agent_log_reader.wait_for_matching_line(
-        pattern=r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z INFO \[core\] \[monitors_manager\.py:\d+\] Starting monitor postgres_monitor\(mydb\)"
+        pattern=r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z INFO \[core\] \[scalyr_agent.monitors_manager:\d+\] Starting monitor postgres_monitor\(mydb\)"
     )
 
     # just wait more to be sure that there are no errors in the agent.log.

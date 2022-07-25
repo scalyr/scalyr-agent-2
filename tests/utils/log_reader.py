@@ -112,8 +112,8 @@ class LogReader(threading.Thread):
             except StopIteration:
                 if time.time() >= timeout_time:
                     raise LogReaderTimeoutError(
-                        "Timeout of %s seconds reached while waiting for new line."
-                        % timeout
+                        "Timeout of %s seconds reached while waiting for new line. Accumulated lines:\n%s"
+                        % (timeout, "\n".join(self._lines))
                     )
                 time.sleep(0.01)
 

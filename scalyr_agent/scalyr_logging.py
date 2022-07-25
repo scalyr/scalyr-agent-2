@@ -30,6 +30,8 @@ __author__ = "czerwin@scalyr.com"
 
 if False:  # NOSONAR
     from typing import Dict
+    from typing import Optional
+    from typing import Callable
 
     # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa
     from scalyr_agent.scalyr_monitor import ScalyrMonitor
@@ -489,7 +491,8 @@ class AgentLogger(logging.Logger):
         from scalyr_agent.metrics.base import get_functions_for_metric
 
         function_instances = get_functions_for_metric(
-            monitor=monitor, metric_name=metric_name
+            monitor=monitor,
+            metric_name=metric_name,
         )
 
         derived_metrics_to_emit = []
@@ -498,6 +501,7 @@ class AgentLogger(logging.Logger):
                 monitor=monitor,
                 metric_name=metric_name,
                 metric_value=metric_value,
+                extra_fields=extra_fields,
                 timestamp=timestamp,
             )
             derived_metrics_to_emit.extend(metric_tuples or [])
@@ -1003,12 +1007,30 @@ class AgentLogFormatter(BaseFormatter):
         # define a custom findCaller method to actually fix the problem.
         BaseFormatter.__init__(
             self,
-            "%(asctime)s %(levelname)s [%(component)s] [%(filename)s:%(lineno)d] "
+            "%(asctime)s %(levelname)s [%(component)s] [%(fqname)s:%(lineno)d] "
             "%(error_message)s%(message)s%(stack_token)s",
             "agent_formatter",
         )
 
     def format(self, record):
+        # Add in a fully qualified module name which contains package suffix. This allows us to
+        # differentiate between log messages which share the same module name, but a different
+        # package
+        if "pathname" in record.__dict__.keys():
+            agent_module_loc = record.pathname.rfind("scalyr_agent")
+            if agent_module_loc != -1:
+                record.fqname = (
+                    record.pathname[record.pathname.rfind("scalyr_agent") :]
+                    .replace(os.path.sep, ".")
+                    .replace(".pyc", "")
+                    .replace(".py", "")
+                )
+            else:
+                # Files without scalyr_agent module (e.g. tests - we only include file name)
+                record.fqname = record.filename.replace(".pyc", "").replace(".py", "")
+        else:
+            record.fqname = record.filename
+
         # Optionally add in the error code if there is one present.
         if record.error_code is not None:
             record.error_message = '[error="%s"] ' % record.error_code
@@ -1985,3 +2007,21 @@ class UnsupportedValueType(Exception):
                 )
             )
         Exception.__init__(self, message)
+
+
+class LazyOnPrintEvaluatedFunction(object):
+    """
+    Wrapper for function which is evaluated lazily once __str__ called on this object.
+
+    This is primarily meant to be used with scalyr_logging.log function when using limit_once_per_x_secs
+    and we only want function to be evaluated when limit has not been reached (aka so we don't incur
+    overhead on each log.log function call when no logging is to be performed due to rate limit being
+    reached).
+    """
+
+    def __init__(self, func):
+        # type: (Callable, Optional[bool]) -> None
+        self.__func = func
+
+    def __str__(self):
+        return six.text_type(self.__func())
