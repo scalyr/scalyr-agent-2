@@ -32,7 +32,7 @@ if False:
 
 import six
 
-from repoze.lru import LRUCache
+from repoze.lru import LRUCache  # pylint: disable=import-error
 
 from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
