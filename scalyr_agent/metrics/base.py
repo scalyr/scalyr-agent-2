@@ -27,11 +27,12 @@ __all__ = [
 
 if False:
     from typing import List
-    from typing import Dict
 
     from scalyr_agent.scalyr_monitor import ScalyrMonitor  # NOQA
 
 import six
+
+from repoze.lru import LRUCache  # pylint: disable=import-error
 
 from scalyr_agent.util import get_flat_dictionary_memory_usage
 from scalyr_agent.instrumentation.timing import get_empty_stats_dict
@@ -50,11 +51,12 @@ FUNCTIONS_REGISTRY = {
     "rate": RateMetricFunction(),
 }
 
+# Maximum cache size for MONITOR_METRIC_TO_FUNCTIONS_CACHE LRU cache
+MAX_CACHE_SIZE = 10000
+
 # Stores cached list of MetricFunction class instances for the provided monitor and metric name.
 # This cache needs to be invalidated each time config is reloaded and config change is detected.
-MONITOR_METRIC_TO_FUNCTIONS_CACHE = (
-    {}
-)  # type: Dict[six.text_type, List[MetricFunction]]
+MONITOR_METRIC_TO_FUNCTIONS_CACHE = LRUCache(MAX_CACHE_SIZE)
 
 # Dictionary which stores timing / run time information for "get_functions_for_metric" function
 GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS = get_empty_stats_dict()
@@ -65,20 +67,33 @@ GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS = get_empty_stats_dict()
 # "limit_once_per_x_secs" argument so the values are only evaluated when we don't hit rate limit and
 # when log message is actually printed.
 LAZY_PRINT_CACHE_SIZE_LENGTH = LazyOnPrintEvaluatedFunction(
-    lambda: len(MONITOR_METRIC_TO_FUNCTIONS_CACHE)
+    lambda: len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data)
 )
 LAZY_PRINT_CACHE_SIZE_BYTES = LazyOnPrintEvaluatedFunction(
-    lambda: get_flat_dictionary_memory_usage(MONITOR_METRIC_TO_FUNCTIONS_CACHE)
+    lambda: get_flat_dictionary_memory_usage(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data)
+)
+
+LAZY_PRINT_CACHE_HITS = LazyOnPrintEvaluatedFunction(
+    lambda: MONITOR_METRIC_TO_FUNCTIONS_CACHE.hits
+)
+LAZY_PRINT_CACHE_MISSES = LazyOnPrintEvaluatedFunction(
+    lambda: MONITOR_METRIC_TO_FUNCTIONS_CACHE.misses
+)
+LAZY_PRINT_CACHE_LOOKUPS = LazyOnPrintEvaluatedFunction(
+    lambda: MONITOR_METRIC_TO_FUNCTIONS_CACHE.lookups
+)
+LAZY_PRINT_CACHE_EVICTIONS = LazyOnPrintEvaluatedFunction(
+    lambda: MONITOR_METRIC_TO_FUNCTIONS_CACHE.evictions
 )
 
 LAZY_PRINT_TIMING_MIN = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["min"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["min"], 4)
 )
 LAZY_PRINT_TIMING_MAX = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["max"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["max"], 4)
 )
 LAZY_PRINT_TIMING_AVG = LazyOnPrintEvaluatedFunction(
-    lambda: GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["avg"]
+    lambda: round(GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS["avg"], 4)
 )
 
 
@@ -92,7 +107,9 @@ def get_functions_for_metric(monitor, metric_name):
       - [ ] To speed up the common case then there are no functions defined, we should short circuit
            in such scenario.
     """
-    cache_key = "%s.%s" % (monitor.short_hash, metric_name)
+    cache_key = "%s:%s" % (monitor.short_hash, metric_name)
+
+    # TODO: Use LRU cache with limited max size
 
     # NOTE: Since there can be tons of different unique extra_fields values for a specific metric
     # and as such permutations, we have first level cache for monitor and metric name here. Having
@@ -100,7 +117,7 @@ def get_functions_for_metric(monitor, metric_name):
     # a cache which can grow too large. And we do still want some kind of cache since having no
     # cache would result in running this "should_calculate()" logic for every single emitted metric
     # which is expensive.
-    if cache_key not in MONITOR_METRIC_TO_FUNCTIONS_CACHE:
+    if MONITOR_METRIC_TO_FUNCTIONS_CACHE.get(cache_key) is None:
         result = []
 
         for function_instance in FUNCTIONS_REGISTRY.values():
@@ -110,7 +127,7 @@ def get_functions_for_metric(monitor, metric_name):
             ):
                 result.append(function_instance)
 
-        MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key] = result
+        MONITOR_METRIC_TO_FUNCTIONS_CACHE.put(cache_key, result)
 
     # Periodically print cache size and function timing information
     # NOTE: We don't have direct access to global config here so we access it via monitor. An
@@ -123,9 +140,14 @@ def get_functions_for_metric(monitor, metric_name):
     )
     if log_interval > 0:
         LOG.info(
-            "agent_instrumentation_stats key=monitor_metric_to_function_cache_stats cache_entries=%s cache_size_bytes=%s",
+            "agent_instrumentation_stats key=monitor_metric_to_function_cache_stats "
+            "cache_entries=%s cache_size_bytes=%s cache_hits=%s cache_misses=%s cache_lookups=%s cache_evictions=%s",
             LAZY_PRINT_CACHE_SIZE_LENGTH,
             LAZY_PRINT_CACHE_SIZE_BYTES,
+            LAZY_PRINT_CACHE_HITS,
+            LAZY_PRINT_CACHE_MISSES,
+            LAZY_PRINT_CACHE_LOOKUPS,
+            LAZY_PRINT_CACHE_EVICTIONS,
             limit_key="mon-met-cache-stats",
             limit_once_per_x_secs=log_interval,
         )
@@ -138,7 +160,7 @@ def get_functions_for_metric(monitor, metric_name):
             limit_once_per_x_secs=log_interval,
         )
 
-    return MONITOR_METRIC_TO_FUNCTIONS_CACHE[cache_key]
+    return MONITOR_METRIC_TO_FUNCTIONS_CACHE.get(cache_key)
 
 
 def clear_registry_cache():
@@ -146,7 +168,7 @@ def clear_registry_cache():
 
     LOG.debug("Clearing registry cache")
 
-    MONITOR_METRIC_TO_FUNCTIONS_CACHE = {}
+    MONITOR_METRIC_TO_FUNCTIONS_CACHE.clear()
 
 
 def clear_internal_cache():

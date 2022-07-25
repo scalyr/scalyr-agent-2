@@ -831,7 +831,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             (RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN * 3) + 2,
         )
         monitor_instance._logger.warn.assert_called_with(
-            "Tracking client side rate for over 15000 metrics. Tracking and calculating rate for that many metrics\ncould add overhead in terms of CPU and memory usage.",
+            "Tracking client side rate for over 20000 metrics. Tracking and calculating rate for that many metrics could add overhead in terms of CPU and memory usage.",
             limit_key="rate-max-count-reached",
             limit_once_per_x_secs=86400,
         )

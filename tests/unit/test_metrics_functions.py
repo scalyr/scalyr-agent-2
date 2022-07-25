@@ -19,6 +19,7 @@ from collections import OrderedDict
 import mock
 
 from scalyr_agent.util import get_hash_for_flat_dictionary
+from scalyr_agent.metrics.base import MONITOR_METRIC_TO_FUNCTIONS_CACHE
 from scalyr_agent.metrics.base import get_functions_for_metric
 from scalyr_agent.metrics.base import clear_internal_cache
 from scalyr_agent.metrics.functions import RateMetricFunction
@@ -114,8 +115,18 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
 
         # Invalid metric name (metric name not in allowlist)
         metric_name = "metric_invalid"
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 0)
         funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
         self.assertEqual(funcs, [])
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
+        self.assertEqual(
+            MONITOR_METRIC_TO_FUNCTIONS_CACHE.data["hashhash:metric_invalid"], (0, [])
+        )
+
+        # Verify cache works also for empty []
+        funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
+        self.assertEqual(funcs, [])
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
 
     def test_rate_metric_function_metric_name_without_extra_fields(self):
         monitor = mock.Mock()
@@ -146,9 +157,12 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         metric_name = "metric1"
         extra_fields = {}
 
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 0)
         funcs = get_functions_for_metric(monitor=monitor, metric_name=metric_name)
         self.assertEqual(len(funcs), 1)
         self.assertTrue(isinstance(funcs[0], RateMetricFunction))
+        self.assertEqual(len(MONITOR_METRIC_TO_FUNCTIONS_CACHE.data), 1)
+        self.assertTrue("hashhash:metric1" in MONITOR_METRIC_TO_FUNCTIONS_CACHE.data)
 
         func = funcs[0]
         func.clear_cache()
@@ -531,7 +545,100 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         )
         self.assertTrue(result)
 
-    def test_old_entries_cleanup(self):
+    def test_calculate_hard_limit_on_internal_dictionary_size(self):
+        RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN = 5
+        RateMetricFunction.MAX_RATE_METRIC_HARD_LIMIT = 8
+
+        monitor = mock.Mock()
+        monitor.monitor_module_name = "openmetrics_monitor"
+        monitor.short_hash = "hashhash"
+        monitor.get_calculate_rate_metric_names.return_value = []
+        monitor._global_config = mock.Mock()
+        monitor._global_config.metric_functions_cleanup_interval = 0
+        monitor._global_config.instrumentation_stats_log_interval = 10
+        monitor._global_config.calculate_rate_metric_names = []
+
+        for index in range(0, 20):
+            monitor._global_config.calculate_rate_metric_names.append(
+                "openmetrics_monitor:metric-%s" % (index)
+            )
+
+        func = RateMetricFunction()
+
+        ts = 10
+        val = 100
+
+        # Valid metric name, no extra_fields
+        extra_fields = {}
+
+        # Initial values
+        for index in range(0, 5):
+            metric_name = "metric-%s" % (index)
+            result = func.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                extra_fields=extra_fields,
+                timestamp=(ts * 1000) * (index + 1),
+                metric_value=val * (index + 1),
+            )
+            self.assertIsNone(result)
+
+        for index in range(0, 5):
+            metric_name = "metric-%s" % (index)
+            result = func.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                extra_fields=extra_fields,
+                timestamp=(ts * 1000) * (index + 2),
+                metric_value=val * (index + 2),
+            )
+            self.assertTrue(result)
+
+        self.assertEqual(len(RateMetricFunction.RATE_CALCULATION_METRIC_VALUES), 5)
+
+        # New values, should refuse accepting new metrics if hard limit has been reached
+        for index in range(5, 20):
+            metric_name = "metric-%s" % (index)
+            result = func.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                extra_fields=extra_fields,
+                timestamp=(ts * 1000) * (index + 3),
+                metric_value=val * (index + 3),
+            )
+            self.assertIsNone(result)
+
+        self.assertEqual(len(RateMetricFunction.RATE_CALCULATION_METRIC_VALUES), 8)
+
+        for index in range(5, 20):
+            metric_name = "metric-%s" % (index)
+            result = func.calculate(
+                monitor=monitor,
+                metric_name=metric_name,
+                extra_fields=extra_fields,
+                timestamp=(ts * 1000) * (index + 4),
+                metric_value=val * (index + 4),
+            )
+            if index >= 8:
+                self.assertIsNone(result)
+            else:
+                self.assertTrue(result)
+
+        self.assertEqual(len(RateMetricFunction.RATE_CALCULATION_METRIC_VALUES), 8)
+
+        monitor._logger.warn.assert_any_call(
+            "Tracking client side rate for over 20000 metrics. Tracking and calculating rate for that many metrics could add overhead in terms of CPU and memory usage.",
+            limit_key="rate-max-count-reached",
+            limit_once_per_x_secs=86400,
+        )
+        monitor._logger.warn.assert_called_with(
+            'Reached a maximum of "%s" values store. Refusing calculation to avoid memory from growing excesively large.',
+            8,
+            limit_key="rate-value-cache-max-size-reached",
+            limit_once_per_x_secs=1800,
+        )
+
+    def test_cleanup_old_entries(self):
         now_ts = int(time.time())
 
         monitor = mock.Mock()
@@ -554,9 +661,16 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         }
 
         self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 6)
-        func._remove_old_entries(monitor=monitor)
+        func._cleanup_old_entries(monitor=monitor)
         self.assertEqual(RateMetricFunction.LAST_CLEANUP_RUNTIME_TS, now_ts)
         self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 3)
         self.assertTrue("one" in func.RATE_CALCULATION_METRIC_VALUES)
         self.assertTrue("two" in func.RATE_CALCULATION_METRIC_VALUES)
         self.assertTrue("three" in func.RATE_CALCULATION_METRIC_VALUES)
+
+        # Not enough time has passed yet since the previous cleanup so no cleanup is performed
+        RateMetricFunction.RATE_CALCULATION_METRIC_VALUES["six"] = (now_ts - 300, 1)
+        self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 4)
+        func._cleanup_old_entries(monitor=monitor)
+        self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 4)
+        self.assertEqual(RateMetricFunction.LAST_CLEANUP_RUNTIME_TS, now_ts)
