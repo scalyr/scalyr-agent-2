@@ -57,9 +57,6 @@ MAX_CACHE_SIZE = 10000
 # Stores cached list of MetricFunction class instances for the provided monitor and metric name.
 # This cache needs to be invalidated each time config is reloaded and config change is detected.
 MONITOR_METRIC_TO_FUNCTIONS_CACHE = LRUCache(MAX_CACHE_SIZE)
-# MONITOR_METRIC_TO_FUNCTIONS_CACHE = (
-#    {}
-# )  # type: Dict[six.text_type, List[MetricFunction]]
 
 # Dictionary which stores timing / run time information for "get_functions_for_metric" function
 GET_FUNCTIONS_FOR_METRICS_RUNTIME_STATS = get_empty_stats_dict()
