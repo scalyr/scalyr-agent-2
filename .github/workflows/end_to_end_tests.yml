@@ -401,13 +401,6 @@ jobs:
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
 
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
-      - name: Dump env
-        run: printenv | sort
-
       - name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
         env:
           COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
