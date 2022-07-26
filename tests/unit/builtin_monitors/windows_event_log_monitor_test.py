@@ -25,6 +25,7 @@ from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
 from scalyr_agent.test_base import ScalyrTestCase
 
 
+@pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
     def test_emit_warning_on_maximum_records_per_source_config_option_new_api(self):
         monitor_config = {
