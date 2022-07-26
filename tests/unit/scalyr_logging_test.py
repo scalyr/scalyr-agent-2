@@ -1375,4 +1375,5 @@ class AgentLogFormatterTestCase(BaseScalyrLogCaptureTestCase):
             self.assertIsNone(getattr(record, "fqname", None))
 
             formatter.format(record)
+            # pylint: disable=no-member
             self.assertEqual(record.fqname, expected_fqname)
