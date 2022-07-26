@@ -17,7 +17,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import json
 import os
 import threading
 import time
@@ -684,7 +683,7 @@ class NewJsonApi(NewApi):
             "SystemTime"
         ]
         event_json["name"] = self._logger.name
-        self._logger.emit_value("unused", json.dumps(event_json))
+        self._logger.emit_value("unused", scalyr_util.json_encode(event_json))
 
         self._bookmark_lock.acquire()
         try:
