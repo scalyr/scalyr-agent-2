@@ -1329,3 +1329,82 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             """Increment some of the counters pertaining to the performance of this monitor."""
             self.reported_lines += reported_lines
             self.errors += errors
+
+
+class AgentLogFormatterTestCase(BaseScalyrLogCaptureTestCase):
+    def test_format_fqname(self):
+        formatter = scalyr_logging.AgentLogFormatter()
+
+        input_expected_values = [
+            # contains scalyr_agent module
+            (
+                os.path.join(
+                    "tmp", "bar", "scalyr-agent-2", "scalyr_agent", "scalyr_logging.py"
+                ),
+                "scalyr_agent.scalyr_logging",
+            ),
+            (
+                os.path.join(
+                    "tmp",
+                    "bar",
+                    "scalyr-agent-2",
+                    "scalyr_agent",
+                    "copying_manager",
+                    "worker.py",
+                ),
+                "scalyr_agent.copying_manager.worker",
+            ),
+            (
+                os.path.join(
+                    "tmp",
+                    "bar",
+                    "scalyr-agent-2",
+                    "scalyr_agent",
+                    "third_party",
+                    "tcollector",
+                    "0",
+                    "collector.py",
+                ),
+                "scalyr_agent.third_party.tcollector.0.collector",
+            ),
+            (
+                os.path.join(
+                    "usr",
+                    "share",
+                    "scalyr-agent-2",
+                    "py",
+                    "scalyr_agent",
+                    "connection.py",
+                ),
+                "scalyr_agent.connection",
+            ),
+            # No scalyr_agent module
+            (
+                os.path.join("tmp", "bar", "scalyr-agent-2", "bar.py"),
+                "bar",
+            ),
+            (
+                os.path.join("tmp", "bar", "scalyr-agent-2", "core.py"),
+                "core",
+            ),
+            # Main agent binary
+            ("scalyr-agent-2", "scalyr-agent-2"),
+        ]
+
+        for path_name, expected_fqname in input_expected_values:
+            record = logging.LogRecord(
+                name="test",
+                level=logging.INFO,
+                pathname=path_name,
+                lineno=10,
+                msg="test message",
+                args=(),
+                exc_info=None,
+            )
+            record.error_code = None
+            record.component = "core"
+            self.assertIsNone(getattr(record, "fqname", None))
+
+            formatter.format(record)
+            # pylint: disable=no-member
+            self.assertEqual(record.fqname, expected_fqname)
