@@ -1,4 +1,4 @@
-# Copyright 2022 Scalyr Inc.
+# Copyright 2011-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -670,12 +670,12 @@ class NewJsonApi(NewApi):
         )
 
         # Dataset does not currently support arrays/lists, hence must convert to dicts/objects.
-        _convert_json_array_to_object(event_json)
+        event_json = _convert_json_array_to_object(event_json)
 
         # If safe, strip off the @ / # prefixes xmltodict uses to prevent conflicts.
         # Ref: json.dumps(xmltodict.parse('<entry>foo<text>bar</text></entry>'))
         #        => '{"entry": {"text": "bar", "#text": "foo"}}'
-        _strip_xmltodict_prefixes(event_json)
+        event_json = _strip_xmltodict_prefixes(event_json)
 
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
@@ -696,33 +696,35 @@ class NewJsonApi(NewApi):
             self._bookmark_lock.release()
 
 
-def _convert_json_array_to_object(obj):
-    for k, v in obj.items():
-        if isinstance(v, dict):
-            _convert_json_array_to_object(v)
-        elif isinstance(v, list):
-            obj[k] = {}
-            for i in range(len(v)):
-                obj[k][str(i)] = v[i]
-                _convert_json_array_to_object(v[i])
+def _convert_json_array_to_object(x):
+    if isinstance(x, list):
+        return {str(i): _convert_json_array_to_object(x[i]) for i in range(len(x))}
+    elif isinstance(x, dict):
+        return {k: _convert_json_array_to_object(v) for k, v in x.items()}
+    else:
+        return x
 
 
-def _strip_xmltodict_prefixes(obj):
-    keys = list(obj.keys())
-    changes = []
-    for k in keys:
-        if k[0] == "@" and k[1:] not in keys + [c[1] for c in changes]:
-            changes += [(k, k[1:])]
-        elif k == "#text" and "Text" not in keys + [c[1] for c in changes]:
-            changes += [("#text", "Text")]
+def _strip_xmltodict_prefixes(x):
+    if isinstance(x, dict):
+        rv = {}
 
-    for old, new in changes:
-        obj[new] = obj[old]
-        del obj[old]
+        # Sort backwards to ensure non-prefixed keys are handled first
+        for k in sorted(x.keys(), reverse=True):
+            dest_key = k
+            if k[0] == "@" and k[1:] not in rv:
+                dest_key = k[1:]
+            elif k == "#text" and "Text" not in rv:
+                dest_key = "Text"
 
-    for v in obj.values():
-        if isinstance(v, dict):
-            _strip_xmltodict_prefixes(v)
+            rv[dest_key] = _strip_xmltodict_prefixes(x[k])
+
+        return rv
+
+    elif isinstance(x, list):
+        return [_strip_xmltodict_prefixes(y) for y in x]
+    else:
+        return x
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
