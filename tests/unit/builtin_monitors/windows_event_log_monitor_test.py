@@ -16,17 +16,21 @@ from __future__ import absolute_import
 
 import mock
 import pytest
+import sys
 
-import scalyr_agent.builtin_monitors.windows_event_log_monitor
-from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
-    WindowEventLogMonitor,
-)
+if sys.platform == "Windows":
+    import scalyr_agent.builtin_monitors.windows_event_log_monitor
+    from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
+        WindowEventLogMonitor,
+    )
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_emit_warning_on_maximum_records_per_source_config_option_new_api(self):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -86,6 +90,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             "affect when using new evt API."
         )
 
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_newjsonapi_backwards_compatible(self):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -113,6 +118,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             )
         )
 
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_convert_json_array_to_object(self):
         self.assertEqual(
             scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
@@ -142,6 +148,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             {"a": "aa", "b": {"0": "b1", "1": "b2"}, "c": "cc"},
         )
 
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_strip_xmltodict_prefixes(self):
         self.assertEqual(
             scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
