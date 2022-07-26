@@ -412,24 +412,28 @@ jobs:
         env:
           COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
           COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
-          CIRCLE_BRANCH: ${{ github.ref_name }}
+          CIRCLE_BRANCH: ${{ github.head_ref }}
           CIRCLE_SHA1: ${{ github.sha }}
         run: |
           ls -la .coverage* || true
 
-          cp .circleci/.coveragerc_ci .coveragerc
-
           # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#$(pwd)#g" .coverage
+          sed -i "s#/usr/share/scalyr-agent-2/py/#${{ github.workspace }}#g" .coverage
 
-          # Submit it to codecov.io
-          coverage xml --rcfile=.coveragerc -i -o coverage.xml
-          ./scripts/submit-codecov-data.sh
+          # Prepare coverage for codecov.io
+          coverage xml --rcfile=.coveragerc_ci -i -o coverage.xml
 
           # Combine it and upload it to S3
-          coverage combine || true
+          coverage combine --rcfile=.coveragerc_ci || true
           export PYTHONPATH=.
           ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
+
+      - name: Upload Coverage to Codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          gcov: false
+          fail_ci_if_error: true
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
