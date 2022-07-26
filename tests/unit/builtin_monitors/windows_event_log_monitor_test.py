@@ -15,7 +15,7 @@
 from __future__ import absolute_import
 
 import mock
-import sys
+import pytest
 
 import scalyr_agent.builtin_monitors.windows_event_log_monitor
 from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
@@ -103,16 +103,15 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             )
         )
 
-        if sys.platform == "Windows":
-            monitor_config["json"] = True
+        monitor_config["json"] = True
 
-            monitor = WindowEventLogMonitor(monitor_config, mock_logger)
-            self.assertTrue(
-                isinstance(
-                    monitor._WindowEventLogMonitor__api,
-                    scalyr_agent.builtin_monitors.windows_event_log_monitor.NewJsonApi,
-                )
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        self.assertTrue(
+            isinstance(
+                monitor._WindowEventLogMonitor__api,
+                scalyr_agent.builtin_monitors.windows_event_log_monitor.NewJsonApi,
             )
+        )
 
     def test_convert_json_array_to_object(self):
         self.assertEqual(
