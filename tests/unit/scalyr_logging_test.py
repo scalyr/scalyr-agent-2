@@ -1338,24 +1338,55 @@ class AgentLogFormatterTestCase(BaseScalyrLogCaptureTestCase):
         input_expected_values = [
             # contains scalyr_agent module
             (
-                "/tmp/bar/scalyr-agent-2/scalyr_agent/scalyr_logging.py",
+                os.path.join(
+                    "tmp", "bar", "scalyr-agent-2", "scalyr_agent", "scalyr_logging.py"
+                ),
                 "scalyr_agent.scalyr_logging",
             ),
             (
-                "/tmp/bar/scalyr-agent-2/scalyr_agent/copying_manager/worker.py",
+                os.path.join(
+                    "tmp",
+                    "bar",
+                    "scalyr-agent-2",
+                    "scalyr_agent",
+                    "copying_manager",
+                    "worker.py",
+                ),
                 "scalyr_agent.copying_manager.worker",
             ),
             (
-                "/tmp/bar/scalyr-agent-2/scalyr_agent/third_party/tcollector/0/collector.py",
+                os.path.join(
+                    "tmp",
+                    "bar",
+                    "scalyr-agent-2",
+                    "scalyr_agent",
+                    "third_party",
+                    "tcollector",
+                    "0",
+                    "collector.py",
+                ),
                 "scalyr_agent.third_party.tcollector.0.collector",
             ),
             (
-                "/usr/share/scalyr-agent-2/py/scalyr_agent/connection.py",
+                os.path.join(
+                    "usr",
+                    "share",
+                    "scalyr-agent-2",
+                    "py",
+                    "scalyr_agent",
+                    "connection.py",
+                ),
                 "scalyr_agent.connection",
             ),
             # No scalyr_agent module
-            ("/tmp/bar/scalyr-agent-2/bar.py", "bar"),
-            ("/tmp/bar/scalyr-agent-2/core.py", "core"),
+            (
+                os.path.join("tmp", "bar", "scalyr-agent-2", "bar.py"),
+                "bar",
+            ),
+            (
+                os.path.join("tmp", "bar", "scalyr-agent-2", "core.py"),
+                "core",
+            ),
             # Main agent binary
             ("scalyr-agent-2", "scalyr-agent-2"),
         ]
