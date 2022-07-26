@@ -2867,7 +2867,7 @@ class DockerMetricFetcher(object):
                     container=container_id, stream=False
                 )
             except Exception as e:
-                global_log.error(
+                global_log.warning(
                     "Error readings stats for '%s': %s\n%s"
                     % (container_id, six.text_type(e), traceback.format_exc()),
                     limit_once_per_x_secs=300,
