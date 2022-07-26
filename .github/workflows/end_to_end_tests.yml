@@ -305,7 +305,7 @@ jobs:
           extra_yaml_paths: "tests/e2e/k8s_om_monitor/scalyr-agent-extra-config-configmap.yaml"
 
       - name: Verify data has been ingested
-        timeout-minutes: 8
+        timeout-minutes: 14
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
