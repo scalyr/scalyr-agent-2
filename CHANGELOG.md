@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.32 "Occao" - July 20, 2022 - In development
+## 2.1.32 "Occao" - July 27, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 20, 2022 12:29 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
 --->
 
 Windows:
