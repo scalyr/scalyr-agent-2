@@ -442,7 +442,7 @@ jobs:
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
 
-      - name: Submit Coverage Data to codecov.io and Combine it and Upload it to S3
+      - name: Prepare Coverage Data for codecov.io and Combine it and Upload it to S3
         env:
           COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
           COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
