@@ -2449,7 +2449,7 @@ TODO:  Back fill the instructions here.
             if result is not None:
                 self.__log_json_metrics(container, result)
         except Exception as e:
-            self._logger.error(
+            self._logger.warning(
                 "Error readings stats for '%s': %s\n%s"
                 % (container, six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,

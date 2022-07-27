@@ -25,6 +25,7 @@ import socket
 
 if False:  # NOSONAR
     from typing import Union
+    from typing import Dict
     from typing import Tuple
     from typing import Callable
     from typing import Optional
@@ -95,14 +96,6 @@ except ImportError:
 
     new_md5 = False
 
-
-USJON_NOT_AVAILABLE_MSG = """
-ujson library is not available. You can install it using pip:
-
-    pip install usjon
-
-Original error: %s
-""".strip()
 
 ORJSON_NOT_AVAILABLE_MSG = """
 orjson library is not available. You can install it using pip.
@@ -217,44 +210,13 @@ def warn_on_old_or_unsupported_python_version():
 
 
 def get_json_implementation(lib_name):
-    if lib_name not in ["json", "ujson", "orjson"]:
+    if lib_name not in ["json", "orjson"]:
         raise ValueError("Unsupported json library %s" % lib_name)
 
     if lib_name == "orjson" and not six.PY3:
         raise ValueError('"orjson" is only available under Python 3')
 
-    if lib_name == "ujson":
-        try:
-            import ujson  # pylint: disable=import-error
-        except ImportError as e:
-            raise ImportError(USJON_NOT_AVAILABLE_MSG % (str(e)))
-
-        def ujson_dumps_custom(obj, fp):
-            """Serialize the objection.
-            Note, this function returns different types (text vs binary) based on which version of Python you are using.
-            We leave the type unchanged here because the code that invokes this function
-            will convert it to the final desired return type.
-            Otherwise, we'd be double converting the result in some cases.
-            :param obj: The object to serialize
-            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
-            :type obj: dict
-            :return: If fp is not None, then the string representing the serialization.
-            :rtype: Python3 - six.text_type, Python2 - six.binary_type
-            """
-            # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
-            # Detect and complain loudly.
-            if isinstance(obj, (json_lib.JsonObject, json_lib.JsonArray)):
-                raise TypeError(
-                    "ujson does not correctly encode objects of type: %s" % type(obj)
-                )
-            if fp is not None:
-                return ujson.dump(obj, sort_keys=SORT_KEYS)
-            else:
-                return ujson.dumps(obj, sort_keys=SORT_KEYS)
-
-        return lib_name, ujson_dumps_custom, ujson.loads
-
-    elif lib_name == "orjson":
+    if lib_name == "orjson":
         # todo: throw a more friendly error message on import error with info on how to install it
         # special case for 3.5
         try:
@@ -368,9 +330,9 @@ def set_json_lib(lib_name):
 # We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
 # encoding
 if six.PY3:
-    JSON_LIBS_TO_USE = ["orjson", "ujson", "json"]
+    JSON_LIBS_TO_USE = ["orjson", "json"]
 else:
-    JSON_LIBS_TO_USE = ["ujson", "json"]
+    JSON_LIBS_TO_USE = ["json"]
 
 last_error = None
 for json_lib_to_use in JSON_LIBS_TO_USE:
@@ -2763,3 +2725,43 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
             return self._process.pid  # type: ignore  # pylint: disable=no-member
         except:
             return None
+
+
+def get_hash_for_flat_dictionary(data):
+    # type: (Dict[str, Union[int, bool, six.text_type]]) -> six.text_type
+    """
+    Calculate hash for the provided dictionary which needs to be flat (aka no nested values).
+
+    NOTE: Result of this function is not stable across Python interpreters since it results on
+    hash() function.
+
+    In case we ever require stable results across runs, we should change hash() function to sha256
+    hash or similar.
+
+    NOTE: Dictionary must not be nested and can only contain simple values (numbers, strings,
+    booleans).
+    """
+    data = data or {}
+
+    # NOTE: We use hash over hashlib since it's faster. Keep in mind that result of hash is Python
+    # interpreter instance specific and is not stable acros the run. This is fine in our case where
+    # we only store this hash in memory of a single process (and we never serialize / write it out
+    # to disk or similar). With hash() function, there is also a larger chance of a collision, but
+    # that's fine here.
+    return six.text_type(hash(frozenset(data.items())))
+
+
+def get_flat_dictionary_memory_usage(data):
+    # type: (dict) -> int
+    """
+    Return approximate memory usage (bytes) for the provided dictionary.
+
+    This function only supports flat dictionaries aka dictionaries with simple types.
+    """
+    # Raw dictionary size
+    size = sys.getsizeof(data)
+    # Size for the actual keys and values
+    size += sum(map(sys.getsizeof, data.values())) + sum(
+        map(sys.getsizeof, data.keys())
+    )
+    return size

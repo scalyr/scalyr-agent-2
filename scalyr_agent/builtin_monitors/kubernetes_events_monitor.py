@@ -390,9 +390,12 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         # NOTE: Right now Kubernetes Explorer functionality also needs data from Kubernetes events
         # monitor so in case explorer functionality is enabled, we also enable events monitor
-        if self._global_config.k8s_explorer_enable:
+        if self.__disable_monitor and self._global_config.k8s_explorer_enable:
+            # NOTE: In case
             global_log.info(
-                "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor"
+                "k8s_explorer_enable config option is set to true, enabling kubernetes events monitor",
+                limit_once_per_x_secs=(12 * 60 * 60),
+                limit_key="k8s-ev-expr-enabled",
             )
             self.__disable_monitor = False
 
@@ -671,11 +674,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
-
-            if self.__log_watcher:
-                self.log_config = self.__log_watcher.add_log_config(
-                    self.module_name, self.log_config
-                )
 
             # First instance of k8s api uses the main rate limiter.  Leader election related API calls to the k8s
             # masters will go through this api/rate limiter.

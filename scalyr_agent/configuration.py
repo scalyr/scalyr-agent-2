@@ -414,6 +414,20 @@ class Configuration(object):
 
             self.__k8s_log_configs = list(self.__config.get_json_array("k8s_logs"))
 
+            if (
+                self.__log_warnings
+                and self.instrumentation_stats_log_interval > 0
+                and self.instrumentation_stats_log_interval < (30 * 60 * 60)
+            ):
+                self.__logger.info(
+                    "Instrumentation logging is enabled (instrumentation_stats_log_interval config "
+                    "option), but logging interval is "
+                    "set lower than 30 minutes. To avoid overhead you are advised to "
+                    "set this interval to 30 minutes or more in production.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="instrumentation-interval-too-low",
+                )
+
             # add in the profile logs if we have enabled profiling
             if self.enable_profiling and self.__log_warnings:
                 self.__logger.info(
@@ -624,7 +638,7 @@ class Configuration(object):
             return
 
         # Set json library based on the config value. If "auto" is provided this means we use
-        # default behavior which is try to use ujson and if that's not available fall back to
+        # default behavior which is try to use orjson and if that's not available fall back to
         # stdlib json
         json_library = self.json_library
         current_json_library = scalyr_util.get_json_lib()
@@ -1222,6 +1236,14 @@ class Configuration(object):
         return self.__get_config().get_float("config_change_check_interval")
 
     @property
+    def instrumentation_stats_log_interval(self):
+        return self.__get_config().get_int("instrumentation_stats_log_interval")
+
+    @property
+    def metric_functions_cleanup_interval(self):
+        return self.__get_config().get_int("metric_functions_cleanup_interval")
+
+    @property
     def overall_stats_log_interval(self):
         return self.__get_config().get_float("overall_stats_log_interval")
 
@@ -1645,6 +1667,17 @@ class Configuration(object):
 
         This value should include a list of metric name (global across all the monitors for which)
         rate value should be calculated on the agent side.
+
+        Example values:
+
+        1) Metric name without extra fields:
+          - openmetrics_monitor:metric1
+          - openmetrics_monitor:metric2
+
+        2) Metric name with extra fields (in this case, rate will only be calculated for metric)
+           where extra field "mode" value matches "user" and "kernel":
+          - openmetrics_monitor:docker.cpu_usage_seconds_total:mode=user
+          - openmetrics_monitor:docker.cpu_usage_seconds_total:mode=kernel
         """
         return self.__get_config().get_json_array("calculate_rate_metric_names")
 
@@ -2158,10 +2191,10 @@ class Configuration(object):
             config,
             "json_library",
             "auto",
-            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json and orjson",
             apply_defaults,
             env_aware=True,
-            valid_values=["auto", "json", "ujson", "orjson"],
+            valid_values=["auto", "json", "orjson"],
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -3148,6 +3181,32 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_int(
             config, "disable_leak_config_reload", None, description, apply_defaults
+        )
+
+        # How often to log instrumentation related stats using INFO log level to agent.log
+        # (in seconds)
+        # NOTE: To avoid large overhead of logging this stats often, this value should not be
+        # set lower than 10-30 minutes in production environments
+        self.__verify_or_set_optional_int(
+            config,
+            "instrumentation_stats_log_interval",
+            # defaults to disabled
+            0,
+            description,
+            apply_defaults,
+            min_value=0,
+            env_aware=True,
+        )
+
+        # How often (in seconds) clean up routine should run for metric functions functionality
+        self.__verify_or_set_optional_int(
+            config,
+            "metric_functions_cleanup_interval",
+            (30 * 60),
+            description,
+            apply_defaults,
+            min_value=0,
+            env_aware=True,
         )
 
         self.__verify_or_set_optional_float(
@@ -4650,7 +4709,16 @@ def perform_str_substitution(str_value, substitutions):
     @rtype: str or unicode
     """
     result = str_value
-    for (var_name, value) in six.iteritems(substitutions):
+
+    # NOTE: Right now out substitution code also supports partial substitutions which means we can't
+    # use regular expression directly, but we need to sort substitutions variables by length (desc)
+    # before we perform substitutions to ensure we use the correct substitution variable in case
+    # multiple variables share the same prefix.
+    # For example: $SCALYR_FOO_VAR1, $SCALYR_FOO_VAR2, $SCALYR_FOO
+    substitutions_variable_names = sorted(substitutions.keys(), key=len, reverse=True)
+
+    for var_name in substitutions_variable_names:
+        value = substitutions[var_name]
         result = result.replace("$%s" % var_name, value)
     return result
 

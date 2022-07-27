@@ -42,7 +42,7 @@ CACHED_TEST_DATA = {
 
 @pytest.mark.parametrize("sort_keys", [False, True], ids=["no_sort_keys", "sort_keys"])
 @pytest.mark.parametrize("keys_count", [10, 100, 1000])
-@pytest.mark.parametrize("json_lib", ["json", "ujson", "orjson"])
+@pytest.mark.parametrize("json_lib", ["json", "orjson"])
 @pytest.mark.benchmark(group="json_encode")
 def test_json_encode_with_custom_options(benchmark, json_lib, keys_count, sort_keys):
     # NOTE: orjson doesn't support sort_keys=True
@@ -82,7 +82,7 @@ def test_json_encode_with_custom_options(benchmark, json_lib, keys_count, sort_k
     ],
 )
 # fmt: on
-@pytest.mark.parametrize("json_lib", ["json", "ujson", "orjson"])
+@pytest.mark.parametrize("json_lib", ["json", "orjson"])
 @pytest.mark.benchmark(group="json_encode")
 def test_json_encode(benchmark, json_lib, log_tuple):
     if not six.PY3 and json_lib == "orjson":
@@ -104,7 +104,7 @@ def test_json_encode(benchmark, json_lib, log_tuple):
     ],
 )
 # fmt: on
-@pytest.mark.parametrize("json_lib", ["json", "ujson", "orjson"])
+@pytest.mark.parametrize("json_lib", ["json", "orjson"])
 @pytest.mark.benchmark(group="json_decode")
 def test_json_decode(benchmark, json_lib, log_tuple):
     if not six.PY3 and json_lib == "orjson":

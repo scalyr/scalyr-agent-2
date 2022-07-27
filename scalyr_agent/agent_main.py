@@ -121,6 +121,7 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import AgentNotRunning
 from scalyr_agent.build_info import get_build_revision
 from scalyr_agent.metrics.base import clear_internal_cache
+
 from scalyr_agent import config_main
 from scalyr_agent import compat
 import scalyr_agent.monitors_manager
@@ -664,15 +665,6 @@ class ScalyrAgent(object):
             log.error("%s" % six.text_type(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
             return 1
-
-        if sys.version_info[:2] < (2, 6):
-            print(
-                "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019",
-                file=sys.stderr,
-            )
-            log.error(
-                "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019"
-            )
 
         if not self.__no_fork:
             # Do one last check to just cut down on the window of race conditions.

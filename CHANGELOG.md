@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.33 "TBD" - Aug 28, 2022
+## 2.1.32 "Occao" - July 27, 2022
 
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
 --->
 
 Windows:
@@ -12,8 +12,19 @@ Windows:
 * Update Windows Process Metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
 * Update Windows Process Metrics monitor to throw an error in case invalid monitor configuration is specified (neither "pid" nor "commandline" config option is specified or both config options which are mutually exclusive are specified).
 
+Bug fixes:
+* Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+* Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status. 
+* Fix a bug in scalyr-agent-2-config ``--export-config``, ``import-config`` options caused by Python 2 and 3 code incompatibility.
+* Fix a bug with the wrong executable ``scalyr-agent-2-config`` in Docker and Kubernetes, due to which it could not be used.
+
+Docker images:
+* Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.
+
 Other:
 * Support for Python 2.6 has been dropped.
+* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
+* Update agent log messages to include full name of the module which produced the message.
 
 ## 2.1.31 "Irati" - Jun 28, 2022
 
@@ -39,6 +50,7 @@ Docker images:
 Other:
 * Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
 * Upgrade dependency ``requests`` library to 2.25.1.
+* Failed docker container metric status requests from the docker client now logged as warnings instead of errors.
 
 ## 2.1.30 "Heturn" - May 17, 2022
 

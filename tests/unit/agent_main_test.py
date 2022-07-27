@@ -17,6 +17,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import os
+import shutil
 import sys
 import subprocess
 import platform
@@ -25,6 +26,8 @@ from io import open
 import functools
 import tempfile
 import json
+import tarfile
+import six
 
 import mock
 
@@ -593,19 +596,19 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         return 0, 0, 0
 
 
+_AGENT_MAIN_PATH = os.path.join(
+    __scalyr__.get_install_root(), "scalyr_agent", "agent_main.py"
+)
+
+
 class TestAgentMainArgumentParsing:
     """
     Test various command line inputs to the agent_main.py script.
     """
 
-    def setup(self):
-        self.agent_main_path = os.path.join(
-            __scalyr__.get_install_root(), "scalyr_agent", "agent_main.py"
-        )
-
     def _run_command_get_output(self, cmd):
 
-        final_commands = [sys.executable, self.agent_main_path]
+        final_commands = [sys.executable, _AGENT_MAIN_PATH]
         final_commands.extend(cmd)
         output = subprocess.check_output(
             final_commands,
@@ -670,3 +673,142 @@ class TestAgentMainArgumentParsing:
             "The service process could not connect to the service controller."
             in err_info.value.stderr.decode()
         )
+
+
+class TestConfigArgumentParsing:
+    def setup(self):
+        self.output_dir = tempfile.mkdtemp()
+        self.output_file = os.path.join(self.output_dir, "config.tar.gz")
+
+        self.config_path = os.path.join(self.output_dir, "agent.json")
+        self.result_dir_path = os.path.join(self.output_dir, "extracted")
+
+        self.extracted_config_path = os.path.join(self.result_dir_path, "agent.json")
+
+    def teardown(self):
+        shutil.rmtree(self.output_dir)
+
+    def _write_config(self, config):
+        with open(self.config_path, "w") as f:
+            f.write(six.ensure_text(json.dumps(config)))
+
+    def _extract_result(self, tar_obj):
+        os.mkdir(self.result_dir_path)
+
+        orig_cwd = os.getcwd()
+        os.chdir(self.result_dir_path)
+        try:
+            tar_obj.extractall()
+        finally:
+            os.chdir(orig_cwd)
+            tar_obj.close()
+
+    def test_export_and_import_config(self):
+        """
+        Test scalyr-agent-3 config --export-config command.
+        """
+
+        original_config = {"api_key": "key"}
+
+        self._write_config(config=original_config)
+
+        subprocess.check_call(
+            [
+                sys.executable,
+                _AGENT_MAIN_PATH,
+                "config",
+                "--export-config",
+                self.output_file,
+                "--config-file",
+                self.config_path,
+            ]
+        )
+
+        tar = tarfile.open(self.output_file)
+        self._extract_result(tar)
+
+        # That same agent config has to be extracted.
+        assert os.path.isfile(self.extracted_config_path)
+
+        with open(self.extracted_config_path, "r") as f:
+            extracted_config = json.load(f)
+
+        assert extracted_config == original_config
+
+        # Change original config and them import it back.
+        changed_config = {"api_key": "key2"}
+        self._write_config(config=changed_config)
+
+        subprocess.check_call(
+            [
+                sys.executable,
+                _AGENT_MAIN_PATH,
+                "config",
+                "--import-config",
+                self.output_file,
+                "--config-file",
+                self.config_path,
+            ]
+        )
+
+        with open(self.config_path, "r") as f:
+            imported_config = json.loads(six.ensure_text(f.read()))
+
+        assert imported_config == original_config
+
+    def test_export_and_import_config_stdout(self):
+        """
+        Test scalyr-agent-3 config --export-config command, but from stdout.
+        """
+
+        original_config = {"api_key": "key"}
+        self._write_config(config=original_config)
+
+        output = subprocess.check_output(
+            [
+                sys.executable,
+                _AGENT_MAIN_PATH,
+                "config",
+                "--export-config",
+                "-",
+                "--config-file",
+                self.config_path,
+            ]
+        )
+
+        # Write zipped config back to file and
+        with open(self.output_file, "wb") as f:
+            f.write(output)
+
+        tar = tarfile.open(self.output_file)
+        self._extract_result(tar)
+
+        assert os.path.isfile(self.extracted_config_path)
+
+        with open(self.extracted_config_path, "r") as f:
+            extracted_config = json.load(f)
+
+        assert extracted_config == original_config
+
+        # Change original config and them import it back.
+        changed_config = {"api_key": "key2"}
+        self._write_config(config=changed_config)
+
+        with open(self.output_file, "rb") as f:
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    _AGENT_MAIN_PATH,
+                    "config",
+                    "--import-config",
+                    "-",
+                    "--config-file",
+                    self.config_path,
+                ],
+                stdin=f,
+            )
+
+        with open(self.config_path, "r") as f:
+            imported_config = json.loads(six.ensure_text(f.read()))
+
+        assert imported_config == original_config
