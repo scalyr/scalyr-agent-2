@@ -60,8 +60,7 @@ contname_verifier="ci-agent-k8s-${CIRCLE_BUILD_NUM}-verifier"
 # Delete existing resources
 if [[ "$delete_existing_objects" == "delete_existing_k8s_objs" ]]; then
     echo ""
-    echo "=================================================="
-    echo "Deleting existing k8s objects"
+    echo "::group::Deleting existing k8s objects"
     echo "=================================================="
     kubectl delete deployment ${contname_verifier} || truepushd
     kubectl delete deployment ${contname_uploader} || true
@@ -69,11 +68,11 @@ if [[ "$delete_existing_objects" == "delete_existing_k8s_objs" ]]; then
     kubectl delete configmap scalyr-config || true
     kubectl delete secret scalyr-api-key || true
     kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml || true
+    echo "::endgroup::"
 fi
 
 echo ""
-echo "=================================================="
-echo "Creating k8s objects"
+echo "::group::Creating k8s objects"
 echo "=================================================="
 # Create service account
 kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
@@ -98,13 +97,13 @@ cat <<'EOF' >./config.json
 }
 EOF
 kubectl create configmap scalyr-extra-config --from-file=config.json
+echo "::endgroup::"
 
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
 
 echo ""
-echo "=================================================="
-echo "Building agent image"
+echo "::group::Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
@@ -114,10 +113,10 @@ perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 # fine since we only test amd64 image on Circle CI.
 python3 build_package_new.py k8s-debian --tag "local_k8s_image" --coverage --platforms linux/amd64
 docker image ls
+echo "::endgroup::"
 
 echo ""
-echo "=================================================="
-echo "Customizing daemonset YAML & starting agent"
+echo "::group::Customizing daemonset YAML & starting agent"
 echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
@@ -129,13 +128,13 @@ kubectl create -f ./scalyr-agent-2-with-extra-config.yaml
 # Capture agent pod
 agent_hostname=$(kubectl get pods | fgrep scalyr-agent-2 | awk {'print $1'})
 echo "Agent pod == ${agent_hostname}"
+echo "::endgroup::"
 
 # Launch Uploader container (only writes to stdout, but needs to query Scalyr to verify agent liveness)
 # You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
 # query to work (uploader container waits for agent to be alive before uploading data)
 echo ""
-echo "=================================================="
-echo "Starting uploader"
+echo "::group::Starting uploader"
 echo "=================================================="
 kubectl run ${contname_uploader} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
@@ -148,21 +147,22 @@ ${contname_uploader} ${max_wait} \
 # Capture uploader pod
 uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
+echo "::endgroup::"
 
 sleep 10
-echo "=================================================="
-echo "Agent pod logs and kubernetes events"
+echo ""
+echo "::group::Agent pod logs and kubernetes events"
 echo "=================================================="
 kubectl get event
 kubectl logs "${agent_hostname}"
+echo "::endgroup::"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 echo ""
+echo "::group::Starting verifier"
 echo "=================================================="
-echo "Starting verifier"
-echo "=================================================="
-kubectl run -it --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
+kubectl run -t --attach=true --wait=true --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
 ${contname_verifier} ${max_wait} \
 --mode verifier \
@@ -171,6 +171,7 @@ ${contname_verifier} ${max_wait} \
 --agent_hostname ${agent_hostname} \
 --uploader_hostname ${uploader_hostname} \
 --debug true"
+echo "::endgroup::"
 
 
 echo "Stopping agent"
