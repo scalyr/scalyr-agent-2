@@ -37,13 +37,18 @@ class FilesChecksumTracker:
         files are added.
     """
 
-    def __init__(self):
+    def __init__(
+            self,
+            tracked_file_globs: List[pl.Path] = None
+    ):
 
+        tracked_file_globs = tracked_file_globs or []
+        self.tracked_file_globs = [pl.Path(g) for g in tracked_file_globs]
         # All final file paths to track.
         self._original_files = []
 
         # Resolve file globs to get all files to track.
-        for file_glob in self._tracked_file_globs:
+        for file_glob in self.tracked_file_globs:
             path = pl.Path(file_glob)
 
             if path.is_absolute():
@@ -63,13 +68,13 @@ class FilesChecksumTracker:
         )
         self._isolated_source_root_path = pl.Path(self._isolated_source_tmp_dir.name)
 
-    @property
-    @abc.abstractmethod
-    def _tracked_file_globs(self) -> List[pl.Path]:
-        """
-        The list of all files to be tracked.
-        """
-        pass
+    # @property
+    # @abc.abstractmethod
+    # def _tracked_file_globs(self) -> List[pl.Path]:
+    #     """
+    #     The list of all files to be tracked.
+    #     """
+    #     pass
 
     def _get_files_checksum(self, additional_seed: str = None) -> str:
         """
@@ -111,14 +116,5 @@ class FilesChecksumTracker:
         os.chdir(self._isolated_source_root_path)
         try:
             return function()
-        except Exception as e:
-
-            globs = [str(g) for g in self._tracked_file_globs]
-            LOG.error(
-                f"'{type(self).__name__}' has failed. "
-                "HINT: Make sure that you have specified all files. "
-                f"For now, tracked files are: {globs}"
-            )
-            raise e from None
         finally:
             os.chdir(original_cwd)

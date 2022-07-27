@@ -1,0 +1,5 @@
+[scalyr_test_repo]
+name=ScalyrTestRepo
+baseurl=http://{repo_host}:{repo_port}
+enabled=1
+gpgcheck=0

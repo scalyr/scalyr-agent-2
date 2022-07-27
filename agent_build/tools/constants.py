@@ -69,17 +69,13 @@ class PackageType(enum.Enum):
     DOCKER_SYSLOG = "docker-syslog"
     DOCKER_API = "docker-api"
     K8S = "k8s"
+    K8S_WITH_OPENMETRICS = "k8s-with-openmetrics"
     MSI = "msi"
 
 
-# CPU architectures or platforms that has to be supported by the Agent docker images,
-AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
-    DockerPlatform.AMD64,
-    DockerPlatform.ARM64,
-    DockerPlatform.ARMV7,
-]
 
-AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING = []
 
-for plat in AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
-    AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING.append(plat.value)
+# AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING = []
+#
+# for plat in AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
+#     AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING.append(plat.value)
