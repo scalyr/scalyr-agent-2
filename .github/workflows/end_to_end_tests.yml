@@ -374,6 +374,39 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#cloud-tech'
 
+  k8s-smoketest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Setup Python 3.8
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: 3.8
+          cache: 'pip'
+      - name: Install Python Dependencies
+        run: |
+          pip install -r dev-requirements.txt
+          pip install "apache-libcloud==3.4.1"
+
+      - name: Setup minikube k8s cluster
+        uses: ./.github/actions/setup-minikube-cluster/
+        with:
+          k8s_version: v1.18.0
+          minikube_driver: ""
+          container_runtime: "docker"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Run Tests (with coverage)
+        env:
+          CIRCLE_BUILD_NUM: ${{ github.run_number }}
+          SCALYR_SERVER: https://agent.scalyr.com
+          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
+          READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
+        run: |
+          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
+
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     runs-on: ubuntu-latest
