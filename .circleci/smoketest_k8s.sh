@@ -162,7 +162,7 @@ echo "::endgroup::"
 echo ""
 echo "::group::Starting verifier"
 echo "=================================================="
-kubectl run --attach=true --wait=true --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
+kubectl run --pod-running-timeout=15m0s --attach=true --wait=true --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
 ${contname_verifier} ${max_wait} \
 --mode verifier \
