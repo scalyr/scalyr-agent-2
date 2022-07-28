@@ -350,13 +350,6 @@ class ContainerImageBuilder(CacheableBuilder):
                 debug=True,
             )
 
-# CPU architectures or platforms that has to be supported by the Agent docker images,
-_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
-    Architecture.X86_64.as_docker_platform.value,
-    Architecture.ARM64.as_docker_platform.value,
-    Architecture.ARMV7.as_docker_platform.value,
-]
-
 _AGENT_BUILD_DOCKER_PATH = _AGENT_BUILD_PATH / "docker"
 _AGENT_BUILD_DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools/environment_deployments/steps"
 _AGENT_BUILD_REQUIREMENTS_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
@@ -386,6 +379,14 @@ _DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS = [
     ContainerPackageDistro.DEBIAN,
     ContainerPackageDistro.ALPINE
 ]
+
+# CPU architectures or platforms that has to be supported by the Agent docker images,
+_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
+    Architecture.X86_64.as_docker_platform.value,
+    # Architecture.ARM64.as_docker_platform.value,
+    # Architecture.ARMV7.as_docker_platform.value,
+]
+
 
 # Here listed all possible types of the containerised agent builds.
 _CONTAINER_PACKAGE_INFOS = [
