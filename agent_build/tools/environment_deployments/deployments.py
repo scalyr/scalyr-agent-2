@@ -490,14 +490,11 @@ class ShellScriptDeploymentStep(DeploymentStep):
         for name, value in self.environment_variables.items():
             env[name] = value
 
-        try:
-            output = common.run_command(
-                command_args,
-                env=env,
-                debug=True,
-            ).decode()
-        except subprocess.CalledProcessError as e:
-            raise DeploymentStepError(stdout=e.stdout, stderr=e.stderr) from None
+        output = common.run_command(
+            command_args,
+            env=env,
+            debug=True,
+        ).decode()
 
         return output
 
