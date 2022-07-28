@@ -87,7 +87,7 @@ jobs:
 
       - name: Build Image
         run: |
-          echo '["docker-json", "docker-syslog", "docker-api", "k8s"]' | jq -c '.[]' | while read i; do
+          echo '["docker-json", "docker-syslog", "docker-api", "k8s"]' | jq -c -r '.[]' | while read i; do
           #echo "${{toJSON(matrix.image-type)}}" | jq -c -r '.[]' | while read i; do
             echo "::group::Build $i"
             python3 build_package_new.py $i-${{ matrix.image-distro-name }} \
