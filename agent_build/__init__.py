@@ -7,7 +7,7 @@ INSTALL_TEST_REQUIREMENT_STEP = ShellScriptDeploymentStep(
     name="install_test_requirements",
     architecture=Architecture.UNKNOWN,
     script_path= SOURCE_ROOT / "agent_build/tools/environment_deployments/steps/deploy-test-environment.sh",
-    tracked_file_globs=[SOURCE_ROOT / "agent_build/requirement-files*.txt"],
+    tracked_file_globs=[SOURCE_ROOT / "agent_build/requirement-files/*.txt"],
     cacheable=True
 )
 

@@ -907,10 +907,32 @@ class CacheableBuilder:
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
 
-        # Parse argument docstring to put them as 'help' for parser arguments.
+        parser.add_argument(
+            "--locally",
+            action="store_true"
+        )
+
+        parser.add_argument(
+            "--get-all-cacheable-steps",
+            dest="get_all_cacheable_steps",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--run-all-cacheable-steps",
+            dest="run_all_cacheable_steps",
+            action="store_true"
+        )
+
+        if cls.__init__ is CacheableBuilder.__init__:
+            return
+
+
+
         builder_signature = inspect.signature(cls.__init__)
         argument_docs = {}
         arg_name = None
+        # Parse argument docstring to put them as 'help' for parser arguments.
         for line in cls.__init__.__doc__.splitlines():
             m = re.match(r"\s*:param ([a-zA-Z_]+):\s*(.*)", line.strip())
             if m:
@@ -946,23 +968,6 @@ class CacheableBuilder:
                 **additional_args
             )
 
-        parser.add_argument(
-            "--locally",
-            action="store_true"
-        )
-
-        parser.add_argument(
-            "--get-all-cacheable-steps",
-            dest="get_all_cacheable_steps",
-            action="store_true",
-        )
-
-        parser.add_argument(
-            "--run-all-cacheable-steps",
-            dest="run_all_cacheable_steps",
-            action="store_true"
-        )
-
     @classmethod
     def handle_command_line_arguments(
             cls,
@@ -981,21 +986,23 @@ class CacheableBuilder:
                 step.run()
             exit(0)
 
-        cls_signature = inspect.signature(cls.__init__)
-        print(dict(cls_signature.parameters.items()))
-        constructor_args = {}
-        for name, param in cls_signature.parameters.items():
-            if name == "self":
-                continue
+        if cls.__init__ is not CacheableBuilder.__init__:
+            cls_signature = inspect.signature(cls.__init__)
+            constructor_args = {}
+            for name, param in cls_signature.parameters.items():
+                if name == "self":
+                    continue
 
-            value = getattr(args, name, None)
+                value = getattr(args, name, None)
 
-            if value:
-                if param.annotation in [List, list]:
-                    # this is comma separated string
-                    value = value.split(",")
+                if value:
+                    if param.annotation in [List, list]:
+                        # this is comma separated string
+                        value = value.split(",")
 
-            constructor_args[name] = value
+                constructor_args[name] = value
+        else:
+            constructor_args = {}
 
         builder = cls(**constructor_args)
 
