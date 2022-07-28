@@ -61,7 +61,7 @@ jobs:
       - name: Get builder fqdn
         id: get-builder-fqdn
         run: |
-          ::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} --fqdn)
+          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
