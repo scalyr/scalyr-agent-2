@@ -487,13 +487,17 @@ for package_info in _CONTAINER_PACKAGE_INFOS:
             platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
         )
 
+        builder_name = f"{package_info.package_type.value}-{distro.value}"
+
         class _ImageBuilder(ContainerImageBuilder):
-            NAME = f"{package_info.package_type.value}-{distro.value}"
+            NAME = builder_name
             PACKAGE_TYPE = package_info.package_type
             CONFIG_PATH = SOURCE_ROOT / "docker" / f"{package_info.package_type.value}-config"
             RESULT_IMAGE_NAMES = package_info.result_image_names[:]
             BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = base_docker_image_step
+            FQDN = f"{__name__}.{builder_name}"
 
+        setattr(sys.modules[__name__], builder_name, _ImageBuilder)
 
-        DOCKER_IMAGE_PACKAGE_BUILDERS[_ImageBuilder.NAME] = _ImageBuilder
+        DOCKER_IMAGE_PACKAGE_BUILDERS[builder_name] = _ImageBuilder
 

@@ -757,6 +757,8 @@ class CacheableBuilder:
     REQUIRED_BUILDER_CLASSES: List[Type['CacheableBuilder']] = []
     DEPLOYMENT_STEP: DeploymentStep = None
 
+    FQDN: str = None
+
     def __new__(cls, *args, **kwargs):
         obj = super(CacheableBuilder, cls).__new__(cls)
 
@@ -797,6 +799,22 @@ class CacheableBuilder:
 
         return result
 
+    @classmethod
+    def get_fully_qualified_name(cls):
+        """
+        Return fully qualified name of the class.
+        :return:
+        """
+        if cls.FQDN:
+            return cls.FQDN
+
+        cls_module = sys.modules[cls.__module__]
+        module_path = pl.Path(cls_module.__file__)
+        module_parent_rel_dir = module_path.parent.relative_to(SOURCE_ROOT)
+        module_full_name = ".".join(str(module_parent_rel_dir).split(os.sep)) + "." + module_path.stem
+        return f"{module_full_name}.{cls.__qualname__}"
+
+
     def build(self, locally: bool = False):
         """
         The function where the actual build of the package happens.
@@ -831,20 +849,11 @@ class CacheableBuilder:
 
         build_package_script_path = pl.Path("/scalyr-agent-2/agent_build/scripts/builder_helper.py")
 
-        cls = type(self)
-        cls_module = sys.modules[cls.__module__]
-        module_path = pl.Path(cls_module.__file__)
-        module_parent_rel_dir = module_path.parent.relative_to(SOURCE_ROOT)
-        module_full_name = ".".join(str(module_parent_rel_dir).split(os.sep)) + "." + module_path.stem
-        cls_fqdm = f"{module_full_name}.{cls.__qualname__}"
-
-
-        a=10
 
         command_args = [
             "python3",
             str(build_package_script_path),
-            cls_fqdm,
+            self.get_fully_qualified_name(),
         ]
 
         signature = inspect.signature(self.__init__)

@@ -20,6 +20,8 @@ import pathlib as pl
 import argparse
 import sys
 
+from typing import Dict
+
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
 
@@ -31,6 +33,7 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
+from agent_build.tools.environment_deployments.deployments import CacheableBuilder
 from agent_build.package_builders import DOCKER_IMAGE_PACKAGE_BUILDERS
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
@@ -38,7 +41,7 @@ _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 common.init_logging()
 
 
-BUILDERS = {
+BUILDERS: Dict[str, CacheableBuilder]  = {
         **DOCKER_IMAGE_PACKAGE_BUILDERS,
 }
 
@@ -46,9 +49,19 @@ if __name__ == "__main__":
     base_parser = argparse.ArgumentParser(add_help=False)
     base_parser.add_argument("builder_name", choices=BUILDERS.keys())
 
+    base_parser.add_argument(
+        "--fqdn",
+        dest="fqdn",
+        action="store_true"
+    )
+
     base_args, other_args = base_parser.parse_known_args()
 
     builder_cls = BUILDERS[base_args.builder_name]
+
+    if base_args.fqdn:
+        print(builder_cls.get_fully_qualified_name())
+        exit(0)
 
     parser = argparse.ArgumentParser()
 

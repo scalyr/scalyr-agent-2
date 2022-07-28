@@ -58,10 +58,15 @@ jobs:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
+      - name: Get builder fqdn
+        id: get-builder-fqdn
+        run: |
+          ::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} --fqdn)
+
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+          deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6 # v2.0.0
