@@ -19,6 +19,8 @@
 # This script is used in the deployment step that build base image for the alpine based agent docker images.
 # This file is sourced by one of the actual shell scripts that has to build the base image.
 
+set -e
+
 # source main library, all needed functions are in there.
 . "$SOURCE_ROOT/agent_build/tools/environment_deployments/steps/build_base_docker_image/build_base_images_common_lib.sh"
 
