@@ -44,9 +44,6 @@ log "Building image for the following platforms: ${TO_BUILD_PLATFORMS}"
 # The directory with registry's data root
 registry_output_path="$STEP_OUTPUT_PATH/output_registry"
 
-# Clear the registry data root path.
-rm -rf "$registry_output_path"
-
 # Check if registry data root already exists in cache.
 restore_from_cache output_registry "$registry_output_path"
 

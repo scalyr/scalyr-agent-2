@@ -276,6 +276,10 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         else:
             run_func = self._run_locally
 
+        if self.output_directory.exists():
+            shutil.rmtree(self.output_directory)
+        self.output_directory.mkdir(parents=True, exist_ok=True)
+
         try:
             logging.info(f"Start step: {self.id}")
             self._run_function_in_isolated_source_directory(function=run_func)
@@ -596,10 +600,6 @@ class ShellScriptDeploymentStep(DeploymentStep):
                 f"{self.cache_directory}",
                 f"{container_name}:{self.docker_cache_directory}",
             ])
-
-            if self.output_directory.exists():
-                shutil.rmtree(self.output_directory)
-            self.output_directory.mkdir(parents=True, exist_ok=True)
 
             common.run_command([
                 "docker",
