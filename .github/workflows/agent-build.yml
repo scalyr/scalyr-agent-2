@@ -32,6 +32,17 @@ jobs:
         python-version: [ "3.8.13" ]
 
 
+    services:
+      # Label used to access the service container
+      registry:
+        # Docker Hub image
+        image: registry:2
+        ports:
+          - 5000:5000
+        volumes:
+          - /tmp/output_registry:/var/lib/registry
+
+
     env:
       DOCKER_BUILDKIT: 1
       # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
@@ -75,7 +86,17 @@ jobs:
 
       - name: Build Image
         run: |
-          python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} 
+          python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} \
+            registry localhost:5000 \
+            --push
+          
+
+      - name: 'Upload docker registry with result image as artifact.'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+          path:  /tmp/output_registry
+          retention-days: 5
       
       
 
