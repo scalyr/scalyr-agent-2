@@ -176,11 +176,13 @@ class DockerContainer:
         image_name: str,
         ports: List[str] = None,
         mounts: List[str] = None,
+        command: List[str] = None
     ):
         self.name = name
         self.image_name = image_name
         self.mounts = mounts or []
         self.ports = ports or []
+        self.command = command or []
 
     def start(self):
 
@@ -191,7 +193,6 @@ class DockerContainer:
             "docker",
             "run",
             "-d",
-            "--rm",
             "--name",
             self.name,
         ]
@@ -205,6 +206,8 @@ class DockerContainer:
             command_args.append(mount)
 
         command_args.append(self.image_name)
+
+        command_args.extend(self.command)
 
         common.check_call_with_log(command_args)
 

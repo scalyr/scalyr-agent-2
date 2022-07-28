@@ -33,6 +33,7 @@ from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools import files_checksum_tracker
 from agent_build.tools import build_in_docker
+from agent_build.tools.build_in_docker import DockerContainer
 from agent_build.tools.constants import Architecture
 from agent_build.tools.constants import AGENT_BUILD_OUTPUT, SOURCE_ROOT
 from agent_build.tools.common import check_call_with_log
@@ -59,6 +60,28 @@ def save_docker_image(image_name: str, output_path: pl.Path):
     """
     with output_path.open("wb") as f:
         common.check_call_with_log(["docker", "save", image_name], stdout=f)
+
+
+def remove_directory_in_docker(path: pl.Path):
+    """
+    Since we produce some artifacts inside docker container, we may face difficulties with
+    deleting the old ones because they may be created inside the container with the root user.
+    The workaround for that to delegate that deletion to a docker container too.
+    """
+
+    # In order to be able to remove the whole directory, we mount parent directory.
+
+    with DockerContainer(
+        name="agent_build_step_trash_remover",
+        image_name="ubuntu:22.04",
+        mounts=[
+            f"{path.parent}:/parent"
+        ],
+        command=[
+            "rm", "-r", f"/parent/{path.name}"
+        ]
+    ):
+        pass
 
 
 class DeploymentStepError(Exception):
@@ -277,7 +300,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
             run_func = self._run_locally
 
         if self.output_directory.exists():
-            shutil.rmtree(self.output_directory)
+            remove_directory_in_docker(self.output_directory)
         self.output_directory.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -633,7 +656,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
             )
             old_cache_directory = self.cache_directory.parent / f"~{self.cache_directory.name}"
             if old_cache_directory.exists():
-                shutil.rmtree(old_cache_directory)
+                self.remove_directory_in_docker(old_cache_directory)
             self.cache_directory.rename(old_cache_directory)
             try:
                 common.run_command(
@@ -649,7 +672,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
                 old_cache_directory.rename(self.cache_directory)
                 raise
             else:
-                shutil.rmtree(old_cache_directory)
+                self.remove_directory_in_docker(old_cache_directory)
 
         finally:
             # Remove intermediate container and image.
@@ -820,7 +843,7 @@ class CacheableBuilder:
         """
 
         if self.output_path.is_dir():
-            shutil.rmtree(self.output_path)
+            remove_directory_in_docker(self.output_path)
 
         self.output_path.mkdir(parents=True)
 
