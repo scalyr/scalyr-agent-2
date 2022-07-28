@@ -27,7 +27,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [[ "docker-json" ]]
+#        #image-type: [[ "docker-json" ]]
+#        image-type: [[ "docker-json" ]]
         image-distro-name: [ "debian" ]
         python-version: [ "3.8.13" ]
 
@@ -86,7 +87,8 @@ jobs:
 
       - name: Build Image
         run: |
-          echo "${{toJSON(matrix.image-type)}}" | jq -c '.[]' | while read i; do
+          echo '["docker-json", "docker-syslog", "docker-api", "k8s"]' | jq -c '.[]' | while read i; do
+          #echo "${{toJSON(matrix.image-type)}}" | jq -c '.[]' | while read i; do
             python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} \
               --registry localhost:5000 \
               --push
