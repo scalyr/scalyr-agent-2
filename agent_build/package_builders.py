@@ -36,16 +36,62 @@ from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
 from agent_build.tools.constants import Architecture, PackageType
-from agent_build.tools.environment_deployments.deployments import ShellScriptDeploymentStep, DeploymentStep, CacheableBuilder, BuilderInput
+from agent_build.tools.environment_deployments.deployments import ShellScriptDeploymentStep, DeploymentStep, CacheableBuilder
 from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, get_install_info, create_change_logs
 from agent_build.tools.constants import SOURCE_ROOT
 from agent_build.tools.common import check_output_with_log
 
 
-__PARENT_DIR__ = pl.Path(__file__).absolute().parent
-__SOURCE_ROOT__ = __PARENT_DIR__.parent
+_AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
-_AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
+
+_REL_DEPLOYMENT_STEPS_PATH = pl.Path("agent_build/tools/environment_deployments/steps")
+_REL_AGENT_BUILD_DOCKER_PATH = pl.Path("agent_build/docker")
+
+
+_DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
+    _AGENT_BUILD_PATH / "tools/environment_deployments/steps/build_base_docker_image"
+)
+_AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
+
+
+class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
+    """
+    This deployment step is responsible for the building of the base image of the agent docker images.
+    It runs shell script that builds that base image and pushes it to the local registry that runs in container.
+    After push, registry is shut down, but it's data root is preserved. This step puts this
+    registry data root to the output of the deployment, so the builder of the final agent docker image can access this
+    output and fetch base images from registry root (it needs to start another registry and mount existing registry
+    root).
+    """
+
+    def __init__(
+        self,
+        name: str,
+        python_image_suffix: str,
+        platforms: List[str]
+    ):
+        self.python_image_suffix = python_image_suffix
+        self.platforms = platforms
+
+        super(BuildDockerBaseImageStep, self).__init__(
+            name=name,
+            architecture=Architecture.UNKNOWN,
+            script_path=_DEPLOYMENT_BUILD_BASE_IMAGE_STEP / f"{self.python_image_suffix}.sh",
+            tracked_file_globs=[
+                 _AGENT_BUILD_PATH / "docker/Dockerfile.base",
+                # and helper lib for base image builder.
+                _DEPLOYMENT_BUILD_BASE_IMAGE_STEP / "build_base_images_common_lib.sh",
+                # .. and requirement files...
+                _AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt",
+                _AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
+                _AGENT_REQUIREMENT_FILES_PATH / "main-requirements.txt",
+            ],
+            environment_variables={
+                "TO_BUILD_PLATFORMS": ",".join(platforms)
+            },
+            cacheable=True
+        )
 
 
 class ContainerImageBuilder(CacheableBuilder):
@@ -61,7 +107,7 @@ class ContainerImageBuilder(CacheableBuilder):
     # Names of the result image that goes to dockerhub.
     RESULT_IMAGE_NAMES: List[str]
 
-    BASE_IMAGE_BUILDER_STEP: deployments.BuildDockerBaseImageStep
+    BASE_IMAGE_BUILDER_STEP: BuildDockerBaseImageStep
 
     def __init__(
             self,
@@ -88,7 +134,7 @@ class ContainerImageBuilder(CacheableBuilder):
         self._name = type(self).NAME
         self.config_path = type(self).CONFIG_PATH
 
-        self.dockerfile_path = __SOURCE_ROOT__ / "agent_build/docker/Dockerfile"
+        self.dockerfile_path = SOURCE_ROOT / "agent_build/docker/Dockerfile"
 
         base_image_deployment_step = type(self).BASE_IMAGE_BUILDER_STEP
 
@@ -322,7 +368,7 @@ class ContainerImageBuilder(CacheableBuilder):
         else:
             command_options.append("--load")
 
-        command_options.append(str(__SOURCE_ROOT__))
+        command_options.append(str(SOURCE_ROOT))
 
         build_log_message = f"Build images:  {image_names}"
         if self.push:
@@ -435,7 +481,7 @@ DOCKER_IMAGE_PACKAGE_BUILDERS = {}
 
 for package_info in _CONTAINER_PACKAGE_INFOS:
     for distro in package_info.distros:
-        base_docker_image_step = deployments.BuildDockerBaseImageStep(
+        base_docker_image_step = BuildDockerBaseImageStep(
             name=f"agent-docker-base-image-{distro.value}",
             python_image_suffix=distro.image_suffix,
             platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
@@ -444,15 +490,10 @@ for package_info in _CONTAINER_PACKAGE_INFOS:
         class _ImageBuilder(ContainerImageBuilder):
             NAME = f"{package_info.package_type.value}-{distro.value}"
             PACKAGE_TYPE = package_info.package_type
-            CONFIG_PATH = __SOURCE_ROOT__ / "docker" / f"{package_info.package_type.value}-config"
+            CONFIG_PATH = SOURCE_ROOT / "docker" / f"{package_info.package_type.value}-config"
             RESULT_IMAGE_NAMES = package_info.result_image_names[:]
             BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = base_docker_image_step
 
 
         DOCKER_IMAGE_PACKAGE_BUILDERS[_ImageBuilder.NAME] = _ImageBuilder
-
-
-class BuildTestEnvironment(CacheableBuilder):
-    NAME = "test_environment"
-    DEPLOYMENT_STEP = deployments.INSTALL_TEST_REQUIREMENT_STEP
 

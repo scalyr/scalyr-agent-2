@@ -23,6 +23,7 @@ import logging
 from typing import List
 
 from agent_build.tools import constants
+from agent_build.tools.constants import SOURCE_ROOT
 
 LOG = logging.getLogger(__name__)
 
@@ -49,12 +50,13 @@ class FilesChecksumTracker:
 
         # Resolve file globs to get all files to track.
         for file_glob in self.tracked_file_globs:
-            path = pl.Path(file_glob)
+            file_glob = pl.Path(file_glob)
 
-            if path.is_absolute():
-                raise ValueError(
-                    f"File '{path}' can not be absolute. Class: {type(self)}"
-                )
+            if file_glob.is_absolute():
+                if not str(file_glob).startswith(str(SOURCE_ROOT)):
+                    raise ValueError(f"Tracked file glob {file_glob} is not part of the source {SOURCE_ROOT}")
+
+                file_glob = file_glob.relative_to(SOURCE_ROOT)
 
             found = list(constants.SOURCE_ROOT.glob(str(file_glob)))
 
@@ -67,14 +69,6 @@ class FilesChecksumTracker:
             prefix="scalyr-agent-build-checksum-isolated-root-"
         )
         self._isolated_source_root_path = pl.Path(self._isolated_source_tmp_dir.name)
-
-    # @property
-    # @abc.abstractmethod
-    # def _tracked_file_globs(self) -> List[pl.Path]:
-    #     """
-    #     The list of all files to be tracked.
-    #     """
-    #     pass
 
     def _get_files_checksum(self, additional_seed: str = None) -> str:
         """
