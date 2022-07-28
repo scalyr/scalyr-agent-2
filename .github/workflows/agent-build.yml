@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
 #        #image-type: [[ "docker-json" ]]
-#        image-type: [[ "docker-json" ]]
+        image-type: [ "docker-json" ]
         image-distro-name: [ "debian" ]
         python-version: [ "3.8.13" ]
 
