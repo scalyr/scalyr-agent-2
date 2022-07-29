@@ -27,9 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-#        #image-type: [[ "docker-json" ]]
-        image-type: [ "docker-json" ]
-        image-distro-name: [ "debian" ]
+        image-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
 
 
@@ -78,7 +76,7 @@ jobs:
       - name: Get builder fqdn
         id: get-builder-fqdn
         run: |
-          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.image-type }}-${{ matrix.image-distro-name }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py images-${{ matrix.image-distro-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
@@ -87,14 +85,9 @@ jobs:
 
       - name: Build Image
         run: |
-          echo '["docker-json", "docker-syslog", "docker-api", "k8s"]' | jq -c -r '.[]' | while read i; do
-          #echo "${{toJSON(matrix.image-type)}}" | jq -c -r '.[]' | while read i; do
-            echo "::group::Build $i"
-            python3 build_package_new.py $i-${{ matrix.image-distro-name }} \
-              --registry localhost:5000 \
-              --push
-            echo "::endgroup::"
-          done
+          python3 build_package_new.py images-${{ matrix.image-distro-name }} \
+            --registry localhost:5000 \
+            --push
           
 
       - name: 'Upload docker registry with result image as artifact.'

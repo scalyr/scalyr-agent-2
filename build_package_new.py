@@ -42,7 +42,7 @@ common.init_logging()
 
 
 BUILDERS: Dict[str, CacheableBuilder]  = {
-        **DOCKER_IMAGE_PACKAGE_BUILDERS,
+    **DOCKER_IMAGE_PACKAGE_BUILDERS
 }
 
 if __name__ == "__main__":

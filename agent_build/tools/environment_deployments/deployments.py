@@ -806,7 +806,7 @@ class CacheableBuilder:
 
         self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).NAME
         self.deployment_step = deployment_step or type(self).DEPLOYMENT_STEP
-        self.required_builders = required_builders
+        self.required_builders = required_builders or type(self).REQUIRED_BUILDER_CLASSES
 
     @classmethod
     def get_all_cacheable_deployment_steps(cls) -> List[DeploymentStep]:
