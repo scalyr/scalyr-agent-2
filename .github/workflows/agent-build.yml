@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-distro: [ "debian" ]
+        images-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
 
 
@@ -76,16 +76,17 @@ jobs:
       - name: Get builder fqdn
         id: get-builder-fqdn
         run: |
-          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.image-distro-name }} --fqdn)"
+          set -e
+          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.images-distro }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
         with:
           deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
-      - name: Build All Images For The ${{ matrix.image-distro-name }}
+      - name: Build All Images For The ${{ matrix.images-distro }}
         run: |
-          python3 build_package_new.py bulk-images-${{ matrix.image-distro-name }} \
+          python3 build_package_new.py bulk-images-${{ matrix.images-distro }} \
             --registry localhost:5000 \
             --push
           
