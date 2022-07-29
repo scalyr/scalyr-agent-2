@@ -809,7 +809,8 @@ class CacheableBuilder:
     def get_all_cacheable_deployment_steps(cls) -> List[DeploymentStep]:
         result = []
 
-        result.extend(cls.DEPLOYMENT_STEP.get_all_cacheable_steps())
+        if cls.DEPLOYMENT_STEP:
+            result.extend(cls.DEPLOYMENT_STEP.get_all_cacheable_steps())
 
         for builder_cls in cls.REQUIRED_BUILDER_CLASSES:
             result.extend(builder_cls.get_all_cacheable_deployment_steps())
