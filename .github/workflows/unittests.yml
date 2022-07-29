@@ -58,5 +58,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install "tox==$TOX_VERSION"
 
-      - name: Run tox
+      - name: Run Unit Tests
         run: tox -e "py${{ matrix.python-version }}-unit-tests"
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: test-results/junit*.xml
+        # Use always() to always run this step to publish test results when there are test failures
+        if: ${{ always() }}
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: ${{ always() }}
+        with:
+          junit_files: "test-results/junit*.xml"
