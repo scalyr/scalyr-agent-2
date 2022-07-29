@@ -28,17 +28,28 @@ jobs:
           github_token: ${{ github.token }}
 
   unittests:
+    name: Unittests - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     needs: pre_job
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.5"
+          - "3.6"
+          - "3.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Python 3.8
+      - name: Setup Python
         uses: actions/setup-python@v4
         id: setup-python
         with:
-          python-version: 3.8
+          python-version: ${{ matrix.python-version }}
 
       - name: Install tox
         env:
@@ -48,7 +59,4 @@ jobs:
           pip install "tox==$TOX_VERSION"
 
       - name: Run tox
-        run: tox -e "py3.8-unit-tests"
-
-     # tox target: "py3.8-unit-tests"
-     # tox version 3.20.1
+        run: tox -e "py${{ matrix.python-version }}-unit-tests"
