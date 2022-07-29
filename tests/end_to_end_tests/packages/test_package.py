@@ -7,13 +7,10 @@ from typing import Union
 import pytest
 
 from agent_build.tools.environment_deployments.deployments import CacheableBuilder, ShellScriptDeploymentStep
-from agent_build.package_builders import PYTHON_GLIBC_WITH_AGENT_DEPS, BUILD_PYTHON_GLIBC, INSTALL_AGENT_REQUIREMENTS, \
-    RpmPackageBuilder
 from agent_build.tools.constants import SOURCE_ROOT, Architecture
 
 
 class FrozenBinaryTestRunnerBuilder(CacheableBuilder):
-    NAME = "test_frozen_binary_builder"
     DEPLOYMENT_STEP = PYTHON_GLIBC_WITH_AGENT_DEPS
 
     def __init__(self, a=None):
@@ -112,7 +109,6 @@ class RpmRepoBuilder(CacheableBuilder):
 
         super(RpmRepoBuilder, self).__init__()
 
-    NAME = "test_rpm_repo_builder"
     DEPLOYMENT_STEP = ShellScriptDeploymentStep(
         name="test_rpm_repo_builder",
         architecture=Architecture.X86_64,

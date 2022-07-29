@@ -773,11 +773,8 @@ def get_deployment_by_name(name: str) -> Deployment:
 
 
 class CacheableBuilder:
-    NAME: str
     REQUIRED_BUILDER_CLASSES: List[Type['CacheableBuilder']] = []
     DEPLOYMENT_STEP: DeploymentStep = None
-
-    FQDN: str = None
 
     def __new__(cls, *args, **kwargs):
         obj = super(CacheableBuilder, cls).__new__(cls)
@@ -804,9 +801,9 @@ class CacheableBuilder:
             deployment_step: DeploymentStep = None
     ):
 
-        self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).NAME
+        self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).get_fully_qualified_name()
         self.deployment_step = deployment_step or type(self).DEPLOYMENT_STEP
-        self.required_builders = required_builders or type(self).REQUIRED_BUILDER_CLASSES
+        self.required_builders = required_builders
 
     @classmethod
     def get_all_cacheable_deployment_steps(cls) -> List[DeploymentStep]:
@@ -825,8 +822,6 @@ class CacheableBuilder:
         Return fully qualified name of the class.
         :return:
         """
-        if cls.FQDN:
-            return cls.FQDN
 
         cls_module = sys.modules[cls.__module__]
         module_path = pl.Path(cls_module.__file__)
@@ -956,20 +951,19 @@ class CacheableBuilder:
         if cls.__init__ is CacheableBuilder.__init__:
             return
 
-
-
         builder_signature = inspect.signature(cls.__init__)
         argument_docs = {}
         arg_name = None
         # Parse argument docstring to put them as 'help' for parser arguments.
-        for line in cls.__init__.__doc__.splitlines():
-            m = re.match(r"\s*:param ([a-zA-Z_]+):\s*(.*)", line.strip())
-            if m:
-                arg_name = m.group(1)
-                text = m.group(2)
-                argument_docs[arg_name] = text.strip()
-            elif arg_name:
-                argument_docs[arg_name] += line.strip()
+        if cls.__init__.__doc__:
+            for line in cls.__init__.__doc__.splitlines():
+                m = re.match(r"\s*:param ([a-zA-Z_]+):\s*(.*)", line.strip())
+                if m:
+                    arg_name = m.group(1)
+                    text = m.group(2)
+                    argument_docs[arg_name] = text.strip()
+                elif arg_name:
+                    argument_docs[arg_name] += line.strip()
 
         for name, param in builder_signature.parameters.items():
             arg_name = name.replace("_", "-")
@@ -993,7 +987,7 @@ class CacheableBuilder:
                 dest=name,
                 default=param.default,
                 required=param.kind == inspect.Parameter.POSITIONAL_ONLY,
-                help=argument_docs[name],
+                help=argument_docs.get(name),
                 **additional_args
             )
 

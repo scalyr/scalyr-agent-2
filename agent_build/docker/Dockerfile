@@ -26,12 +26,12 @@ ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 ENV AGENT_BUILD_IN_DOCKER=1
 # e.g. k8s, docker-json
 ARG BUILD_TYPE
-# e.g. k8s-debian, docker-json-debian, k8s-alpine
-ARG BUILDER_NAME
+# fully qualified name of the builder class which has to build image's filesystem.
+ARG BUILDER_FQDN
 ADD . /scalyr-agent-2
 
 # Build the tarball with Agent's files.
-RUN python3 /scalyr-agent-2/build_package_new.py ${BUILDER_NAME} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
+RUN python3 /scalyr-agent-2/agent_build/scripts/builder_helper.py ${BUILDER_FQDN} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
 
 # Extract tarball to the special place that can be reused by next stages.
 WORKDIR /tmp/container-fs
@@ -71,6 +71,11 @@ EXPOSE 514/udp
 
 # Optional stage for k8s.
 FROM scalyr-base as build-k8s
+MAINTAINER Scalyr Inc <support@scalyr.com>
+ENV SCALYR_STDOUT_SEVERITY ERROR
+
+# Optional stage for k8s-with-openmetrics.
+FROM scalyr-base as build-k8s-with-openmetrics
 MAINTAINER Scalyr Inc <support@scalyr.com>
 ENV SCALYR_STDOUT_SEVERITY ERROR
 

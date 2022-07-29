@@ -13,5 +13,4 @@ INSTALL_TEST_REQUIREMENT_STEP = ShellScriptDeploymentStep(
 
 
 class BuildTestEnvironment(CacheableBuilder):
-    NAME = "test_environment"
     DEPLOYMENT_STEP = INSTALL_TEST_REQUIREMENT_STEP

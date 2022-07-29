@@ -131,7 +131,6 @@ class ContainerImageBuilder(CacheableBuilder):
         :param use_test_version: Build a special version of image with additional measuring tools (such as coverage).
             Used only for testing."
         """
-        self._name = type(self).NAME
         self.config_path = type(self).CONFIG_PATH
 
         self.dockerfile_path = SOURCE_ROOT / "agent_build/docker/Dockerfile"
@@ -336,7 +335,7 @@ class ContainerImageBuilder(CacheableBuilder):
             "--build-arg",
             f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
             "--build-arg",
-            f"BUILDER_NAME={self.name}",
+            f"BUILDER_FQDN={type(self).get_fully_qualified_name()}",
             "--build-arg",
             f"BASE_IMAGE=localhost:5005/{base_image_name}",
             "--build-arg",
@@ -511,10 +510,10 @@ class DockerJsonContainerBuilder(ContainerImageBuilder):
 class DockerSyslogContainerBuilder(ContainerImageBuilder):
     PACKAGE_TYPE = PackageType.DOCKER_SYSLOG
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-syslog-config"
-    RESULT_IMAGE_NAMES =[
+    RESULT_IMAGE_NAMES = [
             "scalyr-agent-docker-syslog",
             "scalyr-agent-docker",
-        ],
+        ]
 
 class DockerApiContainerBuilder(ContainerImageBuilder):
     PACKAGE_TYPE = PackageType.DOCKER_API
@@ -584,25 +583,51 @@ class K8sWithOpenmetricsContainerBuilderAlpine(K8sWithOpenmetricsContainerBuilde
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
 
 
+# Mapping of available docker image type (aka docker-json, docker-syslog) to a
+# particular image distro type (debian, alpine)
+
 _DISTRO_TO_BUILDERS = {
-    "debian":  {
-        PackageType.DOCKER_JSON: DockerJsonContainerBuilderDebian,
-        PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderDebian,
-        PackageType.DOCKER_API: DockerApiContainerBuilderDebian,
-        PackageType.K8S: K8sContainerBuilderDebian,
-        PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderDebian
-    },
-    "alpine":  {
-        PackageType.DOCKER_JSON: DockerJsonContainerBuilderAlpine,
-        PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderAlpine,
-        PackageType.DOCKER_API: DockerApiContainerBuilderAlpine,
-        PackageType.K8S: K8sContainerBuilderAlpine,
-        PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderAlpine
-    }
+    "debian":  [
+        DockerJsonContainerBuilderDebian,
+        DockerSyslogContainerBuilderDebian,
+        DockerApiContainerBuilderDebian,
+        K8sContainerBuilderDebian,
+        K8sWithOpenmetricsContainerBuilderDebian
+    ],
+    "alpine":  [
+        DockerJsonContainerBuilderAlpine,
+        DockerSyslogContainerBuilderAlpine,
+        DockerApiContainerBuilderAlpine,
+        K8sContainerBuilderAlpine,
+        K8sWithOpenmetricsContainerBuilderAlpine
+    ]
 }
+
+# _DISTRO_TO_BUILDERS = {
+#     "debian":  {
+#         PackageType.DOCKER_JSON: DockerJsonContainerBuilderDebian,
+#         PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderDebian,
+#         PackageType.DOCKER_API: DockerApiContainerBuilderDebian,
+#         PackageType.K8S: K8sContainerBuilderDebian,
+#         PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderDebian
+#     },
+#     "alpine":  {
+#         PackageType.DOCKER_JSON: DockerJsonContainerBuilderAlpine,
+#         PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderAlpine,
+#         PackageType.DOCKER_API: DockerApiContainerBuilderAlpine,
+#         PackageType.K8S: K8sContainerBuilderAlpine,
+#         PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderAlpine
+#     }
+# }
 
 
 class ImageBulkBuilder(CacheableBuilder):
+    """
+    This class is mostly for the CI/CD reasons.
+    The result image on the CI/Cd is put to local registry and root of that registry is saved as artifact.
+    This class build all image of the same base bistro image (aka -debian or -alpine). This can help put all
+    images in one registry anf then put that registry as artifact.
+    """
     IMAGE_BUILDERS: List[Type[ContainerImageBuilder]]
 
     def __init__(
@@ -613,29 +638,37 @@ class ImageBulkBuilder(CacheableBuilder):
         self.registry = registry
         self.push = push
 
-        super(ImageBulkBuilder, self).__init__()
+        self.image_builders = []
+        for image_builder_cls in type(self).IMAGE_BUILDERS:
 
-    def build(self, locally: bool = False):
-        for builder_cls in type(self).IMAGE_BUILDERS:
-            builder = builder_cls(
+            image_builder = image_builder_cls(
                 registry=self.registry,
                 push=self.push
             )
-            builder.build(locally=locally)
+            self.image_builders.append(image_builder)
+
+        super(ImageBulkBuilder, self).__init__(
+            required_builders=self.image_builders
+        )
+
+    def build(self, locally: bool = False):
+
+        for image_builder in self.image_builders:
+            image_builder.build(locally=locally)
 
 
-class ImagesBulkBuilderDebian(CacheableBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = list(_DISTRO_TO_BUILDERS["debian"].values())
+class ImagesBulkBuilderDebian(ImageBulkBuilder):
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_TO_BUILDERS["debian"][:]
 
 
-class ImagesBulkBuilderAlpine(CacheableBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = list(_DISTRO_TO_BUILDERS["alpine"].values())
+class ImagesBulkBuilderAlpine(ImageBulkBuilder):
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_TO_BUILDERS["alpine"][:]
 
 
 DOCKER_IMAGE_PACKAGE_BUILDERS = {}
 for distro_name, builders in _DISTRO_TO_BUILDERS.items():
-    for package_type, builder in builders.items():
-        DOCKER_IMAGE_PACKAGE_BUILDERS[f"{package_type.value}-{distro_name}"] = builder
+    for builder in builders:
+        DOCKER_IMAGE_PACKAGE_BUILDERS[f"{builder.PACKAGE_TYPE.value}-{distro_name}"] = builder
 
-DOCKER_IMAGE_PACKAGE_BUILDERS["images-debian"] = ImagesBulkBuilderDebian
-DOCKER_IMAGE_PACKAGE_BUILDERS["images-alpine"] = ImagesBulkBuilderAlpine
+DOCKER_IMAGE_PACKAGE_BUILDERS["bulk-images-debian"] = ImagesBulkBuilderDebian
+DOCKER_IMAGE_PACKAGE_BUILDERS["bulk-images-alpine"] = ImagesBulkBuilderAlpine

@@ -76,16 +76,16 @@ jobs:
       - name: Get builder fqdn
         id: get-builder-fqdn
         run: |
-          echo "::set-output name=fqdn::$(python3 build_package_new.py images-${{ matrix.image-distro-name }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.image-distro-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
         with:
           deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
-      - name: Build Image
+      - name: Build All Images For The ${{ matrix.image-distro-name }}
         run: |
-          python3 build_package_new.py images-${{ matrix.image-distro-name }} \
+          python3 build_package_new.py bulk-images-${{ matrix.image-distro-name }} \
             --registry localhost:5000 \
             --push
           
