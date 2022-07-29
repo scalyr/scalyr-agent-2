@@ -84,6 +84,8 @@ jobs:
         with:
           deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
+      # We build all images with tha same base image all at once and store all result images in a single
+      # registry.
       - name: Build All Images For The ${{ matrix.images-distro }}
         run: |
           python3 build_package_new.py bulk-images-${{ matrix.images-distro }} \
@@ -94,7 +96,7 @@ jobs:
       - name: 'Upload docker registry with result image as artifact.'
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+          name: ${{ matrix.images-distro }} images result registry.
           path:  /tmp/output_registry
           retention-days: 5
       
