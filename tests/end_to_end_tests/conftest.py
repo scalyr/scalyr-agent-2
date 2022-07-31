@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+"""
+This is a root conftest for all pytest-based end-to-end tests. And it is mostly responsible for
+some common options and fixtures such as Scalyr credentials etc.
+"""
+
 import json
 import os
 import pathlib as pl
@@ -66,7 +72,10 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="session")
-def credentials():
+def config_file():
+    """
+    Config dist which is read from the 'credentials.json' file.
+    """
     config_path = pl.Path(__file__).parent.parent / "credentials.json"
     if not config_path.exists():
         return {}
@@ -75,10 +84,16 @@ def credentials():
 
 
 def _get_option_value(name: str, config: dict, arg_options, default=None):
+    """
+    Search for the value with some name in different sources such as command line arguments and config file.
+    """
+
+    # First search in command line arguments.
     arg_value = getattr(arg_options, name, None)
     if arg_value:
         return arg_value
 
+    # Then in config file.
     config_value = config.get(name)
     if config_value:
         return config_value
@@ -90,33 +105,33 @@ def _get_option_value(name: str, config: dict, arg_options, default=None):
 
 
 @pytest.fixture(scope="session")
-def scalyr_api_key(credentials, request):
+def scalyr_api_key(config_file, request):
     return _get_option_value(
-        name="scalyr_api_key", config=credentials, arg_options=request.config.option
+        name="scalyr_api_key", config=config_file, arg_options=request.config.option
     )
 
 
 @pytest.fixture(scope="session")
-def scalyr_api_read_key(credentials, request):
+def scalyr_api_read_key(config_file, request):
     return _get_option_value(
         name="scalyr_api_read_key",
-        config=credentials,
+        config=config_file,
         arg_options=request.config.option,
     )
 
 
 @pytest.fixture(scope="session")
-def scalyr_server(credentials, request):
+def scalyr_server(config_file, request):
     return _get_option_value(
-        name="scalyr_server", config=credentials, arg_options=request.config.option
+        name="scalyr_server", config=config_file, arg_options=request.config.option
     )
 
 
 @pytest.fixture(scope="session")
-def test_session_suffix(request, credentials):
+def test_session_suffix(request, config_file):
     return _get_option_value(
         name="test_session_suffix",
-        config=credentials,
+        config=config_file,
         arg_options=request.config.option,
         default=str(int(time.time())),
     )
