@@ -451,3 +451,23 @@ class MonitorsManagerTest(ScalyrTestCase):
             self.assertEqual(len(monitors), 2)
         finally:
             test_manager.stop_manager(wait_on_join=True)
+
+    def test_find_monitor_by_short_hash(self):
+        base_monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.test_monitor",
+            "id": "1",
+            "gauss_mean": 0,
+        }
+
+        test_manager, global_config = ScalyrTestUtils.create_test_monitors_manager(
+            [
+                base_monitor_config,
+            ],
+            [],
+        )
+
+        monitor_ids = {m.monitor_id: m for m in test_manager.monitors}
+
+        monitor = monitor_ids["1"]
+
+        assert test_manager.find_monitor_by_short_hash(monitor.short_hash) is monitor

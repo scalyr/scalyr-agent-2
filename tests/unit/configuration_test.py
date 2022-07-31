@@ -2520,6 +2520,49 @@ class TestConfiguration(TestConfigurationBase):
             config_description="",
         )
 
+    def test_monitor_stop_agent_if_fails_option(self):
+        """
+        Test the 'stop_agent_if_fails' option.
+        By the default it has to be False for all monitor configs.
+        """
+
+        self._write_file_with_separator_conversion(
+            """
+            {
+                "api_key": "0v7dW1EIPpglMcSjGywUdgY9xTNWQP/kas6qHEmiUG5w-",
+                "monitors": [
+                    {
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "gauss_mean": 1,
+                        "id": "essential",
+                        "stop_agent_if_fails": true
+                    },
+                    {
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "gauss_mean": 1,
+                        "id": "not_essential",
+                        "stop_agent_if_fails": false
+                    },
+                    {
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "id": "not_essential_default",
+                        "gauss_mean": 1,
+                    }
+                ]
+            }
+            """
+        )
+
+        config = self._create_test_configuration_instance()
+
+        config.parse()
+
+        monitors_ids = {m["id"]: m for m in config.monitor_configs}
+
+        assert monitors_ids["essential"]["stop_agent_if_fails"] is True
+        assert monitors_ids["not_essential"]["stop_agent_if_fails"] is False
+        assert monitors_ids["not_essential_default"]["stop_agent_if_fails"] is False
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):

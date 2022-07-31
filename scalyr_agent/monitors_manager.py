@@ -111,6 +111,19 @@ class MonitorsManager(StoppableThread):
 
         return result
 
+    def find_monitor_by_short_hash(self, short_hash):
+        """
+        Find monitor by its short hash.
+        @param short_hash: the short hash of the monitors to find
+        @return: a monitor object if a monitor matches `short_hash`, or None
+        """
+        with self.__lock:
+            monitors = self.__monitors[:]
+
+        for monitor in monitors:
+            if monitor.short_hash == short_hash:
+                return monitor
+
     def generate_status(self):
         """Creates and returns a status object that reports the monitor status.
 
@@ -119,12 +132,16 @@ class MonitorsManager(StoppableThread):
         """
         result = MonitorManagerStatus()
 
-        for monitor in self.__monitors:
+        with self.__lock:
+            monitors = self.__monitors[:]
+
+        for monitor in monitors:
             if monitor.isAlive():
                 result.total_alive_monitors += 1
 
             status = MonitorStatus()
             status.monitor_name = monitor.monitor_name
+            status.monitor_short_hash = monitor.short_hash
             status.reported_lines = monitor.reported_lines()
             status.errors = monitor.errors()
             status.is_alive = monitor.isAlive()
