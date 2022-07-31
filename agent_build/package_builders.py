@@ -19,7 +19,6 @@ This module defines all possible packages of the Scalyr Agent and how they can b
 
 import json
 import pathlib as pl
-import shlex
 import tarfile
 import abc
 import shutil
@@ -37,7 +36,7 @@ from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
 from agent_build.tools import build_in_docker
 from agent_build.tools import common
-
+from agent_build.tools.common import shlex_join
 
 __PARENT_DIR__ = pl.Path(__file__).absolute().parent
 __SOURCE_ROOT__ = __PARENT_DIR__.parent
@@ -263,7 +262,7 @@ class PackageBuilder(abc.ABC):
             "--locally",
         ]
 
-        command = shlex.join(command_args)  # pylint: disable=no-member
+        command = shlex_join(command_args)  # pylint: disable=no-member
 
         # Run the docker build inside the result image of the deployment.
         base_image_name = self.deployment.result_image_name.lower()
