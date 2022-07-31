@@ -57,6 +57,30 @@ AGENT_MAIN = os.path.abspath(os.path.join(BASE_DIR, "../../scalyr_agent/agent_ma
 
 
 class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
+    def setUp(self):
+        super(AgentMainTestCase, self).setUp()
+        tmp_fd, self._config_path = tempfile.mkstemp()
+        os.close(tmp_fd)
+
+    def tearDown(self):
+        os.unlink(self._config_path)
+
+        super(AgentMainTestCase, self).tearDown()
+
+    def _write_mock_config(self, config_data=None):
+
+        if not config_data:
+            config_data = {
+                "api_key": "bar",
+            }
+
+        with open(self._config_path, "wb") as fp:
+            fp.write(json.dumps(config_data).encode("utf-8"))
+
+    @staticmethod
+    def fake_get_useage_info():
+        return 0, 0, 0
+
     @pytest.mark.skipif(
         platform.system() == "Windows", reason="This test is not for Windows."
     )
@@ -372,7 +396,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
 
         agent._ScalyrAgent__run.return_value = 7
-        mock_config_path = self._write_mock_config()
+        self._write_mock_config()
 
         # should use default value of False
         mock_command = "inner_run_with_checks"
@@ -384,7 +408,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
@@ -403,7 +427,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
 
         agent._ScalyrAgent__run.return_value = 7
-        mock_config_path = self._write_mock_config()
+        self._write_mock_config()
 
         # should use overridden value of True
         mock_command = "inner_run_with_checks"
@@ -415,7 +439,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
@@ -440,7 +464,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         agent._ScalyrAgent__read_and_verify_config.return_value = mock_config
 
         agent._ScalyrAgent__run.return_value = 7
-        mock_config_path = self._write_mock_config()
+        self._write_mock_config()
 
         # tty is available, should use command line option value when specified
         mock_command = "inner_run_with_checks"
@@ -452,7 +476,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
@@ -469,7 +493,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
@@ -487,7 +511,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
@@ -506,7 +530,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
@@ -525,7 +549,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(False)
@@ -544,7 +568,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
         with mock.patch("scalyr_agent.agent_main.sys.stdout", mock_stdout):
             return_code = agent.main(
-                mock_config_path, mock_command, mock_command_options
+                self._config_path, mock_command, mock_command_options
             )
             self.assertEqual(return_code, 7)
             agent._ScalyrAgent__perform_config_checks.assert_called_with(True)
@@ -579,21 +603,116 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     % (log_level),
                 )
 
-    def _write_mock_config(self):
-        _, tmp_path = tempfile.mkstemp()
+    def test_essential_monitor_fail(self):
+        """
+        This test checks that agent raises an error when some of its monitors, which
+        are configured as 'stop_agent_if_fails', fail.
 
-        config_data = {
-            "api_key": "bar",
-        }
+        """
+        from scalyr_agent.agent_main import ScalyrAgent
+        from scalyr_agent.platform_controller import PlatformController
 
-        with open(tmp_path, "wb") as fp:
-            fp.write(json.dumps(config_data).encode("utf-8"))
+        # 2. MSI install (only intermediate_certs_path check should be skipped)
+        with mock.patch(
+            "scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.PACKAGE_INSTALL
+        ):
 
-        return tmp_path
+            config_data = {
+                "api_key": "0v7dW1EIPpglMcSjGywUdgY9xTNWQP/kas6qHEmiUG5w-",
+                "monitors": [
+                    {
+                        # agent has to fail if this monitor is not alive.
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "gauss_mean": 1,
+                        "id": "to_fail",
+                        "stop_agent_if_fails": True,
+                    },
+                    {
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "gauss_mean": 1,
+                        "id": "not_to_fail",
+                        "stop_agent_if_fails": False,
+                    },
+                    {
+                        "module": "scalyr_agent.builtin_monitors.test_monitor",
+                        "id": "not_to_fail_default",
+                        "gauss_mean": 1,
+                    },
+                ],
+            }
 
-    @staticmethod
-    def fake_get_useage_info():
-        return 0, 0, 0
+            self._write_mock_config(config_data=config_data)
+
+            from scalyr_agent.configuration import Configuration
+
+            controller = PlatformController.new_platform()
+            config = Configuration(self._config_path, controller.default_paths, None)
+            config.parse()
+
+            from scalyr_agent.monitors_manager import MonitorsManager
+
+            monitors_manager = MonitorsManager(
+                configuration=config, platform_controller=controller
+            )
+
+            monitors_ids = {m.monitor_id: m for m in monitors_manager.monitors}
+            monitor_to_fail = monitors_ids["to_fail"]
+            monitor_not_to_fail = monitors_ids["not_to_fail"]
+            monitor_not_to_fail_default = monitors_ids["not_to_fail_default"]
+
+            assert monitor_to_fail.stop_agent_if_fails is True
+            assert monitor_not_to_fail.stop_agent_if_fails is False
+            assert monitor_not_to_fail_default.stop_agent_if_fails is False
+
+            assert monitor_to_fail is monitors_manager.find_monitor_by_short_hash(
+                short_hash=monitor_to_fail.short_hash
+            )
+            assert monitor_not_to_fail is monitors_manager.find_monitor_by_short_hash(
+                short_hash=monitor_not_to_fail.short_hash
+            )
+            assert (
+                monitor_not_to_fail_default
+                is monitors_manager.find_monitor_by_short_hash(
+                    short_hash=monitor_not_to_fail_default.short_hash
+                )
+            )
+
+            agent = ScalyrAgent(PlatformController())
+            agent._ScalyrAgent__config = config
+            monitor_to_fail.isAlive = mock.Mock()
+            monitor_not_to_fail.isAlive = mock.Mock()
+            monitor_not_to_fail_default.isAlive = mock.Mock()
+
+            # Attach our real monitor manager to the agent instance.
+            with mock.patch.object(
+                agent, "_ScalyrAgent__monitors_manager", monitors_manager
+            ):
+
+                monitor_to_fail.isAlive.return_value = True
+                monitor_not_to_fail.isAlive.return_value = True
+                monitor_not_to_fail_default.isAlive.return_value = True
+
+                # Has to succeed with all alive monitors
+                agent._fail_if_essential_monitors_are_not_running()
+
+                monitor_not_to_fail.isAlive.return_value = False
+                monitor_not_to_fail_default.isAlive.return_value = False
+
+                # Still has to success because monitor which is configured to fail is still alive.
+                agent._fail_if_essential_monitors_are_not_running()
+
+                # Now it has to fail.
+                monitor_to_fail.isAlive.return_value = False
+
+                with pytest.raises(Exception) as err_info:
+                    agent._fail_if_essential_monitors_are_not_running()
+
+                assert (
+                    six.text_type(err_info.value)
+                    == "Monitor 'test_monitor(to_fail)' with short hash '{}' is not running, "
+                    "stopping the agent because it is configured not to run without t"
+                    "his monitor.".format(monitor_to_fail.short_hash)
+                )
 
 
 _AGENT_MAIN_PATH = os.path.join(
