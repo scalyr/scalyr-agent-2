@@ -1,0 +1,92 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import dataclasses
+import json
+import pathlib as pl
+import subprocess
+from typing import List
+
+
+@dataclasses.dataclass
+class AgentPaths:
+    """
+    Container class that stores all essential agent paths.
+    """
+
+    configs_dir: pl.Path
+    logs_dir: pl.Path
+    install_root: pl.Path
+    agent_log_path: pl.Path = dataclasses.field(init=False)
+    agent_config_path: pl.Path = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self.agent_log_path = self.logs_dir / "agent.log"
+        self.pid_file = self.logs_dir / "agent.pid"
+        self.agent_config_path = self.configs_dir / "agent.json"
+        self.agent_d_path = self.configs_dir / "agent.d"
+
+
+class AgentCommander:
+    """
+    Simple wrapper around Scalyr agent's command line interface.
+    """
+
+    def __init__(
+        self,
+        executable_args: List[str],
+        agent_paths: AgentPaths,
+    ):
+        """
+        :param executable_args: Path to executables, may vary from how we want to run the agent.
+        :param agent_paths: Helper class with all paths that are specific for the current agent installation.
+        """
+        self.executable_args = executable_args
+        self.agent_paths = agent_paths
+
+    def _check_call_command(self, command_args: List[str]):
+        subprocess.check_call([*self.executable_args, *command_args])
+
+    def _check_output_command(self, command_args: List[str]) -> bytes:
+        output = subprocess.check_output([*self.executable_args, *command_args])
+        return output
+
+    def start(self, no_fork: bool = False):
+        cmd = ["start"]
+        if no_fork:
+            cmd.append("--no-fork")
+
+        self._check_call_command(cmd)
+
+    def get_status(self) -> str:
+        return self._check_output_command(["status", "-v"]).decode()
+
+    def get_status_json(self) -> dict:
+        output = self._check_output_command(
+            ["status", "-v", "--format", "json"]
+        ).decode()
+        return json.loads(output)
+
+    @property
+    def is_running_and_healthy(self) -> bool:
+        try:
+            self._check_output_command(["status"]).decode()
+        except subprocess.CalledProcessError as e:
+            if "The agent does not appear to be running." in e.stdout.decode():
+                return False
+
+        return True
+
+    def stop(self):
+        self._check_call_command(["stop"])
