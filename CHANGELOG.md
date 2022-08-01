@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.33 "in development" - August 27, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
+--->
+
+Other:
+* Update agent code base to log a warning with the server side SSL certificate in PEM format on SSL certificate validation failure for easier troubleshooting.
+
 ## 2.1.32 "Occao" - July 27, 2022
 
 <!---
