@@ -467,25 +467,27 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             # new connection - not ideal since a different cert may be returned for a new
             # connection, but at least SNI is used and we use the same parameters as we do for
             # normal non-logging connection.
-            sock = socket.create_connection((self.host, self.port), self.__timeout)
-
-            if py_post_equal_279:
-                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-                ssl_context.options |= ssl.OP_NO_SSLv2
-                ssl_context.options |= ssl.OP_NO_SSLv3
-                ssl_context.options |= ssl.OP_NO_TLSv1
-                ssl_context.options |= ssl.OP_NO_TLSv1_1
-                ssl_context.verify_mode = ssl.CERT_NONE
-                ssl_context.check_hostname = False
-
-                sock = ssl_context.wrap_socket(
-                    sock, do_handshake_on_connect=True, server_hostname=self.host
-                )
-
-            else:
-                sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)
+            sock = None
 
             try:
+                sock = socket.create_connection((self.host, self.port), self.__timeout)
+
+                if py_post_equal_279:
+                    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                    ssl_context.options |= ssl.OP_NO_SSLv2
+                    ssl_context.options |= ssl.OP_NO_SSLv3
+                    ssl_context.options |= ssl.OP_NO_TLSv1
+                    ssl_context.options |= ssl.OP_NO_TLSv1_1
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    ssl_context.check_hostname = False
+
+                    sock = ssl_context.wrap_socket(
+                        sock, do_handshake_on_connect=True, server_hostname=self.host
+                    )
+
+                else:
+                    sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)
+
                 # NOTE: In case binary_form is False and validation wasn't perform an empty dict
                 # will be returned so we need to use binary_form to still get cert back for logging
                 # purposes - https://docs.python.org/3/library/ssl.html#ssl.SSLSocket.getpeercert
