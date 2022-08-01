@@ -606,7 +606,7 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
     def test_essential_monitor_fail(self):
         """
         This test checks that agent raises an error when some of its monitors, which
-        are configured as 'stop_agent_if_fails', fail.
+        are configured as 'stop_agent_on_failure', fail.
 
         """
         from scalyr_agent.agent_main import ScalyrAgent
@@ -625,13 +625,13 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
                         "gauss_mean": 1,
                         "id": "to_fail",
-                        "stop_agent_if_fails": True,
+                        "stop_agent_on_failure": True,
                     },
                     {
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
                         "gauss_mean": 1,
                         "id": "not_to_fail",
-                        "stop_agent_if_fails": False,
+                        "stop_agent_on_failure": False,
                     },
                     {
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
@@ -660,9 +660,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             monitor_not_to_fail = monitors_ids["not_to_fail"]
             monitor_not_to_fail_default = monitors_ids["not_to_fail_default"]
 
-            assert monitor_to_fail.stop_agent_if_fails is True
-            assert monitor_not_to_fail.stop_agent_if_fails is False
-            assert monitor_not_to_fail_default.stop_agent_if_fails is False
+            assert monitor_to_fail.stop_agent_on_failure is True
+            assert monitor_not_to_fail.stop_agent_on_failure is False
+            assert monitor_not_to_fail_default.stop_agent_on_failure is False
 
             assert monitor_to_fail is monitors_manager.find_monitor_by_short_hash(
                 short_hash=monitor_to_fail.short_hash

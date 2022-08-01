@@ -1578,7 +1578,7 @@ class ScalyrAgent(object):
             stopped_monitor = self.__monitors_manager.find_monitor_by_short_hash(
                 monitor_status.monitor_short_hash
             )
-            if stopped_monitor.stop_agent_if_fails:
+            if stopped_monitor.stop_agent_on_failure:
                 raise Exception(
                     "Monitor '{}' with short hash '{}' is not running, stopping the agent because it is configured "
                     "not to run without this monitor.".format(

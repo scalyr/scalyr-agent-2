@@ -2520,9 +2520,9 @@ class TestConfiguration(TestConfigurationBase):
             config_description="",
         )
 
-    def test_monitor_stop_agent_if_fails_option(self):
+    def test_monitor_stop_agent_on_failure_option(self):
         """
-        Test the 'stop_agent_if_fails' option.
+        Test the 'stop_agent_on_failure' option.
         By the default it has to be False for all monitor configs.
         """
 
@@ -2535,13 +2535,13 @@ class TestConfiguration(TestConfigurationBase):
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
                         "gauss_mean": 1,
                         "id": "essential",
-                        "stop_agent_if_fails": true
+                        "stop_agent_on_failure": true
                     },
                     {
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
                         "gauss_mean": 1,
                         "id": "not_essential",
-                        "stop_agent_if_fails": false
+                        "stop_agent_on_failure": false
                     },
                     {
                         "module": "scalyr_agent.builtin_monitors.test_monitor",
@@ -2559,9 +2559,9 @@ class TestConfiguration(TestConfigurationBase):
 
         monitors_ids = {m["id"]: m for m in config.monitor_configs}
 
-        assert monitors_ids["essential"]["stop_agent_if_fails"] is True
-        assert monitors_ids["not_essential"]["stop_agent_if_fails"] is False
-        assert monitors_ids["not_essential_default"]["stop_agent_if_fails"] is False
+        assert monitors_ids["essential"]["stop_agent_on_failure"] is True
+        assert monitors_ids["not_essential"]["stop_agent_on_failure"] is False
+        assert monitors_ids["not_essential_default"]["stop_agent_on_failure"] is False
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):

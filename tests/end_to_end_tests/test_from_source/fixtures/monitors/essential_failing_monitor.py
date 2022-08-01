@@ -20,7 +20,7 @@ from scalyr_agent.scalyr_monitor import ScalyrMonitor
 class FailingMonitor(ScalyrMonitor):
     """
     A dummy monitor that fails some time after launch.
-    It is a part of the test that verifies that monitor, which has option 'stop_agent_if_fails',
+    It is a part of the test that verifies that monitor, which has option 'stop_agent_on_failure',
     will fail the whole agent if the monitor fails itself.
     """
 

@@ -10,7 +10,7 @@ inputs:
   cache-key-runner-part:
     description: | 
       Part of a cache key that represents system and architecture of the current runner. This is needed to provide 
-      prevent cache collisions for the sema step which runs on different environments.
+      prevent cache collisions for the same step which runs on different environments.
 
     default: ${{ matrix.os }}-${{ runner.os }}-${{ runner.arch }}
     required: true

@@ -3908,7 +3908,7 @@ class Configuration(object):
         # Verify option which tells that agent has to fail if that monitor stops.
         self.__verify_or_set_optional_bool(
             monitor_entry,
-            field="stop_agent_if_fails",
+            field="stop_agent_on_failure",
             default_value=False,
             config_description=description,
             apply_defaults=True,

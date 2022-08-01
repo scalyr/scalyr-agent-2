@@ -227,7 +227,7 @@ def test_with_failing_essential_monitor(
     default_config,
 ):
     """
-    Check that special 'stop_agent_if_fails' directive in a monitor's config
+    Check that special 'stop_agent_on_failure' directive in a monitor's config
     make the whole agent fail if the monitor fails too.
     """
     test_monitors_path = pl.Path(__file__).parent / "fixtures"
@@ -238,7 +238,7 @@ def test_with_failing_essential_monitor(
             "monitors": [
                 {
                     "module": "monitors.essential_failing_monitor",
-                    "stop_agent_if_fails": True,
+                    "stop_agent_on_failure": True,
                 }
             ],
         }

@@ -213,11 +213,11 @@ class ScalyrMonitor(StoppableThread):
         StoppableThread.__init__(self, name="metric thread")
 
     @property
-    def stop_agent_if_fails(self):
+    def stop_agent_on_failure(self):
         """
         Return true if agent can not operate without this monitor and has to stop.
         """
-        return self._config["stop_agent_if_fails"]
+        return self._config["stop_agent_on_failure"]
 
     @property
     def uid(self):
