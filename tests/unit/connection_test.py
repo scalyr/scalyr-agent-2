@@ -85,7 +85,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                 expected_msg = (
                     r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
                     r"of '\*.scalyr.com', 'scalyr.com'"
-            )  # NOQA
+                )  # NOQA
 
             self.assertRaisesRegexp(
                 Exception,
@@ -108,7 +108,9 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
         )
         self.assertEqual(mock_log.warn.call_count, 1)
         self.assertEqual(mock_log.warn.call_count, 1)
-        self.assertTrue("SSL certificate for example.com" in mock_log.warn.call_args_list[0][0][0])
+        self.assertTrue(
+            "SSL certificate for example.com" in mock_log.warn.call_args_list[0][0][0]
+        )
 
     def _get_connection_cls(self, server):
         connection = ConnectionFactory.connection(

@@ -498,6 +498,10 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                     "SSL certificate for %s (%s:%s):\n%s"
                     % (self.host, self.host, self.port, pem_cert)
                 )
+            except Exception as e:
+                log.warn(
+                    "Failed to retrieve certificate for %s: %s" % (self.host, str(e))
+                )
             finally:
                 if sock:
                     sock.close()
