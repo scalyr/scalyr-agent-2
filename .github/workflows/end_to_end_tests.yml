@@ -227,7 +227,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && ( github.ref == 'refs/heads/master' || github.head_ref == 'master' ) }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' && ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
 
     strategy:
       fail-fast: false
