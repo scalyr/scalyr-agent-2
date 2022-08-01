@@ -25,7 +25,6 @@ import sys
 import ssl
 import socket
 
-from scalyr_agent.compat import PY26
 from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.connection import ConnectionFactory
 from scalyr_agent.connection import HTTPSConnectionWithTimeoutAndVerification
@@ -96,13 +95,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
-        if PY26:
-            # Under Python 2.6, error looks like this:
-            # [Errno 1] _ssl.c:498: error:14090086:SSL
-            # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
-            expected_msg = r"certificate verify failed"
-        else:
-            expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
         self.assertRaisesRegexp(
             Exception,
             expected_msg,
@@ -183,13 +176,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             socket.getaddrinfo = ORIGINAL_SOCKET_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
-        if PY26:
-            # Under Python 2.6, error looks like this:
-            # [Errno 1] _ssl.c:498: error:14090086:SSL
-            # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
-            expected_msg = r"certificate verify failed"
-        else:
-            expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
 
         connection = self._get_connection_cls(server="https://example.com:443")
         self.assertRaisesRegexp(
