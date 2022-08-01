@@ -25,6 +25,8 @@ import sys
 import ssl
 import socket
 
+import mock
+
 from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.connection import ConnectionFactory
 from scalyr_agent.connection import HTTPSConnectionWithTimeoutAndVerification
@@ -83,7 +85,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                 expected_msg = (
                     r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
                     r"of '\*.scalyr.com', 'scalyr.com'"
-                )  # NOQA
+            )  # NOQA
 
             self.assertRaisesRegexp(
                 Exception,
@@ -94,14 +96,19 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
         finally:
             socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
-    def test_connect_invalid_cert_failure(self):
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_invalid_cert_failure(self, mock_log):
         expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        self.assertEqual(mock_log.warn.call_count, 0)
         self.assertRaisesRegexp(
             Exception,
             expected_msg,
             self._get_connection_cls,
             server="https://example.com:443",
         )
+        self.assertEqual(mock_log.warn.call_count, 1)
+        self.assertEqual(mock_log.warn.call_count, 1)
+        self.assertTrue("SSL certificate for example.com" in mock_log.warn.call_args_list[0][0])
 
     def _get_connection_cls(self, server):
         connection = ConnectionFactory.connection(
