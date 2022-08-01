@@ -64,7 +64,8 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
             self.assertEqual(conn.sock.ca_certs, CA_FILE)
 
-    def test_connect_valid_cert_invalid_hostname_failure(self):
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_valid_cert_invalid_hostname_failure(self, mock_log):
         # TODO: Add the same tests but where we mock the host on system level (e.g. via
         # /etc/hosts entry)
         def mock_create_connection(address_pair, timeout, **kwargs):
@@ -87,11 +88,17 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                     r"of '\*.scalyr.com', 'scalyr.com'"
                 )  # NOQA
 
+            self.assertEqual(mock_log.warn.call_count, 0)
             self.assertRaisesRegexp(
                 Exception,
                 expected_msg,
                 self._get_connection_cls,
                 server="https://agent.invalid.scalyr.com:443",
+            )
+            self.assertEqual(mock_log.warn.call_count, 1)
+            self.assertTrue(
+                "SSL certificate for agent.invalid.scalyr.com"
+                in mock_log.warn.call_args_list[0][0][0]
             )
         finally:
             socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
@@ -106,7 +113,6 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             self._get_connection_cls,
             server="https://example.com:443",
         )
-        self.assertEqual(mock_log.warn.call_count, 1)
         self.assertEqual(mock_log.warn.call_count, 1)
         self.assertTrue(
             "SSL certificate for example.com" in mock_log.warn.call_args_list[0][0][0]
