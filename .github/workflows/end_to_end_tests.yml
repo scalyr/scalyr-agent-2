@@ -27,6 +27,13 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
+      - run: |
+          echo ${{ steps.skip_check.outputs.should_skip }}
+          echo ${{ github.event_name }}
+          echo ${{ github.head_ref }}
+          echo ${{ github.ref }}
+          
+
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
