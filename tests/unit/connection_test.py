@@ -24,8 +24,10 @@ import os
 import sys
 import ssl
 import socket
+import logging
 
-from scalyr_agent.compat import PY26
+import mock
+
 from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.connection import ConnectionFactory
 from scalyr_agent.connection import HTTPSConnectionWithTimeoutAndVerification
@@ -50,7 +52,10 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
     def tearDown(self):
         socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
-    def test_connect_valid_cert_and_hostname_success(self):
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_valid_cert_and_hostname_success(self, mock_log):
+        self.assertEqual(mock_log.log.call_count, 0)
+
         connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
 
         conn = connection._ScalyrHttpConnection__connection  # pylint: disable=no-member
@@ -63,7 +68,15 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
             self.assertEqual(conn.sock.ca_certs, CA_FILE)
 
-    def test_connect_valid_cert_invalid_hostname_failure(self):
+        self.assertEqual(mock_log.log.call_count, 1)
+        self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.DEBUG)
+        self.assertTrue(
+            "SSL certificate for agent.scalyr.com"
+            in mock_log.log.call_args_list[0][0][1]
+        )
+
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_valid_cert_invalid_hostname_failure(self, mock_log):
         # TODO: Add the same tests but where we mock the host on system level (e.g. via
         # /etc/hosts entry)
         def mock_create_connection(address_pair, timeout, **kwargs):
@@ -86,28 +99,36 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                     r"of '\*.scalyr.com', 'scalyr.com'"
                 )  # NOQA
 
+            self.assertEqual(mock_log.log.call_count, 0)
             self.assertRaisesRegexp(
                 Exception,
                 expected_msg,
                 self._get_connection_cls,
                 server="https://agent.invalid.scalyr.com:443",
             )
+            self.assertEqual(mock_log.log.call_count, 1)
+            self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
+            self.assertTrue(
+                "SSL certificate for agent.invalid.scalyr.com"
+                in mock_log.log.call_args_list[0][0][1]
+            )
         finally:
             socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
-    def test_connect_invalid_cert_failure(self):
-        if PY26:
-            # Under Python 2.6, error looks like this:
-            # [Errno 1] _ssl.c:498: error:14090086:SSL
-            # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
-            expected_msg = r"certificate verify failed"
-        else:
-            expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_invalid_cert_failure(self, mock_log):
+        expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        self.assertEqual(mock_log.log.call_count, 0)
         self.assertRaisesRegexp(
             Exception,
             expected_msg,
             self._get_connection_cls,
             server="https://example.com:443",
+        )
+        self.assertEqual(mock_log.log.call_count, 1)
+        self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
+        self.assertTrue(
+            "SSL certificate for example.com" in mock_log.log.call_args_list[0][0][1]
         )
 
     def _get_connection_cls(self, server):
@@ -183,13 +204,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             socket.getaddrinfo = ORIGINAL_SOCKET_CREATE_CONNECTION
 
     def test_connect_invalid_cert_failure(self):
-        if PY26:
-            # Under Python 2.6, error looks like this:
-            # [Errno 1] _ssl.c:498: error:14090086:SSL
-            # routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
-            expected_msg = r"certificate verify failed"
-        else:
-            expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
+        expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
 
         connection = self._get_connection_cls(server="https://example.com:443")
         self.assertRaisesRegexp(
